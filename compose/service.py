@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from collections import namedtuple
+from collections import OrderedDict
 from operator import attrgetter
 
 import enum
@@ -87,6 +88,7 @@ HOST_CONFIG_KEYS = [
     'pids_limit',
     'privileged',
     'restart',
+    'runtime',
     'security_opt',
     'shm_size',
     'storage_opt',
@@ -407,7 +409,8 @@ class Service(object):
 
             return containers
 
-    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start):
+    def _execute_convergence_recreate(self, containers, scale, timeout, detached, start,
+                                      renew_anonymous_volumes):
             if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
@@ -415,7 +418,7 @@ class Service(object):
             def recreate(container):
                 return self.recreate_container(
                     container, timeout=timeout, attach_logs=not detached,
-                    start_new_container=start
+                    start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
                 )
             containers, errors = parallel_execute(
                 containers,
@@ -466,7 +469,9 @@ class Service(object):
         )
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
-                                 start=True, scale_override=None, rescale=True, project_services=None):
+                                 start=True, scale_override=None,
+                                 rescale=True, project_services=None,
+                                 reset_container_image=False, renew_anonymous_volumes=False):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -484,8 +489,15 @@ class Service(object):
             scale = None
 
         if action == 'recreate':
+            if reset_container_image:
+                # Updating the image ID on the container object lets us recover old volumes if
+                # the new image uses them as well
+                img_id = self.image()['Id']
+                for c in containers:
+                    c.reset_image(img_id)
             return self._execute_convergence_recreate(
-                containers, scale, timeout, detached, start
+                containers, scale, timeout, detached, start,
+                renew_anonymous_volumes,
             )
 
         if action == 'start':
@@ -505,12 +517,8 @@ class Service(object):
 
         raise Exception("Invalid action: {}".format(action))
 
-    def recreate_container(
-            self,
-            container,
-            timeout=None,
-            attach_logs=False,
-            start_new_container=True):
+    def recreate_container(self, container, timeout=None, attach_logs=False, start_new_container=True,
+                           renew_anonymous_volumes=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -521,7 +529,7 @@ class Service(object):
         container.stop(timeout=self.stop_timeout(timeout))
         container.rename_to_tmp_name()
         new_container = self.create_container(
-            previous_container=container,
+            previous_container=container if not renew_anonymous_volumes else None,
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
         )
@@ -556,18 +564,25 @@ class Service(object):
             raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
+    @property
+    def prioritized_networks(self):
+        return OrderedDict(
+            sorted(
+                self.networks.items(),
+                key=lambda t: t[1].get('priority') or 0, reverse=True
+            )
+        )
+
     def connect_container_to_networks(self, container):
         connected_networks = container.get('NetworkSettings.Networks')
 
-        for network, netdefs in self.networks.items():
+        for network, netdefs in self.prioritized_networks.items():
             if network in connected_networks:
                 if short_id_alias_exists(container, network):
                     continue
+                self.client.disconnect_container_from_network(container.id, network)
 
-                self.client.disconnect_container_from_network(
-                    container.id,
-                    network)
-
+            log.debug('Connecting to {}'.format(network))
             self.client.connect_container_to_network(
                 container.id, network,
                 aliases=self._get_aliases(netdefs, container),
@@ -833,8 +848,14 @@ class Service(object):
         if version_gte(self.client.api_version, '1.30'):
             override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
         else:
-            override_options['binds'].extend(m.legacy_repr() for m in container_mounts)
-            container_options['volumes'].update((m.target, {}) for m in container_mounts)
+            # Workaround for 3.2 format
+            self.options['tmpfs'] = self.options.get('tmpfs') or []
+            for m in container_mounts:
+                if m.is_tmpfs:
+                    self.options['tmpfs'].append(m.target)
+                else:
+                    override_options['binds'].append(m.legacy_repr())
+                    container_options['volumes'][m.target] = {}
 
         secret_volumes = self.get_secret_volumes()
         if secret_volumes:
@@ -878,6 +899,7 @@ class Service(object):
             dns_opt=options.get('dns_opt'),
             dns_search=options.get('dns_search'),
             restart_policy=options.get('restart'),
+            runtime=options.get('runtime'),
             cap_add=options.get('cap_add'),
             cap_drop=options.get('cap_drop'),
             mem_limit=options.get('mem_limit'),
@@ -1343,7 +1365,7 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
             continue
 
         ctnr_mount = container_mounts.get(mount.target)
-        if not ctnr_mount.get('Name'):
+        if not ctnr_mount or not ctnr_mount.get('Name'):
             continue
 
         mount.source = ctnr_mount['Name']

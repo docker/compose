@@ -17,9 +17,11 @@ RUN set -ex; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl https://get.docker.com/builds/Linux/armel/docker-1.8.3 \
-        -o /usr/local/bin/docker && \
-    chmod +x /usr/local/bin/docker
+RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/armhf/docker-17.12.0-ce.tgz" && \
+    tar xvf dockerbins.tgz docker/docker --strip-components 1 && \
+    mv docker /usr/local/bin/docker && \
+    chmod +x /usr/local/bin/docker && \
+    rm dockerbins.tgz
 
 # Build Python 2.7.13 from source
 RUN set -ex; \

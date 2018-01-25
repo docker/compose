@@ -88,7 +88,7 @@
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
                 "args": {"$ref": "#/definitions/list_or_dict"},
-                "labels": {"$ref": "#/definitions/list_or_dict"},
+                "labels": {"$ref": "#/definitions/labels"},
                 "cache_from": {"$ref": "#/definitions/list_of_strings"},
                 "network": {"type": "string"}
               },
@@ -189,7 +189,7 @@
         "init": {"type": ["boolean", "string"]},
         "ipc": {"type": "string"},
         "isolation": {"type": "string"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
@@ -223,7 +223,8 @@
                         "aliases": {"$ref": "#/definitions/list_of_strings"},
                         "ipv4_address": {"type": "string"},
                         "ipv6_address": {"type": "string"},
-                        "link_local_ips": {"$ref": "#/definitions/list_of_strings"}
+                        "link_local_ips": {"$ref": "#/definitions/list_of_strings"},
+                        "priority": {"type": "number"}
                       },
                       "additionalProperties": false
                     },
@@ -357,7 +358,7 @@
         },
         "internal": {"type": "boolean"},
         "enable_ipv6": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "name": {"type": "string"}
       },
       "additionalProperties": false
@@ -381,7 +382,7 @@
           },
           "additionalProperties": false
         },
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "name": {"type": "string"}
       },
       "additionalProperties": false
@@ -407,6 +408,21 @@
           "patternProperties": {
             ".+": {
               "type": ["string", "number", "null"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      ]
+    },
+
+    "labels": {
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            ".+": {
+              "type": "string"
             }
           },
           "additionalProperties": false

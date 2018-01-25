@@ -158,7 +158,7 @@
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
-        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "labels": {"$ref": "#/definitions/labels"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
@@ -191,7 +191,8 @@
                       "properties": {
                         "aliases": {"$ref": "#/definitions/list_of_strings"},
                         "ipv4_address": {"type": "string"},
-                        "ipv6_address": {"type": "string"}
+                        "ipv6_address": {"type": "string"},
+                        "priority": {"type": "number"}
                       },
                       "additionalProperties": false
                     },
@@ -346,6 +347,21 @@
           "patternProperties": {
             ".+": {
               "type": ["string", "number", "null"]
+            }
+          },
+          "additionalProperties": false
+        },
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      ]
+    },
+
+    "labels": {
+      "oneOf": [
+        {
+          "type": "object",
+          "patternProperties": {
+            ".+": {
+              "type": "string"
             }
           },
           "additionalProperties": false

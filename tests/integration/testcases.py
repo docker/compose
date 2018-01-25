@@ -155,6 +155,18 @@ class DockerClientTestCase(unittest.TestCase):
         return self.client.inspect_volume(volumes[0]['Name'])
 
 
+def if_runtime_available(runtime):
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if runtime not in self.client.info().get('Runtimes', {}):
+                return pytest.skip("This daemon does not support the '{}'' runtime".format(runtime))
+            return f(self, *args, **kwargs)
+        return wrapper
+
+    return decorator
+
+
 def is_cluster(client):
     if SWARM_ASSUME_MULTINODE:
         return True

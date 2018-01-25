@@ -22,6 +22,7 @@ from compose.config.types import VolumeSpec
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
+from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_1 as V3_1
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
@@ -31,6 +32,7 @@ from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
 from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
+from tests.integration.testcases import if_runtime_available
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
@@ -61,7 +63,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         containers = project.containers()
-        self.assertEqual(len(containers), 2)
+        assert len(containers) == 2
 
     @pytest.mark.skipif(SWARM_SKIP_CONTAINERS_ALL, reason='Swarm /containers/json bug')
     def test_containers_stopped(self):
@@ -85,9 +87,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         containers = project.containers(['web'])
-        self.assertEqual(
-            [c.name for c in containers],
-            ['composetest_web_1'])
+        assert [c.name for c in containers] == ['composetest_web_1']
 
     def test_containers_with_extra_service(self):
         web = self.create_service('web')
@@ -99,10 +99,7 @@ class ProjectTest(DockerClientTestCase):
         self.create_service('extra').create_container()
 
         project = Project('composetest', [web, db], self.client)
-        self.assertEqual(
-            set(project.containers(stopped=True)),
-            set([web_1, db_1]),
-        )
+        assert set(project.containers(stopped=True)) == set([web_1, db_1])
 
     def test_volumes_from_service(self):
         project = Project.from_config(
@@ -121,7 +118,7 @@ class ProjectTest(DockerClientTestCase):
         )
         db = project.get_service('db')
         data = project.get_service('data')
-        self.assertEqual(db.volumes_from, [VolumeFromSpec(data, 'rw', 'service')])
+        assert db.volumes_from == [VolumeFromSpec(data, 'rw', 'service')]
 
     def test_volumes_from_container(self):
         data_container = Container.create(
@@ -143,7 +140,7 @@ class ProjectTest(DockerClientTestCase):
             client=self.client,
         )
         db = project.get_service('db')
-        self.assertEqual(db._get_volumes_from(), [data_container.id + ':rw'])
+        assert db._get_volumes_from() == [data_container.id + ':rw']
 
     @v2_only()
     @no_cluster('container networks not supported in Swarm')
@@ -171,7 +168,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web.network_mode.mode, 'container:' + net.containers()[0].id)
+        assert web.network_mode.mode == 'container:' + net.containers()[0].id
 
     @v2_only()
     @no_cluster('container networks not supported in Swarm')
@@ -210,7 +207,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web.network_mode.mode, 'container:' + net_container.id)
+        assert web.network_mode.mode == 'container:' + net_container.id
 
     @no_cluster('container networks not supported in Swarm')
     def test_net_from_service_v1(self):
@@ -234,7 +231,7 @@ class ProjectTest(DockerClientTestCase):
 
         web = project.get_service('web')
         net = project.get_service('net')
-        self.assertEqual(web.network_mode.mode, 'container:' + net.containers()[0].id)
+        assert web.network_mode.mode == 'container:' + net.containers()[0].id
 
     @no_cluster('container networks not supported in Swarm')
     def test_net_from_container_v1(self):
@@ -269,7 +266,7 @@ class ProjectTest(DockerClientTestCase):
         project.up()
 
         web = project.get_service('web')
-        self.assertEqual(web.network_mode.mode, 'container:' + net_container.id)
+        assert web.network_mode.mode == 'container:' + net_container.id
 
     def test_start_pause_unpause_stop_kill_remove(self):
         web = self.create_service('web')
@@ -278,53 +275,51 @@ class ProjectTest(DockerClientTestCase):
 
         project.start()
 
-        self.assertEqual(len(web.containers()), 0)
-        self.assertEqual(len(db.containers()), 0)
+        assert len(web.containers()) == 0
+        assert len(db.containers()) == 0
 
         web_container_1 = web.create_container()
         web_container_2 = web.create_container()
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        self.assertEqual(
-            set(c.name for c in project.containers() if c.is_running),
-            set([web_container_1.name, web_container_2.name]))
-
-        project.start()
-        self.assertEqual(
-            set(c.name for c in project.containers() if c.is_running),
-            set([web_container_1.name, web_container_2.name, db_container.name]))
-
-        project.pause(service_names=['web'])
-        self.assertEqual(
-            set([c.name for c in project.containers() if c.is_paused]),
-            set([web_container_1.name, web_container_2.name]))
-
-        project.pause()
-        self.assertEqual(
-            set([c.name for c in project.containers() if c.is_paused]),
-            set([web_container_1.name, web_container_2.name, db_container.name]))
-
-        project.unpause(service_names=['db'])
-        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 2)
-
-        project.unpause()
-        self.assertEqual(len([c.name for c in project.containers() if c.is_paused]), 0)
-
-        project.stop(service_names=['web'], timeout=1)
-        self.assertEqual(
-            set(c.name for c in project.containers() if c.is_running), set([db_container.name])
+        assert set(c.name for c in project.containers() if c.is_running) == set(
+            [web_container_1.name, web_container_2.name]
         )
 
+        project.start()
+        assert set(c.name for c in project.containers() if c.is_running) == set(
+            [web_container_1.name, web_container_2.name, db_container.name]
+        )
+
+        project.pause(service_names=['web'])
+        assert set([c.name for c in project.containers() if c.is_paused]) == set(
+            [web_container_1.name, web_container_2.name]
+        )
+
+        project.pause()
+        assert set([c.name for c in project.containers() if c.is_paused]) == set(
+            [web_container_1.name, web_container_2.name, db_container.name]
+        )
+
+        project.unpause(service_names=['db'])
+        assert len([c.name for c in project.containers() if c.is_paused]) == 2
+
+        project.unpause()
+        assert len([c.name for c in project.containers() if c.is_paused]) == 0
+
+        project.stop(service_names=['web'], timeout=1)
+        assert set(c.name for c in project.containers() if c.is_running) == set([db_container.name])
+
         project.kill(service_names=['db'])
-        self.assertEqual(len([c for c in project.containers() if c.is_running]), 0)
-        self.assertEqual(len(project.containers(stopped=True)), 3)
+        assert len([c for c in project.containers() if c.is_running]) == 0
+        assert len(project.containers(stopped=True)) == 3
 
         project.remove_stopped(service_names=['web'])
-        self.assertEqual(len(project.containers(stopped=True)), 1)
+        assert len(project.containers(stopped=True)) == 1
 
         project.remove_stopped()
-        self.assertEqual(len(project.containers(stopped=True)), 0)
+        assert len(project.containers(stopped=True)) == 0
 
     def test_create(self):
         web = self.create_service('web')
@@ -399,43 +394,43 @@ class ProjectTest(DockerClientTestCase):
         db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['db'])
-        self.assertEqual(len(project.containers()), 1)
-        self.assertEqual(len(db.containers()), 1)
-        self.assertEqual(len(web.containers()), 0)
+        assert len(project.containers()) == 1
+        assert len(db.containers()) == 1
+        assert len(web.containers()) == 0
 
     def test_project_up_starts_uncreated_services(self):
         db = self.create_service('db')
         web = self.create_service('web', links=[(db, 'db')])
         project = Project('composetest', [db, web], self.client)
         project.up(['db'])
-        self.assertEqual(len(project.containers()), 1)
+        assert len(project.containers()) == 1
 
         project.up()
-        self.assertEqual(len(project.containers()), 2)
-        self.assertEqual(len(db.containers()), 1)
-        self.assertEqual(len(web.containers()), 1)
+        assert len(project.containers()) == 2
+        assert len(db.containers()) == 1
+        assert len(web.containers()) == 1
 
     def test_recreate_preserves_volumes(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=[VolumeSpec.parse('/etc')])
         project = Project('composetest', [web, db], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['db'])
-        self.assertEqual(len(project.containers()), 1)
+        assert len(project.containers()) == 1
         old_db_id = project.containers()[0].id
         db_volume_path = project.containers()[0].get('Volumes./etc')
 
         project.up(strategy=ConvergenceStrategy.always)
-        self.assertEqual(len(project.containers()), 2)
+        assert len(project.containers()) == 2
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
-        self.assertNotEqual(db_container.id, old_db_id)
-        self.assertEqual(db_container.get('Volumes./etc'), db_volume_path)
+        assert db_container.id != old_db_id
+        assert db_container.get('Volumes./etc') == db_volume_path
 
     @v2_3_only()
     def test_recreate_preserves_mounts(self):
@@ -462,36 +457,34 @@ class ProjectTest(DockerClientTestCase):
         db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['db'])
-        self.assertEqual(len(project.containers()), 1)
+        assert len(project.containers()) == 1
         old_db_id = project.containers()[0].id
         container, = project.containers()
         db_volume_path = container.get_mount('/var/db')['Source']
 
         project.up(strategy=ConvergenceStrategy.never)
-        self.assertEqual(len(project.containers()), 2)
+        assert len(project.containers()) == 2
 
         db_container = [c for c in project.containers() if 'db' in c.name][0]
-        self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(
-            db_container.get_mount('/var/db')['Source'],
-            db_volume_path)
+        assert db_container.id == old_db_id
+        assert db_container.get_mount('/var/db')['Source'] == db_volume_path
 
     def test_project_up_with_no_recreate_stopped(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=[VolumeSpec.parse('/var/db')])
         project = Project('composetest', [web, db], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['db'])
         project.kill()
 
         old_containers = project.containers(stopped=True)
 
-        self.assertEqual(len(old_containers), 1)
+        assert len(old_containers) == 1
         old_container, = old_containers
         old_db_id = old_container.id
         db_volume_path = old_container.get_mount('/var/db')['Source']
@@ -499,26 +492,24 @@ class ProjectTest(DockerClientTestCase):
         project.up(strategy=ConvergenceStrategy.never)
 
         new_containers = project.containers(stopped=True)
-        self.assertEqual(len(new_containers), 2)
-        self.assertEqual([c.is_running for c in new_containers], [True, True])
+        assert len(new_containers) == 2
+        assert [c.is_running for c in new_containers] == [True, True]
 
         db_container = [c for c in new_containers if 'db' in c.name][0]
-        self.assertEqual(db_container.id, old_db_id)
-        self.assertEqual(
-            db_container.get_mount('/var/db')['Source'],
-            db_volume_path)
+        assert db_container.id == old_db_id
+        assert db_container.get_mount('/var/db')['Source'] == db_volume_path
 
     def test_project_up_without_all_services(self):
         console = self.create_service('console')
         db = self.create_service('db')
         project = Project('composetest', [console, db], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up()
-        self.assertEqual(len(project.containers()), 2)
-        self.assertEqual(len(db.containers()), 1)
-        self.assertEqual(len(console.containers()), 1)
+        assert len(project.containers()) == 2
+        assert len(db.containers()) == 1
+        assert len(console.containers()) == 1
 
     def test_project_up_starts_links(self):
         console = self.create_service('console')
@@ -527,13 +518,13 @@ class ProjectTest(DockerClientTestCase):
 
         project = Project('composetest', [web, db, console], self.client)
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['web'])
-        self.assertEqual(len(project.containers()), 2)
-        self.assertEqual(len(web.containers()), 1)
-        self.assertEqual(len(db.containers()), 1)
-        self.assertEqual(len(console.containers()), 0)
+        assert len(project.containers()) == 2
+        assert len(web.containers()) == 1
+        assert len(db.containers()) == 1
+        assert len(console.containers()) == 0
 
     def test_project_up_starts_depends(self):
         project = Project.from_config(
@@ -561,14 +552,14 @@ class ProjectTest(DockerClientTestCase):
             client=self.client,
         )
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['web'])
-        self.assertEqual(len(project.containers()), 3)
-        self.assertEqual(len(project.get_service('web').containers()), 1)
-        self.assertEqual(len(project.get_service('db').containers()), 1)
-        self.assertEqual(len(project.get_service('data').containers()), 1)
-        self.assertEqual(len(project.get_service('console').containers()), 0)
+        assert len(project.containers()) == 3
+        assert len(project.get_service('web').containers()) == 1
+        assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('data').containers()) == 1
+        assert len(project.get_service('console').containers()) == 0
 
     def test_project_up_with_no_deps(self):
         project = Project.from_config(
@@ -596,15 +587,15 @@ class ProjectTest(DockerClientTestCase):
             client=self.client,
         )
         project.start()
-        self.assertEqual(len(project.containers()), 0)
+        assert len(project.containers()) == 0
 
         project.up(['db'], start_deps=False)
-        self.assertEqual(len(project.containers(stopped=True)), 2)
-        self.assertEqual(len(project.get_service('web').containers()), 0)
-        self.assertEqual(len(project.get_service('db').containers()), 1)
-        self.assertEqual(len(project.get_service('data').containers(stopped=True)), 1)
+        assert len(project.containers(stopped=True)) == 2
+        assert len(project.get_service('web').containers()) == 0
+        assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('data').containers(stopped=True)) == 1
         assert not project.get_service('data').containers(stopped=True)[0].is_running
-        self.assertEqual(len(project.get_service('console').containers()), 0)
+        assert len(project.get_service('console').containers()) == 0
 
     def test_project_up_recreate_with_tmpfs_volume(self):
         # https://github.com/docker/compose/issues/4751
@@ -632,22 +623,22 @@ class ProjectTest(DockerClientTestCase):
 
         service = project.get_service('web')
         service.scale(1)
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
         service.scale(3)
-        self.assertEqual(len(service.containers()), 3)
+        assert len(service.containers()) == 3
         project.up()
         service = project.get_service('web')
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
         service.scale(1)
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
         project.up(scale_override={'web': 3})
         service = project.get_service('web')
-        self.assertEqual(len(service.containers()), 3)
+        assert len(service.containers()) == 3
         # does scale=0 ,makes any sense? after recreating at least 1 container is running
         service.scale(0)
         project.up()
         service = project.get_service('web')
-        self.assertEqual(len(service.containers()), 1)
+        assert len(service.containers()) == 1
 
     @v2_only()
     def test_project_up_networks(self):
@@ -832,11 +823,76 @@ class ProjectTest(DockerClientTestCase):
 
         service_container = project.get_service('web').containers()[0]
 
-        IPAMConfig = (service_container.inspect().get('NetworkSettings', {}).
-                      get('Networks', {}).get('composetest_static_test', {}).
-                      get('IPAMConfig', {}))
-        assert IPAMConfig.get('IPv4Address') == '172.16.100.100'
-        assert IPAMConfig.get('IPv6Address') == 'fe80::1001:102'
+        ipam_config = (service_container.inspect().get('NetworkSettings', {}).
+                       get('Networks', {}).get('composetest_static_test', {}).
+                       get('IPAMConfig', {}))
+        assert ipam_config.get('IPv4Address') == '172.16.100.100'
+        assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
+
+    @v2_3_only()
+    def test_up_with_network_priorities(self):
+        mac_address = '74:6f:75:68:6f:75'
+
+        def get_config_data(p1, p2, p3):
+            return build_config(
+                version=V2_3,
+                services=[{
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'networks': {
+                        'n1': {
+                            'priority': p1,
+                        },
+                        'n2': {
+                            'priority': p2,
+                        },
+                        'n3': {
+                            'priority': p3,
+                        }
+                    },
+                    'command': 'top',
+                    'mac_address': mac_address
+                }],
+                networks={
+                    'n1': {},
+                    'n2': {},
+                    'n3': {}
+                }
+            )
+
+        config1 = get_config_data(1000, 1, 1)
+        config2 = get_config_data(2, 3, 1)
+        config3 = get_config_data(5, 40, 100)
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config1
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n1']
+        assert net_config['MacAddress'] == mac_address
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config2
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n2']
+        assert net_config['MacAddress'] == mac_address
+
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config3
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers()[0]
+        net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n3']
+        assert net_config['MacAddress'] == mac_address
 
     @v2_1_only()
     def test_up_with_enable_ipv6(self):
@@ -915,7 +971,7 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
         )
 
-        with self.assertRaises(ProjectError):
+        with pytest.raises(ProjectError):
             project.up()
 
     @v2_1_only()
@@ -1026,8 +1082,69 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data
         )
-        with self.assertRaises(ProjectError):
+        with pytest.raises(ProjectError):
             project.up()
+
+    @v2_3_only()
+    @if_runtime_available('runc')
+    def test_up_with_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'runc'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'runc'
+
+    @v2_3_only()
+    def test_up_with_invalid_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'foobar'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+    @v2_3_only()
+    @if_runtime_available('nvidia')
+    def test_up_with_nvidia_runtime(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'nvidia'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'nvidia'
 
     @v2_only()
     def test_project_up_with_network_internal(self):
@@ -1109,11 +1226,11 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data, client=self.client
         )
         project.up()
-        self.assertEqual(len(project.containers()), 1)
+        assert len(project.containers()) == 1
 
         volume_data = self.get_volume_data(full_vol_name)
         assert volume_data['Name'].split('/')[-1] == full_vol_name
-        self.assertEqual(volume_data['Driver'], 'local')
+        assert volume_data['Driver'] == 'local'
 
     @v2_1_only()
     def test_project_up_with_volume_labels(self):
@@ -1202,12 +1319,12 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
         containers = project.containers()
-        self.assertEqual(len(containers), 2)
+        assert len(containers) == 2
 
         another = project.get_service('another').containers()[0]
         log_config = another.get('HostConfig.LogConfig')
-        self.assertTrue(log_config)
-        self.assertEqual(log_config.get('Type'), 'none')
+        assert log_config
+        assert log_config.get('Type') == 'none'
 
     @v2_only()
     def test_project_up_port_mappings_with_multiple_files(self):
@@ -1243,7 +1360,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.up()
         containers = project.containers()
-        self.assertEqual(len(containers), 1)
+        assert len(containers) == 1
 
     @v2_2_only()
     def test_project_up_config_scale(self):
@@ -1319,7 +1436,7 @@ class ProjectTest(DockerClientTestCase):
 
         volume_data = self.get_volume_data(full_vol_name)
         assert volume_data['Name'].split('/')[-1] == full_vol_name
-        self.assertEqual(volume_data['Driver'], 'local')
+        assert volume_data['Driver'] == 'local'
 
     @v3_only()
     def test_project_up_with_secrets(self):
@@ -1376,7 +1493,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data, client=self.client
         )
-        with self.assertRaises(APIError if is_cluster(self.client) else config.ConfigurationError):
+        with pytest.raises(APIError if is_cluster(self.client) else config.ConfigurationError):
             project.volumes.initialize()
 
     @v2_only()
@@ -1402,7 +1519,7 @@ class ProjectTest(DockerClientTestCase):
 
         volume_data = self.get_volume_data(full_vol_name)
         assert volume_data['Name'].split('/')[-1] == full_vol_name
-        self.assertEqual(volume_data['Driver'], 'local')
+        assert volume_data['Driver'] == 'local'
 
         config_data = config_data._replace(
             volumes={vol_name: {'driver': 'smb'}}
@@ -1412,11 +1529,11 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data,
             client=self.client
         )
-        with self.assertRaises(config.ConfigurationError) as e:
+        with pytest.raises(config.ConfigurationError) as e:
             project.volumes.initialize()
         assert 'Configuration for volume {0} specifies driver smb'.format(
             vol_name
-        ) in str(e.exception)
+        ) in str(e.value)
 
     @v2_only()
     def test_initialize_volumes_updated_blank_driver(self):
@@ -1440,7 +1557,7 @@ class ProjectTest(DockerClientTestCase):
 
         volume_data = self.get_volume_data(full_vol_name)
         assert volume_data['Name'].split('/')[-1] == full_vol_name
-        self.assertEqual(volume_data['Driver'], 'local')
+        assert volume_data['Driver'] == 'local'
 
         config_data = config_data._replace(
             volumes={vol_name: {}}
@@ -1453,7 +1570,7 @@ class ProjectTest(DockerClientTestCase):
         project.volumes.initialize()
         volume_data = self.get_volume_data(full_vol_name)
         assert volume_data['Name'].split('/')[-1] == full_vol_name
-        self.assertEqual(volume_data['Driver'], 'local')
+        assert volume_data['Driver'] == 'local'
 
     @v2_only()
     @no_cluster('inspect volume by name defect on Swarm Classic')
@@ -1479,7 +1596,7 @@ class ProjectTest(DockerClientTestCase):
         )
         project.volumes.initialize()
 
-        with self.assertRaises(NotFound):
+        with pytest.raises(NotFound):
             self.client.inspect_volume(full_vol_name)
 
     @v2_only()
@@ -1501,11 +1618,11 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=config_data, client=self.client
         )
-        with self.assertRaises(config.ConfigurationError) as e:
+        with pytest.raises(config.ConfigurationError) as e:
             project.volumes.initialize()
         assert 'Volume {0} declared as external'.format(
             vol_name
-        ) in str(e.exception)
+        ) in str(e.value)
 
     @v2_only()
     def test_project_up_named_volumes_in_binds(self):
@@ -1534,10 +1651,10 @@ class ProjectTest(DockerClientTestCase):
             name='composetest', config_data=config_data, client=self.client
         )
         service = project.services[0]
-        self.assertEqual(service.name, 'simple')
+        assert service.name == 'simple'
         volumes = service.options.get('volumes')
-        self.assertEqual(len(volumes), 1)
-        self.assertEqual(volumes[0].external, full_vol_name)
+        assert len(volumes) == 1
+        assert volumes[0].external == full_vol_name
         project.up()
         engine_volumes = self.client.volumes()['Volumes']
         container = service.get_container()
@@ -1580,6 +1697,31 @@ class ProjectTest(DockerClientTestCase):
             ctnr for ctnr in project._labeled_containers()
             if ctnr.labels.get(LABEL_SERVICE) == 'service1'
         ]) == 0
+
+    def test_project_up_ignore_orphans(self):
+        config_dict = {
+            'service1': {
+                'image': 'busybox:latest',
+                'command': 'top',
+            }
+        }
+
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+        config_dict['service2'] = config_dict['service1']
+        del config_dict['service1']
+
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with mock.patch('compose.project.log') as mock_log:
+            project.up(ignore_orphans=True)
+
+        mock_log.warning.assert_not_called()
 
     @v2_1_only()
     def test_project_up_healthy_dependency(self):

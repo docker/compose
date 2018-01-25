@@ -48,6 +48,31 @@ __docker_compose_has_option() {
 	return 1
 }
 
+# Returns `key` if we are currently completing the value of a map option (`key=value`)
+# which matches the extglob passed in as an argument.
+# This function is needed for key-specific completions.
+__docker_compose_map_key_of_current_option() {
+        local glob="$1"
+
+        local key glob_pos
+        if [ "$cur" = "=" ] ; then        # key= case
+                key="$prev"
+                glob_pos=$((cword - 2))
+        elif [[ $cur == *=* ]] ; then     # key=value case (OSX)
+                key=${cur%=*}
+                glob_pos=$((cword - 1))
+        elif [ "$prev" = "=" ] ; then
+                key=${words[$cword - 2]}  # key=value case
+                glob_pos=$((cword - 3))
+        else
+                return
+        fi
+
+        [ "${words[$glob_pos]}" = "=" ] && ((glob_pos--))  # --option=key=value syntax
+
+        [[ ${words[$glob_pos]} == @($glob) ]] && echo "$key"
+}
+
 # suppress trailing whitespace
 __docker_compose_nospace() {
 	# compopt is not available in ancient bash versions
@@ -64,48 +89,32 @@ __docker_compose_services_all() {
 	COMPREPLY=( $(compgen -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
 }
 
-# All services that have an entry with the given key in their compose_file section
-___docker_compose_services_with_key() {
-	# flatten sections under "services" to one line, then filter lines containing the key and return section name
-	__docker_compose_q config \
-		| sed -n -e '/^services:/,/^[^ ]/p' \
-		| sed -n 's/^  //p' \
-		| awk '/^[a-zA-Z0-9]/{printf "\n"};{printf $0;next;}' \
-		| awk -F: -v key=": +$1:" '$0 ~ key {print $1}'
-}
-
 # All services that are defined by a Dockerfile reference
 __docker_compose_services_from_build() {
-	COMPREPLY=( $(compgen -W "$(___docker_compose_services_with_key build)" -- "$cur") )
+	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "source=build")" -- "$cur") )
 }
 
 # All services that are defined by an image
 __docker_compose_services_from_image() {
-	COMPREPLY=( $(compgen -W "$(___docker_compose_services_with_key image)" -- "$cur") )
-}
-
-# The services for which containers have been created, optionally filtered
-# by a boolean expression passed in as argument.
-__docker_compose_services_with() {
-	local containers names
-	containers="$(__docker_compose_q ps -q)"
-	names=$(docker 2>/dev/null inspect -f "{{if ${1:-true}}}{{range \$k, \$v := .Config.Labels}}{{if eq \$k \"com.docker.compose.service\"}}{{\$v}}{{end}}{{end}}{{end}}" $containers)
-	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
+	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "source=image")" -- "$cur") )
 }
 
 # The services for which at least one paused container exists
 __docker_compose_services_paused() {
-	__docker_compose_services_with '.State.Paused'
+	names=$(__docker_compose_q ps --services --filter "status=paused")
+	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one running container exists
 __docker_compose_services_running() {
-	__docker_compose_services_with '.State.Running'
+	names=$(__docker_compose_q ps --services --filter "status=running")
+	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 # The services for which at least one stopped container exists
 __docker_compose_services_stopped() {
-	__docker_compose_services_with 'not .State.Running'
+	names=$(__docker_compose_q ps --services --filter "status=stopped")
+	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
 
@@ -194,11 +203,14 @@ _docker_compose_down() {
 			COMPREPLY=( $( compgen -W "all local" -- "$cur" ) )
 			return
 			;;
+		--timeout|-t)
+			return
+			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --rmi --volumes -v --remove-orphans" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --rmi --timeout -t --volumes -v --remove-orphans" -- "$cur" ) )
 			;;
 	esac
 }
@@ -327,9 +339,29 @@ _docker_compose_port() {
 
 
 _docker_compose_ps() {
+	local key=$(__docker_compose_map_key_of_current_option '--filter')
+	case "$key" in
+		source)
+			COMPREPLY=( $( compgen -W "build image" -- "${cur##*=}" ) )
+			return
+			;;
+		status)
+			COMPREPLY=( $( compgen -W "paused restarting running stopped" -- "${cur##*=}" ) )
+			return
+			;;
+	esac
+
+	case "$prev" in
+		--filter)
+			COMPREPLY=( $( compgen -W "source status" -S "=" -- "$cur" ) )
+			__docker_compose_nospace
+			return;
+			;;
+	esac
+
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help -q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help -q --services --filter" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all

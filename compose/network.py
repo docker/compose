@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+from collections import OrderedDict
 
 from docker.errors import NotFound
 from docker.types import IPAMConfig
@@ -286,4 +287,7 @@ def get_networks(service_dict, network_definitions):
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
 
-    return networks
+    return OrderedDict(sorted(
+        networks.items(),
+        key=lambda t: t[1].get('priority') or 0, reverse=True
+    ))

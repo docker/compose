@@ -1,0 +1,62 @@
+version: 2
+jobs:
+  test:
+    macos:
+      xcode: "8.3.3"
+    steps:
+    - checkout
+#    - run:
+#        name: install python3
+#        command: brew install python3
+    - run:
+        name: install tox
+        command: sudo pip install --upgrade tox==2.1.1
+    - run:
+        name: unit tests
+        command: tox -e py27 -- tests/unit
+
+  build-osx-binary:
+    macos:
+      xcode: "8.3.3"
+    steps:
+      - checkout
+      - run:
+          name: upgrade python tools
+          command: sudo pip install --upgrade pip virtualenv
+      - run:
+         name: setup script
+         command: ./script/setup/osx
+      - run:
+         name: build script
+         command: ./script/build/osx
+      - store_artifacts:
+          path: dist/docker-compose-Darwin-x86_64
+          destination: docker-compose-Darwin-x86_64
+      - deploy:
+          name: Deploy binary to bintray
+          command: |
+            OS_NAME=Darwin PKG_NAME=osx ./script/circle/bintray-deploy.sh
+
+
+  build-linux-binary:
+    machine:
+      enabled: true
+    steps:
+      - checkout
+      - run:
+          name: build Linux binary
+          command: ./script/build/linux
+      - store_artifacts:
+          path: dist/docker-compose-Linux-x86_64
+          destination: docker-compose-Linux-x86_64
+      - deploy:
+          name: Deploy binary to bintray
+          command: |
+            OS_NAME=Linux PKG_NAME=linux ./script/circle/bintray-deploy.sh
+workflows:
+  version: 2
+  all:
+    jobs:
+      - test
+      - build-linux-binary
+      - build-osx-binary

@@ -4,6 +4,7 @@ Types for objects parsed from the configuration.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import ntpath
 import os
 import re
 from collections import namedtuple
@@ -145,9 +146,10 @@ class MountSpec(object):
     _fields = ['type', 'source', 'target', 'read_only', 'consistency']
 
     @classmethod
-    def parse(cls, mount_dict, normalize=False):
+    def parse(cls, mount_dict, normalize=False, win_host=False):
+        normpath = ntpath.normpath if win_host else os.path.normpath
         if mount_dict.get('source'):
-            mount_dict['source'] = os.path.normpath(mount_dict['source'])
+            mount_dict['source'] = normpath(mount_dict['source'])
             if normalize:
                 mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
 
@@ -184,11 +186,16 @@ class MountSpec(object):
         return self.type == 'volume' and self.source
 
     @property
+    def is_tmpfs(self):
+        return self.type == 'tmpfs'
+
+    @property
     def external(self):
         return self.source
 
 
 class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
+    win32 = False
 
     @classmethod
     def _parse_unix(cls, volume_config):
@@ -232,7 +239,7 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
         else:
             external = parts[0]
             parts = separate_next_section(parts[1])
-            external = os.path.normpath(external)
+            external = ntpath.normpath(external)
             internal = parts[0]
             if len(parts) > 1:
                 if ':' in parts[1]:
@@ -245,14 +252,16 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
         if normalize:
             external = normalize_path_for_engine(external) if external else None
 
-        return cls(external, internal, mode)
+        result = cls(external, internal, mode)
+        result.win32 = True
+        return result
 
     @classmethod
-    def parse(cls, volume_config, normalize=False):
+    def parse(cls, volume_config, normalize=False, win_host=False):
         """Parse a volume_config path and split it into external:internal[:mode]
         parts to be returned as a valid VolumeSpec.
         """
-        if IS_WINDOWS_PLATFORM:
+        if IS_WINDOWS_PLATFORM or win_host:
             return cls._parse_win32(volume_config, normalize)
         else:
             return cls._parse_unix(volume_config)
@@ -265,7 +274,7 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
     @property
     def is_named_volume(self):
         res = self.external and not self.external.startswith(('.', '/', '~'))
-        if not IS_WINDOWS_PLATFORM:
+        if not self.win32:
             return res
 
         return (
@@ -402,6 +411,35 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 
     def legacy_repr(self):
         return normalize_port_dict(self.repr())
+
+
+class GenericResource(namedtuple('_GenericResource', 'kind value')):
+    @classmethod
+    def parse(cls, dct):
+        if 'discrete_resource_spec' not in dct:
+            raise ConfigurationError(
+                'generic_resource entry must include a discrete_resource_spec key'
+            )
+        if 'kind' not in dct['discrete_resource_spec']:
+            raise ConfigurationError(
+                'generic_resource entry must include a discrete_resource_spec.kind subkey'
+            )
+        return cls(
+            dct['discrete_resource_spec']['kind'],
+            dct['discrete_resource_spec'].get('value')
+        )
+
+    def repr(self):
+        return {
+            'discrete_resource_spec': {
+                'kind': self.kind,
+                'value': self.value,
+            }
+        }
+
+    @property
+    def merge_field(self):
+        return self.kind
 
 
 def normalize_port_dict(port):

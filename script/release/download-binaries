@@ -33,5 +33,7 @@ wget -O $DESTINATION/docker-compose-Windows-x86_64.exe $APPVEYOR_URL
 
 echo -e "\n\nCopy the following lines into the integrity check table in the release notes:\n\n"
 cd $DESTINATION
+rm -rf *.sha256
 ls | xargs sha256sum | sed 's/  / | /g' | sed -r 's/([^ |]+)/`\1`/g'
+ls | xargs -I@ bash -c "sha256sum @ | cut -d' ' -f1 > @.sha256"
 cd -

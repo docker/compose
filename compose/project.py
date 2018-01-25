@@ -7,6 +7,7 @@ import operator
 from functools import reduce
 
 import enum
+import six
 from docker.errors import APIError
 
 from . import parallel
@@ -330,9 +331,16 @@ class Project(object):
             service_names, stopped=True, one_off=one_off
         ), options)
 
-    def down(self, remove_image_type, include_volumes, remove_orphans=False, timeout=None):
+    def down(
+            self,
+            remove_image_type,
+            include_volumes,
+            remove_orphans=False,
+            timeout=None,
+            ignore_orphans=False):
         self.stop(one_off=OneOffFilter.include, timeout=timeout)
-        self.find_orphan_containers(remove_orphans)
+        if not ignore_orphans:
+            self.find_orphan_containers(remove_orphans)
         self.remove_stopped(v=include_volumes, one_off=OneOffFilter.include)
 
         self.networks.remove()
@@ -432,14 +440,17 @@ class Project(object):
            timeout=None,
            detached=False,
            remove_orphans=False,
+           ignore_orphans=False,
            scale_override=None,
            rescale=True,
-           start=True):
-
-        warn_for_swarm_mode(self.client)
+           start=True,
+           always_recreate_deps=False,
+           reset_container_image=False,
+           renew_anonymous_volumes=False):
 
         self.initialize()
-        self.find_orphan_containers(remove_orphans)
+        if not ignore_orphans:
+            self.find_orphan_containers(remove_orphans)
 
         if scale_override is None:
             scale_override = {}
@@ -450,7 +461,8 @@ class Project(object):
 
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
-        plans = self._get_convergence_plans(services, strategy)
+        plans = self._get_convergence_plans(
+            services, strategy, always_recreate_deps=always_recreate_deps)
         scaled_services = self.get_scaled_services(services, scale_override)
 
         def do(service):
@@ -462,7 +474,9 @@ class Project(object):
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
                 start=start,
-                project_services=scaled_services
+                project_services=scaled_services,
+                reset_container_image=reset_container_image,
+                renew_anonymous_volumes=renew_anonymous_volumes,
             )
 
         def get_deps(service):
@@ -494,7 +508,7 @@ class Project(object):
         self.networks.initialize()
         self.volumes.initialize()
 
-    def _get_convergence_plans(self, services, strategy):
+    def _get_convergence_plans(self, services, strategy, always_recreate_deps=False):
         plans = {}
 
         for service in services:
@@ -509,7 +523,13 @@ class Project(object):
                 log.debug('%s has upstream changes (%s)',
                           service.name,
                           ", ".join(updated_dependencies))
-                plan = service.convergence_plan(ConvergenceStrategy.always)
+                containers_stopped = any(
+                    service.containers(stopped=True, filters={'status': ['created', 'exited']}))
+                has_links = any(c.get('HostConfig.Links') for c in service.containers())
+                if always_recreate_deps or containers_stopped or not has_links:
+                    plan = service.convergence_plan(ConvergenceStrategy.always)
+                else:
+                    plan = service.convergence_plan(strategy)
             else:
                 plan = service.convergence_plan(strategy)
 
@@ -668,24 +688,10 @@ def get_secrets(service, service_secrets, secret_defs):
     return secrets
 
 
-def warn_for_swarm_mode(client):
-    info = client.info()
-    if info.get('Swarm', {}).get('LocalNodeState') == 'active':
-        if info.get('ServerVersion', '').startswith('ucp'):
-            # UCP does multi-node scheduling with traditional Compose files.
-            return
-
-        log.warn(
-            "The Docker Engine you're using is running in swarm mode.\n\n"
-            "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
-            "All containers will be scheduled on the current node.\n\n"
-            "To deploy your application across the swarm, "
-            "use `docker stack deploy`.\n"
-        )
-
-
 class NoSuchService(Exception):
     def __init__(self, name):
+        if isinstance(name, six.binary_type):
+            name = name.decode('utf-8')
         self.name = name
         self.msg = "No such service: %s" % self.name
 

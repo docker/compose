@@ -10,6 +10,7 @@ import six
 from . import errors
 from . import verbose_proxy
 from .. import config
+from .. import parallel
 from ..config.environment import Environment
 from ..const import API_VERSIONS
 from ..project import Project
@@ -23,6 +24,8 @@ log = logging.getLogger(__name__)
 
 def project_from_options(project_dir, options):
     environment = Environment.from_env_file(project_dir)
+    set_parallel_limit(environment)
+
     host = options.get('--host')
     if host is not None:
         host = host.lstrip('=')
@@ -32,10 +35,26 @@ def project_from_options(project_dir, options):
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         host=host,
-        tls_config=tls_config_from_options(options),
+        tls_config=tls_config_from_options(options, environment),
         environment=environment,
         override_dir=options.get('--project-directory'),
     )
+
+
+def set_parallel_limit(environment):
+    parallel_limit = environment.get('COMPOSE_PARALLEL_LIMIT')
+    if parallel_limit:
+        try:
+            parallel_limit = int(parallel_limit)
+        except ValueError:
+            raise errors.UserError(
+                'COMPOSE_PARALLEL_LIMIT must be an integer (found: "{}")'.format(
+                    environment.get('COMPOSE_PARALLEL_LIMIT')
+                )
+            )
+        if parallel_limit <= 1:
+            raise errors.UserError('COMPOSE_PARALLEL_LIMIT can not be less than 2')
+        parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
 def get_config_from_options(base_dir, options):

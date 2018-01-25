@@ -19,6 +19,7 @@ from ..const import COMPOSEFILE_V2_1 as V2_1
 from ..const import COMPOSEFILE_V3_0 as V3_0
 from ..const import COMPOSEFILE_V3_4 as V3_4
 from ..utils import build_string_dict
+from ..utils import json_hash
 from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
@@ -98,6 +99,7 @@ DOCKER_CONFIG_KEYS = [
     'privileged',
     'read_only',
     'restart',
+    'runtime',
     'secrets',
     'security_opt',
     'shm_size',
@@ -814,11 +816,12 @@ def finalize_service_volumes(service_dict, environment):
     if 'volumes' in service_dict:
         finalized_volumes = []
         normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
+        win_host = environment.get_boolean('COMPOSE_FORCE_WINDOWS_HOST')
         for v in service_dict['volumes']:
             if isinstance(v, dict):
-                finalized_volumes.append(MountSpec.parse(v, normalize))
+                finalized_volumes.append(MountSpec.parse(v, normalize, win_host))
             else:
-                finalized_volumes.append(VolumeSpec.parse(v, normalize))
+                finalized_volumes.append(VolumeSpec.parse(v, normalize, win_host))
         service_dict['volumes'] = finalized_volumes
 
     return service_dict
@@ -920,9 +923,13 @@ class MergeDict(dict):
             self.base.get(field, default),
             self.override.get(field, default))
 
-    def merge_mapping(self, field, parse_func):
+    def merge_mapping(self, field, parse_func=None):
         if not self.needs_merge(field):
             return
+
+        if parse_func is None:
+            def parse_func(m):
+                return m or {}
 
         self[field] = parse_func(self.base.get(field))
         self[field].update(parse_func(self.override.get(field)))
@@ -955,7 +962,6 @@ def merge_service_dicts(base, override, version):
     md.merge_sequence('links', ServiceLink.parse)
     md.merge_sequence('secrets', types.ServiceSecret.parse)
     md.merge_sequence('configs', types.ServiceConfig.parse)
-    md.merge_mapping('deploy', parse_deploy)
     md.merge_mapping('extra_hosts', parse_extra_hosts)
 
     for field in ['volumes', 'devices']:
@@ -974,6 +980,7 @@ def merge_service_dicts(base, override, version):
     merge_ports(md, base, override)
     md.merge_field('blkio_config', merge_blkio_config, default={})
     md.merge_field('healthcheck', merge_healthchecks, default={})
+    md.merge_field('deploy', merge_deploy, default={})
 
     for field in set(ALLOWED_KEYS) - set(md):
         md.merge_scalar(field)
@@ -1035,6 +1042,41 @@ def merge_build(output, base, override):
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('extra_hosts', parse_extra_hosts)
     return dict(md)
+
+
+def merge_deploy(base, override):
+    md = MergeDict(base or {}, override or {})
+    md.merge_scalar('mode')
+    md.merge_scalar('endpoint_mode')
+    md.merge_scalar('replicas')
+    md.merge_mapping('labels', parse_labels)
+    md.merge_mapping('update_config')
+    md.merge_mapping('restart_policy')
+    if md.needs_merge('resources'):
+        resources_md = MergeDict(md.base.get('resources') or {}, md.override.get('resources') or {})
+        resources_md.merge_mapping('limits')
+        resources_md.merge_field('reservations', merge_reservations, default={})
+        md['resources'] = dict(resources_md)
+    if md.needs_merge('placement'):
+        placement_md = MergeDict(md.base.get('placement') or {}, md.override.get('placement') or {})
+        placement_md.merge_field('constraints', merge_unique_items_lists, default=[])
+        placement_md.merge_field('preferences', merge_unique_objects_lists, default=[])
+        md['placement'] = dict(placement_md)
+
+    return dict(md)
+
+
+def merge_reservations(base, override):
+    md = MergeDict(base, override)
+    md.merge_scalar('cpus')
+    md.merge_scalar('memory')
+    md.merge_sequence('generic_resources', types.GenericResource.parse)
+    return dict(md)
+
+
+def merge_unique_objects_lists(base, override):
+    result = dict((json_hash(i), i) for i in base + override)
+    return [i[1] for i in sorted([(k, v) for k, v in result.items()], key=lambda x: x[0])]
 
 
 def merge_blkio_config(base, override):
@@ -1123,7 +1165,6 @@ parse_sysctls = functools.partial(parse_dict_or_list, split_kv, 'sysctls')
 parse_depends_on = functools.partial(
     parse_dict_or_list, lambda k: (k, {'condition': 'service_started'}), 'depends_on'
 )
-parse_deploy = functools.partial(parse_dict_or_list, split_kv, 'deploy')
 
 
 def parse_flat_dict(d):

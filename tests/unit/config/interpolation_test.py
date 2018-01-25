@@ -1,13 +1,16 @@
+# encoding: utf-8
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import pytest
 
 from compose.config.environment import Environment
+from compose.config.errors import ConfigurationError
 from compose.config.interpolation import interpolate_environment_variables
 from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
 from compose.config.interpolation import TemplateWithDefaults
+from compose.config.interpolation import UnsetRequiredSubstitution
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_4 as V3_4
@@ -106,7 +109,7 @@ def test_interpolate_environment_variables_in_secrets(mock_env):
         'secretservice': {
             'file': 'bar',
             'labels': {
-                'max': 2,
+                'max': '2',
                 'user': 'jenny'
             }
         },
@@ -254,6 +257,30 @@ def test_interpolate_environment_services_convert_types_v3(mock_env):
     assert value == expected
 
 
+def test_interpolate_environment_services_convert_types_invalid(mock_env):
+    entry = {'service1': {'privileged': '${POSINT}'}}
+
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.privileged to '\
+        'appropriate type: "50" is not a valid boolean value' in exc.exconly()
+
+    entry = {'service1': {'cpus': '${TRUE}'}}
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.cpus to '\
+        'appropriate type: "True" is not a valid float' in exc.exconly()
+
+    entry = {'service1': {'ulimits': {'nproc': '${FLOAT}'}}}
+    with pytest.raises(ConfigurationError) as exc:
+        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+
+    assert 'Error while attempting to convert service.service1.ulimits.nproc to '\
+        'appropriate type: "0.145" is not a valid integer' in exc.exconly()
+
+
 def test_interpolate_environment_network_convert_types(mock_env):
     entry = {
         'network1': {
@@ -332,9 +359,57 @@ def test_interpolate_with_value(defaults_interpolator):
 def test_interpolate_missing_with_default(defaults_interpolator):
     assert defaults_interpolator("ok ${missing:-def}") == "ok def"
     assert defaults_interpolator("ok ${missing-def}") == "ok def"
-    assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
 
 
 def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR:-def}") == "ok def"
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
+
+
+def test_interpolate_mandatory_values(defaults_interpolator):
+    assert defaults_interpolator("ok ${FOO:?bar}") == "ok first"
+    assert defaults_interpolator("ok ${FOO?bar}") == "ok first"
+    assert defaults_interpolator("ok ${BAR?bar}") == "ok "
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAR:?high bar}")
+    assert e.value.err == 'high bar'
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAZ?dropped the bazz}")
+    assert e.value.err == 'dropped the bazz'
+
+
+def test_interpolate_mandatory_no_err_msg(defaults_interpolator):
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAZ?}")
+
+    assert e.value.err == ''
+
+
+def test_interpolate_mixed_separators(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:-/non:-alphanumeric}") == "ok /non:-alphanumeric"
+    assert defaults_interpolator("ok ${BAR:-:?wwegegr??:?}") == "ok :?wwegegr??:?"
+    assert defaults_interpolator("ok ${BAR-:-hello}") == 'ok '
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAR:?xazz:-redf}")
+    assert e.value.err == 'xazz:-redf'
+
+    assert defaults_interpolator("ok ${BAR?...:?bar}") == "ok "
+
+
+def test_unbraced_separators(defaults_interpolator):
+    assert defaults_interpolator("ok $FOO:-bar") == "ok first:-bar"
+    assert defaults_interpolator("ok $BAZ?error") == "ok ?error"
+
+
+def test_interpolate_unicode_values():
+    variable_mapping = {
+        'FOO': '十六夜　咲夜'.encode('utf-8'),
+        'BAR': '十六夜　咲夜'
+    }
+    interpol = Interpolator(TemplateWithDefaults, variable_mapping).interpolate
+
+    interpol("$FOO") == '十六夜　咲夜'
+    interpol("${BAR}") == '十六夜　咲夜'

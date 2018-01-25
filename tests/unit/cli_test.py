@@ -30,36 +30,36 @@ class CLITestCase(unittest.TestCase):
         test_dir = py._path.local.LocalPath('tests/fixtures/simple-composefile')
         with test_dir.as_cwd():
             project_name = get_project_name('.')
-            self.assertEqual('simplecomposefile', project_name)
+            assert 'simplecomposefile' == project_name
 
     def test_project_name_with_explicit_base_dir(self):
         base_dir = 'tests/fixtures/simple-composefile'
         project_name = get_project_name(base_dir)
-        self.assertEqual('simplecomposefile', project_name)
+        assert 'simplecomposefile' == project_name
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         base_dir = 'tests/fixtures/UpperCaseDir'
         project_name = get_project_name(base_dir)
-        self.assertEqual('uppercasedir', project_name)
+        assert 'uppercasedir' == project_name
 
     def test_project_name_with_explicit_project_name(self):
         name = 'explicit-project-name'
         project_name = get_project_name(None, project_name=name)
-        self.assertEqual('explicitprojectname', project_name)
+        assert 'explicitprojectname' == project_name
 
     @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
         name = 'namefromenv'
         os.environ['COMPOSE_PROJECT_NAME'] = name
         project_name = get_project_name(None)
-        self.assertEqual(project_name, name)
+        assert project_name == name
 
     def test_project_name_with_empty_environment_var(self):
         base_dir = 'tests/fixtures/simple-composefile'
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = ''
             project_name = get_project_name(base_dir)
-        self.assertEqual('simplecomposefile', project_name)
+        assert 'simplecomposefile' == project_name
 
     @mock.patch.dict(os.environ)
     def test_project_name_with_environment_file(self):
@@ -80,9 +80,9 @@ class CLITestCase(unittest.TestCase):
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
         project = get_project(base_dir)
-        self.assertEqual(project.name, 'longerfilenamecomposefile')
-        self.assertTrue(project.client)
-        self.assertTrue(project.services)
+        assert project.name == 'longerfilenamecomposefile'
+        assert project.client
+        assert project.services
 
     def test_command_help(self):
         with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
@@ -97,7 +97,9 @@ class CLITestCase(unittest.TestCase):
     @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason="requires dockerpty")
     @mock.patch('compose.cli.main.RunOperation', autospec=True)
     @mock.patch('compose.cli.main.PseudoTerminal', autospec=True)
+    @mock.patch.dict(os.environ)
     def test_run_interactive_passes_logs_false(self, mock_pseudo_terminal, mock_run_operation):
+        os.environ['COMPOSE_INTERACTIVE_NO_CLI'] = 'true'
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
         project = Project.from_config(
@@ -165,10 +167,7 @@ class CLITestCase(unittest.TestCase):
             '--workdir': None,
         })
 
-        self.assertEqual(
-            mock_client.create_host_config.call_args[1]['restart_policy']['Name'],
-            'always'
-        )
+        assert mock_client.create_host_config.call_args[1]['restart_policy']['Name'] == 'always'
 
         command = TopLevelCommand(project)
         command.run({
@@ -189,9 +188,7 @@ class CLITestCase(unittest.TestCase):
             '--workdir': None,
         })
 
-        self.assertFalse(
-            mock_client.create_host_config.call_args[1].get('restart_policy')
-        )
+        assert not mock_client.create_host_config.call_args[1].get('restart_policy')
 
     def test_command_manual_and_service_ports_together(self):
         project = Project.from_config(
@@ -203,7 +200,7 @@ class CLITestCase(unittest.TestCase):
         )
         command = TopLevelCommand(project)
 
-        with self.assertRaises(UserError):
+        with pytest.raises(UserError):
             command.run({
                 'SERVICE': 'service',
                 'COMMAND': None,
