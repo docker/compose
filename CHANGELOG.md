@@ -72,6 +72,9 @@ Change log
 - Fixed a bug where the recreation of a service would break if the image
   associated with the previous container had been removed
 
+- Fixed a bug where updating a mount's target would break Compose when
+  trying to recreate the associated service
+
 - Fixed a bug where `tmpfs` volumes declared using the extended syntax in
   Compose files using version 3.2 would be erroneously created as anonymous
   volumes instead
