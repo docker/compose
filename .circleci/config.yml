@@ -74,7 +74,7 @@ jobs:
               \"build_parameters\": {\
                 \"COMPOSE_BRANCH\": \"${CIRCLE_BRANCH}\"\
               }\
-            }" https://circleci.com/api/v1.1/project/github/docker/compose-osx-release
+            }" https://circleci.com/api/v1.1/project/github/docker/compose-osx-release > /dev/null
 
 
 workflows:
