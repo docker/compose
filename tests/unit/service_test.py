@@ -5,6 +5,7 @@ import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
 from docker.errors import APIError
+from docker.errors import ImageNotFound
 
 from .. import mock
 from .. import unittest
@@ -652,6 +653,14 @@ class ServiceTest(unittest.TestCase):
             assert not web.remove_image(ImageType.all)
         mock_log.error.assert_called_once_with(
             "Failed to remove image for service %s: %s", web.name, error)
+
+    def test_remove_non_existing_image(self):
+        self.mock_client.remove_image.side_effect = ImageNotFound(
+            'image not found')
+        web = Service('web', image='example', client=self.mock_client)
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            assert not web.remove_image(ImageType.all)
+        mock_log.warning.assert_called_once_with("Image %s not found.", web.image_name)
 
     def test_specifies_host_port_with_no_ports(self):
         service = Service(
