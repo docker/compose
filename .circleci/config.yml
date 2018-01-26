@@ -69,12 +69,12 @@ jobs:
       - run:
           name: API trigger
           command: |
-            curl -X POST -H "Content-Type: application/json" \
-            -u ${OSX_RELEASE_TOKEN} -d "{\
+            curl -X POST -H "Content-Type: application/json" -d "{\
               \"build_parameters\": {\
                 \"COMPOSE_BRANCH\": \"${CIRCLE_BRANCH}\"\
               }\
-            }" https://circleci.com/api/v1.1/project/github/docker/compose-osx-release > /dev/null
+            }" https://circleci.com/api/v1.1/project/github/docker/compose-osx-release?circle-token=${OSX_RELEASE_TOKEN} \
+            > /dev/null
 
 
 workflows:
