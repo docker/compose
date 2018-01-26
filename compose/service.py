@@ -1149,6 +1149,9 @@ class Service(object):
         try:
             self.client.remove_image(self.image_name)
             return True
+        except ImageNotFound:
+            log.warning("Image %s not found.", self.image_name)
+            return False
         except APIError as e:
             log.error("Failed to remove image for service %s: %s", self.name, e)
             return False
