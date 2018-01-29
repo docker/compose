@@ -207,13 +207,13 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = None
         result = self.dispatch([
             '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
-            'config', '-q'
+            'config', '--quiet'
         ], returncode=1)
         assert "'notaservice' must be a mapping" in result.stderr
 
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
-        assert self.dispatch(['config', '-q']).stdout == ''
+        assert self.dispatch(['config', '--quiet']).stdout == ''
 
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
