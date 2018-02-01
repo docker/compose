@@ -10,6 +10,7 @@ from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
 
+from ..config.environment import Environment
 from ..const import HTTP_TIMEOUT
 from .errors import UserError
 from .utils import generate_user_agent
@@ -36,14 +37,18 @@ def get_tls_version(environment):
 
 
 def tls_config_from_options(options, environment=None):
-    environment = environment or {}
+    environment = environment or Environment()
     cert_path = environment.get('DOCKER_CERT_PATH') or None
 
     tls = options.get('--tls', False)
     ca_cert = unquote_path(options.get('--tlscacert'))
     cert = unquote_path(options.get('--tlscert'))
     key = unquote_path(options.get('--tlskey'))
-    verify = options.get('--tlsverify', environment.get('DOCKER_TLS_VERIFY'))
+    # verify is a special case - with docopt `--tlsverify` = False means it
+    # wasn't used, so we set it if either the environment or the flag is True
+    # see https://github.com/docker/compose/issues/5632
+    verify = options.get('--tlsverify') or environment.get_boolean('DOCKER_TLS_VERIFY')
+
     skip_hostname_check = options.get('--skip-hostname-check', False)
     if cert_path is not None and not any((ca_cert, cert, key)):
         # FIXME: Modify TLSConfig to take a cert_path argument and do this internally
