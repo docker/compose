@@ -32,7 +32,7 @@ def create_custom_host_file(client, filename, content):
     )
     try:
         client.start(container)
-        exitcode = client.wait(container)
+        exitcode = client.wait(container)['StatusCode']
 
         if exitcode != 0:
             output = client.logs(container)

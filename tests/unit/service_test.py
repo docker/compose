@@ -470,7 +470,6 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
-            stream=True,
             path='.',
             pull=False,
             forcerm=False,
@@ -513,7 +512,6 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
-            stream=True,
             path='.',
             pull=False,
             forcerm=False,
