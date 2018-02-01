@@ -972,7 +972,6 @@ class Service(object):
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
-            stream=True,
             rm=True,
             forcerm=force_rm,
             pull=pull,
