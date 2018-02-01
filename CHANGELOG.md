@@ -66,6 +66,9 @@ Change log
 - Fixed a bug where setting TLS options with environment and CLI flags
   simultaneously would result in part of the configuration being ignored
 
+- Fixed a bug where the DOCKER_TLS_VERIFY environment variable was being
+  ignored by Compose
+
 - Fixed a bug where the `-d` and `--timeout` flags in `up` were erroneously
   marked as incompatible
 
