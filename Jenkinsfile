@@ -60,5 +60,5 @@ buildImage()
 parallel(
   failFast: true,
   all_py27: runTests(pythonVersions: "py27", dockerVersions: "all"),
-  all_py34: runTests(pythonVersions: "py34", dockerVersions: "all"),
+  all_py36: runTests(pythonVersions: "py36", dockerVersions: "all"),
 )

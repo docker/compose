@@ -3,7 +3,7 @@
 set -ex
 
 TARGET=dist/docker-compose-$(uname -s)-$(uname -m)
-VENV=/code/.tox/py27
+VENV=/code/.tox/py36
 
 mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist

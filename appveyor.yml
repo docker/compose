@@ -2,15 +2,15 @@
 version: '{branch}-{build}'
 
 install:
-  - "SET PATH=C:\\Python27-x64;C:\\Python27-x64\\Scripts;%PATH%"
+  - "SET PATH=C:\\Python36-x64;C:\\Python36-x64\\Scripts;%PATH%"
   - "python --version"
-  - "pip install tox==2.1.1 virtualenv==13.1.2"
+  - "pip install tox==2.9.1 virtualenv==15.1.0"
 
 # Build the binary after tests
 build: false
 
 test_script:
-  - "tox -e py27,py34 -- tests/unit"
+  - "tox -e py27,py36 -- tests/unit"
   - ps: ".\\script\\build\\windows.ps1"
 
 artifacts:

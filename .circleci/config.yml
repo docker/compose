@@ -5,15 +5,15 @@ jobs:
       xcode: "8.3.3"
     steps:
     - checkout
-#    - run:
-#        name: install python3
-#        command: brew install python3
+    - run:
+        name: install python3
+        command: brew update > /dev/null && brew install python3
     - run:
         name: install tox
         command: sudo pip install --upgrade tox==2.1.1
     - run:
         name: unit tests
-        command: tox -e py27 -- tests/unit
+        command: tox -e py27,py36 -- tests/unit
 
   build-osx-binary:
     macos:

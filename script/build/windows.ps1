@@ -6,17 +6,17 @@
 #
 #        http://git-scm.com/download/win
 #
-# 2. Install Python 2.7.10:
+# 2. Install Python 3.6.4:
 #
 #        https://www.python.org/downloads/
 #
-# 3. Append ";C:\Python27;C:\Python27\Scripts" to the "Path" environment variable:
+# 3. Append ";C:\Python36;C:\Python36\Scripts" to the "Path" environment variable:
 #
 #        https://www.microsoft.com/resources/documentation/windows/xp/all/proddocs/en-us/sysdm_advancd_environmnt_addchange_variable.mspx?mfr=true
 #
 # 4. In Powershell, run the following commands:
 #
-#        $ pip install virtualenv
+#        $ pip install 'virtualenv>=15.1.0'
 #        $ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # 5. Clone the repository:
@@ -45,7 +45,12 @@ virtualenv .\venv
 $ErrorActionPreference = "Continue"
 
 # Install dependencies
-.\venv\Scripts\pip install pypiwin32==219
+# Fix for https://github.com/pypa/pip/issues/3964
+# Remove-Item -Recurse -Force .\venv\Lib\site-packages\pip
+# .\venv\Scripts\easy_install pip==9.0.1
+# .\venv\Scripts\pip install --upgrade pip setuptools
+# End fix
+.\venv\Scripts\pip install pypiwin32==220
 .\venv\Scripts\pip install -r requirements.txt
 .\venv\Scripts\pip install --no-deps .
 .\venv\Scripts\pip install --allow-external pyinstaller -r requirements-build.txt
