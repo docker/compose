@@ -316,6 +316,23 @@ class ServiceTest(DockerClientTestCase):
         assert mount['Type'] == 'tmpfs'
 
     @v2_3_only()
+    def test_create_container_with_tmpfs_mount_tmpfs_size(self):
+        container_path = '/container-tmpfs'
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(type='tmpfs', target=container_path, tmpfs={'size': 5368709})]
+        )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        print(container.dictionary)
+        assert mount['Type'] == 'tmpfs'
+        assert container.get('HostConfig.Mounts')[0]['TmpfsOptions'] == {
+            'SizeBytes': 5368709
+        }
+
+    @v2_3_only()
     def test_create_container_with_volume_mount(self):
         container_path = '/container-volume'
         volume_name = 'composetest_abcde'

@@ -141,6 +141,9 @@ class MountSpec(object):
         },
         'bind': {
             'propagation': 'propagation'
+        },
+        'tmpfs': {
+            'size': 'tmpfs_size'
         }
     }
     _fields = ['type', 'source', 'target', 'read_only', 'consistency']
@@ -149,6 +152,9 @@ class MountSpec(object):
     def parse(cls, mount_dict, normalize=False, win_host=False):
         normpath = ntpath.normpath if win_host else os.path.normpath
         if mount_dict.get('source'):
+            if mount_dict['type'] == 'tmpfs':
+                raise ConfigurationError('tmpfs mounts can not specify a source')
+
             mount_dict['source'] = normpath(mount_dict['source'])
             if normalize:
                 mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
