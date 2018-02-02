@@ -9,6 +9,7 @@ import six
 
 from .errors import ConfigurationError
 from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.utils import parse_bytes
 
 
 log = logging.getLogger(__name__)
@@ -215,6 +216,13 @@ def to_str(o):
     return o
 
 
+def bytes_to_int(s):
+    v = parse_bytes(s)
+    if v is None:
+        raise ValueError('"{}" is not a valid byte value'.format(s))
+    return v
+
+
 class ConversionMap(object):
     map = {
         service_path('blkio_config', 'weight'): to_int,
@@ -247,6 +255,7 @@ class ConversionMap(object):
         service_path('tty'): to_boolean,
         service_path('volumes', 'read_only'): to_boolean,
         service_path('volumes', 'volume', 'nocopy'): to_boolean,
+        service_path('volumes', 'tmpfs', 'size'): bytes_to_int,
         re_path_basic('network', 'attachable'): to_boolean,
         re_path_basic('network', 'external'): to_boolean,
         re_path_basic('network', 'internal'): to_boolean,

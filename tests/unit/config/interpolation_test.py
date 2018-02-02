@@ -27,6 +27,7 @@ def mock_env():
         'NEGINT': '-200',
         'FLOAT': '0.145',
         'MODE': '0600',
+        'BYTES': '512m',
     })
 
 
@@ -147,6 +148,9 @@ def test_interpolate_environment_services_convert_types_v2(mock_env):
             'read_only': '${DEFAULT:-no}',
             'tty': '${DEFAULT:-N}',
             'stdin_open': '${DEFAULT-on}',
+            'volumes': [
+                {'type': 'tmpfs', 'target': '/target', 'tmpfs': {'size': '$BYTES'}}
+            ]
         }
     }
 
@@ -177,6 +181,9 @@ def test_interpolate_environment_services_convert_types_v2(mock_env):
             'read_only': False,
             'tty': False,
             'stdin_open': True,
+            'volumes': [
+                {'type': 'tmpfs', 'target': '/target', 'tmpfs': {'size': 536870912}}
+            ]
         }
     }
 
