@@ -875,8 +875,8 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'simple_1   | simple' in result.stdout
         assert 'another_1  | another' in result.stdout
-        assert 'simple_1 exited with code {\'Error\': None, \'StatusCode\': 0}' in result.stdout
-        assert 'another_1 exited with code {\'Error\': None, \'StatusCode\': 0}' in result.stdout
+        assert 'simple_1 exited with code 0' in result.stdout
+        assert 'another_1 exited with code 0' in result.stdout
 
     @v2_only()
     def test_up(self):
