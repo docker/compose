@@ -129,6 +129,73 @@ class ContainerTest(unittest.TestCase):
 
         assert container.get_local_port(45454, protocol='tcp') == '0.0.0.0:49197'
 
+    def test_human_readable_states_no_health(self):
+        container = Container(None, {
+            "State": {
+                "Status": "running",
+                "Running": True,
+                "Paused": False,
+                "Restarting": False,
+                "OOMKilled": False,
+                "Dead": False,
+                "Pid": 7623,
+                "ExitCode": 0,
+                "Error": "",
+                "StartedAt": "2018-01-29T00:34:25.2052414Z",
+                "FinishedAt": "0001-01-01T00:00:00Z"
+            },
+        }, has_been_inspected=True)
+        expected = "Up"
+        assert container.human_readable_state == expected
+
+    def test_human_readable_states_starting(self):
+        container = Container(None, {
+            "State": {
+                "Status": "running",
+                "Running": True,
+                "Paused": False,
+                "Restarting": False,
+                "OOMKilled": False,
+                "Dead": False,
+                "Pid": 11744,
+                "ExitCode": 0,
+                "Error": "",
+                "StartedAt": "2018-02-03T07:56:20.3591233Z",
+                "FinishedAt": "2018-01-31T08:56:11.0505228Z",
+                "Health": {
+                    "Status": "starting",
+                    "FailingStreak": 0,
+                    "Log": []
+                }
+            }
+        }, has_been_inspected=True)
+        expected = "Up (health: starting)"
+        assert container.human_readable_state == expected
+
+    def test_human_readable_states_healthy(self):
+        container = Container(None, {
+            "State": {
+                "Status": "running",
+                "Running": True,
+                "Paused": False,
+                "Restarting": False,
+                "OOMKilled": False,
+                "Dead": False,
+                "Pid": 5674,
+                "ExitCode": 0,
+                "Error": "",
+                "StartedAt": "2018-02-03T08:32:05.3281831Z",
+                "FinishedAt": "2018-02-03T08:11:35.7872706Z",
+                "Health": {
+                    "Status": "healthy",
+                    "FailingStreak": 0,
+                    "Log": []
+                }
+            }
+        }, has_been_inspected=True)
+        expected = "Up (healthy)"
+        assert container.human_readable_state == expected
+
     def test_get(self):
         container = Container(None, {
             "Status": "Up 8 seconds",
