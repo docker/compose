@@ -129,7 +129,7 @@ class Container(object):
         if self.is_restarting:
             return 'Restarting'
         if self.is_running:
-            return 'Ghost' if self.get('State.Ghost') else 'Up'
+            return 'Ghost' if self.get('State.Ghost') else self.create_health_status_string
         else:
             return 'Exit %s' % self.get('State.ExitCode')
 
@@ -171,6 +171,19 @@ class Container(object):
     def has_api_logs(self):
         log_type = self.log_driver
         return not log_type or log_type in ('json-file', 'journald')
+
+    @property
+    def create_health_status_string(self):
+        """ Generate UP status string with up time and health
+        """
+        status_string = 'Up'
+        if 'Health' in self.get('State'):
+            container_status = self.get('State.Health.Status')
+            if container_status == 'starting':
+                status_string += ' (health: starting)'
+            else:
+                status_string += ' (%s)' % container_status
+        return status_string
 
     def attach_log_stream(self):
         """A log stream can only be attached if the container uses a json-file
@@ -243,7 +256,7 @@ class Container(object):
             self.inspect()
 
     def wait(self):
-        return self.client.wait(self.id).get('StatusCode', 127)
+        return self.client.wait(self.id)
 
     def logs(self, *args, **kwargs):
         return self.client.logs(self.id, *args, **kwargs)
