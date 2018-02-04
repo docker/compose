@@ -256,7 +256,7 @@ class Container(object):
             self.inspect()
 
     def wait(self):
-        return self.client.wait(self.id)
+        return self.client.wait(self.id).get('StatusCode', 127)
 
     def logs(self, *args, **kwargs):
         return self.client.logs(self.id, *args, **kwargs)
