@@ -537,12 +537,13 @@ class Project(object):
 
         return plans
 
-    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False):
+    def pull(self, service_names=None, ignore_pull_failures=False,
+             parallel_pull=False, silent=False, **kwargs):
         services = self.get_services(service_names, include_deps=False)
 
         if parallel_pull:
             def pull_service(service):
-                service.pull(ignore_pull_failures, True)
+                service.pull(ignore_pull_failures, True, **kwargs)
 
             _, errors = parallel.parallel_execute(
                 services,
@@ -555,11 +556,11 @@ class Project(object):
                 raise ProjectError(b"\n".join(errors.values()))
         else:
             for service in services:
-                service.pull(ignore_pull_failures, silent=silent)
+                service.pull(ignore_pull_failures, silent=silent, **kwargs)
 
-    def push(self, service_names=None, ignore_push_failures=False):
+    def push(self, service_names=None, ignore_push_failures=False, **kwargs):
         for service in self.get_services(service_names, include_deps=False):
-            service.push(ignore_push_failures)
+            service.push(ignore_push_failures, **kwargs)
 
     def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
         return list(filter(None, [

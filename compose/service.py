@@ -1083,7 +1083,7 @@ class Service(object):
 
         return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
-    def pull(self, ignore_pull_failures=False, silent=False):
+    def pull(self, ignore_pull_failures=False, silent=False, **kwargs):
         if 'image' not in self.options:
             return
 
@@ -1092,7 +1092,7 @@ class Service(object):
         if not silent:
             log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
         try:
-            output = self.client.pull(repo, tag=tag, stream=True)
+            output = self.client.pull(repo, tag=tag, stream=True, **kwargs)
             if silent:
                 with open(os.devnull, 'w') as devnull:
                     return progress_stream.get_digest_from_pull(
@@ -1106,14 +1106,14 @@ class Service(object):
             else:
                 log.error(six.text_type(e))
 
-    def push(self, ignore_push_failures=False):
+    def push(self, ignore_push_failures=False, **kwargs):
         if 'image' not in self.options or 'build' not in self.options:
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
         log.info('Pushing %s (%s%s%s)...' % (self.name, repo, separator, tag))
-        output = self.client.push(repo, tag=tag, stream=True)
+        output = self.client.push(repo, tag=tag, stream=True, **kwargs)
 
         try:
             return progress_stream.get_digest_from_push(

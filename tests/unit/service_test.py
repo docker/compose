@@ -416,6 +416,30 @@ class ServiceTest(unittest.TestCase):
             stream=True)
         mock_log.info.assert_called_once_with('Pulling foo (someimage@sha256:1234)...')
 
+    def test_pull_image_with_auth_config(self):
+        service = Service('foo', client=self.mock_client,
+                          image='moisture/penman-adieu')
+        auth_config = {'username': 'avatar-bilious',
+                       'password': 'infinite-wingspan'}
+        service.pull(auth_config=auth_config)
+        self.mock_client.pull.assert_called_once_with(
+            'moisture/penman-adieu',
+            tag='latest',
+            stream=True,
+            auth_config=auth_config)
+
+    def test_push_image_with_auth_config(self):
+        service = Service('foo', client=self.mock_client,
+                          image='drier/stunt-snare', build={'context': '.'})
+        auth_config = {'username': 'valiancy-forelock',
+                       'password': 'reliant-wombat'}
+        service.push(auth_config=auth_config)
+        self.mock_client.push.assert_called_once_with(
+            'drier/stunt-snare',
+            tag='latest',
+            stream=True,
+            auth_config=auth_config)
+
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
