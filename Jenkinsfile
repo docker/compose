@@ -18,12 +18,26 @@ def buildImage = { ->
   }
 }
 
+def get_versions = { int number ->
+  def docker_versions
+  wrappedNode(label: "ubuntu && !zfs") {
+    def result = sh(script: """docker run --rm \\
+        --entrypoint=/code/.tox/py27/bin/python \\
+        ${image.id} \\
+        /code/script/test/versions.py -n ${number} docker/docker-ce recent
+      """, returnStdout: true
+    )
+    docker_versions = result.split()
+  }
+  return docker_versions
+}
+
 def runTests = { Map settings ->
   def dockerVersions = settings.get("dockerVersions", null)
   def pythonVersions = settings.get("pythonVersions", null)
 
   if (!pythonVersions) {
-    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py34')`")
+    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py36')`")
   }
   if (!dockerVersions) {
     throw new Exception("Need Docker versions to test. e.g.: `runTests(dockerVersions: 'all')`")
@@ -46,7 +60,7 @@ def runTests = { Map settings ->
           -e "DOCKER_VERSIONS=${dockerVersions}" \\
           -e "BUILD_NUMBER=\$BUILD_TAG" \\
           -e "PY_TEST_VERSIONS=${pythonVersions}" \\
-          --entrypoint="script/ci" \\
+          --entrypoint="script/test/ci" \\
           ${image.id} \\
           --verbose
         """
@@ -56,9 +70,14 @@ def runTests = { Map settings ->
 }
 
 buildImage()
-// TODO: break this out into meaningful "DOCKER_VERSIONS" values instead of all
-parallel(
-  failFast: true,
-  all_py27: runTests(pythonVersions: "py27", dockerVersions: "all"),
-  all_py36: runTests(pythonVersions: "py36", dockerVersions: "all"),
-)
+
+def testMatrix = [failFast: true]
+def docker_versions = get_versions(2)
+
+for (int i = 0 ;i < docker_versions.length ; i++) {
+  def dockerVersion = docker_versions[i]
+  testMatrix["${dockerVersion}_py27"] = runTests([dockerVersions: dockerVersion, pythonVersions: "py27"])
+  testMatrix["${dockerVersion}_py36"] = runTests([dockerVersions: dockerVersion, pythonVersions: "py36"])
+}
+
+parallel(testMatrix)
