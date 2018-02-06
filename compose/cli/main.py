@@ -185,6 +185,8 @@ class TopLevelCommand(object):
                                   is an IP address)
       --project-directory PATH    Specify an alternate working directory
                                   (default: the path of the Compose file)
+      --compatibility             If set, Compose will attempt to convert deploy keys in v3
+                                  files to their non-Swarm equivalent
 
     Commands:
       build              Build or rebuild services

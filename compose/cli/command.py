@@ -38,6 +38,7 @@ def project_from_options(project_dir, options):
         tls_config=tls_config_from_options(options, environment),
         environment=environment,
         override_dir=options.get('--project-directory'),
+        compatibility=options.get('--compatibility'),
     )
 
 
@@ -63,7 +64,8 @@ def get_config_from_options(base_dir, options):
         base_dir, options, environment
     )
     return config.load(
-        config.find(base_dir, config_path, environment)
+        config.find(base_dir, config_path, environment),
+        options.get('--compatibility')
     )
 
 
@@ -100,14 +102,15 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None, environment=None, override_dir=None):
+                host=None, tls_config=None, environment=None, override_dir=None,
+                compatibility=False):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details)
+    config_data = config.load(config_details, compatibility)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',

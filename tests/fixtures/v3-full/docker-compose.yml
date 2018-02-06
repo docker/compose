@@ -1,8 +1,7 @@
-version: "3.2"
+version: "3.5"
 services:
   web:
     image: busybox
-
     deploy:
       mode: replicated
       replicas: 6
@@ -15,18 +14,22 @@ services:
         max_failure_ratio: 0.3
       resources:
         limits:
-          cpus: '0.001'
+          cpus: '0.05'
           memory: 50M
         reservations:
-          cpus: '0.0001'
+          cpus: '0.01'
           memory: 20M
       restart_policy:
-        condition: on_failure
+        condition: on-failure
         delay: 5s
         max_attempts: 3
         window: 120s
       placement:
-        constraints: [node=foo]
+        constraints:
+          - node.hostname==foo
+          - node.role != manager
+        preferences:
+          - spread: node.labels.datacenter
 
     healthcheck:
       test: cat /etc/passwd
