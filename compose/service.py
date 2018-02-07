@@ -849,10 +849,10 @@ class Service(object):
             override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
         else:
             # Workaround for 3.2 format
-            self.options['tmpfs'] = self.options.get('tmpfs') or []
+            override_options['tmpfs'] = self.options.get('tmpfs') or []
             for m in container_mounts:
                 if m.is_tmpfs:
-                    self.options['tmpfs'].append(m.target)
+                    override_options['tmpfs'].append(m.target)
                 else:
                     override_options['binds'].append(m.legacy_repr())
                     container_options['volumes'][m.target] = {}
