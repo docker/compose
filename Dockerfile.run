@@ -1,13 +1,33 @@
-FROM alpine:3.4
+FROM sgerrand/glibc-builder as glibc
+RUN apt-get install -yq bison
 
-ENV GLIBC 2.23-r3
+ENV PKGDIR /pkgdata
 
-RUN apk update && apk add --no-cache openssl ca-certificates && \
-    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub && \
-    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/$GLIBC/glibc-$GLIBC.apk && \
-    apk add --no-cache glibc-$GLIBC.apk && rm glibc-$GLIBC.apk && \
-    ln -s /lib/libz.so.1 /usr/glibc-compat/lib/ && \
-    ln -s /lib/libc.musl-x86_64.so.1 /usr/glibc-compat/lib
+RUN mkdir -p /usr/glibc-compat/etc && touch /usr/glibc-compat/etc/ld.so.conf
+RUN /builder 2.27 /usr/glibc-compat || true
+RUN mkdir -p $PKGDIR
+RUN tar -xf /glibc-bin-2.27.tar.gz -C $PKGDIR
+RUN rm "$PKGDIR"/usr/glibc-compat/etc/rpc && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/bin && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/sbin && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/lib/gconv && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/lib/getconf && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/lib/audit && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/share && \
+  	rm -rf "$PKGDIR"/usr/glibc-compat/var
+
+
+FROM alpine:3.6
+
+RUN apk update && apk add --no-cache openssl ca-certificates
+COPY --from=glibc /pkgdata/ /
+
+RUN mkdir -p /lib /lib64 /usr/glibc-compat/lib/locale /etc && \
+	ln -s /lib/libz.so.1 /usr/glibc-compat/lib/ && \
+    ln -s /lib/libc.musl-x86_64.so.1 /usr/glibc-compat/lib && \
+ 	ln -s /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib/ld-linux-x86-64.so.2 && \
+  	ln -s /usr/glibc-compat/lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 && \
+  	ln -s /usr/glibc-compat/etc/ld.so.cache /etc/ld.so.cache
 
 COPY dist/docker-compose-Linux-x86_64 /usr/local/bin/docker-compose
 
