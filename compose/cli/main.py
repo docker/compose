@@ -1274,7 +1274,7 @@ def run_one_off_container(container_options, project, service, options, project_
                 service.start_container(container)
                 pty.start(sockets)
                 exit_code = container.wait()
-        except (signals.ShutdownException, signals.HangUpException):
+        except (signals.ShutdownException):
             project.client.stop(container.id)
             exit_code = 1
     except (signals.ShutdownException, signals.HangUpException):
