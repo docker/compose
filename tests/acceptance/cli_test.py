@@ -1876,6 +1876,19 @@ class CLITestCase(DockerClientTestCase):
             'simplecomposefile_simple_run_1',
             'exited'))
 
+    def test_run_handles_sighup(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'running'))
+
+        os.kill(proc.pid, signal.SIGHUP)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'exited'))
+
     @mock.patch.dict(os.environ)
     def test_run_unicode_env_values_from_system(self):
         value = 'ą, ć, ę, ł, ń, ó, ś, ź, ż'

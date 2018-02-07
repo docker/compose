@@ -1256,6 +1256,7 @@ def run_one_off_container(container_options, project, service, options, project_
     use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
     signals.set_signal_handler_to_shutdown()
+    signals.set_signal_handler_to_hang_up()
     try:
         try:
             if IS_WINDOWS_PLATFORM or use_cli:
@@ -1273,10 +1274,10 @@ def run_one_off_container(container_options, project, service, options, project_
                 service.start_container(container)
                 pty.start(sockets)
                 exit_code = container.wait()
-        except signals.ShutdownException:
+        except (signals.ShutdownException, signals.HangUpException):
             project.client.stop(container.id)
             exit_code = 1
-    except signals.ShutdownException:
+    except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
         remove_container(force=True)
         sys.exit(2)
