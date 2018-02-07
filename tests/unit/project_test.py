@@ -560,3 +560,50 @@ class ProjectTest(unittest.TestCase):
     def test_no_such_service_unicode(self):
         assert NoSuchService('十六夜　咲夜'.encode('utf-8')).msg == 'No such service: 十六夜　咲夜'
         assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜'
+
+    @mock.patch('compose.service.Service.pull')
+    def test_pull_image_with_auth_config(self, mock_pull):
+        web = Service(
+            project='guppy-phony-havana',
+            name='web',
+            image='hoc/breath-filename'
+        )
+        auth_config = {
+            'username': 'modest-dogma',
+            'password': 'sallow-exclude'
+        }
+        project = Project('doorjamb-gather-butane', [web], None)
+        project.pull(auth_config=auth_config)
+        mock_pull.assert_called_once_with(
+            False, auth_config=auth_config, silent=False
+        )
+
+    @mock.patch('compose.service.Service.pull')
+    def test_parallel_pull_image_with_auth_config(self, mock_pull):
+        web = Service(
+            project='beeline-compel-croft',
+            name='web',
+            image='irenic/dunce-iroquois'
+        )
+        auth_config = {
+            'username': 'cohere-bluefish',
+            'password': 'deeply-seclude'
+        }
+        project = Project('beeline-compel-croft', [web], None)
+        project.pull(auth_config=auth_config, parallel_pull=True)
+        mock_pull.assert_called_once_with(False, True, auth_config=auth_config)
+
+    @mock.patch('compose.service.Service.push')
+    def test_push_image_with_auth_config(self, mock_push):
+        web = Service(
+            project='divan-georgian-molecule',
+            name='web',
+            image='manikin/simple-nobleman'
+        )
+        auth_config = {
+            'username': 'guild-send',
+            'password': 'pungent-missing'
+        }
+        project = Project('bairn-billet-hirsute', [web], None)
+        project.push(auth_config=auth_config)
+        mock_push.assert_called_once_with(False, auth_config=auth_config)
