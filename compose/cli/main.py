@@ -503,14 +503,14 @@ class TopLevelCommand(object):
         Usage: images [options] [SERVICE...]
 
         Options:
-        -q     Only display IDs
+            -q, --quiet  Only display IDs
         """
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
             self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
             key=attrgetter('name'))
 
-        if options['-q']:
+        if options['--quiet']:
             for image in set(c.image for c in containers):
                 print(image.split(':')[1])
         else:
@@ -624,12 +624,12 @@ class TopLevelCommand(object):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q                   Only display IDs
+            -q, --quiet          Only display IDs
             --services           Display services
             --filter KEY=VAL     Filter services by a property
         """
-        if options['-q'] and options['--services']:
-            raise UserError('-q and --services cannot be combined')
+        if options['--quiet'] and options['--services']:
+            raise UserError('--quiet and --services cannot be combined')
 
         if options['--services']:
             filt = build_filter(options.get('--filter'))
@@ -644,7 +644,7 @@ class TopLevelCommand(object):
             self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
             key=attrgetter('name'))
 
-        if options['-q']:
+        if options['--quiet']:
             for container in containers:
                 print(container.id)
         else:
@@ -676,7 +676,7 @@ class TopLevelCommand(object):
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
             --parallel              Pull multiple images in parallel.
-            --quiet                 Pull without printing progress information
+            -q, --quiet             Pull without printing progress information
         """
         self.project.pull(
             service_names=options['SERVICE'],
