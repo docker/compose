@@ -13,6 +13,7 @@ from compose.config.types import ServicePort
 from compose.config.types import ServiceSecret
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
+from compose.const import API_VERSIONS
 from compose.const import LABEL_CONFIG_HASH
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
@@ -598,6 +599,25 @@ class ServiceTest(unittest.TestCase):
             'volumes_from': [],
         }
         assert config_dict == expected
+
+    def test_config_hash_matches_label(self):
+        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        service = Service(
+            'foo',
+            image='example.com/foo',
+            client=self.mock_client,
+            network_mode=NetworkMode('bridge'),
+            networks={'bridge': {}},
+            links=[(Service('one', client=self.mock_client), 'one')],
+            volumes_from=[VolumeFromSpec(Service('two', client=self.mock_client), 'rw', 'service')]
+        )
+        config_hash = service.config_hash
+
+        for api_version in set(API_VERSIONS.values()):
+            self.mock_client.api_version = api_version
+            assert service._get_container_create_options({}, 1)['labels'][LABEL_CONFIG_HASH] == (
+                config_hash
+            )
 
     def test_remove_image_none(self):
         web = Service('web', image='example', client=self.mock_client)
