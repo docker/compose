@@ -129,7 +129,7 @@ class Container(object):
         if self.is_restarting:
             return 'Restarting'
         if self.is_running:
-            return 'Ghost' if self.get('State.Ghost') else self.create_health_status_string
+            return 'Ghost' if self.get('State.Ghost') else self.human_readable_health_status
         else:
             return 'Exit %s' % self.get('State.ExitCode')
 
@@ -173,16 +173,15 @@ class Container(object):
         return not log_type or log_type in ('json-file', 'journald')
 
     @property
-    def create_health_status_string(self):
+    def human_readable_health_status(self):
         """ Generate UP status string with up time and health
         """
         status_string = 'Up'
-        if 'Health' in self.get('State'):
-            container_status = self.get('State.Health.Status')
-            if container_status == 'starting':
-                status_string += ' (health: starting)'
-            else:
-                status_string += ' (%s)' % container_status
+        container_status = self.get('State.Health.Status')
+        if container_status == 'starting':
+            status_string += ' (health: starting)'
+        elif container_status is not None:
+            status_string += ' (%s)' % container_status
         return status_string
 
     def attach_log_stream(self):
