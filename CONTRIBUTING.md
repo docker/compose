@@ -43,7 +43,11 @@ To run the style checks at any time run `tox -e pre-commit`.
 
 ## Submitting a pull request
 
-See Docker's [basic contribution workflow](https://docs.docker.com/opensource/workflow/make-a-contribution/#the-basic-contribution-workflow) for a guide on how to submit a pull request for code or documentation.
+See Docker's [basic contribution workflow](https://docs.docker.com/v17.06/opensource/code/#code-contribution-workflow) for a guide on how to submit a pull request for code.
+
+## Documentation changes
+
+Issues and pull requests to update the documentation should be submitted to the [docs repo](https://github.com/docker/docker.github.io). You can learn more about contributing to the documentation [here](https://docs.docker.com/opensource/#how-to-contribute-to-the-docs).
 
 ## Running the test suite
 
@@ -69,6 +73,4 @@ you can specify a test directory, file, module, class or method:
 
 ## Finding things to work on
 
-We use a [ZenHub board](https://www.zenhub.io/) to keep track of specific things we are working on and planning to work on. If you're looking for things to work on, stuff in the backlog is a great place to start.
-
-For more information about our project planning, take a look at our [GitHub wiki](https://github.com/docker/compose/wiki).
+[Issues marked with the `exp/beginner` label](https://github.com/docker/compose/issues?q=is%3Aopen+is%3Aissue+label%3Aexp%2Fbeginner) are a good starting point for people looking to make their first contribution to the project.
