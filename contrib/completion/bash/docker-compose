@@ -16,6 +16,8 @@
 #    below to your .bashrc after bash completion features are loaded
 #    . ~/.docker-compose-completion.sh
 
+__docker_compose_previous_extglob_setting=$(shopt -p extglob)
+shopt -s extglob
 
 __docker_compose_q() {
 	docker-compose 2>/dev/null "${top_level_options[@]}" "$@"
@@ -657,5 +659,8 @@ _docker_compose() {
 	eval "$previous_extglob_setting"
 	return 0
 }
+
+eval "$__docker_compose_previous_extglob_setting"
+unset __docker_compose_previous_extglob_setting
 
 complete -F _docker_compose docker-compose docker-compose.exe
