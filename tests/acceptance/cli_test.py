@@ -232,7 +232,7 @@ class CLITestCase(DockerClientTestCase):
                         'context': os.path.abspath(self.base_dir),
                     },
                     'networks': {'front': None, 'default': None},
-                    'volumes_from': ['service:other:rw'],
+                    'volumes_from': ['other:rw'],
                 },
                 'other': {
                     'image': 'busybox:latest',
