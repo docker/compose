@@ -395,7 +395,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['config'])
 
         assert yaml.load(result.stdout) == {
-            'version': '3.2',
+            'version': '3.5',
             'volumes': {
                 'foobar': {
                     'labels': {
@@ -419,22 +419,25 @@ class CLITestCase(DockerClientTestCase):
                         },
                         'resources': {
                             'limits': {
-                                'cpus': '0.001',
+                                'cpus': '0.05',
                                 'memory': '50M',
                             },
                             'reservations': {
-                                'cpus': '0.0001',
+                                'cpus': '0.01',
                                 'memory': '20M',
                             },
                         },
                         'restart_policy': {
-                            'condition': 'on_failure',
+                            'condition': 'on-failure',
                             'delay': '5s',
                             'max_attempts': 3,
                             'window': '120s',
                         },
                         'placement': {
-                            'constraints': ['node=foo'],
+                            'constraints': [
+                                'node.hostname==foo', 'node.role != manager'
+                            ],
+                            'preferences': [{'spread': 'node.labels.datacenter'}]
                         },
                     },
 
@@ -462,6 +465,27 @@ class CLITestCase(DockerClientTestCase):
                     'stop_grace_period': '20s',
                 },
             },
+        }
+
+    def test_config_compatibility_mode(self):
+        self.base_dir = 'tests/fixtures/compatibility-mode'
+        result = self.dispatch(['--compatibility', 'config'])
+
+        assert yaml.load(result.stdout) == {
+            'version': '2.3',
+            'volumes': {'foo': {'driver': 'default'}},
+            'services': {
+                'foo': {
+                    'command': '/bin/true',
+                    'image': 'alpine:3.7',
+                    'scale': 3,
+                    'restart': 'always:7',
+                    'mem_limit': '300M',
+                    'mem_reservation': '100M',
+                    'cpus': 0.7,
+                    'volumes': ['foo:/bar:rw']
+                }
+            }
         }
 
     def test_ps(self):

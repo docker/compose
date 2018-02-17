@@ -896,6 +896,7 @@ def translate_resource_keys_to_container_config(resources_dict, service_dict):
         service_dict['mem_reservation'] = resources_dict['reservations'].get('memory')
         if 'cpus' in resources_dict['reservations']:
             return ['resources.reservations.cpus']
+    return []
 
 
 def convert_restart_policy(name):
@@ -919,7 +920,7 @@ def translate_deploy_keys_to_container_config(service_dict):
         if k in deploy_dict
     ]
 
-    if 'replicas' in deploy_dict and deploy_dict.get('mode') == 'replicated':
+    if 'replicas' in deploy_dict and deploy_dict.get('mode', 'replicated') == 'replicated':
         service_dict['scale'] = deploy_dict['replicas']
 
     if 'restart_policy' in deploy_dict:
