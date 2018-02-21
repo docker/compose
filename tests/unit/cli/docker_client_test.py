@@ -68,9 +68,10 @@ class DockerClientTestCase(unittest.TestCase):
 
 
 class TLSConfigTestCase(unittest.TestCase):
-    ca_cert = os.path.join('tests/fixtures/tls/', 'ca.pem')
-    client_cert = os.path.join('tests/fixtures/tls/', 'cert.pem')
-    key = os.path.join('tests/fixtures/tls/', 'key.pem')
+    cert_path = 'tests/fixtures/tls/'
+    ca_cert = os.path.join(cert_path, 'ca.pem')
+    client_cert = os.path.join(cert_path, 'cert.pem')
+    key = os.path.join(cert_path, 'key.pem')
 
     def test_simple_tls(self):
         options = {'--tls': True}
@@ -202,7 +203,8 @@ class TLSConfigTestCase(unittest.TestCase):
     def test_tls_verify_flag_no_override(self):
         environment = Environment({
             'DOCKER_TLS_VERIFY': 'true',
-            'COMPOSE_TLS_VERSION': 'TLSv1'
+            'COMPOSE_TLS_VERSION': 'TLSv1',
+            'DOCKER_CERT_PATH': self.cert_path
         })
         options = {'--tls': True, '--tlsverify': False}
 
@@ -218,6 +220,17 @@ class TLSConfigTestCase(unittest.TestCase):
         environment = Environment({'DOCKER_TLS_VERIFY': '0'})
         options = {'--tls': True}
         assert tls_config_from_options(options, environment) is True
+
+    def test_tls_verify_default_cert_path(self):
+        environment = Environment({'DOCKER_TLS_VERIFY': '1'})
+        options = {'--tls': True}
+        with mock.patch('compose.cli.docker_client.default_cert_path') as dcp:
+            dcp.return_value = 'tests/fixtures/tls/'
+            result = tls_config_from_options(options, environment)
+        assert isinstance(result, docker.tls.TLSConfig)
+        assert result.verify is True
+        assert result.ca_cert == self.ca_cert
+        assert result.cert == (self.client_cert, self.key)
 
 
 class TestGetTlsVersion(object):
