@@ -236,8 +236,14 @@ class TopLevelCommand(object):
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
         """
+        service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
         if build_args:
+            if not service_names and docker.utils.version_lt(self.project.client.api_version, '1.25'):
+                raise UserError(
+                    '--build-arg is only supported when services are specified for API version < 1.25.'
+                    ' Please use a Compose file version > 2.2 or specify which services to build.'
+                )
             environment = Environment.from_env_file(self.project_dir)
             build_args = resolve_build_args(build_args, environment)
 
@@ -1026,8 +1032,7 @@ class TopLevelCommand(object):
 
             if cascade_stop:
                 print("Aborting on container exit...")
-                all_containers = self.project.containers(
-                    service_names=options['SERVICE'], stopped=True)
+                all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
                 exit_code = compute_exit_code(
                     exit_value_from, attached_containers, cascade_starter, all_containers
                 )
