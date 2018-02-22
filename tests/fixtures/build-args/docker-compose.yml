@@ -1,0 +1,7 @@
+version: '2.2'
+services:
+  web:
+    build:
+      context: .
+      args:
+        - favorite_th_character=mariya.kirisame

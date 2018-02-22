@@ -658,6 +658,33 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['build', '--no-cache', '--memory', '96m', 'service'], None)
         assert 'memory: 100663296' in result.stdout  # 96 * 1024 * 1024
 
+    def test_build_with_buildarg_from_compose_file(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build'], None)
+        assert 'Favorite Touhou Character: mariya.kirisame' in result.stdout
+
+    def test_build_with_buildarg_cli_override(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build', '--build-arg', 'favorite_th_character=sakuya.izayoi'], None)
+        assert 'Favorite Touhou Character: sakuya.izayoi' in result.stdout
+
+    @mock.patch.dict(os.environ)
+    def test_build_with_buildarg_old_api_version(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        os.environ['COMPOSE_API_VERSION'] = '1.24'
+        result = self.dispatch(
+            ['build', '--build-arg', 'favorite_th_character=reimu.hakurei'], None, returncode=1
+        )
+        assert '--build-arg is only supported when services are specified' in result.stderr
+
+        result = self.dispatch(
+            ['build', '--build-arg', 'favorite_th_character=hong.meiling', 'web'], None
+        )
+        assert 'Favorite Touhou Character: hong.meiling' in result.stdout
+
     def test_bundle_with_digests(self):
         self.base_dir = 'tests/fixtures/bundle-with-digests/'
         tmpdir = pytest.ensuretemp('cli_test_bundle')
