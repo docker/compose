@@ -13,9 +13,9 @@ from docker.utils.config import home_dir
 
 from ..config.environment import Environment
 from ..const import HTTP_TIMEOUT
+from ..utils import unquote_path
 from .errors import UserError
 from .utils import generate_user_agent
-from .utils import unquote_path
 
 log = logging.getLogger(__name__)
 

@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import os.path
+import json
+import os
 import random
+import tempfile
 
 import py
 import pytest
@@ -1834,3 +1836,35 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
+
+    def test_project_up_seccomp_profile(self):
+        seccomp_data = {
+            'defaultAction': 'SCMP_ACT_ALLOW',
+            'syscalls': []
+        }
+        fd, profile_path = tempfile.mkstemp('_seccomp.json')
+        self.addCleanup(os.remove, profile_path)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(seccomp_data, f)
+
+        config_dict = {
+            'version': '2.3',
+            'services': {
+                'svc1': {
+                    'image': 'busybox:latest',
+                    'command': 'top',
+                    'security_opt': ['seccomp:"{}"'.format(profile_path)]
+                }
+            }
+        }
+
+        config_data = load_config(config_dict)
+        project = Project.from_config(name='composetest', config_data=config_data, client=self.client)
+        project.up()
+        containers = project.containers()
+        assert len(containers) == 1
+
+        remote_secopts = containers[0].get('HostConfig.SecurityOpt')
+        assert len(remote_secopts) == 1
+        assert remote_secopts[0].startswith('seccomp=')
+        assert json.loads(remote_secopts[0].lstrip('seccomp=')) == seccomp_data

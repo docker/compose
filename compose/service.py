@@ -881,6 +881,10 @@ class Service(object):
             init_path = options.get('init')
             options['init'] = True
 
+        security_opt = [
+            o.value for o in options.get('security_opt')
+        ] if options.get('security_opt') else None
+
         nano_cpus = None
         if 'cpus' in options:
             nano_cpus = int(options.get('cpus') * NANOCPUS_SCALE)
@@ -910,7 +914,7 @@ class Service(object):
             extra_hosts=options.get('extra_hosts'),
             read_only=options.get('read_only'),
             pid_mode=self.pid_mode.mode,
-            security_opt=options.get('security_opt'),
+            security_opt=security_opt,
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
