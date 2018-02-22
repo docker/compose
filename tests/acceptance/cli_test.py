@@ -884,6 +884,19 @@ class CLITestCase(DockerClientTestCase):
         assert not container.get('Config.AttachStdout')
         assert not container.get('Config.AttachStdin')
 
+    def test_up_detached_long_form(self):
+        self.dispatch(['up', '--detach'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        assert len(service.containers()) == 1
+        assert len(another.containers()) == 1
+
+        # Ensure containers don't have stdin and stdout connected in -d mode
+        container, = service.containers()
+        assert not container.get('Config.AttachStderr')
+        assert not container.get('Config.AttachStdout')
+        assert not container.get('Config.AttachStdin')
+
     def test_up_attached(self):
         self.base_dir = 'tests/fixtures/echo-services'
         result = self.dispatch(['up', '--no-color'])
@@ -1457,6 +1470,15 @@ class CLITestCase(DockerClientTestCase):
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'console'])
+        assert len(self.project.containers()) == 1
+
+        stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])
+        assert stderr == ""
+        assert stdout == "/\n"
+
+    def test_exec_detach_long_form(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '--detach', 'console'])
         assert len(self.project.containers()) == 1
 
         stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])

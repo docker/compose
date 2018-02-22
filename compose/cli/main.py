@@ -438,7 +438,7 @@ class TopLevelCommand(object):
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
-        detach = options.get('-d') or options.get('--detach')
+        detach = options.get('--detach')
 
         if options['--env'] and docker.utils.version_lt(self.project.client.api_version, '1.25'):
             raise UserError("Setting environment for exec is not supported in API < 1.25'")
@@ -762,7 +762,7 @@ class TopLevelCommand(object):
                 SERVICE [COMMAND] [ARGS...]
 
         Options:
-            -d --detach           Detached mode: Run container in the background, print
+            -d, --detach          Detached mode: Run container in the background, print
                                   new container name.
             --name NAME           Assign a name to the container
             --entrypoint CMD      Override the entrypoint of the image.
@@ -780,7 +780,7 @@ class TopLevelCommand(object):
             -w, --workdir=""      Working directory inside the container
         """
         service = self.project.get_service(options['SERVICE'])
-        detach = options.get('-d') or options.get('--detach')
+        detach = options.get('--detach')
 
         if options['--publish'] and options['--service-ports']:
             raise UserError(
@@ -963,7 +963,7 @@ class TopLevelCommand(object):
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
-        detached = options.get('-d') or options.get('--detach')
+        detached = options.get('--detach')
         no_start = options.get('--no-start')
 
         if detached and (cascade_stop or exit_value_from):
@@ -1245,7 +1245,7 @@ def run_one_off_container(container_options, project, service, options, project_
         one_off=True,
         **container_options)
 
-    if options.get('-d') or options.get('--detach'):
+    if options.get('--detach'):
         service.start_container(container)
         print(container.name)
         return
@@ -1372,7 +1372,7 @@ def parse_scale_args(options):
 def build_exec_command(options, container_id, command):
     args = ["exec"]
 
-    if options["-d"]:
+    if options["--detach"]:
         args += ["--detach"]
     else:
         args += ["--interactive"]
