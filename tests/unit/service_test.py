@@ -25,6 +25,7 @@ from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
+from compose.service import format_environment
 from compose.service import formatted_ports
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
@@ -742,6 +743,148 @@ class ServiceTest(unittest.TestCase):
         mock_log.warn.assert_called_once_with(
             'The "{}" service specifies a port on the host. If multiple containers '
             'for this service are created on a single host, the port will clash.'.format(name))
+
+    def test_parse_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+            'noProxy': '*.intra.mycorp.com',
+        }
+
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+
+        service = Service('foo', client=self.mock_client)
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': default_proxy_config['httpsProxy'],
+            'https_proxy': default_proxy_config['httpsProxy'],
+            'FTP_PROXY': default_proxy_config['ftpProxy'],
+            'ftp_proxy': default_proxy_config['ftpProxy'],
+            'NO_PROXY': default_proxy_config['noProxy'],
+            'no_proxy': default_proxy_config['noProxy'],
+        }
+
+    def test_parse_proxy_config_per_host(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+            'noProxy': '*.intra.mycorp.com',
+        }
+        host_specific_proxy_config = {
+            'httpProxy': 'http://proxy.example.com:3128',
+            'httpsProxy': 'https://user:password@proxy.example.com:3129',
+            'ftpProxy': 'http://ftpproxy.example.com:21',
+            'noProxy': '*.intra.example.com'
+        }
+
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+                'tcp://example.docker.com:2376': host_specific_proxy_config,
+            }
+        }
+
+        service = Service('foo', client=self.mock_client)
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': default_proxy_config['httpsProxy'],
+            'https_proxy': default_proxy_config['httpsProxy'],
+            'FTP_PROXY': default_proxy_config['ftpProxy'],
+            'ftp_proxy': default_proxy_config['ftpProxy'],
+            'NO_PROXY': default_proxy_config['noProxy'],
+            'no_proxy': default_proxy_config['noProxy'],
+        }
+
+        self.mock_client._original_base_url = 'tcp://example.docker.com:2376'
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': host_specific_proxy_config['httpProxy'],
+            'http_proxy': host_specific_proxy_config['httpProxy'],
+            'HTTPS_PROXY': host_specific_proxy_config['httpsProxy'],
+            'https_proxy': host_specific_proxy_config['httpsProxy'],
+            'FTP_PROXY': host_specific_proxy_config['ftpProxy'],
+            'ftp_proxy': host_specific_proxy_config['ftpProxy'],
+            'NO_PROXY': host_specific_proxy_config['noProxy'],
+            'no_proxy': host_specific_proxy_config['noProxy'],
+        }
+
+    def test_build_service_with_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.example.com:3129',
+        }
+        buildargs = {
+            'HTTPS_PROXY': 'https://rdcf.th08.jp:8911',
+            'https_proxy': 'https://rdcf.th08.jp:8911',
+        }
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.', 'args': buildargs})
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        assert self.mock_client.build.call_args[1]['buildargs'] == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': buildargs['HTTPS_PROXY'],
+            'https_proxy': buildargs['HTTPS_PROXY'],
+        }
+
+    def test_get_create_options_with_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+        }
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+
+        override_options = {
+            'environment': {
+                'FTP_PROXY': 'ftp://xdge.exo.au:21',
+                'ftp_proxy': 'ftp://xdge.exo.au:21',
+            }
+        }
+        environment = {
+            'HTTPS_PROXY': 'https://rdcf.th08.jp:8911',
+            'https_proxy': 'https://rdcf.th08.jp:8911',
+        }
+
+        service = Service('foo', client=self.mock_client, environment=environment)
+
+        create_opts = service._get_container_create_options(override_options, 1)
+        assert set(create_opts['environment']) == set(format_environment({
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': environment['HTTPS_PROXY'],
+            'https_proxy': environment['HTTPS_PROXY'],
+            'FTP_PROXY': override_options['environment']['FTP_PROXY'],
+            'ftp_proxy': override_options['environment']['FTP_PROXY'],
+        }))
 
 
 class TestServiceNetwork(unittest.TestCase):
