@@ -619,6 +619,20 @@ class CLITestCase(DockerClientTestCase):
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
 
+    def test_build_log_level(self):
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        result = self.dispatch(['--log-level', 'warning', 'build', 'simple'])
+        assert result.stderr == ''
+        result = self.dispatch(['--log-level', 'debug', 'build', 'simple'])
+        assert 'Building simple' in result.stderr
+        assert 'Using configuration file' in result.stderr
+        self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+        result = self.dispatch(['--log-level', 'critical', 'build', 'simple'], returncode=1)
+        assert result.stderr == ''
+        result = self.dispatch(['--log-level', 'debug', 'build', 'simple'], returncode=1)
+        assert 'Building simple' in result.stderr
+        assert 'non-zero code' in result.stderr
+
     def test_build_failed(self):
         self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
         self.dispatch(['build', 'simple'], returncode=1)

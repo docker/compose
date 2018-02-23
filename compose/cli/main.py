@@ -100,7 +100,10 @@ def dispatch():
         {'options_first': True, 'version': get_version_info('compose')})
 
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
-    setup_console_handler(console_handler, options.get('--verbose'), options.get('--no-ansi'))
+    setup_console_handler(console_handler,
+                          options.get('--verbose'),
+                          options.get('--no-ansi'),
+                          options.get("--log-level"))
     setup_parallel_logger(options.get('--no-ansi'))
     if options.get('--no-ansi'):
         command_options['--no-color'] = True
@@ -139,7 +142,7 @@ def setup_parallel_logger(noansi):
         compose.parallel.ParallelStreamWriter.set_noansi()
 
 
-def setup_console_handler(handler, verbose, noansi=False):
+def setup_console_handler(handler, verbose, noansi=False, level=None):
     if handler.stream.isatty() and noansi is False:
         format_class = ConsoleWarningFormatter
     else:
@@ -147,10 +150,25 @@ def setup_console_handler(handler, verbose, noansi=False):
 
     if verbose:
         handler.setFormatter(format_class('%(name)s.%(funcName)s: %(message)s'))
-        handler.setLevel(logging.DEBUG)
+        loglevel = logging.DEBUG
     else:
         handler.setFormatter(format_class())
-        handler.setLevel(logging.INFO)
+        loglevel = logging.INFO
+
+    if level is not None:
+        levels = {
+          'DEBUG': logging.DEBUG,
+          'INFO': logging.INFO,
+          'WARNING': logging.WARNING,
+          'ERROR': logging.ERROR,
+          'CRITICAL': logging.CRITICAL,
+        }
+        loglevel = levels.get(level.upper())
+        if loglevel is None:
+            raise UserError('Invalid value for --log-level. Expected one of '
+                            + 'DEBUG, INFO, WARNING, ERROR, CRITICAL.')
+
+    handler.setLevel(loglevel)
 
 
 # stolen from docopt master
@@ -171,6 +189,7 @@ class TopLevelCommand(object):
       -f, --file FILE             Specify an alternate compose file (default: docker-compose.yml)
       -p, --project-name NAME     Specify an alternate project name (default: directory name)
       --verbose                   Show more output
+      --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
       --no-ansi                   Do not print ANSI control characters
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
