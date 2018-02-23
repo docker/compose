@@ -102,6 +102,7 @@ class CLITestCase(unittest.TestCase):
         os.environ['COMPOSE_INTERACTIVE_NO_CLI'] = 'true'
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        mock_client._general_configs = {}
         project = Project.from_config(
             name='composetest',
             client=mock_client,
@@ -136,6 +137,7 @@ class CLITestCase(unittest.TestCase):
     def test_run_service_with_restart_always(self):
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        mock_client._general_configs = {}
 
         project = Project.from_config(
             name='composetest',

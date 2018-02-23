@@ -43,6 +43,7 @@ class ServiceTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
         self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -743,13 +744,16 @@ class ServiceTest(unittest.TestCase):
             'for this service are created on a single host, the port will clash.'.format(name))
 
 
-class TestServiceNetwork(object):
+class TestServiceNetwork(unittest.TestCase):
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_connect_container_to_networks_short_aliase_exists(self):
-        mock_client = mock.create_autospec(docker.APIClient)
         service = Service(
             'db',
-            mock_client,
+            self.mock_client,
             'myproject',
             image='foo',
             networks={'project_default': {}})
@@ -768,8 +772,8 @@ class TestServiceNetwork(object):
             True)
         service.connect_container_to_networks(container)
 
-        assert not mock_client.disconnect_container_from_network.call_count
-        assert not mock_client.connect_container_to_network.call_count
+        assert not self.mock_client.disconnect_container_from_network.call_count
+        assert not self.mock_client.connect_container_to_network.call_count
 
 
 def sort_by_name(dictionary_list):
@@ -814,6 +818,10 @@ class BuildUlimitsTestCase(unittest.TestCase):
 
 
 class NetTestCase(unittest.TestCase):
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_network_mode(self):
         network_mode = NetworkMode('host')
@@ -831,12 +839,11 @@ class NetTestCase(unittest.TestCase):
     def test_network_mode_service(self):
         container_id = 'bbbb'
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.APIClient)
-        mock_client.containers.return_value = [
+        self.mock_client.containers.return_value = [
             {'Id': container_id, 'Name': container_id, 'Image': 'abcd'},
         ]
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=self.mock_client)
         network_mode = ServiceNetworkMode(service)
 
         assert network_mode.id == service_name
@@ -845,10 +852,9 @@ class NetTestCase(unittest.TestCase):
 
     def test_network_mode_service_no_containers(self):
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.APIClient)
-        mock_client.containers.return_value = []
+        self.mock_client.containers.return_value = []
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=self.mock_client)
         network_mode = ServiceNetworkMode(service)
 
         assert network_mode.id == service_name
@@ -884,6 +890,7 @@ class ServiceVolumesTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
         self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(VolumeSpec.parse('/outside:/inside', True))
@@ -1118,6 +1125,8 @@ class ServiceVolumesTest(unittest.TestCase):
 class ServiceSecretTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_get_secret_volumes(self):
         secret1 = {

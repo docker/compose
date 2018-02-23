@@ -793,8 +793,12 @@ class Service(object):
             ))
 
         container_options['environment'] = merge_environment(
-            self.options.get('environment'),
-            override_options.get('environment'))
+            self._parse_proxy_config(),
+            merge_environment(
+                self.options.get('environment'),
+                override_options.get('environment')
+            )
+        )
 
         container_options['labels'] = merge_labels(
             self.options.get('labels'),
@@ -962,6 +966,9 @@ class Service(object):
         build_args = build_opts.get('args', {}).copy()
         if build_args_override:
             build_args.update(build_args_override)
+
+        for k, v in self._parse_proxy_config().items():
+            build_args.setdefault(k, v)
 
         # python2 os.stat() doesn't support unicode on some UNIX, so we
         # encode it to a bytestring to be safe
@@ -1140,6 +1147,31 @@ class Service(object):
                 result = False
             elif status == 'unhealthy':
                 raise HealthCheckFailed(ctnr.short_id)
+        return result
+
+    def _parse_proxy_config(self):
+        client = self.client
+        if 'proxies' not in client._general_configs:
+            return {}
+        docker_host = getattr(client, '_original_base_url', client.base_url)
+        proxy_config = client._general_configs['proxies'].get(
+            docker_host, client._general_configs['proxies'].get('default')
+        ) or {}
+
+        permitted = {
+            'ftpProxy': 'FTP_PROXY',
+            'httpProxy': 'HTTP_PROXY',
+            'httpsProxy': 'HTTPS_PROXY',
+            'noProxy': 'NO_PROXY',
+        }
+
+        result = {}
+
+        for k, v in proxy_config.items():
+            if k not in permitted:
+                continue
+            result[permitted[k]] = result[permitted[k].lower()] = v
+
         return result
 
 
