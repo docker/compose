@@ -934,6 +934,7 @@ class TopLevelCommand(object):
                                        print new container names. Incompatible with
                                        --abort-on-container-exit.
             --no-color                 Produce monochrome output.
+            --quiet-pull               Pull without printing progress information
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
@@ -998,7 +999,8 @@ class TopLevelCommand(object):
                     start=not no_start,
                     always_recreate_deps=always_recreate_deps,
                     reset_container_image=rebuild,
-                    renew_anonymous_volumes=options.get('--renew-anon-volumes')
+                    renew_anonymous_volumes=options.get('--renew-anon-volumes'),
+                    silent=options.get('--quiet-pull'),
                 )
 
             try:

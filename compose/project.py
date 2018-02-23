@@ -446,7 +446,9 @@ class Project(object):
            start=True,
            always_recreate_deps=False,
            reset_container_image=False,
-           renew_anonymous_volumes=False):
+           renew_anonymous_volumes=False,
+           silent=False,
+           ):
 
         self.initialize()
         if not ignore_orphans:
@@ -460,7 +462,7 @@ class Project(object):
             include_deps=start_deps)
 
         for svc in services:
-            svc.ensure_image_exists(do_build=do_build)
+            svc.ensure_image_exists(do_build=do_build, silent=silent)
         plans = self._get_convergence_plans(
             services, strategy, always_recreate_deps=always_recreate_deps)
         scaled_services = self.get_scaled_services(services, scale_override)
