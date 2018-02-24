@@ -261,11 +261,18 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
             config)
 
 
-def find(base_dir, filenames, environment, override_dir=None):
+def find(base_dir, filenames, environment, override_dir=None, url=None):
     if filenames == ['-']:
         return ConfigDetails(
             os.path.abspath(override_dir) if override_dir else os.getcwd(),
             [ConfigFile(None, yaml.safe_load(sys.stdin))],
+            environment
+        )
+    if url:
+        response = six.moves.urllib.request.urlopen(url)
+        return ConfigDetails(
+            os.path.abspath(override_dir) if override_dir else os.getcwd(),
+            [ConfigFile(None, yaml.safe_load(response.read()))],
             environment
         )
 

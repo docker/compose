@@ -191,6 +191,7 @@ class TopLevelCommand(object):
       --verbose                   Show more output
       --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
       --no-ansi                   Do not print ANSI control characters
+      --url URL                   Specify url of compose file to use
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
 

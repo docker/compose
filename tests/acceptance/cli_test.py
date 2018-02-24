@@ -891,6 +891,19 @@ class CLITestCase(DockerClientTestCase):
         assert 'Removing network v2full_default' in result.stderr
         assert 'Removing network v2full_front' in result.stderr
 
+    def test_down_url(self):
+        self.base_dir = '.'
+        url = 'https://raw.githubusercontent.com/docker/compose/' \
+              '771bf5f7ea059f1efede26bd9b164e05467d289e/tests/fixtures/' \
+              'simple-composefile/docker-compose.yml'
+        self._project = get_project(self.base_dir, override_dir=self.override_dir, url=url)
+
+        self.dispatch(['--url', url, 'up', '-d'])
+        wait_on_condition(ContainerCountCondition(self.project, 2))
+
+        self.dispatch(['--url', url, 'down'])
+        assert len(self.project.containers()) == 0
+
     def test_down_timeout(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -937,6 +950,18 @@ class CLITestCase(DockerClientTestCase):
         assert not container.get('Config.AttachStderr')
         assert not container.get('Config.AttachStdout')
         assert not container.get('Config.AttachStdin')
+
+    def test_up_url(self):
+        self.base_dir = '.'
+        url = 'https://raw.githubusercontent.com/docker/compose/' \
+              '771bf5f7ea059f1efede26bd9b164e05467d289e/tests/fixtures/' \
+              'simple-composefile/docker-compose.yml'
+        self._project = get_project(self.base_dir, override_dir=self.override_dir, url=url)
+        self.dispatch(['--url', url, 'up', '-d'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        self.assertEqual(len(service.containers()), 1)
+        self.assertEqual(len(another.containers()), 1)
 
     def test_up_attached(self):
         self.base_dir = 'tests/fixtures/echo-services'
