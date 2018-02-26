@@ -131,14 +131,6 @@ def generate_user_agent():
     return " ".join(parts)
 
 
-def unquote_path(s):
-    if not s:
-        return s
-    if s[0] == '"' and s[-1] == '"':
-        return s[1:-1]
-    return s
-
-
 def human_readable_file_size(size):
     suffixes = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', ]
     order = int(math.log(size, 2) / 10) if size else 0
