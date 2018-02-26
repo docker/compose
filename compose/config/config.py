@@ -16,6 +16,7 @@ from . import types
 from .. import const
 from ..const import COMPOSEFILE_V1 as V1
 from ..const import COMPOSEFILE_V2_1 as V2_1
+from ..const import COMPOSEFILE_V2_3 as V2_3
 from ..const import COMPOSEFILE_V3_0 as V3_0
 from ..const import COMPOSEFILE_V3_4 as V3_4
 from ..utils import build_string_dict
@@ -341,7 +342,7 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-def check_swarm_only_config(service_dicts):
+def check_swarm_only_config(service_dicts, compatibility=False):
     warning_template = (
         "Some services ({services}) use the '{key}' key, which will be ignored. "
         "Compose does not support '{key}' configuration - use "
@@ -357,13 +358,13 @@ def check_swarm_only_config(service_dicts):
                     key=key
                 )
             )
-
-    check_swarm_only_key(service_dicts, 'deploy')
+    if not compatibility:
+        check_swarm_only_key(service_dicts, 'deploy')
     check_swarm_only_key(service_dicts, 'credential_spec')
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details):
+def load(config_details, compatibility=False):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -391,15 +392,17 @@ def load(config_details):
     configs = load_mapping(
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
-    service_dicts = load_services(config_details, main_file)
+    service_dicts = load_services(config_details, main_file, compatibility)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    check_swarm_only_config(service_dicts)
+    check_swarm_only_config(service_dicts, compatibility)
 
-    return Config(main_file.version, service_dicts, volumes, networks, secrets, configs)
+    version = V2_3 if compatibility and main_file.version >= V3_0 else main_file.version
+
+    return Config(version, service_dicts, volumes, networks, secrets, configs)
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):
@@ -441,7 +444,7 @@ def validate_external(entity_type, name, config, version):
                 entity_type, name, ', '.join(k for k in config if k != 'external')))
 
 
-def load_services(config_details, config_file):
+def load_services(config_details, config_file, compatibility=False):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
@@ -459,7 +462,9 @@ def load_services(config_details, config_file):
             service_config,
             service_names,
             config_file.version,
-            config_details.environment)
+            config_details.environment,
+            compatibility
+        )
         return service_dict
 
     def build_services(service_config):
@@ -827,7 +832,7 @@ def finalize_service_volumes(service_dict, environment):
     return service_dict
 
 
-def finalize_service(service_config, service_names, version, environment):
+def finalize_service(service_config, service_names, version, environment, compatibility):
     service_dict = dict(service_config.config)
 
     if 'environment' in service_dict or 'env_file' in service_dict:
@@ -868,8 +873,78 @@ def finalize_service(service_config, service_names, version, environment):
 
     normalize_build(service_dict, service_config.working_dir, environment)
 
+    if compatibility:
+        service_dict, ignored_keys = translate_deploy_keys_to_container_config(
+            service_dict
+        )
+        if ignored_keys:
+            log.warn(
+                'The following deploy sub-keys are not supported in compatibility mode and have'
+                ' been ignored: {}'.format(', '.join(ignored_keys))
+            )
+
     service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
+
+
+def translate_resource_keys_to_container_config(resources_dict, service_dict):
+    if 'limits' in resources_dict:
+        service_dict['mem_limit'] = resources_dict['limits'].get('memory')
+        if 'cpus' in resources_dict['limits']:
+            service_dict['cpus'] = float(resources_dict['limits']['cpus'])
+    if 'reservations' in resources_dict:
+        service_dict['mem_reservation'] = resources_dict['reservations'].get('memory')
+        if 'cpus' in resources_dict['reservations']:
+            return ['resources.reservations.cpus']
+    return []
+
+
+def convert_restart_policy(name):
+    try:
+        return {
+            'any': 'always',
+            'none': 'no',
+            'on-failure': 'on-failure'
+        }[name]
+    except KeyError:
+        raise ConfigurationError('Invalid restart policy "{}"'.format(name))
+
+
+def translate_deploy_keys_to_container_config(service_dict):
+    if 'deploy' not in service_dict:
+        return service_dict, []
+
+    deploy_dict = service_dict['deploy']
+    ignored_keys = [
+        k for k in ['endpoint_mode', 'labels', 'update_config', 'placement']
+        if k in deploy_dict
+    ]
+
+    if 'replicas' in deploy_dict and deploy_dict.get('mode', 'replicated') == 'replicated':
+        service_dict['scale'] = deploy_dict['replicas']
+
+    if 'restart_policy' in deploy_dict:
+        service_dict['restart'] = {
+            'Name': convert_restart_policy(deploy_dict['restart_policy'].get('condition', 'any')),
+            'MaximumRetryCount': deploy_dict['restart_policy'].get('max_attempts', 0)
+        }
+        for k in deploy_dict['restart_policy'].keys():
+            if k != 'condition' and k != 'max_attempts':
+                ignored_keys.append('restart_policy.{}'.format(k))
+
+    ignored_keys.extend(
+        translate_resource_keys_to_container_config(
+            deploy_dict.get('resources', {}), service_dict
+        )
+    )
+
+    del service_dict['deploy']
+    if 'credential_spec' in service_dict:
+        del service_dict['credential_spec']
+    if 'configs' in service_dict:
+        del service_dict['configs']
+
+    return service_dict, ignored_keys
 
 
 def normalize_v1_service_format(service_dict):

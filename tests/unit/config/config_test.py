@@ -3303,6 +3303,82 @@ class InterpolationTest(unittest.TestCase):
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
+    def test_compatibility_mode_warnings(self):
+        config_details = build_config_details({
+            'version': '3.5',
+            'services': {
+                'web': {
+                    'deploy': {
+                        'labels': ['abc=def'],
+                        'endpoint_mode': 'dnsrr',
+                        'update_config': {'max_failure_ratio': 0.4},
+                        'placement': {'constraints': ['node.id==deadbeef']},
+                        'resources': {
+                            'reservations': {'cpus': '0.2'}
+                        },
+                        'restart_policy': {
+                            'delay': '2s',
+                            'window': '12s'
+                        }
+                    },
+                    'image': 'busybox'
+                }
+            }
+        })
+
+        with mock.patch('compose.config.config.log') as log:
+            config.load(config_details, compatibility=True)
+
+        assert log.warn.call_count == 1
+        warn_message = log.warn.call_args[0][0]
+        assert warn_message.startswith(
+            'The following deploy sub-keys are not supported in compatibility mode'
+        )
+        assert 'labels' in warn_message
+        assert 'endpoint_mode' in warn_message
+        assert 'update_config' in warn_message
+        assert 'placement' in warn_message
+        assert 'resources.reservations.cpus' in warn_message
+        assert 'restart_policy.delay' in warn_message
+        assert 'restart_policy.window' in warn_message
+
+    def test_compatibility_mode_load(self):
+        config_details = build_config_details({
+            'version': '3.5',
+            'services': {
+                'foo': {
+                    'image': 'alpine:3.7',
+                    'deploy': {
+                        'replicas': 3,
+                        'restart_policy': {
+                            'condition': 'any',
+                            'max_attempts': 7,
+                        },
+                        'resources': {
+                            'limits': {'memory': '300M', 'cpus': '0.7'},
+                            'reservations': {'memory': '100M'},
+                        },
+                    },
+                },
+            },
+        })
+
+        with mock.patch('compose.config.config.log') as log:
+            cfg = config.load(config_details, compatibility=True)
+
+        assert log.warn.call_count == 0
+
+        service_dict = cfg.services[0]
+        assert service_dict == {
+            'image': 'alpine:3.7',
+            'scale': 3,
+            'restart': {'MaximumRetryCount': 7, 'Name': 'always'},
+            'mem_limit': '300M',
+            'mem_reservation': '100M',
+            'cpus': 0.7,
+            'name': 'foo'
+        }
+
     @mock.patch.dict(os.environ)
     def test_invalid_interpolation(self):
         with pytest.raises(config.ConfigurationError) as cm:

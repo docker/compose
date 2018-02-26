@@ -1,0 +1,22 @@
+version: '3.5'
+services:
+  foo:
+    image: alpine:3.7
+    command: /bin/true
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: any
+        max_attempts: 7
+      resources:
+        limits:
+          memory: 300M
+          cpus: '0.7'
+        reservations:
+          memory: 100M
+    volumes:
+      - foo:/bar
+
+volumes:
+  foo:
+    driver: default
