@@ -265,6 +265,11 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.inspect()['Config']['MacAddress'] == '02:42:ac:11:65:43'
 
+    def test_create_container_with_device_cgroup_rules(self):
+        service = self.create_service('db', device_cgroup_rules=['c 7:128 rwm'])
+        container = service.create_container()
+        assert container.get('HostConfig.DeviceCgroupRules') == ['c 7:128 rwm']
+
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
