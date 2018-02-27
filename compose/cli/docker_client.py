@@ -117,4 +117,7 @@ def docker_client(environment, version=None, tls_config=None, host=None,
 
     kwargs['user_agent'] = generate_user_agent()
 
-    return APIClient(**kwargs)
+    client = APIClient(**kwargs)
+    client._original_base_url = kwargs.get('base_url')
+
+    return client
