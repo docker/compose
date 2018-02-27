@@ -1697,6 +1697,18 @@ class CLITestCase(DockerClientTestCase):
         assert container.get('Config.Entrypoint') == ['printf']
         assert container.get('Config.Cmd') == ['default', 'args']
 
+    def test_run_service_with_unset_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint=""', 'test', 'true'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') is None
+        assert container.get('Config.Cmd') == ['true']
+
+        self.dispatch(['run', '--entrypoint', '""', 'test', 'true'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') is None
+        assert container.get('Config.Cmd') == ['true']
+
     def test_run_service_with_dockerfile_entrypoint_overridden(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
         self.dispatch(['run', '--entrypoint', 'echo', 'test'])

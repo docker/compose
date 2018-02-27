@@ -1232,8 +1232,10 @@ def build_container_options(options, detach, command):
     if options['--label']:
         container_options['labels'] = parse_labels(options['--label'])
 
-    if options['--entrypoint']:
-        container_options['entrypoint'] = options.get('--entrypoint')
+    if options.get('--entrypoint') is not None:
+        container_options['entrypoint'] = (
+            [""] if options['--entrypoint'] == '' else options['--entrypoint']
+        )
 
     if options['--rm']:
         container_options['restart'] = None
