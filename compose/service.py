@@ -66,6 +66,7 @@ HOST_CONFIG_KEYS = [
     'cpu_shares',
     'cpus',
     'cpuset',
+    'device_cgroup_rules',
     'devices',
     'dns',
     'dns_search',
@@ -944,6 +945,7 @@ class Service(object):
             device_write_bps=blkio_config.get('device_write_bps'),
             device_write_iops=blkio_config.get('device_write_iops'),
             mounts=options.get('mounts'),
+            device_cgroup_rules=options.get('device_cgroup_rules'),
         )
 
     def get_secret_volumes(self):

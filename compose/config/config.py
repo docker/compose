@@ -72,6 +72,7 @@ DOCKER_CONFIG_KEYS = [
     'cpus',
     'cpuset',
     'detach',
+    'device_cgroup_rules',
     'devices',
     'dns',
     'dns_search',
@@ -1045,7 +1046,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'cap_add', 'cap_drop', 'expose', 'external_links',
-        'security_opt', 'volumes_from',
+        'security_opt', 'volumes_from', 'device_cgroup_rules',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 

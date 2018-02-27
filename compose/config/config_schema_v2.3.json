@@ -99,8 +99,8 @@
             }
           ]
         },
-        "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-        "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "cap_add": {"$ref": "#/definitions/list_of_strings"},
+        "cap_drop": {"$ref": "#/definitions/list_of_strings"},
         "cgroup_parent": {"type": "string"},
         "command": {
           "oneOf": [
@@ -137,7 +137,8 @@
             }
           ]
         },
-        "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "device_cgroup_rules": {"$ref": "#/definitions/list_of_strings"},
+        "devices": {"$ref": "#/definitions/list_of_strings"},
         "dns_opt": {
           "type": "array",
           "items": {
@@ -184,7 +185,7 @@
           ]
         },
 
-        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "external_links": {"$ref": "#/definitions/list_of_strings"},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
         "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
@@ -193,7 +194,7 @@
         "ipc": {"type": "string"},
         "isolation": {"type": "string"},
         "labels": {"$ref": "#/definitions/labels"},
-        "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "links": {"$ref": "#/definitions/list_of_strings"},
 
         "logging": {
             "type": "object",
@@ -264,7 +265,7 @@
         "restart": {"type": "string"},
         "runtime": {"type": "string"},
         "scale": {"type": "integer"},
-        "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "security_opt": {"$ref": "#/definitions/list_of_strings"},
         "shm_size": {"type": ["number", "string"]},
         "sysctls": {"$ref": "#/definitions/list_or_dict"},
         "pids_limit": {"type": ["number", "string"]},
@@ -335,7 +336,7 @@
           }
         },
         "volume_driver": {"type": "string"},
-        "volumes_from": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "volumes_from": {"$ref": "#/definitions/list_of_strings"},
         "working_dir": {"type": "string"}
       },
 

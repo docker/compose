@@ -2558,6 +2558,21 @@ class ConfigTest(unittest.TestCase):
         actual = config.merge_service_dicts(base, override, V2_3)
         assert actual['healthcheck'] == override['healthcheck']
 
+    def test_merge_device_cgroup_rules(self):
+        base = {
+            'image': 'bar',
+            'device_cgroup_rules': ['c 7:128 rwm', 'x 3:244 rw']
+        }
+
+        override = {
+            'device_cgroup_rules': ['c 7:128 rwm', 'f 0:128 n']
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert sorted(actual['device_cgroup_rules']) == sorted(
+            ['c 7:128 rwm', 'x 3:244 rw', 'f 0:128 n']
+        )
+
     def test_external_volume_config(self):
         config_details = build_config_details({
             'version': '2',
