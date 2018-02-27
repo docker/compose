@@ -6,11 +6,36 @@ python_version() {
   python -V 2>&1
 }
 
+python3_version() {
+  python3 -V 2>&1
+}
+
 openssl_version() {
   python -c "import ssl; print ssl.OPENSSL_VERSION"
 }
 
-echo "*** Using $(python_version)"
+desired_python3_version="3.6.4"
+desired_python3_brew_version="3.6.4_2"
+python3_formula="https://raw.githubusercontent.com/Homebrew/homebrew-core/b4e69a9a592232fa5a82741f6acecffc2f1d198d/Formula/python3.rb"
+
+PATH="/usr/local/bin:$PATH"
+
+if !(which brew); then
+  ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+fi
+
+brew update > /dev/null
+
+if !(python3_version | grep "$desired_python3_version"); then
+  if brew list | grep python3; then
+    brew unlink python3
+  fi
+
+  brew install "$python3_formula"
+  brew switch python3 "$desired_python3_brew_version"
+fi
+
+echo "*** Using $(python3_version) ; $(python_version)"
 echo "*** Using $(openssl_version)"
 
 if !(which virtualenv); then

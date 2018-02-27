@@ -9,14 +9,19 @@ from docker import APIClient
 from docker.errors import TLSParameterError
 from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
+from docker.utils.config import home_dir
 
 from ..config.environment import Environment
 from ..const import HTTP_TIMEOUT
+from ..utils import unquote_path
 from .errors import UserError
 from .utils import generate_user_agent
-from .utils import unquote_path
 
 log = logging.getLogger(__name__)
+
+
+def default_cert_path():
+    return os.path.join(home_dir(), '.docker')
 
 
 def get_tls_version(environment):
@@ -55,6 +60,12 @@ def tls_config_from_options(options, environment=None):
         cert = os.path.join(cert_path, 'cert.pem')
         key = os.path.join(cert_path, 'key.pem')
         ca_cert = os.path.join(cert_path, 'ca.pem')
+
+    if verify and not any((ca_cert, cert, key)):
+        # Default location for cert files is ~/.docker
+        ca_cert = os.path.join(default_cert_path(), 'ca.pem')
+        cert = os.path.join(default_cert_path(), 'cert.pem')
+        key = os.path.join(default_cert_path(), 'key.pem')
 
     tls_version = get_tls_version(environment)
 
@@ -106,4 +117,7 @@ def docker_client(environment, version=None, tls_config=None, host=None,
 
     kwargs['user_agent'] = generate_user_agent()
 
-    return APIClient(**kwargs)
+    client = APIClient(**kwargs)
+    client._original_base_url = kwargs.get('base_url')
+
+    return client

@@ -100,7 +100,10 @@ def dispatch():
         {'options_first': True, 'version': get_version_info('compose')})
 
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
-    setup_console_handler(console_handler, options.get('--verbose'), options.get('--no-ansi'))
+    setup_console_handler(console_handler,
+                          options.get('--verbose'),
+                          options.get('--no-ansi'),
+                          options.get("--log-level"))
     setup_parallel_logger(options.get('--no-ansi'))
     if options.get('--no-ansi'):
         command_options['--no-color'] = True
@@ -113,13 +116,13 @@ def perform_command(options, handler, command_options):
         handler(command_options)
         return
 
-    if options['COMMAND'] in ('config', 'bundle'):
-        command = TopLevelCommand(None)
-        handler(command, options, command_options)
+    if options['COMMAND'] == 'config':
+        command = TopLevelCommand(None, options=options)
+        handler(command, command_options)
         return
 
     project = project_from_options('.', options)
-    command = TopLevelCommand(project)
+    command = TopLevelCommand(project, options=options)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
 
@@ -139,7 +142,7 @@ def setup_parallel_logger(noansi):
         compose.parallel.ParallelStreamWriter.set_noansi()
 
 
-def setup_console_handler(handler, verbose, noansi=False):
+def setup_console_handler(handler, verbose, noansi=False, level=None):
     if handler.stream.isatty() and noansi is False:
         format_class = ConsoleWarningFormatter
     else:
@@ -147,10 +150,26 @@ def setup_console_handler(handler, verbose, noansi=False):
 
     if verbose:
         handler.setFormatter(format_class('%(name)s.%(funcName)s: %(message)s'))
-        handler.setLevel(logging.DEBUG)
+        loglevel = logging.DEBUG
     else:
         handler.setFormatter(format_class())
-        handler.setLevel(logging.INFO)
+        loglevel = logging.INFO
+
+    if level is not None:
+        levels = {
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL,
+        }
+        loglevel = levels.get(level.upper())
+        if loglevel is None:
+            raise UserError(
+                'Invalid value for --log-level. Expected one of DEBUG, INFO, WARNING, ERROR, CRITICAL.'
+            )
+
+    handler.setLevel(loglevel)
 
 
 # stolen from docopt master
@@ -168,9 +187,12 @@ class TopLevelCommand(object):
       docker-compose -h|--help
 
     Options:
-      -f, --file FILE             Specify an alternate compose file (default: docker-compose.yml)
-      -p, --project-name NAME     Specify an alternate project name (default: directory name)
+      -f, --file FILE             Specify an alternate compose file
+                                  (default: docker-compose.yml)
+      -p, --project-name NAME     Specify an alternate project name
+                                  (default: directory name)
       --verbose                   Show more output
+      --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
       --no-ansi                   Do not print ANSI control characters
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
@@ -180,11 +202,12 @@ class TopLevelCommand(object):
       --tlscert CLIENT_CERT_PATH  Path to TLS certificate file
       --tlskey TLS_KEY_PATH       Path to TLS key file
       --tlsverify                 Use TLS and verify the remote
-      --skip-hostname-check       Don't check the daemon's hostname against the name specified
-                                  in the client certificate (for example if your docker host
-                                  is an IP address)
+      --skip-hostname-check       Don't check the daemon's hostname against the
+                                  name specified in the client certificate
       --project-directory PATH    Specify an alternate working directory
                                   (default: the path of the Compose file)
+      --compatibility             If set, Compose will attempt to convert deploy
+                                  keys in v3 files to their non-Swarm equivalent
 
     Commands:
       build              Build or rebuild services
@@ -215,9 +238,10 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.'):
+    def __init__(self, project, project_dir='.', options=None):
         self.project = project
         self.project_dir = '.'
+        self.toplevel_options = options or {}
 
     def build(self, options):
         """
@@ -234,26 +258,28 @@ class TopLevelCommand(object):
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
             -m, --memory MEM        Sets memory limit for the build container.
-            --build-arg key=val     Set build-time variables for one service.
+            --build-arg key=val     Set build-time variables for services.
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
         if build_args:
+            if not service_names and docker.utils.version_lt(self.project.client.api_version, '1.25'):
+                raise UserError(
+                    '--build-arg is only supported when services are specified for API version < 1.25.'
+                    ' Please use a Compose file version > 2.2 or specify which services to build.'
+                )
             environment = Environment.from_env_file(self.project_dir)
             build_args = resolve_build_args(build_args, environment)
 
-        if not service_names and build_args:
-            raise UserError("Need service name for --build-arg option")
-
         self.project.build(
-            service_names=service_names,
+            service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
             build_args=build_args)
 
-    def bundle(self, config_options, options):
+    def bundle(self, options):
         """
         Generate a Distributed Application Bundle (DAB) from the Compose file.
 
@@ -272,8 +298,7 @@ class TopLevelCommand(object):
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
         """
-        self.project = project_from_options('.', config_options)
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
 
         output = options["--output"]
         if not output:
@@ -286,7 +311,7 @@ class TopLevelCommand(object):
 
         log.info("Wrote bundle to {}".format(output))
 
-    def config(self, config_options, options):
+    def config(self, options):
         """
         Validate and view the Compose file.
 
@@ -301,12 +326,13 @@ class TopLevelCommand(object):
 
         """
 
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', config_options)
-            image_digests = image_digests_for_project(self.project)
+            self.project = project_from_options('.', self.toplevel_options)
+            with errors.handle_connection_errors(self.project.client):
+                image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
             return
@@ -424,7 +450,7 @@ class TopLevelCommand(object):
         Usage: exec [options] [-e KEY=VAL...] SERVICE COMMAND [ARGS...]
 
         Options:
-            -d                Detached mode: Run command in the background.
+            -d, --detach      Detached mode: Run command in the background.
             --privileged      Give extended privileges to the process.
             -u, --user USER   Run the command as this user.
             -T                Disable pseudo-tty allocation. By default `docker-compose exec`
@@ -438,7 +464,7 @@ class TopLevelCommand(object):
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
-        detach = options['-d']
+        detach = options.get('--detach')
 
         if options['--env'] and docker.utils.version_lt(self.project.client.api_version, '1.25'):
             raise UserError("Setting environment for exec is not supported in API < 1.25'")
@@ -451,7 +477,10 @@ class TopLevelCommand(object):
         tty = not options["-T"]
 
         if IS_WINDOWS_PLATFORM or use_cli and not detach:
-            sys.exit(call_docker(build_exec_command(options, container.id, command)))
+            sys.exit(call_docker(
+                build_exec_command(options, container.id, command),
+                self.toplevel_options)
+            )
 
         create_exec_options = {
             "privileged": options["--privileged"],
@@ -503,14 +532,14 @@ class TopLevelCommand(object):
         Usage: images [options] [SERVICE...]
 
         Options:
-        -q     Only display IDs
+            -q, --quiet  Only display IDs
         """
         containers = sorted(
             self.project.containers(service_names=options['SERVICE'], stopped=True) +
             self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
             key=attrgetter('name'))
 
-        if options['-q']:
+        if options['--quiet']:
             for image in set(c.image for c in containers):
                 print(image.split(':')[1])
         else:
@@ -624,12 +653,12 @@ class TopLevelCommand(object):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q                   Only display IDs
+            -q, --quiet          Only display IDs
             --services           Display services
             --filter KEY=VAL     Filter services by a property
         """
-        if options['-q'] and options['--services']:
-            raise UserError('-q and --services cannot be combined')
+        if options['--quiet'] and options['--services']:
+            raise UserError('--quiet and --services cannot be combined')
 
         if options['--services']:
             filt = build_filter(options.get('--filter'))
@@ -644,7 +673,7 @@ class TopLevelCommand(object):
             self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
             key=attrgetter('name'))
 
-        if options['-q']:
+        if options['--quiet']:
             for container in containers:
                 print(container.id)
         else:
@@ -676,13 +705,15 @@ class TopLevelCommand(object):
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
             --parallel              Pull multiple images in parallel.
-            --quiet                 Pull without printing progress information
+            -q, --quiet             Pull without printing progress information
+            --include-deps          Also pull services declared as dependencies
         """
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
             parallel_pull=options.get('--parallel'),
             silent=options.get('--quiet'),
+            include_deps=options.get('--include-deps'),
         )
 
     def push(self, options):
@@ -760,7 +791,7 @@ class TopLevelCommand(object):
                 SERVICE [COMMAND] [ARGS...]
 
         Options:
-            -d                    Detached mode: Run container in the background, print
+            -d, --detach          Detached mode: Run container in the background, print
                                   new container name.
             --name NAME           Assign a name to the container
             --entrypoint CMD      Override the entrypoint of the image.
@@ -772,13 +803,15 @@ class TopLevelCommand(object):
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
+            --use-aliases         Use the service's network aliases in the network(s) the
+                                  container connects to.
             -v, --volume=[]       Bind mount a volume (default [])
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
             -w, --workdir=""      Working directory inside the container
         """
         service = self.project.get_service(options['SERVICE'])
-        detach = options['-d']
+        detach = options.get('--detach')
 
         if options['--publish'] and options['--service-ports']:
             raise UserError(
@@ -794,7 +827,10 @@ class TopLevelCommand(object):
             command = service.options.get('command')
 
         container_options = build_container_options(options, detach, command)
-        run_one_off_container(container_options, self.project, service, options, self.project_dir)
+        run_one_off_container(
+            container_options, self.project, service, options,
+            self.toplevel_options, self.project_dir
+        )
 
     def scale(self, options):
         """
@@ -926,10 +962,11 @@ class TopLevelCommand(object):
         Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
 
         Options:
-            -d                         Detached mode: Run containers in the background,
+            -d, --detach               Detached mode: Run containers in the background,
                                        print new container names. Incompatible with
                                        --abort-on-container-exit.
             --no-color                 Produce monochrome output.
+            --quiet-pull               Pull without printing progress information
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
@@ -961,7 +998,7 @@ class TopLevelCommand(object):
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
-        detached = options.get('-d')
+        detached = options.get('--detach')
         no_start = options.get('--no-start')
 
         if detached and (cascade_stop or exit_value_from):
@@ -973,7 +1010,7 @@ class TopLevelCommand(object):
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        opts = ['-d', '--abort-on-container-exit', '--exit-code-from']
+        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from']
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -994,7 +1031,8 @@ class TopLevelCommand(object):
                     start=not no_start,
                     always_recreate_deps=always_recreate_deps,
                     reset_container_image=rebuild,
-                    renew_anonymous_volumes=options.get('--renew-anon-volumes')
+                    renew_anonymous_volumes=options.get('--renew-anon-volumes'),
+                    silent=options.get('--quiet-pull'),
                 )
 
             try:
@@ -1108,42 +1146,41 @@ def timeout_from_opts(options):
 
 
 def image_digests_for_project(project, allow_push=False):
-    with errors.handle_connection_errors(project.client):
-        try:
-            return get_image_digests(
-                project,
-                allow_push=allow_push
+    try:
+        return get_image_digests(
+            project,
+            allow_push=allow_push
+        )
+    except MissingDigests as e:
+        def list_images(images):
+            return "\n".join("    {}".format(name) for name in sorted(images))
+
+        paras = ["Some images are missing digests."]
+
+        if e.needs_push:
+            command_hint = (
+                "Use `docker-compose push {}` to push them. "
+                .format(" ".join(sorted(e.needs_push)))
             )
-        except MissingDigests as e:
-            def list_images(images):
-                return "\n".join("    {}".format(name) for name in sorted(images))
+            paras += [
+                "The following images can be pushed:",
+                list_images(e.needs_push),
+                command_hint,
+            ]
 
-            paras = ["Some images are missing digests."]
+        if e.needs_pull:
+            command_hint = (
+                "Use `docker-compose pull {}` to pull them. "
+                .format(" ".join(sorted(e.needs_pull)))
+            )
 
-            if e.needs_push:
-                command_hint = (
-                    "Use `docker-compose push {}` to push them. "
-                    .format(" ".join(sorted(e.needs_push)))
-                )
-                paras += [
-                    "The following images can be pushed:",
-                    list_images(e.needs_push),
-                    command_hint,
-                ]
+            paras += [
+                "The following images need to be pulled:",
+                list_images(e.needs_pull),
+                command_hint,
+            ]
 
-            if e.needs_pull:
-                command_hint = (
-                    "Use `docker-compose pull {}` to pull them. "
-                    .format(" ".join(sorted(e.needs_pull)))
-                )
-
-                paras += [
-                    "The following images need to be pulled:",
-                    list_images(e.needs_pull),
-                    command_hint,
-                ]
-
-            raise UserError("\n\n".join(paras))
+        raise UserError("\n\n".join(paras))
 
 
 def exitval_from_opts(options, project):
@@ -1197,8 +1234,10 @@ def build_container_options(options, detach, command):
     if options['--label']:
         container_options['labels'] = parse_labels(options['--label'])
 
-    if options['--entrypoint']:
-        container_options['entrypoint'] = options.get('--entrypoint')
+    if options.get('--entrypoint') is not None:
+        container_options['entrypoint'] = (
+            [""] if options['--entrypoint'] == '' else options['--entrypoint']
+        )
 
     if options['--rm']:
         container_options['restart'] = None
@@ -1225,7 +1264,8 @@ def build_container_options(options, detach, command):
     return container_options
 
 
-def run_one_off_container(container_options, project, service, options, project_dir='.'):
+def run_one_off_container(container_options, project, service, options, toplevel_options,
+                          project_dir='.'):
     if not options['--no-deps']:
         deps = service.get_dependency_names()
         if deps:
@@ -1243,8 +1283,10 @@ def run_one_off_container(container_options, project, service, options, project_
         one_off=True,
         **container_options)
 
-    if options['-d']:
-        service.start_container(container)
+    use_network_aliases = options['--use-aliases']
+
+    if options.get('--detach'):
+        service.start_container(container, use_network_aliases)
         print(container.name)
         return
 
@@ -1256,11 +1298,15 @@ def run_one_off_container(container_options, project, service, options, project_
     use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
     signals.set_signal_handler_to_shutdown()
+    signals.set_signal_handler_to_hang_up()
     try:
         try:
             if IS_WINDOWS_PLATFORM or use_cli:
-                service.connect_container_to_networks(container)
-                exit_code = call_docker(["start", "--attach", "--interactive", container.id])
+                service.connect_container_to_networks(container, use_network_aliases)
+                exit_code = call_docker(
+                    ["start", "--attach", "--interactive", container.id],
+                    toplevel_options
+                )
             else:
                 operation = RunOperation(
                     project.client,
@@ -1270,13 +1316,13 @@ def run_one_off_container(container_options, project, service, options, project_
                 )
                 pty = PseudoTerminal(project.client, operation)
                 sockets = pty.sockets()
-                service.start_container(container)
+                service.start_container(container, use_network_aliases)
                 pty.start(sockets)
                 exit_code = container.wait()
-        except signals.ShutdownException:
+        except (signals.ShutdownException):
             project.client.stop(container.id)
             exit_code = 1
-    except signals.ShutdownException:
+    except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
         remove_container(force=True)
         sys.exit(2)
@@ -1339,12 +1385,32 @@ def exit_if(condition, message, exit_code):
         raise SystemExit(exit_code)
 
 
-def call_docker(args):
+def call_docker(args, dockeropts):
     executable_path = find_executable('docker')
     if not executable_path:
         raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
 
-    args = [executable_path] + args
+    tls = dockeropts.get('--tls', False)
+    ca_cert = dockeropts.get('--tlscacert')
+    cert = dockeropts.get('--tlscert')
+    key = dockeropts.get('--tlskey')
+    verify = dockeropts.get('--tlsverify')
+    host = dockeropts.get('--host')
+    tls_options = []
+    if tls:
+        tls_options.append('--tls')
+    if ca_cert:
+        tls_options.extend(['--tlscacert', ca_cert])
+    if cert:
+        tls_options.extend(['--tlscert', cert])
+    if key:
+        tls_options.extend(['--tlskey', key])
+    if verify:
+        tls_options.append('--tlsverify')
+    if host:
+        tls_options.extend(['--host', host])
+
+    args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
     return subprocess.call(args)
@@ -1369,7 +1435,7 @@ def parse_scale_args(options):
 def build_exec_command(options, container_id, command):
     args = ["exec"]
 
-    if options["-d"]:
+    if options["--detach"]:
         args += ["--detach"]
     else:
         args += ["--interactive"]

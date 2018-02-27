@@ -25,6 +25,7 @@ from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
 from compose.service import ContainerNetworkMode
+from compose.service import format_environment
 from compose.service import formatted_ports
 from compose.service import get_container_data_volumes
 from compose.service import ImageType
@@ -43,6 +44,7 @@ class ServiceTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
         self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_containers(self):
         service = Service('db', self.mock_client, 'myproject', image='foo')
@@ -471,7 +473,6 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
-            stream=True,
             path='.',
             pull=False,
             forcerm=False,
@@ -514,7 +515,6 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.build.assert_called_once_with(
             tag='default_foo',
             dockerfile=None,
-            stream=True,
             path='.',
             pull=False,
             forcerm=False,
@@ -744,14 +744,159 @@ class ServiceTest(unittest.TestCase):
             'The "{}" service specifies a port on the host. If multiple containers '
             'for this service are created on a single host, the port will clash.'.format(name))
 
+    def test_parse_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+            'noProxy': '*.intra.mycorp.com',
+        }
 
-class TestServiceNetwork(object):
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+
+        service = Service('foo', client=self.mock_client)
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': default_proxy_config['httpsProxy'],
+            'https_proxy': default_proxy_config['httpsProxy'],
+            'FTP_PROXY': default_proxy_config['ftpProxy'],
+            'ftp_proxy': default_proxy_config['ftpProxy'],
+            'NO_PROXY': default_proxy_config['noProxy'],
+            'no_proxy': default_proxy_config['noProxy'],
+        }
+
+    def test_parse_proxy_config_per_host(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+            'noProxy': '*.intra.mycorp.com',
+        }
+        host_specific_proxy_config = {
+            'httpProxy': 'http://proxy.example.com:3128',
+            'httpsProxy': 'https://user:password@proxy.example.com:3129',
+            'ftpProxy': 'http://ftpproxy.example.com:21',
+            'noProxy': '*.intra.example.com'
+        }
+
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+                'tcp://example.docker.com:2376': host_specific_proxy_config,
+            }
+        }
+
+        service = Service('foo', client=self.mock_client)
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': default_proxy_config['httpsProxy'],
+            'https_proxy': default_proxy_config['httpsProxy'],
+            'FTP_PROXY': default_proxy_config['ftpProxy'],
+            'ftp_proxy': default_proxy_config['ftpProxy'],
+            'NO_PROXY': default_proxy_config['noProxy'],
+            'no_proxy': default_proxy_config['noProxy'],
+        }
+
+        self.mock_client._original_base_url = 'tcp://example.docker.com:2376'
+
+        assert service._parse_proxy_config() == {
+            'HTTP_PROXY': host_specific_proxy_config['httpProxy'],
+            'http_proxy': host_specific_proxy_config['httpProxy'],
+            'HTTPS_PROXY': host_specific_proxy_config['httpsProxy'],
+            'https_proxy': host_specific_proxy_config['httpsProxy'],
+            'FTP_PROXY': host_specific_proxy_config['ftpProxy'],
+            'ftp_proxy': host_specific_proxy_config['ftpProxy'],
+            'NO_PROXY': host_specific_proxy_config['noProxy'],
+            'no_proxy': host_specific_proxy_config['noProxy'],
+        }
+
+    def test_build_service_with_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.example.com:3129',
+        }
+        buildargs = {
+            'HTTPS_PROXY': 'https://rdcf.th08.jp:8911',
+            'https_proxy': 'https://rdcf.th08.jp:8911',
+        }
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.', 'args': buildargs})
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        assert self.mock_client.build.call_args[1]['buildargs'] == {
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': buildargs['HTTPS_PROXY'],
+            'https_proxy': buildargs['HTTPS_PROXY'],
+        }
+
+    def test_get_create_options_with_proxy_config(self):
+        default_proxy_config = {
+            'httpProxy': 'http://proxy.mycorp.com:3128',
+            'httpsProxy': 'https://user:password@proxy.mycorp.com:3129',
+            'ftpProxy': 'http://ftpproxy.mycorp.com:21',
+        }
+        self.mock_client._general_configs = {
+            'proxies': {
+                'default': default_proxy_config,
+            }
+        }
+        self.mock_client.base_url = 'http+docker://localunixsocket'
+
+        override_options = {
+            'environment': {
+                'FTP_PROXY': 'ftp://xdge.exo.au:21',
+                'ftp_proxy': 'ftp://xdge.exo.au:21',
+            }
+        }
+        environment = {
+            'HTTPS_PROXY': 'https://rdcf.th08.jp:8911',
+            'https_proxy': 'https://rdcf.th08.jp:8911',
+        }
+
+        service = Service('foo', client=self.mock_client, environment=environment)
+
+        create_opts = service._get_container_create_options(override_options, 1)
+        assert set(create_opts['environment']) == set(format_environment({
+            'HTTP_PROXY': default_proxy_config['httpProxy'],
+            'http_proxy': default_proxy_config['httpProxy'],
+            'HTTPS_PROXY': environment['HTTPS_PROXY'],
+            'https_proxy': environment['HTTPS_PROXY'],
+            'FTP_PROXY': override_options['environment']['FTP_PROXY'],
+            'ftp_proxy': override_options['environment']['FTP_PROXY'],
+        }))
+
+
+class TestServiceNetwork(unittest.TestCase):
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_connect_container_to_networks_short_aliase_exists(self):
-        mock_client = mock.create_autospec(docker.APIClient)
         service = Service(
             'db',
-            mock_client,
+            self.mock_client,
             'myproject',
             image='foo',
             networks={'project_default': {}})
@@ -770,8 +915,8 @@ class TestServiceNetwork(object):
             True)
         service.connect_container_to_networks(container)
 
-        assert not mock_client.disconnect_container_from_network.call_count
-        assert not mock_client.connect_container_to_network.call_count
+        assert not self.mock_client.disconnect_container_from_network.call_count
+        assert not self.mock_client.connect_container_to_network.call_count
 
 
 def sort_by_name(dictionary_list):
@@ -816,6 +961,10 @@ class BuildUlimitsTestCase(unittest.TestCase):
 
 
 class NetTestCase(unittest.TestCase):
+    def setUp(self):
+        self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_network_mode(self):
         network_mode = NetworkMode('host')
@@ -833,12 +982,11 @@ class NetTestCase(unittest.TestCase):
     def test_network_mode_service(self):
         container_id = 'bbbb'
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.APIClient)
-        mock_client.containers.return_value = [
+        self.mock_client.containers.return_value = [
             {'Id': container_id, 'Name': container_id, 'Image': 'abcd'},
         ]
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=self.mock_client)
         network_mode = ServiceNetworkMode(service)
 
         assert network_mode.id == service_name
@@ -847,10 +995,9 @@ class NetTestCase(unittest.TestCase):
 
     def test_network_mode_service_no_containers(self):
         service_name = 'web'
-        mock_client = mock.create_autospec(docker.APIClient)
-        mock_client.containers.return_value = []
+        self.mock_client.containers.return_value = []
 
-        service = Service(name=service_name, client=mock_client)
+        service = Service(name=service_name, client=self.mock_client)
         network_mode = ServiceNetworkMode(service)
 
         assert network_mode.id == service_name
@@ -886,6 +1033,7 @@ class ServiceVolumesTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
         self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_build_volume_binding(self):
         binding = build_volume_binding(VolumeSpec.parse('/outside:/inside', True))
@@ -1120,6 +1268,8 @@ class ServiceVolumesTest(unittest.TestCase):
 class ServiceSecretTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        self.mock_client._general_configs = {}
 
     def test_get_secret_volumes(self):
         secret1 = {

@@ -66,6 +66,7 @@ HOST_CONFIG_KEYS = [
     'cpu_shares',
     'cpus',
     'cpuset',
+    'device_cgroup_rules',
     'devices',
     'dns',
     'dns_search',
@@ -305,7 +306,7 @@ class Service(object):
             raise OperationFailedError("Cannot create container for service %s: %s" %
                                        (self.name, ex.explanation))
 
-    def ensure_image_exists(self, do_build=BuildAction.none):
+    def ensure_image_exists(self, do_build=BuildAction.none, silent=False):
         if self.can_be_built() and do_build == BuildAction.force:
             self.build()
             return
@@ -317,7 +318,7 @@ class Service(object):
             pass
 
         if not self.can_be_built():
-            self.pull()
+            self.pull(silent=silent)
             return
 
         if do_build == BuildAction.skip:
@@ -556,8 +557,8 @@ class Service(object):
                 container.attach_log_stream()
             return self.start_container(container)
 
-    def start_container(self, container):
-        self.connect_container_to_networks(container)
+    def start_container(self, container, use_network_aliases=True):
+        self.connect_container_to_networks(container, use_network_aliases)
         try:
             container.start()
         except APIError as ex:
@@ -573,7 +574,7 @@ class Service(object):
             )
         )
 
-    def connect_container_to_networks(self, container):
+    def connect_container_to_networks(self, container, use_network_aliases=True):
         connected_networks = container.get('NetworkSettings.Networks')
 
         for network, netdefs in self.prioritized_networks.items():
@@ -582,10 +583,11 @@ class Service(object):
                     continue
                 self.client.disconnect_container_from_network(container.id, network)
 
-            log.debug('Connecting to {}'.format(network))
+            aliases = self._get_aliases(netdefs, container) if use_network_aliases else []
+
             self.client.connect_container_to_network(
                 container.id, network,
-                aliases=self._get_aliases(netdefs, container),
+                aliases=aliases,
                 ipv4_address=netdefs.get('ipv4_address', None),
                 ipv6_address=netdefs.get('ipv6_address', None),
                 links=self._get_links(False),
@@ -691,9 +693,6 @@ class Service(object):
         return 1 if not numbers else max(numbers) + 1
 
     def _get_aliases(self, network, container=None):
-        if container and container.labels.get(LABEL_ONE_OFF) == "True":
-            return []
-
         return list(
             {self.name} |
             ({container.short_id} if container else set()) |
@@ -793,8 +792,12 @@ class Service(object):
             ))
 
         container_options['environment'] = merge_environment(
-            self.options.get('environment'),
-            override_options.get('environment'))
+            self._parse_proxy_config(),
+            merge_environment(
+                self.options.get('environment'),
+                override_options.get('environment')
+            )
+        )
 
         container_options['labels'] = merge_labels(
             self.options.get('labels'),
@@ -881,6 +884,10 @@ class Service(object):
             init_path = options.get('init')
             options['init'] = True
 
+        security_opt = [
+            o.value for o in options.get('security_opt')
+        ] if options.get('security_opt') else None
+
         nano_cpus = None
         if 'cpus' in options:
             nano_cpus = int(options.get('cpus') * NANOCPUS_SCALE)
@@ -910,7 +917,7 @@ class Service(object):
             extra_hosts=options.get('extra_hosts'),
             read_only=options.get('read_only'),
             pid_mode=self.pid_mode.mode,
-            security_opt=options.get('security_opt'),
+            security_opt=security_opt,
             ipc_mode=options.get('ipc'),
             cgroup_parent=options.get('cgroup_parent'),
             cpu_quota=options.get('cpu_quota'),
@@ -940,6 +947,7 @@ class Service(object):
             device_write_bps=blkio_config.get('device_write_bps'),
             device_write_iops=blkio_config.get('device_write_iops'),
             mounts=options.get('mounts'),
+            device_cgroup_rules=options.get('device_cgroup_rules'),
         )
 
     def get_secret_volumes(self):
@@ -963,6 +971,9 @@ class Service(object):
         if build_args_override:
             build_args.update(build_args_override)
 
+        for k, v in self._parse_proxy_config().items():
+            build_args.setdefault(k, v)
+
         # python2 os.stat() doesn't support unicode on some UNIX, so we
         # encode it to a bytestring to be safe
         path = build_opts.get('context')
@@ -972,7 +983,6 @@ class Service(object):
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
-            stream=True,
             rm=True,
             forcerm=force_rm,
             pull=pull,
@@ -1141,6 +1151,31 @@ class Service(object):
                 result = False
             elif status == 'unhealthy':
                 raise HealthCheckFailed(ctnr.short_id)
+        return result
+
+    def _parse_proxy_config(self):
+        client = self.client
+        if 'proxies' not in client._general_configs:
+            return {}
+        docker_host = getattr(client, '_original_base_url', client.base_url)
+        proxy_config = client._general_configs['proxies'].get(
+            docker_host, client._general_configs['proxies'].get('default')
+        ) or {}
+
+        permitted = {
+            'ftpProxy': 'FTP_PROXY',
+            'httpProxy': 'HTTP_PROXY',
+            'httpsProxy': 'HTTPS_PROXY',
+            'noProxy': 'NO_PROXY',
+        }
+
+        result = {}
+
+        for k, v in proxy_config.items():
+            if k not in permitted:
+                continue
+            result[permitted[k]] = result[permitted[k].lower()] = v
+
         return result
 
 

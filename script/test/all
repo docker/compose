@@ -24,7 +24,7 @@ fi
 
 
 BUILD_NUMBER=${BUILD_NUMBER-$USER}
-PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py27,py34}
+PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py27,py36}
 
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"

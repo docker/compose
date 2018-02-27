@@ -4,6 +4,7 @@ Types for objects parsed from the configuration.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import json
 import ntpath
 import os
 import re
@@ -13,6 +14,7 @@ import six
 from docker.utils.ports import build_port_bindings
 
 from ..const import COMPOSEFILE_V1 as V1
+from ..utils import unquote_path
 from .errors import ConfigurationError
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import splitdrive
@@ -141,6 +143,9 @@ class MountSpec(object):
         },
         'bind': {
             'propagation': 'propagation'
+        },
+        'tmpfs': {
+            'size': 'tmpfs_size'
         }
     }
     _fields = ['type', 'source', 'target', 'read_only', 'consistency']
@@ -149,6 +154,9 @@ class MountSpec(object):
     def parse(cls, mount_dict, normalize=False, win_host=False):
         normpath = ntpath.normpath if win_host else os.path.normpath
         if mount_dict.get('source'):
+            if mount_dict['type'] == 'tmpfs':
+                raise ConfigurationError('tmpfs mounts can not specify a source')
+
             mount_dict['source'] = normpath(mount_dict['source'])
             if normalize:
                 mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
@@ -451,3 +459,30 @@ def normalize_port_dict(port):
         external_ip=port.get('external_ip', ''),
         has_ext_ip=(':' if port.get('external_ip') else ''),
     )
+
+
+class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
+    @classmethod
+    def parse(cls, value):
+        # based on https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697
+        con = value.split('=', 2)
+        if len(con) == 1 and con[0] != 'no-new-privileges':
+            if ':' not in value:
+                raise ConfigurationError('Invalid security_opt: {}'.format(value))
+            con = value.split(':', 2)
+
+        if con[0] == 'seccomp' and con[1] != 'unconfined':
+            try:
+                with open(unquote_path(con[1]), 'r') as f:
+                    seccomp_data = json.load(f)
+            except (IOError, ValueError) as e:
+                raise ConfigurationError('Error reading seccomp profile: {}'.format(e))
+            return cls(
+                'seccomp={}'.format(json.dumps(seccomp_data)), con[1]
+            )
+        return cls(value, None)
+
+    def repr(self):
+        if self.src_file is not None:
+            return 'seccomp:{}'.format(self.src_file)
+        return self.value

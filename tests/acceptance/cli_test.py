@@ -207,13 +207,13 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = None
         result = self.dispatch([
             '-f', 'tests/fixtures/invalid-composefile/invalid.yml',
-            'config', '-q'
+            'config', '--quiet'
         ], returncode=1)
         assert "'notaservice' must be a mapping" in result.stderr
 
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
-        assert self.dispatch(['config', '-q']).stdout == ''
+        assert self.dispatch(['config', '--quiet']).stdout == ''
 
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
@@ -395,7 +395,7 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['config'])
 
         assert yaml.load(result.stdout) == {
-            'version': '3.2',
+            'version': '3.5',
             'volumes': {
                 'foobar': {
                     'labels': {
@@ -419,22 +419,25 @@ class CLITestCase(DockerClientTestCase):
                         },
                         'resources': {
                             'limits': {
-                                'cpus': '0.001',
+                                'cpus': '0.05',
                                 'memory': '50M',
                             },
                             'reservations': {
-                                'cpus': '0.0001',
+                                'cpus': '0.01',
                                 'memory': '20M',
                             },
                         },
                         'restart_policy': {
-                            'condition': 'on_failure',
+                            'condition': 'on-failure',
                             'delay': '5s',
                             'max_attempts': 3,
                             'window': '120s',
                         },
                         'placement': {
-                            'constraints': ['node=foo'],
+                            'constraints': [
+                                'node.hostname==foo', 'node.role != manager'
+                            ],
+                            'preferences': [{'spread': 'node.labels.datacenter'}]
                         },
                     },
 
@@ -462,6 +465,27 @@ class CLITestCase(DockerClientTestCase):
                     'stop_grace_period': '20s',
                 },
             },
+        }
+
+    def test_config_compatibility_mode(self):
+        self.base_dir = 'tests/fixtures/compatibility-mode'
+        result = self.dispatch(['--compatibility', 'config'])
+
+        assert yaml.load(result.stdout) == {
+            'version': '2.3',
+            'volumes': {'foo': {'driver': 'default'}},
+            'services': {
+                'foo': {
+                    'command': '/bin/true',
+                    'image': 'alpine:3.7',
+                    'scale': 3,
+                    'restart': 'always:7',
+                    'mem_limit': '300M',
+                    'mem_reservation': '100M',
+                    'cpus': 0.7,
+                    'volumes': ['foo:/bar:rw']
+                }
+            }
         }
 
     def test_ps(self):
@@ -567,6 +591,21 @@ class CLITestCase(DockerClientTestCase):
             result.stderr
         )
 
+    def test_pull_with_no_deps(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        result = self.dispatch(['pull', 'web'])
+        assert sorted(result.stderr.split('\n'))[1:] == [
+            'Pulling web (busybox:latest)...',
+        ]
+
+    def test_pull_with_include_deps(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        result = self.dispatch(['pull', '--include-deps', 'web'])
+        assert sorted(result.stderr.split('\n'))[1:] == [
+            'Pulling db (busybox:latest)...',
+            'Pulling web (busybox:latest)...',
+        ]
+
     def test_build_plain(self):
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         self.dispatch(['build', 'simple'])
@@ -603,6 +642,20 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['build', '--no-cache', '--pull', 'simple'])
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
+
+    def test_build_log_level(self):
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        result = self.dispatch(['--log-level', 'warning', 'build', 'simple'])
+        assert result.stderr == ''
+        result = self.dispatch(['--log-level', 'debug', 'build', 'simple'])
+        assert 'Building simple' in result.stderr
+        assert 'Using configuration file' in result.stderr
+        self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
+        result = self.dispatch(['--log-level', 'critical', 'build', 'simple'], returncode=1)
+        assert result.stderr == ''
+        result = self.dispatch(['--log-level', 'debug', 'build', 'simple'], returncode=1)
+        assert 'Building simple' in result.stderr
+        assert 'non-zero code' in result.stderr
 
     def test_build_failed(self):
         self.base_dir = 'tests/fixtures/simple-failing-dockerfile'
@@ -642,6 +695,33 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/build-memory'
         result = self.dispatch(['build', '--no-cache', '--memory', '96m', 'service'], None)
         assert 'memory: 100663296' in result.stdout  # 96 * 1024 * 1024
+
+    def test_build_with_buildarg_from_compose_file(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build'], None)
+        assert 'Favorite Touhou Character: mariya.kirisame' in result.stdout
+
+    def test_build_with_buildarg_cli_override(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build', '--build-arg', 'favorite_th_character=sakuya.izayoi'], None)
+        assert 'Favorite Touhou Character: sakuya.izayoi' in result.stdout
+
+    @mock.patch.dict(os.environ)
+    def test_build_with_buildarg_old_api_version(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/build-args'
+        os.environ['COMPOSE_API_VERSION'] = '1.24'
+        result = self.dispatch(
+            ['build', '--build-arg', 'favorite_th_character=reimu.hakurei'], None, returncode=1
+        )
+        assert '--build-arg is only supported when services are specified' in result.stderr
+
+        result = self.dispatch(
+            ['build', '--build-arg', 'favorite_th_character=hong.meiling', 'web'], None
+        )
+        assert 'Favorite Touhou Character: hong.meiling' in result.stdout
 
     def test_bundle_with_digests(self):
         self.base_dir = 'tests/fixtures/bundle-with-digests/'
@@ -858,6 +938,19 @@ class CLITestCase(DockerClientTestCase):
 
     def test_up_detached(self):
         self.dispatch(['up', '-d'])
+        service = self.project.get_service('simple')
+        another = self.project.get_service('another')
+        assert len(service.containers()) == 1
+        assert len(another.containers()) == 1
+
+        # Ensure containers don't have stdin and stdout connected in -d mode
+        container, = service.containers()
+        assert not container.get('Config.AttachStderr')
+        assert not container.get('Config.AttachStdout')
+        assert not container.get('Config.AttachStdin')
+
+    def test_up_detached_long_form(self):
+        self.dispatch(['up', '--detach'])
         service = self.project.get_service('simple')
         another = self.project.get_service('another')
         assert len(service.containers()) == 1
@@ -1448,6 +1541,15 @@ class CLITestCase(DockerClientTestCase):
         assert stderr == ""
         assert stdout == "/\n"
 
+    def test_exec_detach_long_form(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['up', '--detach', 'console'])
+        assert len(self.project.containers()) == 1
+
+        stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])
+        assert stderr == ""
+        assert stdout == "/\n"
+
     def test_exec_custom_user(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'console'])
@@ -1594,6 +1696,18 @@ class CLITestCase(DockerClientTestCase):
         container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
         assert container.get('Config.Entrypoint') == ['printf']
         assert container.get('Config.Cmd') == ['default', 'args']
+
+    def test_run_service_with_unset_entrypoint(self):
+        self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
+        self.dispatch(['run', '--entrypoint=""', 'test', 'true'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') is None
+        assert container.get('Config.Cmd') == ['true']
+
+        self.dispatch(['run', '--entrypoint', '""', 'test', 'true'])
+        container = self.project.containers(stopped=True, one_off=OneOffFilter.only)[0]
+        assert container.get('Config.Entrypoint') is None
+        assert container.get('Config.Cmd') == ['true']
 
     def test_run_service_with_dockerfile_entrypoint_overridden(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
@@ -1802,6 +1916,28 @@ class CLITestCase(DockerClientTestCase):
         assert workdir == container.get('Config.WorkingDir')
 
     @v2_only()
+    def test_run_service_with_use_aliases(self):
+        filename = 'network-aliases.yml'
+        self.base_dir = 'tests/fixtures/networks'
+        self.dispatch(['-f', filename, 'run', '-d', '--use-aliases', 'web', 'top'])
+
+        back_name = '{}_back'.format(self.project.name)
+        front_name = '{}_front'.format(self.project.name)
+
+        web_container = self.project.get_service('web').containers(one_off=OneOffFilter.only)[0]
+
+        back_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(back_name)
+        )
+        assert 'web' in back_aliases
+        front_aliases = web_container.get(
+            'NetworkSettings.Networks.{}.Aliases'.format(front_name)
+        )
+        assert 'web' in front_aliases
+        assert 'forward_facing' in front_aliases
+        assert 'ahead' in front_aliases
+
+    @v2_only()
     def test_run_interactive_connects_to_network(self):
         self.base_dir = 'tests/fixtures/networks'
 
@@ -1871,6 +2007,19 @@ class CLITestCase(DockerClientTestCase):
             'running'))
 
         os.kill(proc.pid, signal.SIGTERM)
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'exited'))
+
+    def test_run_handles_sighup(self):
+        proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'simplecomposefile_simple_run_1',
+            'running'))
+
+        os.kill(proc.pid, signal.SIGHUP)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
             'simplecomposefile_simple_run_1',

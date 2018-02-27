@@ -23,6 +23,7 @@ from .testcases import SWARM_SKIP_CONTAINERS_ALL
 from .testcases import SWARM_SKIP_CPU_SHARES
 from compose import __version__
 from compose.config.types import MountSpec
+from compose.config.types import SecurityOpt
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
 from compose.const import IS_WINDOWS_PLATFORM
@@ -238,11 +239,11 @@ class ServiceTest(DockerClientTestCase):
         }]
 
     def test_create_container_with_security_opt(self):
-        security_opt = ['label:disable']
+        security_opt = [SecurityOpt.parse('label:disable')]
         service = self.create_service('db', security_opt=security_opt)
         container = service.create_container()
         service.start_container(container)
-        assert set(container.get('HostConfig.SecurityOpt')) == set(security_opt)
+        assert set(container.get('HostConfig.SecurityOpt')) == set([o.repr() for o in security_opt])
 
     @pytest.mark.xfail(True, reason='Not supported on most drivers')
     def test_create_container_with_storage_opt(self):
@@ -263,6 +264,11 @@ class ServiceTest(DockerClientTestCase):
         container = service.create_container()
         service.start_container(container)
         assert container.inspect()['Config']['MacAddress'] == '02:42:ac:11:65:43'
+
+    def test_create_container_with_device_cgroup_rules(self):
+        service = self.create_service('db', device_cgroup_rules=['c 7:128 rwm'])
+        container = service.create_container()
+        assert container.get('HostConfig.DeviceCgroupRules') == ['c 7:128 rwm']
 
     def test_create_container_with_specified_volume(self):
         host_path = '/tmp/host-path'
@@ -314,6 +320,23 @@ class ServiceTest(DockerClientTestCase):
         mount = container.get_mount(container_path)
         assert mount
         assert mount['Type'] == 'tmpfs'
+
+    @v2_3_only()
+    def test_create_container_with_tmpfs_mount_tmpfs_size(self):
+        container_path = '/container-tmpfs'
+        service = self.create_service(
+            'db',
+            volumes=[MountSpec(type='tmpfs', target=container_path, tmpfs={'size': 5368709})]
+        )
+        container = service.create_container()
+        service.start_container(container)
+        mount = container.get_mount(container_path)
+        assert mount
+        print(container.dictionary)
+        assert mount['Type'] == 'tmpfs'
+        assert container.get('HostConfig.Mounts')[0]['TmpfsOptions'] == {
+            'SizeBytes': 5368709
+        }
 
     @v2_3_only()
     def test_create_container_with_volume_mount(self):

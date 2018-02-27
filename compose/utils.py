@@ -143,3 +143,11 @@ def parse_bytes(n):
         return sdk_parse_bytes(n)
     except DockerException:
         return None
+
+
+def unquote_path(s):
+    if not s:
+        return s
+    if s[0] == '"' and s[-1] == '"':
+        return s[1:-1]
+    return s

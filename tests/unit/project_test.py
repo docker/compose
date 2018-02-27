@@ -24,6 +24,7 @@ from compose.service import Service
 class ProjectTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
+        self.mock_client._general_configs = {}
 
     def test_from_config_v1(self):
         config = Config(

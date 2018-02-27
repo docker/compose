@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import unittest
 
-from compose.cli.utils import unquote_path
+from compose.utils import unquote_path
 
 
 class UnquotePathTest(unittest.TestCase):

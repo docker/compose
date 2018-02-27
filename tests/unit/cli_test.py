@@ -102,6 +102,7 @@ class CLITestCase(unittest.TestCase):
         os.environ['COMPOSE_INTERACTIVE_NO_CLI'] = 'true'
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        mock_client._general_configs = {}
         project = Project.from_config(
             name='composetest',
             client=mock_client,
@@ -119,10 +120,11 @@ class CLITestCase(unittest.TestCase):
                 '--label': [],
                 '--user': None,
                 '--no-deps': None,
-                '-d': False,
+                '--detach': False,
                 '-T': None,
                 '--entrypoint': None,
                 '--service-ports': None,
+                '--use-aliases': None,
                 '--publish': [],
                 '--volume': [],
                 '--rm': None,
@@ -136,6 +138,7 @@ class CLITestCase(unittest.TestCase):
     def test_run_service_with_restart_always(self):
         mock_client = mock.create_autospec(docker.APIClient)
         mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        mock_client._general_configs = {}
 
         project = Project.from_config(
             name='composetest',
@@ -156,10 +159,11 @@ class CLITestCase(unittest.TestCase):
             '--label': [],
             '--user': None,
             '--no-deps': None,
-            '-d': True,
+            '--detach': True,
             '-T': None,
             '--entrypoint': None,
             '--service-ports': None,
+            '--use-aliases': None,
             '--publish': [],
             '--volume': [],
             '--rm': None,
@@ -177,10 +181,11 @@ class CLITestCase(unittest.TestCase):
             '--label': [],
             '--user': None,
             '--no-deps': None,
-            '-d': True,
+            '--detach': True,
             '-T': None,
             '--entrypoint': None,
             '--service-ports': None,
+            '--use-aliases': None,
             '--publish': [],
             '--volume': [],
             '--rm': True,
@@ -208,10 +213,11 @@ class CLITestCase(unittest.TestCase):
                 '--label': [],
                 '--user': None,
                 '--no-deps': None,
-                '-d': True,
+                '--detach': True,
                 '-T': None,
                 '--entrypoint': None,
                 '--service-ports': True,
+                '--use-aliases': None,
                 '--publish': ['80:80'],
                 '--rm': None,
                 '--name': None,

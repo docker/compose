@@ -42,6 +42,7 @@ def serialize_string(dumper, data):
 yaml.SafeDumper.add_representer(types.MountSpec, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.VolumeFromSpec, serialize_config_type)
 yaml.SafeDumper.add_representer(types.VolumeSpec, serialize_config_type)
+yaml.SafeDumper.add_representer(types.SecurityOpt, serialize_config_type)
 yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServiceConfig, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)

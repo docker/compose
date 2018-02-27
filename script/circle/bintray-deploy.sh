@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 curl -f -u$BINTRAY_USERNAME:$BINTRAY_API_KEY -X GET \
   https://api.bintray.com/repos/docker-compose/${CIRCLE_BRANCH}
 

@@ -1,6 +1,83 @@
 Change log
 ==========
 
+1.20.0 (2018-03-07)
+-------------------
+
+### New features
+
+#### Compose file version 3.6
+
+- Introduced version 3.6 of the `docker-compose.yml` specification.
+  This version requires to be used with Docker Engine 18.02.0 or above.
+
+- Added support for the `tmpfs.size` property in volume mappings
+
+#### Compose file version 3.2 and up
+
+- The `--build-arg` option can now be used without specifying a service
+  in `docker-compose build`
+
+#### Compose file version 2.3
+
+- Added support for `device_cgroup_rules` in service definitions
+
+- Added support for the `tmpfs.size` property in long-form volume mappings
+
+- The `--build-arg` option can now be used without specifying a service
+  in `docker-compose build`
+
+#### All formats
+
+- Added a `--log-level` option to the top-level `docker-compose` command.
+  Accepted values are `debug`, `info`, `warning`, `error`, `critical`.
+  Default log level is `info`
+
+- `docker-compose run` now allows users to unset the container's entrypoint
+
+- Proxy configuration found in the `~/.docker/config.json` file now populates
+  environment and build args for containers created by Compose
+
+- Added a `--use-aliases` flag to `docker-compose run`, indicating that
+  network aliases declared in the service's config should be used for the
+  running container
+
+- `docker-compose run` now kills and removes the running container upon
+  receiving `SIGHUP`
+
+- `docker-compose ps` now shows the containers' health status if available
+
+- Added the long-form `--detach` option to the `exec`, `run` and `up`
+  commands
+
+### Bugfixes
+
+- Fixed `.dockerignore` handling, notably with regard to absolute paths
+  and last-line precedence rules
+
+- Fixed a bug introduced in 1.19.0 which caused the default certificate path
+  to not be honored by Compose
+
+- Fixed a bug where Compose would incorrectly check whether a symlink's
+  destination was accessible when part of a build context
+
+- Fixed a bug where `.dockerignore` files containing lines of whitespace
+  caused Compose to error out on Windows
+
+- Fixed a bug where `--tls*` and `--host` options wouldn't be properly honored
+  for interactive `run` and `exec` commands
+
+- A `seccomp:<filepath>` entry in the `security_opt` config now correctly
+  sends the contents of the file to the engine
+
+- Improved support for non-unicode locales
+
+- Fixed a crash occurring on Windows when the user's home directory name
+  contained non-ASCII characters
+
+- Fixed a bug occurring during builds caused by files with a negative `mtime`
+  values in the build context
+
 1.19.0 (2018-02-07)
 -------------------
 
