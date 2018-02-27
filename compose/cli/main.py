@@ -1232,7 +1232,10 @@ def build_container_options(options, detach, command):
     if options['--label']:
         container_options['labels'] = parse_labels(options['--label'])
 
-    _build_container_entrypoint_options(container_options, options)
+    if options.get('--entrypoint') is not None:
+        container_options['entrypoint'] = (
+            [""] if options['--entrypoint'] == '' else options['--entrypoint']
+        )
 
     if options['--rm']:
         container_options['restart'] = None
@@ -1257,16 +1260,6 @@ def build_container_options(options, detach, command):
         container_options['volumes'] = volumes
 
     return container_options
-
-
-def _build_container_entrypoint_options(container_options, options):
-    if options['--entrypoint']:
-        if options['--entrypoint'].strip() == '':
-            # Set an empty entry point. Refer https://github.com/moby/moby/pull/23718
-            log.info("Overriding the entrypoint")
-            container_options['entrypoint'] = [""]
-        else:
-            container_options['entrypoint'] = options.get('--entrypoint')
 
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
