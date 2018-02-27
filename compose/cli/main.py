@@ -121,7 +121,7 @@ def perform_command(options, handler, command_options):
         handler(command, options, command_options)
         return
 
-    project = project_from_options('.', options)
+    project = project_from_options(self.project_dir, options)
     command = TopLevelCommand(project)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
@@ -239,7 +239,7 @@ class TopLevelCommand(object):
 
     def __init__(self, project, project_dir='.'):
         self.project = project
-        self.project_dir = '.'
+        self.project_dir = project_dir
 
     def build(self, options):
         """
@@ -296,7 +296,7 @@ class TopLevelCommand(object):
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
         """
-        self.project = project_from_options('.', config_options)
+        self.project = project_from_options(self.project_dir, config_options)
         compose_config = get_config_from_options(self.project_dir, config_options)
 
         output = options["--output"]
@@ -329,7 +329,7 @@ class TopLevelCommand(object):
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', config_options)
+            self.project = project_from_options(self.project_dir, config_options)
             image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
