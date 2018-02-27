@@ -9,6 +9,7 @@ import pytest
 from compose import container
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
+from compose.cli.main import call_docker
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_containers_to_service_names
 from compose.cli.main import setup_console_handler
@@ -112,3 +113,44 @@ class TestConvergeStrategyFromOptsTestCase(object):
             convergence_strategy_from_opts(options) ==
             ConvergenceStrategy.changed
         )
+
+
+def mock_find_executable(exe):
+    return exe
+
+
+@mock.patch('compose.cli.main.find_executable', mock_find_executable)
+class TestCallDocker(object):
+    def test_simple_no_options(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {})
+
+        assert fake_call.call_args[0][0] == ['docker', 'ps']
+
+    def test_simple_tls_option(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {'--tls': True})
+
+        assert fake_call.call_args[0][0] == ['docker', '--tls', 'ps']
+
+    def test_advanced_tls_options(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {
+                '--tls': True,
+                '--tlscacert': './ca.pem',
+                '--tlscert': './cert.pem',
+                '--tlskey': './key.pem',
+            })
+
+        assert fake_call.call_args[0][0] == [
+            'docker', '--tls', '--tlscacert', './ca.pem', '--tlscert',
+            './cert.pem', '--tlskey', './key.pem', 'ps'
+        ]
+
+    def test_with_host_option(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {'--host': 'tcp://mydocker.net:2333'})
+
+        assert fake_call.call_args[0][0] == [
+            'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
+        ]

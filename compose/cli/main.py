@@ -116,13 +116,13 @@ def perform_command(options, handler, command_options):
         handler(command_options)
         return
 
-    if options['COMMAND'] in ('config', 'bundle'):
-        command = TopLevelCommand(None)
-        handler(command, options, command_options)
+    if options['COMMAND'] == 'config':
+        command = TopLevelCommand(None, options=options)
+        handler(command, command_options)
         return
 
     project = project_from_options('.', options)
-    command = TopLevelCommand(project)
+    command = TopLevelCommand(project, options=options)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
 
@@ -157,16 +157,17 @@ def setup_console_handler(handler, verbose, noansi=False, level=None):
 
     if level is not None:
         levels = {
-          'DEBUG': logging.DEBUG,
-          'INFO': logging.INFO,
-          'WARNING': logging.WARNING,
-          'ERROR': logging.ERROR,
-          'CRITICAL': logging.CRITICAL,
+            'DEBUG': logging.DEBUG,
+            'INFO': logging.INFO,
+            'WARNING': logging.WARNING,
+            'ERROR': logging.ERROR,
+            'CRITICAL': logging.CRITICAL,
         }
         loglevel = levels.get(level.upper())
         if loglevel is None:
-            raise UserError('Invalid value for --log-level. Expected one of '
-                            + 'DEBUG, INFO, WARNING, ERROR, CRITICAL.')
+            raise UserError(
+                'Invalid value for --log-level. Expected one of DEBUG, INFO, WARNING, ERROR, CRITICAL.'
+            )
 
     handler.setLevel(loglevel)
 
@@ -237,9 +238,10 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.'):
+    def __init__(self, project, project_dir='.', options=None):
         self.project = project
         self.project_dir = '.'
+        self.toplevel_options = options or {}
 
     def build(self, options):
         """
@@ -277,7 +279,7 @@ class TopLevelCommand(object):
             memory=options.get('--memory'),
             build_args=build_args)
 
-    def bundle(self, config_options, options):
+    def bundle(self, options):
         """
         Generate a Distributed Application Bundle (DAB) from the Compose file.
 
@@ -296,8 +298,7 @@ class TopLevelCommand(object):
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
         """
-        self.project = project_from_options('.', config_options)
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
 
         output = options["--output"]
         if not output:
@@ -310,7 +311,7 @@ class TopLevelCommand(object):
 
         log.info("Wrote bundle to {}".format(output))
 
-    def config(self, config_options, options):
+    def config(self, options):
         """
         Validate and view the Compose file.
 
@@ -325,12 +326,13 @@ class TopLevelCommand(object):
 
         """
 
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', config_options)
-            image_digests = image_digests_for_project(self.project)
+            self.project = project_from_options('.', self.toplevel_options)
+            with errors.handle_connection_errors(self.project.client):
+                image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
             return
@@ -475,7 +477,10 @@ class TopLevelCommand(object):
         tty = not options["-T"]
 
         if IS_WINDOWS_PLATFORM or use_cli and not detach:
-            sys.exit(call_docker(build_exec_command(options, container.id, command)))
+            sys.exit(call_docker(
+                build_exec_command(options, container.id, command),
+                self.toplevel_options)
+            )
 
         create_exec_options = {
             "privileged": options["--privileged"],
@@ -820,7 +825,10 @@ class TopLevelCommand(object):
             command = service.options.get('command')
 
         container_options = build_container_options(options, detach, command)
-        run_one_off_container(container_options, self.project, service, options, self.project_dir)
+        run_one_off_container(
+            container_options, self.project, service, options,
+            self.toplevel_options, self.project_dir
+        )
 
     def scale(self, options):
         """
@@ -1136,42 +1144,41 @@ def timeout_from_opts(options):
 
 
 def image_digests_for_project(project, allow_push=False):
-    with errors.handle_connection_errors(project.client):
-        try:
-            return get_image_digests(
-                project,
-                allow_push=allow_push
+    try:
+        return get_image_digests(
+            project,
+            allow_push=allow_push
+        )
+    except MissingDigests as e:
+        def list_images(images):
+            return "\n".join("    {}".format(name) for name in sorted(images))
+
+        paras = ["Some images are missing digests."]
+
+        if e.needs_push:
+            command_hint = (
+                "Use `docker-compose push {}` to push them. "
+                .format(" ".join(sorted(e.needs_push)))
             )
-        except MissingDigests as e:
-            def list_images(images):
-                return "\n".join("    {}".format(name) for name in sorted(images))
+            paras += [
+                "The following images can be pushed:",
+                list_images(e.needs_push),
+                command_hint,
+            ]
 
-            paras = ["Some images are missing digests."]
+        if e.needs_pull:
+            command_hint = (
+                "Use `docker-compose pull {}` to pull them. "
+                .format(" ".join(sorted(e.needs_pull)))
+            )
 
-            if e.needs_push:
-                command_hint = (
-                    "Use `docker-compose push {}` to push them. "
-                    .format(" ".join(sorted(e.needs_push)))
-                )
-                paras += [
-                    "The following images can be pushed:",
-                    list_images(e.needs_push),
-                    command_hint,
-                ]
+            paras += [
+                "The following images need to be pulled:",
+                list_images(e.needs_pull),
+                command_hint,
+            ]
 
-            if e.needs_pull:
-                command_hint = (
-                    "Use `docker-compose pull {}` to pull them. "
-                    .format(" ".join(sorted(e.needs_pull)))
-                )
-
-                paras += [
-                    "The following images need to be pulled:",
-                    list_images(e.needs_pull),
-                    command_hint,
-                ]
-
-            raise UserError("\n\n".join(paras))
+        raise UserError("\n\n".join(paras))
 
 
 def exitval_from_opts(options, project):
@@ -1253,7 +1260,8 @@ def build_container_options(options, detach, command):
     return container_options
 
 
-def run_one_off_container(container_options, project, service, options, project_dir='.'):
+def run_one_off_container(container_options, project, service, options, toplevel_options,
+                          project_dir='.'):
     if not options['--no-deps']:
         deps = service.get_dependency_names()
         if deps:
@@ -1289,7 +1297,10 @@ def run_one_off_container(container_options, project, service, options, project_
         try:
             if IS_WINDOWS_PLATFORM or use_cli:
                 service.connect_container_to_networks(container)
-                exit_code = call_docker(["start", "--attach", "--interactive", container.id])
+                exit_code = call_docker(
+                    ["start", "--attach", "--interactive", container.id],
+                    toplevel_options
+                )
             else:
                 operation = RunOperation(
                     project.client,
@@ -1368,12 +1379,32 @@ def exit_if(condition, message, exit_code):
         raise SystemExit(exit_code)
 
 
-def call_docker(args):
+def call_docker(args, dockeropts):
     executable_path = find_executable('docker')
     if not executable_path:
         raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
 
-    args = [executable_path] + args
+    tls = dockeropts.get('--tls', False)
+    ca_cert = dockeropts.get('--tlscacert')
+    cert = dockeropts.get('--tlscert')
+    key = dockeropts.get('--tlskey')
+    verify = dockeropts.get('--tlsverify')
+    host = dockeropts.get('--host')
+    tls_options = []
+    if tls:
+        tls_options.append('--tls')
+    if ca_cert:
+        tls_options.extend(['--tlscacert', ca_cert])
+    if cert:
+        tls_options.extend(['--tlscert', cert])
+    if key:
+        tls_options.extend(['--tlskey', key])
+    if verify:
+        tls_options.append('--tlsverify')
+    if host:
+        tls_options.extend(['--host', host])
+
+    args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
     return subprocess.call(args)
