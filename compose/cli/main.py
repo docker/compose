@@ -116,9 +116,9 @@ def perform_command(options, handler, command_options):
         handler(command_options)
         return
 
-    if options['COMMAND'] in ('config', 'bundle'):
-        command = TopLevelCommand(None)
-        handler(command, options, command_options)
+    if options['COMMAND'] == 'config':
+        command = TopLevelCommand(None, options=options)
+        handler(command, command_options)
         return
 
     project = project_from_options('.', options)
@@ -279,7 +279,7 @@ class TopLevelCommand(object):
             memory=options.get('--memory'),
             build_args=build_args)
 
-    def bundle(self, config_options, options):
+    def bundle(self, options):
         """
         Generate a Distributed Application Bundle (DAB) from the Compose file.
 
@@ -298,8 +298,7 @@ class TopLevelCommand(object):
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
         """
-        self.project = project_from_options('.', config_options)
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
 
         output = options["--output"]
         if not output:
@@ -312,7 +311,7 @@ class TopLevelCommand(object):
 
         log.info("Wrote bundle to {}".format(output))
 
-    def config(self, config_options, options):
+    def config(self, options):
         """
         Validate and view the Compose file.
 
@@ -327,12 +326,13 @@ class TopLevelCommand(object):
 
         """
 
-        compose_config = get_config_from_options(self.project_dir, config_options)
+        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', config_options)
-            image_digests = image_digests_for_project(self.project)
+            self.project = project_from_options('.', self.toplevel_options)
+            with errors.handle_connection_errors(self.project.client):
+                image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
             return
@@ -1144,42 +1144,41 @@ def timeout_from_opts(options):
 
 
 def image_digests_for_project(project, allow_push=False):
-    with errors.handle_connection_errors(project.client):
-        try:
-            return get_image_digests(
-                project,
-                allow_push=allow_push
+    try:
+        return get_image_digests(
+            project,
+            allow_push=allow_push
+        )
+    except MissingDigests as e:
+        def list_images(images):
+            return "\n".join("    {}".format(name) for name in sorted(images))
+
+        paras = ["Some images are missing digests."]
+
+        if e.needs_push:
+            command_hint = (
+                "Use `docker-compose push {}` to push them. "
+                .format(" ".join(sorted(e.needs_push)))
             )
-        except MissingDigests as e:
-            def list_images(images):
-                return "\n".join("    {}".format(name) for name in sorted(images))
+            paras += [
+                "The following images can be pushed:",
+                list_images(e.needs_push),
+                command_hint,
+            ]
 
-            paras = ["Some images are missing digests."]
+        if e.needs_pull:
+            command_hint = (
+                "Use `docker-compose pull {}` to pull them. "
+                .format(" ".join(sorted(e.needs_pull)))
+            )
 
-            if e.needs_push:
-                command_hint = (
-                    "Use `docker-compose push {}` to push them. "
-                    .format(" ".join(sorted(e.needs_push)))
-                )
-                paras += [
-                    "The following images can be pushed:",
-                    list_images(e.needs_push),
-                    command_hint,
-                ]
+            paras += [
+                "The following images need to be pulled:",
+                list_images(e.needs_pull),
+                command_hint,
+            ]
 
-            if e.needs_pull:
-                command_hint = (
-                    "Use `docker-compose pull {}` to pull them. "
-                    .format(" ".join(sorted(e.needs_pull)))
-                )
-
-                paras += [
-                    "The following images need to be pulled:",
-                    list_images(e.needs_pull),
-                    command_hint,
-                ]
-
-            raise UserError("\n\n".join(paras))
+        raise UserError("\n\n".join(paras))
 
 
 def exitval_from_opts(options, project):
