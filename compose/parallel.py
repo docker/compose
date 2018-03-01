@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import operator
 import sys
+from threading import Lock
 from threading import Semaphore
 from threading import Thread
 
@@ -251,6 +252,7 @@ class ParallelStreamWriter(object):
     """
 
     noansi = False
+    lock = Lock()
 
     @classmethod
     def set_noansi(cls, value=True):
@@ -274,6 +276,7 @@ class ParallelStreamWriter(object):
         self.stream.flush()
 
     def _write_ansi(self, obj_index, status):
+        self.lock.acquire()
         position = self.lines.index(obj_index)
         diff = len(self.lines) - position
         # move up
@@ -285,6 +288,7 @@ class ParallelStreamWriter(object):
         # move back down
         self.stream.write("%c[%dB" % (27, diff))
         self.stream.flush()
+        self.lock.release()
 
     def _write_noansi(self, obj_index, status):
         self.stream.write("{} {:<{width}} ... {}\r\n".format(self.msg, obj_index,
