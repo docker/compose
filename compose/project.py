@@ -366,10 +366,10 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None):
+              build_args=None, volumes=None):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm, memory, build_args)
+                service.build(no_cache, pull, force_rm, memory, build_args, volumes)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 

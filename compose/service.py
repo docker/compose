@@ -962,7 +962,8 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None):
+    def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
+              volumes=None):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
@@ -979,6 +980,14 @@ class Service(object):
         path = build_opts.get('context')
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
+
+        if volumes:
+            volume_bindings = dict(
+                build_volume_binding(volume)
+                for volume in volumes
+                if volume.external
+            )
+            volumes = list(volume_bindings.values())
 
         build_output = self.client.build(
             path=path,
@@ -998,6 +1007,7 @@ class Service(object):
             container_limits={
                 'memory': parse_bytes(memory) if memory else None
             },
+            volumes=volumes,
         )
 
         try:

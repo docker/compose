@@ -251,7 +251,7 @@ class TopLevelCommand(object):
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `docker-compose build` to rebuild it.
 
-        Usage: build [options] [--build-arg key=val...] [SERVICE...]
+        Usage: build [options] [--build-arg key=val...] [-v VOLUME...] [SERVICE...]
 
         Options:
             --force-rm              Always remove intermediate containers.
@@ -259,6 +259,7 @@ class TopLevelCommand(object):
             --pull                  Always attempt to pull a newer version of the image.
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
+            -v, --volume=[]         Bind mount a volume (default [])
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -271,13 +272,18 @@ class TopLevelCommand(object):
             environment = Environment.from_env_file(self.project_dir)
             build_args = resolve_build_args(build_args, environment)
 
+        volumes = options.get('--volume', None)
+        if volumes:
+            volumes = [VolumeSpec.parse(i) for i in volumes]
+
         self.project.build(
             service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
-            build_args=build_args)
+            build_args=build_args,
+            volumes=volumes)
 
     def bundle(self, options):
         """
