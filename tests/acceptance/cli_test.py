@@ -1559,6 +1559,16 @@ class CLITestCase(DockerClientTestCase):
         assert stdout == "operator\n"
         assert stderr == ""
 
+    @v3_only()
+    def test_exec_workdir(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        os.environ['COMPOSE_API_VERSION'] = '1.35'
+        self.dispatch(['up', '-d', 'console'])
+        assert len(self.project.containers()) == 1
+
+        stdout, stderr = self.dispatch(['exec', '-T', '--workdir', '/etc', 'console', 'ls'])
+        assert 'passwd' in stdout
+
     @v2_2_only()
     def test_exec_service_with_environment_overridden(self):
         name = 'service'

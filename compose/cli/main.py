@@ -459,6 +459,7 @@ class TopLevelCommand(object):
                               instances of a service [default: 1]
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
+            -w, --workdir DIR Path to workdir directory for this command.
         """
         environment = Environment.from_env_file(self.project_dir)
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
@@ -467,7 +468,12 @@ class TopLevelCommand(object):
         detach = options.get('--detach')
 
         if options['--env'] and docker.utils.version_lt(self.project.client.api_version, '1.25'):
-            raise UserError("Setting environment for exec is not supported in API < 1.25'")
+            raise UserError("Setting environment for exec is not supported in API < 1.25 (%s)"
+                            % self.project.client.api_version)
+
+        if options['--workdir'] and docker.utils.version_lt(self.project.client.api_version, '1.35'):
+            raise UserError("Setting workdir for exec is not supported in API < 1.35 (%s)"
+                            % self.project.client.api_version)
 
         try:
             container = service.get_container(number=index)
@@ -487,6 +493,7 @@ class TopLevelCommand(object):
             "user": options["--user"],
             "tty": tty,
             "stdin": True,
+            "workdir": options["--workdir"],
         }
 
         if docker.utils.version_gte(self.project.client.api_version, '1.25'):
@@ -1452,6 +1459,9 @@ def build_exec_command(options, container_id, command):
     if options["--env"]:
         for env_variable in options["--env"]:
             args += ["--env", env_variable]
+
+    if options["--workdir"]:
+        args += ["--workdir", options["--workdir"]]
 
     args += [container_id]
     args += command
