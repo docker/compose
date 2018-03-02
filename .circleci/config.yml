@@ -7,7 +7,7 @@ jobs:
     - checkout
     - run:
         name: install python3
-        command: brew update > /dev/null && brew install python3
+        command: brew update > /dev/null && brew upgrade python
     - run:
         name: install tox
         command: sudo pip install --upgrade tox==2.1.1
