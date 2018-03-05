@@ -67,6 +67,7 @@ DOCKER_CONFIG_KEYS = [
     'command',
     'cpu_count',
     'cpu_percent',
+    'cpu_period',
     'cpu_quota',
     'cpu_shares',
     'cpus',

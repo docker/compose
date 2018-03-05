@@ -10,6 +10,7 @@ import six
 from .errors import ConfigurationError
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.utils import parse_bytes
+from compose.utils import parse_nanoseconds_int
 
 
 log = logging.getLogger(__name__)
@@ -223,6 +224,12 @@ def bytes_to_int(s):
     return v
 
 
+def to_microseconds(v):
+    if not isinstance(v, six.string_types):
+        return v
+    return int(parse_nanoseconds_int(v) / 1000)
+
+
 class ConversionMap(object):
     map = {
         service_path('blkio_config', 'weight'): to_int,
@@ -230,6 +237,8 @@ class ConversionMap(object):
         service_path('build', 'labels', FULL_JOKER): to_str,
         service_path('cpus'): to_float,
         service_path('cpu_count'): to_int,
+        service_path('cpu_quota'): to_microseconds,
+        service_path('cpu_period'): to_microseconds,
         service_path('configs', 'mode'): to_int,
         service_path('secrets', 'mode'): to_int,
         service_path('healthcheck', 'retries'): to_int,

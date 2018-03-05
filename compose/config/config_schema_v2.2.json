@@ -110,6 +110,7 @@
         "cpu_percent": {"type": "integer", "minimum": 0, "maximum": 100},
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
+        "cpu_period": {"type": ["number", "string"]},
         "cpus": {"type": "number", "minimum": 0},
         "cpuset": {"type": "string"},
         "depends_on": {

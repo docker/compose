@@ -121,10 +121,11 @@ class ServiceTest(DockerClientTestCase):
         assert container.get('HostConfig.CpuShares') == 73
 
     def test_create_container_with_cpu_quota(self):
-        service = self.create_service('db', cpu_quota=40000)
+        service = self.create_service('db', cpu_quota=40000, cpu_period=150000)
         container = service.create_container()
         container.start()
         assert container.get('HostConfig.CpuQuota') == 40000
+        assert container.get('HostConfig.CpuPeriod') == 150000
 
     @v2_2_only()
     def test_create_container_with_cpu_count(self):
