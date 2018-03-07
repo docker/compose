@@ -73,6 +73,11 @@ class Version(namedtuple('_Version', 'major minor patch rc edition')):
         return '.'.join(map(str, self[:3])) + edition + rc
 
 
+BLACKLIST = [  # List of versions known to be broken and should not be used
+    Version.parse('18.03.0-ce-rc2'),
+]
+
+
 def group_versions(versions):
     """Group versions by `major.minor` releases.
 
@@ -117,7 +122,9 @@ def get_default(versions):
 def get_versions(tags):
     for tag in tags:
         try:
-            yield Version.parse(tag['name'])
+            v = Version.parse(tag['name'])
+            if v not in BLACKLIST:
+                yield v
         except ValueError:
             print("Skipping invalid tag: {name}".format(**tag), file=sys.stderr)
 
