@@ -997,6 +997,7 @@ class TopLevelCommand(object):
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
+            --timestamps               Show timestamps in logs.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -1040,6 +1041,7 @@ class TopLevelCommand(object):
                     reset_container_image=rebuild,
                     renew_anonymous_volumes=options.get('--renew-anon-volumes'),
                     silent=options.get('--quiet-pull'),
+                    log_timestamps=options.get('--timestamps'),
                 )
 
             try:
@@ -1061,11 +1063,15 @@ class TopLevelCommand(object):
 
             attached_containers = filter_containers_to_service_names(to_attach, service_names)
 
+            log_args = {
+                'follow': True,
+                'timestamps': options['--timestamps']
+            }
             log_printer = log_printer_from_project(
                 self.project,
                 attached_containers,
                 options['--no-color'],
-                {'follow': True},
+                log_args,
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))

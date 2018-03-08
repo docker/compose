@@ -2255,6 +2255,12 @@ class CLITestCase(DockerClientTestCase):
         assert 'test' in result.stdout
         assert 'exited with' not in result.stdout
 
+    def test_logs_attach_timestamps(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--timestamps'])
+        assert 'simple' in result.stdout
+        assert str(datetime.datetime.now().year) in result.stdout
+
     def test_logs_on_stopped_containers_exits(self):
         self.base_dir = 'tests/fixtures/echo-services'
         self.dispatch(['up'])

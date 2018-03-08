@@ -448,6 +448,7 @@ class Project(object):
            reset_container_image=False,
            renew_anonymous_volumes=False,
            silent=False,
+           log_timestamps=False,
            ):
 
         self.initialize()
@@ -479,6 +480,7 @@ class Project(object):
                 project_services=scaled_services,
                 reset_container_image=reset_container_image,
                 renew_anonymous_volumes=renew_anonymous_volumes,
+                log_timestamps=log_timestamps,
             )
 
         def get_deps(service):

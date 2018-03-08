@@ -264,7 +264,7 @@ class Service(object):
 
             sorted_containers = sorted(all_containers, key=attrgetter('number'))
             self._execute_convergence_start(
-                sorted_containers, desired_num, timeout, True, True
+                sorted_containers, desired_num, timeout, True, True, False
             )
 
         if desired_num < num_running:
@@ -387,15 +387,19 @@ class Service(object):
 
         return has_diverged
 
-    def _execute_convergence_create(self, scale, detached, start, project_services=None):
+    def _execute_convergence_create(self, scale, detached, start, project_services=None,
+                                    log_timestamps=False):
             i = self._next_container_number()
 
             def create_and_start(service, n):
                 container = service.create_container(number=n, quiet=True)
-                if not detached:
-                    container.attach_log_stream()
+                # Logs with timestamps require container to be started
+                if not detached and not log_timestamps:
+                    container.attach_log_stream(log_timestamps)
                 if start:
                     self.start_container(container)
+                if not detached and log_timestamps:
+                    container.attach_log_stream(log_timestamps)
                 return container
 
             containers, errors = parallel_execute(
@@ -411,7 +415,7 @@ class Service(object):
             return containers
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start,
-                                      renew_anonymous_volumes):
+                                      renew_anonymous_volumes, log_timestamps):
             if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
@@ -419,7 +423,8 @@ class Service(object):
             def recreate(container):
                 return self.recreate_container(
                     container, timeout=timeout, attach_logs=not detached,
-                    start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
+                    start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes,
+                    log_timestamps=log_timestamps
                 )
             containers, errors = parallel_execute(
                 containers,
@@ -432,18 +437,19 @@ class Service(object):
 
             if scale is not None and len(containers) < scale:
                 containers.extend(self._execute_convergence_create(
-                    scale - len(containers), detached, start
+                    scale - len(containers), detached, start, log_timestamps=log_timestamps
                 ))
             return containers
 
-    def _execute_convergence_start(self, containers, scale, timeout, detached, start):
+    def _execute_convergence_start(self, containers, scale, timeout, detached, start, log_timestamps):
             if scale is not None and len(containers) > scale:
                 self._downscale(containers[scale:], timeout)
                 containers = containers[:scale]
             if start:
                 _, errors = parallel_execute(
                     containers,
-                    lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True),
+                    lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True,
+                                                              log_timestamps=log_timestamps),
                     lambda c: c.name,
                     "Starting",
                 )
@@ -472,7 +478,8 @@ class Service(object):
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
                                  start=True, scale_override=None,
                                  rescale=True, project_services=None,
-                                 reset_container_image=False, renew_anonymous_volumes=False):
+                                 reset_container_image=False, renew_anonymous_volumes=False,
+                                 log_timestamps=False):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -481,7 +488,7 @@ class Service(object):
 
         if action == 'create':
             return self._execute_convergence_create(
-                scale, detached, start, project_services
+                scale, detached, start, project_services, log_timestamps
             )
 
         # The create action needs always needs an initial scale, but otherwise,
@@ -498,18 +505,18 @@ class Service(object):
                     c.reset_image(img_id)
             return self._execute_convergence_recreate(
                 containers, scale, timeout, detached, start,
-                renew_anonymous_volumes,
+                renew_anonymous_volumes, log_timestamps
             )
 
         if action == 'start':
             return self._execute_convergence_start(
-                containers, scale, timeout, detached, start
+                containers, scale, timeout, detached, start, log_timestamps
             )
 
         if action == 'noop':
             if scale != len(containers):
                 return self._execute_convergence_start(
-                    containers, scale, timeout, detached, start
+                    containers, scale, timeout, detached, start, log_timestamps
                 )
             for c in containers:
                 log.info("%s is up-to-date" % c.name)
@@ -519,7 +526,7 @@ class Service(object):
         raise Exception("Invalid action: {}".format(action))
 
     def recreate_container(self, container, timeout=None, attach_logs=False, start_new_container=True,
-                           renew_anonymous_volumes=False):
+                           renew_anonymous_volumes=False, log_timestamps=False):
         """Recreate a container.
 
         The original container is renamed to a temporary name so that data
@@ -534,10 +541,13 @@ class Service(object):
             number=container.labels.get(LABEL_CONTAINER_NUMBER),
             quiet=True,
         )
-        if attach_logs:
-            new_container.attach_log_stream()
+        # Logs with timestamps require the container to be started
+        if attach_logs and not log_timestamps:
+            new_container.attach_log_stream(log_timestamps)
         if start_new_container:
             self.start_container(new_container)
+        if attach_logs and log_timestamps:
+            new_container.attach_log_stream(log_timestamps)
         container.remove()
         return new_container
 
@@ -549,13 +559,18 @@ class Service(object):
             return timeout
         return DEFAULT_TIMEOUT
 
-    def start_container_if_stopped(self, container, attach_logs=False, quiet=False):
+    def start_container_if_stopped(self, container, attach_logs=False, quiet=False,
+                                   log_timestamps=False):
         if not container.is_running:
             if not quiet:
                 log.info("Starting %s" % container.name)
-            if attach_logs:
-                container.attach_log_stream()
-            return self.start_container(container)
+            # Logs with timestamps require the container to be started
+            if attach_logs and not log_timestamps:
+                container.attach_log_stream(log_timestamps)
+            res = self.start_container(container)
+            if attach_logs and log_timestamps:
+                container.attach_log_stream(log_timestamps)
+            return res
 
     def start_container(self, container, use_network_aliases=True):
         self.connect_container_to_networks(container, use_network_aliases)

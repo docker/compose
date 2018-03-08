@@ -184,12 +184,16 @@ class Container(object):
             status_string += ' (%s)' % container_status
         return status_string
 
-    def attach_log_stream(self):
+    def attach_log_stream(self, log_timestamps=False):
         """A log stream can only be attached if the container uses a json-file
         log driver.
         """
         if self.has_api_logs:
-            self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
+            if log_timestamps:
+                self.log_stream = self.logs(stdout=True, stderr=True, stream=True,
+                                            follow=True, timestamps=True, tail='all')
+            else:
+                self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
 
     def get(self, key):
         """Return a value from the container or None if the value is not set.
