@@ -38,9 +38,11 @@ Change log
 - Proxy configuration found in the `~/.docker/config.json` file now populates
   environment and build args for containers created by Compose
 
-- Added a `--use-aliases` flag to `docker-compose run`, indicating that
+- Added the `--use-aliases` flag to `docker-compose run`, indicating that
   network aliases declared in the service's config should be used for the
   running container
+
+- Added the `--include-deps` flag to `docker-compose pull`
 
 - `docker-compose run` now kills and removes the running container upon
   receiving `SIGHUP`
@@ -54,6 +56,9 @@ Change log
 
 - Fixed `.dockerignore` handling, notably with regard to absolute paths
   and last-line precedence rules
+
+- Fixed an issue where Compose would make costly DNS lookups when connecting
+  to the Engine when using Docker For Mac
 
 - Fixed a bug introduced in 1.19.0 which caused the default certificate path
   to not be honored by Compose
@@ -69,6 +74,9 @@ Change log
 
 - A `seccomp:<filepath>` entry in the `security_opt` config now correctly
   sends the contents of the file to the engine
+
+- ANSI output for `up` and `down` operations should no longer affect the wrong
+  lines
 
 - Improved support for non-unicode locales
 
