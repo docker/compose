@@ -106,6 +106,7 @@
         "container_name": {"type": "string"},
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
+        "cpu_period": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
         "depends_on": {
           "oneOf": [
