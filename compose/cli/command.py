@@ -122,7 +122,9 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     )
 
     with errors.handle_connection_errors(client):
-        return Project.from_config(project_name, config_data, client)
+        return Project.from_config(
+            project_name, config_data, client, environment.get('DOCKER_DEFAULT_PLATFORM')
+        )
 
 
 def get_project_name(working_dir, project_name=None, environment=None):

@@ -998,6 +998,12 @@ class Service(object):
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
+        platform = self.options.get('platform')
+        if platform and version_lt(self.client.api_version, '1.35'):
+            raise OperationFailedError(
+                'Impossible to perform platform-targeted builds for API version < 1.35'
+            )
+
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
@@ -1018,6 +1024,7 @@ class Service(object):
             },
             gzip=gzip,
             isolation=build_opts.get('isolation', self.options.get('isolation', None)),
+            platform=platform,
         )
 
         try:
@@ -1119,11 +1126,20 @@ class Service(object):
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
-        tag = tag or 'latest'
+        kwargs = {
+            'tag': tag or 'latest',
+            'stream': True,
+            'platform': self.options.get('platform'),
+        }
         if not silent:
             log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
+
+        if kwargs['platform'] and version_lt(self.client.api_version, '1.35'):
+            raise OperationFailedError(
+                'Impossible to perform platform-targeted builds for API version < 1.35'
+            )
         try:
-            output = self.client.pull(repo, tag=tag, stream=True)
+            output = self.client.pull(repo, **kwargs)
             if silent:
                 with open(os.devnull, 'w') as devnull:
                     return progress_stream.get_digest_from_pull(

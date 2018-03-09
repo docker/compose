@@ -129,11 +129,12 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'container_name',
     'credential_spec',
     'dockerfile',
+    'init',
     'log_driver',
     'log_opt',
     'logging',
     'network_mode',
-    'init',
+    'platform',
     'scale',
     'stop_grace_period',
 ]

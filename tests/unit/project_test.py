@@ -13,6 +13,7 @@ from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V2_4 as V2_4
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import NoSuchService
@@ -561,3 +562,29 @@ class ProjectTest(unittest.TestCase):
     def test_no_such_service_unicode(self):
         assert NoSuchService('十六夜　咲夜'.encode('utf-8')).msg == 'No such service: 十六夜　咲夜'
         assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜'
+
+    def test_project_platform_value(self):
+        service_config = {
+            'name': 'web',
+            'image': 'busybox:latest',
+        }
+        config_data = Config(
+            version=V2_4, services=[service_config], networks={}, volumes={}, secrets=None, configs=None
+        )
+
+        project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
+        assert project.get_service('web').options.get('platform') is None
+
+        project = Project.from_config(
+            name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
+        )
+        assert project.get_service('web').options.get('platform') == 'windows'
+
+        service_config['platform'] = 'linux/s390x'
+        project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
+        assert project.get_service('web').options.get('platform') == 'linux/s390x'
+
+        project = Project.from_config(
+            name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
+        )
+        assert project.get_service('web').options.get('platform') == 'linux/s390x'

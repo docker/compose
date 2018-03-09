@@ -21,6 +21,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import SECRETS_PATH
 from compose.container import Container
+from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
@@ -400,7 +401,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sometag',
-            stream=True)
+            stream=True,
+            platform=None)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
     def test_pull_image_no_tag(self):
@@ -409,7 +411,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'ababab',
             tag='latest',
-            stream=True)
+            stream=True,
+            platform=None)
 
     @mock.patch('compose.service.log', autospec=True)
     def test_pull_image_digest(self, mock_log):
@@ -418,8 +421,29 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sha256:1234',
-            stream=True)
+            stream=True,
+            platform=None)
         mock_log.info.assert_called_once_with('Pulling foo (someimage@sha256:1234)...')
+
+    @mock.patch('compose.service.log', autospec=True)
+    def test_pull_image_with_platform(self, mock_log):
+        self.mock_client.api_version = '1.35'
+        service = Service(
+            'foo', client=self.mock_client, image='someimage:sometag', platform='windows/x86_64'
+        )
+        service.pull()
+        assert self.mock_client.pull.call_count == 1
+        call_args = self.mock_client.pull.call_args
+        assert call_args[1]['platform'] == 'windows/x86_64'
+
+    @mock.patch('compose.service.log', autospec=True)
+    def test_pull_image_with_platform_unsupported_api(self, mock_log):
+        self.mock_client.api_version = '1.33'
+        service = Service(
+            'foo', client=self.mock_client, image='someimage:sometag', platform='linux/arm'
+        )
+        with pytest.raises(OperationFailedError):
+            service.pull()
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
@@ -512,6 +536,19 @@ class ServiceTest(unittest.TestCase):
 
         assert self.mock_client.build.call_count == 1
         assert not self.mock_client.build.call_args[1]['pull']
+
+    def test_build_does_with_platform(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.'}, platform='linux')
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        call_args = self.mock_client.build.call_args
+        assert call_args[1]['platform'] == 'linux'
 
     def test_build_with_override_build_args(self):
         self.mock_client.build.return_value = [
