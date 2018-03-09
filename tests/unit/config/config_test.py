@@ -4508,6 +4508,29 @@ class ExtendsTest(unittest.TestCase):
         for svc in services:
             assert svc['ports'] == [types.ServicePort('80', None, None, None, None)]
 
+    def test_extends_with_security_opt(self):
+        tmpdir = py.test.ensuretemp('test_extends_with_ports')
+        self.addCleanup(tmpdir.remove)
+        tmpdir.join('docker-compose.yml').write("""
+            version: '2'
+
+            services:
+              a:
+                image: nginx
+                security_opt:
+                  - apparmor:unconfined
+                  - seccomp:unconfined
+
+              b:
+                extends:
+                  service: a
+        """)
+        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        assert len(services) == 2
+        for svc in services:
+            assert types.SecurityOpt.parse('apparmor:unconfined') in svc['security_opt']
+            assert types.SecurityOpt.parse('seccomp:unconfined') in svc['security_opt']
+
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')
 class ExpandPathTest(unittest.TestCase):
