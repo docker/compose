@@ -1040,6 +1040,7 @@ def merge_service_dicts(base, override, version):
     md.merge_sequence('links', ServiceLink.parse)
     md.merge_sequence('secrets', types.ServiceSecret.parse)
     md.merge_sequence('configs', types.ServiceConfig.parse)
+    md.merge_sequence('security_opt', types.SecurityOpt.parse)
     md.merge_mapping('extra_hosts', parse_extra_hosts)
 
     for field in ['volumes', 'devices']:
@@ -1047,7 +1048,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'cap_add', 'cap_drop', 'expose', 'external_links',
-        'security_opt', 'volumes_from', 'device_cgroup_rules',
+        'volumes_from', 'device_cgroup_rules',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 
