@@ -402,8 +402,7 @@ class Service(object):
                 [ServiceName(self.project, self.name, index) for index in range(i, i + scale)],
                 lambda service_name: create_and_start(self, service_name.number),
                 lambda service_name: self.get_container_name(service_name.service, service_name.number),
-                "Creating",
-                parent_objects=project_services
+                "Creating"
             )
             for error in errors.values():
                 raise OperationFailedError(error)
