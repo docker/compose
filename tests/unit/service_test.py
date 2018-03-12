@@ -20,6 +20,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import SECRETS_PATH
 from compose.container import Container
+from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
@@ -727,6 +728,7 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.log', autospec=True)
     def test_only_log_warning_when_host_ports_clash(self, mock_log):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
+        ParallelStreamWriter.instance = None
         name = 'foo'
         service = Service(
             name,

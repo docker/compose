@@ -464,6 +464,8 @@ def normalize_port_dict(port):
 class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
     @classmethod
     def parse(cls, value):
+        if not isinstance(value, six.string_types):
+            return value
         # based on https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697
         con = value.split('=', 2)
         if len(con) == 1 and con[0] != 'no-new-privileges':
@@ -485,4 +487,8 @@ class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
     def repr(self):
         if self.src_file is not None:
             return 'seccomp:{}'.format(self.src_file)
+        return self.value
+
+    @property
+    def merge_field(self):
         return self.value

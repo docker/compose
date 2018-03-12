@@ -35,6 +35,7 @@ from compose.const import LABEL_SERVICE
 from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.errors import OperationFailedError
+from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
@@ -1197,6 +1198,7 @@ class ServiceTest(DockerClientTestCase):
         service.create_container(number=next_number)
         service.create_container(number=next_number + 1)
 
+        ParallelStreamWriter.instance = None
         with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
         for container in service.containers():
@@ -1220,6 +1222,7 @@ class ServiceTest(DockerClientTestCase):
         for container in service.containers():
             assert not container.is_running
 
+        ParallelStreamWriter.instance = None
         with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
 

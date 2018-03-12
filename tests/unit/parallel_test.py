@@ -143,6 +143,7 @@ class ParallelTest(unittest.TestCase):
 
 
 def test_parallel_execute_alignment(capsys):
+    ParallelStreamWriter.instance = None
     results, errors = parallel_execute(
         objects=["short", "a very long name"],
         func=lambda x: x,
@@ -158,6 +159,7 @@ def test_parallel_execute_alignment(capsys):
 
 
 def test_parallel_execute_ansi(capsys):
+    ParallelStreamWriter.instance = None
     ParallelStreamWriter.set_noansi(value=False)
     results, errors = parallel_execute(
         objects=["something", "something more"],
@@ -173,6 +175,7 @@ def test_parallel_execute_ansi(capsys):
 
 
 def test_parallel_execute_noansi(capsys):
+    ParallelStreamWriter.instance = None
     ParallelStreamWriter.set_noansi()
     results, errors = parallel_execute(
         objects=["something", "something more"],

@@ -179,18 +179,22 @@ _docker_compose_docker_compose() {
 			_filedir "y?(a)ml"
 			return
 			;;
+		--log-level)
+			COMPREPLY=( $( compgen -W "debug info warning error critical" -- "$cur" ) )
+			return
+			;;
 		--project-directory)
 			_filedir -d
 			return
 			;;
-		$(__docker_compose_to_extglob "$top_level_options_with_args") )
+		$(__docker_compose_to_extglob "$daemon_options_with_args") )
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "$top_level_boolean_options $top_level_options_with_args --help -h --no-ansi --verbose --version -v" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "$daemon_boolean_options $daemon_options_with_args $top_level_options_with_args --help -h --no-ansi --verbose --version -v" -- "$cur" ) )
 			;;
 		*)
 			COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
@@ -375,7 +379,7 @@ _docker_compose_ps() {
 _docker_compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --parallel --quiet -q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --include-deps --parallel --quiet -q" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_image
@@ -444,7 +448,7 @@ _docker_compose_run() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --detach --entrypoint -e --help --label -l --name --no-deps --publish -p --rm --service-ports -T --user -u --volume -v --workdir -w" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--detach -d --entrypoint -e --help --label -l --name --no-deps --publish -p --rm --service-ports -T --use-aliases --user -u --volume -v --workdir -w" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_all
@@ -605,14 +609,12 @@ _docker_compose() {
 
 	# Options for the docker daemon that have to be passed to secondary calls to
 	# docker-compose executed by this script.
-	# Other global otions that are not relevant for secondary calls are defined in
-	# `_docker_compose_docker_compose`.
-	local top_level_boolean_options="
+	local daemon_boolean_options="
 		--skip-hostname-check
 		--tls
 		--tlsverify
 	"
-	local top_level_options_with_args="
+	local daemon_options_with_args="
 		--file -f
 		--host -H
 		--project-directory
@@ -620,6 +622,11 @@ _docker_compose() {
 		--tlscacert
 		--tlscert
 		--tlskey
+	"
+
+	# These options are require special treatment when searching the command.
+	local top_level_options_with_args="
+		--log-level
 	"
 
 	COMPREPLY=()
@@ -634,14 +641,17 @@ _docker_compose() {
 
 	while [ $counter -lt $cword ]; do
 		case "${words[$counter]}" in
-			$(__docker_compose_to_extglob "$top_level_boolean_options") )
+			$(__docker_compose_to_extglob "$daemon_boolean_options") )
 				local opt=${words[counter]}
 				top_level_options+=($opt)
 				;;
-			$(__docker_compose_to_extglob "$top_level_options_with_args") )
+			$(__docker_compose_to_extglob "$daemon_options_with_args") )
 				local opt=${words[counter]}
 				local arg=${words[++counter]}
 				top_level_options+=($opt $arg)
+				;;
+			$(__docker_compose_to_extglob "$top_level_options_with_args") )
+				(( counter++ ))
 				;;
 			-*)
 				;;
