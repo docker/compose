@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import json
 import os
 import random
+import shutil
 import tempfile
 
 import py
@@ -1535,6 +1536,52 @@ class ProjectTest(DockerClientTestCase):
             project.volumes.initialize()
         assert 'Configuration for volume {0} specifies driver smb'.format(
             vol_name
+        ) in str(e.value)
+
+    @v2_only()
+    @no_cluster('inspect volume by name defect on Swarm Classic')
+    def test_initialize_volumes_updated_driver_opts(self):
+        vol_name = '{0:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{0}'.format(vol_name)
+        tmpdir = tempfile.mkdtemp(prefix='compose_test_')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        driver_opts = {'o': 'bind', 'device': tmpdir, 'type': 'none'}
+
+        config_data = build_config(
+            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'command': 'top'
+            }],
+            volumes={
+                vol_name: {
+                    'driver': 'local',
+                    'driver_opts': driver_opts
+                }
+            },
+        )
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data, client=self.client
+        )
+        project.volumes.initialize()
+
+        volume_data = self.get_volume_data(full_vol_name)
+        assert volume_data['Name'].split('/')[-1] == full_vol_name
+        assert volume_data['Driver'] == 'local'
+        assert volume_data['Options'] == driver_opts
+
+        driver_opts['device'] = '/opt/data/localdata'
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data,
+            client=self.client
+        )
+        with pytest.raises(config.ConfigurationError) as e:
+            project.volumes.initialize()
+        assert 'Configuration for volume {0} specifies "device" driver_opt {1}'.format(
+            vol_name, driver_opts['device']
         ) in str(e.value)
 
     @v2_only()

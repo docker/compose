@@ -6,8 +6,8 @@ jobs:
     steps:
     - checkout
     - run:
-        name: install python3
-        command: brew update > /dev/null && brew upgrade python
+        name: setup script
+        command: ./script/setup/osx
     - run:
         name: install tox
         command: sudo pip install --upgrade tox==2.1.1
