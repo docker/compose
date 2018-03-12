@@ -1452,6 +1452,8 @@ def build_volume_from(volume_from_spec):
         return "{}:{}".format(container.id, volume_from_spec.mode)
     elif isinstance(volume_from_spec.source, Container):
         return "{}:{}".format(volume_from_spec.source.id, volume_from_spec.mode)
+    else:
+        raise Exception('volume source "%s" is of unexpected type' % volume_from_spec.source)
 
 
 def build_mount(mount_spec):

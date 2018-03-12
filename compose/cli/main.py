@@ -28,9 +28,11 @@ from ..config import parse_labels
 from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
+from ..config.types import VolumeFromSpec
 from ..config.types import VolumeSpec
 from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
+from ..container import Container
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
@@ -794,8 +796,8 @@ class TopLevelCommand(object):
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage:
-            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...]
-                SERVICE [COMMAND] [ARGS...]
+            run [options] [--volumes-from SRC...] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...]
+                 [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]
 
         Options:
             -d, --detach          Detached mode: Run container in the background, print
@@ -813,6 +815,7 @@ class TopLevelCommand(object):
             --use-aliases         Use the service's network aliases in the network(s) the
                                   container connects to.
             -v, --volume=[]       Bind mount a volume (default [])
+            --volumes-from=[]     Mount volumes from given source.
             -T                    Disable pseudo-tty allocation. By default `docker-compose run`
                                   allocates a TTY.
             -w, --workdir=""      Working directory inside the container
@@ -832,6 +835,15 @@ class TopLevelCommand(object):
             command = []
         else:
             command = service.options.get('command')
+
+        for vf in options.get('--volumes-from', []):
+            spec = VolumeFromSpec.parse(vf, self.project.service_names, V2_2)
+            if spec.type == 'service':
+                spec = spec._replace(source=self.project.get_service(spec.source))
+            elif spec.type == 'container':
+                container = Container.from_id(self.project.client, spec.source)
+                spec = spec._replace(source=container)
+            service.volumes_from.append(spec)
 
         container_options = build_container_options(options, detach, command)
         run_one_off_container(

@@ -1,0 +1,14 @@
+version: '3.4'
+services:
+  writer:
+    image: busybox
+    command: sh -c 'echo foo >/tmp/vol/bar; sleep 3600'
+    volumes:
+     - type: volume
+       source: data
+       target: /tmp/vol
+  reader:
+    image: busybox
+    command: cat /tmp/vol/bar
+volumes:
+  data:

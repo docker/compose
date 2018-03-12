@@ -2075,6 +2075,12 @@ class CLITestCase(DockerClientTestCase):
         assert labels['foo'] == 'baz'
         assert labels['hello'] == 'world'
 
+    def test_run_volumes_from(self):
+        self.base_dir = 'tests/fixtures/run-volumes-from'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['run', '--volumes-from', 'writer', 'reader'])
+        assert 'foo' in result.stdout
+
     def test_rm(self):
         service = self.project.get_service('simple')
         service.create_container()
