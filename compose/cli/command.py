@@ -57,7 +57,8 @@ def project_from_options(project_dir, options, additional_options={}):
         environment=environment,
         override_dir=override_dir,
         compatibility=options.get('--compatibility'),
-        interpolate=(not additional_options.get('--no-interpolate'))
+        interpolate=(not additional_options.get('--no-interpolate')),
+        skipped_sections=['services.build'] if '--no-build' in options else []
     )
 
 
@@ -84,10 +85,14 @@ def get_config_from_options(base_dir, options, additional_options={}):
     config_path = get_config_path_from_options(
         base_dir, options, environment
     )
+
+    skipped_sections = ['services.build'] if '--no-build' in options else []
+
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
         options.get('--compatibility'),
-        not additional_options.get('--no-interpolate')
+        not additional_options.get('--no-interpolate'),
+        skipped_sections
     )
 
 
@@ -125,14 +130,14 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 host=None, tls_config=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True):
+                compatibility=False, interpolate=True, skipped_sections=[]):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details, compatibility, interpolate)
+    config_data = config.load(config_details, compatibility, interpolate, skipped_sections)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',

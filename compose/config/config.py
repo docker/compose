@@ -373,7 +373,16 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details, compatibility=False, interpolate=True):
+def filter_sections(parent_section, skipped_sections, separator='.'):
+    """Filters a list of sections to skip based on their parent section
+
+    Return a list of sections under the given parent section
+    """
+    return [parts[2] for parts in (section.partition(separator) for section in skipped_sections)
+            if separator == parts[1] and parent_section == parts[0]]
+
+
+def load(config_details, compatibility=False, interpolate=True, skipped_sections=[]):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -401,7 +410,12 @@ def load(config_details, compatibility=False, interpolate=True):
     configs = load_mapping(
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
-    service_dicts = load_services(config_details, main_file, compatibility)
+    service_dicts = load_services(
+        config_details,
+        main_file,
+        compatibility,
+        filter_sections('services', skipped_sections)
+    )
 
     if main_file.version != V1:
         for service_dict in service_dicts:
@@ -453,7 +467,7 @@ def validate_external(entity_type, name, config, version):
                 entity_type, name, ', '.join(k for k in config if k != 'external')))
 
 
-def load_services(config_details, config_file, compatibility=False):
+def load_services(config_details, config_file, compatibility=False, skipped_sections=[]):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
@@ -463,10 +477,10 @@ def load_services(config_details, config_file, compatibility=False):
         resolver = ServiceExtendsResolver(
             service_config, config_file, environment=config_details.environment
         )
-        service_dict = process_service(resolver.run())
+        service_dict = process_service(resolver.run(), skipped_sections)
 
         service_config = service_config._replace(config=service_dict)
-        validate_service(service_config, service_names, config_file)
+        validate_service(service_config, service_names, config_file, skipped_sections)
         service_dict = finalize_service(
             service_config,
             service_names,
@@ -715,10 +729,10 @@ def validate_extended_service_dict(service_dict, filename, service):
             "%s services with 'depends_on' cannot be extended" % error_prefix)
 
 
-def validate_service(service_config, service_names, config_file):
+def validate_service(service_config, service_names, config_file, skipped_sections=[]):
     service_dict, service_name = service_config.config, service_config.name
     validate_service_constraints(service_dict, service_name, config_file)
-    validate_paths(service_dict)
+    validate_paths(service_dict, skipped_sections)
 
     validate_cpu(service_config)
     validate_ulimits(service_config)
@@ -737,7 +751,7 @@ def validate_service(service_config, service_names, config_file):
             .format(name=service_name))
 
 
-def process_service(service_config):
+def process_service(service_config, skipped_sections=[]):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
 
@@ -747,7 +761,7 @@ def process_service(service_config):
             for path in to_list(service_dict['env_file'])
         ]
 
-    if 'build' in service_dict:
+    if 'build' in service_dict and 'build' not in skipped_sections:
         process_build_section(service_dict, working_dir)
 
     if 'volumes' in service_dict and service_dict.get('volume_driver') is None:
@@ -1399,8 +1413,8 @@ def is_url(build_path):
     return build_path.startswith(DOCKER_VALID_URL_PREFIXES)
 
 
-def validate_paths(service_dict):
-    if 'build' in service_dict:
+def validate_paths(service_dict, skipped_sections=[]):
+    if 'build' in service_dict and 'build' not in skipped_sections:
         build = service_dict.get('build', {})
 
         if isinstance(build, six.string_types):

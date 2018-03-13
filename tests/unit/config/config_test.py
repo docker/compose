@@ -69,6 +69,23 @@ def secret_sort(secrets):
 
 class ConfigTest(unittest.TestCase):
 
+    def test_filter_sections(self):
+        filtered_sections = config.filter_sections(
+            "services",
+            [
+                'secrets.build',
+                'services',
+                'services.image',
+                'services.build',
+                'networks.driver',
+            ]
+        )
+
+        assert filtered_sections == [
+            'image',
+            'build',
+        ]
+
     def test_load(self):
         service_dicts = config.load(
             build_config_details(
@@ -4953,6 +4970,18 @@ class BuildPathTest(unittest.TestCase):
                     'filename.yml'
                 )
             )
+
+    def test_skip_nonexistent_path(self):
+        service_dict = config.load(
+            build_config_details(
+                {
+                    'foo': {'build': 'nonexistent.path'},
+                },
+                'working_dir',
+                'filename.yml'
+            ), skipped_sections=['services.build']
+        ).services
+        assert service_dict[0]['name'] == 'foo'
 
     def test_relative_path(self):
         relative_build_path = '../build-ctx/'
