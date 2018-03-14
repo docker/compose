@@ -124,19 +124,7 @@ class ProjectVolumes(object):
                     )
                     volume.create()
                 else:
-                    driver = volume.inspect()['Driver']
-                    if volume.driver is not None and driver != volume.driver:
-                        raise ConfigurationError(
-                            'Configuration for volume {0} specifies driver '
-                            '{1}, but a volume with the same name uses a '
-                            'different driver ({3}). If you wish to use the '
-                            'new configuration, please remove the existing '
-                            'volume "{2}" first:\n'
-                            '$ docker volume rm {2}'.format(
-                                volume.name, volume.driver, volume.full_name,
-                                volume.inspect()['Driver']
-                            )
-                        )
+                    check_remote_volume_config(volume.inspect(), volume)
         except NotFound:
             raise ConfigurationError(
                 'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
@@ -152,3 +140,43 @@ class ProjectVolumes(object):
         else:
             volume_spec.source = self.volumes[volume_spec.source].full_name
             return volume_spec
+
+
+class VolumeConfigChangedError(ConfigurationError):
+    def __init__(self, local, property_name, local_value, remote_value):
+        super(VolumeConfigChangedError, self).__init__(
+            'Configuration for volume {vol_name} specifies {property_name} '
+            '{local_value}, but a volume with the same name uses a different '
+            '{property_name} ({remote_value}). If you wish to use the new '
+            'configuration, please remove the existing volume "{full_name}" '
+            'first:\n$ docker volume rm {full_name}'.format(
+                vol_name=local.name, property_name=property_name,
+                local_value=local_value, remote_value=remote_value,
+                full_name=local.full_name
+            )
+        )
+
+
+def check_remote_volume_config(remote, local):
+    if local.driver and remote.get('Driver') != local.driver:
+        raise VolumeConfigChangedError(local, 'driver', local.driver, remote.get('Driver'))
+    local_opts = local.driver_opts or {}
+    remote_opts = remote.get('Options') or {}
+    for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
+        if k.startswith('com.docker.'):  # These options are set internally
+            continue
+        if remote_opts.get(k) != local_opts.get(k):
+            raise VolumeConfigChangedError(
+                local, '"{}" driver_opt'.format(k), local_opts.get(k), remote_opts.get(k),
+            )
+
+    local_labels = local.labels or {}
+    remote_labels = remote.get('Labels') or {}
+    for k in set.union(set(remote_labels.keys()), set(local_labels.keys())):
+        if k.startswith('com.docker.'):  # We are only interested in user-specified labels
+            continue
+        if remote_labels.get(k) != local_labels.get(k):
+            log.warn(
+                'Volume {}: label "{}" has changed. It may need to be'
+                ' recreated.'.format(local.name, k)
+            )
