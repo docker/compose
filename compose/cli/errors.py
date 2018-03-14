@@ -83,7 +83,7 @@ def log_windows_pipe_error(exc):
 
 def log_timeout_error(timeout):
     log.error(
-        "An HTTP request took too long to complete. Retry with --verbose to "
+        "A HTTP request took too long to complete. Retry with --verbose to "
         "obtain debug information.\n"
         "If you encounter this issue regularly because of slow network "
         "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
