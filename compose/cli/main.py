@@ -711,14 +711,17 @@ class TopLevelCommand(object):
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
-            --parallel              Pull multiple images in parallel.
+            --parallel              Deprecated, pull multiple images in parallel (enabled by default).
+            --no-parallel           Disable parallel pulling.
             -q, --quiet             Pull without printing progress information
             --include-deps          Also pull services declared as dependencies
         """
+        if options.get('--parallel'):
+            log.warn('--parallel option is deprecated and will be removed in future versions.')
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
-            parallel_pull=options.get('--parallel'),
+            parallel_pull=not options.get('--no-parallel'),
             silent=options.get('--quiet'),
             include_deps=options.get('--include-deps'),
         )

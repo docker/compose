@@ -545,13 +545,11 @@ class CLITestCase(DockerClientTestCase):
 
     def test_pull(self):
         result = self.dispatch(['pull'])
-        assert sorted(result.stderr.split('\n'))[1:] == [
-            'Pulling another (busybox:latest)...',
-            'Pulling simple (busybox:latest)...',
-        ]
+        assert 'Pulling simple' in result.stderr
+        assert 'Pulling another' in result.stderr
 
     def test_pull_with_digest(self):
-        result = self.dispatch(['-f', 'digest.yml', 'pull'])
+        result = self.dispatch(['-f', 'digest.yml', 'pull', '--no-parallel'])
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
         assert ('Pulling digest (busybox@'
@@ -561,7 +559,7 @@ class CLITestCase(DockerClientTestCase):
     def test_pull_with_ignore_pull_failures(self):
         result = self.dispatch([
             '-f', 'ignore-pull-failures.yml',
-            'pull', '--ignore-pull-failures']
+            'pull', '--ignore-pull-failures', '--no-parallel']
         )
 
         assert 'Pulling simple (busybox:latest)...' in result.stderr
@@ -576,7 +574,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_pull_with_parallel_failure(self):
         result = self.dispatch([
-            '-f', 'ignore-pull-failures.yml', 'pull', '--parallel'],
+            '-f', 'ignore-pull-failures.yml', 'pull'],
             returncode=1
         )
 
@@ -593,14 +591,14 @@ class CLITestCase(DockerClientTestCase):
 
     def test_pull_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
-        result = self.dispatch(['pull', 'web'])
+        result = self.dispatch(['pull', '--no-parallel', 'web'])
         assert sorted(result.stderr.split('\n'))[1:] == [
             'Pulling web (busybox:latest)...',
         ]
 
     def test_pull_with_include_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
-        result = self.dispatch(['pull', '--include-deps', 'web'])
+        result = self.dispatch(['pull', '--no-parallel', '--include-deps', 'web'])
         assert sorted(result.stderr.split('\n'))[1:] == [
             'Pulling db (busybox:latest)...',
             'Pulling web (busybox:latest)...',
