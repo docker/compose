@@ -11,7 +11,6 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
-			"dnephin",
 			"mefyl",
 			"mnottale",
 			"shin-",
@@ -30,6 +29,7 @@
 			# in 2015 with solid bugfixes and improved error handling
 			# among them
 			"mnowster",
+            "dnephin",
 		]
 
 [people]
