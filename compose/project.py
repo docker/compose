@@ -551,7 +551,7 @@ class Project(object):
                 services,
                 pull_service,
                 operator.attrgetter('name'),
-                'Pulling',
+                not silent and 'Pulling' or None,
                 limit=5,
             )
             if len(errors):
