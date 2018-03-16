@@ -111,6 +111,8 @@
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
         "cpu_period": {"type": ["number", "string"]},
+        "cpu_rt_period": {"type": ["number", "string"]},
+        "cpu_rt_runtime": {"type": ["number", "string"]},
         "cpus": {"type": "number", "minimum": 0},
         "cpuset": {"type": "string"},
         "depends_on": {

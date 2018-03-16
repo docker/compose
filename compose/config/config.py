@@ -69,6 +69,8 @@ DOCKER_CONFIG_KEYS = [
     'cpu_percent',
     'cpu_period',
     'cpu_quota',
+    'cpu_rt_period',
+    'cpu_rt_runtime',
     'cpu_shares',
     'cpus',
     'cpuset',

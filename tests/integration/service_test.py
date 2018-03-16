@@ -128,6 +128,14 @@ class ServiceTest(DockerClientTestCase):
         assert container.get('HostConfig.CpuQuota') == 40000
         assert container.get('HostConfig.CpuPeriod') == 150000
 
+    @pytest.mark.xfail(raises=OperationFailedError, reason='not supported by kernel')
+    def test_create_container_with_cpu_rt(self):
+        service = self.create_service('db', cpu_rt_runtime=40000, cpu_rt_period=150000)
+        container = service.create_container()
+        container.start()
+        assert container.get('HostConfig.CpuRealtimeRuntime') == 40000
+        assert container.get('HostConfig.CpuRealtimePeriod') == 150000
+
     @v2_2_only()
     def test_create_container_with_cpu_count(self):
         self.require_api_version('1.25')
