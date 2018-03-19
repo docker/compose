@@ -64,6 +64,8 @@ HOST_CONFIG_KEYS = [
     'cpu_percent',
     'cpu_period',
     'cpu_quota',
+    'cpu_rt_period',
+    'cpu_rt_runtime',
     'cpu_shares',
     'cpus',
     'cpuset',
@@ -949,6 +951,8 @@ class Service(object):
             mounts=options.get('mounts'),
             device_cgroup_rules=options.get('device_cgroup_rules'),
             cpu_period=options.get('cpu_period'),
+            cpu_rt_period=options.get('cpu_rt_period'),
+            cpu_rt_runtime=options.get('cpu_rt_runtime'),
         )
 
     def get_secret_volumes(self):

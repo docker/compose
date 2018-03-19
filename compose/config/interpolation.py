@@ -239,6 +239,8 @@ class ConversionMap(object):
         service_path('cpu_count'): to_int,
         service_path('cpu_quota'): to_microseconds,
         service_path('cpu_period'): to_microseconds,
+        service_path('cpu_rt_period'): to_microseconds,
+        service_path('cpu_rt_runtime'): to_microseconds,
         service_path('configs', 'mode'): to_int,
         service_path('secrets', 'mode'): to_int,
         service_path('healthcheck', 'retries'): to_int,
