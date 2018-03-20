@@ -86,6 +86,8 @@ Change log
 - Fixed a bug occurring during builds caused by files with a negative `mtime`
   values in the build context
 
+- Fixed an encoding bug when streaming build progress
+
 1.19.0 (2018-02-07)
 -------------------
 
