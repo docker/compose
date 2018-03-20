@@ -1,5 +1,12 @@
+# ~*~ encoding: utf-8 ~*~
 from __future__ import absolute_import
 from __future__ import unicode_literals
+
+import io
+import os
+import random
+import shutil
+import tempfile
 
 from six import StringIO
 
@@ -65,6 +72,30 @@ class ProgressStreamTestCase(unittest.TestCase):
 
         events = progress_stream.stream_output(events, output)
         assert len(output.getvalue()) > 0
+
+    def test_mismatched_encoding_stream_write(self):
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir, True)
+
+        def mktempfile(encoding):
+            fname = os.path.join(tmpdir, hex(random.getrandbits(128))[2:-1])
+            return io.open(fname, mode='w+', encoding=encoding)
+
+        text = '就吃饭'
+        with mktempfile(encoding='utf-8') as tf:
+            progress_stream.write_to_stream(text, tf)
+            tf.seek(0)
+            assert tf.read() == text
+
+        with mktempfile(encoding='utf-32') as tf:
+            progress_stream.write_to_stream(text, tf)
+            tf.seek(0)
+            assert tf.read() == text
+
+        with mktempfile(encoding='ascii') as tf:
+            progress_stream.write_to_stream(text, tf)
+            tf.seek(0)
+            assert tf.read() == '???'
 
 
 def test_get_digest_from_push():
