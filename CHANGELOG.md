@@ -1,7 +1,15 @@
 Change log
 ==========
 
-1.20.0 (2018-03-07)
+1.20.1 (2018-03-21)
+-------------------
+
+### Bugfixes
+
+- Fixed an issue where `docker-compose build` would error out if the
+  build context contained directory symlinks
+
+1.20.0 (2018-03-20)
 -------------------
 
 ### New features
