@@ -1105,6 +1105,24 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
+    def test_build_with_gzip(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('\n'.join([
+                'FROM busybox',
+                'COPY . /src',
+                'RUN cat /src/hello.txt'
+            ]))
+        with open(os.path.join(base_dir, 'hello.txt'), 'w') as f:
+            f.write('hello world\n')
+
+        service = self.create_service('build_gzip', build={
+            'context': text_type(base_dir),
+        })
+        service.build(gzip=True)
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
