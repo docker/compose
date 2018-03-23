@@ -7,7 +7,7 @@ do not comply and contributions with failing tests will not be reviewed!
 
 <!-- Please make sure an issue describing the problem the PR is trying to
     solve exists, or create it before submitting a PR. The maintainers will
-    validate if the issue should be addressed or if it out of scope for the
+    validate if the issue should be addressed or if it is out of scope for the
     project.
 -->
 Resolves #
