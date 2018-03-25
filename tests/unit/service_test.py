@@ -5,6 +5,7 @@ import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
 from docker.errors import APIError
+from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
@@ -887,6 +888,38 @@ class ServiceTest(unittest.TestCase):
             'FTP_PROXY': override_options['environment']['FTP_PROXY'],
             'ftp_proxy': override_options['environment']['FTP_PROXY'],
         }))
+
+    def test_create_when_removed_containers_are_listed(self):
+        # This is aimed at simulating a race between the API call to list the
+        # containers, and the ones to inspect each of the listed containers.
+        # It can happen that a container has been removed after we listed it.
+
+        # containers() returns a container that is about to be removed
+        self.mock_client.containers.return_value = [
+            {'Id': 'rm_cont_id', 'Name': 'rm_cont', 'Image': 'img_id'},
+        ]
+
+        # inspect_container() will raise a NotFound when trying to inspect
+        # rm_cont_id, which at this point has been removed
+        def inspect(name):
+            if name == 'rm_cont_id':
+                raise NotFound(message='Not Found')
+
+            if name == 'new_cont_id':
+                return {'Id': 'new_cont_id'}
+
+            raise NotImplementedError("incomplete mock")
+
+        self.mock_client.inspect_container.side_effect = inspect
+
+        self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
+
+        self.mock_client.create_container.return_value = {'Id': 'new_cont_id'}
+
+        # We should nonetheless be able to create a new container
+        service = Service('foo', client=self.mock_client)
+
+        assert service.create_container().id == 'new_cont_id'
 
 
 class TestServiceNetwork(unittest.TestCase):
