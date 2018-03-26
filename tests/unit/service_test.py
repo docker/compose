@@ -487,6 +487,7 @@ class ServiceTest(unittest.TestCase):
             shmsize=None,
             extra_hosts=None,
             container_limits={'memory': None},
+            gzip=False,
         )
 
     def test_ensure_image_exists_no_build(self):
@@ -529,6 +530,7 @@ class ServiceTest(unittest.TestCase):
             shmsize=None,
             extra_hosts=None,
             container_limits={'memory': None},
+            gzip=False
         )
 
     def test_build_does_not_pull(self):

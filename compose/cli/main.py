@@ -254,6 +254,7 @@ class TopLevelCommand(object):
         Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
+            --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
@@ -277,7 +278,9 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
-            build_args=build_args)
+            build_args=build_args,
+            gzip=options.get('--compress', False),
+        )
 
     def bundle(self, options):
         """
