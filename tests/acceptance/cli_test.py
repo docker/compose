@@ -177,6 +177,13 @@ class CLITestCase(DockerClientTestCase):
             returncode=0
         )
 
+    def test_shorthand_host_opt_interactive(self):
+        self.dispatch(
+            ['-H={0}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
+             'run', 'another', 'ls'],
+            returncode=0
+        )
+
     def test_host_not_reachable(self):
         result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
         assert "Couldn't connect to Docker daemon" in result.stderr
