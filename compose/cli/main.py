@@ -1418,7 +1418,7 @@ def call_docker(args, dockeropts):
     if verify:
         tls_options.append('--tlsverify')
     if host:
-        tls_options.extend(['--host', host])
+        tls_options.extend(['--host', host.lstrip('=')])
 
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
