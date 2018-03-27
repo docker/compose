@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import functools
+import io
 import logging
 import os
 import string
@@ -1431,10 +1432,15 @@ def has_uppercase(name):
     return any(char in string.ascii_uppercase for char in name)
 
 
-def load_yaml(filename):
+def load_yaml(filename, encoding=None):
     try:
-        with open(filename, 'r') as fh:
+        with io.open(filename, 'r', encoding=encoding) as fh:
             return yaml.safe_load(fh)
-    except (IOError, yaml.YAMLError) as e:
+    except (IOError, yaml.YAMLError, UnicodeDecodeError) as e:
+        if encoding is None:
+            # Sometimes the user's locale sets an encoding that doesn't match
+            # the YAML files. Im such cases, retry once with the "default"
+            # UTF-8 encoding
+            return load_yaml(filename, encoding='utf-8')
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
         raise ConfigurationError(u"{}: {}".format(error_name, e))
