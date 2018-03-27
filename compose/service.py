@@ -685,14 +685,26 @@ class Service(object):
     # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
-        containers = filter(None, [
-            Container.from_ps(self.client, container)
-            for container in self.client.containers(
-                all=True,
-                filters={'label': self.labels(one_off=one_off)})
-        ])
+        containers = self._fetch_containers(
+            all=True,
+            filters={'label': self.labels(one_off=one_off)}
+        )
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
+
+    def _fetch_containers(self, **fetch_options):
+        # Account for containers that might have been removed since we fetched
+        # the list.
+        def soft_inspect(container):
+            try:
+                return Container.from_id(self.client, container['Id'])
+            except NotFound:
+                return None
+
+        return filter(None, [
+            soft_inspect(container)
+            for container in self.client.containers(**fetch_options)
+        ])
 
     def _get_aliases(self, network, container=None):
         return list(
