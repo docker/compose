@@ -133,9 +133,8 @@ class TemplateWithDefaults(Template):
             braced = mo.group('braced')
             if braced is not None:
                 sep = mo.group('sep')
-                result = self.process_braced_group(braced, sep, mapping)
-                if result:
-                    return result
+                if sep:
+                    return self.process_braced_group(braced, sep, mapping)
 
             if named is not None:
                 val = mapping[named]

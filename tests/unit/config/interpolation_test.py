@@ -420,3 +420,15 @@ def test_interpolate_unicode_values():
 
     interpol("$FOO") == '十六夜　咲夜'
     interpol("${BAR}") == '十六夜　咲夜'
+
+
+def test_interpolate_no_fallthrough():
+    # Test regression on docker/compose#5829
+    variable_mapping = {
+        'TEST:-': 'hello',
+        'TEST-': 'hello',
+    }
+    interpol = Interpolator(TemplateWithDefaults, variable_mapping).interpolate
+
+    assert interpol('${TEST:-}') == ''
+    assert interpol('${TEST-}') == ''
