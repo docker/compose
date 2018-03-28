@@ -42,6 +42,11 @@ class Network(object):
 
     def ensure(self):
         if self.external:
+            if self.driver == 'overlay':
+                # Swarm nodes do not register overlay networks that were
+                # created on a different node unless they're in use.
+                # See docker/compose#4399
+                return
             try:
                 self.inspect()
                 log.debug(
