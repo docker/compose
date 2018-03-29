@@ -562,6 +562,33 @@ class ServiceTest(unittest.TestCase):
         assert called_build_args['arg1'] == build_args['arg1']
         assert called_build_args['arg2'] == 'arg2'
 
+    def test_build_with_isolation_from_service_config(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.'}, isolation='hyperv')
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        called_build_args = self.mock_client.build.call_args[1]
+        assert called_build_args['isolation'] == 'hyperv'
+
+    def test_build_isolation_from_build_override_service_config(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, build={'context': '.', 'isolation': 'default'},
+            isolation='hyperv'
+        )
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        called_build_args = self.mock_client.build.call_args[1]
+        assert called_build_args['isolation'] == 'default'
+
     def test_config_dict(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         service = Service(
