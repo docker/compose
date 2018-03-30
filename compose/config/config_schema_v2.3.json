@@ -93,7 +93,8 @@
                 "network": {"type": "string"},
                 "target": {"type": "string"},
                 "shm_size": {"type": ["integer", "string"]},
-                "extra_hosts": {"$ref": "#/definitions/list_or_dict"}
+                "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+                "isolation": {"type": "string"}
               },
               "additionalProperties": false
             }

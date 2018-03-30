@@ -1123,6 +1123,20 @@ class ServiceTest(DockerClientTestCase):
         service.build(gzip=True)
         assert service.image()
 
+    @v2_1_only()
+    def test_build_with_isolation(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\n')
+
+        service = self.create_service('build_isolation', build={
+            'context': text_type(base_dir),
+            'isolation': 'default',
+        })
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()

@@ -1016,7 +1016,8 @@ class Service(object):
             container_limits={
                 'memory': parse_bytes(memory) if memory else None
             },
-            gzip=gzip
+            gzip=gzip,
+            isolation=build_opts.get('isolation', self.options.get('isolation', None)),
         )
 
         try:
