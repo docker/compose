@@ -472,24 +472,8 @@ class ServiceTest(unittest.TestCase):
             _, args, _ = mock_log.warn.mock_calls[0]
             assert 'was built because it did not already exist' in args[0]
 
-        self.mock_client.build.assert_called_once_with(
-            tag='default_foo',
-            dockerfile=None,
-            path='.',
-            pull=False,
-            forcerm=False,
-            nocache=False,
-            rm=True,
-            buildargs={},
-            labels=None,
-            cache_from=None,
-            network_mode=None,
-            target=None,
-            shmsize=None,
-            extra_hosts=None,
-            container_limits={'memory': None},
-            gzip=False,
-        )
+        assert self.mock_client.build.call_count == 1
+        self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
     def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
@@ -515,24 +499,8 @@ class ServiceTest(unittest.TestCase):
             service.ensure_image_exists(do_build=BuildAction.force)
 
         assert not mock_log.warn.called
-        self.mock_client.build.assert_called_once_with(
-            tag='default_foo',
-            dockerfile=None,
-            path='.',
-            pull=False,
-            forcerm=False,
-            nocache=False,
-            rm=True,
-            buildargs={},
-            labels=None,
-            cache_from=None,
-            network_mode=None,
-            target=None,
-            shmsize=None,
-            extra_hosts=None,
-            container_limits={'memory': None},
-            gzip=False
-        )
+        assert self.mock_client.build.call_count == 1
+        self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
