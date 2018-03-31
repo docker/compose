@@ -4943,6 +4943,18 @@ class SerializeTest(unittest.TestCase):
         serialized_config = yaml.load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
 
+    def test_serialize_ports_with_ext_ip(self):
+        config_dict = config.Config(version=V3_5, services=[
+            {
+                'ports': [types.ServicePort('80', '8080', None, None, '127.0.0.1')],
+                'image': 'alpine',
+                'name': 'web'
+            }
+        ], volumes={}, networks={}, secrets={}, configs={})
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        assert '127.0.0.1:8080:80/tcp' in serialized_config['services']['web']['ports']
+
     def test_serialize_configs(self):
         service_dict = {
             'image': 'example/web',
