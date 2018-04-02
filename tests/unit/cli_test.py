@@ -30,12 +30,12 @@ class CLITestCase(unittest.TestCase):
         test_dir = py._path.local.LocalPath('tests/fixtures/simple-composefile')
         with test_dir.as_cwd():
             project_name = get_project_name('.')
-            assert 'simplecomposefile' == project_name
+            assert 'simple-composefile' == project_name
 
     def test_project_name_with_explicit_base_dir(self):
         base_dir = 'tests/fixtures/simple-composefile'
         project_name = get_project_name(base_dir)
-        assert 'simplecomposefile' == project_name
+        assert 'simple-composefile' == project_name
 
     def test_project_name_with_explicit_uppercase_base_dir(self):
         base_dir = 'tests/fixtures/UpperCaseDir'
@@ -45,7 +45,7 @@ class CLITestCase(unittest.TestCase):
     def test_project_name_with_explicit_project_name(self):
         name = 'explicit-project-name'
         project_name = get_project_name(None, project_name=name)
-        assert 'explicitprojectname' == project_name
+        assert 'explicit-project-name' == project_name
 
     @mock.patch.dict(os.environ)
     def test_project_name_from_environment_new_var(self):
@@ -59,7 +59,7 @@ class CLITestCase(unittest.TestCase):
         with mock.patch.dict(os.environ):
             os.environ['COMPOSE_PROJECT_NAME'] = ''
             project_name = get_project_name(base_dir)
-        assert 'simplecomposefile' == project_name
+        assert 'simple-composefile' == project_name
 
     @mock.patch.dict(os.environ)
     def test_project_name_with_environment_file(self):
@@ -80,7 +80,7 @@ class CLITestCase(unittest.TestCase):
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
         project = get_project(base_dir)
-        assert project.name == 'longerfilenamecomposefile'
+        assert project.name == 'longer-filename-composefile'
         assert project.client
         assert project.services
 

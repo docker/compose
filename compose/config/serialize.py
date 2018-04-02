@@ -151,9 +151,10 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
             service_dict['healthcheck']['start_period'] = serialize_ns_time_value(
                 service_dict['healthcheck']['start_period']
             )
-    if 'ports' in service_dict and version < V3_2:
+
+    if 'ports' in service_dict:
         service_dict['ports'] = [
-            p.legacy_repr() if isinstance(p, types.ServicePort) else p
+            p.legacy_repr() if p.external_ip or version < V3_2 else p
             for p in service_dict['ports']
         ]
     if 'volumes' in service_dict and (version < V2_3 or (version > V3_0 and version < V3_2)):

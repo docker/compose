@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import codecs
 import os
 import shutil
 import tempfile
@@ -1622,6 +1623,21 @@ class ConfigTest(unittest.TestCase):
             config.load_yaml(str(invalid_yaml_file))
 
         assert 'line 3, column 32' in exc.exconly()
+
+    def test_load_yaml_with_bom(self):
+        tmpdir = py.test.ensuretemp('bom_yaml')
+        self.addCleanup(tmpdir.remove)
+        bom_yaml = tmpdir.join('docker-compose.yml')
+        with codecs.open(str(bom_yaml), 'w', encoding='utf-8') as f:
+            f.write('''\ufeff
+                version: '2.3'
+                volumes:
+                    park_bom:
+            ''')
+        assert config.load_yaml(str(bom_yaml)) == {
+            'version': '2.3',
+            'volumes': {'park_bom': None}
+        }
 
     def test_validate_extra_hosts_invalid(self):
         with pytest.raises(ConfigurationError) as exc:
@@ -4926,6 +4942,18 @@ class SerializeTest(unittest.TestCase):
 
         serialized_config = yaml.load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
+
+    def test_serialize_ports_with_ext_ip(self):
+        config_dict = config.Config(version=V3_5, services=[
+            {
+                'ports': [types.ServicePort('80', '8080', None, None, '127.0.0.1')],
+                'image': 'alpine',
+                'name': 'web'
+            }
+        ], volumes={}, networks={}, secrets={}, configs={})
+
+        serialized_config = yaml.load(serialize_config(config_dict))
+        assert '127.0.0.1:8080:80/tcp' in serialized_config['services']['web']['ports']
 
     def test_serialize_configs(self):
         service_dict = {

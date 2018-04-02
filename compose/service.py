@@ -62,7 +62,10 @@ HOST_CONFIG_KEYS = [
     'cgroup_parent',
     'cpu_count',
     'cpu_percent',
+    'cpu_period',
     'cpu_quota',
+    'cpu_rt_period',
+    'cpu_rt_runtime',
     'cpu_shares',
     'cpus',
     'cpuset',
@@ -682,14 +685,26 @@ class Service(object):
     # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
-        containers = filter(None, [
-            Container.from_ps(self.client, container)
-            for container in self.client.containers(
-                all=True,
-                filters={'label': self.labels(one_off=one_off)})
-        ])
+        containers = self._fetch_containers(
+            all=True,
+            filters={'label': self.labels(one_off=one_off)}
+        )
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
+
+    def _fetch_containers(self, **fetch_options):
+        # Account for containers that might have been removed since we fetched
+        # the list.
+        def soft_inspect(container):
+            try:
+                return Container.from_id(self.client, container['Id'])
+            except NotFound:
+                return None
+
+        return filter(None, [
+            soft_inspect(container)
+            for container in self.client.containers(**fetch_options)
+        ])
 
     def _get_aliases(self, network, container=None):
         return list(
@@ -947,6 +962,9 @@ class Service(object):
             device_write_iops=blkio_config.get('device_write_iops'),
             mounts=options.get('mounts'),
             device_cgroup_rules=options.get('device_cgroup_rules'),
+            cpu_period=options.get('cpu_period'),
+            cpu_rt_period=options.get('cpu_rt_period'),
+            cpu_rt_runtime=options.get('cpu_rt_runtime'),
         )
 
     def get_secret_volumes(self):
@@ -961,7 +979,8 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
-    def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None):
+    def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
+              gzip=False):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
@@ -978,6 +997,12 @@ class Service(object):
         path = build_opts.get('context')
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
+
+        platform = self.options.get('platform')
+        if platform and version_lt(self.client.api_version, '1.35'):
+            raise OperationFailedError(
+                'Impossible to perform platform-targeted builds for API version < 1.35'
+            )
 
         build_output = self.client.build(
             path=path,
@@ -997,6 +1022,9 @@ class Service(object):
             container_limits={
                 'memory': parse_bytes(memory) if memory else None
             },
+            gzip=gzip,
+            isolation=build_opts.get('isolation', self.options.get('isolation', None)),
+            platform=platform,
         )
 
         try:
@@ -1098,11 +1126,20 @@ class Service(object):
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
-        tag = tag or 'latest'
+        kwargs = {
+            'tag': tag or 'latest',
+            'stream': True,
+            'platform': self.options.get('platform'),
+        }
         if not silent:
             log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
+
+        if kwargs['platform'] and version_lt(self.client.api_version, '1.35'):
+            raise OperationFailedError(
+                'Impossible to perform platform-targeted builds for API version < 1.35'
+            )
         try:
-            output = self.client.pull(repo, tag=tag, stream=True)
+            output = self.client.pull(repo, **kwargs)
             if silent:
                 with open(os.devnull, 'w') as devnull:
                     return progress_stream.get_digest_from_pull(

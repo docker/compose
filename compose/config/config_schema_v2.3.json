@@ -93,7 +93,8 @@
                 "network": {"type": "string"},
                 "target": {"type": "string"},
                 "shm_size": {"type": ["integer", "string"]},
-                "extra_hosts": {"$ref": "#/definitions/list_or_dict"}
+                "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+                "isolation": {"type": "string"}
               },
               "additionalProperties": false
             }
@@ -113,6 +114,9 @@
         "cpu_percent": {"type": "integer", "minimum": 0, "maximum": 100},
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
+        "cpu_period": {"type": ["number", "string"]},
+        "cpu_rt_period": {"type": ["number", "string"]},
+        "cpu_rt_runtime": {"type": ["number", "string"]},
         "cpus": {"type": "number", "minimum": 0},
         "cpuset": {"type": "string"},
         "depends_on": {

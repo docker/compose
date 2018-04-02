@@ -254,6 +254,7 @@ class TopLevelCommand(object):
         Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
+            --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
             --pull                  Always attempt to pull a newer version of the image.
@@ -277,7 +278,9 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
-            build_args=build_args)
+            build_args=build_args,
+            gzip=options.get('--compress', False),
+        )
 
     def bundle(self, options):
         """
@@ -459,6 +462,7 @@ class TopLevelCommand(object):
                               instances of a service [default: 1]
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
+            -w, --workdir DIR Path to workdir directory for this command.
         """
         environment = Environment.from_env_file(self.project_dir)
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
@@ -467,7 +471,12 @@ class TopLevelCommand(object):
         detach = options.get('--detach')
 
         if options['--env'] and docker.utils.version_lt(self.project.client.api_version, '1.25'):
-            raise UserError("Setting environment for exec is not supported in API < 1.25'")
+            raise UserError("Setting environment for exec is not supported in API < 1.25 (%s)"
+                            % self.project.client.api_version)
+
+        if options['--workdir'] and docker.utils.version_lt(self.project.client.api_version, '1.35'):
+            raise UserError("Setting workdir for exec is not supported in API < 1.35 (%s)"
+                            % self.project.client.api_version)
 
         try:
             container = service.get_container(number=index)
@@ -487,6 +496,7 @@ class TopLevelCommand(object):
             "user": options["--user"],
             "tty": tty,
             "stdin": True,
+            "workdir": options["--workdir"],
         }
 
         if docker.utils.version_gte(self.project.client.api_version, '1.25'):
@@ -704,14 +714,17 @@ class TopLevelCommand(object):
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
-            --parallel              Pull multiple images in parallel.
+            --parallel              Deprecated, pull multiple images in parallel (enabled by default).
+            --no-parallel           Disable parallel pulling.
             -q, --quiet             Pull without printing progress information
             --include-deps          Also pull services declared as dependencies
         """
+        if options.get('--parallel'):
+            log.warn('--parallel option is deprecated and will be removed in future versions.')
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
-            parallel_pull=options.get('--parallel'),
+            parallel_pull=not options.get('--no-parallel'),
             silent=options.get('--quiet'),
             include_deps=options.get('--include-deps'),
         )
@@ -1408,7 +1421,7 @@ def call_docker(args, dockeropts):
     if verify:
         tls_options.append('--tlsverify')
     if host:
-        tls_options.extend(['--host', host])
+        tls_options.extend(['--host', host.lstrip('=')])
 
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
@@ -1452,6 +1465,9 @@ def build_exec_command(options, container_id, command):
     if options["--env"]:
         for env_variable in options["--env"]:
             args += ["--env", env_variable]
+
+    if options["--workdir"]:
+        args += ["--workdir", options["--workdir"]]
 
     args += [container_id]
     args += command

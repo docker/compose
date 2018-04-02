@@ -122,10 +122,19 @@ class ServiceTest(DockerClientTestCase):
         assert container.get('HostConfig.CpuShares') == 73
 
     def test_create_container_with_cpu_quota(self):
-        service = self.create_service('db', cpu_quota=40000)
+        service = self.create_service('db', cpu_quota=40000, cpu_period=150000)
         container = service.create_container()
         container.start()
         assert container.get('HostConfig.CpuQuota') == 40000
+        assert container.get('HostConfig.CpuPeriod') == 150000
+
+    @pytest.mark.xfail(raises=OperationFailedError, reason='not supported by kernel')
+    def test_create_container_with_cpu_rt(self):
+        service = self.create_service('db', cpu_rt_runtime=40000, cpu_rt_period=150000)
+        container = service.create_container()
+        container.start()
+        assert container.get('HostConfig.CpuRealtimeRuntime') == 40000
+        assert container.get('HostConfig.CpuRealtimePeriod') == 150000
 
     @v2_2_only()
     def test_create_container_with_cpu_count(self):
@@ -1092,6 +1101,38 @@ class ServiceTest(DockerClientTestCase):
                 'foobar': '127.0.0.1',
                 'baz': '127.0.0.1'
             }
+        })
+        service.build()
+        assert service.image()
+
+    def test_build_with_gzip(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('\n'.join([
+                'FROM busybox',
+                'COPY . /src',
+                'RUN cat /src/hello.txt'
+            ]))
+        with open(os.path.join(base_dir, 'hello.txt'), 'w') as f:
+            f.write('hello world\n')
+
+        service = self.create_service('build_gzip', build={
+            'context': text_type(base_dir),
+        })
+        service.build(gzip=True)
+        assert service.image()
+
+    @v2_1_only()
+    def test_build_with_isolation(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\n')
+
+        service = self.create_service('build_isolation', build={
+            'context': text_type(base_dir),
+            'isolation': 'default',
         })
         service.build()
         assert service.image()

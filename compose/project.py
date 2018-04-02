@@ -77,7 +77,7 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client):
+    def from_config(cls, name, config_data, client, default_platform=None):
         """
         Construct a Project from a config.Config object.
         """
@@ -128,6 +128,7 @@ class Project(object):
                     volumes_from=volumes_from,
                     secrets=secrets,
                     pid_mode=pid_mode,
+                    platform=service_dict.pop('platform', default_platform),
                     **service_dict)
             )
 
@@ -366,10 +367,10 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None):
+              build_args=None, gzip=False):
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm, memory, build_args)
+                service.build(no_cache, pull, force_rm, memory, build_args, gzip)
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
@@ -551,7 +552,7 @@ class Project(object):
                 services,
                 pull_service,
                 operator.attrgetter('name'),
-                'Pulling',
+                not silent and 'Pulling' or None,
                 limit=5,
             )
             if len(errors):

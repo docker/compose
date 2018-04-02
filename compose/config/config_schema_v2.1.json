@@ -88,7 +88,8 @@
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
                 "args": {"$ref": "#/definitions/list_or_dict"},
-                "labels": {"$ref": "#/definitions/labels"}
+                "labels": {"$ref": "#/definitions/labels"},
+                "isolation": {"type": "string"}
               },
               "additionalProperties": false
             }
@@ -106,6 +107,7 @@
         "container_name": {"type": "string"},
         "cpu_shares": {"type": ["number", "string"]},
         "cpu_quota": {"type": ["number", "string"]},
+        "cpu_period": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
         "depends_on": {
           "oneOf": [

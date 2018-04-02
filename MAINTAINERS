@@ -11,11 +11,29 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
-			"aanand",
-			"bfirsh",
-			"dnephin",
-			"mnowster",
+			"mefyl",
+			"mnottale",
 			"shin-",
+		]
+	[Org.Alumni]
+		people = [
+			# Aanand Prasad is one of the two creators of the fig project
+			# which later went on to become docker-compose, and a longtime
+			# maintainer responsible for several keystone features
+			"aanand",
+			# Ben Firshman is also one of the fig creators and contributed
+			# heavily to the project's design and UX as well as the
+			# day-to-day maintenance
+			"bfirsh",
+			# Mazz Mosley made significant contributions to the project
+			# in 2015 with solid bugfixes and improved error handling
+			# among them
+			"mnowster",
+			# Daniel Nephin is one of the longest-running maitainers on
+			# the Compose project, and has contributed several major features
+			# including muti-file support, variable interpolation, secrets
+			# emulation and many more
+			"dnephin",
 		]
 
 [people]
@@ -40,6 +58,16 @@
 	Name = "Daniel Nephin"
 	Email = "dnephin@gmail.com"
 	GitHub = "dnephin"
+
+	[people.mefyl]
+	Name = "Quentin Hocquet"
+	Email = "quentin.hocquet@docker.com"
+	GitHub = "mefyl"
+
+	[people.mnottale]
+	Name = "Matthieu Nottale"
+	Email = "matthieu.nottale@docker.com"
+	GitHub = "mnottale"
 
 	[people.mnowster]
 	Name = "Mazz Mosley"

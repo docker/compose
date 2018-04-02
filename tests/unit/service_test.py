@@ -5,6 +5,7 @@ import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
 from docker.errors import APIError
+from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
@@ -20,6 +21,7 @@ from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import SECRETS_PATH
 from compose.container import Container
+from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.service import build_ulimits
@@ -399,7 +401,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sometag',
-            stream=True)
+            stream=True,
+            platform=None)
         mock_log.info.assert_called_once_with('Pulling foo (someimage:sometag)...')
 
     def test_pull_image_no_tag(self):
@@ -408,7 +411,8 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'ababab',
             tag='latest',
-            stream=True)
+            stream=True,
+            platform=None)
 
     @mock.patch('compose.service.log', autospec=True)
     def test_pull_image_digest(self, mock_log):
@@ -417,8 +421,29 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.pull.assert_called_once_with(
             'someimage',
             tag='sha256:1234',
-            stream=True)
+            stream=True,
+            platform=None)
         mock_log.info.assert_called_once_with('Pulling foo (someimage@sha256:1234)...')
+
+    @mock.patch('compose.service.log', autospec=True)
+    def test_pull_image_with_platform(self, mock_log):
+        self.mock_client.api_version = '1.35'
+        service = Service(
+            'foo', client=self.mock_client, image='someimage:sometag', platform='windows/x86_64'
+        )
+        service.pull()
+        assert self.mock_client.pull.call_count == 1
+        call_args = self.mock_client.pull.call_args
+        assert call_args[1]['platform'] == 'windows/x86_64'
+
+    @mock.patch('compose.service.log', autospec=True)
+    def test_pull_image_with_platform_unsupported_api(self, mock_log):
+        self.mock_client.api_version = '1.33'
+        service = Service(
+            'foo', client=self.mock_client, image='someimage:sometag', platform='linux/arm'
+        )
+        with pytest.raises(OperationFailedError):
+            service.pull()
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
@@ -471,23 +496,8 @@ class ServiceTest(unittest.TestCase):
             _, args, _ = mock_log.warn.mock_calls[0]
             assert 'was built because it did not already exist' in args[0]
 
-        self.mock_client.build.assert_called_once_with(
-            tag='default_foo',
-            dockerfile=None,
-            path='.',
-            pull=False,
-            forcerm=False,
-            nocache=False,
-            rm=True,
-            buildargs={},
-            labels=None,
-            cache_from=None,
-            network_mode=None,
-            target=None,
-            shmsize=None,
-            extra_hosts=None,
-            container_limits={'memory': None},
-        )
+        assert self.mock_client.build.call_count == 1
+        self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
     def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
@@ -513,23 +523,8 @@ class ServiceTest(unittest.TestCase):
             service.ensure_image_exists(do_build=BuildAction.force)
 
         assert not mock_log.warn.called
-        self.mock_client.build.assert_called_once_with(
-            tag='default_foo',
-            dockerfile=None,
-            path='.',
-            pull=False,
-            forcerm=False,
-            nocache=False,
-            rm=True,
-            buildargs={},
-            labels=None,
-            cache_from=None,
-            network_mode=None,
-            target=None,
-            shmsize=None,
-            extra_hosts=None,
-            container_limits={'memory': None},
-        )
+        assert self.mock_client.build.call_count == 1
+        self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
@@ -541,6 +536,19 @@ class ServiceTest(unittest.TestCase):
 
         assert self.mock_client.build.call_count == 1
         assert not self.mock_client.build.call_args[1]['pull']
+
+    def test_build_does_with_platform(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.'}, platform='linux')
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        call_args = self.mock_client.build.call_args
+        assert call_args[1]['platform'] == 'linux'
 
     def test_build_with_override_build_args(self):
         self.mock_client.build.return_value = [
@@ -558,6 +566,33 @@ class ServiceTest(unittest.TestCase):
 
         assert called_build_args['arg1'] == build_args['arg1']
         assert called_build_args['arg2'] == 'arg2'
+
+    def test_build_with_isolation_from_service_config(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service('foo', client=self.mock_client, build={'context': '.'}, isolation='hyperv')
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        called_build_args = self.mock_client.build.call_args[1]
+        assert called_build_args['isolation'] == 'hyperv'
+
+    def test_build_isolation_from_build_override_service_config(self):
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, build={'context': '.', 'isolation': 'default'},
+            isolation='hyperv'
+        )
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        called_build_args = self.mock_client.build.call_args[1]
+        assert called_build_args['isolation'] == 'default'
 
     def test_config_dict(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
@@ -887,6 +922,38 @@ class ServiceTest(unittest.TestCase):
             'FTP_PROXY': override_options['environment']['FTP_PROXY'],
             'ftp_proxy': override_options['environment']['FTP_PROXY'],
         }))
+
+    def test_create_when_removed_containers_are_listed(self):
+        # This is aimed at simulating a race between the API call to list the
+        # containers, and the ones to inspect each of the listed containers.
+        # It can happen that a container has been removed after we listed it.
+
+        # containers() returns a container that is about to be removed
+        self.mock_client.containers.return_value = [
+            {'Id': 'rm_cont_id', 'Name': 'rm_cont', 'Image': 'img_id'},
+        ]
+
+        # inspect_container() will raise a NotFound when trying to inspect
+        # rm_cont_id, which at this point has been removed
+        def inspect(name):
+            if name == 'rm_cont_id':
+                raise NotFound(message='Not Found')
+
+            if name == 'new_cont_id':
+                return {'Id': 'new_cont_id'}
+
+            raise NotImplementedError("incomplete mock")
+
+        self.mock_client.inspect_container.side_effect = inspect
+
+        self.mock_client.inspect_image.return_value = {'Id': 'imageid'}
+
+        self.mock_client.create_container.return_value = {'Id': 'new_cont_id'}
+
+        # We should nonetheless be able to create a new container
+        service = Service('foo', client=self.mock_client)
+
+        assert service.create_container().id == 'new_cont_id'
 
 
 class TestServiceNetwork(unittest.TestCase):
