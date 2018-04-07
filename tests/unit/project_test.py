@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 import datetime
 
 import docker
+import pytest
 from docker.errors import NotFound
 
 from .. import mock
@@ -16,8 +17,10 @@ from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_4 as V2_4
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.errors import OperationFailedError
 from compose.project import NoSuchService
 from compose.project import Project
+from compose.project import ProjectError
 from compose.service import ImageType
 from compose.service import Service
 
@@ -588,3 +591,29 @@ class ProjectTest(unittest.TestCase):
             name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
         )
         assert project.get_service('web').options.get('platform') == 'linux/s390x'
+
+    @mock.patch('compose.parallel.ParallelStreamWriter._write_noansi')
+    def test_error_parallel_pull(self, mock_write):
+        project = Project.from_config(
+            name='test',
+            client=self.mock_client,
+            config_data=Config(
+                version=V2_0,
+                services=[{
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                }],
+                networks=None,
+                volumes=None,
+                secrets=None,
+                configs=None,
+            ),
+        )
+
+        self.mock_client.pull.side_effect = OperationFailedError('pull error')
+        with pytest.raises(ProjectError):
+            project.pull(parallel_pull=True)
+
+        self.mock_client.pull.side_effect = OperationFailedError(b'pull error')
+        with pytest.raises(ProjectError):
+            project.pull(parallel_pull=True)
