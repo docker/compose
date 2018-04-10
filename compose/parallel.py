@@ -279,9 +279,7 @@ class ParallelStreamWriter(object):
     def write_initial(self, msg, obj_index):
         if msg is None:
             return
-        self.stream.write("{:<{width}} ... \r\n".format(
-            msg + ' ' + obj_index, width=self.width))
-        self.stream.flush()
+        return self._write_noansi(msg, obj_index, '')
 
     def _write_ansi(self, msg, obj_index, status):
         self.lock.acquire()
@@ -299,8 +297,11 @@ class ParallelStreamWriter(object):
         self.lock.release()
 
     def _write_noansi(self, msg, obj_index, status):
-        self.stream.write("{:<{width}} ... {}\r\n".format(msg + ' ' + obj_index,
-                          status, width=self.width))
+        self.stream.write(
+            "{:<{width}} ... {}\r\n".format(
+                msg + ' ' + obj_index, status, width=self.width
+            )
+        )
         self.stream.flush()
 
     def write(self, msg, obj_index, status, color_func):
