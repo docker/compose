@@ -131,7 +131,7 @@ _docker_compose_build() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--build-arg --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--build-arg --compress --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_build
@@ -242,14 +242,14 @@ _docker_compose_events() {
 
 _docker_compose_exec() {
 	case "$prev" in
-		--index|--user|-u)
+		--index|--user|-u|--workdir|-w)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --detach --help --index --privileged -T --user -u" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --detach --help --index --privileged -T --user -u --workdir -w" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_running
@@ -379,7 +379,7 @@ _docker_compose_ps() {
 _docker_compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --include-deps --parallel --quiet -q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --include-deps --no-parallel --quiet -q" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_services_from_image
