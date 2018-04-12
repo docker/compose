@@ -1,6 +1,70 @@
 Change log
 ==========
 
+1.21.0 (2018-04-10)
+-------------------
+
+### New features
+
+#### Compose file version 2.4
+
+- Introduced version 2.4 of the `docker-compose.yml` specification.
+  This version requires Docker Engine 17.12.0 or above.
+
+- Added support for the `platform` parameter in service definitions.
+  If supplied, the parameter is also used when performing build for the
+  service.
+
+#### Compose file version 2.2 and up
+
+- Added support for the `cpu_rt_period` and `cpu_rt_runtime` parameters
+  in service definitions (2.x only).
+
+#### Compose file version 2.1 and up
+
+- Added support for the `cpu_period` parameter in service definitions
+  (2.x only).
+
+- Added support for the `isolation` parameter in service build configurations.
+  Additionally, the `isolation` parameter is used for builds as well if no
+  `build.isolation` parameter is defined. (2.x only)
+
+#### All formats
+
+- Added support for the `--workdir` flag in `docker-compose exec`.
+
+- Added support for the `--compress` flag in `docker-compose build`.
+
+- `docker-compose pull` is now performed in parallel by default. You can
+  opt out using the `--no-parallel` flag. The `--parallel` flag is now
+  deprecated and will be removed in a future version.
+
+- Dashes and underscores in project names are no longer stripped out.
+
+- `docker-compose build` now supports the use of Dockerfile from outside
+  the build context.
+
+### Bugfixes
+
+- Compose now checks that the volume's configuration matches the remote
+  volume, and errors out if a mismatch is detected.
+
+- Fixed a bug that caused Compose to raise unexpected errors when attempting
+  to create several one-off containers in parallel.
+
+- Fixed a bug with argument parsing when using `docker-machine config` to
+  generate TLS flags for `exec` and `run` commands.
+
+- Fixed a bug where variable substitution with an empty default value
+  (e.g. `${VAR:-}`) would print an incorrect warning.
+
+- Improved resilience when encoding of the Compose file doesn't match the
+  system's. Users are encouraged to use UTF-8 when possible.
+
+- Fixed a bug where external overlay networks in Swarm would be incorrectly
+  recognized as inexistent by Compose, interrupting otherwise valid
+  operations.
+
 1.20.1 (2018-03-21)
 -------------------
 
@@ -17,7 +81,7 @@ Change log
 #### Compose file version 3.6
 
 - Introduced version 3.6 of the `docker-compose.yml` specification.
-  This version requires to be used with Docker Engine 18.02.0 or above.
+  This version requires Docker Engine 18.02.0 or above.
 
 - Added support for the `tmpfs.size` property in volume mappings
 
