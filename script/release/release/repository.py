@@ -67,7 +67,7 @@ class Repository(object):
     def push_branch_to_remote(self, branch, remote_name=None):
         print('Pushing branch {} to remote...'.format(branch.name))
         remote = self.find_remote(remote_name)
-        remote.push(refspec=branch)
+        remote.push(refspec=branch, force=True)
 
     def branch_exists(self, name):
         return name in [h.name for h in self.git_repo.heads]
@@ -86,6 +86,14 @@ class Repository(object):
         return self.gh_repo.create_git_release(
             tag=version, name=version, message=release_notes, **kwargs
         )
+
+    def find_release(self, version):
+        print('Retrieving release draft for {}'.format(version))
+        releases = self.gh_repo.get_releases()
+        for release in releases:
+            if release.tag_name == version and release.title == version:
+                return release
+        return None
 
     def remove_release(self, version):
         print('Removing release draft for {}'.format(version))
@@ -125,6 +133,17 @@ class Repository(object):
                 'Error trying to remove remote branch: {}'.format(e)
             )
         return True
+
+    def find_release_pr(self, version):
+        print('Retrieving release PR for {}'.format(version))
+        name = branch_name(version)
+        open_prs = self.gh_repo.get_pulls(state='open')
+        for pr in open_prs:
+            if pr.head.ref == name:
+                print('Found matching PR #{}'.format(pr.number))
+                return pr
+        print('No open PR for this release branch.')
+        return None
 
     def close_release_pr(self, version):
         print('Retrieving and closing release PR for {}'.format(version))

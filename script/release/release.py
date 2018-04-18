@@ -26,6 +26,12 @@ from release.utils import update_run_sh_version
 
 def create_initial_branch(repository, release, base, bintray_user):
     release_branch = repository.create_release_branch(release, base)
+    return create_bump_commit(repository, release_branch, bintray_user)
+
+
+def create_bump_commit(repository, release_branch, bintray_user):
+    with release_branch.config_reader() as cfg:
+        release = cfg.get('release')
     print('Updating version info in __init__.py and run.sh')
     update_run_sh_version(release)
     update_init_py_version(release)
@@ -36,7 +42,8 @@ def create_initial_branch(repository, release, base, bintray_user):
         print(repository.diff())
         proceed = input('Are these changes ok? y/N ')
 
-    repository.create_bump_commit(release_branch, release)
+    if repository.diff():
+        repository.create_bump_commit(release_branch, release)
     repository.push_branch_to_remote(release_branch)
 
     bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], bintray_user)
@@ -89,17 +96,48 @@ def create_release_draft(repository, version, pr_data, files):
     return gh_release
 
 
+def print_final_instructions(gh_release):
+    print("""
+You're almost done! The following steps should be executed after you've
+verified that everything is in order and are ready to make the release public:
+1.
+2.
+3.""")
+
+
 def resume(args):
-    raise NotImplementedError()
     try:
         repository = Repository(REPO_ROOT, args.repo or NAME)
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):
             raise ScriptError('No local branch exists for this release.')
-        # release_branch = repository.checkout_branch(br_name)
+        release_branch = repository.checkout_branch(br_name)
+        create_bump_commit(repository, release_branch, args.bintray_user)
+        pr_data = repository.find_release_pr(args.release)
+        if not pr_data:
+            pr_data = repository.create_release_pull_request(args.release)
+        monitor_pr_status(pr_data)
+        downloader = BinaryDownloader(args.destination)
+        files = downloader.download_all(args.release)
+        gh_release = repository.find_release(args.release)
+        if not gh_release:
+            gh_release = create_release_draft(repository, args.release, pr_data, files)
+        elif not gh_release.draft:
+            print('WARNING!! Found non-draft (public) release for this version!')
+            proceed = input(
+                'Are you sure you wish to proceed? Modifying an already '
+                'released version is dangerous! y/N'
+            )
+            if proceed.lower() != 'y':
+                raise ScriptError('Aborting release')
+        for asset in gh_release.get_assets():
+            asset.delete_asset()
+        upload_assets(gh_release, files)
     except ScriptError as e:
         print(e)
         return 1
+
+    print_final_instructions(gh_release)
     return 0
 
 
@@ -134,6 +172,7 @@ def start(args):
         print(e)
         return 1
 
+    print_final_instructions(gh_release)
     return 0
 
 
@@ -147,8 +186,8 @@ def main():
         return 1
 
     parser = argparse.ArgumentParser(
-        description='Orchestrate a new release of docker/compose. This tool assumes that you have'
-                    'obtained a Github API token and Bintray API key and set the GITHUB_TOKEN and'
+        description='Orchestrate a new release of docker/compose. This tool assumes that you have '
+                    'obtained a Github API token and Bintray API key and set the GITHUB_TOKEN and '
                     'BINTRAY_TOKEN environment variables accordingly.',
         epilog='''Example uses:
     * Start a new feature release (includes all changes currently in master)
@@ -158,8 +197,7 @@ def main():
     * Cancel / rollback an existing release draft
         release.py -b user cancel 1.23.0
     * Restart a previously aborted patch release
-        release.py -b user -p 1.21.0 resume 1.21.1
-    ''', formatter_class=argparse.RawTextHelpFormatter)
+        release.py -b user -p 1.21.0 resume 1.21.1''', formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
         'action', choices=['start', 'resume', 'cancel'],
         help='The action to be performed for this release'
