@@ -1,0 +1,34 @@
+If you're a Mac or Windows user, the best way to install Compose and keep it up-to-date is **[Docker for Mac and Windows](https://www.docker.com/products/docker)**.
+
+Docker for Mac and Windows will automatically install the latest version of Docker Engine for you.
+
+Alternatively, you can use the usual commands to install or upgrade Compose:
+
+```
+curl -L https://github.com/docker/compose/releases/download/{{version}}/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+```
+
+See the [install docs](https://docs.docker.com/compose/install/) for more install options and instructions.
+
+## Compose file format compatibility matrix
+
+| Compose file format | Docker Engine |
+| --- | --- |
+{% for engine, formats in compat_matrix.items() -%}
+| {% for format in formats %}{{format}}{% if not loop.last %}, {% endif %}{% endfor %} | {{engine}}+ |
+{% endfor -%}
+
+## Changes
+
+{{changelog}}
+
+Thanks to {% for name in contributors %}@{{name}}{% if not loop.last %}, {% endif %}{% endfor %} for contributing to this release!
+
+## Integrity check
+
+Binary name | SHA-256 sum
+| --- | --- |
+{% for filename, sha in integrity.items() -%}
+| `{{filename}}` | `{{sha[1]}}` |
+{% endfor -%}
