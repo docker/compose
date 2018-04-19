@@ -13,6 +13,7 @@ from release.const import BINTRAY_ORG
 from release.const import NAME
 from release.const import REPO_ROOT
 from release.downloader import BinaryDownloader
+from release.repository import delete_assets
 from release.repository import get_contributors
 from release.repository import Repository
 from release.repository import upload_assets
@@ -130,8 +131,7 @@ def resume(args):
             )
             if proceed.lower() != 'y':
                 raise ScriptError('Aborting release')
-        for asset in gh_release.get_assets():
-            asset.delete_asset()
+        delete_assets(gh_release)
         upload_assets(gh_release, files)
     except ScriptError as e:
         print(e)

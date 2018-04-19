@@ -178,3 +178,10 @@ def upload_assets(gh_release, files):
     gh_release.upload_asset(
         os.path.join(REPO_ROOT, 'script', 'run', 'run.sh'), content_type='text/plain'
     )
+
+
+def delete_assets(gh_release):
+    print('Removing previously uploaded assets')
+    for asset in gh_release.get_assets():
+        print('Deleting asset {}'.format(asset.name))
+        asset.delete_asset()
