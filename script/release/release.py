@@ -4,17 +4,18 @@ from __future__ import unicode_literals
 
 import argparse
 import os
-import shutil
 import sys
 import time
+from distutils.core import run_setup
 
-import docker
+import pypandoc
 from jinja2 import Template
 from release.bintray import BintrayAPI
 from release.const import BINTRAY_ORG
 from release.const import NAME
 from release.const import REPO_ROOT
 from release.downloader import BinaryDownloader
+from release.images import ImageManager
 from release.repository import delete_assets
 from release.repository import get_contributors
 from release.repository import Repository
@@ -108,43 +109,6 @@ def create_release_draft(repository, version, pr_data, files):
     return gh_release
 
 
-def build_images(repository, files, version):
-    print("Building release images...")
-    repository.write_git_sha()
-    docker_client = docker.APIClient(**docker.utils.kwargs_from_env())
-    distdir = os.path.join(REPO_ROOT, 'dist')
-    os.makedirs(distdir, exist_ok=True)
-    shutil.copy(files['docker-compose-Linux-x86_64'][0], distdir)
-    print('Building docker/compose image')
-    logstream = docker_client.build(
-        REPO_ROOT, tag='docker/compose:{}'.format(version), dockerfile='Dockerfile.run',
-        decode=True
-    )
-    for chunk in logstream:
-        if 'error' in chunk:
-            raise ScriptError('Build error: {}'.format(chunk['error']))
-        if 'stream' in chunk:
-            print(chunk['stream'], end='')
-
-    print('Building test image (for UCP e2e)')
-    logstream = docker_client.build(
-        REPO_ROOT, tag='docker-compose-tests:tmp', decode=True
-    )
-    for chunk in logstream:
-        if 'error' in chunk:
-            raise ScriptError('Build error: {}'.format(chunk['error']))
-        if 'stream' in chunk:
-            print(chunk['stream'], end='')
-
-    container = docker_client.create_container(
-        'docker-compose-tests:tmp', entrypoint='tox'
-    )
-    docker_client.commit(container, 'docker/compose-tests:latest')
-    docker_client.tag('docker/compose-tests:latest', 'docker/compose-tests:{}'.format(version))
-    docker_client.remove_container(container, force=True)
-    docker_client.remove_image('docker-compose-tests:tmp', force=True)
-
-
 def print_final_instructions(args):
     print(
         "You're almost done! Please verify that everything is in order and "
@@ -183,7 +147,8 @@ def resume(args):
                 raise ScriptError('Aborting release')
         delete_assets(gh_release)
         upload_assets(gh_release, files)
-        build_images(repository, files, args.release)
+        img_manager = ImageManager(args.release)
+        img_manager.build_images(repository, files, args.release)
     except ScriptError as e:
         print(e)
         return 1
@@ -220,7 +185,8 @@ def start(args):
         files = downloader.download_all(args.release)
         gh_release = create_release_draft(repository, args.release, pr_data, files)
         upload_assets(gh_release, files)
-        build_images(repository, files, args.release)
+        img_manager = ImageManager(args.release)
+        img_manager.build_images(repository, files)
     except ScriptError as e:
         print(e)
         return 1
@@ -231,7 +197,34 @@ def start(args):
 
 def finalize(args):
     try:
-        raise NotImplementedError()
+        repository = Repository(REPO_ROOT, args.repo or NAME)
+        img_manager = ImageManager(args.release)
+        pr_data = repository.find_release_pr(args.release)
+        if not pr_data:
+            raise ScriptError('No PR found for {}'.format(args.release))
+        if not check_pr_mergeable(pr_data):
+            raise ScriptError('Can not finalize release with an unmergeable PR')
+        if not img_manager.check_images(args.release):
+            raise ScriptError('Missing release image')
+        br_name = branch_name(args.release)
+        if not repository.branch_exists(br_name):
+            raise ScriptError('No local branch exists for this release.')
+        gh_release = repository.find_release(args.release)
+        if not gh_release:
+            raise ScriptError('No Github release draft for this version')
+
+        pypandoc.convert_file(
+            os.path.join(REPO_ROOT, 'README.md'), 'rst', outputfile=os.path.join(REPO_ROOT, 'README.rst')
+        )
+        run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['sdist', 'bdist_wheel'])
+
+        merge_status = pr_data.merge()
+        if not merge_status.merged:
+            raise ScriptError('Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message))
+        print('Uploading to PyPi')
+        run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['upload'])
+        img_manager.push_images(args.release)
+        repository.publish_release(gh_release)
     except ScriptError as e:
         print(e)
         return 1

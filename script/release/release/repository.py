@@ -95,6 +95,14 @@ class Repository(object):
                 return release
         return None
 
+    def publish_release(self, release):
+        release.update_release(
+            name=release.title,
+            message=release.body,
+            draft=False,
+            prerelease=release.prerelease
+        )
+
     def remove_release(self, version):
         print('Removing release draft for {}'.format(version))
         releases = self.gh_repo.get_releases()
