@@ -36,7 +36,7 @@ class Repository(object):
         if base is not None:
             base = self.git_repo.tag('refs/tags/{}'.format(base))
         else:
-            base = 'refs/remotes/{}/master'.format(remote.name)
+            base = 'refs/remotes/{}/automated-releases'.format(remote.name)
         release_branch = self.git_repo.create_head(branch_name(version), commit=base)
         release_branch.checkout()
         self.git_repo.git.merge('--strategy=ours', '--no-edit', '{}/release'.format(remote.name))
