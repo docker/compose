@@ -159,6 +159,10 @@ class Repository(object):
             print('No open PR for this release branch.')
         return count
 
+    def write_git_sha(self):
+        with open(os.path.join(REPO_ROOT, 'compose', 'GITSHA'), 'w') as f:
+            f.write(self.git_repo.head.commit.hexsha[:7])
+
 
 def get_contributors(pr_data):
     commits = pr_data.get_commits()
@@ -175,6 +179,7 @@ def upload_assets(gh_release, files):
         print('Uploading {}...'.format(filename))
         gh_release.upload_asset(filedata[0], content_type='application/octet-stream')
         gh_release.upload_asset('{}.sha256'.format(filedata[0]), content_type='text/plain')
+    print('Uploading run.sh...')
     gh_release.upload_asset(
         os.path.join(REPO_ROOT, 'script', 'run', 'run.sh'), content_type='text/plain'
     )

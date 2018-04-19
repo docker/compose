@@ -4,9 +4,11 @@ from __future__ import unicode_literals
 
 import argparse
 import os
+import shutil
 import sys
 import time
 
+import docker
 from jinja2 import Template
 from release.bintray import BintrayAPI
 from release.const import BINTRAY_ORG
@@ -77,6 +79,15 @@ def monitor_pr_status(pr_data):
             raise ScriptError('CI failure detected')
 
 
+def check_pr_mergeable(pr_data):
+    if not pr_data.mergeable:
+        print(
+            'WARNING!! PR #{} can not currently be merged. You will need to '
+            'resolve the conflicts manually before finalizing the release.'.format(pr_data.number)
+        )
+    return pr_data.mergeable
+
+
 def create_release_draft(repository, version, pr_data, files):
     print('Creating Github release draft')
     with open(os.path.join(os.path.dirname(__file__), 'release.md.tmpl'), 'r') as f:
@@ -97,13 +108,51 @@ def create_release_draft(repository, version, pr_data, files):
     return gh_release
 
 
-def print_final_instructions(gh_release):
-    print("""
-You're almost done! The following steps should be executed after you've
-verified that everything is in order and are ready to make the release public:
-1.
-2.
-3.""")
+def build_images(repository, files, version):
+    print("Building release images...")
+    repository.write_git_sha()
+    docker_client = docker.APIClient(**docker.utils.kwargs_from_env())
+    distdir = os.path.join(REPO_ROOT, 'dist')
+    os.makedirs(distdir, exist_ok=True)
+    shutil.copy(files['docker-compose-Linux-x86_64'][0], distdir)
+    print('Building docker/compose image')
+    logstream = docker_client.build(
+        REPO_ROOT, tag='docker/compose:{}'.format(version), dockerfile='Dockerfile.run',
+        decode=True
+    )
+    for chunk in logstream:
+        if 'error' in chunk:
+            raise ScriptError('Build error: {}'.format(chunk['error']))
+        if 'stream' in chunk:
+            print(chunk['stream'], end='')
+
+    print('Building test image (for UCP e2e)')
+    logstream = docker_client.build(
+        REPO_ROOT, tag='docker-compose-tests:tmp', decode=True
+    )
+    for chunk in logstream:
+        if 'error' in chunk:
+            raise ScriptError('Build error: {}'.format(chunk['error']))
+        if 'stream' in chunk:
+            print(chunk['stream'], end='')
+
+    container = docker_client.create_container(
+        'docker-compose-tests:tmp', entrypoint='tox'
+    )
+    docker_client.commit(container, 'docker/compose-tests:latest')
+    docker_client.tag('docker/compose-tests:latest', 'docker/compose-tests:{}'.format(version))
+    docker_client.remove_container(container, force=True)
+    docker_client.remove_image('docker-compose-tests:tmp', force=True)
+
+
+def print_final_instructions(args):
+    print(
+        "You're almost done! Please verify that everything is in order and "
+        "you are ready to make the release public, then run the following "
+        "command:\n{exe} -b {user} finalize {version}".format(
+            exe=sys.argv[0], user=args.bintray_user, version=args.release
+        )
+    )
 
 
 def resume(args):
@@ -117,6 +166,7 @@ def resume(args):
         pr_data = repository.find_release_pr(args.release)
         if not pr_data:
             pr_data = repository.create_release_pull_request(args.release)
+        check_pr_mergeable(pr_data)
         monitor_pr_status(pr_data)
         downloader = BinaryDownloader(args.destination)
         files = downloader.download_all(args.release)
@@ -133,11 +183,12 @@ def resume(args):
                 raise ScriptError('Aborting release')
         delete_assets(gh_release)
         upload_assets(gh_release, files)
+        build_images(repository, files, args.release)
     except ScriptError as e:
         print(e)
         return 1
 
-    print_final_instructions(gh_release)
+    print_final_instructions(args)
     return 0
 
 
@@ -163,17 +214,48 @@ def start(args):
         repository = Repository(REPO_ROOT, args.repo or NAME)
         create_initial_branch(repository, args.release, args.base, args.bintray_user)
         pr_data = repository.create_release_pull_request(args.release)
+        check_pr_mergeable(pr_data)
         monitor_pr_status(pr_data)
         downloader = BinaryDownloader(args.destination)
         files = downloader.download_all(args.release)
         gh_release = create_release_draft(repository, args.release, pr_data, files)
         upload_assets(gh_release, files)
+        build_images(repository, files, args.release)
     except ScriptError as e:
         print(e)
         return 1
 
-    print_final_instructions(gh_release)
+    print_final_instructions(args)
     return 0
+
+
+def finalize(args):
+    try:
+        raise NotImplementedError()
+    except ScriptError as e:
+        print(e)
+        return 1
+
+    return 0
+
+
+ACTIONS = [
+    'start',
+    'cancel',
+    'resume',
+    'finalize',
+]
+
+EPILOG = '''Example uses:
+    * Start a new feature release (includes all changes currently in master)
+        release.py -b user start 1.23.0
+    * Start a new patch release
+        release.py -b user --patch 1.21.0 start 1.21.1
+    * Cancel / rollback an existing release draft
+        release.py -b user cancel 1.23.0
+    * Restart a previously aborted patch release
+        release.py -b user -p 1.21.0 resume 1.21.1
+'''
 
 
 def main():
@@ -189,18 +271,9 @@ def main():
         description='Orchestrate a new release of docker/compose. This tool assumes that you have '
                     'obtained a Github API token and Bintray API key and set the GITHUB_TOKEN and '
                     'BINTRAY_TOKEN environment variables accordingly.',
-        epilog='''Example uses:
-    * Start a new feature release (includes all changes currently in master)
-        release.py -b user start 1.23.0
-    * Start a new patch release
-        release.py -b user --patch 1.21.0 start 1.21.1
-    * Cancel / rollback an existing release draft
-        release.py -b user cancel 1.23.0
-    * Restart a previously aborted patch release
-        release.py -b user -p 1.21.0 resume 1.21.1''', formatter_class=argparse.RawTextHelpFormatter)
+        epilog=EPILOG, formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument(
-        'action', choices=['start', 'resume', 'cancel'],
-        help='The action to be performed for this release'
+        'action', choices=ACTIONS, help='The action to be performed for this release'
     )
     parser.add_argument('release', help='Release number, e.g. 1.9.0-rc1, 2.1.1')
     parser.add_argument(
@@ -227,6 +300,9 @@ def main():
         return resume(args)
     elif args.action == 'cancel':
         return cancel(args)
+    elif args.action == 'finalize':
+        return finalize(args)
+
     print('Unexpected action "{}"'.format(args.action), file=sys.stderr)
     return 1
 
