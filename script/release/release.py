@@ -125,6 +125,15 @@ def resume(args):
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):
             raise ScriptError('No local branch exists for this release.')
+        gh_release = repository.find_release(args.release)
+        if gh_release and not gh_release.draft:
+            print('WARNING!! Found non-draft (public) release for this version!')
+            proceed = input(
+                'Are you sure you wish to proceed? Modifying an already '
+                'released version is dangerous! y/N '
+            )
+            if proceed.lower() != 'y':
+                raise ScriptError('Aborting release')
         release_branch = repository.checkout_branch(br_name)
         create_bump_commit(repository, release_branch, args.bintray_user)
         pr_data = repository.find_release_pr(args.release)
@@ -134,17 +143,8 @@ def resume(args):
         monitor_pr_status(pr_data)
         downloader = BinaryDownloader(args.destination)
         files = downloader.download_all(args.release)
-        gh_release = repository.find_release(args.release)
         if not gh_release:
             gh_release = create_release_draft(repository, args.release, pr_data, files)
-        elif not gh_release.draft:
-            print('WARNING!! Found non-draft (public) release for this version!')
-            proceed = input(
-                'Are you sure you wish to proceed? Modifying an already '
-                'released version is dangerous! y/N'
-            )
-            if proceed.lower() != 'y':
-                raise ScriptError('Aborting release')
         delete_assets(gh_release)
         upload_assets(gh_release, files)
         img_manager = ImageManager(args.release)
