@@ -26,19 +26,20 @@ from release.utils import read_release_notes_from_changelog
 from release.utils import ScriptError
 from release.utils import update_init_py_version
 from release.utils import update_run_sh_version
+from release.utils import yesno
 
 
-def create_initial_branch(repository, release, base, bintray_user):
-    release_branch = repository.create_release_branch(release, base)
-    if base:
+def create_initial_branch(repository, args):
+    release_branch = repository.create_release_branch(args.release, args.base)
+    if args.base and args.cherries:
         print('Detected patch version.')
-        cherries = input('Indicate PR#s to cherry-pick then press Enter:\n')
+        cherries = input('Indicate (space-separated) PR numbers to cherry-pick then press Enter:\n')
         repository.cherry_pick_prs(release_branch, cherries.split())
 
-    return create_bump_commit(repository, release_branch, bintray_user)
+    return create_bump_commit(repository, release_branch, args.bintray_user, args.bintray_org)
 
 
-def create_bump_commit(repository, release_branch, bintray_user):
+def create_bump_commit(repository, release_branch, bintray_user, bintray_org):
     with release_branch.config_reader() as cfg:
         release = cfg.get('release')
     print('Updating version info in __init__.py and run.sh')
@@ -46,10 +47,10 @@ def create_bump_commit(repository, release_branch, bintray_user):
     update_init_py_version(release)
 
     input('Please add the release notes to the CHANGELOG.md file, then press Enter to continue.')
-    proceed = ''
-    while proceed.lower() != 'y':
+    proceed = None
+    while not proceed:
         print(repository.diff())
-        proceed = input('Are these changes ok? y/N ')
+        proceed = yesno('Are these changes ok? y/N ', default=False)
 
     if repository.diff():
         repository.create_bump_commit(release_branch, release)
@@ -57,7 +58,7 @@ def create_bump_commit(repository, release_branch, bintray_user):
 
     bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], bintray_user)
     print('Creating data repository {} on bintray'.format(release_branch.name))
-    bintray_api.create_repository(BINTRAY_ORG, release_branch.name, 'generic')
+    bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
 
 
 def monitor_pr_status(pr_data):
@@ -126,21 +127,26 @@ def print_final_instructions(args):
 
 def resume(args):
     try:
-        repository = Repository(REPO_ROOT, args.repo or NAME)
+        repository = Repository(REPO_ROOT, args.repo)
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):
             raise ScriptError('No local branch exists for this release.')
         gh_release = repository.find_release(args.release)
         if gh_release and not gh_release.draft:
             print('WARNING!! Found non-draft (public) release for this version!')
-            proceed = input(
+            proceed = yesno(
                 'Are you sure you wish to proceed? Modifying an already '
-                'released version is dangerous! y/N '
+                'released version is dangerous! y/N ', default=False
             )
-            if proceed.lower() != 'y':
+            if proceed.lower() is not True:
                 raise ScriptError('Aborting release')
+
         release_branch = repository.checkout_branch(br_name)
-        create_bump_commit(repository, release_branch, args.bintray_user)
+        if args.cherries:
+            cherries = input('Indicate (space-separated) PR numbers to cherry-pick then press Enter:\n')
+            repository.cherry_pick_prs(release_branch, cherries.split())
+
+        create_bump_commit(repository, release_branch, args.bintray_user, args.bintray_org)
         pr_data = repository.find_release_pr(args.release)
         if not pr_data:
             pr_data = repository.create_release_pull_request(args.release)
@@ -164,14 +170,13 @@ def resume(args):
 
 def cancel(args):
     try:
-        repository = Repository(REPO_ROOT, args.repo or NAME)
+        repository = Repository(REPO_ROOT, args.repo)
         repository.close_release_pr(args.release)
         repository.remove_release(args.release)
         repository.remove_bump_branch(args.release)
-        # TODO: uncomment after testing is complete
-        # bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], args.bintray_user)
-        # print('Removing Bintray data repository for {}'.format(args.release))
-        # bintray_api.delete_repository(BINTRAY_ORG, branch_name(args.release))
+        bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], args.bintray_user)
+        print('Removing Bintray data repository for {}'.format(args.release))
+        bintray_api.delete_repository(args.bintray_org, branch_name(args.release))
     except ScriptError as e:
         print(e)
         return 1
@@ -181,8 +186,8 @@ def cancel(args):
 
 def start(args):
     try:
-        repository = Repository(REPO_ROOT, args.repo or NAME)
-        create_initial_branch(repository, args.release, args.base, args.bintray_user)
+        repository = Repository(REPO_ROOT, args.repo)
+        create_initial_branch(repository, args)
         pr_data = repository.create_release_pull_request(args.release)
         check_pr_mergeable(pr_data)
         monitor_pr_status(pr_data)
@@ -202,7 +207,7 @@ def start(args):
 
 def finalize(args):
     try:
-        repository = Repository(REPO_ROOT, args.repo or NAME)
+        repository = Repository(REPO_ROOT, args.repo)
         img_manager = ImageManager(args.release)
         pr_data = repository.find_release_pr(args.release)
         if not pr_data:
@@ -282,7 +287,7 @@ def main():
         help='Which version is being patched by this release'
     )
     parser.add_argument(
-        '--repo', '-r', dest='repo',
+        '--repo', '-r', dest='repo', default=NAME,
         help='Start a release for the given repo (default: {})'.format(NAME)
     )
     parser.add_argument(
@@ -290,8 +295,16 @@ def main():
         help='Username associated with the Bintray API key'
     )
     parser.add_argument(
+        '--bintray-org', dest='bintray_org', metavar='ORG', default=BINTRAY_ORG,
+        help='Organization name on bintray where the data repository will be created.'
+    )
+    parser.add_argument(
         '--destination', '-o', metavar='DIR', default='binaries',
         help='Directory where release binaries will be downloaded relative to the project root'
+    )
+    parser.add_argument(
+        '--no-cherries', '-C', dest='cherries', action='store_false',
+        help='If set, the program will not prompt the user for PR numbers to cherry-pick'
     )
     args = parser.parse_args()
 
