@@ -5,5 +5,5 @@ import os
 
 
 REPO_ROOT = os.path.join(os.path.dirname(__file__), '..', '..', '..')
-NAME = 'shin-/compose'
-BINTRAY_ORG = 'shin-compose'
+NAME = 'docker/compose'
+BINTRAY_ORG = 'docker-compose'

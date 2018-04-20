@@ -61,3 +61,25 @@ def compatibility_matrix():
     for fmt, api_version in compose_const.API_VERSIONS.items():
         result[compose_const.API_VERSION_TO_ENGINE_VERSION[api_version]].append(fmt.vstring)
     return result
+
+
+def yesno(prompt, default=None):
+    """
+    Prompt the user for a yes or no.
+
+    Can optionally specify a default value, which will only be
+    used if they enter a blank line.
+
+    Unrecognised input (anything other than "y", "n", "yes",
+    "no" or "") will return None.
+    """
+    answer = input(prompt).strip().lower()
+
+    if answer == "y" or answer == "yes":
+        return True
+    elif answer == "n" or answer == "no":
+        return False
+    elif answer == "":
+        return default
+    else:
+        return None

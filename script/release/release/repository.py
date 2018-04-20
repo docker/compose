@@ -29,17 +29,20 @@ class Repository(object):
     def create_release_branch(self, version, base=None):
         print('Creating release branch {} based on {}...'.format(version, base or 'master'))
         remote = self.find_remote(self.gh_repo.full_name)
+        br_name = branch_name(version)
         remote.fetch()
-        if self.branch_exists(branch_name(version)):
+        if self.branch_exists(br_name):
             raise ScriptError(
-                "Branch {} already exists locally. "
-                "Please remove it before running the release script.".format(branch_name(version))
+                "Branch {} already exists locally. Please remove it before "
+                "running the release script, or use `resume` instead.".format(
+                    br_name
+                )
             )
         if base is not None:
             base = self.git_repo.tag('refs/tags/{}'.format(base))
         else:
             base = 'refs/remotes/{}/master'.format(remote.name)
-        release_branch = self.git_repo.create_head(branch_name(version), commit=base)
+        release_branch = self.git_repo.create_head(br_name, commit=base)
         release_branch.checkout()
         self.git_repo.git.merge('--strategy=ours', '--no-edit', '{}/release'.format(remote.name))
         with release_branch.config_writer() as cfg:
