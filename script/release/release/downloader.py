@@ -36,7 +36,7 @@ class BinaryDownloader(requests.Session):
             base=self.base_appveyor_url, filename=filename, branch_name=branch_name
         )
         full_dest = os.path.join(REPO_ROOT, self.destination, filename)
-        return self.download(url, full_dest)
+        return self._download(url, full_dest)
 
     def _download(self, url, full_dest):
         m = hashlib.sha256()
@@ -57,7 +57,7 @@ class BinaryDownloader(requests.Session):
         files = {
             'docker-compose-Darwin-x86_64': None,
             'docker-compose-Linux-x86_64': None,
-            # 'docker-compose-Windows-x86_64.exe': None,
+            'docker-compose-Windows-x86_64.exe': None,
         }
 
         for filename in files.keys():
