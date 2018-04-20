@@ -12,3 +12,4 @@ compose/GITSHA
 *.swo
 *.swp
 .DS_Store
+.cache
