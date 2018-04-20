@@ -30,6 +30,11 @@ from release.utils import update_run_sh_version
 
 def create_initial_branch(repository, release, base, bintray_user):
     release_branch = repository.create_release_branch(release, base)
+    if base:
+        print('Detected patch version.')
+        cherries = input('Indicate PR#s to cherry-pick then press Enter:\n')
+        repository.cherry_pick_prs(release_branch, cherries.split())
+
     return create_bump_commit(repository, release_branch, bintray_user)
 
 

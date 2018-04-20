@@ -2,7 +2,9 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import os
+import tempfile
 
+import requests
 from git import GitCommandError
 from git import Repo
 from github import Github
@@ -111,7 +113,7 @@ class Repository(object):
                 if not release.draft:
                     print(
                         'The release at {} is no longer a draft. If you TRULY intend '
-                        'to remove it, please do so manually.'
+                        'to remove it, please do so manually.'.format(release.url)
                     )
                     continue
                 release.delete_release()
@@ -170,6 +172,26 @@ class Repository(object):
     def write_git_sha(self):
         with open(os.path.join(REPO_ROOT, 'compose', 'GITSHA'), 'w') as f:
             f.write(self.git_repo.head.commit.hexsha[:7])
+
+    def cherry_pick_prs(self, release_branch, ids):
+        if not ids:
+            return
+        release_branch.checkout()
+        for i in ids:
+            try:
+                i = int(i)
+            except ValueError as e:
+                raise ScriptError('Invalid PR id: {}'.format(e))
+            print('Retrieving PR#{}'.format(i))
+            pr = self.gh_repo.get_pull(i)
+            patch_data = requests.get(pr.patch_url).text
+            self.apply_patch(patch_data)
+
+    def apply_patch(self, patch_data):
+        with tempfile.NamedTemporaryFile(mode='w', prefix='_compose_cherry', encoding='utf-8') as f:
+            f.write(patch_data)
+            f.flush()
+            self.git_repo.git.am('--3way', f.name)
 
 
 def get_contributors(pr_data):
