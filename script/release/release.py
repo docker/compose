@@ -66,24 +66,29 @@ def monitor_pr_status(pr_data):
     last_commit = pr_data.get_commits().reversed[0]
     while True:
         status = last_commit.get_combined_status()
-        if status.state == 'pending':
+        if status.state == 'pending' or status.state == 'failure':
             summary = {
                 'pending': 0,
                 'success': 0,
                 'failure': 0,
             }
             for detail in status.statuses:
+                if detail.context == 'dco-signed':
+                    # dco-signed check breaks on merge remote-tracking ; ignore it
+                    continue
                 summary[detail.state] += 1
             print('{pending} pending, {success} successes, {failure} failures'.format(**summary))
             if status.total_count == 0:
                 # Mostly for testing purposes against repos with no CI setup
                 return True
+            elif summary['pending'] == 0 and summary['failure'] == 0:
+                return True
+            elif summary['failure'] > 0:
+                raise ScriptError('CI failures detected!')
             time.sleep(30)
         elif status.state == 'success':
             print('{} successes: all clear!'.format(status.total_count))
             return True
-        else:
-            raise ScriptError('CI failure detected')
 
 
 def check_pr_mergeable(pr_data):
@@ -159,7 +164,7 @@ def resume(args):
         delete_assets(gh_release)
         upload_assets(gh_release, files)
         img_manager = ImageManager(args.release)
-        img_manager.build_images(repository, files, args.release)
+        img_manager.build_images(repository, files)
     except ScriptError as e:
         print(e)
         return 1
