@@ -45,15 +45,10 @@ virtualenv .\venv
 $ErrorActionPreference = "Continue"
 
 # Install dependencies
-# Fix for https://github.com/pypa/pip/issues/3964
-# Remove-Item -Recurse -Force .\venv\Lib\site-packages\pip
-# .\venv\Scripts\easy_install pip==9.0.1
-# .\venv\Scripts\pip install --upgrade pip setuptools
-# End fix
 .\venv\Scripts\pip install pypiwin32==220
 .\venv\Scripts\pip install -r requirements.txt
 .\venv\Scripts\pip install --no-deps .
-.\venv\Scripts\pip install --allow-external pyinstaller -r requirements-build.txt
+.\venv\Scripts\pip install -r requirements-build.txt
 
 git rev-parse --short HEAD | out-file -encoding ASCII compose\GITSHA
 
