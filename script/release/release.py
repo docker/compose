@@ -239,9 +239,8 @@ def finalize(args):
         if not merge_status.merged:
             raise ScriptError('Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message))
         print('Uploading to PyPi')
-        # TODO: this will do real stuff. Uncomment when done testing
-        # run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['upload'])
-        # img_manager.push_images(args.release)
+        run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['upload'])
+        img_manager.push_images(args.release)
         repository.publish_release(gh_release)
     except ScriptError as e:
         print(e)
