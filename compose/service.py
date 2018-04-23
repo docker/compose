@@ -51,6 +51,7 @@ from .progress_stream import StreamOutputError
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
+from .version import ComposeVersion
 
 
 log = logging.getLogger(__name__)
@@ -192,11 +193,25 @@ class Service(object):
     def containers(self, stopped=False, one_off=False, filters={}):
         filters.update({'label': self.labels(one_off=one_off)})
 
-        return list(filter(None, [
+        result = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
-                filters=filters)]))
+                filters=filters)])
+        )
+        if result:
+            return result
+
+        filters.update({'label': self.labels(one_off=one_off, legacy=True)})
+        return list(
+            filter(
+                self.has_legacy_proj_name, filter(None, [
+                    Container.from_ps(self.client, container)
+                    for container in self.client.containers(
+                        all=stopped,
+                        filters=filters)])
+            )
+        )
 
     def get_container(self, number=1):
         """Return a :class:`compose.container.Container` for this service. The
@@ -380,6 +395,10 @@ class Service(object):
         has_diverged = False
 
         for c in containers:
+            if self.has_legacy_proj_name(c):
+                log.debug('%s has diverged: Legacy project name' % c.name)
+                has_diverged = True
+                continue
             container_config_hash = c.labels.get(LABEL_CONFIG_HASH, None)
             if container_config_hash != config_hash:
                 log.debug(
@@ -1053,11 +1072,12 @@ class Service(object):
     def can_be_built(self):
         return 'build' in self.options
 
-    def labels(self, one_off=False):
+    def labels(self, one_off=False, legacy=False):
+        proj_name = self.project if not legacy else re.sub(r'[_-]', '', self.project)
         return [
-            '{0}={1}'.format(LABEL_PROJECT, self.project),
+            '{0}={1}'.format(LABEL_PROJECT, proj_name),
             '{0}={1}'.format(LABEL_SERVICE, self.name),
-            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False")
+            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
         ]
 
     @property
@@ -1213,6 +1233,12 @@ class Service(object):
             result[permitted[k]] = result[permitted[k].lower()] = v
 
         return result
+
+    def has_legacy_proj_name(self, ctnr):
+        return (
+            ComposeVersion(ctnr.labels.get(LABEL_VERSION)) < ComposeVersion('1.21.0') and
+            ctnr.project != self.project
+        )
 
 
 def short_id_alias_exists(container, network):
