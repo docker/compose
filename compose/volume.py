@@ -2,14 +2,18 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import re
 
 from docker.errors import NotFound
 from docker.utils import version_lt
 
+from . import __version__
 from .config import ConfigurationError
 from .config.types import VolumeSpec
 from .const import LABEL_PROJECT
+from .const import LABEL_VERSION
 from .const import LABEL_VOLUME
+
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +29,7 @@ class Volume(object):
         self.external = external
         self.labels = labels
         self.custom_name = custom_name
+        self.legacy = False
 
     def create(self):
         return self.client.create_volume(
@@ -36,15 +41,26 @@ class Volume(object):
             log.info("Volume %s is external, skipping", self.full_name)
             return
         log.info("Removing volume %s", self.full_name)
-        return self.client.remove_volume(self.full_name)
+        try:
+            return self.client.remove_volume(self.full_name)
+        except NotFound:
+            self.client.remove_volume(self.legacy_full_name)
 
-    def inspect(self):
+    def inspect(self, legacy=False):
+        if legacy:
+            return self.client.inspect_volume(self.legacy_full_name)
         return self.client.inspect_volume(self.full_name)
 
     def exists(self):
         try:
             self.inspect()
         except NotFound:
+            try:
+                self.inspect(legacy=True)
+                self.legacy = True
+                return True
+            except NotFound:
+                pass
             return False
         return True
 
@@ -55,6 +71,20 @@ class Volume(object):
         return '{0}_{1}'.format(self.project, self.name)
 
     @property
+    def legacy_full_name(self):
+        if self.custom_name:
+            return self.name
+        return '{0}_{1}'.format(
+            re.sub(r'[_-]', '', self.project), self.name
+        )
+
+    @property
+    def true_name(self):
+        if self.legacy:
+            return self.legacy_full_name
+        return self.full_name
+
+    @property
     def _labels(self):
         if version_lt(self.client._version, '1.23'):
             return None
@@ -62,6 +92,7 @@ class Volume(object):
         labels.update({
             LABEL_PROJECT: self.project,
             LABEL_VOLUME: self.name,
+            LABEL_VERSION: __version__,
         })
         return labels
 
@@ -94,7 +125,7 @@ class ProjectVolumes(object):
             try:
                 volume.remove()
             except NotFound:
-                log.warn("Volume %s not found.", volume.full_name)
+                log.warn("Volume %s not found.", volume.true_name)
 
     def initialize(self):
         try:
@@ -136,9 +167,9 @@ class ProjectVolumes(object):
 
         if isinstance(volume_spec, VolumeSpec):
             volume = self.volumes[volume_spec.external]
-            return volume_spec._replace(external=volume.full_name)
+            return volume_spec._replace(external=volume.true_name)
         else:
-            volume_spec.source = self.volumes[volume_spec.source].full_name
+            volume_spec.source = self.volumes[volume_spec.source].true_name
             return volume_spec
 
 
@@ -152,7 +183,7 @@ class VolumeConfigChangedError(ConfigurationError):
             'first:\n$ docker volume rm {full_name}'.format(
                 vol_name=local.name, property_name=property_name,
                 local_value=local_value, remote_value=remote_value,
-                full_name=local.full_name
+                full_name=local.true_name
             )
         )
 

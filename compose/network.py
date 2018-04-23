@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
+import re
 from collections import OrderedDict
 
 from docker.errors import NotFound
@@ -10,9 +11,11 @@ from docker.types import IPAMPool
 from docker.utils import version_gte
 from docker.utils import version_lt
 
+from . import __version__
 from .config import ConfigurationError
 from .const import LABEL_NETWORK
 from .const import LABEL_PROJECT
+from .const import LABEL_VERSION
 
 
 log = logging.getLogger(__name__)
@@ -39,6 +42,7 @@ class Network(object):
         self.enable_ipv6 = enable_ipv6
         self.labels = labels
         self.custom_name = custom_name
+        self.legacy = False
 
     def ensure(self):
         if self.external:
@@ -68,6 +72,14 @@ class Network(object):
             data = self.inspect()
             check_remote_network_config(data, self)
         except NotFound:
+            try:
+                data = self.inspect(legacy=True)
+                self.legacy = True
+                check_remote_network_config(data, self)
+                return
+            except NotFound:
+                pass
+
             driver_name = 'the default driver'
             if self.driver:
                 driver_name = 'driver "{}"'.format(self.driver)
@@ -94,17 +106,36 @@ class Network(object):
             log.info("Network %s is external, skipping", self.full_name)
             return
 
-        log.info("Removing network {}".format(self.full_name))
-        self.client.remove_network(self.full_name)
+        log.info("Removing network {}".format(self.true_name))
+        try:
+            self.client.remove_network(self.full_name)
+        except NotFound:
+            self.client.remove_network(self.legacy_full_name)
 
-    def inspect(self):
+    def inspect(self, legacy=False):
+        if legacy:
+            return self.client.inspect_network(self.legacy_full_name)
         return self.client.inspect_network(self.full_name)
+
+    @property
+    def legacy_full_name(self):
+        if self.custom_name:
+            return self.name
+        return '{0}_{1}'.format(
+            re.sub(r'[_-]', '', self.project), self.name
+        )
 
     @property
     def full_name(self):
         if self.custom_name:
             return self.name
         return '{0}_{1}'.format(self.project, self.name)
+
+    @property
+    def true_name(self):
+        if self.legacy:
+            return self.legacy_full_name
+        return self.full_name
 
     @property
     def _labels(self):
@@ -114,6 +145,7 @@ class Network(object):
         labels.update({
             LABEL_PROJECT: self.project,
             LABEL_NETWORK: self.name,
+            LABEL_VERSION: __version__,
         })
         return labels
 
@@ -150,49 +182,49 @@ def check_remote_ipam_config(remote, local):
     remote_ipam = remote.get('IPAM')
     ipam_dict = create_ipam_config_from_dict(local.ipam)
     if local.ipam.get('driver') and local.ipam.get('driver') != remote_ipam.get('Driver'):
-        raise NetworkConfigChangedError(local.full_name, 'IPAM driver')
+        raise NetworkConfigChangedError(local.true_name, 'IPAM driver')
     if len(ipam_dict['Config']) != 0:
         if len(ipam_dict['Config']) != len(remote_ipam['Config']):
-            raise NetworkConfigChangedError(local.full_name, 'IPAM configs')
+            raise NetworkConfigChangedError(local.true_name, 'IPAM configs')
         remote_configs = sorted(remote_ipam['Config'], key='Subnet')
         local_configs = sorted(ipam_dict['Config'], key='Subnet')
         while local_configs:
             lc = local_configs.pop()
             rc = remote_configs.pop()
             if lc.get('Subnet') != rc.get('Subnet'):
-                raise NetworkConfigChangedError(local.full_name, 'IPAM config subnet')
+                raise NetworkConfigChangedError(local.true_name, 'IPAM config subnet')
             if lc.get('Gateway') is not None and lc.get('Gateway') != rc.get('Gateway'):
-                raise NetworkConfigChangedError(local.full_name, 'IPAM config gateway')
+                raise NetworkConfigChangedError(local.true_name, 'IPAM config gateway')
             if lc.get('IPRange') != rc.get('IPRange'):
-                raise NetworkConfigChangedError(local.full_name, 'IPAM config ip_range')
+                raise NetworkConfigChangedError(local.true_name, 'IPAM config ip_range')
             if sorted(lc.get('AuxiliaryAddresses')) != sorted(rc.get('AuxiliaryAddresses')):
-                raise NetworkConfigChangedError(local.full_name, 'IPAM config aux_addresses')
+                raise NetworkConfigChangedError(local.true_name, 'IPAM config aux_addresses')
 
     remote_opts = remote_ipam.get('Options') or {}
     local_opts = local.ipam.get('Options') or {}
     for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
         if remote_opts.get(k) != local_opts.get(k):
-            raise NetworkConfigChangedError(local.full_name, 'IPAM option "{}"'.format(k))
+            raise NetworkConfigChangedError(local.true_name, 'IPAM option "{}"'.format(k))
 
 
 def check_remote_network_config(remote, local):
     if local.driver and remote.get('Driver') != local.driver:
-        raise NetworkConfigChangedError(local.full_name, 'driver')
+        raise NetworkConfigChangedError(local.true_name, 'driver')
     local_opts = local.driver_opts or {}
     remote_opts = remote.get('Options') or {}
     for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
         if k in OPTS_EXCEPTIONS:
             continue
         if remote_opts.get(k) != local_opts.get(k):
-            raise NetworkConfigChangedError(local.full_name, 'option "{}"'.format(k))
+            raise NetworkConfigChangedError(local.true_name, 'option "{}"'.format(k))
 
     if local.ipam is not None:
         check_remote_ipam_config(remote, local)
 
     if local.internal is not None and local.internal != remote.get('Internal', False):
-        raise NetworkConfigChangedError(local.full_name, 'internal')
+        raise NetworkConfigChangedError(local.true_name, 'internal')
     if local.enable_ipv6 is not None and local.enable_ipv6 != remote.get('EnableIPv6', False):
-        raise NetworkConfigChangedError(local.full_name, 'enable_ipv6')
+        raise NetworkConfigChangedError(local.true_name, 'enable_ipv6')
 
     local_labels = local.labels or {}
     remote_labels = remote.get('Labels', {})
@@ -202,7 +234,7 @@ def check_remote_network_config(remote, local):
         if remote_labels.get(k) != local_labels.get(k):
             log.warn(
                 'Network {}: label "{}" has changed. It may need to be'
-                ' recreated.'.format(local.full_name, k)
+                ' recreated.'.format(local.true_name, k)
             )
 
 
@@ -257,7 +289,7 @@ class ProjectNetworks(object):
             try:
                 network.remove()
             except NotFound:
-                log.warn("Network %s not found.", network.full_name)
+                log.warn("Network %s not found.", network.true_name)
 
     def initialize(self):
         if not self.use_networking:
@@ -286,7 +318,7 @@ def get_networks(service_dict, network_definitions):
     for name, netdef in get_network_defs_for_service(service_dict).items():
         network = network_definitions.get(name)
         if network:
-            networks[network.full_name] = netdef
+            networks[network.true_name] = netdef
         else:
             raise ConfigurationError(
                 'Service "{}" uses an undefined network "{}"'
