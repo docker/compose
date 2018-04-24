@@ -281,7 +281,8 @@
             "properties": {
                 "driver": {"type": "string"},
                 "config": {
-                    "type": "array"
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/ipam_config"}
                 },
                 "options": {
                   "type": "object",
@@ -301,6 +302,24 @@
           "additionalProperties": false
         },
         "internal": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+
+    "ipam_config": {
+      "id": "#/definitions/ipam_config",
+      "type": "object",
+      "properties": {
+        "subnet": {"type": "string"},
+        "iprange": {"type": "string"},
+        "gateway": {"type": "string"},
+        "aux_addresses": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
