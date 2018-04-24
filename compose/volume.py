@@ -38,13 +38,10 @@ class Volume(object):
 
     def remove(self):
         if self.external:
-            log.info("Volume %s is external, skipping", self.full_name)
+            log.info("Volume %s is external, skipping", self.true_name)
             return
-        log.info("Removing volume %s", self.full_name)
-        try:
-            return self.client.remove_volume(self.full_name)
-        except NotFound:
-            self.client.remove_volume(self.legacy_full_name)
+        log.info("Removing volume %s", self.true_name)
+        return self.client.remove_volume(self.true_name)
 
     def inspect(self, legacy=None):
         if legacy:

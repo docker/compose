@@ -95,14 +95,11 @@ class Network(object):
 
     def remove(self):
         if self.external:
-            log.info("Network %s is external, skipping", self.full_name)
+            log.info("Network %s is external, skipping", self.true_name)
             return
 
         log.info("Removing network {}".format(self.true_name))
-        try:
-            self.client.remove_network(self.full_name)
-        except NotFound:
-            self.client.remove_network(self.legacy_full_name)
+        self.client.remove_network(self.true_name)
 
     def inspect(self, legacy=False):
         if legacy:
