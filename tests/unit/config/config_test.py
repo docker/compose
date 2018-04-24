@@ -1322,6 +1322,28 @@ class ConfigTest(unittest.TestCase):
         assert mount.type == 'bind'
         assert mount.source == expected_source
 
+    def test_config_invalid_ipam_config(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': str(V2_1),
+                        'networks': {
+                            'foo': {
+                                'driver': 'default',
+                                'ipam': {
+                                    'driver': 'default',
+                                    'config': ['172.18.0.0/16'],
+                                }
+                            }
+                        }
+                    },
+                    filename='filename.yml',
+                )
+            )
+        assert ('networks.foo.ipam.config contains an invalid type,'
+                ' it should be an object') in excinfo.exconly()
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             services = config.load(
