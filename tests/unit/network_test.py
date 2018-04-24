@@ -23,7 +23,10 @@ class NetworkTest(unittest.TestCase):
                     'aux_addresses': ['11.0.0.1', '24.25.26.27'],
                     'ip_range': '156.0.0.1-254'
                 }
-            ]
+            ],
+            'options': {
+                'iface': 'eth0',
+            }
         }
         labels = {
             'com.project.tests.istest': 'true',
@@ -57,6 +60,9 @@ class NetworkTest(unittest.TestCase):
                         'Subnet': '172.0.0.1/16',
                         'Gateway': '172.0.0.1'
                     }],
+                    'Options': {
+                        'iface': 'eth0',
+                    },
                 },
                 'Labels': remote_labels
             },

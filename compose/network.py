@@ -169,7 +169,7 @@ def check_remote_ipam_config(remote, local):
                 raise NetworkConfigChangedError(local.full_name, 'IPAM config aux_addresses')
 
     remote_opts = remote_ipam.get('Options') or {}
-    local_opts = local.ipam.get('options') or {}
+    local_opts = local.ipam.get('Options') or {}
     for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
         if remote_opts.get(k) != local_opts.get(k):
             raise NetworkConfigChangedError(local.full_name, 'IPAM option "{}"'.format(k))
