@@ -13,3 +13,4 @@ compose/GITSHA
 *.swp
 .DS_Store
 .cache
+.idea
