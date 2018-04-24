@@ -60,6 +60,7 @@ class ProjectTest(unittest.TestCase):
         assert project.get_service('db').options['image'] == 'busybox:latest'
         assert not project.networks.use_networking
 
+    @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_from_config_v2(self):
         config = Config(
             version=V2_0,
@@ -217,6 +218,7 @@ class ProjectTest(unittest.TestCase):
         )
         assert project.get_service('test')._get_volumes_from() == [container_name + ":rw"]
 
+    @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_use_volumes_from_service_container(self):
         container_ids = ['aabbccddee', '12345']
 
