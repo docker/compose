@@ -29,7 +29,7 @@ class Volume(object):
         self.external = external
         self.labels = labels
         self.custom_name = custom_name
-        self.legacy = False
+        self.legacy = None
 
     def create(self):
         return self.client.create_volume(
@@ -46,21 +46,16 @@ class Volume(object):
         except NotFound:
             self.client.remove_volume(self.legacy_full_name)
 
-    def inspect(self, legacy=False):
+    def inspect(self, legacy=None):
         if legacy:
             return self.client.inspect_volume(self.legacy_full_name)
         return self.client.inspect_volume(self.full_name)
 
     def exists(self):
+        self._set_legacy_flag()
         try:
-            self.inspect()
+            self.inspect(legacy=self.legacy)
         except NotFound:
-            try:
-                self.inspect(legacy=True)
-                self.legacy = True
-                return True
-            except NotFound:
-                pass
             return False
         return True
 
@@ -80,6 +75,7 @@ class Volume(object):
 
     @property
     def true_name(self):
+        self._set_legacy_flag()
         if self.legacy:
             return self.legacy_full_name
         return self.full_name
@@ -95,6 +91,15 @@ class Volume(object):
             LABEL_VERSION: __version__,
         })
         return labels
+
+    def _set_legacy_flag(self):
+        if self.legacy is not None:
+            return
+        try:
+            data = self.inspect(legacy=True)
+            self.legacy = data is not None
+        except NotFound:
+            self.legacy = False
 
 
 class ProjectVolumes(object):
@@ -155,7 +160,7 @@ class ProjectVolumes(object):
                     )
                     volume.create()
                 else:
-                    check_remote_volume_config(volume.inspect(), volume)
+                    check_remote_volume_config(volume.inspect(legacy=volume.legacy), volume)
         except NotFound:
             raise ConfigurationError(
                 'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)

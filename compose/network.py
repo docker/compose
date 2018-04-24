@@ -42,7 +42,7 @@ class Network(object):
         self.enable_ipv6 = enable_ipv6
         self.labels = labels
         self.custom_name = custom_name
-        self.legacy = False
+        self.legacy = None
 
     def ensure(self):
         if self.external:
@@ -68,25 +68,17 @@ class Network(object):
                 )
             return
 
+        self._set_legacy_flag()
         try:
-            data = self.inspect()
+            data = self.inspect(legacy=self.legacy)
             check_remote_network_config(data, self)
         except NotFound:
-            try:
-                data = self.inspect(legacy=True)
-                self.legacy = True
-                check_remote_network_config(data, self)
-                return
-            except NotFound:
-                pass
-
             driver_name = 'the default driver'
             if self.driver:
                 driver_name = 'driver "{}"'.format(self.driver)
 
             log.info(
-                'Creating network "{}" with {}'
-                .format(self.full_name, driver_name)
+                'Creating network "{}" with {}'.format(self.full_name, driver_name)
             )
 
             self.client.create_network(
@@ -133,6 +125,7 @@ class Network(object):
 
     @property
     def true_name(self):
+        self._set_legacy_flag()
         if self.legacy:
             return self.legacy_full_name
         return self.full_name
@@ -148,6 +141,15 @@ class Network(object):
             LABEL_VERSION: __version__,
         })
         return labels
+
+    def _set_legacy_flag(self):
+        if self.legacy is not None:
+            return
+        try:
+            data = self.inspect(legacy=True)
+            self.legacy = data is not None
+        except NotFound:
+            self.legacy = False
 
 
 def create_ipam_config_from_dict(ipam_dict):
