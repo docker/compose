@@ -10,6 +10,7 @@ from docker.errors import NotFound
 from .. import mock
 from .. import unittest
 from compose.config.errors import DependencyError
+from compose.config.types import MountSpec
 from compose.config.types import ServicePort
 from compose.config.types import ServiceSecret
 from compose.config.types import VolumeFromSpec
@@ -954,6 +955,24 @@ class ServiceTest(unittest.TestCase):
         service = Service('foo', client=self.mock_client)
 
         assert service.create_container().id == 'new_cont_id'
+
+    def test_build_volume_options_duplicate_binds(self):
+        self.mock_client.api_version = '1.29'  # Trigger 3.2 format workaround
+        service = Service('foo', client=self.mock_client)
+        ctnr_opts, override_opts = service._build_container_volume_options(
+            previous_container=None,
+            container_options={
+                'volumes': [
+                    MountSpec.parse({'source': 'vol', 'target': '/data', 'type': 'volume'}),
+                    VolumeSpec.parse('vol:/data:rw'),
+                ],
+                'environment': {},
+            },
+            override_options={},
+        )
+        assert 'binds' in override_opts
+        assert len(override_opts['binds']) == 1
+        assert override_opts['binds'][0] == 'vol:/data:rw'
 
 
 class TestServiceNetwork(unittest.TestCase):

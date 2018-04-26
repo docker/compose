@@ -877,7 +877,6 @@ class Service(object):
             container_volumes, self.options.get('tmpfs') or [], previous_container,
             container_mounts
         )
-        override_options['binds'] = binds
         container_options['environment'].update(affinity)
 
         container_options['volumes'] = dict((v.internal, {}) for v in container_volumes or {})
@@ -890,13 +889,13 @@ class Service(object):
                 if m.is_tmpfs:
                     override_options['tmpfs'].append(m.target)
                 else:
-                    override_options['binds'].append(m.legacy_repr())
+                    binds.append(m.legacy_repr())
                     container_options['volumes'][m.target] = {}
 
         secret_volumes = self.get_secret_volumes()
         if secret_volumes:
             if version_lt(self.client.api_version, '1.30'):
-                override_options['binds'].extend(v.legacy_repr() for v in secret_volumes)
+                binds.extend(v.legacy_repr() for v in secret_volumes)
                 container_options['volumes'].update(
                     (v.target, {}) for v in secret_volumes
                 )
@@ -904,6 +903,8 @@ class Service(object):
                 override_options['mounts'] = override_options.get('mounts') or []
                 override_options['mounts'].extend([build_mount(v) for v in secret_volumes])
 
+        # Remove possible duplicates (see e.g. https://github.com/docker/compose/issues/5885)
+        override_options['binds'] = list(set(binds))
         return container_options, override_options
 
     def _get_container_host_config(self, override_options, one_off=False):
