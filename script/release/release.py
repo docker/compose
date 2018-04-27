@@ -27,6 +27,7 @@ from release.utils import ScriptError
 from release.utils import update_init_py_version
 from release.utils import update_run_sh_version
 from release.utils import yesno
+from twine.commands.upload import main as twine_upload
 
 
 def create_initial_branch(repository, args):
@@ -240,8 +241,8 @@ def finalize(args):
         if not merge_status.merged:
             raise ScriptError('Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message))
         print('Uploading to PyPi')
-        run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['upload'])
-        img_manager.push_images(args.release)
+        twine_upload(['dist/*'])
+        img_manager.push_images()
         repository.publish_release(gh_release)
     except ScriptError as e:
         print(e)
