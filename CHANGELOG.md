@@ -1,6 +1,32 @@
 Change log
 ==========
 
+1.21.1 (2018-04-27)
+-------------------
+
+### Bugfixes
+
+- In 1.21.0, we introduced a change to how project names are sanitized for
+  internal use in resource names. This caused issues when manipulating an
+  existing, deployed application whose name had changed as a result.
+  This release properly detects resources using "legacy" naming conventions.
+
+- Fixed an issue where specifying an in-context Dockerfile using an absolute
+  path would fail despite being valid.
+
+- Fixed a bug where IPAM option changes were incorrectly detected, preventing
+  redeployments.
+
+- Validation of v2 files now properly checks the structure of IPAM configs.
+
+- Improved support for credentials stores on Windows to include binaries using
+  extensions other than `.exe`. The list of valid extensions is determined by
+  the contents of the `PATHEXT` environment variable.
+
+- Fixed a bug where Compose would generate invalid binds containing duplicate
+  elements with some v3.2 files, triggering errors at the Engine level during
+  deployment.
+
 1.21.0 (2018-04-10)
 -------------------
 
