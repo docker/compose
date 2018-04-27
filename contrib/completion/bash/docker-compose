@@ -81,41 +81,24 @@ __docker_compose_nospace() {
 	type compopt &>/dev/null && compopt -o nospace
 }
 
-# Extracts all service names from the compose file.
-___docker_compose_all_services_in_compose_file() {
-	__docker_compose_q config --services
+
+# Outputs a list of all defined services, regardless of their running state.
+# Arguments for `docker-compose ps` may be passed in order to filter the service list,
+# e.g. `status=running`.
+__docker_compose_services() {
+	__docker_compose_q ps --services "$@"
 }
 
-# All services, even those without an existing container
-__docker_compose_services_all() {
-	COMPREPLY=( $(compgen -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
-}
-
-# All services that are defined by a Dockerfile reference
-__docker_compose_services_from_build() {
-	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "source=build")" -- "$cur") )
-}
-
-# All services that are defined by an image
-__docker_compose_services_from_image() {
-	COMPREPLY=( $(compgen -W "$(__docker_compose_q ps --services --filter "source=image")" -- "$cur") )
-}
-
-# The services for which at least one paused container exists
-__docker_compose_services_paused() {
-	names=$(__docker_compose_q ps --services --filter "status=paused")
-	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
+# Applies completion of services based on the current value of `$cur`.
+# Arguments for `docker-compose ps` may be passed in order to filter the service list,
+# see `__docker_compose_services`.
+__docker_compose_complete_services() {
+	COMPREPLY=( $(compgen -W "$(__docker_compose_services "$@")" -- "$cur") )
 }
 
 # The services for which at least one running container exists
-__docker_compose_services_running() {
-	names=$(__docker_compose_q ps --services --filter "status=running")
-	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
-}
-
-# The services for which at least one stopped container exists
-__docker_compose_services_stopped() {
-	names=$(__docker_compose_q ps --services --filter "status=stopped")
+__docker_compose_complete_running_services() {
+	local names=$(__docker_compose_complete_services --filter status=running)
 	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
@@ -131,10 +114,10 @@ _docker_compose_build() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--build-arg --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--build-arg --compress --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_from_build
+			__docker_compose_complete_services --filter source=build
 			;;
 	esac
 }
@@ -163,7 +146,7 @@ _docker_compose_create() {
 			COMPREPLY=( $( compgen -W "--build --force-recreate --help --no-build --no-recreate" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -234,7 +217,7 @@ _docker_compose_events() {
 			COMPREPLY=( $( compgen -W "--help --json" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -242,17 +225,17 @@ _docker_compose_events() {
 
 _docker_compose_exec() {
 	case "$prev" in
-		--index|--user|-u)
+		--index|--user|-u|--workdir|-w)
 			return
 			;;
 	esac
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "-d --detach --help --index --privileged -T --user -u" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-d --detach --help --index --privileged -T --user -u --workdir -w" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -268,7 +251,7 @@ _docker_compose_images() {
 			COMPREPLY=( $( compgen -W "--help --quiet -q" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -286,7 +269,7 @@ _docker_compose_kill() {
 			COMPREPLY=( $( compgen -W "--help -s" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -304,7 +287,7 @@ _docker_compose_logs() {
 			COMPREPLY=( $( compgen -W "--follow -f --help --no-color --tail --timestamps -t" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -316,7 +299,7 @@ _docker_compose_pause() {
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -338,7 +321,7 @@ _docker_compose_port() {
 			COMPREPLY=( $( compgen -W "--help --index --protocol" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -370,7 +353,7 @@ _docker_compose_ps() {
 			COMPREPLY=( $( compgen -W "--help --quiet -q --services --filter" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -379,10 +362,10 @@ _docker_compose_ps() {
 _docker_compose_pull() {
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --include-deps --parallel --quiet -q" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--help --ignore-pull-failures --include-deps --no-parallel --quiet -q" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_from_image
+			__docker_compose_complete_services --filter source=image
 			;;
 	esac
 }
@@ -394,7 +377,7 @@ _docker_compose_push() {
 			COMPREPLY=( $( compgen -W "--help --ignore-push-failures" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -412,7 +395,7 @@ _docker_compose_restart() {
 			COMPREPLY=( $( compgen -W "--help --timeout -t" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -425,9 +408,9 @@ _docker_compose_rm() {
 			;;
 		*)
 			if __docker_compose_has_option "--stop|-s" ; then
-				__docker_compose_services_all
+				__docker_compose_complete_services
 			else
-				__docker_compose_services_stopped
+				__docker_compose_complete_services --filter status=stopped
 			fi
 			;;
 	esac
@@ -451,7 +434,7 @@ _docker_compose_run() {
 			COMPREPLY=( $( compgen -W "--detach -d --entrypoint -e --help --label -l --name --no-deps --publish -p --rm --service-ports -T --use-aliases --user -u --volume -v --workdir -w" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }
@@ -473,7 +456,7 @@ _docker_compose_scale() {
 			COMPREPLY=( $( compgen -W "--help --timeout -t" -- "$cur" ) )
 			;;
 		*)
-			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
+			COMPREPLY=( $(compgen -S "=" -W "$(__docker_compose_services)" -- "$cur") )
 			__docker_compose_nospace
 			;;
 	esac
@@ -486,7 +469,7 @@ _docker_compose_start() {
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_stopped
+			__docker_compose_complete_services --filter status=stopped
 			;;
 	esac
 }
@@ -504,7 +487,7 @@ _docker_compose_stop() {
 			COMPREPLY=( $( compgen -W "--help --timeout -t" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -516,7 +499,7 @@ _docker_compose_top() {
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_running
+			__docker_compose_complete_running_services
 			;;
 	esac
 }
@@ -528,7 +511,7 @@ _docker_compose_unpause() {
 			COMPREPLY=( $( compgen -W "--help" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_paused
+			__docker_compose_complete_services --filter status=paused
 			;;
 	esac
 }
@@ -541,11 +524,11 @@ _docker_compose_up() {
 			return
 			;;
 		--exit-code-from)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			return
 			;;
 		--scale)
-			COMPREPLY=( $(compgen -S "=" -W "$(___docker_compose_all_services_in_compose_file)" -- "$cur") )
+			COMPREPLY=( $(compgen -S "=" -W "$(__docker_compose_services)" -- "$cur") )
 			__docker_compose_nospace
 			return
 			;;
@@ -559,7 +542,7 @@ _docker_compose_up() {
 			COMPREPLY=( $( compgen -W "--abort-on-container-exit --always-recreate-deps --build -d --detach --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --no-start --renew-anon-volumes -V --remove-orphans --scale --timeout -t" -- "$cur" ) )
 			;;
 		*)
-			__docker_compose_services_all
+			__docker_compose_complete_services
 			;;
 	esac
 }

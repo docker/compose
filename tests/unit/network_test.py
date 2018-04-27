@@ -23,7 +23,10 @@ class NetworkTest(unittest.TestCase):
                     'aux_addresses': ['11.0.0.1', '24.25.26.27'],
                     'ip_range': '156.0.0.1-254'
                 }
-            ]
+            ],
+            'options': {
+                'iface': 'eth0',
+            }
         }
         labels = {
             'com.project.tests.istest': 'true',
@@ -57,6 +60,9 @@ class NetworkTest(unittest.TestCase):
                         'Subnet': '172.0.0.1/16',
                         'Gateway': '172.0.0.1'
                     }],
+                    'Options': {
+                        'iface': 'eth0',
+                    },
                 },
                 'Labels': remote_labels
             },
@@ -78,6 +84,7 @@ class NetworkTest(unittest.TestCase):
             {'Driver': 'overlay', 'Options': remote_options}, net
         )
 
+    @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_check_remote_network_config_driver_mismatch(self):
         net = Network(None, 'compose_test', 'net1', 'overlay')
         with pytest.raises(NetworkConfigChangedError) as e:
@@ -87,6 +94,7 @@ class NetworkTest(unittest.TestCase):
 
         assert 'driver has changed' in str(e.value)
 
+    @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_check_remote_network_config_options_mismatch(self):
         net = Network(None, 'compose_test', 'net1', 'overlay')
         with pytest.raises(NetworkConfigChangedError) as e:
@@ -140,6 +148,7 @@ class NetworkTest(unittest.TestCase):
             net
         )
 
+    @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_check_remote_network_labels_mismatch(self):
         net = Network(None, 'compose_test', 'net1', 'overlay', labels={
             'com.project.touhou.character': 'sakuya.izayoi'

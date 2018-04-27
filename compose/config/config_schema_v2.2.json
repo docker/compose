@@ -341,7 +341,8 @@
             "properties": {
                 "driver": {"type": "string"},
                 "config": {
-                    "type": "array"
+                    "type": "array",
+                    "items": {"$ref": "#/definitions/ipam_config"}
                 },
                 "options": {
                   "type": "object",
@@ -364,6 +365,24 @@
         "enable_ipv6": {"type": "boolean"},
         "labels": {"$ref": "#/definitions/labels"},
         "name": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+
+    "ipam_config": {
+      "id": "#/definitions/ipam_config",
+      "type": "object",
+      "properties": {
+        "subnet": {"type": "string"},
+        "iprange": {"type": "string"},
+        "gateway": {"type": "string"},
+        "aux_addresses": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
