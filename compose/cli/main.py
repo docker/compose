@@ -1144,7 +1144,7 @@ def convergence_strategy_from_opts(options):
     if no_recreate and renew_anonymous_volumes:
         raise UserError('--no-recreate and --renew-anon-volumes cannot be combined.')
 
-    if force_recreate or renew_anonymous_volumes:
+    if force_recreate:
         return ConvergenceStrategy.always
 
     if no_recreate:
