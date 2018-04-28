@@ -34,15 +34,6 @@ def create_initial_branch(repository, args):
     release_branch = repository.create_release_branch(args.release, args.base)
     if args.base and args.cherries:
         print('Detected patch version.')
-        auto_prs = repository.get_prs_in_milestone(args.release)
-        if auto_prs:
-            print(
-                'Found the following PRs in this release\'s milestone: {}'.format(', '.join(auto_prs))
-            )
-            proceed = yesno('Automatically cherry-pick detected PRs? Y/n', default=True)
-            if proceed:
-                repository.cherry_pick_prs(release_branch, auto_prs)
-
         cherries = input('Indicate (space-separated) PR numbers to cherry-pick then press Enter:\n')
         repository.cherry_pick_prs(release_branch, cherries.split())
 
