@@ -196,6 +196,24 @@ class Repository(object):
             f.flush()
             self.git_repo.git.am('--3way', f.name)
 
+    def get_prs_in_milestone(self, version):
+        milestones = self.gh_repo.get_milestones(state='open')
+        milestone = None
+        for ms in milestones:
+            if ms.title == version:
+                milestone = ms
+                break
+        if not milestone:
+            print('Didn\'t find a milestone matching "{}"'.format(version))
+            return None
+
+        issues = self.gh_repo.get_issues(milestone=milestone, state='all')
+        prs = []
+        for issue in issues:
+            if issue.pull_request is not None:
+                prs.append(issue.number)
+        return sorted(prs)
+
 
 def get_contributors(pr_data):
     commits = pr_data.get_commits()
