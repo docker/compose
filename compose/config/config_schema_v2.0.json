@@ -311,7 +311,7 @@
       "type": "object",
       "properties": {
         "subnet": {"type": "string"},
-        "iprange": {"type": "string"},
+        "ip_range": {"type": "string"},
         "gateway": {"type": "string"},
         "aux_addresses": {
           "type": "object",
