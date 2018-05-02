@@ -19,6 +19,7 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e BINTRAY_TOKEN=$BINTRAY_TOKEN -it \
     --mount type=bind,source=$(pwd),target=/src \
     --mount type=bind,source=$(pwd)/.git,target=/src/.git \
     --mount type=bind,source=$HOME/.docker,target=/root/.docker \
+    --mount type=bind,source=$HOME/.gitconfig,target=/root/.gitconfig \
     --mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
     --mount type=bind,source=$HOME/.ssh,target=/root/.ssh \
     -v $HOME/.pypirc:/root/.pypirc \

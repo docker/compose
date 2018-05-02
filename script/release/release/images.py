@@ -23,6 +23,7 @@ class ImageManager(object):
         distdir = os.path.join(REPO_ROOT, 'dist')
         os.makedirs(distdir, exist_ok=True)
         shutil.copy(files['docker-compose-Linux-x86_64'][0], distdir)
+        os.chmod(os.path.join(distdir, 'docker-compose-Linux-x86_64'), 0o755)
         print('Building docker/compose image')
         logstream = docker_client.build(
             REPO_ROOT, tag='docker/compose:{}'.format(self.version), dockerfile='Dockerfile.run',
