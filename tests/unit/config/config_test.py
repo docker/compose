@@ -1344,6 +1344,38 @@ class ConfigTest(unittest.TestCase):
         assert ('networks.foo.ipam.config contains an invalid type,'
                 ' it should be an object') in excinfo.exconly()
 
+    def test_config_valid_ipam_config(self):
+        ipam_config = {
+            'subnet': '172.28.0.0/16',
+            'ip_range': '172.28.5.0/24',
+            'gateway': '172.28.5.254',
+            'aux_addresses': {
+                'host1': '172.28.1.5',
+                'host2': '172.28.1.6',
+                'host3': '172.28.1.7',
+            },
+        }
+        networks = config.load(
+            build_config_details(
+                {
+                    'version': str(V2_1),
+                    'networks': {
+                        'foo': {
+                            'driver': 'default',
+                            'ipam': {
+                                'driver': 'default',
+                                'config': [ipam_config],
+                            }
+                        }
+                    }
+                },
+                filename='filename.yml',
+            )
+        ).networks
+
+        assert 'foo' in networks
+        assert networks['foo']['ipam']['config'] == [ipam_config]
+
     def test_config_valid_service_names(self):
         for valid_name in ['_', '-', '.__.', '_what-up.', 'what_.up----', 'whatup']:
             services = config.load(
