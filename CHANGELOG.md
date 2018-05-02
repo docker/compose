@@ -1,6 +1,14 @@
 Change log
 ==========
 
+1.21.2 (2018-05-03)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug where the ip_range attirbute in IPAM configs was prevented
+  from passing validation
+
 1.21.1 (2018-04-27)
 -------------------
 
