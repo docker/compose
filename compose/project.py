@@ -128,7 +128,8 @@ class Project(object):
                     volumes_from=volumes_from,
                     secrets=secrets,
                     pid_mode=pid_mode,
-                    platform=service_dict.pop('platform', default_platform),
+                    platform=service_dict.pop('platform', None),
+                    default_platform=default_platform,
                     **service_dict)
             )
 

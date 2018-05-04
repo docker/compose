@@ -172,6 +172,7 @@ class Service(object):
         secrets=None,
         scale=None,
         pid_mode=None,
+        default_platform=None,
         **options
     ):
         self.name = name
@@ -185,6 +186,7 @@ class Service(object):
         self.networks = networks or {}
         self.secrets = secrets or []
         self.scale_num = scale or 1
+        self.default_platform = default_platform
         self.options = options
 
     def __repr__(self):
@@ -357,6 +359,13 @@ class Service(object):
     @property
     def image_name(self):
         return self.options.get('image', '{s.project}_{s.name}'.format(s=self))
+
+    @property
+    def platform(self):
+        platform = self.options.get('platform')
+        if not platform and version_gte(self.client.api_version, '1.35'):
+            platform = self.default_platform
+        return platform
 
     def convergence_plan(self, strategy=ConvergenceStrategy.changed):
         containers = self.containers(stopped=True)
@@ -1018,8 +1027,7 @@ class Service(object):
         if not six.PY3 and not IS_WINDOWS_PLATFORM:
             path = path.encode('utf8')
 
-        platform = self.options.get('platform')
-        if platform and version_lt(self.client.api_version, '1.35'):
+        if self.platform and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
@@ -1044,7 +1052,7 @@ class Service(object):
             },
             gzip=gzip,
             isolation=build_opts.get('isolation', self.options.get('isolation', None)),
-            platform=platform,
+            platform=self.platform,
         )
 
         try:
@@ -1150,14 +1158,14 @@ class Service(object):
         kwargs = {
             'tag': tag or 'latest',
             'stream': True,
-            'platform': self.options.get('platform'),
+            'platform': self.platform,
         }
         if not silent:
             log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
 
         if kwargs['platform'] and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
-                'Impossible to perform platform-targeted builds for API version < 1.35'
+                'Impossible to perform platform-targeted pulls for API version < 1.35'
             )
         try:
             output = self.client.pull(repo, **kwargs)
