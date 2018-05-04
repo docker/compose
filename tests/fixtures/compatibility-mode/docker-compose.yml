@@ -16,7 +16,13 @@ services:
           memory: 100M
     volumes:
       - foo:/bar
+    networks:
+      - bar
 
 volumes:
   foo:
     driver: default
+
+networks:
+  bar:
+    attachable: true
