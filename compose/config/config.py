@@ -918,6 +918,11 @@ def convert_restart_policy(name):
 
 
 def translate_deploy_keys_to_container_config(service_dict):
+    if 'credential_spec' in service_dict:
+        del service_dict['credential_spec']
+    if 'configs' in service_dict:
+        del service_dict['configs']
+
     if 'deploy' not in service_dict:
         return service_dict, []
 
@@ -946,10 +951,6 @@ def translate_deploy_keys_to_container_config(service_dict):
     )
 
     del service_dict['deploy']
-    if 'credential_spec' in service_dict:
-        del service_dict['credential_spec']
-    if 'configs' in service_dict:
-        del service_dict['configs']
 
     return service_dict, ignored_keys
 
