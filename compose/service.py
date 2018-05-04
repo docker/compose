@@ -1355,7 +1355,7 @@ class ServiceNetworkMode(object):
 
 
 def build_container_name(project, service, number, one_off=False):
-    bits = [project, service]
+    bits = [project.lstrip('-_'), service]
     if one_off:
         bits.append('run')
     return '_'.join(bits + [str(number)])
