@@ -1513,6 +1513,20 @@ class CLITestCase(DockerClientTestCase):
         proc.wait()
         assert proc.returncode == 1
 
+    def test_up_handles_cleanup_on_container_exit(self):
+        self.base_dir = 'tests/fixtures/abort-on-container-exit-0'
+        proc = start_process(self.base_dir, ['up', '--cleanup-on-container-exit'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+        proc.wait()
+        assert proc.returncode == 0
+
+    def test_up_handles_cleanup_on_container_exit_code(self):
+        self.base_dir = 'tests/fixtures/abort-on-container-exit-1'
+        proc = start_process(self.base_dir, ['up', '--cleanup-on-container-exit'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+        proc.wait()
+        assert proc.returncode == 1
+
     @v2_only()
     @no_cluster('Container PID mode does not work across clusters')
     def test_up_with_pid_mode(self):

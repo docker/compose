@@ -975,46 +975,49 @@ class TopLevelCommand(object):
         Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
 
         Options:
-            -d, --detach               Detached mode: Run containers in the background,
-                                       print new container names. Incompatible with
-                                       --abort-on-container-exit.
-            --no-color                 Produce monochrome output.
-            --quiet-pull               Pull without printing progress information
-            --no-deps                  Don't start linked services.
-            --force-recreate           Recreate containers even if their configuration
-                                       and image haven't changed.
-            --always-recreate-deps     Recreate dependent containers.
-                                       Incompatible with --no-recreate.
-            --no-recreate              If containers already exist, don't recreate
-                                       them. Incompatible with --force-recreate and -V.
-            --no-build                 Don't build an image, even if it's missing.
-            --no-start                 Don't start the services after creating them.
-            --build                    Build images before starting containers.
-            --abort-on-container-exit  Stops all containers if any container was
-                                       stopped. Incompatible with -d.
-            -t, --timeout TIMEOUT      Use this timeout in seconds for container
-                                       shutdown when attached or when containers are
-                                       already running. (default: 10)
-            -V, --renew-anon-volumes   Recreate anonymous volumes instead of retrieving
-                                       data from the previous containers.
-            --remove-orphans           Remove containers for services not defined
-                                       in the Compose file.
-            --exit-code-from SERVICE   Return the exit code of the selected service
-                                       container. Implies --abort-on-container-exit.
-            --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
-                                       `scale` setting in the Compose file if present.
+            -d, --detach                  Detached mode: Run containers in the background,
+                                          print new container names. Incompatible with
+                                          --abort-on-container-exit.
+            --no-color                    Produce monochrome output.
+            --quiet-pull                  Pull without printing progress information
+            --no-deps                     Don't start linked services.
+            --force-recreate              Recreate containers even if their configuration
+                                          and image haven't changed.
+            --always-recreate-deps        Recreate dependent containers.
+                                          Incompatible with --no-recreate.
+            --no-recreate                 If containers already exist, don't recreate
+                                          them. Incompatible with --force-recreate and -V.
+            --no-build                    Don't build an image, even if it's missing.
+            --no-start                    Don't start the services after creating them.
+            --build                       Build images before starting containers.
+            --abort-on-container-exit     Stops all containers if any container was
+                                          stopped. Incompatible with -d.
+            --cleanup-on-container-exit   Stops all containers if any container was
+                                          stopped. Incompatible with -d.
+            -t, --timeout TIMEOUT         Use this timeout in seconds for container
+                                          shutdown when attached or when containers are
+                                          already running. (default: 10)
+            -V, --renew-anon-volumes      Recreate anonymous volumes instead of retrieving
+                                          data from the previous containers.
+            --remove-orphans              Remove containers for services not defined
+                                          in the Compose file.
+            --exit-code-from SERVICE      Return the exit code of the selected service
+                                          container. Implies --abort-on-container-exit.
+            --scale SERVICE=NUM           Scale SERVICE to NUM instances. Overrides the
+                                          `scale` setting in the Compose file if present.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
         exit_value_from = exitval_from_opts(options, self.project)
         cascade_stop = options['--abort-on-container-exit']
+        cleanup_on_container_exit = options['--cleanup-on-container-exit']
         service_names = options['SERVICE']
         timeout = timeout_from_opts(options)
         remove_orphans = options['--remove-orphans']
         detached = options.get('--detach')
         no_start = options.get('--no-start')
 
-        if detached and (cascade_stop or exit_value_from):
+        if detached and (cascade_stop or exit_value_from or cleanup_on_container_exit):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
         environment = Environment.from_env_file(self.project_dir)
@@ -1023,7 +1026,7 @@ class TopLevelCommand(object):
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from']
+        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--cleanup-on-container-exit']
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -1072,7 +1075,7 @@ class TopLevelCommand(object):
                 attached_containers,
                 options['--no-color'],
                 {'follow': True},
-                cascade_stop,
+                cascade_stop or cleanup_on_container_exit,
                 event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
             cascade_starter = log_printer.run()
@@ -1083,8 +1086,21 @@ class TopLevelCommand(object):
                 exit_code = compute_exit_code(
                     exit_value_from, attached_containers, cascade_starter, all_containers
                 )
-
+                sys.exit(exit_code)
+                
+            if cleanup_on_container_exit:
+                print("Cleaning up on container exit...")
+                all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
+                exit_code = compute_exit_code(
+                    exit_value_from, attached_containers, cascade_starter, all_containers
+                )
                 self.project.stop(service_names=service_names, timeout=timeout)
+                self.project.down(
+                    ImageType.none,
+                    None,
+                    None,
+                    timeout=None,
+                    ignore_orphans=ignore_orphans)
                 sys.exit(exit_code)
 
     @classmethod
