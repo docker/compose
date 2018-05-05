@@ -1026,7 +1026,10 @@ class TopLevelCommand(object):
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--cleanup-on-container-exit']
+        opts = ['--detach',
+                '--abort-on-container-exit',
+                '--exit-code-from',
+                '--cleanup-on-container-exit']
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -1087,7 +1090,7 @@ class TopLevelCommand(object):
                     exit_value_from, attached_containers, cascade_starter, all_containers
                 )
                 sys.exit(exit_code)
-                
+
             if cleanup_on_container_exit:
                 print("Cleaning up on container exit...")
                 all_containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
