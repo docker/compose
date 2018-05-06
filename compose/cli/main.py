@@ -581,10 +581,18 @@ class TopLevelCommand(object):
             rows = []
             for container in containers:
                 image_config = container.image_config
-                repo_tags = (
-                    image_config['RepoTags'][0].rsplit(':', 1) if image_config['RepoTags']
-                    else ('<none>', '<none>')
-                )
+                service = self.project.get_service(container.service)
+                if service.image_name in image_config['RepoTags']:
+                    index = image_config['RepoTags'].index(service.image_name)
+                    repo_tags = (
+                        image_config['RepoTags'][index].rsplit(':', 1) if image_config['RepoTags']
+                        else ('<none>', '<none>')
+                    )
+                else:
+                    repo_tags = (
+                        image_config['RepoTags'][0].rsplit(':', 1) if image_config['RepoTags']
+                        else ('<none>', '<none>')
+                    )
                 image_id = image_config['Id'].split(':')[1][:12]
                 size = human_readable_file_size(image_config['Size'])
                 rows.append([
