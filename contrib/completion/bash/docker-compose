@@ -98,7 +98,7 @@ __docker_compose_complete_services() {
 
 # The services for which at least one running container exists
 __docker_compose_complete_running_services() {
-	local names=$(__docker_compose_complete_services --filter status=running)
+	local names=$(__docker_compose_services --filter status=running)
 	COMPREPLY=( $(compgen -W "$names" -- "$cur") )
 }
 
