@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import itertools
 import logging
 import os
 import re
@@ -51,7 +52,6 @@ from .progress_stream import StreamOutputError
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
-from .version import ComposeVersion
 
 
 log = logging.getLogger(__name__)
@@ -192,8 +192,8 @@ class Service(object):
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
 
-    def containers(self, stopped=False, one_off=False, filters={}):
-        filters.update({'label': self.labels(one_off=one_off)})
+    def containers(self, stopped=False, one_off=False, filters={}, labels=None):
+        filters.update({'label': self.labels(one_off=one_off) + (labels or [])})
 
         result = list(filter(None, [
             Container.from_ps(self.client, container)
@@ -204,10 +204,10 @@ class Service(object):
         if result:
             return result
 
-        filters.update({'label': self.labels(one_off=one_off, legacy=True)})
+        filters.update({'label': self.labels(one_off=one_off, legacy=True) + (labels or [])})
         return list(
             filter(
-                self.has_legacy_proj_name, filter(None, [
+                lambda c: c.has_legacy_proj_name(self.project), filter(None, [
                     Container.from_ps(self.client, container)
                     for container in self.client.containers(
                         all=stopped,
@@ -219,9 +219,9 @@ class Service(object):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-        labels = self.labels() + ['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]
-        for container in self.client.containers(filters={'label': labels}):
-            return Container.from_ps(self.client, container)
+
+        for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
+            return container
 
         raise ValueError("No container found for %s_%s" % (self.name, number))
 
@@ -258,6 +258,11 @@ class Service(object):
 
         running_containers = self.containers(stopped=False)
         num_running = len(running_containers)
+        for c in running_containers:
+            if not c.has_legacy_proj_name(self.project):
+                continue
+            log.info('Recreating container with legacy name %s' % c.name)
+            self.recreate_container(c, timeout, start_new_container=False)
 
         if desired_num == num_running:
             # do nothing as we already have the desired number
@@ -404,7 +409,7 @@ class Service(object):
         has_diverged = False
 
         for c in containers:
-            if self.has_legacy_proj_name(c):
+            if c.has_legacy_proj_name(self.project):
                 log.debug('%s has diverged: Legacy project name' % c.name)
                 has_diverged = True
                 continue
@@ -713,9 +718,14 @@ class Service(object):
     # TODO: this would benefit from github.com/docker/docker/pull/14699
     # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
-        containers = self._fetch_containers(
-            all=True,
-            filters={'label': self.labels(one_off=one_off)}
+        containers = itertools.chain(
+            self._fetch_containers(
+                all=True,
+                filters={'label': self.labels(one_off=one_off)}
+            ), self._fetch_containers(
+                all=True,
+                filters={'label': self.labels(one_off=one_off, legacy=True)}
+            )
         )
         numbers = [c.number for c in containers]
         return 1 if not numbers else max(numbers) + 1
@@ -1242,12 +1252,6 @@ class Service(object):
             result[permitted[k]] = result[permitted[k].lower()] = v
 
         return result
-
-    def has_legacy_proj_name(self, ctnr):
-        return (
-            ComposeVersion(ctnr.labels.get(LABEL_VERSION)) < ComposeVersion('1.21.0') and
-            ctnr.project != self.project
-        )
 
 
 def short_id_alias_exists(container, network):

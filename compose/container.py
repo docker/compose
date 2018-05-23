@@ -9,6 +9,8 @@ from docker.errors import ImageNotFound
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
+from .const import LABEL_VERSION
+from .version import ComposeVersion
 
 
 class Container(object):
@@ -282,6 +284,12 @@ class Container(object):
 
     def attach(self, *args, **kwargs):
         return self.client.attach(self.id, *args, **kwargs)
+
+    def has_legacy_proj_name(self, project_name):
+        return (
+            ComposeVersion(self.labels.get(LABEL_VERSION)) < ComposeVersion('1.21.0') and
+            self.project != project_name
+        )
 
     def __repr__(self):
         return '<Container: %s (%s)>' % (self.name, self.id[:6])
