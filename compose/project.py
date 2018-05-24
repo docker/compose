@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import datetime
 import logging
 import operator
+import re
 from functools import reduce
 
 import enum
@@ -70,8 +71,11 @@ class Project(object):
         self.networks = networks or ProjectNetworks({}, False)
         self.config_version = config_version
 
-    def labels(self, one_off=OneOffFilter.exclude):
-        labels = ['{0}={1}'.format(LABEL_PROJECT, self.name)]
+    def labels(self, one_off=OneOffFilter.exclude, legacy=False):
+        name = self.name
+        if legacy:
+            name = re.sub(r'[_-]', '', name)
+        labels = ['{0}={1}'.format(LABEL_PROJECT, name)]
 
         OneOffFilter.update_labels(one_off, labels)
         return labels
@@ -571,12 +575,21 @@ class Project(object):
             service.push(ignore_push_failures)
 
     def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
-        return list(filter(None, [
+        ctnrs = list(filter(None, [
             Container.from_ps(self.client, container)
             for container in self.client.containers(
                 all=stopped,
                 filters={'label': self.labels(one_off=one_off)})])
         )
+        if ctnrs:
+            return ctnrs
+
+        return list(filter(lambda c: c.has_legacy_proj_name(self.name), filter(None, [
+            Container.from_ps(self.client, container)
+            for container in self.client.containers(
+                all=stopped,
+                filters={'label': self.labels(one_off=one_off, legacy=True)})])
+        ))
 
     def containers(self, service_names=None, stopped=False, one_off=OneOffFilter.exclude):
         if service_names:
