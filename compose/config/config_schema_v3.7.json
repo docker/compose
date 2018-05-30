@@ -348,6 +348,20 @@
         "endpoint_mode": {"type": "string"},
         "replicas": {"type": "integer"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
+        "rollback_config": {
+          "type": "object",
+          "properties": {
+            "parallelism": {"type": "integer"},
+            "delay": {"type": "string", "format": "duration"},
+            "failure_action": {"type": "string"},
+            "monitor": {"type": "string", "format": "duration"},
+            "max_failure_ratio": {"type": "number"},
+            "order": {"type": "string", "enum": [
+              "start-first", "stop-first"
+            ]}
+          },
+          "additionalProperties": false
+        },
         "update_config": {
           "type": "object",
           "properties": {

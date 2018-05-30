@@ -928,7 +928,7 @@ def translate_deploy_keys_to_container_config(service_dict):
 
     deploy_dict = service_dict['deploy']
     ignored_keys = [
-        k for k in ['endpoint_mode', 'labels', 'update_config', 'placement']
+        k for k in ['endpoint_mode', 'labels', 'update_config', 'rollback_config', 'placement']
         if k in deploy_dict
     ]
 
@@ -1136,6 +1136,7 @@ def merge_deploy(base, override):
     md.merge_scalar('replicas')
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('update_config')
+    md.merge_mapping('rollback_config')
     md.merge_mapping('restart_policy')
     if md.needs_merge('resources'):
         resources_md = MergeDict(md.base.get('resources') or {}, md.override.get('resources') or {})
