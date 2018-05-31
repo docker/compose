@@ -346,6 +346,7 @@
       "dependencies": {
         "memswap_limit": ["mem_limit"]
       },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
 
@@ -409,6 +410,7 @@
         "labels": {"$ref": "#/definitions/labels"},
         "name": {"type": "string"}
       },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
 
@@ -451,6 +453,7 @@
         "labels": {"$ref": "#/definitions/labels"},
         "name": {"type": "string"}
       },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
 
