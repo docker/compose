@@ -394,13 +394,6 @@ class Service(object):
 
         return ConvergencePlan('noop', containers)
 
-    def get_config_hash(self):
-        log.debug(
-            'Service %s as config hash: %s',
-            self.name, self.config_hash,
-        )
-        return self.config_hash
-
     def _containers_have_diverged(self, containers):
         config_hash = None
 

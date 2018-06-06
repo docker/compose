@@ -318,7 +318,7 @@ class TopLevelCommand(object):
         """
         Validate and view the Compose file.
 
-        Usage: config [options] [SERVICE...]
+        Usage: config [options]
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
@@ -326,7 +326,8 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
-            --hash                   Print the service config hash, one per line.
+            --hash=""                Print the service config hash, one per line.
+                                     Set "service1,service2" for a list of specified services.
         """
 
         compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
@@ -348,17 +349,19 @@ class TopLevelCommand(object):
             print('\n'.join(volume for volume in compose_config.volumes))
             return
 
-        if options['--hash']:
+        if options.get('--hash') is not None:
             self.project = project_from_options('.', self.toplevel_options)
-            with errors.handle_connection_errors(self.project.client):
-                if options['SERVICE']:
-                    for service_name in options['SERVICE']:
+            if options['--hash'] == '':
+                for service in self.project.services:
+                    print('{} {}'.format(service.name, service.config_hash))
+            else:
+                for service_name in options['--hash'].split(','):
+                    try:
                         print('{} {}'.format(service_name,
-                                             self.project.get_service(service_name).get_config_hash()))
-                else:
-                    for service in self.project.services:
-                        print('{} {}'.format(service.name, service.get_config_hash()))
-            return
+                                             self.project.get_service(service_name).config_hash))
+                    except NoSuchService as s:
+                        print('{}'.format(s))
+        return
 
         print(serialize_config(compose_config, image_digests))
 
