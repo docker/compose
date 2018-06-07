@@ -203,7 +203,7 @@
           ]
         },
         "pid": {"type": ["string", "null"]},
-
+	"platform": {"type": "string"},
         "ports": {
           "type": "array",
           "items": {
