@@ -117,6 +117,13 @@ def docker_client(environment, version=None, tls_config=None, host=None,
 
     kwargs['user_agent'] = generate_user_agent()
 
+    # Workaround for
+    # https://pyinstaller.readthedocs.io/en/v3.3.1/runtime-information.html#ld-library-path-libpath-considerations
+    if 'LD_LIBRARY_PATH_ORIG' in environment:
+        kwargs['credstore_env'] = {
+            'LD_LIBRARY_PATH': environment.get('LD_LIBRARY_PATH_ORIG'),
+        }
+
     client = APIClient(**kwargs)
     client._original_base_url = kwargs.get('base_url')
 
