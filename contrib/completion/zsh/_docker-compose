@@ -320,7 +320,7 @@ __docker-compose_subcommand() {
                 '--entrypoint[Overwrite the entrypoint of the image.]:entry point: ' \
                 '--name=[Assign a name to the container]:name: ' \
                 '(-p --publish)'{-p,--publish=}"[Publish a container's port(s) to the host]" \
-                '--rm[Remove container after run. Ignored in detached mode.]' \
+                "--rm[Remove container after run. Ignored in detached mode. Overrides the container's restart policy]" \
                 "--service-ports[Run command with the service's ports enabled and mapped to the host.]" \
                 '-T[Disable pseudo-tty allocation. By default `docker-compose run` allocates a TTY.]' \
                 '(-u --user)'{-u,--user=}'[Run as specified username or uid]:username or uid:_users' \

@@ -813,6 +813,7 @@ class TopLevelCommand(object):
             -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
+                                  Overrides the container's restart policy.
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
