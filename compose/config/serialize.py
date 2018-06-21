@@ -80,6 +80,10 @@ def denormalize_config(config, image_digests=None):
                 elif 'external' in conf:
                     conf['external'] = True
 
+            if 'attachable' in conf and config.version < V3_2:
+                # For compatibility mode, this option is invalid in v2
+                del conf['attachable']
+
     return result
 
 

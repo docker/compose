@@ -248,6 +248,8 @@ class ConversionMap(object):
         service_path('deploy', 'replicas'): to_int,
         service_path('deploy', 'update_config', 'parallelism'): to_int,
         service_path('deploy', 'update_config', 'max_failure_ratio'): to_float,
+        service_path('deploy', 'rollback_config', 'parallelism'): to_int,
+        service_path('deploy', 'rollback_config', 'max_failure_ratio'): to_float,
         service_path('deploy', 'restart_policy', 'max_attempts'): to_int,
         service_path('mem_swappiness'): to_int,
         service_path('labels', FULL_JOKER): to_str,

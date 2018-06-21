@@ -48,7 +48,7 @@ class ImageManager(object):
         container = docker_client.create_container(
             'docker-compose-tests:tmp', entrypoint='tox'
         )
-        docker_client.commit(container, 'docker/compose-tests:latest')
+        docker_client.commit(container, 'docker/compose-tests', 'latest')
         docker_client.tag('docker/compose-tests:latest', 'docker/compose-tests:{}'.format(self.version))
         docker_client.remove_container(container, force=True)
         docker_client.remove_image('docker-compose-tests:tmp', force=True)

@@ -1,6 +1,55 @@
 Change log
 ==========
 
+1.22.0 (2018-06-30)
+-------------------
+
+### Features
+
+#### Compose format version 3.7
+
+- Introduced version 3.7 of the `docker-compose.yml` specification.
+  This version requires Docker Engine 18.06.0 or above.
+
+- Added support for `rollback_config` in the deploy configuration
+
+- Added support for the `init` parameter in service configurations
+
+- Added support for extension fields in service, network, volume, secret,
+  and config configurations
+
+#### Compose format version 2.4
+
+- Added support for extension fields in service, network,
+  and volume configurations
+
+### Bugfixes
+
+- Fixed a bug that prevented deployment with some Compose files when
+  `DOCKER_DEFAULT_PLATFORM` was set
+
+- Compose will no longer try to create containers or volumes with
+  invalid starting characters
+
+- Fixed several bugs that prevented Compose commands from working properly
+  with containers created with an older version of Compose
+
+- Fixed an issue with the output of `docker-compose config` with the
+  `--compatibility-mode` flag enabled when the source file contains
+  attachable networks
+
+- Fixed a bug that prevented the `gcloud` credential store from working
+  properly when used with the Compose binary on UNIX
+
+- Fixed a bug that caused connection errors when trying to operate
+  over a non-HTTPS TCP connection on Windows
+
+- Fixed a bug that caused builds to fail on Windows if the Dockerfile
+  was located in a subdirectory of the build context
+
+- Fixed an issue that prevented proper parsing of UTF-8 BOM encoded
+  Compose files on Windows
+
 1.21.2 (2018-05-03)
 -------------------
 
