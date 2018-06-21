@@ -25,7 +25,9 @@ class BintrayAPI(requests.Session):
             'desc': 'Automated release for {}: {}'.format(NAME, repo_name),
             'labels': ['docker-compose', 'docker', 'release-bot'],
         }
-        return self.post_json(url, data)
+        result = self.post_json(url, data)
+        result.raise_for_status()
+        return result
 
     def delete_repository(self, subject, repo_name):
         url = '{base}/repos/{subject}/{repo_name}'.format(
