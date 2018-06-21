@@ -15,7 +15,7 @@ class BintrayAPI(requests.Session):
         self.base_url = 'https://api.bintray.com/'
 
     def create_repository(self, subject, repo_name, repo_type='generic'):
-        url = '{base}/repos/{subject}/{repo_name}'.format(
+        url = '{base}repos/{subject}/{repo_name}'.format(
             base=self.base_url, subject=subject, repo_name=repo_name,
         )
         data = {
@@ -30,7 +30,7 @@ class BintrayAPI(requests.Session):
         return result
 
     def delete_repository(self, subject, repo_name):
-        url = '{base}/repos/{subject}/{repo_name}'.format(
+        url = '{base}repos/{subject}/{repo_name}'.format(
             base=self.base_url, subject=subject, repo_name=repo_name,
         )
         return self.delete(url)
