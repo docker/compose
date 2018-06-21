@@ -60,7 +60,7 @@ class Volume(object):
     def full_name(self):
         if self.custom_name:
             return self.name
-        return '{0}_{1}'.format(self.project, self.name)
+        return '{0}_{1}'.format(self.project.lstrip('-_'), self.name)
 
     @property
     def legacy_full_name(self):

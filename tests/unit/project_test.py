@@ -29,6 +29,7 @@ class ProjectTest(unittest.TestCase):
     def setUp(self):
         self.mock_client = mock.create_autospec(docker.APIClient)
         self.mock_client._general_configs = {}
+        self.mock_client.api_version = docker.constants.DEFAULT_DOCKER_API_VERSION
 
     def test_from_config_v1(self):
         config = Config(
@@ -578,21 +579,21 @@ class ProjectTest(unittest.TestCase):
         )
 
         project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
-        assert project.get_service('web').options.get('platform') is None
+        assert project.get_service('web').platform is None
 
         project = Project.from_config(
             name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
         )
-        assert project.get_service('web').options.get('platform') == 'windows'
+        assert project.get_service('web').platform == 'windows'
 
         service_config['platform'] = 'linux/s390x'
         project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
-        assert project.get_service('web').options.get('platform') == 'linux/s390x'
+        assert project.get_service('web').platform == 'linux/s390x'
 
         project = Project.from_config(
             name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
         )
-        assert project.get_service('web').options.get('platform') == 'linux/s390x'
+        assert project.get_service('web').platform == 'linux/s390x'
 
     @mock.patch('compose.parallel.ParallelStreamWriter._write_noansi')
     def test_error_parallel_pull(self, mock_write):

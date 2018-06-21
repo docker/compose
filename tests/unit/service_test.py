@@ -446,6 +446,20 @@ class ServiceTest(unittest.TestCase):
         with pytest.raises(OperationFailedError):
             service.pull()
 
+    def test_pull_image_with_default_platform(self):
+        self.mock_client.api_version = '1.35'
+
+        service = Service(
+            'foo', client=self.mock_client, image='someimage:sometag',
+            default_platform='linux'
+        )
+        assert service.platform == 'linux'
+        service.pull()
+
+        assert self.mock_client.pull.call_count == 1
+        call_args = self.mock_client.pull.call_args
+        assert call_args[1]['platform'] == 'linux'
+
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
@@ -538,7 +552,7 @@ class ServiceTest(unittest.TestCase):
         assert self.mock_client.build.call_count == 1
         assert not self.mock_client.build.call_args[1]['pull']
 
-    def test_build_does_with_platform(self):
+    def test_build_with_platform(self):
         self.mock_client.api_version = '1.35'
         self.mock_client.build.return_value = [
             b'{"stream": "Successfully built 12345"}',
@@ -550,6 +564,47 @@ class ServiceTest(unittest.TestCase):
         assert self.mock_client.build.call_count == 1
         call_args = self.mock_client.build.call_args
         assert call_args[1]['platform'] == 'linux'
+
+    def test_build_with_default_platform(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, build={'context': '.'},
+            default_platform='linux'
+        )
+        assert service.platform == 'linux'
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        call_args = self.mock_client.build.call_args
+        assert call_args[1]['platform'] == 'linux'
+
+    def test_service_platform_precedence(self):
+        self.mock_client.api_version = '1.35'
+
+        service = Service(
+            'foo', client=self.mock_client, platform='linux/arm',
+            default_platform='osx'
+        )
+        assert service.platform == 'linux/arm'
+
+    def test_service_ignore_default_platform_with_unsupported_api(self):
+        self.mock_client.api_version = '1.32'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, default_platform='windows', build={'context': '.'}
+        )
+        assert service.platform is None
+        service.build()
+        assert self.mock_client.build.call_count == 1
+        call_args = self.mock_client.build.call_args
+        assert call_args[1]['platform'] is None
 
     def test_build_with_override_build_args(self):
         self.mock_client.build.return_value = [

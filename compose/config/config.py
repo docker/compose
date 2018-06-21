@@ -918,12 +918,17 @@ def convert_restart_policy(name):
 
 
 def translate_deploy_keys_to_container_config(service_dict):
+    if 'credential_spec' in service_dict:
+        del service_dict['credential_spec']
+    if 'configs' in service_dict:
+        del service_dict['configs']
+
     if 'deploy' not in service_dict:
         return service_dict, []
 
     deploy_dict = service_dict['deploy']
     ignored_keys = [
-        k for k in ['endpoint_mode', 'labels', 'update_config', 'placement']
+        k for k in ['endpoint_mode', 'labels', 'update_config', 'rollback_config', 'placement']
         if k in deploy_dict
     ]
 
@@ -946,10 +951,6 @@ def translate_deploy_keys_to_container_config(service_dict):
     )
 
     del service_dict['deploy']
-    if 'credential_spec' in service_dict:
-        del service_dict['credential_spec']
-    if 'configs' in service_dict:
-        del service_dict['configs']
 
     return service_dict, ignored_keys
 
@@ -1135,6 +1136,7 @@ def merge_deploy(base, override):
     md.merge_scalar('replicas')
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('update_config')
+    md.merge_mapping('rollback_config')
     md.merge_mapping('restart_policy')
     if md.needs_merge('resources'):
         resources_md = MergeDict(md.base.get('resources') or {}, md.override.get('resources') or {})
@@ -1434,15 +1436,15 @@ def has_uppercase(name):
     return any(char in string.ascii_uppercase for char in name)
 
 
-def load_yaml(filename, encoding=None):
+def load_yaml(filename, encoding=None, binary=True):
     try:
-        with io.open(filename, 'r', encoding=encoding) as fh:
+        with io.open(filename, 'rb' if binary else 'r', encoding=encoding) as fh:
             return yaml.safe_load(fh)
     except (IOError, yaml.YAMLError, UnicodeDecodeError) as e:
         if encoding is None:
             # Sometimes the user's locale sets an encoding that doesn't match
             # the YAML files. Im such cases, retry once with the "default"
             # UTF-8 encoding
-            return load_yaml(filename, encoding='utf-8')
+            return load_yaml(filename, encoding='utf-8-sig', binary=False)
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
         raise ConfigurationError(u"{}: {}".format(error_name, e))

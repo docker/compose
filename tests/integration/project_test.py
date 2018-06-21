@@ -1915,3 +1915,65 @@ class ProjectTest(DockerClientTestCase):
         assert len(remote_secopts) == 1
         assert remote_secopts[0].startswith('seccomp=')
         assert json.loads(remote_secopts[0].lstrip('seccomp=')) == seccomp_data
+
+    @no_cluster('inspect volume by name defect on Swarm Classic')
+    def test_project_up_name_starts_with_illegal_char(self):
+        config_dict = {
+            'version': '2.3',
+            'services': {
+                'svc1': {
+                    'image': 'busybox:latest',
+                    'command': 'ls',
+                    'volumes': ['foo:/foo:rw'],
+                    'networks': ['bar'],
+                },
+            },
+            'volumes': {
+                'foo': {},
+            },
+            'networks': {
+                'bar': {},
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='_underscoretest', config_data=config_data, client=self.client
+        )
+        project.up()
+        self.addCleanup(project.down, None, True)
+
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        assert containers[0].name == 'underscoretest_svc1_1'
+        assert containers[0].project == '_underscoretest'
+
+        full_vol_name = 'underscoretest_foo'
+        vol_data = self.get_volume_data(full_vol_name)
+        assert vol_data
+        assert vol_data['Labels'][LABEL_PROJECT] == '_underscoretest'
+
+        full_net_name = '_underscoretest_bar'
+        net_data = self.client.inspect_network(full_net_name)
+        assert net_data
+        assert net_data['Labels'][LABEL_PROJECT] == '_underscoretest'
+
+        project2 = Project.from_config(
+            name='-dashtest', config_data=config_data, client=self.client
+        )
+        project2.up()
+        self.addCleanup(project2.down, None, True)
+
+        containers = project2.containers(stopped=True)
+        assert len(containers) == 1
+        assert containers[0].name == 'dashtest_svc1_1'
+        assert containers[0].project == '-dashtest'
+
+        full_vol_name = 'dashtest_foo'
+        vol_data = self.get_volume_data(full_vol_name)
+        assert vol_data
+        assert vol_data['Labels'][LABEL_PROJECT] == '-dashtest'
+
+        full_net_name = '-dashtest_bar'
+        net_data = self.client.inspect_network(full_net_name)
+        assert net_data
+        assert net_data['Labels'][LABEL_PROJECT] == '-dashtest'

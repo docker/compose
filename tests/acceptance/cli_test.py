@@ -481,6 +481,7 @@ class CLITestCase(DockerClientTestCase):
         assert yaml.load(result.stdout) == {
             'version': '2.3',
             'volumes': {'foo': {'driver': 'default'}},
+            'networks': {'bar': {}},
             'services': {
                 'foo': {
                     'command': '/bin/true',
@@ -490,9 +491,10 @@ class CLITestCase(DockerClientTestCase):
                     'mem_limit': '300M',
                     'mem_reservation': '100M',
                     'cpus': 0.7,
-                    'volumes': ['foo:/bar:rw']
+                    'volumes': ['foo:/bar:rw'],
+                    'networks': {'bar': None},
                 }
-            }
+            },
         }
 
     def test_ps(self):
