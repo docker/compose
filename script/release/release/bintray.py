@@ -29,6 +29,16 @@ class BintrayAPI(requests.Session):
         result.raise_for_status()
         return result
 
+    def repository_exists(self, subject, repo_name):
+        url = '{base}/repos/{subject}/{repo_name}'.format(
+            base=self.base_url, subject=subject, repo_name=repo_name,
+        )
+        result = self.get(url)
+        if result.status_code == 404:
+            return False
+        result.raise_for_status()
+        return True
+
     def delete_repository(self, subject, repo_name):
         url = '{base}repos/{subject}/{repo_name}'.format(
             base=self.base_url, subject=subject, repo_name=repo_name,
