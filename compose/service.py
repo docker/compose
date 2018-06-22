@@ -363,7 +363,9 @@ class Service(object):
 
     @property
     def image_name(self):
-        return self.options.get('image', '{s.project}_{s.name}'.format(s=self))
+        return self.options.get('image', '{project}_{s.name}'.format(
+            s=self, project=self.project.lstrip('_-')
+        ))
 
     @property
     def platform(self):
