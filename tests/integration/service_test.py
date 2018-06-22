@@ -1137,6 +1137,21 @@ class ServiceTest(DockerClientTestCase):
         service.build()
         assert service.image()
 
+    def test_build_with_illegal_leading_chars(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox\nRUN echo "Embodiment of Scarlet Devil"\n')
+        service = Service(
+            'build_leading_slug', client=self.client,
+            project='___-composetest', build={
+                'context': text_type(base_dir)
+            }
+        )
+        assert service.image_name == 'composetest_build_leading_slug'
+        service.build()
+        assert service.image()
+
     def test_start_container_stays_unprivileged(self):
         service = self.create_service('web')
         container = create_and_start_container(service).inspect()
