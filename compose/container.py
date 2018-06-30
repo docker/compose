@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import re
+from datetime import datetime
 from functools import reduce
 
 import six
@@ -140,6 +142,35 @@ class Container(object):
         entrypoint = self.get('Config.Entrypoint') or []
         cmd = self.get('Config.Cmd') or []
         return ' '.join(entrypoint + cmd)
+
+    @property
+    def human_readable_duration(self):
+        parsedDate = list(map(int, re.findall(r"[\d]+", self.get('Created'))))
+        date = datetime(parsedDate[0],
+                        parsedDate[1],
+                        parsedDate[2],
+                        parsedDate[3],
+                        parsedDate[4],
+                        parsedDate[5])
+        now = datetime.now()
+        duration = now - date
+        if duration.seconds < 1:
+            return "Less than a second"
+        elif duration.seconds < 60:
+            return "%s seconds" % str(duration.seconds)
+        elif duration.seconds / 60 < 60:
+            return "%s minutes" % str(duration.seconds/60)
+        elif duration.seconds/60/60 == 1:
+            return "About an hour"
+        elif duration.seconds/60/60 < 48:
+            return "%s hours" % str(duration.seconds/60/60)
+        elif duration.days < 7:
+            return "%s days" % str(duration.days)
+        elif duration.days < 30:
+            return "%s weeks" % str(duration.days/7)
+        elif duration.days < 365:
+            return "%s months" % str(duration.days/30)
+        return "%s years" % str(duration.days/365)
 
     @property
     def environment(self):

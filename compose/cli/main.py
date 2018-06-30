@@ -688,21 +688,28 @@ class TopLevelCommand(object):
                 print(container.id)
         else:
             headers = [
-                'Name',
+                'Container ID',
+                'Image',
                 'Command',
-                'State',
+                'Created',
+                'Status',
                 'Ports',
+                'Name'
             ]
             rows = []
             for container in containers:
+                container.human_readable_duration
                 command = container.human_readable_command
                 if len(command) > 30:
                     command = '%s ...' % command[:26]
                 rows.append([
-                    container.name,
+                    container.short_id,
+                    container.get('Config')['Image'],
                     command,
+                    container.human_readable_duration,
                     container.human_readable_state,
                     container.human_readable_ports,
+                    container.name
                 ])
             print(Formatter().table(headers, rows))
 
