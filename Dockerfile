@@ -25,15 +25,15 @@ WORKDIR /code/
 
 RUN pip install tox==2.1.1
 
-ADD requirements.txt /code/
-ADD requirements-dev.txt /code/
-ADD .pre-commit-config.yaml /code/
-ADD setup.py /code/
-ADD tox.ini /code/
-ADD compose /code/compose/
+COPY requirements.txt /code/
+COPY requirements-dev.txt /code/
+COPY .pre-commit-config.yaml /code/
+COPY setup.py /code/
+COPY tox.ini /code/
+COPY compose /code/compose/
 RUN tox --notest
 
-ADD . /code/
+COPY . /code/
 RUN chown -R user /code/
 
 ENTRYPOINT ["/code/.tox/py36/bin/docker-compose"]
