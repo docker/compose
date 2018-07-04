@@ -25,11 +25,13 @@ WORKDIR /code/
 
 RUN pip install tox==2.1.1
 
-COPY requirements.txt /code/
-COPY requirements-dev.txt /code/
-COPY .pre-commit-config.yaml /code/
-COPY setup.py /code/
-COPY tox.ini /code/
+COPY \
+  requirements.txt \
+  requirements-dev.txt \
+  .pre-commit-config.yaml \
+  setup.py \
+  tox.ini \
+  /code/
 COPY compose /code/compose/
 RUN tox --notest
 
