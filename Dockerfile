@@ -26,17 +26,12 @@ WORKDIR /code/
 
 RUN pip install tox==2.1.1
 
-COPY \
-  requirements.txt \
-  requirements-dev.txt \
-  .pre-commit-config.yaml \
-  setup.py \
-  tox.ini \
-  /code/
-COPY compose /code/compose/
+COPY --chown=user:user . /code/
+
+# Run tox as "user" so that generated files are owned by user
+USER user:user
 RUN tox --notest
 
-COPY . /code/
-RUN chown -R user /code/
+USER root:root
 
 ENTRYPOINT ["/code/.tox/py36/bin/docker-compose"]
