@@ -8,6 +8,15 @@ RUN set -ex; \
         python-dev \
         git
 
+# Python3 requires a valid locale
+RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
+ENV LANG en_US.UTF-8
+
+RUN useradd -d /home/user -m -s /bin/bash user
+RUN mkdir /code/ && chown -R user:user /code/
+RUN pip install tox==2.1.1
+
+# Install the docker cli, which is used for docker-compose exec by default
 RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/x86_64/docker-17.12.0-ce.tgz" && \
     SHA256=692e1c72937f6214b1038def84463018d8e320c8eaf8530546c84c2f8f9c767d; \
     echo "${SHA256} dockerbins.tgz" | sha256sum -c - && \
@@ -16,15 +25,7 @@ RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stabl
     chmod +x /usr/local/bin/docker && \
     rm dockerbins.tgz
 
-# Python3 requires a valid locale
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
-ENV LANG en_US.UTF-8
-
-RUN useradd -d /home/user -m -s /bin/bash user
-RUN mkdir /code/ && chown -R user:user /code/
 WORKDIR /code/
-
-RUN pip install tox==2.1.1
 
 COPY --chown=user:user . /code/
 
