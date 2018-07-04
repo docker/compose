@@ -59,7 +59,7 @@ jobs:
     # with support for OSSX 10.11 (xcode 7). This job triggers a build on
     # that repo.
     docker:
-      - image: alpine:3.6
+      - image: alpine:3.7
 
     steps:
       - run:
