@@ -52,8 +52,8 @@ RUN useradd -d /home/user -m -s /bin/bash user
 RUN mkdir /code/ && chown -R user:user /code/
 
 # Install the docker cli, which is used for docker-compose exec by default
-ARG DOCKERBINS_VERSION=17.12.1
-ARG DOCKERBINS_SHA=850992fd8a95e2c6f9adfb047eb5150f2af4e65b2e641b4c13c09bd4c418d0a5
+ARG DOCKERBINS_VERSION=18.03.1
+ARG DOCKERBINS_SHA=871aa7e06cbe93ccbcfc6464e0d1e8b11467cbddbfe57e484d2103889969ac4b
 RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/armhf/docker-${DOCKERBINS_VERSION}-ce.tgz" && \
     echo "${DOCKERBINS_SHA} dockerbins.tgz" | sha256sum -c - && \
     tar xvf dockerbins.tgz docker/docker --strip-components 1 && \

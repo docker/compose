@@ -17,8 +17,8 @@ RUN mkdir /code/ && chown -R user:user /code/
 RUN pip install tox==2.1.1
 
 # Install the docker cli, which is used for docker-compose exec by default
-ARG DOCKERBINS_VERSION=17.12.1
-ARG DOCKERBINS_SHA=1270dce1bd7e1838d62ae21d2505d87f16efc1d9074645571daaefdfd0c14054
+ARG DOCKERBINS_VERSION=18.03.1
+ARG DOCKERBINS_SHA=0e245c42de8a21799ab11179a4fce43b494ce173a8a2d6567ea6825d6c5265aa
 RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKERBINS_VERSION}-ce.tgz" && \
     echo "${DOCKERBINS_SHA} dockerbins.tgz" | sha256sum -c - && \
     tar xvf dockerbins.tgz docker/docker --strip-components 1 && \

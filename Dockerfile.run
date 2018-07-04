@@ -1,8 +1,8 @@
 FROM alpine:3.7
 
 ENV GLIBC 2.27-r0
-ARG DOCKERBINS_VERSION=17.12.1
-ARG DOCKERBINS_SHA=1270dce1bd7e1838d62ae21d2505d87f16efc1d9074645571daaefdfd0c14054
+ARG DOCKERBINS_VERSION=18.03.1
+ARG DOCKERBINS_SHA=0e245c42de8a21799ab11179a4fce43b494ce173a8a2d6567ea6825d6c5265aa
 
 RUN apk update && apk add --no-cache openssl ca-certificates curl libgcc && \
     curl -fsSL -o /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub && \
