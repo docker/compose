@@ -21,6 +21,7 @@ RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
 ENV LANG en_US.UTF-8
 
 RUN useradd -d /home/user -m -s /bin/bash user
+RUN mkdir /code/ && chown -R user:user /code/
 WORKDIR /code/
 
 RUN pip install tox==2.1.1
