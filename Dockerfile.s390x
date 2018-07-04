@@ -5,7 +5,7 @@ ARG COMPOSE_VERSION=1.21.2
 RUN apk add --no-cache \
     python \
     py-pip \
- && pip install --no-cache-dir docker-compose==$COMPOSE_VERSION
+ && pip install --no-cache-dir docker-compose==${COMPOSE_VERSION}
 
 WORKDIR /data
 VOLUME /data
