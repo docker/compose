@@ -2672,3 +2672,16 @@ class CLITestCase(DockerClientTestCase):
         with pytest.raises(DuplicateOverrideFileFound):
             get_project(self.base_dir, [])
         self.base_dir = None
+
+    def test_images_use_service_tag(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/images-service-tag/dev'
+        self.dispatch(['build'])
+        self.base_dir = 'tests/fixtures/images-service-tag/prod'
+        self.dispatch(['build'])
+        self.base_dir = 'tests/fixtures/images-service-tag'
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['images'])
+        self.dispatch(['down'])
+
+        assert 'dev' in result.stdout
