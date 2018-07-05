@@ -50,6 +50,11 @@ Change log
 - Fixed an issue that prevented proper parsing of UTF-8 BOM encoded
   Compose files on Windows
 
+- Fixed an issue with handling of the double-wildcard (`**`) pattern in `.dockerignore` files when using `docker-compose build`
+
+- Fixed a bug that caused auth values in legacy `.dockercfg` files to be ignored
+- `docker-compose build` will no longer attempt to create image names starting with an invalid character
+
 1.21.2 (2018-05-03)
 -------------------
 
