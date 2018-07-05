@@ -58,11 +58,8 @@ def create_bump_commit(repository, release_branch, bintray_user, bintray_org):
     repository.push_branch_to_remote(release_branch)
 
     bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], bintray_user)
-    if not bintray_api.repository_exists(bintray_org, release_branch.name):
-        print('Creating data repository {} on bintray'.format(release_branch.name))
-        bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
-    else:
-        print('Bintray repository {} already exists. Skipping'.format(release_branch.name))
+    print('Creating data repository {} on bintray'.format(release_branch.name))
+    bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
 
 
 def monitor_pr_status(pr_data):
