@@ -1707,6 +1707,18 @@ class CLITestCase(DockerClientTestCase):
         assert name in volume_names
         assert anonymous_name not in volume_names
 
+    def test_run_rm_deps(self):
+        self.base_dir = 'tests/fixtures/v2-dependencies'
+        proc = start_process(self.base_dir, ['run', '--rm', '--rm-deps', 'web'])
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'v2-dependencies_web_run_1',
+            'running'))
+        assert len(self.project.containers(one_off=OneOffFilter.include)) == 2
+        os.kill(proc.pid, signal.SIGINT)
+        wait_on_process(proc, 1)
+        assert len(self.project.containers(one_off=OneOffFilter.include, stopped=True)) == 0
+
     def test_run_service_with_dockerfile_entrypoint(self):
         self.base_dir = 'tests/fixtures/entrypoint-dockerfile'
         self.dispatch(['run', 'test'])

@@ -813,6 +813,7 @@ class TopLevelCommand(object):
             -u, --user=""         Run as specified username or uid
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
+            --rm-deps             Down dependencies after run. (Requires --rm)
             -p, --publish=[]      Publish a container's port(s) to the host
             --service-ports       Run command with the service's ports enabled and mapped
                                   to the host.
@@ -831,6 +832,9 @@ class TopLevelCommand(object):
                 'Service port mapping and manual port mapping '
                 'can not be used together'
             )
+
+        if options['--rm-deps'] and not options['--rm']:
+            raise UserError("--rm flag must be used when using --rm-deps")
 
         if options['COMMAND'] is not None:
             command = [options['COMMAND']] + options['ARGS']
@@ -1303,10 +1307,6 @@ def run_one_off_container(container_options, project, service, options, toplevel
         print(container.name)
         return
 
-    def remove_container(force=False):
-        if options['--rm']:
-            project.client.remove_container(container.id, force=True, v=True)
-
     environment = Environment.from_env_file(project_dir)
     use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
@@ -1337,11 +1337,21 @@ def run_one_off_container(container_options, project, service, options, toplevel
             exit_code = 1
     except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
-        remove_container(force=True)
+        remove_containers(project, container, options, force=True)
         sys.exit(2)
 
-    remove_container()
+    remove_containers(project, container, options)
     sys.exit(exit_code)
+
+
+def remove_containers(project, container, options, force=False):
+    if options['--rm']:
+        project.client.remove_container(container.id, force=True, v=True)
+    if options['--rm-deps']:
+        project.down(
+            ImageType.none,
+            True,
+            ignore_orphans=True)
 
 
 def log_printer_from_project(

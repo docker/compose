@@ -128,6 +128,7 @@ class CLITestCase(unittest.TestCase):
                 '--publish': [],
                 '--volume': [],
                 '--rm': None,
+                '--rm-deps': None,
                 '--name': None,
                 '--workdir': None,
             })
@@ -167,6 +168,7 @@ class CLITestCase(unittest.TestCase):
             '--publish': [],
             '--volume': [],
             '--rm': None,
+            '--rm-deps': None,
             '--name': None,
             '--workdir': None,
         })
@@ -189,6 +191,7 @@ class CLITestCase(unittest.TestCase):
             '--publish': [],
             '--volume': [],
             '--rm': True,
+            '--rm-deps': None,
             '--name': None,
             '--workdir': None,
         })
