@@ -274,7 +274,10 @@ def finalize(args):
         if not merge_status.merged:
             raise ScriptError('Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message))
         print('Uploading to PyPi')
-        twine_upload(['dist/*'])
+        twine_upload([
+            'dist/docker_compose-{}*.whl'.format(args.release),
+            'dist/docker-compose-{}*.tar.gz'.format(args.release)
+        ])
         img_manager.push_images()
         repository.publish_release(gh_release)
     except ScriptError as e:
