@@ -28,6 +28,7 @@ from release.utils import ScriptError
 from release.utils import update_init_py_version
 from release.utils import update_run_sh_version
 from release.utils import yesno
+from requests.exceptions import HTTPError
 from twine.commands.upload import main as twine_upload
 
 
@@ -159,6 +160,24 @@ def distclean():
         shutil.rmtree(folder, ignore_errors=True)
 
 
+def pypi_upload(args):
+    print('Uploading to PyPi')
+    try:
+        twine_upload([
+            'dist/docker_compose-{}*.whl'.format(args.release),
+            'dist/docker-compose-{}*.tar.gz'.format(args.release)
+        ])
+    except HTTPError as e:
+        if e.response.status_code == 400 and 'File already exists' in e.message:
+            if not args.finalize_resume:
+                raise ScriptError(
+                    'Package already uploaded on PyPi.'
+                )
+            print('Skipping PyPi upload - package already uploaded')
+        else:
+            raise ScriptError('Unexpected HTTP error uploading package to PyPi: {}'.format(e))
+
+
 def resume(args):
     try:
         distclean()
@@ -271,13 +290,13 @@ def finalize(args):
         run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['sdist', 'bdist_wheel'])
 
         merge_status = pr_data.merge()
-        if not merge_status.merged:
-            raise ScriptError('Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message))
-        print('Uploading to PyPi')
-        twine_upload([
-            'dist/docker_compose-{}*.whl'.format(args.release),
-            'dist/docker-compose-{}*.tar.gz'.format(args.release)
-        ])
+        if not merge_status.merged and not args.finalize_resume:
+            raise ScriptError(
+                'Unable to merge PR #{}: {}'.format(pr_data.number, merge_status.message)
+            )
+
+        pypi_upload(args)
+
         img_manager.push_images()
         repository.publish_release(gh_release)
     except ScriptError as e:
@@ -351,6 +370,10 @@ def main():
     parser.add_argument(
         '--skip-ci-checks', dest='skip_ci', action='store_true',
         help='If set, the program will not wait for CI jobs to complete'
+    )
+    parser.add_argument(
+        '--finalize-resume', dest='finalize_resume', action='store_true',
+        help='If set, finalize will continue through steps that have already been completed.'
     )
     args = parser.parse_args()
 
