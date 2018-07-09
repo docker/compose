@@ -128,7 +128,7 @@ def print_final_instructions(args):
         "You're almost done! Please verify that everything is in order and "
         "you are ready to make the release public, then run the following "
         "command:\n{exe} -b {user} finalize {version}".format(
-            exe=sys.argv[0], user=args.bintray_user, version=args.release
+            exe='./script/release/release.sh', user=args.bintray_user, version=args.release
         )
     )
 
@@ -263,13 +263,13 @@ ACTIONS = [
 
 EPILOG = '''Example uses:
     * Start a new feature release (includes all changes currently in master)
-        release.py -b user start 1.23.0
+        release.sh -b user start 1.23.0
     * Start a new patch release
-        release.py -b user --patch 1.21.0 start 1.21.1
+        release.sh -b user --patch 1.21.0 start 1.21.1
     * Cancel / rollback an existing release draft
-        release.py -b user cancel 1.23.0
+        release.sh -b user cancel 1.23.0
     * Restart a previously aborted patch release
-        release.py -b user -p 1.21.0 resume 1.21.1
+        release.sh -b user -p 1.21.0 resume 1.21.1
 '''
 
 
