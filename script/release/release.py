@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 import argparse
 import os
+import shutil
 import sys
 import time
 from distutils.core import run_setup
@@ -133,8 +134,37 @@ def print_final_instructions(args):
     )
 
 
+def distclean():
+    print('Running distclean...')
+    dirs = [
+        os.path.join(REPO_ROOT, 'build'), os.path.join(REPO_ROOT, 'dist'),
+        os.path.join(REPO_ROOT, 'docker-compose.egg-info')
+    ]
+    files = []
+    for base, dirnames, fnames in os.walk(REPO_ROOT):
+        for fname in fnames:
+            path = os.path.normpath(os.path.join(base, fname))
+            if fname.endswith('.pyc'):
+                files.append(path)
+            elif fname.startswith('.coverage.'):
+                files.append(path)
+        for dirname in dirnames:
+            path = os.path.normpath(os.path.join(base, dirname))
+            if dirname == '__pycache__':
+                dirs.append(path)
+            elif dirname == '.coverage-binfiles':
+                dirs.append(path)
+
+    for file in files:
+        os.unlink(file)
+
+    for folder in dirs:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
 def resume(args):
     try:
+        distclean()
         repository = Repository(REPO_ROOT, args.repo)
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):
@@ -186,6 +216,7 @@ def cancel(args):
         bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], args.bintray_user)
         print('Removing Bintray data repository for {}'.format(args.release))
         bintray_api.delete_repository(args.bintray_org, branch_name(args.release))
+        distclean()
     except ScriptError as e:
         print(e)
         return 1
@@ -194,6 +225,7 @@ def cancel(args):
 
 
 def start(args):
+    distclean()
     try:
         repository = Repository(REPO_ROOT, args.repo)
         create_initial_branch(repository, args)
@@ -216,6 +248,7 @@ def start(args):
 
 
 def finalize(args):
+    distclean()
     try:
         repository = Repository(REPO_ROOT, args.repo)
         img_manager = ImageManager(args.release)
