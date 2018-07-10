@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     macos:
-      xcode: "8.3.3"
+      xcode: "9.4.1"
     steps:
     - checkout
     - run:
@@ -17,7 +17,7 @@ jobs:
 
   build-osx-binary:
     macos:
-      xcode: "8.3.3"
+      xcode: "9.4.1"
     steps:
       - checkout
       - run:
@@ -25,18 +25,17 @@ jobs:
           command: sudo pip install --upgrade pip virtualenv
       - run:
          name: setup script
-         command: ./script/setup/osx
+         command: DEPLOYMENT_TARGET=10.11 ./script/setup/osx
       - run:
          name: build script
          command: ./script/build/osx
       - store_artifacts:
           path: dist/docker-compose-Darwin-x86_64
           destination: docker-compose-Darwin-x86_64
-      # - deploy:
-      #     name: Deploy binary to bintray
-      #     command: |
-      #       OS_NAME=Darwin PKG_NAME=osx ./script/circle/bintray-deploy.sh
-
+      - deploy:
+          name: Deploy binary to bintray
+          command: |
+            OS_NAME=Darwin PKG_NAME=osx ./script/circle/bintray-deploy.sh
 
   build-linux-binary:
     machine:
@@ -54,28 +53,6 @@ jobs:
           command: |
             OS_NAME=Linux PKG_NAME=linux ./script/circle/bintray-deploy.sh
 
-  trigger-osx-binary-deploy:
-    # We use a separate repo to build OSX binaries meant for distribution
-    # with support for OSSX 10.11 (xcode 7). This job triggers a build on
-    # that repo.
-    docker:
-      - image: alpine:3.6
-
-    steps:
-      - run:
-          name: install curl
-          command: apk update && apk add curl
-
-      - run:
-          name: API trigger
-          command: |
-            curl -X POST -H "Content-Type: application/json" -d "{\
-              \"build_parameters\": {\
-                \"COMPOSE_BRANCH\": \"${CIRCLE_BRANCH}\"\
-              }\
-            }" https://circleci.com/api/v1.1/project/github/docker/compose-osx-release?circle-token=${OSX_RELEASE_TOKEN} \
-            > /dev/null
-
 
 workflows:
   version: 2
@@ -84,9 +61,3 @@ workflows:
       - test
       - build-linux-binary
       - build-osx-binary
-      - trigger-osx-binary-deploy:
-          filters:
-            branches:
-              only:
-                - master
-                - /bump-.*/

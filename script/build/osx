@@ -1,11 +1,11 @@
 #!/bin/bash
 set -ex
 
-PATH="/usr/local/bin:$PATH"
+TOOLCHAIN_PATH="$(realpath $(dirname $0)/../../build/toolchain)"
 
 rm -rf venv
 
-virtualenv -p /usr/local/bin/python3 venv
+virtualenv -p ${TOOLCHAIN_PATH}/bin/python3 venv
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-build.txt
 venv/bin/pip install --no-deps .
