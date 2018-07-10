@@ -81,3 +81,7 @@ class ImageManager(object):
             for chunk in logstream:
                 if 'status' in chunk:
                     print(chunk['status'])
+                if 'error' in chunk:
+                    raise ScriptError(
+                        'Error pushing {name}: {err}'.format(name=name, err=chunk['error'])
+                    )
