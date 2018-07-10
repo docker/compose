@@ -2620,6 +2620,15 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'exit-code-from_another_1 exited with code 1' in result.stdout
 
+    def test_exit_code_from_signal_stop(self):
+        self.base_dir = 'tests/fixtures/exit-code-from'
+        proc = start_process(
+            self.base_dir,
+            ['up', '--abort-on-container-exit', '--exit-code-from', 'simple']
+        )
+        result = wait_on_process(proc, returncode=137)  # SIGKILL
+        assert 'exit-code-from_another_1 exited with code 1' in result.stdout
+
     def test_images(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['images'])
