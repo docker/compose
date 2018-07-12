@@ -78,7 +78,7 @@ def denormalize_config(config, image_digests=None):
                         config.version >= V3_0 and config.version < v3_introduced_name_key(key)):
                     del conf['name']
                 elif 'external' in conf:
-                    conf['external'] = True
+                    conf['external'] = bool(conf['external'])
 
             if 'attachable' in conf and config.version < V3_2:
                 # For compatibility mode, this option is invalid in v2
