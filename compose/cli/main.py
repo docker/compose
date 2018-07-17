@@ -1085,6 +1085,9 @@ class TopLevelCommand(object):
                 )
 
                 self.project.stop(service_names=service_names, timeout=timeout)
+                if exit_value_from:
+                    exit_code = compute_service_exit_code(exit_value_from, attached_containers)
+
                 sys.exit(exit_code)
 
     @classmethod
@@ -1103,33 +1106,33 @@ class TopLevelCommand(object):
             print(get_version_info('full'))
 
 
+def compute_service_exit_code(exit_value_from, attached_containers):
+    candidates = list(filter(
+        lambda c: c.service == exit_value_from,
+        attached_containers))
+    if not candidates:
+        log.error(
+            'No containers matching the spec "{0}" '
+            'were run.'.format(exit_value_from)
+        )
+        return 2
+    if len(candidates) > 1:
+        exit_values = filter(
+            lambda e: e != 0,
+            [c.inspect()['State']['ExitCode'] for c in candidates]
+        )
+
+        return exit_values[0]
+    return candidates[0].inspect()['State']['ExitCode']
+
+
 def compute_exit_code(exit_value_from, attached_containers, cascade_starter, all_containers):
     exit_code = 0
-    if exit_value_from:
-        candidates = list(filter(
-            lambda c: c.service == exit_value_from,
-            attached_containers))
-        if not candidates:
-            log.error(
-                'No containers matching the spec "{0}" '
-                'were run.'.format(exit_value_from)
-            )
-            exit_code = 2
-        elif len(candidates) > 1:
-            exit_values = filter(
-                lambda e: e != 0,
-                [c.inspect()['State']['ExitCode'] for c in candidates]
-            )
-
-            exit_code = exit_values[0]
-        else:
-            exit_code = candidates[0].inspect()['State']['ExitCode']
-    else:
-        for e in all_containers:
-            if (not e.is_running and cascade_starter == e.name):
-                if not e.exit_code == 0:
-                    exit_code = e.exit_code
-                    break
+    for e in all_containers:
+        if (not e.is_running and cascade_starter == e.name):
+            if not e.exit_code == 0:
+                exit_code = e.exit_code
+                break
 
     return exit_code
 
