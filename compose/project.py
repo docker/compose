@@ -548,16 +548,37 @@ class Project(object):
     def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
+        msg = not silent and 'Pulling' or None
 
         if parallel_pull:
             def pull_service(service):
-                service.pull(ignore_pull_failures, True)
+                strm = service.pull(ignore_pull_failures, True, stream=True)
+                writer = parallel.get_stream_writer()
+
+                def trunc(s):
+                    if len(s) > 35:
+                        return s[:33] + '...'
+                    return s
+
+                for event in strm:
+                    if 'status' not in event:
+                        continue
+                    status = event['status'].lower()
+                    if 'progressDetail' in event:
+                        detail = event['progressDetail']
+                        if 'current' in detail and 'total' in detail:
+                            percentage = float(detail['current']) / float(detail['total'])
+                            status = '{} ({:.1%})'.format(status, percentage)
+
+                    writer.write(
+                        msg, service.name, trunc(status), lambda s: s
+                    )
 
             _, errors = parallel.parallel_execute(
                 services,
                 pull_service,
                 operator.attrgetter('name'),
-                not silent and 'Pulling' or None,
+                msg,
                 limit=5,
             )
             if len(errors):
