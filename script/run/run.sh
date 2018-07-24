@@ -47,10 +47,11 @@ if [ -n "$HOME" ]; then
 fi
 
 # Only allocate tty if we detect one
-if [ -t 1 ]; then
-    DOCKER_RUN_OPTIONS="-t"
-fi
 if [ -t 0 ]; then
+    if [ -t 1 ]; then
+        DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
+    fi
+else
     DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 fi
 
