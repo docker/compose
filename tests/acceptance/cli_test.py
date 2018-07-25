@@ -2253,6 +2253,22 @@ class CLITestCase(DockerClientTestCase):
         assert 'logs-composefile_another_1 exited with code 0' in result.stdout
         assert 'logs-composefile_simple_1 exited with code 137' in result.stdout
 
+    def test_logs_follow_logs_from_restarted_containers(self):
+        self.base_dir = 'tests/fixtures/logs-restart-composefile'
+        proc = start_process(self.base_dir, ['up'])
+
+        wait_on_condition(ContainerStateCondition(
+            self.project.client,
+            'logs-restart-composefile_another_1',
+            'exited'))
+
+        self.dispatch(['kill', 'simple'])
+
+        result = wait_on_process(proc)
+
+        assert result.stdout.count('logs-restart-composefile_another_1 exited with code 1') == 3
+        assert result.stdout.count('world') == 3
+
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
         self.dispatch(['up', '-d'])
