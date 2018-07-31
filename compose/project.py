@@ -372,12 +372,35 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False):
+              build_args=None, gzip=False, parallel_build=False):
+
+        services = []
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm, memory, build_args, gzip)
+                services.append(service)
             else:
                 log.info('%s uses an image, skipping' % service.name)
+
+        def build_service(service):
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip)
+
+        if parallel_build:
+            _, errors = parallel.parallel_execute(
+                services,
+                build_service,
+                operator.attrgetter('name'),
+                'Building',
+                limit=5,
+            )
+            if len(errors):
+                combined_errors = '\n'.join([
+                    e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
+                ])
+                raise ProjectError(combined_errors)
+
+        else:
+            for service in services:
+                build_service(service)
 
     def create(
         self,

@@ -260,6 +260,7 @@ class TopLevelCommand(object):
             --pull                  Always attempt to pull a newer version of the image.
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
+            --parallel              Build images in parallel.
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -280,6 +281,7 @@ class TopLevelCommand(object):
             memory=options.get('--memory'),
             build_args=build_args,
             gzip=options.get('--compress', False),
+            parallel_build=options.get('--parallel', False),
         )
 
     def bundle(self, options):

@@ -773,6 +773,13 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'does not exist, is not accessible, or is not a valid URL' in result.stderr
 
+    def test_build_parallel(self):
+        self.base_dir = 'tests/fixtures/build-multiple-composefile'
+        result = self.dispatch(['build', '--parallel'])
+        assert 'Successfully tagged build-multiple-composefile_a:latest' in result.stdout
+        assert 'Successfully tagged build-multiple-composefile_b:latest' in result.stdout
+        assert 'Successfully built' in result.stdout
+
     def test_create(self):
         self.dispatch(['create'])
         service = self.project.get_service('simple')

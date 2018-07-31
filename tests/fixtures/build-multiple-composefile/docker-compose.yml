@@ -1,0 +1,8 @@
+
+version: "2"
+
+services:
+  a:
+    build: ./a
+  b:
+    build: ./b
