@@ -323,7 +323,12 @@ def get_networks(service_dict, network_definitions):
                 'Service "{}" uses an undefined network "{}"'
                 .format(service_dict['name'], name))
 
-    return OrderedDict(sorted(
-        networks.items(),
-        key=lambda t: t[1].get('priority') or 0, reverse=True
-    ))
+    if any([v.get('priority') for v in networks.values()]):
+        return OrderedDict(sorted(
+            networks.items(),
+            key=lambda t: t[1].get('priority') or 0, reverse=True
+        ))
+    else:
+        # Ensure Compose will pick a consistent primary network if no
+        # priority is set
+        return OrderedDict(sorted(networks.items(), key=lambda t: t[0]))
