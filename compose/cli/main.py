@@ -328,8 +328,9 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
-            --hash="all"             Print the service config hash, one per line.
-                                     Set "service1,service2" for a list of specified services.
+            --hash="*"               Print the service config hash, one per line.
+                                     Set "service1,service2" for a list of specified services
+                                     or use the wildcard symbol to display all services
         """
 
         compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
@@ -352,17 +353,12 @@ class TopLevelCommand(object):
             return
 
         if options['--hash'] is not None:
+            h = options['--hash']
             self.project = project_from_options('.', self.toplevel_options)
-            if options['--hash'] == "all":
-                for service in self.project.services:
-                    print('{} {}'.format(service.name, service.config_hash))
-            else:
-                for service_name in options['--hash'].split(','):
-                    try:
-                        print('{} {}'.format(service_name,
-                                             self.project.get_service(service_name).config_hash))
-                    except NoSuchService as s:
-                        print('{}'.format(s))
+            services = [svc for svc in options['--hash'].split(',')] if h != '*' else None
+
+            for service in self.project.get_services(services):
+                print('{} {}'.format(service.name, service.config_hash))
             return
 
         print(serialize_config(compose_config, image_digests))

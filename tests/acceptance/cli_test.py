@@ -222,6 +222,17 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '--quiet']).stdout == ''
 
+    def test_config_with_hash_option(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        self.project.build()
+        result = self.dispatch(['config', '--hash=*'])
+        for service in self.project.get_services():
+            assert '{} {}\n'.format(service.name, service.config_hash) in result.stdout
+
+        svc = self.project.get_service('other')
+        result = self.dispatch(['config', '--hash=other'])
+        assert result.stdout == '{} {}\n'.format(svc.name, svc.config_hash)
+
     def test_config_default(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config'])
