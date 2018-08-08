@@ -701,9 +701,11 @@ class ServiceTest(unittest.TestCase):
             image='example.com/foo',
             client=self.mock_client,
             network_mode=NetworkMode('bridge'),
-            networks={'bridge': {}},
+            networks={'bridge': {}, 'net2': {}},
             links=[(Service('one', client=self.mock_client), 'one')],
-            volumes_from=[VolumeFromSpec(Service('two', client=self.mock_client), 'rw', 'service')]
+            volumes_from=[VolumeFromSpec(Service('two', client=self.mock_client), 'rw', 'service')],
+            volumes=[VolumeSpec('/ext', '/int', 'ro')],
+            build={'context': 'some/random/path'},
         )
         config_hash = service.config_hash
 

@@ -328,7 +328,9 @@ class TopLevelCommand(object):
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
-
+            --hash="*"               Print the service config hash, one per line.
+                                     Set "service1,service2" for a list of specified services
+                                     or use the wildcard symbol to display all services
         """
 
         compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
@@ -348,6 +350,15 @@ class TopLevelCommand(object):
 
         if options['--volumes']:
             print('\n'.join(volume for volume in compose_config.volumes))
+            return
+
+        if options['--hash'] is not None:
+            h = options['--hash']
+            self.project = project_from_options('.', self.toplevel_options)
+            services = [svc for svc in options['--hash'].split(',')] if h != '*' else None
+            with errors.handle_connection_errors(self.project.client):
+                for service in self.project.get_services(services):
+                    print('{} {}'.format(service.name, service.config_hash))
             return
 
         print(serialize_config(compose_config, image_digests))
