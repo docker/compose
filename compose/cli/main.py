@@ -356,9 +356,9 @@ class TopLevelCommand(object):
             h = options['--hash']
             self.project = project_from_options('.', self.toplevel_options)
             services = [svc for svc in options['--hash'].split(',')] if h != '*' else None
-
-            for service in self.project.get_services(services):
-                print('{} {}'.format(service.name, service.config_hash))
+            with errors.handle_connection_errors(self.project.client):
+                for service in self.project.get_services(services):
+                    print('{} {}'.format(service.name, service.config_hash))
             return
 
         print(serialize_config(compose_config, image_digests))

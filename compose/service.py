@@ -656,9 +656,15 @@ class Service(object):
         return json_hash(self.config_dict())
 
     def config_dict(self):
+        def image_id():
+            try:
+                return self.image()['Id']
+            except NoSuchImageError:
+                return None
+
         return {
             'options': self.options,
-            'image_id': self.image()['Id'],
+            'image_id': image_id(),
             'links': self.get_link_names(),
             'net': self.network_mode.id,
             'networks': self.networks,
