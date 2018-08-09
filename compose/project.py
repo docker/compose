@@ -6,6 +6,7 @@ import logging
 import operator
 import re
 from functools import reduce
+from os import path
 
 import enum
 import six
@@ -807,7 +808,15 @@ def get_secrets(service, service_secrets, secret_defs):
                 )
             )
 
-        secrets.append({'secret': secret, 'file': secret_def.get('file')})
+        secret_file = secret_def.get('file')
+        if not path.isfile(str(secret_file)):
+            log.warn(
+                "Service \"{service}\" uses an undefined secret file \"{secret_file}\", "
+                "the following folder is created \"{secret_file}\"".format(
+                    service=service, secret_file=secret_file
+                )
+            )
+        secrets.append({'secret': secret, 'file': secret_file})
 
     return secrets
 
