@@ -10,7 +10,7 @@ install:
 build: false
 
 test_script:
-  - "tox -e py27,py36 -- tests/unit"
+  - "tox -e py27,py36,py37 -- tests/unit"
   - ps: ".\\script\\build\\windows.ps1"
 
 artifacts:

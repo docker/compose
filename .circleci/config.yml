@@ -13,7 +13,7 @@ jobs:
         command: sudo pip install --upgrade tox==2.1.1
     - run:
         name: unit tests
-        command: tox -e py27,py36 -- tests/unit
+        command: tox -e py27,py36,py37 -- tests/unit
 
   build-osx-binary:
     macos:

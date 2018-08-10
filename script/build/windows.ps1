@@ -44,7 +44,7 @@ virtualenv .\venv
 # pip and pyinstaller generate lots of warnings, so we need to ignore them
 $ErrorActionPreference = "Continue"
 
-.\venv\Scripts\pip install pypiwin32==220
+.\venv\Scripts\pip install pypiwin32==223
 .\venv\Scripts\pip install -r requirements.txt
 .\venv\Scripts\pip install --no-deps .
 .\venv\Scripts\pip install -r requirements-build.txt
