@@ -303,6 +303,36 @@ class CLITestCase(DockerClientTestCase):
             }
         }
 
+    def test_config_with_dot_env(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['config'])
+        json_result = yaml.load(result.stdout)
+        assert json_result == {
+            'services': {
+                'web': {
+                    'command': 'true',
+                    'image': 'alpine:latest',
+                    'ports': ['5643/tcp', '9999/tcp']
+                }
+            },
+            'version': '2.4'
+        }
+
+    def test_config_with_dot_env_and_override_dir(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['--project-directory', 'alt/', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert json_result == {
+            'services': {
+                'web': {
+                    'command': 'echo uwu',
+                    'image': 'alpine:3.4',
+                    'ports': ['3341/tcp', '4449/tcp']
+                }
+            },
+            'version': '2.4'
+        }
+
     def test_config_external_volume_v2(self):
         self.base_dir = 'tests/fixtures/volumes'
         result = self.dispatch(['-f', 'external-volumes-v2.yml', 'config'])

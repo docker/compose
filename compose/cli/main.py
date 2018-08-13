@@ -238,10 +238,13 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, project_dir='.', options=None):
+    def __init__(self, project, options=None):
         self.project = project
-        self.project_dir = '.'
         self.toplevel_options = options or {}
+
+    @property
+    def project_dir(self):
+        return self.toplevel_options.get('--project-directory') or '.'
 
     def build(self, options):
         """
