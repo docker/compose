@@ -30,7 +30,7 @@ class ContainerTest(unittest.TestCase):
                 "Labels": {
                     "com.docker.compose.project": "composetest",
                     "com.docker.compose.service": "web",
-                    "com.docker.compose.container-number": 7,
+                    "com.docker.compose.container-number": "092cd63296fdc446ad432d3905dd1fcbe12a2ba6b52",
                 },
             }
         }
@@ -77,7 +77,7 @@ class ContainerTest(unittest.TestCase):
 
     def test_number(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
-        assert container.number == 7
+        assert container.number == "092cd63296fdc446ad432d3905dd1fcbe12a2ba6b52"
 
     def test_name(self):
         container = Container.from_ps(None,
@@ -88,7 +88,7 @@ class ContainerTest(unittest.TestCase):
     def test_name_without_project(self):
         self.container_dict['Name'] = "/composetest_web_7"
         container = Container(None, self.container_dict, has_been_inspected=True)
-        assert container.name_without_project == "web_7"
+        assert container.name_without_project == "web_092cd63296fd"
 
     def test_name_without_project_custom_container_name(self):
         self.container_dict['Name'] = "/custom_name_of_container"

@@ -41,6 +41,7 @@ from compose.service import parse_repository_tag
 from compose.service import Service
 from compose.service import ServiceNetworkMode
 from compose.service import warn_on_masked_volume
+from compose.utils import generate_random_id as generate_id
 
 
 class ServiceTest(unittest.TestCase):
@@ -81,8 +82,7 @@ class ServiceTest(unittest.TestCase):
         service = Service('db', self.mock_client, 'myproject', image='foo')
 
         assert [c.id for c in service.containers()] == ['1']
-        assert service._next_container_number() == 2
-        assert service.get_container(1).id == '1'
+        assert service.get_container().id == '1'
 
     def test_get_volumes_from_container(self):
         container_id = 'aabbccddee'
@@ -164,7 +164,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             mem_limit=1000000000,
             memswap_limit=2000000000)
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, generate_id())
 
         assert self.mock_client.create_host_config.called
         assert self.mock_client.create_host_config.call_args[1]['mem_limit'] == 1000000000
@@ -173,10 +173,10 @@ class ServiceTest(unittest.TestCase):
     def test_self_reference_external_link(self):
         service = Service(
             name='foo',
-            external_links=['default_foo_1']
+            external_links=['default_foo_bdfa3ed91e2c']
         )
         with pytest.raises(DependencyError):
-            service.get_container_name('foo', 1)
+            service.get_container_name('foo', 'bdfa3ed91e2c')
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}
@@ -188,7 +188,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             mem_reservation='512m'
         )
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, generate_id())
         assert self.mock_client.create_host_config.called is True
         assert self.mock_client.create_host_config.call_args[1]['mem_reservation'] == '512m'
 
@@ -201,7 +201,7 @@ class ServiceTest(unittest.TestCase):
             hostname='name',
             client=self.mock_client,
             cgroup_parent='test')
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, generate_id())
 
         assert self.mock_client.create_host_config.called
         assert self.mock_client.create_host_config.call_args[1]['cgroup_parent'] == 'test'
@@ -218,7 +218,7 @@ class ServiceTest(unittest.TestCase):
             client=self.mock_client,
             log_driver='syslog',
             logging=logging)
-        service._get_container_create_options({'some': 'overrides'}, 1)
+        service._get_container_create_options({'some': 'overrides'}, generate_id())
 
         assert self.mock_client.create_host_config.called
         assert self.mock_client.create_host_config.call_args[1]['log_config'] == {
@@ -233,7 +233,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             client=self.mock_client,
             stop_grace_period="1m35s")
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts['stop_timeout'] == 95
 
     def test_split_domainname_none(self):
@@ -242,7 +242,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             hostname='name.domain.tld',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts['hostname'] == 'name.domain.tld', 'hostname'
         assert not ('domainname' in opts), 'domainname'
 
@@ -253,7 +253,7 @@ class ServiceTest(unittest.TestCase):
             hostname='name.domain.tld',
             image='foo',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts['hostname'] == 'name', 'hostname'
         assert opts['domainname'] == 'domain.tld', 'domainname'
 
@@ -265,7 +265,7 @@ class ServiceTest(unittest.TestCase):
             image='foo',
             domainname='domain.tld',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts['hostname'] == 'name', 'hostname'
         assert opts['domainname'] == 'domain.tld', 'domainname'
 
@@ -277,7 +277,7 @@ class ServiceTest(unittest.TestCase):
             domainname='domain.tld',
             image='foo',
             client=self.mock_client)
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts['hostname'] == 'name.sub', 'hostname'
         assert opts['domainname'] == 'domain.tld', 'domainname'
 
@@ -288,7 +288,7 @@ class ServiceTest(unittest.TestCase):
             use_networking=False,
             client=self.mock_client,
         )
-        opts = service._get_container_create_options({'image': 'foo'}, 1)
+        opts = service._get_container_create_options({'image': 'foo'}, generate_id())
         assert opts.get('hostname') is None
 
     def test_get_container_create_options_with_name_option(self):
@@ -321,9 +321,8 @@ class ServiceTest(unittest.TestCase):
         prev_container.get.return_value = None
 
         opts = service._get_container_create_options(
-            {},
-            1,
-            previous_container=prev_container)
+            {}, generate_id(), previous_container=prev_container
+        )
 
         assert service.options['labels'] == labels
         assert service.options['environment'] == environment
@@ -358,7 +357,7 @@ class ServiceTest(unittest.TestCase):
 
         opts = service._get_container_create_options(
             {},
-            1,
+            generate_id(),
             previous_container=prev_container)
 
         assert opts['environment'] == ['affinity:container==ababab']
@@ -373,7 +372,7 @@ class ServiceTest(unittest.TestCase):
 
         opts = service._get_container_create_options(
             {},
-            1,
+            generate_id(),
             previous_container=prev_container)
         assert opts['environment'] == []
 
@@ -386,11 +385,11 @@ class ServiceTest(unittest.TestCase):
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
-        container_dict = dict(Name='default_foo_2')
+        container_dict = dict(Name='default_foo_bdfa3ed91e2c')
         self.mock_client.containers.return_value = [container_dict]
         service = Service('foo', image='foo', client=self.mock_client)
 
-        container = service.get_container(number=2)
+        container = service.get_container(number="bdfa3ed91e2c")
         assert container == mock_container_class.from_ps.return_value
         mock_container_class.from_ps.assert_called_once_with(
             self.mock_client, container_dict)
@@ -463,6 +462,7 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
+        mock_container.number = generate_id()
         service = Service('foo', client=self.mock_client, image='someimage')
         service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
@@ -476,6 +476,7 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container_with_timeout(self, _):
         mock_container = mock.create_autospec(Container)
+        mock_container.number = generate_id()
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
         service = Service('foo', client=self.mock_client, image='someimage')
         service.recreate_container(mock_container, timeout=1)
@@ -711,9 +712,9 @@ class ServiceTest(unittest.TestCase):
 
         for api_version in set(API_VERSIONS.values()):
             self.mock_client.api_version = api_version
-            assert service._get_container_create_options({}, 1)['labels'][LABEL_CONFIG_HASH] == (
-                config_hash
-            )
+            assert service._get_container_create_options(
+                {}, generate_id()
+            )['labels'][LABEL_CONFIG_HASH] == config_hash
 
     def test_remove_image_none(self):
         web = Service('web', image='example', client=self.mock_client)
@@ -971,7 +972,7 @@ class ServiceTest(unittest.TestCase):
 
         service = Service('foo', client=self.mock_client, environment=environment)
 
-        create_opts = service._get_container_create_options(override_options, 1)
+        create_opts = service._get_container_create_options(override_options, generate_id())
         assert set(create_opts['environment']) == set(format_environment({
             'HTTP_PROXY': default_proxy_config['httpProxy'],
             'http_proxy': default_proxy_config['httpProxy'],
@@ -1296,7 +1297,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
         service._get_container_create_options(
             override_options={},
-            number=1,
+            number=generate_id(),
         )
 
         assert set(self.mock_client.create_host_config.call_args[1]['binds']) == set([
@@ -1339,7 +1340,7 @@ class ServiceVolumesTest(unittest.TestCase):
 
         service._get_container_create_options(
             override_options={},
-            number=1,
+            number=generate_id(),
             previous_container=Container(self.mock_client, {'Id': '123123123'}),
         )
 

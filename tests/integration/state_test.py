@@ -55,8 +55,8 @@ class BasicProjectTest(ProjectTestCase):
 
     def test_partial_change(self):
         old_containers = self.run_up(self.cfg)
-        old_db = [c for c in old_containers if c.name_without_project == 'db_1'][0]
-        old_web = [c for c in old_containers if c.name_without_project == 'web_1'][0]
+        old_db = [c for c in old_containers if c.name_without_project.startswith('db_')][0]
+        old_web = [c for c in old_containers if c.name_without_project.startswith('web_')][0]
 
         self.cfg['web']['command'] = '/bin/true'
 
@@ -71,7 +71,7 @@ class BasicProjectTest(ProjectTestCase):
 
         created = list(new_containers - old_containers)
         assert len(created) == 1
-        assert created[0].name_without_project == 'web_1'
+        assert created[0].name_without_project == old_web.name_without_project
         assert created[0].get('Config.Cmd') == ['/bin/true']
 
     def test_all_change(self):
@@ -114,7 +114,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
     def test_up(self):
         containers = self.run_up(self.cfg)
-        assert set(c.name_without_project for c in containers) == set(['db_1', 'web_1', 'nginx_1'])
+        assert set(c.service for c in containers) == set(['db', 'web', 'nginx'])
 
     def test_change_leaf(self):
         old_containers = self.run_up(self.cfg)
@@ -122,7 +122,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['nginx']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        assert set(c.name_without_project for c in new_containers - old_containers) == set(['nginx_1'])
+        assert set(c.service for c in new_containers - old_containers) == set(['nginx'])
 
     def test_change_middle(self):
         old_containers = self.run_up(self.cfg)
@@ -130,7 +130,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['web']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        assert set(c.name_without_project for c in new_containers - old_containers) == set(['web_1'])
+        assert set(c.service for c in new_containers - old_containers) == set(['web'])
 
     def test_change_middle_always_recreate_deps(self):
         old_containers = self.run_up(self.cfg, always_recreate_deps=True)
@@ -138,8 +138,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['web']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg, always_recreate_deps=True)
 
-        assert set(c.name_without_project
-                   for c in new_containers - old_containers) == {'web_1', 'nginx_1'}
+        assert set(c.service for c in new_containers - old_containers) == {'web', 'nginx'}
 
     def test_change_root(self):
         old_containers = self.run_up(self.cfg)
@@ -147,7 +146,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg)
 
-        assert set(c.name_without_project for c in new_containers - old_containers) == set(['db_1'])
+        assert set(c.service for c in new_containers - old_containers) == set(['db'])
 
     def test_change_root_always_recreate_deps(self):
         old_containers = self.run_up(self.cfg, always_recreate_deps=True)
@@ -155,8 +154,9 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         self.cfg['db']['environment'] = {'NEW_VAR': '1'}
         new_containers = self.run_up(self.cfg, always_recreate_deps=True)
 
-        assert set(c.name_without_project
-                   for c in new_containers - old_containers) == {'db_1', 'web_1', 'nginx_1'}
+        assert set(c.service for c in new_containers - old_containers) == {
+            'db', 'web', 'nginx'
+        }
 
     def test_change_root_no_recreate(self):
         old_containers = self.run_up(self.cfg)
@@ -195,9 +195,18 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         web, = [c for c in containers if c.service == 'web']
         nginx, = [c for c in containers if c.service == 'nginx']
+        db, = [c for c in containers if c.service == 'db']
 
-        assert set(get_links(web)) == {'composetest_db_1', 'db', 'db_1'}
-        assert set(get_links(nginx)) == {'composetest_web_1', 'web', 'web_1'}
+        assert set(get_links(web)) == {
+            'composetest_db_{}'.format(db.short_number),
+            'db',
+            'db_{}'.format(db.short_number)
+        }
+        assert set(get_links(nginx)) == {
+            'composetest_web_{}'.format(web.short_number),
+            'web',
+            'web_{}'.format(web.short_number)
+        }
 
 
 class ServiceStateTest(DockerClientTestCase):
