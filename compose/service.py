@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import itertools
 import logging
 import os
 import re
@@ -49,9 +48,11 @@ from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
+from .utils import generate_random_id
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
+from .utils import truncate_id
 
 
 log = logging.getLogger(__name__)
@@ -215,13 +216,17 @@ class Service(object):
             )
         )
 
-    def get_container(self, number=1):
+    def get_container(self, number=None):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-
-        for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
-            return container
+        if number is not None and len(number) == 64:
+            for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
+                return container
+        else:
+            for container in self.containers():
+                if number is None or container.number.startswith(number):
+                    return container
 
         raise ValueError("No container found for %s_%s" % (self.name, number))
 
@@ -426,7 +431,6 @@ class Service(object):
         return has_diverged
 
     def _execute_convergence_create(self, scale, detached, start, project_services=None):
-            i = self._next_container_number()
 
             def create_and_start(service, n):
                 container = service.create_container(number=n, quiet=True)
@@ -437,7 +441,9 @@ class Service(object):
                 return container
 
             containers, errors = parallel_execute(
-                [ServiceName(self.project, self.name, index) for index in range(i, i + scale)],
+                [ServiceName(self.project, self.name, number) for number in [
+                    self._next_container_number() for _ in range(scale)
+                ]],
                 lambda service_name: create_and_start(self, service_name.number),
                 lambda service_name: self.get_container_name(service_name.service, service_name.number),
                 "Creating"
@@ -568,7 +574,7 @@ class Service(object):
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container if not renew_anonymous_volumes else None,
-            number=container.labels.get(LABEL_CONTAINER_NUMBER),
+            number=container.number,
             quiet=True,
         )
         if attach_logs:
@@ -723,20 +729,8 @@ class Service(object):
     def get_volumes_from_names(self):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
-    # TODO: this would benefit from github.com/docker/docker/pull/14699
-    # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
-        containers = itertools.chain(
-            self._fetch_containers(
-                all=True,
-                filters={'label': self.labels(one_off=one_off)}
-            ), self._fetch_containers(
-                all=True,
-                filters={'label': self.labels(one_off=one_off, legacy=True)}
-            )
-        )
-        numbers = [c.number for c in containers]
-        return 1 if not numbers else max(numbers) + 1
+        return generate_random_id()
 
     def _fetch_containers(self, **fetch_options):
         # Account for containers that might have been removed since we fetched
@@ -1377,7 +1371,7 @@ def build_container_name(project, service, number, one_off=False):
     bits = [project.lstrip('-_'), service]
     if one_off:
         bits.append('run')
-    return '_'.join(bits + [str(number)])
+    return '_'.join(bits + [truncate_id(number)])
 
 
 # Images

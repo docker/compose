@@ -10,6 +10,7 @@ from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
 from .const import LABEL_VERSION
+from .utils import truncate_id
 from .version import ComposeVersion
 
 
@@ -80,7 +81,7 @@ class Container(object):
     @property
     def name_without_project(self):
         if self.name.startswith('{0}_{1}'.format(self.project, self.service)):
-            return '{0}_{1}'.format(self.service, self.number)
+            return '{0}_{1}'.format(self.service, self.short_number)
         else:
             return self.name
 
@@ -90,7 +91,11 @@ class Container(object):
         if not number:
             raise ValueError("Container {0} does not have a {1} label".format(
                 self.short_id, LABEL_CONTAINER_NUMBER))
-        return int(number)
+        return number
+
+    @property
+    def short_number(self):
+        return truncate_id(self.number)
 
     @property
     def ports(self):

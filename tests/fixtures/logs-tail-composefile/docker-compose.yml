@@ -1,3 +1,3 @@
 simple:
   image: busybox:latest
-  command: sh -c "echo a && echo b && echo c && echo d"
+  command: sh -c "echo w && echo x && echo y && echo z"
