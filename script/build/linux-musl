@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -ex
+
+./script/clean
+
+TAG="docker-compose:musl"
+docker build -t "${TAG}" -f Dockerfile.musl .
+docker run \
+    --rm --entrypoint="script/build/linux-entrypoint" \
+    -v $(pwd)/dist:/code/dist \
+    -v $(pwd)/.git:/code/.git \
+    -e VENV=/code/.tox/py35 \
+    "$TAG"

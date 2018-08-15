@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 set -ex
 
-TARGET=dist/docker-compose-$(uname -s)-$(uname -m)
-VENV=/code/.tox/py36
+TARGET=dist/docker-compose${MUSL+-musl}-$(uname -s)-$(uname -m)
+: ${VENV=/code/.tox/py36}
 
 mkdir -p `pwd`/dist
 chmod 777 `pwd`/dist

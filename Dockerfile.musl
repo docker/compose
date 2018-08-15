@@ -1,0 +1,53 @@
+FROM alpine:3.4
+# Even though this is built against alpine 3.4, it works down to 3.2
+
+SHELL ["/usr/bin/env", "sh", "-euxvc"]
+
+RUN apk add --no-cache curl git python3-dev binutils
+
+RUN curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/x86_64/docker-17.12.0-ce.tgz"; \
+    SHA256=692e1c72937f6214b1038def84463018d8e320c8eaf8530546c84c2f8f9c767d; \
+    echo "${SHA256}  dockerbins.tgz" | sha256sum -c -; \
+    tar xzvf dockerbins.tgz docker/docker; \
+    mv docker /usr/local/bin/docker; \
+    chmod +x /usr/local/bin/docker; \
+    rm dockerbins.tgz
+
+RUN adduser -h /home/user -s /bin/sh -D user
+
+COPY --chown=user:user requirements-build.txt /code/
+RUN apk add --no-cache --virtual .deps ca-certificates gcc zlib-dev musl-dev libc-dev pwgen; \
+    curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py; \
+    python3 /tmp/get-pip.py; \
+    cd /tmp; \
+    pip download -r /code/requirements-build.txt; \
+    tar xzf PyInstaller*.tar.gz; \
+    cd PyInstaller-*/bootloader; \
+    python3 ./waf configure --no-lsb all; \
+    cd ..; \
+    python3 setup.py bdist_wheel; \
+    mv dist/*.whl /; \
+    cd /; \
+    rm -rf /tmp/*; \
+    apk del --no-cache .deps
+
+WORKDIR /code/
+RUN chown user:user /code
+
+RUN pip install tox==2.1.1
+
+COPY --chown=user:user requirements.txt /code/
+COPY --chown=user:user requirements-dev.txt /code/
+COPY --chown=user:user .pre-commit-config.yaml /code/
+COPY --chown=user:user setup.py /code/
+COPY --chown=user:user tox.ini /code/
+COPY --chown=user:user compose /code/compose/
+RUN su -c "tox -e py35 --notest" user; \
+    /code/.tox/py35/bin/pip install /*.whl
+
+COPY --chown=user:user . /code/
+# RUN chown -R user /code/
+
+ENV MUSL=1
+
+ENTRYPOINT ["/code/.tox/py35/bin/docker-compose"]
