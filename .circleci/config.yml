@@ -48,6 +48,12 @@ jobs:
       - store_artifacts:
           path: dist/docker-compose-Linux-x86_64
           destination: docker-compose-Linux-x86_64
+      - run:
+          name: build Linux musl binary
+          command: ./script/build/linux-musl
+      - store_artifacts:
+          path: dist/docker-compose-musl-Linux-x86_64
+          destination: docker-compose-musl-Linux-x86_64
       - deploy:
           name: Deploy binary to bintray
           command: |

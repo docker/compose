@@ -27,3 +27,8 @@ curl -f -T dist/docker-compose-${OS_NAME}-x86_64 -u$BINTRAY_USERNAME:$BINTRAY_AP
   -H "X-Bintray-Package: ${PKG_NAME}" -H "X-Bintray-Version: $CIRCLE_BRANCH" \
   -H "X-Bintray-Override: 1" -H "X-Bintray-Publish: 1" -X PUT \
   https://api.bintray.com/content/docker-compose/${CIRCLE_BRANCH}/docker-compose-${OS_NAME}-x86_64 || exit 1
+
+curl -f -T dist/docker-compose-musl-${OS_NAME}-x86_64 -u$BINTRAY_USERNAME:$BINTRAY_API_KEY \
+  -H "X-Bintray-Package: ${PKG_NAME}" -H "X-Bintray-Version: $CIRCLE_BRANCH" \
+  -H "X-Bintray-Override: 1" -H "X-Bintray-Publish: 1" -X PUT \
+  https://api.bintray.com/content/docker-compose/${CIRCLE_BRANCH}/docker-compose-musl-${OS_NAME}-x86_64 || exit 1
