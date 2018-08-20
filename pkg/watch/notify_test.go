@@ -92,7 +92,10 @@ func TestWatchesAreRecursive(t *testing.T) {
 
 	// add a sub directory
 	subPath := filepath.Join(root.Path(), "sub")
-	os.MkdirAll(subPath, os.ModePerm)
+	err = os.MkdirAll(subPath, os.ModePerm)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// watch parent
 	err = f.notify.Add(root.Path())
@@ -133,7 +136,10 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 	f.events = nil
 	// add a sub directory
 	subPath := filepath.Join(root.Path(), "sub")
-	os.MkdirAll(subPath, os.ModePerm)
+	err = os.MkdirAll(subPath, os.ModePerm)
+	if err != nil {
+		f.t.Fatal(err)
+	}
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
 	_, err = os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
