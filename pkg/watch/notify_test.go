@@ -240,6 +240,39 @@ func TestSingleFile(t *testing.T) {
 	f.assertEvents(path)
 }
 
+func TestWriteBrokenLink(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	link := filepath.Join(f.watched.Path(), "brokenLink")
+	missingFile := filepath.Join(f.watched.Path(), "missingFile")
+	err := os.Symlink(missingFile, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.assertEvents(link)
+}
+
+func TestWriteGoodLink(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	goodFile := filepath.Join(f.watched.Path(), "goodFile")
+	err := ioutil.WriteFile(goodFile, []byte("hello"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	link := filepath.Join(f.watched.Path(), "goodFileSymlink")
+	err = os.Symlink(goodFile, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.assertEvents(goodFile, link)
+}
+
 type notifyFixture struct {
 	t       *testing.T
 	root    *TempDir
