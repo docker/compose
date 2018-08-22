@@ -79,7 +79,17 @@ func (d *linuxNotify) Errors() chan error {
 
 func (d *linuxNotify) loop() {
 	for e := range d.events {
-		if e.Op&fsnotify.Create == fsnotify.Create && isDir(e.Name) {
+		isCreateOp := e.Op&fsnotify.Create == fsnotify.Create
+		shouldWalk := false
+		if isCreateOp {
+			isDir, err := isDir(e.Name)
+			if err != nil {
+				log.Printf("Error stat-ing file %s: %s", e.Name, err)
+				continue
+			}
+			shouldWalk = isDir
+		}
+		if shouldWalk {
 			err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
 				if err != nil {
 					return err
@@ -140,10 +150,14 @@ func NewWatcher() (*linuxNotify, error) {
 	return wmw, nil
 }
 
-func isDir(pth string) bool {
-	fi, _ := os.Stat(pth)
-
-	return fi.IsDir()
+func isDir(pth string) (bool, error) {
+	fi, err := os.Lstat(pth)
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return fi.IsDir(), nil
 }
 
 func checkInotifyLimits() error {
