@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/windmilleng/fsevents"
-	"github.com/windmilleng/fsnotify"
 )
 
 type darwinNotify struct {
 	stream *fsevents.EventStream
-	events chan fsnotify.Event
+	events chan FileEvent
 	errors chan error
 	stop   chan struct{}
 
@@ -35,7 +34,6 @@ func (d *darwinNotify) isTrackingPath(path string) bool {
 }
 
 func (d *darwinNotify) loop() {
-	lastCreate := ""
 	ignoredSpuriousEvent := false
 	for {
 		select {
@@ -48,31 +46,18 @@ func (d *darwinNotify) loop() {
 
 			for _, e := range events {
 				e.Path = filepath.Join("/", e.Path)
-				op := eventFlagsToOp(e.Flags)
-
-				// Sometimes we get duplicate CREATE events.
-				//
-				// This is exercised by TestEventOrdering, which creates lots of files
-				// and generates duplicate CREATE events for some of them.
-				if op == fsnotify.Create {
-					if lastCreate == e.Path {
-						continue
-					}
-					lastCreate = e.Path
-				}
 
 				// ignore the first event that says the watched directory
 				// has been created. these are fired spuriously on initiation.
-				if op == fsnotify.Create {
+				if e.Flags&fsevents.ItemCreated == fsevents.ItemCreated {
 					if d.isTrackingPath(e.Path) && !ignoredSpuriousEvent {
 						ignoredSpuriousEvent = true
 						continue
 					}
 				}
 
-				d.events <- fsnotify.Event{
-					Name: e.Path,
-					Op:   op,
+				d.events <- FileEvent{
+					Path: e.Path,
 				}
 			}
 		}
@@ -116,7 +101,7 @@ func (d *darwinNotify) Close() error {
 	return nil
 }
 
-func (d *darwinNotify) Events() chan fsnotify.Event {
+func (d *darwinNotify) Events() chan FileEvent {
 	return d.events
 }
 
@@ -131,7 +116,7 @@ func NewWatcher() (Notify, error) {
 			Flags:   fsevents.FileEvents,
 		},
 		sm:     &sync.Mutex{},
-		events: make(chan fsnotify.Event),
+		events: make(chan FileEvent),
 		errors: make(chan error),
 		stop:   make(chan struct{}),
 	}
@@ -139,18 +124,4 @@ func NewWatcher() (Notify, error) {
 	return dw, nil
 }
 
-func eventFlagsToOp(flags fsevents.EventFlags) fsnotify.Op {
-	if flags&fsevents.ItemRemoved != 0 {
-		return fsnotify.Remove
-	}
-	if flags&fsevents.ItemRenamed != 0 {
-		return fsnotify.Rename
-	}
-	if flags&fsevents.ItemChangeOwner != 0 {
-		return fsnotify.Chmod
-	}
-	if flags&fsevents.ItemCreated != 0 {
-		return fsnotify.Create
-	}
-	return fsnotify.Write
-}
+var _ Notify = &darwinNotify{}

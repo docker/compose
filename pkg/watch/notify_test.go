@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/windmilleng/fsnotify"
 )
 
 // Each implementation of the notify interface should have the same basic
@@ -19,7 +17,6 @@ import (
 func TestNoEvents(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
-	f.fsync()
 	f.assertEvents()
 }
 
@@ -44,7 +41,7 @@ func TestEventOrdering(t *testing.T) {
 	f.fsync()
 	f.events = nil
 
-	var expected []fsnotify.Event
+	var expected []string
 	for i, dir := range dirs {
 		base := fmt.Sprintf("%d.txt", i)
 		p := filepath.Join(dir, base)
@@ -52,33 +49,10 @@ func TestEventOrdering(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected = append(expected, create(filepath.Join(dir, base)))
+		expected = append(expected, filepath.Join(dir, base))
 	}
 
-	f.fsync()
-
-	f.filterJustCreateEvents()
 	f.assertEvents(expected...)
-
-	// Check to make sure that the files appeared in the right order.
-	createEvents := make([]fsnotify.Event, 0, count)
-	for _, e := range f.events {
-		if e.Op == fsnotify.Create {
-			createEvents = append(createEvents, e)
-		}
-	}
-
-	if len(createEvents) != count {
-		t.Fatalf("Expected %d create events. Actual: %+v", count, createEvents)
-	}
-
-	for i, event := range createEvents {
-		base := fmt.Sprintf("%d.txt", i)
-		p := filepath.Join(dirs[i], base)
-		if event.Name != p {
-			t.Fatalf("Expected event %q at %d. Actual: %+v", base, i, createEvents)
-		}
-	}
 }
 
 func TestWatchesAreRecursive(t *testing.T) {
@@ -112,10 +86,7 @@ func TestWatchesAreRecursive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// we should get notified
-	f.fsync()
-
-	f.assertEvents(create(changeFilePath))
+	f.assertEvents(changeFilePath)
 }
 
 func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
@@ -146,10 +117,7 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// we should get notified
-	f.fsync()
-	// assert events
-	f.assertEvents(create(subPath), create(changeFilePath))
+	f.assertEvents(subPath, changeFilePath)
 }
 
 func TestWatchNonExistentPath(t *testing.T) {
@@ -172,12 +140,7 @@ func TestWatchNonExistentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.fsync()
-	if runtime.GOOS == "darwin" {
-		f.assertEvents(create(path))
-	} else {
-		f.assertEvents(create(path), write(path))
-	}
+	f.assertEvents(path)
 }
 
 func TestRemove(t *testing.T) {
@@ -209,9 +172,7 @@ func TestRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.fsync()
-
-	f.assertEvents(remove(path))
+	f.assertEvents(path)
 }
 
 func TestRemoveAndAddBack(t *testing.T) {
@@ -242,9 +203,8 @@ func TestRemoveAndAddBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.fsync()
 
-	f.assertEvents(remove(path))
+	f.assertEvents(path)
 	f.events = nil
 
 	err = ioutil.WriteFile(path, d1, 0644)
@@ -252,7 +212,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.assertEvents(create(path))
+	f.assertEvents(path)
 }
 
 func TestSingleFile(t *testing.T) {
@@ -288,9 +248,7 @@ func TestSingleFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.fsync()
-
-	f.assertEvents(create(path))
+	f.assertEvents(path)
 }
 
 type notifyFixture struct {
@@ -298,7 +256,7 @@ type notifyFixture struct {
 	root    *TempDir
 	watched *TempDir
 	notify  Notify
-	events  []fsnotify.Event
+	events  []FileEvent
 }
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
@@ -330,49 +288,18 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 	}
 }
 
-func (f *notifyFixture) filterJustCreateEvents() {
-	var r []fsnotify.Event
+func (f *notifyFixture) assertEvents(expected ...string) {
+	f.fsync()
 
-	for _, ev := range f.events {
-		if ev.Op != fsnotify.Create {
-			continue
-		}
-		r = append(r, ev)
-	}
-
-	f.events = r
-}
-
-func (f *notifyFixture) assertEvents(expected ...fsnotify.Event) {
 	if len(f.events) != len(expected) {
 		f.t.Fatalf("Got %d events (expected %d): %v %v", len(f.events), len(expected), f.events, expected)
 	}
 
 	for i, actual := range f.events {
-		if actual != expected[i] {
-			f.t.Fatalf("Got event %v (expected %v)", actual, expected[i])
+		e := FileEvent{expected[i]}
+		if actual != e {
+			f.t.Fatalf("Got event %v (expected %v)", actual, e)
 		}
-	}
-}
-
-func create(f string) fsnotify.Event {
-	return fsnotify.Event{
-		Name: f,
-		Op:   fsnotify.Create,
-	}
-}
-
-func write(f string) fsnotify.Event {
-	return fsnotify.Event{
-		Name: f,
-		Op:   fsnotify.Write,
-	}
-}
-
-func remove(f string) fsnotify.Event {
-	return fsnotify.Event{
-		Name: f,
-		Op:   fsnotify.Remove,
 	}
 }
 
@@ -394,12 +321,19 @@ F:
 			f.t.Fatal(err)
 
 		case event := <-f.notify.Events():
-			if strings.Contains(event.Name, syncPath) {
+			if strings.Contains(event.Path, syncPath) {
 				break F
 			}
-			if strings.Contains(event.Name, anySyncPath) {
+			if strings.Contains(event.Path, anySyncPath) {
 				continue
 			}
+
+			// Don't bother tracking duplicate changes to the same path
+			// for testing.
+			if len(f.events) > 0 && f.events[len(f.events)-1].Path == event.Path {
+				continue
+			}
+
 			f.events = append(f.events, event)
 
 		case <-timeout:

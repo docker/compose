@@ -20,7 +20,7 @@ const inotifyMin = 8192
 type linuxNotify struct {
 	watcher       *fsnotify.Watcher
 	events        chan fsnotify.Event
-	wrappedEvents chan fsnotify.Event
+	wrappedEvents chan FileEvent
 	errors        chan error
 	watchList     map[string]bool
 }
@@ -69,7 +69,7 @@ func (d *linuxNotify) Close() error {
 	return d.watcher.Close()
 }
 
-func (d *linuxNotify) Events() chan fsnotify.Event {
+func (d *linuxNotify) Events() chan FileEvent {
 	return d.wrappedEvents
 }
 
@@ -107,12 +107,12 @@ func (d *linuxNotify) loop() {
 
 func (d *linuxNotify) sendEventIfWatched(e fsnotify.Event) {
 	if _, ok := d.watchList[e.Name]; ok {
-		d.wrappedEvents <- e
+		d.wrappedEvents <- FileEvent{e.Name}
 	} else {
 		// TODO(dmiller): maybe use a prefix tree here?
 		for path := range d.watchList {
 			if pathIsChildOf(e.Name, path) {
-				d.wrappedEvents <- e
+				d.wrappedEvents <- FileEvent{e.Name}
 				break
 			}
 		}
@@ -125,7 +125,7 @@ func NewWatcher() (*linuxNotify, error) {
 		return nil, err
 	}
 
-	wrappedEvents := make(chan fsnotify.Event)
+	wrappedEvents := make(chan FileEvent)
 
 	wmw := &linuxNotify{
 		watcher:       fsw,
@@ -171,3 +171,5 @@ func checkInotifyLimits() error {
 
 	return nil
 }
+
+var _ Notify = &linuxNotify{}
