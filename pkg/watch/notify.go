@@ -1,10 +1,12 @@
 package watch
 
-import "github.com/windmilleng/fsnotify"
+type FileEvent struct {
+	Path string
+}
 
 type Notify interface {
 	Close() error
 	Add(name string) error
-	Events() chan fsnotify.Event
+	Events() chan FileEvent
 	Errors() chan error
 }
