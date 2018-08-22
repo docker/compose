@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -176,22 +175,13 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveAndAddBack(t *testing.T) {
-	t.Skip("Skipping broken test for now")
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	path := filepath.Join(f.watched.Path(), "change")
 
-	path := filepath.Join(root.Path(), "change")
-
-	if err != nil {
-		t.Fatal(err)
-	}
 	d1 := []byte("hello\ngo\n")
-	err = ioutil.WriteFile(path, d1, 0644)
+	err := ioutil.WriteFile(path, d1, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,6 +189,8 @@ func TestRemoveAndAddBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.assertEvents(path)
+
 	err = os.Remove(path)
 	if err != nil {
 		t.Fatal(err)
@@ -216,9 +208,6 @@ func TestRemoveAndAddBack(t *testing.T) {
 }
 
 func TestSingleFile(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Broken on Linux")
-	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
