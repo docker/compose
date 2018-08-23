@@ -134,6 +134,9 @@ func TestWatchNonExistentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	f.fsync()
+
 	d1 := []byte("hello\ngo\n")
 	err = ioutil.WriteFile(path, d1, 0644)
 	if err != nil {

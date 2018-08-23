@@ -20,21 +20,13 @@ type darwinNotify struct {
 	// so that, for recursive watches, we can guarantee that the path list doesn't
 	// change.
 	sm *sync.Mutex
-}
 
-func (d *darwinNotify) isTrackingPath(path string) bool {
-	d.sm.Lock()
-	defer d.sm.Unlock()
-	for _, p := range d.stream.Paths {
-		if p == path {
-			return true
-		}
-	}
-	return false
+	// ignore the first event that says the watched directory
+	// has been created. these are fired spuriously on initiation.
+	ignoreCreatedEvents map[string]bool
 }
 
 func (d *darwinNotify) loop() {
-	ignoredSpuriousEvents := make(map[string]bool, 0)
 	for {
 		select {
 		case <-d.stop:
@@ -47,11 +39,20 @@ func (d *darwinNotify) loop() {
 			for _, e := range events {
 				e.Path = filepath.Join("/", e.Path)
 
-				// ignore the first event that says the watched directory
-				// has been created. these are fired spuriously on initiation.
 				if e.Flags&fsevents.ItemCreated == fsevents.ItemCreated {
-					if !ignoredSpuriousEvents[e.Path] && d.isTrackingPath(e.Path) {
-						ignoredSpuriousEvents[e.Path] = true
+					d.sm.Lock()
+					shouldIgnore := d.ignoreCreatedEvents[e.Path]
+					if shouldIgnore {
+						d.ignoreCreatedEvents[e.Path] = false
+					} else {
+						// If we got a created event for something
+						// that's not on the ignore list, we assume
+						// we're done with the spurious events.
+						d.ignoreCreatedEvents = nil
+					}
+					d.sm.Unlock()
+
+					if shouldIgnore {
 						continue
 					}
 				}
@@ -80,6 +81,12 @@ func (d *darwinNotify) Add(name string) error {
 	}
 
 	es.Paths = append(es.Paths, name)
+
+	if d.ignoreCreatedEvents == nil {
+		d.ignoreCreatedEvents = make(map[string]bool, 1)
+	}
+	d.ignoreCreatedEvents[name] = true
+
 	if len(es.Paths) == 1 {
 		go d.loop()
 		es.Start()
