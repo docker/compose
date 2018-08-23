@@ -34,7 +34,7 @@ func (d *darwinNotify) isTrackingPath(path string) bool {
 }
 
 func (d *darwinNotify) loop() {
-	ignoredSpuriousEvent := false
+	ignoredSpuriousEvents := make(map[string]bool, 0)
 	for {
 		select {
 		case <-d.stop:
@@ -50,8 +50,8 @@ func (d *darwinNotify) loop() {
 				// ignore the first event that says the watched directory
 				// has been created. these are fired spuriously on initiation.
 				if e.Flags&fsevents.ItemCreated == fsevents.ItemCreated {
-					if d.isTrackingPath(e.Path) && !ignoredSpuriousEvent {
-						ignoredSpuriousEvent = true
+					if !ignoredSpuriousEvents[e.Path] && d.isTrackingPath(e.Path) {
+						ignoredSpuriousEvents[e.Path] = true
 						continue
 					}
 				}
