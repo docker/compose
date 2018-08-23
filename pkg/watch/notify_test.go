@@ -231,6 +231,7 @@ func TestSingleFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	f.fsync()
 
 	d2 := []byte("hello\nworld\n")
 	err = ioutil.WriteFile(path, d2, 0644)
