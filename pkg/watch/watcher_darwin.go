@@ -22,8 +22,8 @@ type darwinNotify struct {
 	sm *sync.Mutex
 
 	// When a watch is created for a directory, we've seen fsevents non-determistically
-	// fire 0-2 CREATE events for that directory. We want to ignore these.
-	ignoreCreatedEvents map[string]int
+	// fire 0-3 CREATE events for that directory. We want to ignore these.
+	ignoreCreatedEvents map[string]bool
 }
 
 func (d *darwinNotify) loop() {
@@ -41,11 +41,8 @@ func (d *darwinNotify) loop() {
 
 				if e.Flags&fsevents.ItemCreated == fsevents.ItemCreated {
 					d.sm.Lock()
-					ignoreCount := d.ignoreCreatedEvents[e.Path]
-					shouldIgnore := ignoreCount > 0
-					if shouldIgnore {
-						d.ignoreCreatedEvents[e.Path]--
-					} else {
+					shouldIgnore := d.ignoreCreatedEvents[e.Path]
+					if !shouldIgnore {
 						// If we got a created event for something
 						// that's not on the ignore list, we assume
 						// we're done with the spurious events.
@@ -84,9 +81,9 @@ func (d *darwinNotify) Add(name string) error {
 	es.Paths = append(es.Paths, name)
 
 	if d.ignoreCreatedEvents == nil {
-		d.ignoreCreatedEvents = make(map[string]int, 1)
+		d.ignoreCreatedEvents = make(map[string]bool, 1)
 	}
-	d.ignoreCreatedEvents[name] = 2
+	d.ignoreCreatedEvents[name] = true
 
 	if len(es.Paths) == 1 {
 		es.Start()
