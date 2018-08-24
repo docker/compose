@@ -1074,7 +1074,7 @@ class Service(object):
         )
 
         try:
-            all_events = stream_output(build_output, sys.stdout)
+            all_events = list(stream_output(build_output, sys.stdout))
         except StreamOutputError as e:
             raise BuildError(self, six.text_type(e))
 
@@ -1168,7 +1168,23 @@ class Service(object):
 
         return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
-    def pull(self, ignore_pull_failures=False, silent=False):
+    def _do_pull(self, repo, pull_kwargs, silent, ignore_pull_failures):
+        try:
+            output = self.client.pull(repo, **pull_kwargs)
+            if silent:
+                with open(os.devnull, 'w') as devnull:
+                    for event in stream_output(output, devnull):
+                        yield event
+            else:
+                for event in stream_output(output, sys.stdout):
+                    yield event
+        except (StreamOutputError, NotFound) as e:
+            if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
+
+    def pull(self, ignore_pull_failures=False, silent=False, stream=False):
         if 'image' not in self.options:
             return
 
@@ -1185,20 +1201,11 @@ class Service(object):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted pulls for API version < 1.35'
             )
-        try:
-            output = self.client.pull(repo, **kwargs)
-            if silent:
-                with open(os.devnull, 'w') as devnull:
-                    return progress_stream.get_digest_from_pull(
-                        stream_output(output, devnull))
-            else:
-                return progress_stream.get_digest_from_pull(
-                    stream_output(output, sys.stdout))
-        except (StreamOutputError, NotFound) as e:
-            if not ignore_pull_failures:
-                raise
-            else:
-                log.error(six.text_type(e))
+
+        event_stream = self._do_pull(repo, kwargs, silent, ignore_pull_failures)
+        if stream:
+            return event_stream
+        return progress_stream.get_digest_from_pull(event_stream)
 
     def push(self, ignore_push_failures=False):
         if 'image' not in self.options or 'build' not in self.options:

@@ -19,12 +19,11 @@ def write_to_stream(s, stream):
 def stream_output(output, stream):
     is_terminal = hasattr(stream, 'isatty') and stream.isatty()
     stream = utils.get_output_stream(stream)
-    all_events = []
     lines = {}
     diff = 0
 
     for event in utils.json_stream(output):
-        all_events.append(event)
+        yield event
         is_progress_event = 'progress' in event or 'progressDetail' in event
 
         if not is_progress_event:
@@ -56,8 +55,6 @@ def stream_output(output, stream):
             write_to_stream("%c[%dB" % (27, diff), stream)
 
         stream.flush()
-
-    return all_events
 
 
 def print_output_event(event, stream, is_terminal):

@@ -139,7 +139,9 @@ class DockerClientTestCase(unittest.TestCase):
     def check_build(self, *args, **kwargs):
         kwargs.setdefault('rm', True)
         build_output = self.client.build(*args, **kwargs)
-        stream_output(build_output, open('/dev/null', 'w'))
+        with open(os.devnull, 'w') as devnull:
+            for event in stream_output(build_output, devnull):
+                pass
 
     def require_api_version(self, minimum):
         api_version = self.client.version()['ApiVersion']
