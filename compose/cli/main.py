@@ -264,6 +264,7 @@ class TopLevelCommand(object):
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
             --parallel              Build images in parallel.
+            -q, --quiet             Don't print anything to STDOUT
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -285,6 +286,7 @@ class TopLevelCommand(object):
             build_args=build_args,
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
+            silent=options.get('--quiet', False)
         )
 
     def bundle(self, options):

@@ -52,6 +52,7 @@ from .progress_stream import StreamOutputError
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
+from compose import utils
 
 
 log = logging.getLogger(__name__)
@@ -1027,8 +1028,9 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False):
-        log.info('Building %s' % self.name)
+              gzip=False, silent=False):
+        if not silent:
+            log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
 
