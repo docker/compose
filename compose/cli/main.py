@@ -476,16 +476,15 @@ class TopLevelCommand(object):
             -u, --user USER   Run the command as this user.
             -T                Disable pseudo-tty allocation. By default `docker-compose exec`
                               allocates a TTY.
-            --index=index     "index" of the container if there are multiple
-                              instances of a service. If missing, Compose will pick an
-                              arbitrary container.
+            --index=index     index of the container if there are multiple
+                              instances of a service [default: 1]
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
             -w, --workdir DIR Path to workdir directory for this command.
         """
         environment = Environment.from_env_file(self.project_dir)
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
-        index = options.get('--index')
+        index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         detach = options.get('--detach')
 
@@ -662,11 +661,10 @@ class TopLevelCommand(object):
 
         Options:
             --protocol=proto  tcp or udp [default: tcp]
-            --index=index     "index" of the container if there are multiple
-                              instances of a service. If missing, Compose will pick an
-                              arbitrary container.
+            --index=index     index of the container if there are multiple
+                              instances of a service [default: 1]
         """
-        index = options.get('--index')
+        index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         try:
             container = service.get_container(number=index)

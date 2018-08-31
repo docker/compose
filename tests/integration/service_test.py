@@ -32,6 +32,7 @@ from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
+from compose.const import LABEL_SLUG
 from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.errors import OperationFailedError
@@ -867,17 +868,17 @@ class ServiceTest(DockerClientTestCase):
         db_ctnrs = [create_and_start_container(db) for _ in range(3)]
         web = self.create_service(
             'web', external_links=[
-                'composetest_db_{}'.format(db_ctnrs[0].short_number),
-                'composetest_db_{}'.format(db_ctnrs[1].short_number),
-                'composetest_db_{}:db_3'.format(db_ctnrs[2].short_number)
+                db_ctnrs[0].name,
+                db_ctnrs[1].name,
+                '{}:db_3'.format(db_ctnrs[2].name)
             ]
         )
 
         create_and_start_container(web)
 
         assert set(get_links(web.containers()[0])) == set([
-            'composetest_db_{}'.format(db_ctnrs[0].short_number),
-            'composetest_db_{}'.format(db_ctnrs[1].short_number),
+            db_ctnrs[0].name,
+            db_ctnrs[1].name,
             'db_3'
         ])
 
@@ -1584,6 +1585,7 @@ class ServiceTest(DockerClientTestCase):
             LABEL_PROJECT: 'composetest',
             LABEL_SERVICE: 'web',
             LABEL_VERSION: __version__,
+            LABEL_CONTAINER_NUMBER: '1'
         }
         expected = dict(labels_dict, **compose_labels)
 
@@ -1592,7 +1594,7 @@ class ServiceTest(DockerClientTestCase):
         labels = ctnr.labels.items()
         for pair in expected.items():
             assert pair in labels
-        assert ctnr.labels[LABEL_CONTAINER_NUMBER] == ctnr.number
+        assert ctnr.labels[LABEL_SLUG] == ctnr.full_slug
 
     def test_empty_labels(self):
         labels_dict = {'foo': '', 'bar': ''}

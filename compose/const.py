@@ -15,6 +15,7 @@ LABEL_PROJECT = 'com.docker.compose.project'
 LABEL_SERVICE = 'com.docker.compose.service'
 LABEL_NETWORK = 'com.docker.compose.network'
 LABEL_VERSION = 'com.docker.compose.version'
+LABEL_SLUG = 'com.docker.compose.slug'
 LABEL_VOLUME = 'com.docker.compose.volume'
 LABEL_CONFIG_HASH = 'com.docker.compose.config-hash'
 NANOCPUS_SCALE = 1000000000

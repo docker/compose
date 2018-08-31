@@ -198,14 +198,14 @@ class ProjectWithDependenciesTest(ProjectTestCase):
         db, = [c for c in containers if c.service == 'db']
 
         assert set(get_links(web)) == {
-            'composetest_db_{}'.format(db.short_number),
+            'composetest_db_{}_{}'.format(db.number, db.slug),
             'db',
-            'db_{}'.format(db.short_number)
+            'db_{}_{}'.format(db.number, db.slug)
         }
         assert set(get_links(nginx)) == {
-            'composetest_web_{}'.format(web.short_number),
+            'composetest_web_{}_{}'.format(web.number, web.slug),
             'web',
-            'web_{}'.format(web.short_number)
+            'web_{}_{}'.format(web.number, web.slug)
         }
 
 
