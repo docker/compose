@@ -1109,7 +1109,7 @@ class TopLevelCommand(object):
     @classmethod
     def version(cls, options):
         """
-        Show version informations
+        Show version information
 
         Usage: version [--short]
 
