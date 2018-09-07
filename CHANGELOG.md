@@ -60,7 +60,7 @@ Change log
 
 ### Bugfixes
 
-- Fixed a bug where the ip_range attirbute in IPAM configs was prevented
+- Fixed a bug where the ip_range attribute in IPAM configs was prevented
   from passing validation
 
 1.21.1 (2018-04-27)
@@ -285,7 +285,7 @@ Change log
   preventing Compose from recovering volume data from previous containers for
   anonymous volumes
 
-- Added limit for number of simulatenous parallel operations, which should
+- Added limit for number of simultaneous parallel operations, which should
   prevent accidental resource exhaustion of the server. Default is 64 and
   can be configured using the `COMPOSE_PARALLEL_LIMIT` environment variable
 
@@ -583,7 +583,7 @@ Change log
 ### Bugfixes
 
 - Volumes specified through the `--volume` flag of `docker-compose run` now
-  complement volumes declared in the service's defintion instead of replacing
+  complement volumes declared in the service's definition instead of replacing
   them
 
 - Fixed a bug where using multiple Compose files would unset the scale value
