@@ -99,6 +99,7 @@ HOST_CONFIG_KEYS = [
     'storage_opt',
     'sysctls',
     'userns_mode',
+    'uts_mode',
     'volumes_from',
     'volume_driver',
 ]
@@ -991,6 +992,7 @@ class Service(object):
             mem_swappiness=options.get('mem_swappiness'),
             group_add=options.get('group_add'),
             userns_mode=options.get('userns_mode'),
+            uts_mode=options.get('uts_mode'),
             init=options.get('init', None),
             init_path=init_path,
             isolation=options.get('isolation'),
