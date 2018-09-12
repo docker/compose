@@ -55,4 +55,9 @@ else
     DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 fi
 
+# Handle userns security
+if [ ! -z "$(docker info 2>/dev/null | grep userns)" ]; then
+    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS --userns=host"
+fi
+
 exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"
