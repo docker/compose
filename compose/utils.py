@@ -7,6 +7,7 @@ import json
 import json.decoder
 import logging
 import ntpath
+import os
 
 import six
 from docker.errors import DockerException
@@ -19,9 +20,18 @@ from .timeparse import timeparse
 
 json_decoder = json.JSONDecoder()
 log = logging.getLogger(__name__)
+keep_quiet = False
+
+
+def set_quiet(quiet=True):
+    global keep_quiet
+    keep_quiet = quiet
 
 
 def get_output_stream(stream):
+    global keep_quiet
+    if keep_quiet:
+        stream = open(os.devnull, "w")
     if six.PY3:
         return stream
     return codecs.getwriter('utf-8')(stream)

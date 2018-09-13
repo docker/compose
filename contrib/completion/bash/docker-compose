@@ -195,6 +195,9 @@ _docker_compose_down() {
 		--timeout|-t)
 			return
 			;;
+		--quiet|-q)
+			return
+			;;
 	esac
 
 	case "$cur" in
@@ -533,6 +536,9 @@ _docker_compose_up() {
 			return
 			;;
 		--timeout|-t)
+			return
+			;;
+		--quiet|-q)
 			return
 			;;
 	esac
