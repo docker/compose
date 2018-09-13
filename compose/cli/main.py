@@ -42,6 +42,7 @@ from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
 from ..service import OperationFailedError
+from ..utils import set_quiet
 from .command import get_config_from_options
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
@@ -168,6 +169,9 @@ def setup_console_handler(handler, verbose, noansi=False, level=None):
             raise UserError(
                 'Invalid value for --log-level. Expected one of DEBUG, INFO, WARNING, ERROR, CRITICAL.'
             )
+
+        if loglevel < logging.WARNING:
+            set_quiet(True)
 
     handler.setLevel(loglevel)
 
