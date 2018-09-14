@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -28,26 +29,27 @@ type linuxNotify struct {
 func (d *linuxNotify) Add(name string) error {
 	fi, err := os.Stat(name)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("notify.Add(%q): %v", name, err)
 	}
+
 	// if it's a file that doesn't exist watch it's parent
 	if os.IsNotExist(err) {
 		parent := filepath.Join(name, "..")
 		err = d.watcher.Add(parent)
 		if err != nil {
-			return err
+			return fmt.Errorf("notify.Add(%q): %v", name, err)
 		}
 		d.watchList[parent] = true
 	} else if fi.IsDir() {
 		err = d.watchRecursively(name)
 		if err != nil {
-			return err
+			return fmt.Errorf("notify.Add(%q): %v", name, err)
 		}
 		d.watchList[name] = true
 	} else {
 		err = d.watcher.Add(name)
 		if err != nil {
-			return err
+			return fmt.Errorf("notify.Add(%q): %v", name, err)
 		}
 		d.watchList[name] = true
 	}
@@ -61,7 +63,14 @@ func (d *linuxNotify) watchRecursively(dir string) error {
 			return err
 		}
 
-		return d.watcher.Add(path)
+		err = d.watcher.Add(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("watcher.Add(%q): %v", path, err)
+		}
+		return nil
 	})
 }
 
