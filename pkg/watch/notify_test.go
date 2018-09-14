@@ -277,6 +277,32 @@ func TestWriteGoodLink(t *testing.T) {
 	f.assertEvents(goodFile, link)
 }
 
+func TestWatchBrokenLink(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	newRoot, err := NewDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newRoot.TearDown()
+
+	link := filepath.Join(newRoot.Path(), "brokenLink")
+	missingFile := filepath.Join(newRoot.Path(), "missingFile")
+	err = os.Symlink(missingFile, link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.notify.Add(newRoot.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	os.Remove(link)
+	f.assertEvents(link)
+}
+
 type notifyFixture struct {
 	t       *testing.T
 	root    *TempDir
