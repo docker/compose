@@ -827,8 +827,10 @@ def process_healthcheck(service_dict):
 def finalize_service_volumes(service_dict, environment):
     if 'volumes' in service_dict:
         finalized_volumes = []
-        normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
-        win_host = environment.get_boolean('COMPOSE_FORCE_WINDOWS_HOST')
+        win_host = environment.get_boolean(
+            'COMPOSE_FORCE_WINDOWS_HOST') or const.IS_WINDOWS_PLATFORM
+        normalize = environment.get_boolean(
+            'COMPOSE_CONVERT_WINDOWS_PATHS') or win_host
         for v in service_dict['volumes']:
             if isinstance(v, dict):
                 finalized_volumes.append(MountSpec.parse(v, normalize, win_host))
