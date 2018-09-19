@@ -99,7 +99,14 @@ class ContainerStateCondition(object):
 
     def __call__(self):
         try:
-            container = self.client.inspect_container(self.name)
+            if self.name.endswith('*'):
+                ctnrs = self.client.containers(all=True, filters={'name': self.name[:-1]})
+                if len(ctnrs) > 0:
+                    container = self.client.inspect_container(ctnrs[0]['Id'])
+                else:
+                    return False
+            else:
+                container = self.client.inspect_container(self.name)
             return container['State']['Status'] == self.status
         except errors.APIError:
             return False
@@ -1019,11 +1026,15 @@ class CLITestCase(DockerClientTestCase):
     def test_up_attached(self):
         self.base_dir = 'tests/fixtures/echo-services'
         result = self.dispatch(['up', '--no-color'])
+        simple_name = self.project.get_service('simple').containers(stopped=True)[0].name_without_project
+        another_name = self.project.get_service('another').containers(
+            stopped=True
+        )[0].name_without_project
 
-        assert 'simple_1   | simple' in result.stdout
-        assert 'another_1  | another' in result.stdout
-        assert 'simple_1 exited with code 0' in result.stdout
-        assert 'another_1 exited with code 0' in result.stdout
+        assert '{} | simple'.format(simple_name) in result.stdout
+        assert '{} | another'.format(another_name) in result.stdout
+        assert '{} exited with code 0'.format(simple_name) in result.stdout
+        assert '{} exited with code 0'.format(another_name) in result.stdout
 
     @v2_only()
     def test_up(self):
@@ -1727,11 +1738,12 @@ class CLITestCase(DockerClientTestCase):
     def test_run_rm(self):
         self.base_dir = 'tests/fixtures/volume'
         proc = start_process(self.base_dir, ['run', '--rm', 'test'])
+        service = self.project.get_service('test')
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'volume_test_run_1',
-            'running'))
-        service = self.project.get_service('test')
+            'volume_test_run_*',
+            'running')
+        )
         containers = service.containers(one_off=OneOffFilter.only)
         assert len(containers) == 1
         mounts = containers[0].get('Mounts')
@@ -2054,39 +2066,39 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'running'))
 
         os.kill(proc.pid, signal.SIGINT)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'exited'))
 
     def test_run_handles_sigterm(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'running'))
 
         os.kill(proc.pid, signal.SIGTERM)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'exited'))
 
     def test_run_handles_sighup(self):
         proc = start_process(self.base_dir, ['run', '-T', 'simple', 'top'])
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'running'))
 
         os.kill(proc.pid, signal.SIGHUP)
         wait_on_condition(ContainerStateCondition(
             self.project.client,
-            'simple-composefile_simple_run_1',
+            'simple-composefile_simple_run_*',
             'exited'))
 
     @mock.patch.dict(os.environ)
@@ -2286,34 +2298,44 @@ class CLITestCase(DockerClientTestCase):
         proc = start_process(self.base_dir, ['logs', '-f'])
 
         self.dispatch(['up', '-d', 'another'])
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'logs-composefile_another_1',
-            'exited'))
+        another_name = self.project.get_service('another').get_container().name_without_project
+        wait_on_condition(
+            ContainerStateCondition(
+                self.project.client,
+                'logs-composefile_another_*',
+                'exited'
+            )
+        )
 
+        simple_name = self.project.get_service('simple').get_container().name_without_project
         self.dispatch(['kill', 'simple'])
 
         result = wait_on_process(proc)
 
         assert 'hello' in result.stdout
         assert 'test' in result.stdout
-        assert 'logs-composefile_another_1 exited with code 0' in result.stdout
-        assert 'logs-composefile_simple_1 exited with code 137' in result.stdout
+        assert '{} exited with code 0'.format(another_name) in result.stdout
+        assert '{} exited with code 137'.format(simple_name) in result.stdout
 
     def test_logs_follow_logs_from_restarted_containers(self):
         self.base_dir = 'tests/fixtures/logs-restart-composefile'
         proc = start_process(self.base_dir, ['up'])
 
-        wait_on_condition(ContainerStateCondition(
-            self.project.client,
-            'logs-restart-composefile_another_1',
-            'exited'))
-
+        wait_on_condition(
+            ContainerStateCondition(
+                self.project.client,
+                'logs-restart-composefile_another_*',
+                'exited'
+            )
+        )
         self.dispatch(['kill', 'simple'])
 
         result = wait_on_process(proc)
 
-        assert result.stdout.count('logs-restart-composefile_another_1 exited with code 1') == 3
+        assert len(re.findall(
+            r'logs-restart-composefile_another_1_[a-f0-9]{12} exited with code 1',
+            result.stdout
+        )) == 3
         assert result.stdout.count('world') == 3
 
     def test_logs_default(self):
@@ -2346,10 +2368,10 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up'])
 
         result = self.dispatch(['logs', '--tail', '2'])
-        assert 'c\n' in result.stdout
-        assert 'd\n' in result.stdout
-        assert 'a\n' not in result.stdout
-        assert 'b\n' not in result.stdout
+        assert 'y\n' in result.stdout
+        assert 'z\n' in result.stdout
+        assert 'w\n' not in result.stdout
+        assert 'x\n' not in result.stdout
 
     def test_kill(self):
         self.dispatch(['up', '-d'], None)
@@ -2523,9 +2545,9 @@ class CLITestCase(DockerClientTestCase):
                 result = self.dispatch(['port', '--index=' + str(index), 'simple', str(number)])
             return result.stdout.rstrip()
 
-        assert get_port(3000) == containers[0].get_local_port(3000)
-        assert get_port(3000, index=1) == containers[0].get_local_port(3000)
-        assert get_port(3000, index=2) == containers[1].get_local_port(3000)
+        assert get_port(3000) in (containers[0].get_local_port(3000), containers[1].get_local_port(3000))
+        assert get_port(3000, index=containers[0].number) == containers[0].get_local_port(3000)
+        assert get_port(3000, index=containers[1].number) == containers[1].get_local_port(3000)
         assert get_port(3002) == ""
 
     def test_events_json(self):
@@ -2561,7 +2583,7 @@ class CLITestCase(DockerClientTestCase):
 
         container, = self.project.containers()
         expected_template = ' container {} {}'
-        expected_meta_info = ['image=busybox:latest', 'name=simple-composefile_simple_1']
+        expected_meta_info = ['image=busybox:latest', 'name=simple-composefile_simple_']
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
@@ -2643,8 +2665,11 @@ class CLITestCase(DockerClientTestCase):
 
         assert len(containers) == 2
         web = containers[1]
+        db_name = containers[0].name_without_project
 
-        assert set(get_links(web)) == set(['db', 'mydb_1', 'extends_mydb_1'])
+        assert set(get_links(web)) == set(
+            ['db', db_name, 'extends_{}'.format(db_name)]
+        )
 
         expected_env = set([
             "FOO=1",
@@ -2677,11 +2702,11 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/exit-code-from'
         proc = start_process(
             self.base_dir,
-            ['up', '--abort-on-container-exit', '--exit-code-from', 'another'])
+            ['up', '--abort-on-container-exit', '--exit-code-from', 'another']
+        )
 
         result = wait_on_process(proc, returncode=1)
-
-        assert 'exit-code-from_another_1 exited with code 1' in result.stdout
+        assert re.findall(r'exit-code-from_another_1_[a-f0-9]{12} exited with code 1', result.stdout)
 
     def test_exit_code_from_signal_stop(self):
         self.base_dir = 'tests/fixtures/exit-code-from'
@@ -2690,13 +2715,14 @@ class CLITestCase(DockerClientTestCase):
             ['up', '--abort-on-container-exit', '--exit-code-from', 'simple']
         )
         result = wait_on_process(proc, returncode=137)  # SIGKILL
-        assert 'exit-code-from_another_1 exited with code 1' in result.stdout
+        name = self.project.get_service('another').containers(stopped=True)[0].name_without_project
+        assert '{} exited with code 1'.format(name) in result.stdout
 
     def test_images(self):
         self.project.get_service('simple').create_container()
         result = self.dispatch(['images'])
         assert 'busybox' in result.stdout
-        assert 'simple-composefile_simple_1' in result.stdout
+        assert 'simple-composefile_simple_' in result.stdout
 
     def test_images_default_composefile(self):
         self.base_dir = 'tests/fixtures/multiple-composefiles'
