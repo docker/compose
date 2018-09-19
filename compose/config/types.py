@@ -136,6 +136,20 @@ def normalize_path_for_engine(path):
     return path.replace('\\', '/')
 
 
+def normpath(path, win_host=False):
+    """ Custom path normalizer that handles Compose-specific edge cases like
+        UNIX paths on Windows hosts and vice-versa. """
+
+    sysnorm = ntpath.normpath if win_host else os.path.normpath
+    # If a path looks like a UNIX absolute path on Windows, it probably is;
+    # we'll need to revert the backslashes to forward slashes after normalization
+    flip_slashes = path.startswith('/') and IS_WINDOWS_PLATFORM
+    path = sysnorm(path)
+    if flip_slashes:
+        path = path.replace('\\', '/')
+    return path
+
+
 class MountSpec(object):
     options_map = {
         'volume': {
@@ -152,12 +166,11 @@ class MountSpec(object):
 
     @classmethod
     def parse(cls, mount_dict, normalize=False, win_host=False):
-        normpath = ntpath.normpath if win_host else os.path.normpath
         if mount_dict.get('source'):
             if mount_dict['type'] == 'tmpfs':
                 raise ConfigurationError('tmpfs mounts can not specify a source')
 
-            mount_dict['source'] = normpath(mount_dict['source'])
+            mount_dict['source'] = normpath(mount_dict['source'], win_host)
             if normalize:
                 mount_dict['source'] = normalize_path_for_engine(mount_dict['source'])
 
@@ -247,7 +260,7 @@ class VolumeSpec(namedtuple('_VolumeSpec', 'external internal mode')):
         else:
             external = parts[0]
             parts = separate_next_section(parts[1])
-            external = ntpath.normpath(external)
+            external = normpath(external, True)
             internal = parts[0]
             if len(parts) > 1:
                 if ':' in parts[1]:
