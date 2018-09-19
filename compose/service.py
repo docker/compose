@@ -43,6 +43,7 @@ from .const import LABEL_SERVICE
 from .const import LABEL_SLUG
 from .const import LABEL_VERSION
 from .const import NANOCPUS_SCALE
+from .const import WINDOWS_LONGPATH_PREFIX
 from .container import Container
 from .errors import HealthCheckFailed
 from .errors import NoHealthCheckConfigured
@@ -1049,12 +1050,7 @@ class Service(object):
         for k, v in self._parse_proxy_config().items():
             build_args.setdefault(k, v)
 
-        # python2 os.stat() doesn't support unicode on some UNIX, so we
-        # encode it to a bytestring to be safe
-        path = build_opts.get('context')
-        if not six.PY3 and not IS_WINDOWS_PLATFORM:
-            path = path.encode('utf8')
-
+        path = rewrite_build_path(build_opts.get('context'))
         if self.platform and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted builds for API version < 1.35'
@@ -1663,3 +1659,15 @@ def convert_blkio_config(blkio_config):
             arr.append(dict([(k.capitalize(), v) for k, v in item.items()]))
         result[field] = arr
     return result
+
+
+def rewrite_build_path(path):
+    # python2 os.stat() doesn't support unicode on some UNIX, so we
+    # encode it to a bytestring to be safe
+    if not six.PY3 and not IS_WINDOWS_PLATFORM:
+        path = path.encode('utf8')
+
+    if IS_WINDOWS_PLATFORM and not path.startswith(WINDOWS_LONGPATH_PREFIX):
+        path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
+
+    return path
