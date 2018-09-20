@@ -1,0 +1,6 @@
+version: "2.2"
+
+services:
+  test:
+    image: busybox:dev
+    build: .
