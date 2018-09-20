@@ -570,39 +570,43 @@ class TopLevelCommand(object):
         if options['--quiet']:
             for image in set(c.image for c in containers):
                 print(image.split(':')[1])
-        else:
-            headers = [
-                'Container',
-                'Repository',
-                'Tag',
-                'Image Id',
-                'Size'
-            ]
-            rows = []
-            for container in containers:
-                image_config = container.image_config
-                service = self.project.get_service(container.service)
-                if service.image_name in image_config['RepoTags']:
-                    index = image_config['RepoTags'].index(service.image_name)
-                    repo_tags = (
-                        image_config['RepoTags'][index].rsplit(':', 1) if image_config['RepoTags']
-                        else ('<none>', '<none>')
-                    )
-                else:
-                    repo_tags = (
-                        image_config['RepoTags'][0].rsplit(':', 1) if image_config['RepoTags']
-                        else ('<none>', '<none>')
-                    )
-                image_id = image_config['Id'].split(':')[1][:12]
-                size = human_readable_file_size(image_config['Size'])
-                rows.append([
-                    container.name,
-                    repo_tags[0],
-                    repo_tags[1],
-                    image_id,
-                    size
-                ])
-            print(Formatter().table(headers, rows))
+            return
+
+        def add_default_tag(img_name):
+            if ':' not in img_name.split('/')[-1]:
+                return '{}:latest'.format(img_name)
+            return img_name
+
+        headers = [
+            'Container',
+            'Repository',
+            'Tag',
+            'Image Id',
+            'Size'
+        ]
+        rows = []
+        for container in containers:
+            image_config = container.image_config
+            service = self.project.get_service(container.service)
+            index = 0
+            img_name = add_default_tag(service.image_name)
+            if img_name in image_config['RepoTags']:
+                index = image_config['RepoTags'].index(img_name)
+            repo_tags = (
+                image_config['RepoTags'][index].rsplit(':', 1) if image_config['RepoTags']
+                else ('<none>', '<none>')
+            )
+
+            image_id = image_config['Id'].split(':')[1][:12]
+            size = human_readable_file_size(image_config['Size'])
+            rows.append([
+                container.name,
+                repo_tags[0],
+                repo_tags[1],
+                image_id,
+                size
+            ])
+        print(Formatter().table(headers, rows))
 
     def kill(self, options):
         """
