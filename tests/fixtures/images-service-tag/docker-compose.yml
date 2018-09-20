@@ -1,0 +1,10 @@
+version: "2.4"
+services:
+  foo1:
+    build: .
+    image: test:dev
+  foo2:
+    build: .
+    image: test:prod
+  foo3:
+    build: .
