@@ -37,6 +37,11 @@ def env_vars_from_file(filename):
             line = line.strip()
             if line and not line.startswith('#'):
                 k, v = split_env(line)
+                try:
+                    v = v.encode('utf-8').decode('unicode_escape')
+                except Exception:
+                    log.warning('Env file unicode escape failed for value: "{}".'.format(v))
+                    pass
                 env[k] = v
     return env
 
