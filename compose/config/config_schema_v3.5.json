@@ -308,7 +308,8 @@
             "uniqueItems": true
           }
         },
-        "working_dir": {"type": "string"}
+        "working_dir": {"type": "string"},
+        "override": {"type": "array", "items": {"type": ["string"], "uniqueItems": true, "format": "override"}}
       },
       "additionalProperties": false
     },

@@ -69,6 +69,8 @@ VALID_REGEX_IPV6_CIDR = "".join("""
 $
 """.format(IPV6_SEG=VALID_IPV6_SEG, IPV4_ADDR=VALID_IPV4_ADDR).split())
 
+VALID_OVERRIDE_FORMAT = r'^(ports)$'
+
 
 @FormatChecker.cls_checks(format="ports", raises=ValidationError)
 def format_ports(instance):
@@ -95,6 +97,15 @@ def format_subnet_ip_address(instance):
         if not re.match(VALID_REGEX_IPV4_CIDR, instance) and \
                 not re.match(VALID_REGEX_IPV6_CIDR, instance):
             raise ValidationError("should use the CIDR format")
+
+    return True
+
+
+@FormatChecker.cls_checks(format="override", raises=ValidationError)
+def format_override(instance):
+    if isinstance(instance, six.string_types):
+        if not re.match(VALID_OVERRIDE_FORMAT, instance):
+            raise ValidationError("should be of the format 'ports'")
 
     return True
 
@@ -426,7 +437,7 @@ def process_config_schema_errors(error):
 
 def validate_against_config_schema(config_file):
     schema = load_jsonschema(config_file)
-    format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
+    format_checker = FormatChecker(["ports", "expose", "subnet_ip_address", "override"])
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),

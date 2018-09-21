@@ -341,7 +341,8 @@
         },
         "volume_driver": {"type": "string"},
         "volumes_from": {"$ref": "#/definitions/list_of_strings"},
-        "working_dir": {"type": "string"}
+        "working_dir": {"type": "string"},
+        "override": {"type": "array", "items": {"type": ["string"], "uniqueItems": true, "format": "override"}}
       },
 
       "dependencies": {

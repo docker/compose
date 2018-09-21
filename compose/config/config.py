@@ -1061,7 +1061,12 @@ def merge_service_dicts(base, override, version):
         md.merge_field(field, merge_list_or_string)
 
     md.merge_field('logging', merge_logging, default={})
-    merge_ports(md, base, override)
+
+    if 'ports' in md.override.get('override', []):
+        md.merge_field('ports', merge_override_items_lists, default=[])
+    else:
+        merge_ports(md, base, override)
+
     md.merge_field('blkio_config', merge_blkio_config, default={})
     md.merge_field('healthcheck', merge_healthchecks, default={})
     md.merge_field('deploy', merge_deploy, default={})
@@ -1218,6 +1223,10 @@ def merge_labels(base, override):
     labels = parse_labels(base)
     labels.update(parse_labels(override))
     return labels
+
+
+def merge_override_items_lists(base, override):
+    return sorted(set(override))
 
 
 def split_kv(kvpair):

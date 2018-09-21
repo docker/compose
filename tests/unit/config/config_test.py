@@ -1205,6 +1205,58 @@ class ConfigTest(unittest.TestCase):
         svc_volumes = list(map(lambda v: v.repr(), service_dicts[0]['volumes']))
         assert svc_volumes == ['/c:/b:ro']
 
+    def test_config_invalid_override_config(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': str(V2_0),
+                        'services': {
+                            'web': {
+                                'image': 'example/web',
+                                'override': ["foo"]
+                            }
+                        },
+                    },
+                    filename='filename.yml',
+                )
+            )
+        assert 'services.web.override is invalid: should be of the format' in excinfo.exconly()
+
+    def test_override_mode_ports_override(self):
+        base_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': str(V2_0),
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'ports': ['80:80']
+                    }
+                },
+            }
+        )
+
+        override_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'ports': ['8080:80'],
+                        'override': ['ports'],
+                    }
+                }
+            }
+        )
+        details = config.ConfigDetails('.', [base_file, override_file])
+        service_dicts = config.load(details).services
+        svc_ports = list(map(lambda v: v.repr(), service_dicts[0]['ports']))
+        assert svc_ports == [{
+            'published': 8080,
+            'target': 80,
+        }]
+
     def test_undeclared_volume_v2(self):
         base_file = config.ConfigFile(
             'base.yaml',
