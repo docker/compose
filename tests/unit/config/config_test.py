@@ -42,7 +42,7 @@ from tests import unittest
 DEFAULT_VERSION = V2_0
 
 
-def make_service_dict(name, service_dict, working_dir, filename=None):
+def make_service_dict(name, service_dict, working_dir='.', filename=None):
     """Test helper function to construct a ServiceExtendsResolver
     """
     resolver = config.ServiceExtendsResolver(
