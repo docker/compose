@@ -170,6 +170,9 @@ def setup_console_handler(handler, verbose, noansi=False, level=None):
                 'Invalid value for --log-level. Expected one of DEBUG, INFO, WARNING, ERROR, CRITICAL.'
             )
 
+        if loglevel < logging.WARNING:
+            set_quiet(True)
+
     handler.setLevel(loglevel)
 
 
@@ -411,7 +414,6 @@ class TopLevelCommand(object):
         Usage: down [options]
 
         Options:
-            -q, --quiet             Suppresses parallel progress messages
             --rmi type              Remove images. Type must be one of:
                                       'all': Remove all images used by any service.
                                       'local': Remove only images that don't have a
@@ -426,15 +428,12 @@ class TopLevelCommand(object):
         """
         environment = Environment.from_env_file(self.project_dir)
         ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
-        quiet = options.get('--quiet')
 
         if ignore_orphans and options['--remove-orphans']:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
         image_type = image_type_from_opt('--rmi', options['--rmi'])
         timeout = timeout_from_opts(options)
-
-        set_quiet(quiet)
         self.project.down(
             image_type,
             options['--volumes'],
@@ -1001,8 +1000,6 @@ class TopLevelCommand(object):
                                        --abort-on-container-exit.
             --no-color                 Produce monochrome output.
             --quiet-pull               Pull without printing progress information
-            -q, --quiet                Suppresses parallel progress messages
-                                       (implies --quiet-pull)
             --no-deps                  Don't start linked services.
             --force-recreate           Recreate containers even if their configuration
                                        and image haven't changed.
@@ -1036,7 +1033,6 @@ class TopLevelCommand(object):
         remove_orphans = options['--remove-orphans']
         detached = options.get('--detach')
         no_start = options.get('--no-start')
-        quiet = options.get('--quiet')
 
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
@@ -1051,7 +1047,6 @@ class TopLevelCommand(object):
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
-        set_quiet(quiet)
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)
 

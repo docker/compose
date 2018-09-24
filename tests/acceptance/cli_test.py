@@ -969,12 +969,6 @@ class CLITestCase(DockerClientTestCase):
         assert 'Removing network v2-full_default' in result.stderr
         assert 'Removing network v2-full_front' in result.stderr
 
-    @v2_only()
-    def test_down_quiet(self):
-        self.dispatch(['up', '-d'], None)
-        result = self.dispatch(['down', '-q'], None)
-        assert result.stderr == ''
-
     def test_down_timeout(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
@@ -1101,11 +1095,6 @@ class CLITestCase(DockerClientTestCase):
         assert "%c[2K\r" % 27 not in result.stderr
         assert "%c[1A" % 27 not in result.stderr
         assert "%c[1B" % 27 not in result.stderr
-
-    @v2_only()
-    def test_up_quiet(self):
-        result = self.dispatch(['up', '-d', '-q'], None)
-        assert result.stderr == ''
 
     @v2_only()
     def test_up_with_default_network_config(self):
