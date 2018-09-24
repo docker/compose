@@ -8,6 +8,7 @@ import json.decoder
 import logging
 import ntpath
 import os
+import random
 
 import six
 from docker.errors import DockerException
@@ -161,3 +162,21 @@ def unquote_path(s):
     if s[0] == '"' and s[-1] == '"':
         return s[1:-1]
     return s
+
+
+def generate_random_id():
+    while True:
+        val = hex(random.getrandbits(32 * 8))[2:-1]
+        try:
+            int(truncate_id(val))
+            continue
+        except ValueError:
+            return val
+
+
+def truncate_id(value):
+    if ':' in value:
+        value = value[value.index(':') + 1:]
+    if len(value) > 12:
+        return value[:12]
+    return value

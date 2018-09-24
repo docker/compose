@@ -1291,7 +1291,7 @@ class ConfigTest(unittest.TestCase):
         assert tmpfs_mount.target == '/tmpfs'
         assert not tmpfs_mount.is_named_volume
 
-        assert host_mount.source == os.path.normpath('/abc')
+        assert host_mount.source == '/abc'
         assert host_mount.target == '/xyz'
         assert not host_mount.is_named_volume
 

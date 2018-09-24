@@ -50,7 +50,6 @@ class Version(namedtuple('_Version', 'major minor patch stage edition')):
                 stage = None
             elif '-' in stage:
                 edition, stage = stage.split('-')
-
         major, minor, patch = version.split('.', 3)
         return cls(major, minor, patch, stage, edition)
 

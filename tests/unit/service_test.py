@@ -173,10 +173,10 @@ class ServiceTest(unittest.TestCase):
     def test_self_reference_external_link(self):
         service = Service(
             name='foo',
-            external_links=['default_foo_1']
+            external_links=['default_foo_1_bdfa3ed91e2c']
         )
         with pytest.raises(DependencyError):
-            service.get_container_name('foo', 1)
+            service.get_container_name('foo', 1, 'bdfa3ed91e2c')
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}
@@ -317,13 +317,14 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         prev_container = mock.Mock(
             id='ababab',
-            image_config={'ContainerConfig': {}})
+            image_config={'ContainerConfig': {}}
+        )
+        prev_container.full_slug = 'abcdefff1234'
         prev_container.get.return_value = None
 
         opts = service._get_container_create_options(
-            {},
-            1,
-            previous_container=prev_container)
+            {}, 1, previous_container=prev_container
+        )
 
         assert service.options['labels'] == labels
         assert service.options['environment'] == environment
@@ -355,11 +356,13 @@ class ServiceTest(unittest.TestCase):
             }.get(key, None)
 
         prev_container.get.side_effect = container_get
+        prev_container.full_slug = 'abcdefff1234'
 
         opts = service._get_container_create_options(
             {},
             1,
-            previous_container=prev_container)
+            previous_container=prev_container
+        )
 
         assert opts['environment'] == ['affinity:container==ababab']
 
@@ -370,6 +373,7 @@ class ServiceTest(unittest.TestCase):
             id='ababab',
             image_config={'ContainerConfig': {}})
         prev_container.get.return_value = None
+        prev_container.full_slug = 'abcdefff1234'
 
         opts = service._get_container_create_options(
             {},
@@ -386,7 +390,7 @@ class ServiceTest(unittest.TestCase):
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
-        container_dict = dict(Name='default_foo_2')
+        container_dict = dict(Name='default_foo_2_bdfa3ed91e2c')
         self.mock_client.containers.return_value = [container_dict]
         service = Service('foo', image='foo', client=self.mock_client)
 
@@ -463,6 +467,7 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container(self, _):
         mock_container = mock.create_autospec(Container)
+        mock_container.full_slug = 'abcdefff1234'
         service = Service('foo', client=self.mock_client, image='someimage')
         service.image = lambda: {'Id': 'abc123'}
         new_container = service.recreate_container(mock_container)
@@ -476,6 +481,7 @@ class ServiceTest(unittest.TestCase):
     @mock.patch('compose.service.Container', autospec=True)
     def test_recreate_container_with_timeout(self, _):
         mock_container = mock.create_autospec(Container)
+        mock_container.full_slug = 'abcdefff1234'
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
         service = Service('foo', client=self.mock_client, image='someimage')
         service.recreate_container(mock_container, timeout=1)
@@ -711,9 +717,9 @@ class ServiceTest(unittest.TestCase):
 
         for api_version in set(API_VERSIONS.values()):
             self.mock_client.api_version = api_version
-            assert service._get_container_create_options({}, 1)['labels'][LABEL_CONFIG_HASH] == (
-                config_hash
-            )
+            assert service._get_container_create_options(
+                {}, 1
+            )['labels'][LABEL_CONFIG_HASH] == config_hash
 
     def test_remove_image_none(self):
         web = Service('web', image='example', client=self.mock_client)
