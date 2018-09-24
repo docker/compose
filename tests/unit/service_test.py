@@ -1037,6 +1037,23 @@ class ServiceTest(unittest.TestCase):
         assert len(override_opts['binds']) == 1
         assert override_opts['binds'][0] == 'vol:/data:rw'
 
+    def test_volumes_order_is_preserved(self):
+        service = Service('foo', client=self.mock_client)
+        volumes = [
+            VolumeSpec.parse(cfg) for cfg in [
+                '/v{0}:/v{0}:rw'.format(i) for i in range(6)
+            ]
+        ]
+        ctnr_opts, override_opts = service._build_container_volume_options(
+            previous_container=None,
+            container_options={
+                'volumes': volumes,
+                'environment': {},
+            },
+            override_options={},
+        )
+        assert override_opts['binds'] == [vol.repr() for vol in volumes]
+
 
 class TestServiceNetwork(unittest.TestCase):
     def setUp(self):
