@@ -68,3 +68,9 @@ class TestParseBytes(object):
         assert utils.parse_bytes(123) == 123
         assert utils.parse_bytes('foobar') is None
         assert utils.parse_bytes('123') == 123
+
+
+class TestMoreItertools(object):
+    def test_unique_everseen(self):
+        assert list(utils.unique_everseen([2, 1, 2, 1])) == [2, 1]
+        assert list(utils.unique_everseen([2, 1, 2, 1], hash)) == [2, 1]
