@@ -432,7 +432,7 @@ class ProjectTest(DockerClientTestCase):
         project.up(strategy=ConvergenceStrategy.always)
         assert len(project.containers()) == 2
 
-        db_container = [c for c in project.containers() if 'db' in c.name][0]
+        db_container = [c for c in project.containers() if c.service == 'db'][0]
         assert db_container.id != old_db_id
         assert db_container.get('Volumes./etc') == db_volume_path
 
@@ -452,7 +452,7 @@ class ProjectTest(DockerClientTestCase):
         project.up(strategy=ConvergenceStrategy.always)
         assert len(project.containers()) == 2
 
-        db_container = [c for c in project.containers() if 'db' in c.name][0]
+        db_container = [c for c in project.containers() if c.service == 'db'][0]
         assert db_container.id != old_db_id
         assert db_container.get_mount('/etc')['Source'] == db_volume_path
 
@@ -499,7 +499,7 @@ class ProjectTest(DockerClientTestCase):
         assert len(new_containers) == 2
         assert [c.is_running for c in new_containers] == [True, True]
 
-        db_container = [c for c in new_containers if 'db' in c.name][0]
+        db_container = [c for c in new_containers if c.service == 'db'][0]
         assert db_container.id == old_db_id
         assert db_container.get_mount('/var/db')['Source'] == db_volume_path
 
