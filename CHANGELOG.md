@@ -4,8 +4,6 @@ Change log
 1.23.0 (2018-10-10)
 -------------------
 
-### Features
-
 ### Important note
 
 The default naming scheme for containers created by Compose in this version
@@ -14,7 +12,7 @@ has changed from `<project>_<service>_<index>` to
 hexadecimal string. Please make sure to update scripts relying on the old
 naming scheme accordingly before upgrading.
 
-### All versions
+### Features
 
 - Logs for containers restarting after a crash will now appear in the output
   of the `up` and `logs` commands.
