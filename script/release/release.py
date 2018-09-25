@@ -77,19 +77,24 @@ def monitor_pr_status(pr_data):
                 'pending': 0,
                 'success': 0,
                 'failure': 0,
+                'error': 0,
             }
             for detail in status.statuses:
                 if detail.context == 'dco-signed':
                     # dco-signed check breaks on merge remote-tracking ; ignore it
                     continue
-                summary[detail.state] += 1
-            print('{pending} pending, {success} successes, {failure} failures'.format(**summary))
-            if summary['pending'] == 0 and summary['failure'] == 0 and summary['success'] > 0:
+                if detail.state in summary:
+                    summary[detail.state] += 1
+            print(
+                '{pending} pending, {success} successes, {failure} failures, '
+                '{error} errors'.format(**summary)
+            )
+            if summary['failure'] > 0 or summary['error'] > 0:
+                raise ScriptError('CI failures detected!')
+            elif summary['pending'] == 0 and summary['success'] > 0:
                 # This check assumes at least 1 non-DCO CI check to avoid race conditions.
                 # If testing on a repo without CI, use --skip-ci-check to avoid looping eternally
                 return True
-            elif summary['failure'] > 0:
-                raise ScriptError('CI failures detected!')
             time.sleep(30)
         elif status.state == 'success':
             print('{} successes: all clear!'.format(status.total_count))
@@ -97,12 +102,14 @@ def monitor_pr_status(pr_data):
 
 
 def check_pr_mergeable(pr_data):
-    if not pr_data.mergeable:
+    if pr_data.mergeable is False:
+        # mergeable can also be null, in which case the warning would be a false positive.
         print(
             'WARNING!! PR #{} can not currently be merged. You will need to '
             'resolve the conflicts manually before finalizing the release.'.format(pr_data.number)
         )
-    return pr_data.mergeable
+
+    return pr_data.mergeable is True
 
 
 def create_release_draft(repository, version, pr_data, files):
