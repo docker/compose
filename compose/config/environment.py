@@ -5,6 +5,7 @@ import codecs
 import contextlib
 import logging
 import os
+import re
 
 import six
 
@@ -38,9 +39,10 @@ def env_vars_from_file(filename):
             if line and not line.startswith('#'):
                 k, v = split_env(line)
                 try:
-                    v = v.encode('utf-8').decode('unicode_escape')
+                    quoted_str = re.search('^\"(.*)\"$', v)
+                    if quoted_str:
+                        v = quoted_str.group(1).encode('utf-8').decode('unicode_escape')
                 except Exception:
-                    log.warning('Env file unicode escape failed for value: "{}".'.format(v))
                     pass
                 env[k] = v
     return env
