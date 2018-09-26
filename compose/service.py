@@ -40,8 +40,10 @@ from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
+from .const import LABEL_SLUG
 from .const import LABEL_VERSION
 from .const import NANOCPUS_SCALE
+from .const import WINDOWS_LONGPATH_PREFIX
 from .container import Container
 from .errors import HealthCheckFailed
 from .errors import NoHealthCheckConfigured
@@ -49,9 +51,11 @@ from .errors import OperationFailedError
 from .parallel import parallel_execute
 from .progress_stream import stream_output
 from .progress_stream import StreamOutputError
+from .utils import generate_random_id
 from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
+from .utils import truncate_id
 
 
 log = logging.getLogger(__name__)
@@ -122,7 +126,7 @@ class NoSuchImageError(Exception):
     pass
 
 
-ServiceName = namedtuple('ServiceName', 'project service number')
+ServiceName = namedtuple('ServiceName', 'project service number slug')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
@@ -219,7 +223,6 @@ class Service(object):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-
         for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
             return container
 
@@ -425,27 +428,33 @@ class Service(object):
 
         return has_diverged
 
-    def _execute_convergence_create(self, scale, detached, start, project_services=None):
-            i = self._next_container_number()
+    def _execute_convergence_create(self, scale, detached, start):
 
-            def create_and_start(service, n):
-                container = service.create_container(number=n, quiet=True)
-                if not detached:
-                    container.attach_log_stream()
-                if start:
-                    self.start_container(container)
-                return container
+        i = self._next_container_number()
 
-            containers, errors = parallel_execute(
-                [ServiceName(self.project, self.name, index) for index in range(i, i + scale)],
-                lambda service_name: create_and_start(self, service_name.number),
-                lambda service_name: self.get_container_name(service_name.service, service_name.number),
-                "Creating"
-            )
-            for error in errors.values():
-                raise OperationFailedError(error)
+        def create_and_start(service, n):
+            container = service.create_container(number=n, quiet=True)
+            if not detached:
+                container.attach_log_stream()
+            if start:
+                self.start_container(container)
+            return container
 
-            return containers
+        containers, errors = parallel_execute(
+            [
+                ServiceName(self.project, self.name, index, generate_random_id())
+                for index in range(i, i + scale)
+            ],
+            lambda service_name: create_and_start(self, service_name.number),
+            lambda service_name: self.get_container_name(
+                service_name.service, service_name.number, service_name.slug
+            ),
+            "Creating"
+        )
+        for error in errors.values():
+            raise OperationFailedError(error)
+
+        return containers
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start,
                                       renew_anonymous_volumes):
@@ -508,8 +517,8 @@ class Service(object):
 
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
                                  start=True, scale_override=None,
-                                 rescale=True, project_services=None,
-                                 reset_container_image=False, renew_anonymous_volumes=False):
+                                 rescale=True, reset_container_image=False,
+                                 renew_anonymous_volumes=False):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
@@ -518,7 +527,7 @@ class Service(object):
 
         if action == 'create':
             return self._execute_convergence_create(
-                scale, detached, start, project_services
+                scale, detached, start
             )
 
         # The create action needs always needs an initial scale, but otherwise,
@@ -568,7 +577,7 @@ class Service(object):
         container.rename_to_tmp_name()
         new_container = self.create_container(
             previous_container=container if not renew_anonymous_volumes else None,
-            number=container.labels.get(LABEL_CONTAINER_NUMBER),
+            number=container.number,
             quiet=True,
         )
         if attach_logs:
@@ -656,9 +665,15 @@ class Service(object):
         return json_hash(self.config_dict())
 
     def config_dict(self):
+        def image_id():
+            try:
+                return self.image()['Id']
+            except NoSuchImageError:
+                return None
+
         return {
             'options': self.options,
-            'image_id': self.image()['Id'],
+            'image_id': image_id(),
             'links': self.get_link_names(),
             'net': self.network_mode.id,
             'networks': self.networks,
@@ -717,8 +732,6 @@ class Service(object):
     def get_volumes_from_names(self):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
-    # TODO: this would benefit from github.com/docker/docker/pull/14699
-    # to remove the need to inspect every container
     def _next_container_number(self, one_off=False):
         containers = itertools.chain(
             self._fetch_containers(
@@ -807,6 +820,7 @@ class Service(object):
             one_off=False,
             previous_container=None):
         add_config_hash = (not one_off and not override_options)
+        slug = generate_random_id() if previous_container is None else previous_container.full_slug
 
         container_options = dict(
             (k, self.options[k])
@@ -815,7 +829,7 @@ class Service(object):
         container_options.update(override_options)
 
         if not container_options.get('name'):
-            container_options['name'] = self.get_container_name(self.name, number, one_off)
+            container_options['name'] = self.get_container_name(self.name, number, slug, one_off)
 
         container_options.setdefault('detach', True)
 
@@ -867,7 +881,9 @@ class Service(object):
             container_options.get('labels', {}),
             self.labels(one_off=one_off),
             number,
-            self.config_hash if add_config_hash else None)
+            self.config_hash if add_config_hash else None,
+            slug
+        )
 
         # Delete options which are only used in HostConfig
         for key in HOST_CONFIG_KEYS:
@@ -1033,12 +1049,7 @@ class Service(object):
         for k, v in self._parse_proxy_config().items():
             build_args.setdefault(k, v)
 
-        # python2 os.stat() doesn't support unicode on some UNIX, so we
-        # encode it to a bytestring to be safe
-        path = build_opts.get('context')
-        if not six.PY3 and not IS_WINDOWS_PLATFORM:
-            path = path.encode('utf8')
-
+        path = rewrite_build_path(build_opts.get('context'))
         if self.platform and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted builds for API version < 1.35'
@@ -1068,7 +1079,7 @@ class Service(object):
         )
 
         try:
-            all_events = stream_output(build_output, sys.stdout)
+            all_events = list(stream_output(build_output, sys.stdout))
         except StreamOutputError as e:
             raise BuildError(self, six.text_type(e))
 
@@ -1105,12 +1116,12 @@ class Service(object):
     def custom_container_name(self):
         return self.options.get('container_name')
 
-    def get_container_name(self, service_name, number, one_off=False):
+    def get_container_name(self, service_name, number, slug, one_off=False):
         if self.custom_container_name and not one_off:
             return self.custom_container_name
 
         container_name = build_container_name(
-            self.project, service_name, number, one_off,
+            self.project, service_name, number, slug, one_off,
         )
         ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
@@ -1162,7 +1173,23 @@ class Service(object):
 
         return any(has_host_port(binding) for binding in self.options.get('ports', []))
 
-    def pull(self, ignore_pull_failures=False, silent=False):
+    def _do_pull(self, repo, pull_kwargs, silent, ignore_pull_failures):
+        try:
+            output = self.client.pull(repo, **pull_kwargs)
+            if silent:
+                with open(os.devnull, 'w') as devnull:
+                    for event in stream_output(output, devnull):
+                        yield event
+            else:
+                for event in stream_output(output, sys.stdout):
+                    yield event
+        except (StreamOutputError, NotFound) as e:
+            if not ignore_pull_failures:
+                raise
+            else:
+                log.error(six.text_type(e))
+
+    def pull(self, ignore_pull_failures=False, silent=False, stream=False):
         if 'image' not in self.options:
             return
 
@@ -1179,20 +1206,11 @@ class Service(object):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted pulls for API version < 1.35'
             )
-        try:
-            output = self.client.pull(repo, **kwargs)
-            if silent:
-                with open(os.devnull, 'w') as devnull:
-                    return progress_stream.get_digest_from_pull(
-                        stream_output(output, devnull))
-            else:
-                return progress_stream.get_digest_from_pull(
-                    stream_output(output, sys.stdout))
-        except (StreamOutputError, NotFound) as e:
-            if not ignore_pull_failures:
-                raise
-            else:
-                log.error(six.text_type(e))
+
+        event_stream = self._do_pull(repo, kwargs, silent, ignore_pull_failures)
+        if stream:
+            return event_stream
+        return progress_stream.get_digest_from_pull(event_stream)
 
     def push(self, ignore_push_failures=False):
         if 'image' not in self.options or 'build' not in self.options:
@@ -1360,11 +1378,13 @@ class ServiceNetworkMode(object):
 # Names
 
 
-def build_container_name(project, service, number, one_off=False):
+def build_container_name(project, service, number, slug, one_off=False):
     bits = [project.lstrip('-_'), service]
     if one_off:
         bits.append('run')
-    return '_'.join(bits + [str(number)])
+    return '_'.join(
+        bits + ([str(number), truncate_id(slug)] if slug else [str(number)])
+    )
 
 
 # Images
@@ -1545,10 +1565,11 @@ def build_mount(mount_spec):
 # Labels
 
 
-def build_container_labels(label_options, service_labels, number, config_hash):
+def build_container_labels(label_options, service_labels, number, config_hash, slug):
     labels = dict(label_options or {})
     labels.update(label.split('=', 1) for label in service_labels)
     labels[LABEL_CONTAINER_NUMBER] = str(number)
+    labels[LABEL_SLUG] = slug
     labels[LABEL_VERSION] = __version__
 
     if config_hash:
@@ -1637,3 +1658,15 @@ def convert_blkio_config(blkio_config):
             arr.append(dict([(k.capitalize(), v) for k, v in item.items()]))
         result[field] = arr
     return result
+
+
+def rewrite_build_path(path):
+    # python2 os.stat() doesn't support unicode on some UNIX, so we
+    # encode it to a bytestring to be safe
+    if not six.PY3 and not IS_WINDOWS_PLATFORM:
+        path = path.encode('utf8')
+
+    if IS_WINDOWS_PLATFORM and not path.startswith(WINDOWS_LONGPATH_PREFIX):
+        path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
+
+    return path

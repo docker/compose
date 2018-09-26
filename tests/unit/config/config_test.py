@@ -1291,7 +1291,7 @@ class ConfigTest(unittest.TestCase):
         assert tmpfs_mount.target == '/tmpfs'
         assert not tmpfs_mount.is_named_volume
 
-        assert host_mount.source == os.path.normpath('/abc')
+        assert host_mount.source == '/abc'
         assert host_mount.target == '/xyz'
         assert not host_mount.is_named_volume
 
@@ -5096,3 +5096,19 @@ class SerializeTest(unittest.TestCase):
         serialized_config = yaml.load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['command'] == 'echo 十六夜　咲夜'
+
+    def test_serialize_external_false(self):
+        cfg = {
+            'version': '3.4',
+            'volumes': {
+                'test': {
+                    'name': 'test-false',
+                    'external': False
+                }
+            }
+        }
+
+        config_dict = config.load(build_config_details(cfg))
+        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_volume = serialized_config['volumes']['test']
+        assert serialized_volume['external'] is False

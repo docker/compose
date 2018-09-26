@@ -1,43 +1,104 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -ex
 
-python_version() {
-  python -V 2>&1
-}
+. $(dirname $0)/osx_helpers.sh
 
-python3_version() {
-  python3 -V 2>&1
-}
+DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET:-"$(macos_version)"}
+SDK_FETCH=
+if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
+  SDK_FETCH=1
+  # SDK URL from https://github.com/docker/golang-cross/blob/master/osx-cross.sh
+  SDK_URL=https://s3.dockerproject.org/darwin/v2/MacOSX${DEPLOYMENT_TARGET}.sdk.tar.xz
+  SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
+fi
 
-openssl_version() {
-  python -c "import ssl; print ssl.OPENSSL_VERSION"
-}
+OPENSSL_VERSION=1.1.0h
+OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
+OPENSSL_SHA1=0fc39f6aa91b6e7f4d05018f7c5e991e1d2491fd
 
-desired_python3_version="3.6.4"
-desired_python3_brew_version="3.6.4_2"
-python3_formula="https://raw.githubusercontent.com/Homebrew/homebrew-core/b4e69a9a592232fa5a82741f6acecffc2f1d198d/Formula/python3.rb"
+PYTHON_VERSION=3.6.6
+PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
+PYTHON_SHA1=ae1fc9ddd29ad8c1d5f7b0d799ff0787efeb9652
 
-PATH="/usr/local/bin:$PATH"
-
-if !(which brew); then
+#
+# Install prerequisites.
+#
+if ! [ -x "$(command -v brew)" ]; then
   ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 fi
-
-brew update > /dev/null
-
-if !(python3_version | grep "$desired_python3_version"); then
-  if brew list | grep python3; then
-    brew unlink python3
-  fi
-
-  brew install "$python3_formula"
-  brew switch python3 "$desired_python3_brew_version"
+if ! [ -x "$(command -v grealpath)" ]; then
+  brew update > /dev/null
+  brew install coreutils
 fi
-
-echo "*** Using $(python3_version) ; $(python_version)"
-echo "*** Using $(openssl_version)"
-
-if !(which virtualenv); then
+if ! [ -x "$(command -v python3)" ]; then
+  brew update > /dev/null
+  brew install python3
+fi
+if ! [ -x "$(command -v virtualenv)" ]; then
   pip install virtualenv
 fi
+
+#
+# Create toolchain directory.
+#
+BUILD_PATH="$(grealpath $(dirname $0)/../../build)"
+mkdir -p ${BUILD_PATH}
+TOOLCHAIN_PATH="${BUILD_PATH}/toolchain"
+mkdir -p ${TOOLCHAIN_PATH}
+
+#
+# Set macOS SDK.
+#
+if [ ${SDK_FETCH} ]; then
+  SDK_PATH=${TOOLCHAIN_PATH}/MacOSX${DEPLOYMENT_TARGET}.sdk
+  fetch_tarball ${SDK_URL} ${SDK_PATH} ${SDK_SHA1}
+else
+  SDK_PATH="$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${DEPLOYMENT_TARGET}.sdk"
+fi
+
+#
+# Build OpenSSL.
+#
+OPENSSL_SRC_PATH=${TOOLCHAIN_PATH}/openssl-${OPENSSL_VERSION}
+if ! [ -f ${TOOLCHAIN_PATH}/bin/openssl ]; then
+  rm -rf ${OPENSSL_SRC_PATH}
+  fetch_tarball ${OPENSSL_URL} ${OPENSSL_SRC_PATH} ${OPENSSL_SHA1}
+  (
+    cd ${OPENSSL_SRC_PATH}
+    export MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET}
+    export SDKROOT=${SDK_PATH}
+    ./Configure darwin64-x86_64-cc --prefix=${TOOLCHAIN_PATH}
+    make install_sw install_dev
+  )
+fi
+
+#
+# Build Python.
+#
+PYTHON_SRC_PATH=${TOOLCHAIN_PATH}/Python-${PYTHON_VERSION}
+if ! [ -f ${TOOLCHAIN_PATH}/bin/python3 ]; then
+  rm -rf ${PYTHON_SRC_PATH}
+  fetch_tarball ${PYTHON_URL} ${PYTHON_SRC_PATH} ${PYTHON_SHA1}
+  (
+    cd ${PYTHON_SRC_PATH}
+    ./configure --prefix=${TOOLCHAIN_PATH} \
+      --enable-ipv6 --without-ensurepip --with-dtrace --without-gcc \
+      --datarootdir=${TOOLCHAIN_PATH}/share \
+      --datadir=${TOOLCHAIN_PATH}/share \
+      --enable-framework=${TOOLCHAIN_PATH}/Frameworks \
+      MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET} \
+      CFLAGS="-isysroot ${SDK_PATH} -I${TOOLCHAIN_PATH}/include" \
+      CPPFLAGS="-I${SDK_PATH}/usr/include -I${TOOLCHAIN_PATH}include" \
+      LDFLAGS="-isysroot ${SDK_PATH} -L ${TOOLCHAIN_PATH}/lib"
+    make -j 4
+    make install PYTHONAPPSDIR=${TOOLCHAIN_PATH}
+    make frameworkinstallextras PYTHONAPPSDIR=${TOOLCHAIN_PATH}/share
+  )
+fi
+
+echo ""
+echo "*** Targeting macOS: ${DEPLOYMENT_TARGET}"
+echo "*** Using SDK ${SDK_PATH}"
+echo "*** Using $(python3_version ${TOOLCHAIN_PATH})"
+echo "*** Using $(openssl_version ${TOOLCHAIN_PATH})"

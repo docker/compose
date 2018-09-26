@@ -31,7 +31,6 @@ from .service import ConvergenceStrategy
 from .service import NetworkMode
 from .service import PidMode
 from .service import Service
-from .service import ServiceName
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
@@ -198,25 +197,6 @@ class Project(object):
             service.remove_duplicate_containers()
         return services
 
-    def get_scaled_services(self, services, scale_override):
-        """
-        Returns a list of this project's services as scaled ServiceName objects.
-
-        services: a list of Service objects
-        scale_override: a dict with the scale to apply to each service (k: service_name, v: scale)
-        """
-        service_names = []
-        for service in services:
-            if service.name in scale_override:
-                scale = scale_override[service.name]
-            else:
-                scale = service.scale_num
-
-            for i in range(1, scale + 1):
-                service_names.append(ServiceName(self.name, service.name, i))
-
-        return service_names
-
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:
@@ -372,12 +352,35 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False):
+              build_args=None, gzip=False, parallel_build=False):
+
+        services = []
         for service in self.get_services(service_names):
             if service.can_be_built():
-                service.build(no_cache, pull, force_rm, memory, build_args, gzip)
+                services.append(service)
             else:
                 log.info('%s uses an image, skipping' % service.name)
+
+        def build_service(service):
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip)
+
+        if parallel_build:
+            _, errors = parallel.parallel_execute(
+                services,
+                build_service,
+                operator.attrgetter('name'),
+                'Building',
+                limit=5,
+            )
+            if len(errors):
+                combined_errors = '\n'.join([
+                    e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
+                ])
+                raise ProjectError(combined_errors)
+
+        else:
+            for service in services:
+                build_service(service)
 
     def create(
         self,
@@ -471,7 +474,6 @@ class Project(object):
             svc.ensure_image_exists(do_build=do_build, silent=silent)
         plans = self._get_convergence_plans(
             services, strategy, always_recreate_deps=always_recreate_deps)
-        scaled_services = self.get_scaled_services(services, scale_override)
 
         def do(service):
 
@@ -482,7 +484,6 @@ class Project(object):
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
                 start=start,
-                project_services=scaled_services,
                 reset_container_image=reset_container_image,
                 renew_anonymous_volumes=renew_anonymous_volumes,
             )
@@ -548,16 +549,37 @@ class Project(object):
     def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
+        msg = not silent and 'Pulling' or None
 
         if parallel_pull:
             def pull_service(service):
-                service.pull(ignore_pull_failures, True)
+                strm = service.pull(ignore_pull_failures, True, stream=True)
+                writer = parallel.get_stream_writer()
+
+                def trunc(s):
+                    if len(s) > 35:
+                        return s[:33] + '...'
+                    return s
+
+                for event in strm:
+                    if 'status' not in event:
+                        continue
+                    status = event['status'].lower()
+                    if 'progressDetail' in event:
+                        detail = event['progressDetail']
+                        if 'current' in detail and 'total' in detail:
+                            percentage = float(detail['current']) / float(detail['total'])
+                            status = '{} ({:.1%})'.format(status, percentage)
+
+                    writer.write(
+                        msg, service.name, trunc(status), lambda s: s
+                    )
 
             _, errors = parallel.parallel_execute(
                 services,
                 pull_service,
                 operator.attrgetter('name'),
-                not silent and 'Pulling' or None,
+                msg,
                 limit=5,
             )
             if len(errors):

@@ -313,6 +313,13 @@ class ParallelStreamWriter(object):
             self._write_ansi(msg, obj_index, color_func(status))
 
 
+def get_stream_writer():
+    instance = ParallelStreamWriter.instance
+    if instance is None:
+        raise RuntimeError('ParallelStreamWriter has not yet been instantiated')
+    return instance
+
+
 def parallel_operation(containers, operation, options, message):
     parallel_execute(
         containers,
