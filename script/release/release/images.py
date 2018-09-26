@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import base64
+import json
 import os
 import shutil
 
@@ -15,6 +17,12 @@ class ImageManager(object):
     def __init__(self, version):
         self.docker_client = docker.APIClient(**docker.utils.kwargs_from_env())
         self.version = version
+        if 'HUB_CREDENTIALS' in os.environ:
+            print('HUB_CREDENTIALS found in environment, issuing login')
+            credentials = json.loads(base64.urlsafe_b64decode(os.environ['HUB_CREDENTIALS']))
+            self.docker_client.login(
+                username=credentials['Username'], password=credentials['Password']
+            )
 
     def build_images(self, repository, files):
         print("Building release images...")
