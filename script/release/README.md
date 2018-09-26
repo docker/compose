@@ -20,6 +20,12 @@ following repositories:
 - docker/compose
 - docker/compose-tests
 
+### A local Python environment
+
+While most of the release script is running inside a Docker container,
+fetching local Docker credentials depends on the `docker` Python package
+being available locally.
+
 ### A Github account and Github API token
 
 Your Github account needs to have write access on the `docker/compose` repo.
