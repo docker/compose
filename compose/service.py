@@ -1430,7 +1430,7 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
     """
     affinity = {}
 
-    volume_bindings = dict(
+    volume_bindings = OrderedDict(
         build_volume_binding(volume)
         for volume in volumes
         if volume.external
