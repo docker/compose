@@ -170,3 +170,13 @@ def truncate_id(value):
     if len(value) > 12:
         return value[:12]
     return value
+
+
+def unique_everseen(iterable, key=lambda x: x):
+    "List unique elements, preserving order. Remember all elements ever seen."
+    seen = set()
+    for element in iterable:
+        unique_key = key(element)
+        if unique_key not in seen:
+            seen.add(unique_key)
+            yield element
