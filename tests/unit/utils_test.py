@@ -72,5 +72,7 @@ class TestParseBytes(object):
 
 class TestMoreItertools(object):
     def test_unique_everseen(self):
-        assert list(utils.unique_everseen([2, 1, 2, 1])) == [2, 1]
-        assert list(utils.unique_everseen([2, 1, 2, 1], hash)) == [2, 1]
+        unique = utils.unique_everseen
+        assert list(unique([2, 1, 2, 1])) == [2, 1]
+        assert list(unique([2, 1, 2, 1], hash)) == [2, 1]
+        assert list(unique([2, 1, 2, 1], lambda x: 'key_%s' % x)) == [2, 1]
