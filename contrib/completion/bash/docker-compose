@@ -136,7 +136,18 @@ _docker_compose_bundle() {
 
 
 _docker_compose_config() {
-	COMPREPLY=( $( compgen -W "--help --quiet -q --resolve-image-digests --services --volumes --hash" -- "$cur" ) )
+	case "$prev" in
+		--hash)
+			if [[ $cur == \\* ]] ; then
+				COMPREPLY=( '\*' )
+			else
+				COMPREPLY=( $(compgen -W "$(__docker_compose_services) \\\* " -- "$cur") )
+			fi
+			return
+			;;
+	esac
+
+	COMPREPLY=( $( compgen -W "--hash --help --quiet -q --resolve-image-digests --services --volumes" -- "$cur" ) )
 }
 
 
