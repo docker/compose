@@ -176,6 +176,7 @@ def unique_everseen(iterable, key=lambda x: x):
     "List unique elements, preserving order. Remember all elements ever seen."
     seen = set()
     for element in iterable:
-        if key(element) not in seen:
-            seen.add(element)
+        unique_key = key(element)
+        if unique_key not in seen:
+            seen.add(unique_key)
             yield element
