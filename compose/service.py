@@ -197,7 +197,9 @@ class Service(object):
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
 
-    def containers(self, stopped=False, one_off=False, filters={}, labels=None):
+    def containers(self, stopped=False, one_off=False, filters=None, labels=None):
+        if filters is None:
+            filters = {}
         filters.update({'label': self.labels(one_off=one_off) + (labels or [])})
 
         result = list(filter(None, [
