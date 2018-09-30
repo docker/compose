@@ -27,6 +27,7 @@ from compose.const import COMPOSEFILE_V2_1 as V2_1
 from compose.const import COMPOSEFILE_V2_2 as V2_2
 from compose.const import COMPOSEFILE_V2_3 as V2_3
 from compose.const import COMPOSEFILE_V3_1 as V3_1
+from compose.const import COMPOSEFILE_V3_7 as V3_7
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
@@ -37,6 +38,7 @@ from compose.project import ProjectError
 from compose.service import ConvergenceStrategy
 from tests.integration.testcases import if_runtime_available
 from tests.integration.testcases import is_cluster
+from tests.integration.testcases import min_version_skip
 from tests.integration.testcases import no_cluster
 from tests.integration.testcases import v2_1_only
 from tests.integration.testcases import v2_2_only
@@ -1135,6 +1137,67 @@ class ProjectTest(DockerClientTestCase):
         self.require_api_version('1.30')
         config_data = build_config(
             version=V2_3,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'nvidia'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'nvidia'
+
+    @min_version_skip(V3_7)
+    @if_runtime_available('runc')
+    def test_up_with_runtime_3(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V3_7,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'runc'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        project.up(detached=True)
+        service_container = project.get_service('web').containers(stopped=True)[0]
+        assert service_container.inspect()['HostConfig']['Runtime'] == 'runc'
+
+    @min_version_skip(V3_7)
+    def test_up_with_invalid_runtime_3(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V3_7,
+            services=[{
+                'name': 'web',
+                'image': 'busybox:latest',
+                'runtime': 'foobar'
+            }],
+        )
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+    @min_version_skip(V3_7)
+    @if_runtime_available('nvidia')
+    def test_up_with_nvidia_runtime_3(self):
+        self.require_api_version('1.30')
+        config_data = build_config(
+            version=V3_7,
             services=[{
                 'name': 'web',
                 'image': 'busybox:latest',

@@ -250,6 +250,7 @@
           }
         },
         "sysctls": {"$ref": "#/definitions/list_or_dict"},
+        "runtime": {"type": "string"},
         "stdin_open": {"type": "boolean"},
         "stop_grace_period": {"type": "string", "format": "duration"},
         "stop_signal": {"type": "string"},
