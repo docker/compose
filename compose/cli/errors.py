@@ -67,7 +67,9 @@ def handle_connection_errors(client):
 
 
 def log_windows_pipe_error(exc):
-    if exc.winerror == 232:  # https://github.com/docker/compose/issues/5005
+    if exc.winerror == 2:
+        log.error("Couldn't connect to Docker daemon. You might need to start Docker for Windows.")
+    elif exc.winerror == 232:  # https://github.com/docker/compose/issues/5005
         log.error(
             "The current Compose file version is not compatible with your engine version. "
             "Please upgrade your Compose file to a more recent version, or set "
