@@ -105,6 +105,23 @@ class ProjectTest(DockerClientTestCase):
         project = Project('composetest', [web, db], self.client)
         assert set(project.containers(stopped=True)) == set([web_1, db_1])
 
+    def test_parallel_pull_with_no_image(self):
+        config_data = build_config(
+            version=V2_3,
+            services=[{
+                'name': 'web',
+                'build': {'context': '.'},
+            }],
+        )
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=config_data,
+            client=self.client
+        )
+
+        project.pull(parallel_pull=True)
+
     def test_volumes_from_service(self):
         project = Project.from_config(
             name='composetest',
