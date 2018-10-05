@@ -9,8 +9,7 @@ The following things are required to bring a release to a successful conclusion
 
 ### Local Docker engine (Linux Containers)
 
-The release script runs inside a container and builds images that will be part
-of the release.
+The release script builds images that will be part of the release.
 
 ### Docker Hub account
 
@@ -20,11 +19,9 @@ following repositories:
 - docker/compose
 - docker/compose-tests
 
-### A local Python environment
+### Python
 
-While most of the release script is running inside a Docker container,
-fetching local Docker credentials depends on the `docker` Python package
-being available locally.
+The release script is written in Python and requires Python 3.3 at minimum.
 
 ### A Github account and Github API token
 
@@ -58,6 +55,18 @@ Said account needs to be a member of the maintainers group for the
 
 Moreover, the `~/.pypirc` file should exist on your host and contain the
 relevant pypi credentials.
+
+The following is a sample `.pypirc` provided as a guideline:
+
+```
+[distutils]
+index-servers =
+    pypi
+
+[pypi]
+username = user
+password = pass
+```
 
 ## Start a feature release
 
