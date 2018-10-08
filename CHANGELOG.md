@@ -56,6 +56,12 @@ naming scheme accordingly before upgrading.
 - Fixed a bug causing `external: false` entries in the Compose file to be
   printed as `external: true` in the output of `docker-compose config`
 
+- Fixed a bug where issuing a `docker-compose pull` command on services
+  without a defined image key would cause Compose to crash
+
+- Volumes and binds are now mounted in the order they're declared in the
+  service definition
+
 ### Miscellaneous
 
 - The `zsh` completion script has been updated with new options, and no
