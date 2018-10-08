@@ -36,6 +36,8 @@ import requests
 
 GITHUB_API = 'https://api.github.com/repos'
 
+STAGES = ['tp', 'beta', 'rc']
+
 
 class Version(namedtuple('_Version', 'major minor patch stage edition')):
 
@@ -45,7 +47,7 @@ class Version(namedtuple('_Version', 'major minor patch stage edition')):
         version = version.lstrip('v')
         version, _, stage = version.partition('-')
         if stage:
-            if not any(marker in stage for marker in ['rc', 'tp', 'beta']):
+            if not any(marker in stage for marker in STAGES):
                 edition = stage
                 stage = None
             elif '-' in stage:
@@ -62,8 +64,16 @@ class Version(namedtuple('_Version', 'major minor patch stage edition')):
         """Return a representation that allows this object to be sorted
         correctly with the default comparator.
         """
-        # rc releases should appear before official releases
-        stage = (0, self.stage) if self.stage else (1, )
+        # non-GA releases should appear before GA releases
+        # Order: tp -> beta -> rc -> GA
+        if self.stage:
+            for st in STAGES:
+                if st in self.stage:
+                    stage = (STAGES.index(st), self.stage)
+                    break
+        else:
+            stage = (len(STAGES),)
+
         return (int(self.major), int(self.minor), int(self.patch)) + stage
 
     def __str__(self):
@@ -123,9 +133,6 @@ def get_versions(tags):
         try:
             v = Version.parse(tag['name'])
             if v in BLACKLIST:
-                continue
-            # FIXME: Temporary. Remove once these versions are built on dockerswarm/dind
-            if v.stage and 'rc' not in v.stage:
                 continue
             yield v
         except ValueError:

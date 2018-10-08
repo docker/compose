@@ -173,9 +173,10 @@ def distclean():
 def pypi_upload(args):
     print('Uploading to PyPi')
     try:
+        rel = args.release.replace('-rc', 'rc')
         twine_upload([
-            'dist/docker_compose-{}*.whl'.format(args.release),
-            'dist/docker-compose-{}*.tar.gz'.format(args.release)
+            'dist/docker_compose-{}*.whl'.format(rel),
+            'dist/docker-compose-{}*.tar.gz'.format(rel)
         ])
     except HTTPError as e:
         if e.response.status_code == 400 and 'File already exists' in e.message:

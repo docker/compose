@@ -8,6 +8,7 @@ import os
 import shutil
 import tempfile
 from operator import itemgetter
+from random import shuffle
 
 import py
 import pytest
@@ -42,7 +43,7 @@ from tests import unittest
 DEFAULT_VERSION = V2_0
 
 
-def make_service_dict(name, service_dict, working_dir, filename=None):
+def make_service_dict(name, service_dict, working_dir='.', filename=None):
     """Test helper function to construct a ServiceExtendsResolver
     """
     resolver = config.ServiceExtendsResolver(
@@ -3535,6 +3536,13 @@ class VolumeConfigTest(unittest.TestCase):
             )
         ).services[0]
         assert d['volumes'] == [VolumeSpec.parse('/host/path:/container/path')]
+
+    @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
+    def test_volumes_order_is_preserved(self):
+        volumes = ['/{0}:/{0}'.format(i) for i in range(0, 6)]
+        shuffle(volumes)
+        cfg = make_service_dict('foo', {'build': '.', 'volumes': volumes})
+        assert cfg['volumes'] == volumes
 
     @pytest.mark.skipif(IS_WINDOWS_PLATFORM, reason='posix paths')
     @mock.patch.dict(os.environ)

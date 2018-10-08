@@ -34,6 +34,7 @@ from .service import Service
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
+from .utils import truncate_string
 from .volume import ProjectVolumes
 
 
@@ -554,12 +555,10 @@ class Project(object):
         if parallel_pull:
             def pull_service(service):
                 strm = service.pull(ignore_pull_failures, True, stream=True)
-                writer = parallel.get_stream_writer()
+                if strm is None:  # Attempting to pull service with no `image` key is a no-op
+                    return
 
-                def trunc(s):
-                    if len(s) > 35:
-                        return s[:33] + '...'
-                    return s
+                writer = parallel.get_stream_writer()
 
                 for event in strm:
                     if 'status' not in event:
@@ -572,7 +571,7 @@ class Project(object):
                             status = '{} ({:.1%})'.format(status, percentage)
 
                     writer.write(
-                        msg, service.name, trunc(status), lambda s: s
+                        msg, service.name, truncate_string(status), lambda s: s
                     )
 
             _, errors = parallel.parallel_execute(

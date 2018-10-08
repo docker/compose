@@ -56,6 +56,7 @@ from .utils import json_hash
 from .utils import parse_bytes
 from .utils import parse_seconds_float
 from .utils import truncate_id
+from .utils import unique_everseen
 
 
 log = logging.getLogger(__name__)
@@ -940,8 +941,9 @@ class Service(object):
                 override_options['mounts'] = override_options.get('mounts') or []
                 override_options['mounts'].extend([build_mount(v) for v in secret_volumes])
 
-        # Remove possible duplicates (see e.g. https://github.com/docker/compose/issues/5885)
-        override_options['binds'] = list(set(binds))
+        # Remove possible duplicates (see e.g. https://github.com/docker/compose/issues/5885).
+        # unique_everseen preserves order. (see https://github.com/docker/compose/issues/6091).
+        override_options['binds'] = list(unique_everseen(binds))
         return container_options, override_options
 
     def _get_container_host_config(self, override_options, one_off=False):
@@ -1427,7 +1429,7 @@ def merge_volume_bindings(volumes, tmpfs, previous_container, mounts):
     """
     affinity = {}
 
-    volume_bindings = dict(
+    volume_bindings = OrderedDict(
         build_volume_binding(volume)
         for volume in volumes
         if volume.external
