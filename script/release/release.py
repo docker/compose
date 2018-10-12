@@ -266,7 +266,7 @@ def finalize(args):
             raise ScriptError('No PR found for {}'.format(args.release))
         if not check_pr_mergeable(pr_data):
             raise ScriptError('Can not finalize release with an unmergeable PR')
-        if not img_manager.check_images(args.release):
+        if not img_manager.check_images():
             raise ScriptError('Missing release image')
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):
