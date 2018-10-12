@@ -6,10 +6,8 @@ else
     ./script/release/setup-venv.sh
 fi
 
-args=$*
-
-if test -z $args; then
+if test -z "$*"; then
     args="--help"
 fi
 
-./.release-venv/bin/python ./script/release/release.py $args
+./.release-venv/bin/python ./script/release/release.py "$@"
