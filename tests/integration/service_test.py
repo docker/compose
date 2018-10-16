@@ -425,6 +425,22 @@ class ServiceTest(DockerClientTestCase):
         new_container = service.recreate_container(old_container)
         assert new_container.get_mount('/data')['Source'] == volume_path
 
+    def test_recreate_volume_to_mount(self):
+        # https://github.com/docker/compose/issues/6280
+        service = Service(
+            project='composetest',
+            name='db',
+            client=self.client,
+            build={'context': 'tests/fixtures/dockerfile-with-volume'},
+            volumes=[MountSpec.parse({
+                'type': 'volume',
+                'target': '/data',
+            })]
+        )
+        old_container = create_and_start_container(service)
+        new_container = service.recreate_container(old_container)
+        assert new_container.get_mount('/data')['Source']
+
     def test_duplicate_volume_trailing_slash(self):
         """
         When an image specifies a volume, and the Compose file specifies a host path
