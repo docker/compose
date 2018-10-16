@@ -5,7 +5,6 @@ RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
         locales \
-        curl \
         python-dev \
         git
 
