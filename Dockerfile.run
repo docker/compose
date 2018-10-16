@@ -1,7 +1,7 @@
-FROM docker:17.12.1 as docker
-FROM alpine:3.6
+FROM docker:18.06.1 as docker
+FROM alpine:3.8
 
-ENV GLIBC 2.27-r0
+ENV GLIBC 2.28-r0
 
 RUN apk update && apk add --no-cache openssl ca-certificates curl libgcc && \
     curl -fsSL -o /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
