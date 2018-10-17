@@ -17,6 +17,8 @@ from release.const import NAME
 from release.const import REPO_ROOT
 from release.downloader import BinaryDownloader
 from release.images import ImageManager
+from release.pypi import check_pypirc
+from release.pypi import pypi_upload
 from release.repository import delete_assets
 from release.repository import get_contributors
 from release.repository import Repository
@@ -28,8 +30,6 @@ from release.utils import ScriptError
 from release.utils import update_init_py_version
 from release.utils import update_run_sh_version
 from release.utils import yesno
-from requests.exceptions import HTTPError
-from twine.commands.upload import main as twine_upload
 
 
 def create_initial_branch(repository, args):
@@ -170,25 +170,6 @@ def distclean():
         shutil.rmtree(folder, ignore_errors=True)
 
 
-def pypi_upload(args):
-    print('Uploading to PyPi')
-    try:
-        rel = args.release.replace('-rc', 'rc')
-        twine_upload([
-            'dist/docker_compose-{}*.whl'.format(rel),
-            'dist/docker-compose-{}*.tar.gz'.format(rel)
-        ])
-    except HTTPError as e:
-        if e.response.status_code == 400 and 'File already exists' in e.message:
-            if not args.finalize_resume:
-                raise ScriptError(
-                    'Package already uploaded on PyPi.'
-                )
-            print('Skipping PyPi upload - package already uploaded')
-        else:
-            raise ScriptError('Unexpected HTTP error uploading package to PyPi: {}'.format(e))
-
-
 def resume(args):
     try:
         distclean()
@@ -277,6 +258,7 @@ def start(args):
 def finalize(args):
     distclean()
     try:
+        check_pypirc()
         repository = Repository(REPO_ROOT, args.repo)
         img_manager = ImageManager(args.release)
         pr_data = repository.find_release_pr(args.release)
@@ -284,7 +266,7 @@ def finalize(args):
             raise ScriptError('No PR found for {}'.format(args.release))
         if not check_pr_mergeable(pr_data):
             raise ScriptError('Can not finalize release with an unmergeable PR')
-        if not img_manager.check_images(args.release):
+        if not img_manager.check_images():
             raise ScriptError('Missing release image')
         br_name = branch_name(args.release)
         if not repository.branch_exists(br_name):

@@ -1,7 +1,7 @@
-FROM alpine:3.6
+FROM docker:18.06.1 as docker
+FROM alpine:3.8
 
-ENV GLIBC 2.27-r0
-ENV DOCKERBINS_SHA 1270dce1bd7e1838d62ae21d2505d87f16efc1d9074645571daaefdfd0c14054
+ENV GLIBC 2.28-r0
 
 RUN apk update && apk add --no-cache openssl ca-certificates curl libgcc && \
     curl -fsSL -o /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
@@ -10,14 +10,10 @@ RUN apk update && apk add --no-cache openssl ca-certificates curl libgcc && \
     ln -s /lib/libz.so.1 /usr/glibc-compat/lib/ && \
     ln -s /lib/libc.musl-x86_64.so.1 /usr/glibc-compat/lib && \
     ln -s /usr/lib/libgcc_s.so.1 /usr/glibc-compat/lib && \
-    curl -fsSL -o dockerbins.tgz "https://download.docker.com/linux/static/stable/x86_64/docker-17.12.1-ce.tgz" && \
-    echo "${DOCKERBINS_SHA}  dockerbins.tgz" | sha256sum -c - && \
-    tar xvf dockerbins.tgz docker/docker --strip-components 1 && \
-    mv docker /usr/local/bin/docker && \
-    chmod +x /usr/local/bin/docker && \
-    rm dockerbins.tgz /etc/apk/keys/sgerrand.rsa.pub glibc-$GLIBC.apk && \
+    rm /etc/apk/keys/sgerrand.rsa.pub glibc-$GLIBC.apk && \
     apk del curl
 
+COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
 COPY dist/docker-compose-Linux-x86_64 /usr/local/bin/docker-compose
 
 ENTRYPOINT ["docker-compose"]

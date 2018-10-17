@@ -1489,6 +1489,11 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
         if not mount.get('Name'):
             continue
 
+        # Volume (probably an image volume) is overridden by a mount in the service's config
+        # and would cause a duplicate mountpoint error
+        if volume.internal in [m.target for m in mounts_option]:
+            continue
+
         # Copy existing volume from old container
         volume = volume._replace(external=mount['Name'])
         volumes.append(volume)
