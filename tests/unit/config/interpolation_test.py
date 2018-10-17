@@ -332,6 +332,37 @@ def test_interpolate_environment_external_resource_convert_types(mock_env):
     assert value == expected
 
 
+def test_interpolate_service_name_uses_dot(mock_env):
+    entry = {
+        'service.1': {
+            'image': 'busybox',
+            'ulimits': {
+                'nproc': '${POSINT}',
+                'nofile': {
+                    'soft': '${POSINT}',
+                    'hard': '${DEFAULT:-40000}'
+                },
+            },
+        }
+    }
+
+    expected = {
+        'service.1': {
+            'image': 'busybox',
+            'ulimits': {
+                'nproc': 50,
+                'nofile': {
+                    'soft': 50,
+                    'hard': 40000
+                },
+            },
+        }
+    }
+
+    value = interpolate_environment_variables(V3_4, entry, 'service', mock_env)
+    assert value == expected
+
+
 def test_escaped_interpolation(defaults_interpolator):
     assert defaults_interpolator('$${foo}') == '${foo}'
 
