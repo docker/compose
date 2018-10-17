@@ -48,8 +48,15 @@ naming scheme accordingly before upgrading.
   the actual exit code even when the watched container isn't the cause of the
   exit.
 
+- Fixed an issue that would prevent recreating a service in some cases where
+  a volume would be mapped to the same mountpoint as a volume declared inside
+  the image's Dockerfile.
+
 - Fixed a bug that caused hash configuration with multiple networks to be
   inconsistent, causing some services to be unnecessarily restarted.
+
+- Fixed a bug that would cause failures with variable substitution for services
+  with a name containing one or more dot characters
 
 - Fixed a pipe handling issue when using the containerized version of Compose.
 
