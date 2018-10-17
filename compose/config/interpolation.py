@@ -48,7 +48,7 @@ def interpolate_environment_variables(version, config, section, environment):
 
 
 def get_config_path(config_key, section, name):
-    return '{}.{}.{}'.format(section, name, config_key)
+    return '{}/{}/{}'.format(section, name, config_key)
 
 
 def interpolate_value(name, config_key, value, section, interpolator):
@@ -75,7 +75,7 @@ def interpolate_value(name, config_key, value, section, interpolator):
 
 def recursive_interpolate(obj, interpolator, config_path):
     def append(config_path, key):
-        return '{}.{}'.format(config_path, key)
+        return '{}/{}'.format(config_path, key)
 
     if isinstance(obj, six.string_types):
         return converter.convert(config_path, interpolator.interpolate(obj))
@@ -160,12 +160,12 @@ class UnsetRequiredSubstitution(Exception):
         self.err = custom_err_msg
 
 
-PATH_JOKER = '[^.]+'
+PATH_JOKER = '[^/]+'
 FULL_JOKER = '.+'
 
 
 def re_path(*args):
-    return re.compile('^{}$'.format('\.'.join(args)))
+    return re.compile('^{}$'.format('/'.join(args)))
 
 
 def re_path_basic(section, name):
@@ -288,7 +288,7 @@ class ConversionMap(object):
                 except ValueError as e:
                     raise ConfigurationError(
                         'Error while attempting to convert {} to appropriate type: {}'.format(
-                            path, e
+                            path.replace('/', '.'), e
                         )
                     )
         return value
