@@ -1,11 +1,13 @@
 *.egg-info
 .coverage
 .git
+.github
 .tox
 build
+binaries
 coverage-html
 docs/_site
-venv
+*venv
 .tox
 **/__pycache__
 *.pyc
