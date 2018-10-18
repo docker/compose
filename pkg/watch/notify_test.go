@@ -303,6 +303,40 @@ func TestWatchBrokenLink(t *testing.T) {
 	f.assertEvents(link)
 }
 
+func TestMoveAndReplace(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root, err := f.root.NewDir("root")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	file := filepath.Join(root.Path(), "myfile")
+	err = ioutil.WriteFile(file, []byte("hello"), 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = f.notify.Add(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpFile := filepath.Join(root.Path(), ".myfile.swp")
+	err = ioutil.WriteFile(tmpFile, []byte("world"), 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = os.Rename(tmpFile, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.assertEvents(file)
+}
+
 type notifyFixture struct {
 	t       *testing.T
 	root    *TempDir
