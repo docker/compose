@@ -21,9 +21,8 @@ type darwinNotify struct {
 	// change.
 	sm *sync.Mutex
 
-	// When a watch is created for a directory, we've seen fsevents non-determistically
-	// fire 0-3 CREATE events for that directory. We want to ignore these.
-	ignoreCreatedEvents map[string]bool
+	pathsWereWatching map[string]interface{}
+	sawAnyHistoryDone bool
 }
 
 func (d *darwinNotify) loop() {
@@ -39,20 +38,24 @@ func (d *darwinNotify) loop() {
 			for _, e := range events {
 				e.Path = filepath.Join("/", e.Path)
 
-				if e.Flags&fsevents.ItemCreated == fsevents.ItemCreated {
+				if e.Flags&fsevents.HistoryDone == fsevents.HistoryDone {
 					d.sm.Lock()
-					shouldIgnore := d.ignoreCreatedEvents[e.Path]
-					if !shouldIgnore {
-						// If we got a created event for something
-						// that's not on the ignore list, we assume
-						// we're done with the spurious events.
-						d.ignoreCreatedEvents = nil
-					}
+					d.sawAnyHistoryDone = true
 					d.sm.Unlock()
+					continue
+				}
 
-					if shouldIgnore {
-						continue
-					}
+				// We wait until we've seen the HistoryDone event for this watcher before processing any events
+				// so that we skip all of the "spurious" events that precede it.
+				if !d.sawAnyHistoryDone {
+					continue
+				}
+
+				_, isPathWereWatching := d.pathsWereWatching[e.Path]
+				if e.Flags&fsevents.ItemIsDir == fsevents.ItemIsDir && e.Flags&fsevents.ItemCreated == fsevents.ItemCreated && isPathWereWatching {
+					// This is the first create for the path that we're watching. We always get exactly one of these
+					// even after we get the HistoryDone event. Skip it.
+					continue
 				}
 
 				d.events <- FileEvent{
@@ -80,10 +83,10 @@ func (d *darwinNotify) Add(name string) error {
 
 	es.Paths = append(es.Paths, name)
 
-	if d.ignoreCreatedEvents == nil {
-		d.ignoreCreatedEvents = make(map[string]bool, 1)
+	if d.pathsWereWatching == nil {
+		d.pathsWereWatching = make(map[string]interface{})
 	}
-	d.ignoreCreatedEvents[name] = true
+	d.pathsWereWatching[name] = struct{}{}
 
 	if len(es.Paths) == 1 {
 		es.Start()
@@ -119,6 +122,9 @@ func NewWatcher() (Notify, error) {
 		stream: &fsevents.EventStream{
 			Latency: 1 * time.Millisecond,
 			Flags:   fsevents.FileEvents,
+			// NOTE(dmiller): this corresponds to the `sinceWhen` parameter in FSEventStreamCreate
+			// https://developer.apple.com/documentation/coreservices/1443980-fseventstreamcreate
+			EventID: fsevents.LatestEventID(),
 		},
 		sm:     &sync.Mutex{},
 		events: make(chan FileEvent),
