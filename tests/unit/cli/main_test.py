@@ -155,6 +155,14 @@ class TestCallDocker(object):
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
         ]
 
+    def test_with_http_host(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {'--host': 'http://mydocker.net:2333'})
+
+        assert fake_call.call_args[0][0] == [
+            'docker', '--host', 'tcp://mydocker.net:2333', 'ps',
+        ]
+
     def test_with_host_option_shorthand_equal(self):
         with mock.patch('subprocess.call') as fake_call:
             call_docker(['ps'], {'--host': '=tcp://mydocker.net:2333'})
