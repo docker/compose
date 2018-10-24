@@ -41,15 +41,15 @@ DOCKER_CONFIG_HINTS = {
 }
 
 
-VALID_NAME_CHARS = '[a-zA-Z0-9\._\-]'
+VALID_NAME_CHARS = r'[a-zA-Z0-9\._\-]'
 VALID_EXPOSE_FORMAT = r'^\d+(\-\d+)?(\/[a-zA-Z]+)?$'
 
 VALID_IPV4_SEG = r'(\d{1,2}|1\d{2}|2[0-4]\d|25[0-5])'
-VALID_IPV4_ADDR = "({IPV4_SEG}\.){{3}}{IPV4_SEG}".format(IPV4_SEG=VALID_IPV4_SEG)
-VALID_REGEX_IPV4_CIDR = "^{IPV4_ADDR}/(\d|[1-2]\d|3[0-2])$".format(IPV4_ADDR=VALID_IPV4_ADDR)
+VALID_IPV4_ADDR = r"({IPV4_SEG}\.){{3}}{IPV4_SEG}".format(IPV4_SEG=VALID_IPV4_SEG)
+VALID_REGEX_IPV4_CIDR = r"^{IPV4_ADDR}/(\d|[1-2]\d|3[0-2])$".format(IPV4_ADDR=VALID_IPV4_ADDR)
 
 VALID_IPV6_SEG = r'[0-9a-fA-F]{1,4}'
-VALID_REGEX_IPV6_CIDR = "".join("""
+VALID_REGEX_IPV6_CIDR = "".join(r"""
 ^
 (
     (({IPV6_SEG}:){{7}}{IPV6_SEG})|

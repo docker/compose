@@ -2368,7 +2368,7 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
 
         result = self.dispatch(['logs', '-f', '-t'])
-        assert re.search('(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})', result.stdout)
+        assert re.search(r'(\d{4})-(\d{2})-(\d{2})T(\d{2})\:(\d{2})\:(\d{2})', result.stdout)
 
     def test_logs_tail(self):
         self.base_dir = 'tests/fixtures/logs-tail-composefile'

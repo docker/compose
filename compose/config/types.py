@@ -125,7 +125,7 @@ def parse_extra_hosts(extra_hosts_config):
 
 
 def normalize_path_for_engine(path):
-    """Windows paths, c:\my\path\shiny, need to be changed to be compatible with
+    """Windows paths, c:\\my\\path\\shiny, need to be changed to be compatible with
     the Engine. Volume paths are expected to be linux style /c/my/path/shiny/
     """
     drive, tail = splitdrive(path)
