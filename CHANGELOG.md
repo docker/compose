@@ -21,6 +21,9 @@ naming scheme accordingly before upgrading.
   to print a hash string for each service's configuration to facilitate rolling
   updates.
 
+- Added `--parallel` flag to the `docker-compose build` command, allowing
+  Compose to build up to 5 images simultaneously.
+
 - Output for the `pull` command now reports status / progress even when pulling
   multiple images in parallel.
 
