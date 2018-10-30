@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.23.0 (2018-10-10)
+1.23.0 (2018-10-30)
 -------------------
 
 ### Important note
@@ -20,6 +20,9 @@ naming scheme accordingly before upgrading.
 - Added `--hash` option to the `docker-compose config` command, allowing users
   to print a hash string for each service's configuration to facilitate rolling
   updates.
+
+- Added `--parallel` flag to the `docker-compose build` command, allowing
+  Compose to build up to 5 images simultaneously.
 
 - Output for the `pull` command now reports status / progress even when pulling
   multiple images in parallel.
