@@ -1,6 +1,17 @@
 Change log
 ==========
 
+1.23.1 (2018-11-01)
+-------------------
+
+### Bugfixes
+
+- Fixed a bug where working with containers created with a previous (< 1.23.0)
+  version of Compose would cause unexpected crashes
+
+- Fixed an issue where the behavior of the `--project-directory` flag would
+  vary depending on which subcommand was being used.
+
 1.23.0 (2018-10-30)
 -------------------
 
