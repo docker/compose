@@ -5,6 +5,7 @@ import docker
 
 from .. import mock
 from .. import unittest
+from compose.const import LABEL_SLUG
 from compose.container import Container
 from compose.container import get_container_name
 
@@ -87,7 +88,7 @@ class ContainerTest(unittest.TestCase):
         assert container.name == "composetest_db_1"
 
     def test_name_without_project(self):
-        self.container_dict['Name'] = "/composetest_web_7"
+        self.container_dict['Name'] = "/composetest_web_7_092cd63296fd"
         container = Container(None, self.container_dict, has_been_inspected=True)
         assert container.name_without_project == "web_7_092cd63296fd"
 
@@ -95,6 +96,12 @@ class ContainerTest(unittest.TestCase):
         self.container_dict['Name'] = "/custom_name_of_container"
         container = Container(None, self.container_dict, has_been_inspected=True)
         assert container.name_without_project == "custom_name_of_container"
+
+    def test_name_without_project_noslug(self):
+        self.container_dict['Name'] = "/composetest_web_7"
+        del self.container_dict['Config']['Labels'][LABEL_SLUG]
+        container = Container(None, self.container_dict, has_been_inspected=True)
+        assert container.name_without_project == 'web_7'
 
     def test_inspect_if_not_inspected(self):
         mock_client = mock.create_autospec(docker.APIClient)
