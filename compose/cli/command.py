@@ -23,7 +23,8 @@ log = logging.getLogger(__name__)
 
 
 def project_from_options(project_dir, options):
-    environment = Environment.from_env_file(project_dir)
+    override_dir = options.get('--project-directory')
+    environment = Environment.from_env_file(override_dir or project_dir)
     set_parallel_limit(environment)
 
     host = options.get('--host')
@@ -37,7 +38,7 @@ def project_from_options(project_dir, options):
         host=host,
         tls_config=tls_config_from_options(options, environment),
         environment=environment,
-        override_dir=options.get('--project-directory'),
+        override_dir=override_dir,
         compatibility=options.get('--compatibility'),
     )
 
@@ -59,12 +60,13 @@ def set_parallel_limit(environment):
 
 
 def get_config_from_options(base_dir, options):
-    environment = Environment.from_env_file(base_dir)
+    override_dir = options.get('--project-directory')
+    environment = Environment.from_env_file(override_dir or base_dir)
     config_path = get_config_path_from_options(
         base_dir, options, environment
     )
     return config.load(
-        config.find(base_dir, config_path, environment),
+        config.find(base_dir, config_path, environment, override_dir),
         options.get('--compatibility')
     )
 
