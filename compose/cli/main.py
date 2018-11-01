@@ -306,7 +306,7 @@ class TopLevelCommand(object):
             -o, --output PATH          Path to write the bundle file to.
                                        Defaults to "<project name>.dab".
         """
-        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
+        compose_config = get_config_from_options('.', self.toplevel_options)
 
         output = options["--output"]
         if not output:
@@ -336,7 +336,7 @@ class TopLevelCommand(object):
                                      or use the wildcard symbol to display all services
         """
 
-        compose_config = get_config_from_options(self.project_dir, self.toplevel_options)
+        compose_config = get_config_from_options('.', self.toplevel_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
