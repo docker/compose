@@ -91,6 +91,7 @@ DOCKER_CONFIG_KEYS = [
     'healthcheck',
     'image',
     'ipc',
+    'isolation',
     'labels',
     'links',
     'mac_address',
@@ -1042,6 +1043,7 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('networks', parse_networks)
     md.merge_mapping('sysctls', parse_sysctls)
     md.merge_mapping('depends_on', parse_depends_on)
+    md.merge_mapping('storage_opt', parse_flat_dict)
     md.merge_sequence('links', ServiceLink.parse)
     md.merge_sequence('secrets', types.ServiceSecret.parse)
     md.merge_sequence('configs', types.ServiceConfig.parse)
