@@ -85,6 +85,7 @@ HOST_CONFIG_KEYS = [
     'group_add',
     'init',
     'ipc',
+    'isolation',
     'read_only',
     'log_driver',
     'log_opt',
