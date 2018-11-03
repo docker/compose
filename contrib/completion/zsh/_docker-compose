@@ -354,7 +354,7 @@ _docker-compose() {
         '(-): :->command' \
         '(-)*:: :->option-or-argument' && ret=0
 
-    local -a relevant_compose_flags relevant_docker_flags compose_options docker_options
+    local -a relevant_compose_flags relevant_compose_repeatable_flags relevant_docker_flags compose_options docker_options
 
     relevant_compose_flags=(
         "--file" "-f"
@@ -366,6 +366,10 @@ _docker-compose() {
         "--tlskey"
         "--tlsverify"
         "--skip-hostname-check"
+    )
+
+    relevant_compose_repeatable_flags=(
+        "--file" "-f"
     )
 
     relevant_docker_flags=(
@@ -385,9 +389,18 @@ _docker-compose() {
             fi
         fi
         if [[ -n "${relevant_compose_flags[(r)$k]}" ]]; then
-            compose_options+=$k
-            if [[ -n "$opt_args[$k]" ]]; then
-                compose_options+=$opt_args[$k]
+            if [[ -n "${relevant_compose_repeatable_flags[(r)$k]}"  ]]; then
+                values=("${(@s/:/)opt_args[$k]}")
+                for value in $values
+                do
+                    compose_options+=$k
+                    compose_options+=$value
+                done
+            else
+                compose_options+=$k
+                if [[ -n "$opt_args[$k]" ]]; then
+                    compose_options+=$opt_args[$k]
+                fi
             fi
         fi
     done
