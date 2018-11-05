@@ -613,6 +613,19 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_integer_service_property_raise_validation_error(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2.1',
+                    'services': {'foobar': {'image': 'busybox', 1234: 'hah'}}
+                }, 'working_dir', 'filename.yml')
+            )
+
+        assert (
+            "Unsupported config option for services.foobar: '1234'" in excinfo.exconly()
+        )
+
     def test_config_invalid_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
