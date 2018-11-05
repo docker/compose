@@ -330,7 +330,10 @@ def handle_generic_error(error, path):
 
 
 def parse_key_from_error_msg(error):
-    return error.message.split("'")[1]
+    try:
+        return error.message.split("'")[1]
+    except IndexError:
+        return error.message.split('(')[1].split(' ')[0].strip("'")
 
 
 def path_string(path):
