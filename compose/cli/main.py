@@ -696,6 +696,7 @@ class TopLevelCommand(object):
             -q, --quiet          Only display IDs
             --services           Display services
             --filter KEY=VAL     Filter services by a property
+            -a, --all            Shows all stopped containers
         """
         if options['--quiet'] and options['--services']:
             raise UserError('--quiet and --services cannot be combined')
@@ -708,10 +709,14 @@ class TopLevelCommand(object):
             print('\n'.join(service.name for service in services))
             return
 
-        containers = sorted(
-            self.project.containers(service_names=options['SERVICE'], stopped=True) +
-            self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
-            key=attrgetter('name'))
+        if options['--all']:
+            containers = sorted(self.project.containers(service_names=options['SERVICE'],
+                                                        one_off=OneOffFilter.include, stopped=True))
+        else:
+            containers = sorted(
+                self.project.containers(service_names=options['SERVICE'], stopped=True) +
+                self.project.containers(service_names=options['SERVICE'], one_off=OneOffFilter.only),
+                key=attrgetter('name'))
 
         if options['--quiet']:
             for container in containers:
