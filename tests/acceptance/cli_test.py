@@ -606,6 +606,14 @@ class CLITestCase(DockerClientTestCase):
         assert 'with_build' in running.stdout
         assert 'with_image' in running.stdout
 
+    def test_ps_all(self):
+        self.project.get_service('simple').create_container(one_off='blahblah')
+        result = self.dispatch(['ps'])
+        assert 'simple-composefile_simple_run_1' not in result.stdout
+
+        result2 = self.dispatch(['ps', '--all'])
+        assert 'simple-composefile_simple_run_1' in result2.stdout
+
     def test_pull(self):
         result = self.dispatch(['pull'])
         assert 'Pulling simple' in result.stderr

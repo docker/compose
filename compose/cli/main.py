@@ -696,7 +696,7 @@ class TopLevelCommand(object):
             -q, --quiet          Only display IDs
             --services           Display services
             --filter KEY=VAL     Filter services by a property
-            -a, --all            Shows all stopped containers
+            -a, --all            Show all stopped containers
         """
         if options['--quiet'] and options['--services']:
             raise UserError('--quiet and --services cannot be combined')
