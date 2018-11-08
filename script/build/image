@@ -15,3 +15,4 @@ VERSION="$(python setup.py --version)"
 python setup.py sdist bdist_wheel
 ./script/build/linux
 docker build -t docker/compose:$TAG -f Dockerfile.run .
+docker tag docker/compose:$TAG docker/compose:latest
