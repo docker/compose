@@ -12,6 +12,7 @@ import subprocess
 import time
 from collections import Counter
 from collections import namedtuple
+from functools import reduce
 from operator import attrgetter
 
 import pytest
@@ -1098,6 +1099,22 @@ class CLITestCase(DockerClientTestCase):
             if v['Name'].split('/')[-1] == volume.full_name
         ]
         assert len(remote_volumes) > 0
+
+    @v2_only()
+    def test_up_no_start_remove_orphans(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+        self.dispatch(['up', '--no-start'], None)
+
+        services = self.project.get_services()
+
+        stopped = reduce((lambda prev, next: prev.containers(
+            stopped=True) + next.containers(stopped=True)), services)
+        assert len(stopped) == 2
+
+        self.dispatch(['-f', 'one-container.yml', 'up', '--no-start', '--remove-orphans'], None)
+        stopped2 = reduce((lambda prev, next: prev.containers(
+            stopped=True) + next.containers(stopped=True)), services)
+        assert len(stopped2) == 1
 
     @v2_only()
     def test_up_no_ansi(self):

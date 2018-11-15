@@ -627,7 +627,7 @@ class Project(object):
 
     def find_orphan_containers(self, remove_orphans):
         def _find():
-            containers = self._labeled_containers()
+            containers = set(self._labeled_containers() + self._labeled_containers(stopped=True))
             for ctnr in containers:
                 service_name = ctnr.labels.get(LABEL_SERVICE)
                 if service_name not in self.service_names:
@@ -638,7 +638,10 @@ class Project(object):
         if remove_orphans:
             for ctnr in orphans:
                 log.info('Removing orphan container "{0}"'.format(ctnr.name))
-                ctnr.kill()
+                try:
+                    ctnr.kill()
+                except APIError:
+                    pass
                 ctnr.remove(force=True)
         else:
             log.warning(
