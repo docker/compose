@@ -2236,6 +2236,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_start_no_containers(self):
         result = self.dispatch(['start'], returncode=1)
+        assert 'failed' in result.stderr
         assert 'No containers to start' in result.stderr
 
     @v2_only()
