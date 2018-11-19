@@ -1288,8 +1288,8 @@ def build_container_options(options, detach, command):
             [""] if options['--entrypoint'] == '' else options['--entrypoint']
         )
 
-    if options['--rm']:
-        container_options['restart'] = None
+    # Ensure that run command remains one-off (issue #6302)
+    container_options['restart'] = None
 
     if options['--user']:
         container_options['user'] = options.get('--user')
