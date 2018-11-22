@@ -1995,3 +1995,21 @@ class ProjectTest(DockerClientTestCase):
         net_data = self.client.inspect_network(full_net_name)
         assert net_data
         assert net_data['Labels'][LABEL_PROJECT] == '-dashtest'
+
+    def test_avoid_multiple_push(self):
+        service_config_latest = {'image': 'busybox:latest', 'build': '.'}
+        service_config_default = {'image': 'busybox', 'build': '.'}
+        service_config_sha = {
+            'image': 'busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d',
+            'build': '.'
+        }
+        svc1 = self.create_service('busy1', **service_config_latest)
+        svc1_1 = self.create_service('busy11', **service_config_latest)
+        svc2 = self.create_service('busy2', **service_config_default)
+        svc2_1 = self.create_service('busy21', **service_config_default)
+        svc3 = self.create_service('busy3', **service_config_sha)
+        svc3_1 = self.create_service('busy31', **service_config_sha)
+        project = Project('composetest', [svc1, svc1_1, svc2, svc2_1, svc3, svc3_1], self.client)
+        with mock.patch('compose.service.Service.push') as fake_push:
+            project.push(ignore_push_failures=True)
+            assert fake_push.call_count == 2

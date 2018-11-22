@@ -29,6 +29,7 @@ from .service import ContainerNetworkMode
 from .service import ContainerPidMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
+from .service import parse_repository_tag
 from .service import PidMode
 from .service import Service
 from .service import ServiceNetworkMode
@@ -593,8 +594,15 @@ class Project(object):
                 service.pull(ignore_pull_failures, silent=silent)
 
     def push(self, service_names=None, ignore_push_failures=False):
+        unique_images = set()
         for service in self.get_services(service_names, include_deps=False):
-            service.push(ignore_push_failures)
+            # Considering <image> and <image:latest> as the same
+            repo, tag, sep = parse_repository_tag(service.image_name)
+            service_image_name = sep.join((repo, tag)) if tag else sep.join((repo, 'latest'))
+
+            if service_image_name not in unique_images:
+                service.push(ignore_push_failures)
+                unique_images.add(service_image_name)
 
     def _labeled_containers(self, stopped=False, one_off=OneOffFilter.exclude):
         ctnrs = list(filter(None, [
