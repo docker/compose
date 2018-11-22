@@ -56,6 +56,7 @@ class Environment(dict):
     def __init__(self, *args, **kwargs):
         super(Environment, self).__init__(*args, **kwargs)
         self.missing_keys = []
+        self.silent = False
 
     @classmethod
     def from_env_file(cls, base_dir):
@@ -95,7 +96,7 @@ class Environment(dict):
                     return super(Environment, self).__getitem__(key.upper())
                 except KeyError:
                     pass
-            if key not in self.missing_keys:
+            if not self.silent and key not in self.missing_keys:
                 log.warn(
                     "The {} variable is not set. Defaulting to a blank string."
                     .format(key)

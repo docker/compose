@@ -1,4 +1,5 @@
 coverage==4.4.2
+ddt==1.2.0
 flake8==3.5.0
 mock>=1.0.1
 pytest==3.6.3
