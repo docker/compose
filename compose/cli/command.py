@@ -21,10 +21,26 @@ from .utils import get_version_info
 
 log = logging.getLogger(__name__)
 
+SILENT_COMMANDS = set((
+    'events',
+    'exec',
+    'kill',
+    'logs',
+    'pause',
+    'ps',
+    'restart',
+    'rm',
+    'start',
+    'stop',
+    'top',
+    'unpause',
+))
+
 
 def project_from_options(project_dir, options):
     override_dir = options.get('--project-directory')
     environment = Environment.from_env_file(override_dir or project_dir)
+    environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
     set_parallel_limit(environment)
 
     host = options.get('--host')
