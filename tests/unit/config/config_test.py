@@ -613,6 +613,25 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_integer_service_name_raise_validation_error_v2_when_no_interpolate(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '2',
+                        'services': {1: {'image': 'busybox'}}
+                    },
+                    'working_dir',
+                    'filename.yml'
+                ),
+                interpolate=False
+            )
+
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
+
     def test_config_integer_service_property_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
@@ -5327,6 +5346,28 @@ class SerializeTest(unittest.TestCase):
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
         assert serialized_service['entrypoint'][0] == '$$SHELL'
+
+    def test_serialize_escape_dont_interpolate(self):
+        cfg = {
+            'version': '2.2',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': 'echo $FOO',
+                    'environment': {
+                        'CURRENCY': '$'
+                    },
+                    'entrypoint': ['$SHELL', '-c'],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg), interpolate=False)
+
+        serialized_config = yaml.load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+        assert serialized_service['environment']['CURRENCY'] == '$'
+        assert serialized_service['command'] == 'echo $FOO'
+        assert serialized_service['entrypoint'][0] == '$SHELL'
 
     def test_serialize_unicode_values(self):
         cfg = {
