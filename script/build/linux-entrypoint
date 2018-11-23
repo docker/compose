@@ -5,11 +5,15 @@ set -ex
 TARGET=dist/docker-compose-$(uname -s)-$(uname -m)
 VENV=/code/.tox/py36
 
-mkdir -p `pwd`/dist
-chmod 777 `pwd`/dist
+mkdir -p "$(pwd)"/dist
+chmod 777 "$(pwd)"/dist
 
-$VENV/bin/pip install -q -r requirements-build.txt
-./script/build/write-git-sha
-su -c "$VENV/bin/pyinstaller docker-compose.spec" user
-mv dist/docker-compose $TARGET
-$TARGET version
+if [ ! -f "${VENV}/bin/pip" ]; then
+    "${VENV}"/bin/pip install -q -r requirements-build.txt
+    ./script/build/write-git-sha
+    su -c "${VENV}/bin/pyinstaller docker-compose.spec" user
+    mv dist/docker-compose "${TARGET}"
+    "${TARGET}" version
+else
+    echo "Python-Pip is not installed in your Env"
+fi
