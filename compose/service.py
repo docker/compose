@@ -27,6 +27,7 @@ from . import __version__
 from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
+from .config import is_url
 from .config import merge_environment
 from .config import merge_labels
 from .config.errors import DependencyError
@@ -1674,7 +1675,7 @@ def rewrite_build_path(path):
     if not six.PY3 and not IS_WINDOWS_PLATFORM:
         path = path.encode('utf8')
 
-    if IS_WINDOWS_PLATFORM and not path.startswith(WINDOWS_LONGPATH_PREFIX):
+    if IS_WINDOWS_PLATFORM and not is_url(path) and not path.startswith(WINDOWS_LONGPATH_PREFIX):
         path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
 
     return path
