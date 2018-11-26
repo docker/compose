@@ -872,7 +872,7 @@ class TopLevelCommand(object):
         else:
             command = service.options.get('command')
 
-        container_options = build_container_options(options, detach, command)
+        container_options = build_one_off_container_options(options, detach, command)
         run_one_off_container(
             container_options, self.project, service, options,
             self.toplevel_options, self.project_dir
@@ -1267,7 +1267,7 @@ def build_action_from_opts(options):
     return BuildAction.none
 
 
-def build_container_options(options, detach, command):
+def build_one_off_container_options(options, detach, command):
     container_options = {
         'command': command,
         'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
