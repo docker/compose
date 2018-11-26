@@ -21,6 +21,7 @@ from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.const import SECRETS_PATH
+from compose.const import WINDOWS_LONGPATH_PREFIX
 from compose.container import Container
 from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
@@ -38,6 +39,7 @@ from compose.service import NeedsBuildError
 from compose.service import NetworkMode
 from compose.service import NoSuchImageError
 from compose.service import parse_repository_tag
+from compose.service import rewrite_build_path
 from compose.service import Service
 from compose.service import ServiceNetworkMode
 from compose.service import warn_on_masked_volume
@@ -1486,3 +1488,28 @@ class ServiceSecretTest(unittest.TestCase):
 
         assert volumes[0].source == secret1['file']
         assert volumes[0].target == '{}/{}'.format(SECRETS_PATH, secret1['secret'].source)
+
+
+class RewriteBuildPathTest(unittest.TestCase):
+    @mock.patch('compose.service.IS_WINDOWS_PLATFORM', True)
+    def test_rewrite_url_no_prefix(self):
+        urls = [
+            'http://test.com',
+            'https://test.com',
+            'git://test.com',
+            'github.com/test/test',
+            'git@test.com',
+        ]
+        for u in urls:
+            assert rewrite_build_path(u) == u
+
+    @mock.patch('compose.service.IS_WINDOWS_PLATFORM', True)
+    def test_rewrite_windows_path(self):
+        assert rewrite_build_path('C:\\context') == WINDOWS_LONGPATH_PREFIX + 'C:\\context'
+        assert rewrite_build_path(
+            rewrite_build_path('C:\\context')
+        ) == rewrite_build_path('C:\\context')
+
+    @mock.patch('compose.service.IS_WINDOWS_PLATFORM', False)
+    def test_rewrite_unix_path(self):
+        assert rewrite_build_path('/context') == '/context'
