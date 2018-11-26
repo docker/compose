@@ -171,7 +171,10 @@ class CLITestCase(unittest.TestCase):
             '--workdir': None,
         })
 
-        assert mock_client.create_host_config.call_args[1]['restart_policy']['Name'] == 'always'
+        # NOTE: The "run" command is supposed to be a one-off tool; therefore restart policy "no"
+        #       (the default) is enforced despite explicit wish for "always" in the project
+        #       configuration file
+        assert not mock_client.create_host_config.call_args[1].get('restart_policy')
 
         command = TopLevelCommand(project)
         command.run({
