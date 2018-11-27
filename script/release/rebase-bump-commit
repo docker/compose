@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Move the "bump to <version>" commit to the HEAD of the branch
 #
@@ -21,18 +21,18 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 VERSION="$(git config "branch.${BRANCH}.release")" || usage
 
 
-COMMIT_MSG="Bump $VERSION"
+COMMIT_MSG="Bump ${VERSION}"
 sha="$(git log --grep "$COMMIT_MSG\$" --format="%H")"
 if [ -z "$sha" ]; then
     >&2 echo "No commit with message \"$COMMIT_MSG\""
     exit 2
 fi
-if [[ "$sha" == "$(git rev-parse HEAD)" ]]; then
+if [[ "${sha}" == "$(git rev-parse HEAD)" ]]; then
     >&2 echo "Bump commit already at HEAD"
     exit 0
 fi
 
-commits=$(git log --format="%H" "$sha..HEAD" | wc -l | xargs echo)
+commits=$(git log --format="%H" "${sha}..HEAD" | wc -l | xargs echo)
 
-git rebase --onto $sha~1 HEAD~$commits $BRANCH
-git cherry-pick $sha
+git rebase --onto "${sha}"~1 HEAD~"${commits}" "${BRANCH}"
+git cherry-pick "${sha}"

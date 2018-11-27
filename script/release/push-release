@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Create the official release
 #
@@ -34,29 +34,29 @@ fi
 
 API=https://api.github.com/repos
 REPO=docker/compose
-GITHUB_REPO=git@github.com:$REPO
+GITHUB_REPO=git@github.com:"${REPO}"
 
 # Check the build status is green
 sha=$(git rev-parse HEAD)
 url=$API/$REPO/statuses/$sha
 build_status=$(curl -s $url | jq -r '.[0].state')
-if [ -n "$SKIP_BUILD_CHECK" ]; then
+if [ -n "${SKIP_BUILD_CHECK}" ]; then
     echo "Skipping build status check..."
-elif [[ "$build_status" != "success" ]]; then
-    >&2 echo "Build status is $build_status, but it should be success."
+elif [[ "${build_status}" != "success" ]]; then
+    >&2 echo "Build status is ${build_status}, but it should be success."
     exit -1
 fi
 
-echo "Tagging the release as $VERSION"
-git tag $VERSION
-git push $GITHUB_REPO $VERSION
+echo "Tagging the release as ${VERSION}"
+git tag "${VERSION}"
+git push $GITHUB_REPO "${VERSION}"
 
 echo "Uploading the docker image"
-docker push docker/compose:$VERSION
+docker push docker/compose:"${VERSION}"
 
 echo "Uploading the compose-tests image"
 docker push docker/compose-tests:latest
-docker push docker/compose-tests:$VERSION
+docker push docker/compose-tests:"${VERSION}"
 
 echo "Uploading package to PyPI"
 pandoc -f markdown -t rst README.md -o README.rst
@@ -64,7 +64,7 @@ sed -i -e 's/logo.png?raw=true/https:\/\/github.com\/docker\/compose\/raw\/maste
 ./script/build/write-git-sha
 python setup.py sdist bdist_wheel
 if [ "$(command -v twine 2> /dev/null)" ]; then
-    twine upload ./dist/docker-compose-${VERSION/-/}.tar.gz ./dist/docker_compose-${VERSION/-/}-py2.py3-none-any.whl
+    twine upload ./dist/docker-compose-"${VERSION/-/}".tar.gz ./dist/docker_compose-"${VERSION/-/}"-py2.py3-none-any.whl
 else
     python setup.py upload
 fi
@@ -73,7 +73,7 @@ echo "Testing pip package"
 deactivate || true
 virtualenv venv-test
 source venv-test/bin/activate
-pip install docker-compose==$VERSION
+pip install docker-compose=="${VERSION}"
 docker-compose version
 deactivate
 rm -rf venv-test

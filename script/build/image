@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -14,4 +14,4 @@ VERSION="$(python setup.py --version)"
 ./script/build/write-git-sha
 python setup.py sdist bdist_wheel
 ./script/build/linux
-docker build -t docker/compose:$TAG -f Dockerfile.run .
+docker build -t docker/compose:"${TAG}" -f Dockerfile.run .

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # This should be run inside a container built from the Dockerfile
 # at the root of the repo - script/test will do it automatically.
 

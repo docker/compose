@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Write the current commit sha to the file GITSHA. This file is included in
 # packaging so that `docker-compose version` can include the git sha.

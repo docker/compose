@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -ex
 
@@ -15,5 +15,6 @@ if [ ! -f "${VENV}/bin/pip" ]; then
     mv dist/docker-compose "${TARGET}"
     "${TARGET}" version
 else
-    echo "Python-Pip is not installed in your Env"
+    >&2 echo "python-pip is not installed in your environment."
+    exit 1
 fi
