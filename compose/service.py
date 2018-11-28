@@ -27,6 +27,7 @@ from . import __version__
 from . import const
 from . import progress_stream
 from .config import DOCKER_CONFIG_KEYS
+from .config import is_url
 from .config import merge_environment
 from .config import merge_labels
 from .config.errors import DependencyError
@@ -85,6 +86,7 @@ HOST_CONFIG_KEYS = [
     'group_add',
     'init',
     'ipc',
+    'isolation',
     'read_only',
     'log_driver',
     'log_opt',
@@ -127,7 +129,7 @@ class NoSuchImageError(Exception):
     pass
 
 
-ServiceName = namedtuple('ServiceName', 'project service number slug')
+ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
@@ -443,13 +445,11 @@ class Service(object):
 
         containers, errors = parallel_execute(
             [
-                ServiceName(self.project, self.name, index, generate_random_id())
+                ServiceName(self.project, self.name, index)
                 for index in range(i, i + scale)
             ],
             lambda service_name: create_and_start(self, service_name.number),
-            lambda service_name: self.get_container_name(
-                service_name.service, service_name.number, service_name.slug
-            ),
+            lambda service_name: self.get_container_name(service_name.service, service_name.number),
             "Creating"
         )
         for error in errors.values():
@@ -734,16 +734,18 @@ class Service(object):
         return [s.source.name for s in self.volumes_from if isinstance(s.source, Service)]
 
     def _next_container_number(self, one_off=False):
+        if one_off:
+            return None
         containers = itertools.chain(
             self._fetch_containers(
                 all=True,
-                filters={'label': self.labels(one_off=one_off)}
+                filters={'label': self.labels(one_off=False)}
             ), self._fetch_containers(
                 all=True,
-                filters={'label': self.labels(one_off=one_off, legacy=True)}
+                filters={'label': self.labels(one_off=False, legacy=True)}
             )
         )
-        numbers = [c.number for c in containers]
+        numbers = [c.number for c in containers if c.number is not None]
         return 1 if not numbers else max(numbers) + 1
 
     def _fetch_containers(self, **fetch_options):
@@ -821,7 +823,7 @@ class Service(object):
             one_off=False,
             previous_container=None):
         add_config_hash = (not one_off and not override_options)
-        slug = generate_random_id() if previous_container is None else previous_container.full_slug
+        slug = generate_random_id() if one_off else None
 
         container_options = dict(
             (k, self.options[k])
@@ -830,7 +832,7 @@ class Service(object):
         container_options.update(override_options)
 
         if not container_options.get('name'):
-            container_options['name'] = self.get_container_name(self.name, number, slug, one_off)
+            container_options['name'] = self.get_container_name(self.name, number, slug)
 
         container_options.setdefault('detach', True)
 
@@ -1118,12 +1120,12 @@ class Service(object):
     def custom_container_name(self):
         return self.options.get('container_name')
 
-    def get_container_name(self, service_name, number, slug, one_off=False):
-        if self.custom_container_name and not one_off:
+    def get_container_name(self, service_name, number, slug=None):
+        if self.custom_container_name and slug is None:
             return self.custom_container_name
 
         container_name = build_container_name(
-            self.project, service_name, number, slug, one_off,
+            self.project, service_name, number, slug,
         )
         ext_links_origins = [l.split(':')[0] for l in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
@@ -1380,13 +1382,13 @@ class ServiceNetworkMode(object):
 # Names
 
 
-def build_container_name(project, service, number, slug, one_off=False):
+def build_container_name(project, service, number, slug=None):
     bits = [project.lstrip('-_'), service]
-    if one_off:
-        bits.append('run')
-    return '_'.join(
-        bits + ([str(number), truncate_id(slug)] if slug else [str(number)])
-    )
+    if slug:
+        bits.extend(['run', truncate_id(slug)])
+    else:
+        bits.append(str(number))
+    return '_'.join(bits)
 
 
 # Images
@@ -1575,8 +1577,10 @@ def build_mount(mount_spec):
 def build_container_labels(label_options, service_labels, number, config_hash, slug):
     labels = dict(label_options or {})
     labels.update(label.split('=', 1) for label in service_labels)
-    labels[LABEL_CONTAINER_NUMBER] = str(number)
-    labels[LABEL_SLUG] = slug
+    if number is not None:
+        labels[LABEL_CONTAINER_NUMBER] = str(number)
+    if slug is not None:
+        labels[LABEL_SLUG] = slug
     labels[LABEL_VERSION] = __version__
 
     if config_hash:
@@ -1673,7 +1677,7 @@ def rewrite_build_path(path):
     if not six.PY3 and not IS_WINDOWS_PLATFORM:
         path = path.encode('utf8')
 
-    if IS_WINDOWS_PLATFORM and not path.startswith(WINDOWS_LONGPATH_PREFIX):
+    if IS_WINDOWS_PLATFORM and not is_url(path) and not path.startswith(WINDOWS_LONGPATH_PREFIX):
         path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
 
     return path

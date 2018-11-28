@@ -613,6 +613,19 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_integer_service_property_raise_validation_error(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details({
+                    'version': '2.1',
+                    'services': {'foobar': {'image': 'busybox', 1234: 'hah'}}
+                }, 'working_dir', 'filename.yml')
+            )
+
+        assert (
+            "Unsupported config option for services.foobar: '1234'" in excinfo.exconly()
+        )
+
     def test_config_invalid_service_name_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
@@ -2643,6 +2656,45 @@ class ConfigTest(unittest.TestCase):
         assert sorted(actual['device_cgroup_rules']) == sorted(
             ['c 7:128 rwm', 'x 3:244 rw', 'f 0:128 n']
         )
+
+    def test_merge_isolation(self):
+        base = {
+            'image': 'bar',
+            'isolation': 'default',
+        }
+
+        override = {
+            'isolation': 'hyperv',
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert actual == {
+            'image': 'bar',
+            'isolation': 'hyperv',
+        }
+
+    def test_merge_storage_opt(self):
+        base = {
+            'image': 'bar',
+            'storage_opt': {
+                'size': '1G',
+                'readonly': 'false',
+            }
+        }
+
+        override = {
+            'storage_opt': {
+                'size': '2G',
+                'encryption': 'aes',
+            }
+        }
+
+        actual = config.merge_service_dicts(base, override, V2_3)
+        assert actual['storage_opt'] == {
+            'size': '2G',
+            'readonly': 'false',
+            'encryption': 'aes',
+        }
 
     def test_external_volume_config(self):
         config_details = build_config_details({

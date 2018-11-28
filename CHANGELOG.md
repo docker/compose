@@ -1,6 +1,30 @@
 Change log
 ==========
 
+1.23.2 (2018-11-28)
+-------------------
+
+### Bugfixes
+
+- Reverted a 1.23.0 change that appended random strings to container names
+  created by `docker-compose up`, causing addressability issues.
+  Note: Containers created by `docker-compose run` will continue to use
+  randomly generated names to avoid collisions during parallel runs.
+
+- Fixed an issue where some `dockerfile` paths would fail unexpectedly when
+  attempting to build on Windows.
+
+- Fixed a bug where build context URLs would fail to build on Windows.
+
+- Fixed a bug that caused `run` and `exec` commands to fail for some otherwise
+  accepted values of the `--host` parameter.
+
+- Fixed an issue where overrides for the `storage_opt` and `isolation` keys in
+  service definitions weren't properly applied.
+
+- Fixed a bug where some invalid Compose files would raise an uncaught
+  exception during validation.
+
 1.23.1 (2018-11-01)
 -------------------
 
