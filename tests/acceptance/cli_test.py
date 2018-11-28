@@ -609,10 +609,10 @@ class CLITestCase(DockerClientTestCase):
     def test_ps_all(self):
         self.project.get_service('simple').create_container(one_off='blahblah')
         result = self.dispatch(['ps'])
-        assert 'simple-composefile_simple_run_1' not in result.stdout
+        assert 'simple-composefile_simple_run_' not in result.stdout
 
         result2 = self.dispatch(['ps', '--all'])
-        assert 'simple-composefile_simple_run_1' in result2.stdout
+        assert 'simple-composefile_simple_run_' in result2.stdout
 
     def test_pull(self):
         result = self.dispatch(['pull'])
@@ -980,11 +980,11 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['down', '--rmi=local', '--volumes'])
         assert 'Stopping v2-full_web_1' in result.stderr
         assert 'Stopping v2-full_other_1' in result.stderr
-        assert 'Stopping v2-full_web_run_2' in result.stderr
+        assert 'Stopping v2-full_web_run_' in result.stderr
         assert 'Removing v2-full_web_1' in result.stderr
         assert 'Removing v2-full_other_1' in result.stderr
-        assert 'Removing v2-full_web_run_1' in result.stderr
-        assert 'Removing v2-full_web_run_2' in result.stderr
+        assert 'Removing v2-full_web_run_' in result.stderr
+        assert 'Removing v2-full_web_run_' in result.stderr
         assert 'Removing volume v2-full_data' in result.stderr
         assert 'Removing image v2-full_web' in result.stderr
         assert 'Removing image busybox' not in result.stderr
@@ -1046,8 +1046,8 @@ class CLITestCase(DockerClientTestCase):
             stopped=True
         )[0].name_without_project
 
-        assert '{} | simple'.format(simple_name) in result.stdout
-        assert '{} | another'.format(another_name) in result.stdout
+        assert '{}   | simple'.format(simple_name) in result.stdout
+        assert '{}  | another'.format(another_name) in result.stdout
         assert '{} exited with code 0'.format(simple_name) in result.stdout
         assert '{} exited with code 0'.format(another_name) in result.stdout
 
@@ -2347,10 +2347,9 @@ class CLITestCase(DockerClientTestCase):
 
         result = wait_on_process(proc)
 
-        assert len(re.findall(
-            r'logs-restart-composefile_another_1_[a-f0-9]{12} exited with code 1',
-            result.stdout
-        )) == 3
+        assert result.stdout.count(
+            r'logs-restart-composefile_another_1 exited with code 1'
+        ) == 3
         assert result.stdout.count('world') == 3
 
     def test_logs_default(self):
@@ -2721,7 +2720,7 @@ class CLITestCase(DockerClientTestCase):
         )
 
         result = wait_on_process(proc, returncode=1)
-        assert re.findall(r'exit-code-from_another_1_[a-f0-9]{12} exited with code 1', result.stdout)
+        assert 'exit-code-from_another_1 exited with code 1' in result.stdout
 
     def test_exit_code_from_signal_stop(self):
         self.base_dir = 'tests/fixtures/exit-code-from'
