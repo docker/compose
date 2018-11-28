@@ -175,10 +175,10 @@ class ServiceTest(unittest.TestCase):
     def test_self_reference_external_link(self):
         service = Service(
             name='foo',
-            external_links=['default_foo_1_bdfa3ed91e2c']
+            external_links=['default_foo_1']
         )
         with pytest.raises(DependencyError):
-            service.get_container_name('foo', 1, 'bdfa3ed91e2c')
+            service.get_container_name('foo', 1)
 
     def test_mem_reservation(self):
         self.mock_client.create_host_config.return_value = {}

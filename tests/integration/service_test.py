@@ -32,7 +32,6 @@ from compose.const import LABEL_CONTAINER_NUMBER
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
-from compose.const import LABEL_SLUG
 from compose.const import LABEL_VERSION
 from compose.container import Container
 from compose.errors import OperationFailedError
@@ -1269,16 +1268,15 @@ class ServiceTest(DockerClientTestCase):
         test that those containers are restarted and not removed/recreated.
         """
         service = self.create_service('web')
-        valid_numbers = [service._next_container_number(), service._next_container_number()]
-        service.create_container(number=valid_numbers[0])
-        service.create_container(number=valid_numbers[1])
+        service.create_container(number=1)
+        service.create_container(number=2)
 
         ParallelStreamWriter.instance = None
         with mock.patch('sys.stderr', new_callable=StringIO) as mock_stderr:
             service.scale(2)
         for container in service.containers():
             assert container.is_running
-            assert container.number in valid_numbers
+            assert container.number in [1, 2]
 
         captured_output = mock_stderr.getvalue()
         assert 'Creating' not in captured_output
@@ -1610,7 +1608,6 @@ class ServiceTest(DockerClientTestCase):
         labels = ctnr.labels.items()
         for pair in expected.items():
             assert pair in labels
-        assert ctnr.labels[LABEL_SLUG] == ctnr.full_slug
 
     def test_empty_labels(self):
         labels_dict = {'foo': '', 'bar': ''}
