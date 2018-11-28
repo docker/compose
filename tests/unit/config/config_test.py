@@ -1336,32 +1336,6 @@ class ConfigTest(unittest.TestCase):
         assert mount.type == 'bind'
         assert mount.source == expected_source
 
-    def test_load_bind_mount_relative_path_with_tilde(self):
-        base_file = config.ConfigFile(
-            'base.yaml', {
-                'version': '3.4',
-                'services': {
-                    'web': {
-                        'image': 'busybox:latest',
-                        'volumes': [
-                            {'type': 'bind', 'source': '~/web', 'target': '/web'},
-                        ],
-                    },
-                },
-            },
-        )
-
-        details = config.ConfigDetails('.', [base_file])
-        config_data = config.load(details)
-        mount = config_data.services[0].get('volumes')[0]
-        assert mount.target == '/web'
-        assert mount.type == 'bind'
-        assert (
-            not mount.source.startswith('~') and mount.source.endswith(
-                '{}web'.format(os.path.sep)
-            )
-        )
-
     def test_config_invalid_ipam_config(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
