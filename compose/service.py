@@ -129,7 +129,7 @@ class NoSuchImageError(Exception):
     pass
 
 
-ServiceName = namedtuple('ServiceName', 'project service number slug')
+ServiceName = namedtuple('ServiceName', 'project service number')
 
 
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
@@ -445,13 +445,11 @@ class Service(object):
 
         containers, errors = parallel_execute(
             [
-                ServiceName(self.project, self.name, index, generate_random_id())
+                ServiceName(self.project, self.name, index)
                 for index in range(i, i + scale)
             ],
             lambda service_name: create_and_start(self, service_name.number),
-            lambda service_name: self.get_container_name(
-                service_name.service, service_name.number, service_name.slug
-            ),
+            lambda service_name: self.get_container_name(service_name.service, service_name.number),
             "Creating"
         )
         for error in errors.values():
