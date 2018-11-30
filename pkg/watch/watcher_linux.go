@@ -1,7 +1,6 @@
 package watch
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -29,27 +29,27 @@ type linuxNotify struct {
 func (d *linuxNotify) Add(name string) error {
 	fi, err := os.Stat(name)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("notify.Add(%q): %v", name, err)
+		return errors.Wrapf(err, "notify.Add(%q)", name)
 	}
 
-	// if it's a file that doesn't exist watch it's parent
+	// if it's a file that doesn't exist, watch its parent
 	if os.IsNotExist(err) {
 		parent := filepath.Join(name, "..")
 		err = d.watcher.Add(parent)
 		if err != nil {
-			return fmt.Errorf("notify.Add(%q): %v", name, err)
+			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 		d.watchList[parent] = true
 	} else if fi.IsDir() {
 		err = d.watchRecursively(name)
 		if err != nil {
-			return fmt.Errorf("notify.Add(%q): %v", name, err)
+			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 		d.watchList[name] = true
 	} else {
 		err = d.watcher.Add(name)
 		if err != nil {
-			return fmt.Errorf("notify.Add(%q): %v", name, err)
+			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 		d.watchList[name] = true
 	}
@@ -68,7 +68,7 @@ func (d *linuxNotify) watchRecursively(dir string) error {
 			if os.IsNotExist(err) {
 				return nil
 			}
-			return fmt.Errorf("watcher.Add(%q): %v", path, err)
+			return errors.Wrapf(err, "watcher.Add(%q)", path)
 		}
 		return nil
 	})
