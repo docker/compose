@@ -26,12 +26,6 @@ if [ -z "$(command -v jq 2> /dev/null)" ]; then
 fi
 
 
-if [ -z "$(command -v pandoc 2> /dev/null)" ]; then
-    >&2 echo "$0 requires http://pandoc.org/"
-    >&2 echo "Please install it and make sure it is available on your \$PATH."
-    exit 2
-fi
-
 API=https://api.github.com/repos
 REPO=docker/compose
 GITHUB_REPO=git@github.com:$REPO
@@ -59,8 +53,6 @@ docker push docker/compose-tests:latest
 docker push docker/compose-tests:$VERSION
 
 echo "Uploading package to PyPI"
-pandoc -f markdown -t rst README.md -o README.rst
-sed -i -e 's/logo.png?raw=true/https:\/\/github.com\/docker\/compose\/raw\/master\/logo.png?raw=true/' README.rst
 ./script/build/write-git-sha
 python setup.py sdist bdist_wheel
 if [ "$(command -v twine 2> /dev/null)" ]; then
