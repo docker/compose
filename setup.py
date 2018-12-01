@@ -77,19 +77,26 @@ setup(
     name='docker-compose',
     version=find_version("compose", "__init__.py"),
     description='Multi-container orchestration for Docker',
+    long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     url='https://www.docker.com/',
+    project_urls={
+        'Documentation': 'https://docs.docker.com/compose/overview',
+        'Changelog': 'https://github.com/docker/compose/blob/release/CHANGELOG.md',
+        'Source': 'https://github.com/docker/compose',
+        'Tracker': 'https://github.com/docker/compose/issues',
+    },
     author='Docker, Inc.',
     license='Apache License 2.0',
     packages=find_packages(exclude=['tests.*', 'tests']),
     include_package_data=True,
-    test_suite='nose.collector',
     install_requires=install_requires,
     extras_require=extras_require,
     tests_require=tests_require,
-    entry_points="""
-    [console_scripts]
-    docker-compose=compose.cli.main:main
-    """,
+    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
+    entry_points={
+        'console_scripts': ['docker-compose=compose.cli.main:main'],
+    },
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
