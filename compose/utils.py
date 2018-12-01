@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import codecs
 import hashlib
-import json
 import json.decoder
 import logging
 import ntpath
