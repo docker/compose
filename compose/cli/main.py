@@ -695,6 +695,7 @@ class TopLevelCommand(object):
             --services           Display services
             --filter KEY=VAL     Filter services by a property
             -a, --all            Show all stopped containers (including those created by the run command)
+            --columns string     Show specific columns without header
         """
         if options['--quiet'] and options['--services']:
             raise UserError('--quiet and --services cannot be combined')
@@ -720,23 +721,23 @@ class TopLevelCommand(object):
             for container in containers:
                 print(container.id)
         else:
-            headers = [
-                'Name',
-                'Command',
-                'State',
-                'Ports',
-            ]
+            if not options['--columns']:
+                headers = columns = ['Name', 'Command', 'State', 'Ports']
+            else:
+                headers = []
+                columns = options.get('--columns').split(',')
             rows = []
             for container in containers:
                 command = container.human_readable_command
                 if len(command) > 30:
                     command = '%s ...' % command[:26]
-                rows.append([
-                    container.name,
-                    command,
-                    container.human_readable_state,
-                    container.human_readable_ports,
-                ])
+                row = {
+                    'Name': container.name,
+                    'Command': command,
+                    'State': container.human_readable_state,
+                    'Ports': container.human_readable_ports,
+                }
+                rows.append([row[column] for column in columns])
             print(Formatter().table(headers, rows))
 
     def pull(self, options):
