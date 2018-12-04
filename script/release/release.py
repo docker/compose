@@ -9,7 +9,6 @@ import sys
 import time
 from distutils.core import run_setup
 
-import pypandoc
 from jinja2 import Template
 from release.bintray import BintrayAPI
 from release.const import BINTRAY_ORG
@@ -277,9 +276,6 @@ def finalize(args):
 
         repository.checkout_branch(br_name)
 
-        pypandoc.convert_file(
-            os.path.join(REPO_ROOT, 'README.md'), 'rst', outputfile=os.path.join(REPO_ROOT, 'README.rst')
-        )
         run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['sdist', 'bdist_wheel'])
 
         merge_status = pr_data.merge()
