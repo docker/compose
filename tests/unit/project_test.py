@@ -620,3 +620,23 @@ class ProjectTest(unittest.TestCase):
         self.mock_client.pull.side_effect = OperationFailedError(b'pull error')
         with pytest.raises(ProjectError):
             project.pull(parallel_pull=True)
+
+    def test_avoid_multiple_push(self):
+        service_config_latest = {'image': 'busybox:latest', 'build': '.'}
+        service_config_default = {'image': 'busybox', 'build': '.'}
+        service_config_sha = {
+            'image': 'busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d',
+            'build': '.'
+        }
+        svc1 = Service('busy1', **service_config_latest)
+        svc1_1 = Service('busy11', **service_config_latest)
+        svc2 = Service('busy2', **service_config_default)
+        svc2_1 = Service('busy21', **service_config_default)
+        svc3 = Service('busy3', **service_config_sha)
+        svc3_1 = Service('busy31', **service_config_sha)
+        project = Project(
+            'composetest', [svc1, svc1_1, svc2, svc2_1, svc3, svc3_1], self.mock_client
+        )
+        with mock.patch('compose.service.Service.push') as fake_push:
+            project.push()
+            assert fake_push.call_count == 2
