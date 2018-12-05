@@ -18,9 +18,10 @@ def split_env(env):
     if isinstance(env, six.binary_type):
         env = env.decode('utf-8', 'replace')
     if '=' in env:
-        return env.split('=', 1)
+        key, value = env.split('=', 1)
+        return key.strip(), value.strip()
     else:
-        return env, None
+        return env.strip(), None
 
 
 def env_vars_from_file(filename):
