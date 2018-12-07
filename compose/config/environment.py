@@ -5,22 +5,33 @@ import codecs
 import contextlib
 import logging
 import os
+import string
 
 import six
 
 from ..const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
+from .errors import EnvFileNotFound
 
 log = logging.getLogger(__name__)
+
+whitespace = set(string.whitespace)
 
 
 def split_env(env):
     if isinstance(env, six.binary_type):
         env = env.decode('utf-8', 'replace')
+    key = value = None
     if '=' in env:
-        return env.split('=', 1)
+        key, value = env.split('=', 1)
     else:
-        return env, None
+        key = env
+    for k in key:
+        if k in whitespace:
+            raise ConfigurationError(
+                "environment variable name '%s' may not contains white spaces." % key
+            )
+    return key, value
 
 
 def env_vars_from_file(filename):
@@ -28,16 +39,19 @@ def env_vars_from_file(filename):
     Read in a line delimited file of environment variables.
     """
     if not os.path.exists(filename):
-        raise ConfigurationError("Couldn't find env file: %s" % filename)
+        raise EnvFileNotFound("Couldn't find env file: %s" % filename)
     elif not os.path.isfile(filename):
-        raise ConfigurationError("%s is not a file." % (filename))
+        raise EnvFileNotFound("%s is not a file." % (filename))
     env = {}
     with contextlib.closing(codecs.open(filename, 'r', 'utf-8-sig')) as fileobj:
         for line in fileobj:
             line = line.strip()
             if line and not line.startswith('#'):
-                k, v = split_env(line)
-                env[k] = v
+                try:
+                    k, v = split_env(line)
+                    env[k] = v
+                except ConfigurationError as e:
+                    raise ConfigurationError('In file {}: {}'.format(filename, e.msg))
     return env
 
 
@@ -55,9 +69,10 @@ class Environment(dict):
             env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
-            except ConfigurationError:
+            except EnvFileNotFound:
                 pass
             return result
+
         instance = _initialize()
         instance.update(os.environ)
         return instance

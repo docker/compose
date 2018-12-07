@@ -19,6 +19,10 @@ class ConfigurationError(Exception):
         return self.msg
 
 
+class EnvFileNotFound(ConfigurationError):
+    pass
+
+
 class DependencyError(ConfigurationError):
     pass
 
