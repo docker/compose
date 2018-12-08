@@ -9,7 +9,6 @@ import sys
 from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
-from operator import itemgetter
 
 import enum
 import six

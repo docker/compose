@@ -3071,6 +3071,41 @@ class ConfigTest(unittest.TestCase):
         )
         config.load(config_details)
 
+    def test_config_duplicate_mount_points(self):
+        config1 = build_config_details(
+            {
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'volumes': ['/tmp/foo:/tmp/foo', '/tmp/foo:/tmp/foo:rw']
+                    }
+                }
+            }
+        )
+
+        config2 = build_config_details(
+            {
+                'version': '3.5',
+                'services': {
+                    'web': {
+                        'image': 'busybox',
+                        'volumes': ['/x:/y', '/z:/y']
+                    }
+                }
+            }
+        )
+
+        with self.assertRaises(ConfigurationError) as e:
+            config.load(config1)
+        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+            ', '.join(['/tmp/foo:/tmp/foo:rw']*2)))
+
+        with self.assertRaises(ConfigurationError) as e:
+            config.load(config2)
+        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+            ', '.join(['/x:/y:rw', '/z:/y:rw'])))
+
 
 class NetworkModeTest(unittest.TestCase):
 
