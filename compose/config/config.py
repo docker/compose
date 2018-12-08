@@ -8,7 +8,7 @@ import os
 import string
 import sys
 from collections import namedtuple
-from operator import itemgetter, attrgetter
+from operator import attrgetter
 
 import six
 import yaml
@@ -844,9 +844,9 @@ def finalize_service_volumes(service_dict, environment):
                 duplicate_mounts.append(mount.repr())
 
         if duplicate_mounts:
-            raise ConfigurationError("Duplicate mount points: volumes [%s]" % (
+            raise ConfigurationError("Duplicate mount points: [%s]" % (
                 ', '.join(duplicate_mounts)))
-        
+
         service_dict['volumes'] = finalized_volumes
 
     return service_dict
