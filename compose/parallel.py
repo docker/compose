@@ -50,7 +50,11 @@ def parallel_execute_watch(events, writer, errors, results, msg, get_name):
     error_to_reraise = None
     for obj, result, exception in events:
         if exception is None:
-            writer.write(msg, get_name(obj), 'done', green)
+            if callable(getattr(obj, 'containers', None)) and not obj.containers():
+                # If service has no containers started
+                writer.write(msg, get_name(obj), 'failed', red)
+            else:
+                writer.write(msg, get_name(obj), 'done', green)
             results.append(result)
         elif isinstance(exception, ImageNotFound):
             # This is to bubble up ImageNotFound exceptions to the client so we
