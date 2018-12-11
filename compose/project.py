@@ -10,13 +10,13 @@ from functools import reduce
 import enum
 import six
 from docker.errors import APIError
+from docker.utils import version_lt
 
 from . import parallel
 from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
 from .config.sort_services import get_service_name_from_network_mode
-from .const import IMAGE_EVENTS
 from .const import LABEL_ONE_OFF
 from .const import LABEL_PROJECT
 from .const import LABEL_SERVICE
@@ -403,11 +403,13 @@ class Project(object):
                 detached=True,
                 start=False)
 
-    def events(self, service_names=None):
+    def _legacy_event_processor(self, service_names):
+        # Only for v1 files or when Compose is forced to use an older API version
         def build_container_event(event, container):
             time = datetime.datetime.fromtimestamp(event['time'])
             time = time.replace(
-                microsecond=microseconds_from_time_nano(event['timeNano']))
+                microsecond=microseconds_from_time_nano(event['timeNano'])
+            )
             return {
                 'time': time,
                 'type': 'container',
@@ -426,23 +428,71 @@ class Project(object):
             filters={'label': self.labels()},
             decode=True
         ):
-            # The first part of this condition is a guard against some events
-            # broadcasted by swarm that don't have a status field.
+            # This is a guard against some events broadcasted by swarm that
+            # don't have a status field.
             # See https://github.com/docker/compose/issues/3316
-            if 'status' not in event or event['status'] in IMAGE_EVENTS:
-                # We don't receive any image events because labels aren't applied
-                # to images
+            if 'status' not in event:
                 continue
 
-            # TODO: get labels from the API v1.22 , see github issue 2618
             try:
-                # this can fail if the container has been removed
+                # this can fail if the container has been removed or if the event
+                # refers to an image
                 container = Container.from_id(self.client, event['id'])
             except APIError:
                 continue
             if container.service not in service_names:
                 continue
             yield build_container_event(event, container)
+
+    def events(self, service_names=None):
+        if version_lt(self.client.api_version, '1.22'):
+            # New, better event API was introduced in 1.22.
+            return self._legacy_event_processor(service_names)
+
+        def build_container_event(event):
+            container_attrs = event['Actor']['Attributes']
+            time = datetime.datetime.fromtimestamp(event['time'])
+            time = time.replace(
+                microsecond=microseconds_from_time_nano(event['timeNano'])
+            )
+
+            container = None
+            try:
+                container = Container.from_id(self.client, event['id'])
+            except APIError:
+                # Container may have been removed (e.g. if this is a destroy event)
+                pass
+
+            return {
+                'time': time,
+                'type': 'container',
+                'action': event['status'],
+                'id': event['Actor']['ID'],
+                'service': container_attrs.get(LABEL_SERVICE),
+                'attributes': dict([
+                    (k, v) for k, v in container_attrs.items()
+                    if not k.startswith('com.docker.compose.')
+                ]),
+                'container': container,
+            }
+
+        def yield_loop(service_names):
+            for event in self.client.events(
+                filters={'label': self.labels()},
+                decode=True
+            ):
+                # TODO: support other event types
+                if event.get('Type') != 'container':
+                    continue
+
+                try:
+                    if event['Actor']['Attributes'][LABEL_SERVICE] not in service_names:
+                        continue
+                except KeyError:
+                    continue
+                yield build_container_event(event)
+
+        return yield_loop(set(service_names) if service_names else self.service_names)
 
     def up(self,
            service_names=None,
