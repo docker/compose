@@ -5,7 +5,7 @@ import codecs
 import contextlib
 import logging
 import os
-import string
+import re
 
 import six
 
@@ -14,8 +14,6 @@ from .errors import ConfigurationError
 from .errors import EnvFileNotFound
 
 log = logging.getLogger(__name__)
-
-whitespace = set(string.whitespace)
 
 
 def split_env(env):
@@ -26,11 +24,10 @@ def split_env(env):
         key, value = env.split('=', 1)
     else:
         key = env
-    for k in key:
-        if k in whitespace:
-            raise ConfigurationError(
-                "environment variable name '%s' may not contains white spaces." % key
-            )
+    if re.search(r'\s', key):
+        raise ConfigurationError(
+            "environment variable name '{}' may not contains whitespace.".format(key)
+        )
     return key, value
 
 
@@ -39,9 +36,9 @@ def env_vars_from_file(filename):
     Read in a line delimited file of environment variables.
     """
     if not os.path.exists(filename):
-        raise EnvFileNotFound("Couldn't find env file: %s" % filename)
+        raise EnvFileNotFound("Couldn't find env file: {}".format(filename))
     elif not os.path.isfile(filename):
-        raise EnvFileNotFound("%s is not a file." % (filename))
+        raise EnvFileNotFound("{} is not a file.".format(filename))
     env = {}
     with contextlib.closing(codecs.open(filename, 'r', 'utf-8-sig')) as fileobj:
         for line in fileobj:
