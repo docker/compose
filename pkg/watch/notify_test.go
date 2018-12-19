@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/windmilleng/tilt/internal/testutils/tempdir"
 )
 
 // Each implementation of the notify interface should have the same basic
@@ -26,12 +28,9 @@ func TestEventOrdering(t *testing.T) {
 	count := 8
 	dirs := make([]string, count)
 	for i, _ := range dirs {
-		dir, err := f.root.NewDir("watched")
-		if err != nil {
-			t.Fatal(err)
-		}
-		dirs[i] = dir.Path()
-		err = f.notify.Add(dir.Path())
+		dir := f.TempDir("watched")
+		dirs[i] = dir
+		err := f.notify.Add(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,20 +57,14 @@ func TestWatchesAreRecursive(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := f.TempDir("root")
 
 	// add a sub directory
-	subPath := filepath.Join(root.Path(), "sub")
-	err = os.MkdirAll(subPath, os.ModePerm)
-	if err != nil {
-		t.Fatal(err)
-	}
+	subPath := filepath.Join(root, "sub")
+	f.MkdirAll(subPath)
 
 	// watch parent
-	err = f.notify.Add(root.Path())
+	err := f.notify.Add(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,24 +85,20 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := f.TempDir("root")
 
 	// watch parent
-	err = f.notify.Add(root.Path())
+	err := f.notify.Add(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.fsync()
 	f.events = nil
+
 	// add a sub directory
-	subPath := filepath.Join(root.Path(), "sub")
-	err = os.MkdirAll(subPath, os.ModePerm)
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	subPath := filepath.Join(root, "sub")
+	f.MkdirAll(subPath)
+
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
 	_, err = os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
@@ -123,25 +112,18 @@ func TestWatchNonExistentPath(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := f.TempDir("root")
+	path := filepath.Join(root, "change")
 
-	path := filepath.Join(root.Path(), "change")
-
-	err = f.notify.Add(path)
+	err := f.notify.Add(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	f.fsync()
 
-	d1 := []byte("hello\ngo\n")
-	err = ioutil.WriteFile(path, d1, 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	d1 := "hello\ngo\n"
+	f.WriteFile(path, d1)
 	f.assertEvents(path)
 }
 
@@ -149,22 +131,13 @@ func TestRemove(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := f.TempDir("root")
+	path := filepath.Join(root, "change")
 
-	path := filepath.Join(root.Path(), "change")
+	d1 := "hello\ngo\n"
+	f.WriteFile(path, d1)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	d1 := []byte("hello\ngo\n")
-	err = ioutil.WriteFile(path, d1, 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = f.notify.Add(path)
+	err := f.notify.Add(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +154,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	path := filepath.Join(f.watched.Path(), "change")
+	path := filepath.Join(f.watched, "change")
 
 	d1 := []byte("hello\ngo\n")
 	err := ioutil.WriteFile(path, d1, 0644)
@@ -214,23 +187,13 @@ func TestSingleFile(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := f.TempDir("root")
+	path := filepath.Join(root, "change")
 
-	path := filepath.Join(root.Path(), "change")
+	d1 := "hello\ngo\n"
+	f.WriteFile(path, d1)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	d1 := []byte("hello\ngo\n")
-	err = ioutil.WriteFile(path, d1, 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = f.notify.Add(path)
+	err := f.notify.Add(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,8 +211,8 @@ func TestWriteBrokenLink(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	link := filepath.Join(f.watched.Path(), "brokenLink")
-	missingFile := filepath.Join(f.watched.Path(), "missingFile")
+	link := filepath.Join(f.watched, "brokenLink")
+	missingFile := filepath.Join(f.watched, "missingFile")
 	err := os.Symlink(missingFile, link)
 	if err != nil {
 		t.Fatal(err)
@@ -262,13 +225,13 @@ func TestWriteGoodLink(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	goodFile := filepath.Join(f.watched.Path(), "goodFile")
+	goodFile := filepath.Join(f.watched, "goodFile")
 	err := ioutil.WriteFile(goodFile, []byte("hello"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	link := filepath.Join(f.watched.Path(), "goodFileSymlink")
+	link := filepath.Join(f.watched, "goodFileSymlink")
 	err = os.Symlink(goodFile, link)
 	if err != nil {
 		t.Fatal(err)
@@ -307,27 +270,17 @@ func TestMoveAndReplace(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	root, err := f.root.NewDir("root")
+	root := f.TempDir("root")
+	file := filepath.Join(root, "myfile")
+	f.WriteFile(file, "hello")
+
+	err := f.notify.Add(file)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	file := filepath.Join(root.Path(), "myfile")
-	err = ioutil.WriteFile(file, []byte("hello"), 0777)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = f.notify.Add(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tmpFile := filepath.Join(root.Path(), ".myfile.swp")
-	err = ioutil.WriteFile(tmpFile, []byte("world"), 0777)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpFile := filepath.Join(root, ".myfile.swp")
+	f.WriteFile(tmpFile, "world")
 
 	err = os.Rename(tmpFile, file)
 	if err != nil {
@@ -338,10 +291,9 @@ func TestMoveAndReplace(t *testing.T) {
 }
 
 type notifyFixture struct {
-	t       *testing.T
-	root    *TempDir
-	watched *TempDir
+	*tempdir.TempDirFixture
 	notify  Notify
+	watched string
 	events  []FileEvent
 }
 
@@ -352,25 +304,17 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 		t.Fatal(err)
 	}
 
-	root, err := NewDir(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	f := tempdir.NewTempDirFixture(t)
+	watched := f.TempDir("watched")
 
-	watched, err := root.NewDir("watched")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = notify.Add(watched.Path())
+	err = notify.Add(watched)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return &notifyFixture{
-		t:       t,
-		root:    root,
-		watched: watched,
-		notify:  notify,
+		TempDirFixture: f,
+		watched:        watched,
+		notify:         notify,
 	}
 }
 
@@ -378,33 +322,30 @@ func (f *notifyFixture) assertEvents(expected ...string) {
 	f.fsync()
 
 	if len(f.events) != len(expected) {
-		f.t.Fatalf("Got %d events (expected %d): %v %v", len(f.events), len(expected), f.events, expected)
+		f.T().Fatalf("Got %d events (expected %d): %v %v", len(f.events), len(expected), f.events, expected)
 	}
 
 	for i, actual := range f.events {
 		e := FileEvent{expected[i]}
 		if actual != e {
-			f.t.Fatalf("Got event %v (expected %v)", actual, e)
+			f.T().Fatalf("Got event %v (expected %v)", actual, e)
 		}
 	}
 }
 
 func (f *notifyFixture) fsync() {
 	syncPathBase := fmt.Sprintf("sync-%d.txt", time.Now().UnixNano())
-	syncPath := filepath.Join(f.watched.Path(), syncPathBase)
-	anySyncPath := filepath.Join(f.watched.Path(), "sync-")
+	syncPath := filepath.Join(f.watched, syncPathBase)
+	anySyncPath := filepath.Join(f.watched, "sync-")
 	timeout := time.After(time.Second)
 
-	err := ioutil.WriteFile(syncPath, []byte(fmt.Sprintf("%s", time.Now())), os.FileMode(0777))
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	f.WriteFile(syncPath, fmt.Sprintf("%s", time.Now()))
 
 F:
 	for {
 		select {
 		case err := <-f.notify.Errors():
-			f.t.Fatal(err)
+			f.T().Fatal(err)
 
 		case event := <-f.notify.Events():
 			if strings.Contains(event.Path, syncPath) {
@@ -423,24 +364,18 @@ F:
 			f.events = append(f.events, event)
 
 		case <-timeout:
-			f.t.Fatalf("fsync: timeout")
+			f.T().Fatalf("fsync: timeout")
 		}
-	}
-
-	if err != nil {
-		f.t.Fatal(err)
 	}
 }
 
 func (f *notifyFixture) tearDown() {
 	SetLimitChecksEnabled(true)
-	err := f.root.TearDown()
+
+	err := f.notify.Close()
 	if err != nil {
-		f.t.Fatal(err)
+		f.T().Fatal(err)
 	}
 
-	err = f.notify.Close()
-	if err != nil {
-		f.t.Fatal(err)
-	}
+	f.TempDirFixture.TearDown()
 }
