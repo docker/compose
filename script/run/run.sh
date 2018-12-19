@@ -47,13 +47,13 @@ if [ -n "$HOME" ]; then
 fi
 
 # Only allocate tty if we detect one
-if [ -t 0 ]; then
-    if [ -t 1 ]; then
+if [ -t 0 -a -t 1 ]; then
         DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
-    fi
-else
-    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 fi
+
+# Always set -i to support piped and terminal input in run/exec
+DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
+
 
 # Handle userns security
 if [ ! -z "$(docker info 2>/dev/null | grep userns)" ]; then
