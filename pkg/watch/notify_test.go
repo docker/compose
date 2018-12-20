@@ -290,6 +290,25 @@ func TestMoveAndReplace(t *testing.T) {
 	f.assertEvents(file)
 }
 
+func TestWatchBothDirAndFile(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	dir := f.JoinPath("foo")
+	fileA := f.JoinPath("foo", "a")
+	fileB := f.JoinPath("foo", "b")
+	f.WriteFile(fileA, "a")
+	f.WriteFile(fileB, "b")
+
+	f.watch(fileA)
+	f.watch(dir)
+	f.fsync()
+	f.events = nil
+
+	f.WriteFile(fileB, "b-new")
+	f.assertEvents(fileB)
+}
+
 type notifyFixture struct {
 	*tempdir.TempDirFixture
 	notify  Notify
@@ -315,6 +334,13 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 		TempDirFixture: f,
 		watched:        watched,
 		notify:         notify,
+	}
+}
+
+func (f *notifyFixture) watch(path string) {
+	err := f.notify.Add(path)
+	if err != nil {
+		f.T().Fatalf("notify.Add: %s", path)
 	}
 }
 
