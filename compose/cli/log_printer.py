@@ -236,7 +236,8 @@ def watch_events(thread_map, event_stream, presenters, thread_args):
         thread_map[event['id']] = build_thread(
             event['container'],
             next(presenters),
-            *thread_args)
+            *thread_args
+        )
 
 
 def consume_queue(queue, cascade_stop):
