@@ -1085,8 +1085,43 @@ class ConfigTest(unittest.TestCase):
         details = config.ConfigDetails('.', [base_file, override_file])
         web_service = config.load(details).services[0]
         assert web_service['networks'] == {
-            'foobar': {'aliases': ['foo', 'bar']},
-            'baz': None
+            'foobar': {'aliases': ['bar', 'foo']},
+            'baz': {}
+        }
+
+    def test_load_with_multiple_files_mismatched_networks_format_inverse_order(self):
+        base_file = config.ConfigFile(
+            'override.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'networks': ['baz']
+                    }
+                }
+            }
+        )
+        override_file = config.ConfigFile(
+            'base.yaml',
+            {
+                'version': '2',
+                'services': {
+                    'web': {
+                        'image': 'example/web',
+                        'networks': {
+                            'foobar': {'aliases': ['foo', 'bar']}
+                        }
+                    }
+                },
+                'networks': {'foobar': {}, 'baz': {}}
+            }
+        )
+
+        details = config.ConfigDetails('.', [base_file, override_file])
+        web_service = config.load(details).services[0]
+        assert web_service['networks'] == {
+            'foobar': {'aliases': ['bar', 'foo']},
+            'baz': {}
         }
 
     def test_load_with_multiple_files_v2(self):
@@ -3843,8 +3878,77 @@ class MergePortsTest(unittest.TestCase, MergeListsTest):
 
 class MergeNetworksTest(unittest.TestCase, MergeListsTest):
     config_name = 'networks'
-    base_config = ['frontend', 'backend']
-    override_config = ['monitoring']
+    base_config = {'default': {'aliases': ['foo.bar', 'foo.baz']}}
+    override_config = {'default': {'ipv4_address': '123.234.123.234'}}
+
+    def test_no_network_overrides(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: self.base_config},
+            {self.config_name: self.override_config},
+            DEFAULT_VERSION)
+        assert service_dict[self.config_name] == {
+            'default': {
+                'aliases': ['foo.bar', 'foo.baz'],
+                'ipv4_address': '123.234.123.234'
+            }
+        }
+
+    def test_all_properties(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: {
+                'default': {
+                    'aliases': ['foo.bar', 'foo.baz'],
+                    'link_local_ips': ['192.168.1.10', '192.168.1.11'],
+                    'ipv4_address': '111.111.111.111',
+                    'ipv6_address': 'FE80:CD00:0000:0CDE:1257:0000:211E:729C-first'
+                }
+            }},
+            {self.config_name: {
+                'default': {
+                    'aliases': ['foo.baz', 'foo.baz2'],
+                    'link_local_ips': ['192.168.1.11', '192.168.1.12'],
+                    'ipv4_address': '123.234.123.234',
+                    'ipv6_address': 'FE80:CD00:0000:0CDE:1257:0000:211E:729C-second'
+                }
+            }},
+            DEFAULT_VERSION)
+
+        assert service_dict[self.config_name] == {
+            'default': {
+                'aliases': ['foo.bar', 'foo.baz', 'foo.baz2'],
+                'link_local_ips': ['192.168.1.10', '192.168.1.11', '192.168.1.12'],
+                'ipv4_address': '123.234.123.234',
+                'ipv6_address': 'FE80:CD00:0000:0CDE:1257:0000:211E:729C-second'
+            }
+        }
+
+    def test_no_network_name_overrides(self):
+        service_dict = config.merge_service_dicts(
+            {
+                self.config_name: {
+                    'default': {
+                        'aliases': ['foo.bar', 'foo.baz'],
+                        'ipv4_address': '123.234.123.234'
+                    }
+                }
+            },
+            {
+                self.config_name: {
+                    'another_network': {
+                        'ipv4_address': '123.234.123.234'
+                    }
+                }
+            },
+            DEFAULT_VERSION)
+        assert service_dict[self.config_name] == {
+            'default': {
+                'aliases': ['foo.bar', 'foo.baz'],
+                'ipv4_address': '123.234.123.234'
+            },
+            'another_network': {
+                'ipv4_address': '123.234.123.234'
+            }
+        }
 
 
 class MergeStringsOrListsTest(unittest.TestCase):

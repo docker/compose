@@ -1040,7 +1040,6 @@ def merge_service_dicts(base, override, version):
     md.merge_mapping('environment', parse_environment)
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('ulimits', parse_flat_dict)
-    md.merge_mapping('networks', parse_networks)
     md.merge_mapping('sysctls', parse_sysctls)
     md.merge_mapping('depends_on', parse_depends_on)
     md.merge_mapping('storage_opt', parse_flat_dict)
@@ -1050,6 +1049,7 @@ def merge_service_dicts(base, override, version):
     md.merge_sequence('security_opt', types.SecurityOpt.parse)
     md.merge_mapping('extra_hosts', parse_extra_hosts)
 
+    md.merge_field('networks', merge_networks, default={})
     for field in ['volumes', 'devices']:
         md.merge_field(field, merge_path_mappings)
 
@@ -1152,6 +1152,22 @@ def merge_deploy(base, override):
         md['placement'] = dict(placement_md)
 
     return dict(md)
+
+
+def merge_networks(base, override):
+    merged_networks = {}
+    all_network_names = set(base) | set(override)
+    base = {k: {} for k in base} if isinstance(base, list) else base
+    override = {k: {} for k in override} if isinstance(override, list) else override
+    for network_name in all_network_names:
+        md = MergeDict(base.get(network_name, {}), override.get(network_name, {}))
+        md.merge_field('aliases', merge_unique_items_lists, [])
+        md.merge_field('link_local_ips', merge_unique_items_lists, [])
+        md.merge_scalar('priority')
+        md.merge_scalar('ipv4_address')
+        md.merge_scalar('ipv6_address')
+        merged_networks[network_name] = dict(md)
+    return merged_networks
 
 
 def merge_reservations(base, override):
