@@ -8,6 +8,8 @@ import (
 	"github.com/windmilleng/fsevents"
 )
 
+// A file watcher optimized for Darwin.
+// Uses FSEvents to avoid the terrible perf characteristics of kqueue.
 type darwinNotify struct {
 	stream *fsevents.EventStream
 	events chan FileEvent
