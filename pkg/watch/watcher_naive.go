@@ -1,24 +1,21 @@
+// +build !darwin
+
 package watch
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 )
 
-const enospc = "no space left on device"
-const inotifyErrMsg = "The user limit on the total number of inotify watches was reached; increase the fs.inotify.max_user_watches sysctl. See here for more information: https://facebook.github.io/watchman/docs/install.html#linux-inotify-limits"
-const inotifyMin = 8192
-
-type linuxNotify struct {
+// A naive file watcher that uses the plain fsnotify API.
+// Used on all non-Darwin systems (including Windows & Linux).
+//
+// All OS-specific codepaths are handled by fsnotify.
+type naiveNotify struct {
 	watcher       *fsnotify.Watcher
 	events        chan fsnotify.Event
 	wrappedEvents chan FileEvent
@@ -26,7 +23,7 @@ type linuxNotify struct {
 	watchList     map[string]bool
 }
 
-func (d *linuxNotify) Add(name string) error {
+func (d *naiveNotify) Add(name string) error {
 	fi, err := os.Stat(name)
 	if err != nil && !os.IsNotExist(err) {
 		return errors.Wrapf(err, "notify.Add(%q)", name)
@@ -57,7 +54,7 @@ func (d *linuxNotify) Add(name string) error {
 	return nil
 }
 
-func (d *linuxNotify) watchRecursively(dir string) error {
+func (d *naiveNotify) watchRecursively(dir string) error {
 	return filepath.Walk(dir, func(path string, mode os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -74,19 +71,19 @@ func (d *linuxNotify) watchRecursively(dir string) error {
 	})
 }
 
-func (d *linuxNotify) Close() error {
+func (d *naiveNotify) Close() error {
 	return d.watcher.Close()
 }
 
-func (d *linuxNotify) Events() chan FileEvent {
+func (d *naiveNotify) Events() chan FileEvent {
 	return d.wrappedEvents
 }
 
-func (d *linuxNotify) Errors() chan error {
+func (d *naiveNotify) Errors() chan error {
 	return d.errors
 }
 
-func (d *linuxNotify) loop() {
+func (d *naiveNotify) loop() {
 	for e := range d.events {
 		isCreateOp := e.Op&fsnotify.Create == fsnotify.Create
 		shouldWalk := false
@@ -124,7 +121,7 @@ func (d *linuxNotify) loop() {
 	}
 }
 
-func (d *linuxNotify) sendEventIfWatched(e fsnotify.Event) {
+func (d *naiveNotify) sendEventIfWatched(e fsnotify.Event) {
 	if _, ok := d.watchList[e.Name]; ok {
 		d.wrappedEvents <- FileEvent{e.Name}
 	} else {
@@ -138,7 +135,7 @@ func (d *linuxNotify) sendEventIfWatched(e fsnotify.Event) {
 	}
 }
 
-func NewWatcher() (*linuxNotify, error) {
+func NewWatcher() (*naiveNotify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -146,7 +143,7 @@ func NewWatcher() (*linuxNotify, error) {
 
 	wrappedEvents := make(chan FileEvent)
 
-	wmw := &linuxNotify{
+	wmw := &naiveNotify{
 		watcher:       fsw,
 		events:        fsw.Events,
 		wrappedEvents: wrappedEvents,
@@ -169,30 +166,4 @@ func isDir(pth string) (bool, error) {
 	return fi.IsDir(), nil
 }
 
-func checkInotifyLimits() error {
-	if !LimitChecksEnabled() {
-		return nil
-	}
-
-	data, err := ioutil.ReadFile("/proc/sys/fs/inotify/max_user_watches")
-	if err != nil {
-		return err
-	}
-
-	i, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil {
-		return err
-	}
-
-	if i < inotifyMin {
-		return grpc.Errorf(
-			codes.ResourceExhausted,
-			"The user limit on the total number of inotify watches is too low (%d); increase the fs.inotify.max_user_watches sysctl. See here for more information: https://facebook.github.io/watchman/docs/install.html#linux-inotify-limits",
-			i,
-		)
-	}
-
-	return nil
-}
-
-var _ Notify = &linuxNotify{}
+var _ Notify = &naiveNotify{}
