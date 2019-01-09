@@ -98,14 +98,14 @@ def print_output_event(event, stream, is_terminal):
 
 
 def get_digest_from_pull(events):
+    digest = None
     for event in events:
         status = event.get('status')
         if not status or 'Digest' not in status:
             continue
-
-        _, digest = status.split(':', 1)
-        return digest.strip()
-    return None
+        else:
+            digest = status.split(':', 1)[1].strip()
+    return digest
 
 
 def get_digest_from_push(events):
