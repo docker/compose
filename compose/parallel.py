@@ -102,7 +102,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     errors = {}
     results = []
     error_to_reraise = parallel_execute_watch(
-        events, writer, errors, results, msg, get_name, func.__name__)
+        events, writer, errors, results, msg, get_name, getattr(func, '__name__', None))
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
