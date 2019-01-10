@@ -280,6 +280,7 @@ class Project(object):
             operator.attrgetter('name'),
             'Starting',
             get_deps,
+            fail_check=lambda obj: not obj.containers(),
         )
 
         return containers
