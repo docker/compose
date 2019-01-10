@@ -43,16 +43,14 @@ class GlobalLimit(object):
         cls.global_limiter = Semaphore(value)
 
 
-def parallel_execute_watch(events, writer, errors, results, msg, get_name, func_name):
+def parallel_execute_watch(events, writer, errors, results, msg, get_name, fail_check):
     """ Watch events from a parallel execution, update status and fill errors and results.
         Returns exception to re-raise.
     """
     error_to_reraise = None
     for obj, result, exception in events:
         if exception is None:
-            if func_name == 'start_service' and (
-                    callable(getattr(obj, 'containers', None)) and not obj.containers()):
-                # If service has no containers started
+            if fail_check is not None and fail_check(obj):
                 writer.write(msg, get_name(obj), 'failed', red)
             else:
                 writer.write(msg, get_name(obj), 'done', green)
@@ -77,12 +75,14 @@ def parallel_execute_watch(events, writer, errors, results, msg, get_name, func_
     return error_to_reraise
 
 
-def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
+def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, fail_check=None):
     """Runs func on objects in parallel while ensuring that func is
     ran on object only after it is ran on all its dependencies.
 
     get_deps called on object must return a collection with its dependencies.
     get_name called on object must return its name.
+    fail_check is an additional failure check for cases that should display as a failure
+        in the CLI logs, but don't raise an exception (such as attempting to start 0 containers)
     """
     objects = list(objects)
     stream = get_output_stream(sys.stderr)
@@ -102,7 +102,8 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
     errors = {}
     results = []
     error_to_reraise = parallel_execute_watch(
-        events, writer, errors, results, msg, get_name, getattr(func, '__name__', None))
+        events, writer, errors, results, msg, get_name, fail_check
+    )
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))

@@ -610,11 +610,8 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['pull'])
         assert 'Pulling simple' in result.stderr
         assert 'Pulling another' in result.stderr
-
-    def test_pull_done(self):
-        result = self.dispatch(['pull'])
-        assert 'Pulling simple' in result.stderr
         assert 'done' in result.stderr
+        assert 'failed' not in result.stderr
 
     def test_pull_with_digest(self):
         result = self.dispatch(['-f', 'digest.yml', 'pull', '--no-parallel'])
