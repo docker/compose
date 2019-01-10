@@ -43,14 +43,15 @@ class GlobalLimit(object):
         cls.global_limiter = Semaphore(value)
 
 
-def parallel_execute_watch(events, writer, errors, results, msg, get_name):
+def parallel_execute_watch(events, writer, errors, results, msg, get_name, func_name):
     """ Watch events from a parallel execution, update status and fill errors and results.
         Returns exception to re-raise.
     """
     error_to_reraise = None
     for obj, result, exception in events:
         if exception is None:
-            if callable(getattr(obj, 'containers', None)) and not obj.containers():
+            if func_name == 'start_service' and (
+                    callable(getattr(obj, 'containers', None)) and not obj.containers()):
                 # If service has no containers started
                 writer.write(msg, get_name(obj), 'failed', red)
             else:
@@ -100,7 +101,8 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None):
 
     errors = {}
     results = []
-    error_to_reraise = parallel_execute_watch(events, writer, errors, results, msg, get_name)
+    error_to_reraise = parallel_execute_watch(
+        events, writer, errors, results, msg, get_name, func.__name__)
 
     for obj_name, error in errors.items():
         stream.write("\nERROR: for {}  {}\n".format(obj_name, error))
