@@ -1,6 +1,42 @@
 Change log
 ==========
 
+1.24.0 (2019-01-25)
+-------------------
+
+### Features
+
+- Added support for connecting to the Docker Engine using the `ssh` protocol.
+
+- Added a `--all` flag to `docker-compose ps` to include stopped one-off containers
+  in the command's output.
+
+### Bugfixes
+
+- Fixed a bug where some valid credential helpers weren't properly handled by Compose
+  when attempting to pull images from private registries.
+
+- Fixed an issue where the output of `docker-compose start` before containers were created
+  was misleading
+  
+- To match the Docker CLI behavior and to avoid confusing issues, Compose will no longer
+  accept whitespace in variable names sourced from environment files.
+
+- Compose will now report a configuration error if a service attempts to declare
+  duplicate mount points in the volumes section.
+
+- Fixed an issue with the containerized version of Compose that prevented users from
+  writing to stdin during interactive sessions started by `run` or `exec`.
+
+- One-off containers started by `run` no longer adopt the restart policy of the service,
+  and are instead set to never restart.
+
+- Fixed an issue that caused some container events to not appear in the output of 
+  the `docker-compose events` command.
+
+- Missing images will no longer stop the execution of `docker-compose down` commands
+  (a warning will be displayed instead).
+
 1.23.2 (2018-11-28)
 -------------------
 
