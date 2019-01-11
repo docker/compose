@@ -32,7 +32,7 @@ def find_version(*file_paths):
 install_requires = [
     'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 0.7',
-    'PyYAML >= 3.10, < 4',
+    'PyYAML >= 3.10, < 4.3',
     'requests >= 2.6.1, != 2.11.0, != 2.12.2, != 2.18.0, < 2.21',
     'texttable >= 0.9.0, < 0.10',
     'websocket-client >= 0.32.0, < 1.0',
