@@ -18,7 +18,7 @@ Change log
 
 - Fixed an issue where the output of `docker-compose start` before containers were created
   was misleading
-  
+
 - To match the Docker CLI behavior and to avoid confusing issues, Compose will no longer
   accept whitespace in variable names sourced from environment files.
 
@@ -31,7 +31,7 @@ Change log
 - One-off containers started by `run` no longer adopt the restart policy of the service,
   and are instead set to never restart.
 
-- Fixed an issue that caused some container events to not appear in the output of 
+- Fixed an issue that caused some container events to not appear in the output of
   the `docker-compose events` command.
 
 - Missing images will no longer stop the execution of `docker-compose down` commands
