@@ -95,19 +95,10 @@ def get_image_digest(service, allow_push=False):
     if separator == '@':
         return service.options['image']
 
-    try:
-        image = service.image()
-    except NoSuchImageError:
-        action = 'build' if 'build' in service.options else 'pull'
-        raise UserError(
-            "Image not found for service '{service}'. "
-            "You might need to run `docker-compose {action} {service}`."
-            .format(service=service.name, action=action))
+    digest = get_digest(service)
 
-    if image['RepoDigests']:
-        # TODO: pick a digest based on the image tag if there are multiple
-        # digests
-        return image['RepoDigests'][0]
+    if digest:
+        return digest
 
     if 'build' not in service.options:
         raise NeedsPull(service.image_name, service.name)
@@ -116,6 +107,32 @@ def get_image_digest(service, allow_push=False):
         raise NeedsPush(service.image_name)
 
     return push_image(service)
+
+
+def get_digest(service):
+    digest = None
+    try:
+        image = service.image()
+        # TODO: pick a digest based on the image tag if there are multiple
+        # digests
+        if image['RepoDigests']:
+            digest = image['RepoDigests'][0]
+    except NoSuchImageError:
+        try:
+            # Fetch the image digest from the registry
+            distribution = service.get_image_registry_data()
+
+            if distribution['Descriptor']['digest']:
+                digest = '{image_name}@{digest}'.format(
+                    image_name=service.image_name,
+                    digest=distribution['Descriptor']['digest']
+                )
+        except NoSuchImageError:
+            raise UserError(
+                "Digest not found for service '{service}'. "
+                "Repository does not exist or may require 'docker login'"
+                .format(service=service.name))
+    return digest
 
 
 def push_image(service):

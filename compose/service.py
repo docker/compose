@@ -363,6 +363,12 @@ class Service(object):
             "rebuild this image you must use `docker-compose build` or "
             "`docker-compose up --build`.".format(self.name))
 
+    def get_image_registry_data(self):
+        try:
+            return self.client.inspect_distribution(self.image_name)
+        except APIError:
+            raise NoSuchImageError("Image '{}' not found".format(self.image_name))
+
     def image(self):
         try:
             return self.client.inspect_image(self.image_name)
