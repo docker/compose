@@ -254,9 +254,10 @@ class ProjectTest(unittest.TestCase):
                 [container_ids[0] + ':rw']
             )
 
-    def test_events(self):
+    def test_events_legacy(self):
         services = [Service(name='web'), Service(name='db')]
         project = Project('test', services, self.mock_client)
+        self.mock_client.api_version = '1.21'
         self.mock_client.events.return_value = iter([
             {
                 'status': 'create',
@@ -359,6 +360,175 @@ class ProjectTest(unittest.TestCase):
                 },
                 'time': dt_with_microseconds(1420092061, 4),
                 'container': Container(None, {'Id': 'ababa'}),
+            },
+        ]
+
+    def test_events(self):
+        services = [Service(name='web'), Service(name='db')]
+        project = Project('test', services, self.mock_client)
+        self.mock_client.api_version = '1.35'
+        self.mock_client.events.return_value = iter([
+            {
+                'status': 'create',
+                'from': 'example/image',
+                'Type': 'container',
+                'Actor': {
+                    'ID': 'abcde',
+                    'Attributes': {
+                        'com.docker.compose.project': 'test',
+                        'com.docker.compose.service': 'web',
+                        'image': 'example/image',
+                        'name': 'test_web_1',
+                    }
+                },
+                'id': 'abcde',
+                'time': 1420092061,
+                'timeNano': 14200920610000002000,
+            },
+            {
+                'status': 'attach',
+                'from': 'example/image',
+                'Type': 'container',
+                'Actor': {
+                    'ID': 'abcde',
+                    'Attributes': {
+                        'com.docker.compose.project': 'test',
+                        'com.docker.compose.service': 'web',
+                        'image': 'example/image',
+                        'name': 'test_web_1',
+                    }
+                },
+                'id': 'abcde',
+                'time': 1420092061,
+                'timeNano': 14200920610000003000,
+            },
+            {
+                'status': 'create',
+                'from': 'example/other',
+                'Type': 'container',
+                'Actor': {
+                    'ID': 'bdbdbd',
+                    'Attributes': {
+                        'image': 'example/other',
+                        'name': 'shrewd_einstein',
+                    }
+                },
+                'id': 'bdbdbd',
+                'time': 1420092061,
+                'timeNano': 14200920610000005000,
+            },
+            {
+                'status': 'create',
+                'from': 'example/db',
+                'Type': 'container',
+                'Actor': {
+                    'ID': 'ababa',
+                    'Attributes': {
+                        'com.docker.compose.project': 'test',
+                        'com.docker.compose.service': 'db',
+                        'image': 'example/db',
+                        'name': 'test_db_1',
+                    }
+                },
+                'id': 'ababa',
+                'time': 1420092061,
+                'timeNano': 14200920610000004000,
+            },
+            {
+                'status': 'destroy',
+                'from': 'example/db',
+                'Type': 'container',
+                'Actor': {
+                    'ID': 'eeeee',
+                    'Attributes': {
+                        'com.docker.compose.project': 'test',
+                        'com.docker.compose.service': 'db',
+                        'image': 'example/db',
+                        'name': 'test_db_1',
+                    }
+                },
+                'id': 'eeeee',
+                'time': 1420092061,
+                'timeNano': 14200920610000004000,
+            },
+        ])
+
+        def dt_with_microseconds(dt, us):
+            return datetime.datetime.fromtimestamp(dt).replace(microsecond=us)
+
+        def get_container(cid):
+            if cid == 'eeeee':
+                raise NotFound(None, None, "oops")
+            if cid == 'abcde':
+                name = 'web'
+                labels = {LABEL_SERVICE: name}
+            elif cid == 'ababa':
+                name = 'db'
+                labels = {LABEL_SERVICE: name}
+            else:
+                labels = {}
+                name = ''
+            return {
+                'Id': cid,
+                'Config': {'Labels': labels},
+                'Name': '/project_%s_1' % name,
+            }
+
+        self.mock_client.inspect_container.side_effect = get_container
+
+        events = project.events()
+
+        events_list = list(events)
+        # Assert the return value is a generator
+        assert not list(events)
+        assert events_list == [
+            {
+                'type': 'container',
+                'service': 'web',
+                'action': 'create',
+                'id': 'abcde',
+                'attributes': {
+                    'name': 'test_web_1',
+                    'image': 'example/image',
+                },
+                'time': dt_with_microseconds(1420092061, 2),
+                'container': Container(None, get_container('abcde')),
+            },
+            {
+                'type': 'container',
+                'service': 'web',
+                'action': 'attach',
+                'id': 'abcde',
+                'attributes': {
+                    'name': 'test_web_1',
+                    'image': 'example/image',
+                },
+                'time': dt_with_microseconds(1420092061, 3),
+                'container': Container(None, get_container('abcde')),
+            },
+            {
+                'type': 'container',
+                'service': 'db',
+                'action': 'create',
+                'id': 'ababa',
+                'attributes': {
+                    'name': 'test_db_1',
+                    'image': 'example/db',
+                },
+                'time': dt_with_microseconds(1420092061, 4),
+                'container': Container(None, get_container('ababa')),
+            },
+            {
+                'type': 'container',
+                'service': 'db',
+                'action': 'destroy',
+                'id': 'eeeee',
+                'attributes': {
+                    'name': 'test_db_1',
+                    'image': 'example/db',
+                },
+                'time': dt_with_microseconds(1420092061, 4),
+                'container': None,
             },
         ]
 
@@ -620,3 +790,23 @@ class ProjectTest(unittest.TestCase):
         self.mock_client.pull.side_effect = OperationFailedError(b'pull error')
         with pytest.raises(ProjectError):
             project.pull(parallel_pull=True)
+
+    def test_avoid_multiple_push(self):
+        service_config_latest = {'image': 'busybox:latest', 'build': '.'}
+        service_config_default = {'image': 'busybox', 'build': '.'}
+        service_config_sha = {
+            'image': 'busybox@sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b52004ee8502d',
+            'build': '.'
+        }
+        svc1 = Service('busy1', **service_config_latest)
+        svc1_1 = Service('busy11', **service_config_latest)
+        svc2 = Service('busy2', **service_config_default)
+        svc2_1 = Service('busy21', **service_config_default)
+        svc3 = Service('busy3', **service_config_sha)
+        svc3_1 = Service('busy31', **service_config_sha)
+        project = Project(
+            'composetest', [svc1, svc1_1, svc2, svc2_1, svc3, svc3_1], self.mock_client
+        )
+        with mock.patch('compose.service.Service.push') as fake_push:
+            project.push()
+            assert fake_push.call_count == 2

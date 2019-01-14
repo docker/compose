@@ -199,7 +199,9 @@ class Service(object):
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
 
-    def containers(self, stopped=False, one_off=False, filters={}, labels=None):
+    def containers(self, stopped=False, one_off=False, filters=None, labels=None):
+        if filters is None:
+            filters = {}
         filters.update({'label': self.labels(one_off=one_off) + (labels or [])})
 
         result = list(filter(None, [
@@ -1146,6 +1148,9 @@ class Service(object):
         try:
             self.client.remove_image(self.image_name)
             return True
+        except ImageNotFound:
+            log.warning("Image %s not found.", self.image_name)
+            return False
         except APIError as e:
             log.error("Failed to remove image for service %s: %s", self.name, e)
             return False

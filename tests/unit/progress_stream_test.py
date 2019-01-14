@@ -97,22 +97,24 @@ class ProgressStreamTestCase(unittest.TestCase):
             tf.seek(0)
             assert tf.read() == '???'
 
+    def test_get_digest_from_push(self):
+        digest = "sha256:abcd"
+        events = [
+            {"status": "..."},
+            {"status": "..."},
+            {"progressDetail": {}, "aux": {"Digest": digest}},
+        ]
+        assert progress_stream.get_digest_from_push(events) == digest
 
-def test_get_digest_from_push():
-    digest = "sha256:abcd"
-    events = [
-        {"status": "..."},
-        {"status": "..."},
-        {"progressDetail": {}, "aux": {"Digest": digest}},
-    ]
-    assert progress_stream.get_digest_from_push(events) == digest
+    def test_get_digest_from_pull(self):
+        events = list()
+        assert progress_stream.get_digest_from_pull(events) is None
 
-
-def test_get_digest_from_pull():
-    digest = "sha256:abcd"
-    events = [
-        {"status": "..."},
-        {"status": "..."},
-        {"status": "Digest: %s" % digest},
-    ]
-    assert progress_stream.get_digest_from_pull(events) == digest
+        digest = "sha256:abcd"
+        events = [
+            {"status": "..."},
+            {"status": "..."},
+            {"status": "Digest: %s" % digest},
+            {"status": "..."},
+        ]
+        assert progress_stream.get_digest_from_pull(events) == digest

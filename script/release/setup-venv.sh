@@ -39,9 +39,9 @@ fi
 
 $VENV_PYTHONBIN -m pip install -U Jinja2==2.10 \
     PyGithub==1.39 \
-    pypandoc==1.4 \
     GitPython==2.1.9 \
     requests==2.18.4 \
+    setuptools==40.6.2 \
     twine==1.11.0
 
 $VENV_PYTHONBIN setup.py develop

@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 
 import datetime
 import json
-import os
 import os.path
 import re
 import signal
@@ -599,10 +598,20 @@ class CLITestCase(DockerClientTestCase):
         assert 'with_build' in running.stdout
         assert 'with_image' in running.stdout
 
+    def test_ps_all(self):
+        self.project.get_service('simple').create_container(one_off='blahblah')
+        result = self.dispatch(['ps'])
+        assert 'simple-composefile_simple_run_' not in result.stdout
+
+        result2 = self.dispatch(['ps', '--all'])
+        assert 'simple-composefile_simple_run_' in result2.stdout
+
     def test_pull(self):
         result = self.dispatch(['pull'])
         assert 'Pulling simple' in result.stderr
         assert 'Pulling another' in result.stderr
+        assert 'done' in result.stderr
+        assert 'failed' not in result.stderr
 
     def test_pull_with_digest(self):
         result = self.dispatch(['-f', 'digest.yml', 'pull', '--no-parallel'])
@@ -2221,6 +2230,7 @@ class CLITestCase(DockerClientTestCase):
 
     def test_start_no_containers(self):
         result = self.dispatch(['start'], returncode=1)
+        assert 'failed' in result.stderr
         assert 'No containers to start' in result.stderr
 
     @v2_only()
