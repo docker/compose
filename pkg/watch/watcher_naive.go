@@ -3,6 +3,7 @@
 package watch
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -31,12 +32,11 @@ func (d *naiveNotify) Add(name string) error {
 
 	// if it's a file that doesn't exist, watch its parent
 	if os.IsNotExist(err) {
-		parent := filepath.Join(name, "..")
-		err = d.watcher.Add(parent)
+		err, fileWatched := d.watchUpRecursively(name)
 		if err != nil {
-			return errors.Wrapf(err, "notify.Add(%q)", name)
+			return errors.Wrapf(err, "watchUpRecursively(%q)", name)
 		}
-		d.watchList[parent] = true
+		d.watchList[fileWatched] = true
 	} else if fi.IsDir() {
 		err = d.watchRecursively(name)
 		if err != nil {
@@ -69,6 +69,24 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		}
 		return nil
 	})
+}
+
+func (d *naiveNotify) watchUpRecursively(path string) (error, string) {
+	if path == string(filepath.Separator) {
+		return fmt.Errorf("cannot watch root directory"), ""
+	}
+
+	_, err := os.Stat(path)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "os.Stat(%q)", path), ""
+	}
+
+	if os.IsNotExist(err) {
+		parent := filepath.Dir(path)
+		return d.watchUpRecursively(parent)
+	}
+
+	return d.watcher.Add(path), path
 }
 
 func (d *naiveNotify) Close() error {
