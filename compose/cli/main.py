@@ -206,8 +206,8 @@ class TopLevelCommand(object):
                                   name specified in the client certificate
       --project-directory PATH    Specify an alternate working directory
                                   (default: the path of the Compose file)
-      --compatibility             If set, Compose will attempt to convert deploy
-                                  keys in v3 files to their non-Swarm equivalent
+      --compatibility             If set, Compose will attempt to convert keys
+                                  in v3 files to their non-Swarm equivalent
 
     Commands:
       build              Build or rebuild services
