@@ -51,6 +51,7 @@ from .validation import match_named_volumes
 from .validation import validate_against_config_schema
 from .validation import validate_config_section
 from .validation import validate_cpu
+from .validation import validate_credential_spec
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_healthcheck
@@ -369,7 +370,6 @@ def check_swarm_only_config(service_dicts, compatibility=False):
             )
     if not compatibility:
         check_swarm_only_key(service_dicts, 'deploy')
-    check_swarm_only_key(service_dicts, 'credential_spec')
     check_swarm_only_key(service_dicts, 'configs')
 
 
@@ -706,6 +706,7 @@ def validate_service(service_config, service_names, config_file):
     validate_depends_on(service_config, service_names)
     validate_links(service_config, service_names)
     validate_healthcheck(service_config)
+    validate_credential_spec(service_config)
 
     if not service_dict.get('image') and has_uppercase(service_name):
         raise ConfigurationError(
@@ -894,6 +895,7 @@ def finalize_service(service_config, service_names, version, environment, compat
     normalize_build(service_dict, service_config.working_dir, environment)
 
     if compatibility:
+        service_dict = translate_credential_spec_to_security_opt(service_dict)
         service_dict, ignored_keys = translate_deploy_keys_to_container_config(
             service_dict
         )
@@ -928,6 +930,25 @@ def convert_restart_policy(name):
         }[name]
     except KeyError:
         raise ConfigurationError('Invalid restart policy "{}"'.format(name))
+
+
+def convert_credential_spec_to_security_opt(credential_spec):
+    if 'file' in credential_spec:
+        return 'file://{file}'.format(file=credential_spec['file'])
+    return 'registry://{registry}'.format(registry=credential_spec['registry'])
+
+
+def translate_credential_spec_to_security_opt(service_dict):
+    result = []
+
+    if 'credential_spec' in service_dict:
+        spec = convert_credential_spec_to_security_opt(service_dict['credential_spec'])
+        result.append('credentialspec={spec}'.format(spec=spec))
+
+    if result:
+        service_dict['security_opt'] = result
+
+    return service_dict
 
 
 def translate_deploy_keys_to_container_config(service_dict):
