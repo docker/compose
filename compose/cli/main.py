@@ -122,7 +122,9 @@ def perform_command(options, handler, command_options):
         return
 
     project = project_from_options('.', options)
-    command = TopLevelCommand(project, options=options)
+    config = get_config_from_options('.', options)
+
+    command = TopLevelCommand(project, config=config, options=options)
     with errors.handle_connection_errors(project.client):
         handler(command, command_options)
 
@@ -238,8 +240,9 @@ class TopLevelCommand(object):
       version            Show the Docker-Compose version information
     """
 
-    def __init__(self, project, options=None):
+    def __init__(self, project, config=None, options=None):
         self.project = project
+        self.config = config
         self.toplevel_options = options or {}
 
     @property
@@ -652,6 +655,7 @@ class TopLevelCommand(object):
             containers,
             options['--no-color'],
             log_args,
+            config=self.config,
             event_stream=self.project.events(service_names=options['SERVICE'])).run()
 
     def pause(self, options):
@@ -1106,6 +1110,7 @@ class TopLevelCommand(object):
                 options['--no-color'],
                 {'follow': True},
                 cascade_stop,
+                config=self.config,
                 event_stream=self.project.events(service_names=service_names))
             print("Attaching to", list_containers(log_printer.containers))
             cascade_starter = log_printer.run()
@@ -1386,11 +1391,12 @@ def log_printer_from_project(
     monochrome,
     log_args,
     cascade_stop=False,
+    config=None,
     event_stream=None,
 ):
     return LogPrinter(
         containers,
-        build_log_presenters(project.service_names, monochrome),
+        build_log_presenters(project.service_names, monochrome, config=config),
         event_stream or project.events(),
         cascade_stop=cascade_stop,
         log_args=log_args)
