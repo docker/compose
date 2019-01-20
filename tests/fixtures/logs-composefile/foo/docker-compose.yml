@@ -1,0 +1,11 @@
+simple:
+  image: busybox:latest
+  command: sh -c "echo test"
+another:
+  container_name: 'bar'
+  image: busybox:latest
+  command: sh -c "echo test"
+another2:
+  container_name: 'foo_another'
+  image: busybox:latest
+  command: sh -c "echo test"

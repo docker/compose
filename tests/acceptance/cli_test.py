@@ -2382,6 +2382,30 @@ class CLITestCase(DockerClientTestCase):
         assert 'w\n' not in result.stdout
         assert 'x\n' not in result.stdout
 
+    def test_log_prefix_implicit(self):
+        self.base_dir = 'tests/fixtures/logs-composefile/foo'
+        self.dispatch(['up', 'simple'])
+
+        result = self.dispatch(['logs'])
+        assert 'simple_1' in result.stdout
+
+    def test_log_prefix_explicit(self):
+        self.base_dir = 'tests/fixtures/logs-composefile/foo'
+        self.dispatch(['up', 'another'])
+
+        result = self.dispatch(['logs'])
+        assert 'bar' in result.stdout
+        assert 'another' not in result.stdout
+
+    def test_log_prefix_explicit2(self):
+        # with project name prefixing the container_name
+        self.base_dir = 'tests/fixtures/logs-composefile/foo'
+        self.dispatch(['up', 'another2'])
+
+        result = self.dispatch(['logs'])
+        assert 'foo_another' in result.stdout
+        assert 'another2' not in result.stdout
+
     def test_kill(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
