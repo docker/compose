@@ -10,6 +10,7 @@ from compose import service
 from compose.cli.errors import UserError
 from compose.config.config import Config
 from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.service import NoSuchImageError
 
 
 @pytest.fixture
@@ -33,6 +34,16 @@ def test_get_image_digest_image_uses_digest(mock_service):
     digest = bundle.get_image_digest(mock_service)
     assert digest == image_id
     assert not mock_service.image.called
+
+
+def test_get_image_digest_from_repository(mock_service):
+    mock_service.options['image'] = 'abcd'
+    mock_service.image_name = 'abcd'
+    mock_service.image.side_effect = NoSuchImageError(None)
+    mock_service.get_image_registry_data.return_value = {'Descriptor': {'digest': 'digest'}}
+
+    digest = bundle.get_image_digest(mock_service)
+    assert digest == 'abcd@digest'
 
 
 def test_get_image_digest_no_image(mock_service):
