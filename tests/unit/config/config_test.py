@@ -3593,6 +3593,9 @@ class InterpolationTest(unittest.TestCase):
                             'reservations': {'memory': '100M'},
                         },
                     },
+                    'credential_spec': {
+                        'file': 'spec.json'
+                    },
                 },
             },
         })
@@ -3610,7 +3613,8 @@ class InterpolationTest(unittest.TestCase):
             'mem_limit': '300M',
             'mem_reservation': '100M',
             'cpus': 0.7,
-            'name': 'foo'
+            'name': 'foo',
+            'security_opt': ['credentialspec=file://spec.json'],
         }
 
     @mock.patch.dict(os.environ)
