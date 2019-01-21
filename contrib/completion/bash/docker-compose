@@ -114,7 +114,7 @@ _docker_compose_build() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--build-arg --compress --force-rm --help --memory --no-cache --pull" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--build-arg --compress --force-rm --help --memory --no-cache --pull --parallel" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_complete_services --filter source=build
