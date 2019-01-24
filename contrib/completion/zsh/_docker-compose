@@ -117,6 +117,7 @@ __docker-compose_subcommand() {
                 '--no-cache[Do not use cache when building the image.]' \
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '--compress[Compress the build context using gzip.]' \
+                '--parallel[Build images in parallel.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
         (bundle)
