@@ -193,7 +193,7 @@ class TestConsumeQueue(object):
             queue.put(item)
 
         generator = consume_queue(queue, True)
-        assert next(generator) is 'foobar-1'
+        assert next(generator) == 'foobar-1'
 
     def test_item_is_none_when_timeout_is_hit(self):
         queue = Queue()
