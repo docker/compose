@@ -291,7 +291,7 @@ class Service(object):
                     c for c in stopped_containers if self._containers_have_diverged([c])
                 ]
                 for c in divergent_containers:
-                        c.remove()
+                    c.remove()
 
                 all_containers = list(set(all_containers) - set(divergent_containers))
 
@@ -467,50 +467,50 @@ class Service(object):
 
     def _execute_convergence_recreate(self, containers, scale, timeout, detached, start,
                                       renew_anonymous_volumes):
-            if scale is not None and len(containers) > scale:
-                self._downscale(containers[scale:], timeout)
-                containers = containers[:scale]
+        if scale is not None and len(containers) > scale:
+            self._downscale(containers[scale:], timeout)
+            containers = containers[:scale]
 
-            def recreate(container):
-                return self.recreate_container(
-                    container, timeout=timeout, attach_logs=not detached,
-                    start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
-                )
-            containers, errors = parallel_execute(
-                containers,
-                recreate,
-                lambda c: c.name,
-                "Recreating",
+        def recreate(container):
+            return self.recreate_container(
+                container, timeout=timeout, attach_logs=not detached,
+                start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
             )
+        containers, errors = parallel_execute(
+            containers,
+            recreate,
+            lambda c: c.name,
+            "Recreating",
+        )
+        for error in errors.values():
+            raise OperationFailedError(error)
+
+        if scale is not None and len(containers) < scale:
+            containers.extend(self._execute_convergence_create(
+                scale - len(containers), detached, start
+            ))
+        return containers
+
+    def _execute_convergence_start(self, containers, scale, timeout, detached, start):
+        if scale is not None and len(containers) > scale:
+            self._downscale(containers[scale:], timeout)
+            containers = containers[:scale]
+        if start:
+            _, errors = parallel_execute(
+                containers,
+                lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True),
+                lambda c: c.name,
+                "Starting",
+            )
+
             for error in errors.values():
                 raise OperationFailedError(error)
 
-            if scale is not None and len(containers) < scale:
-                containers.extend(self._execute_convergence_create(
-                    scale - len(containers), detached, start
-                ))
-            return containers
-
-    def _execute_convergence_start(self, containers, scale, timeout, detached, start):
-            if scale is not None and len(containers) > scale:
-                self._downscale(containers[scale:], timeout)
-                containers = containers[:scale]
-            if start:
-                _, errors = parallel_execute(
-                    containers,
-                    lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True),
-                    lambda c: c.name,
-                    "Starting",
-                )
-
-                for error in errors.values():
-                    raise OperationFailedError(error)
-
-            if scale is not None and len(containers) < scale:
-                containers.extend(self._execute_convergence_create(
-                    scale - len(containers), detached, start
-                ))
-            return containers
+        if scale is not None and len(containers) < scale:
+            containers.extend(self._execute_convergence_create(
+                scale - len(containers), detached, start
+            ))
+        return containers
 
     def _downscale(self, containers, timeout=None):
         def stop_and_remove(container):
