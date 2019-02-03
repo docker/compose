@@ -602,6 +602,9 @@ class Project(object):
     def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
+        images_to_build = {service.image_name for service in services if service.can_be_built()}
+        services_to_pull = [service for service in services if service.image_name not in images_to_build]
+
         msg = not silent and 'Pulling' or None
 
         if parallel_pull:
@@ -627,7 +630,7 @@ class Project(object):
                     )
 
             _, errors = parallel.parallel_execute(
-                services,
+                services_to_pull,
                 pull_service,
                 operator.attrgetter('name'),
                 msg,
@@ -640,7 +643,7 @@ class Project(object):
                 raise ProjectError(combined_errors)
 
         else:
-            for service in services:
+            for service in services_to_pull:
                 service.pull(ignore_pull_failures, silent=silent)
 
     def push(self, service_names=None, ignore_push_failures=False):

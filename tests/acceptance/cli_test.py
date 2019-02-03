@@ -633,6 +633,13 @@ class CLITestCase(DockerClientTestCase):
                 'image library/nonexisting-image:latest not found' in result.stderr or
                 'pull access denied for nonexisting-image' in result.stderr)
 
+    def test_pull_with_build(self):
+        result = self.dispatch(['-f', 'pull-with-build.yml', 'pull'])
+
+        assert 'Pulling simple' not in result.stderr
+        assert 'Pulling from_simple' not in result.stderr
+        assert 'Pulling another ...' in result.stderr
+
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
         assert self.dispatch(['pull', '--quiet']).stdout == ''
