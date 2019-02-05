@@ -1,6 +1,6 @@
 coverage==4.4.2
 ddt==1.2.0
 flake8==3.5.0
-mock>=1.0.1
+mock==2.0.0
 pytest==3.6.3
 pytest-cov==2.5.1
