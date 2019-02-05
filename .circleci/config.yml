@@ -10,7 +10,7 @@ jobs:
         command: ./script/setup/osx
     - run:
         name: install tox
-        command: sudo pip install --upgrade tox==2.1.1
+        command: sudo pip install --upgrade tox==2.1.1 virtualenv==16.2.0
     - run:
         name: unit tests
         command: tox -e py27,py36,py37 -- tests/unit
@@ -22,7 +22,7 @@ jobs:
       - checkout
       - run:
           name: upgrade python tools
-          command: sudo pip install --upgrade pip virtualenv
+          command: sudo pip install --upgrade pip virtualenv==16.2.0
       - run:
          name: setup script
          command: DEPLOYMENT_TARGET=10.11 ./script/setup/osx
