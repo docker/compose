@@ -726,10 +726,11 @@ class Project(object):
 
     def build_container_operation_with_timeout_func(self, operation, options):
         def container_operation_with_timeout(container):
-            if options.get('timeout') is None:
+            _options = options.copy()
+            if _options.get('timeout') is None:
                 service = self.get_service(container.service)
-                options['timeout'] = service.stop_timeout(None)
-            return getattr(container, operation)(**options)
+                _options['timeout'] = service.stop_timeout(None)
+            return getattr(container, operation)(**_options)
         return container_operation_with_timeout
 
 
