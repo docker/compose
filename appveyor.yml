@@ -4,7 +4,7 @@ version: '{branch}-{build}'
 install:
   - "SET PATH=C:\\Python37-x64;C:\\Python37-x64\\Scripts;%PATH%"
   - "python --version"
-  - "pip install tox==2.9.1 virtualenv==15.1.0"
+  - "pip install tox==2.9.1 virtualenv==16.2.0"
 
 # Build the binary after tests
 build: false

@@ -36,7 +36,7 @@ if ! [ -x "$(command -v python3)" ]; then
   brew install python3
 fi
 if ! [ -x "$(command -v virtualenv)" ]; then
-  pip install virtualenv
+  pip install virtualenv==16.2.0
 fi
 
 #
