@@ -1049,7 +1049,7 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False):
+              gzip=False, rm=True):
         log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
@@ -1070,7 +1070,7 @@ class Service(object):
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
-            rm=True,
+            rm=rm,
             forcerm=force_rm,
             pull=pull,
             nocache=no_cache,

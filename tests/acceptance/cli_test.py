@@ -747,6 +747,23 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert not containers
 
+    def test_build_rm(self):
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(all=True)
+        ]
+
+        assert not containers
+
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', '--no-rm', 'simple'], returncode=0)
+
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(all=True)
+        ]
+        assert containers
+
     def test_build_shm_size_build_option(self):
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-shm-size'
