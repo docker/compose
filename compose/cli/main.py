@@ -260,6 +260,7 @@ class TopLevelCommand(object):
             --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
+            --no-rm                 Do not remove intermediate containers after a successful build.
             --pull                  Always attempt to pull a newer version of the image.
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
@@ -283,6 +284,7 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
+            rm=not bool(options.get('--no-rm', False)),
             build_args=build_args,
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
