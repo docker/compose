@@ -98,6 +98,11 @@ if ! [[ $(${TOOLCHAIN_PATH}/bin/python3 --version) == *"${PYTHON_VERSION}"* ]]; 
   )
 fi
 
+#
+# Smoke test built Python.
+#
+openssl_version ${TOOLCHAIN_PATH}
+
 echo ""
 echo "*** Targeting macOS: ${DEPLOYMENT_TARGET}"
 echo "*** Using SDK ${SDK_PATH}"
