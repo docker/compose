@@ -3466,6 +3466,25 @@ class InterpolationTest(unittest.TestCase):
         }
 
     @mock.patch.dict(os.environ)
+    def test_config_file_with_options_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir, '.env2')
+            )
+        ).services
+
+        assert service_dicts[0] == {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': [
+                types.ServicePort.parse('5644')[0],
+                types.ServicePort.parse('9998')[0]
+            ],
+            'command': 'false'
+        }
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
         project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(

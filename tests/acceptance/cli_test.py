@@ -324,6 +324,21 @@ class CLITestCase(DockerClientTestCase):
             'version': '2.4'
         }
 
+    def test_config_with_env_file(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['--env-file', '.env2', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert json_result == {
+            'services': {
+                'web': {
+                    'command': 'false',
+                    'image': 'alpine:latest',
+                    'ports': ['5644/tcp', '9998/tcp']
+                }
+            },
+            'version': '2.4'
+        }
+
     def test_config_with_dot_env_and_override_dir(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['--project-directory', 'alt/', 'config'])
