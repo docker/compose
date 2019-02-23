@@ -208,6 +208,7 @@ class TopLevelCommand(object):
                                   (default: the path of the Compose file)
       --compatibility             If set, Compose will attempt to convert keys
                                   in v3 files to their non-Swarm equivalent
+      --env-file PATH             Specify an alternate environment file
 
     Commands:
       build              Build or rebuild services
@@ -274,7 +275,8 @@ class TopLevelCommand(object):
                     '--build-arg is only supported when services are specified for API version < 1.25.'
                     ' Please use a Compose file version > 2.2 or specify which services to build.'
                 )
-            environment = Environment.from_env_file(self.project_dir)
+            environment_file = options.get('--env-file')
+            environment = Environment.from_env_file(self.project_dir, environment_file)
             build_args = resolve_build_args(build_args, environment)
 
         self.project.build(
@@ -423,8 +425,10 @@ class TopLevelCommand(object):
                                     Compose file
             -t, --timeout TIMEOUT   Specify a shutdown timeout in seconds.
                                     (default: 10)
+            --env-file PATH         Specify an alternate environment file
         """
-        environment = Environment.from_env_file(self.project_dir)
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(self.project_dir, environment_file)
         ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and options['--remove-orphans']:
@@ -481,8 +485,10 @@ class TopLevelCommand(object):
             -e, --env KEY=VAL Set environment variables (can be used multiple times,
                               not supported in API < 1.25)
             -w, --workdir DIR Path to workdir directory for this command.
+            --env-file PATH   Specify an alternate environment file
         """
-        environment = Environment.from_env_file(self.project_dir)
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(self.project_dir, environment_file)
         use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
@@ -1038,6 +1044,7 @@ class TopLevelCommand(object):
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
+            --env-file PATH            Specify an alternate environment file
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -1052,7 +1059,8 @@ class TopLevelCommand(object):
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        environment = Environment.from_env_file(self.project_dir)
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(self.project_dir, environment_file)
         ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and remove_orphans:
@@ -1345,7 +1353,8 @@ def run_one_off_container(container_options, project, service, options, toplevel
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
-    environment = Environment.from_env_file(project_dir)
+    environment_file = options.get('--env-file')
+    environment = Environment.from_env_file(project_dir, environment_file)
     use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
     signals.set_signal_handler_to_shutdown()
