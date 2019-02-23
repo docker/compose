@@ -59,12 +59,15 @@ class Environment(dict):
         self.silent = False
 
     @classmethod
-    def from_env_file(cls, base_dir):
+    def from_env_file(cls, base_dir, env_file=None):
         def _initialize():
             result = cls()
             if base_dir is None:
                 return result
-            env_file_path = os.path.join(base_dir, '.env')
+            if env_file:
+                env_file_path = os.path.join(base_dir, env_file)
+            else:
+                env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
             except EnvFileNotFound:
