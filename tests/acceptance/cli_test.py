@@ -174,7 +174,11 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/build-args'
         result = self.dispatch(['build'], None)
         quietResult = self.dispatch(['build', '-q'], None)
+<<<<<<< HEAD
         assert result.stdout is not ""
+=======
+        assert result.stdout != ""
+>>>>>>> Add --quiet build flag
         assert quietResult.stdout == ""
 
     def test_help_nonexistent(self):

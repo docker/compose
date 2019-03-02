@@ -361,13 +361,11 @@ class Project(object):
         for service in self.get_services(service_names):
             if service.can_be_built():
                 services.append(service)
-            else:
-                if not silent:
-                    log.info('%s uses an image, skipping' % service.name)
+            elif not silent:
+                log.info('%s uses an image, skipping' % service.name)
 
         def build_service(service):
             service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent)
-
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,

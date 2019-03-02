@@ -59,7 +59,6 @@ from .utils import parse_seconds_float
 from .utils import truncate_id
 from .utils import unique_everseen
 
-
 log = logging.getLogger(__name__)
 
 
@@ -1050,7 +1049,9 @@ class Service(object):
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
               gzip=False, rm=True, silent=False):
+        output_stream = open(os.devnull, 'w')
         if not silent:
+            output_stream = sys.stdout
             log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
@@ -1092,7 +1093,7 @@ class Service(object):
         )
 
         try:
-            all_events = list(stream_output(build_output, sys.stdout))
+            all_events = list(stream_output(build_output, output_stream))
         except StreamOutputError as e:
             raise BuildError(self, six.text_type(e))
 
