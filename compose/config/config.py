@@ -1214,7 +1214,7 @@ def merge_networks(base, override):
     base = {k: {} for k in base} if isinstance(base, list) else base
     override = {k: {} for k in override} if isinstance(override, list) else override
     for network_name in all_network_names:
-        md = MergeDict(base.get(network_name, {}), override.get(network_name, {}))
+        md = MergeDict(base.get(network_name) or {}, override.get(network_name) or {})
         md.merge_field('aliases', merge_unique_items_lists, [])
         md.merge_field('link_local_ips', merge_unique_items_lists, [])
         md.merge_scalar('priority')
