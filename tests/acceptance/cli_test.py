@@ -170,6 +170,13 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    def test_quiet_build(self):
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build'], None)
+        quietResult = self.dispatch(['build', '-q'], None)
+        assert result.stdout != ""
+        assert quietResult.stdout == ""
+
     def test_help_nonexistent(self):
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'foobar'], returncode=1)
