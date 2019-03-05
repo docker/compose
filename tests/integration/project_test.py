@@ -1534,7 +1534,6 @@ class ProjectTest(DockerClientTestCase):
             config_data=config_data1,
         )
         project.up()
-        project.stop()
 
         # Then up with secret
         project = Project.from_config(
