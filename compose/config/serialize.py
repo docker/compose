@@ -24,19 +24,23 @@ def serialize_dict_type(dumper, data):
 
 
 def serialize_string(dumper, data):
-    """ Ensure boolean-like strings are quoted in the output and escape $ characters """
+    """ Ensure boolean-like strings are quoted in the output """
     representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
 
     if isinstance(data, six.binary_type):
         data = data.decode('utf-8')
-
-    data = data.replace('$', '$$')
 
     if data.lower() in ('y', 'n', 'yes', 'no', 'on', 'off', 'true', 'false'):
         # Empirically only y/n appears to be an issue, but this might change
         # depending on which PyYaml version is being used. Err on safe side.
         return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
     return representer(data)
+
+
+def serialize_string_escape_dollar(dumper, data):
+    """ Ensure boolean-like strings are quoted in the output and escape $ characters """
+    data = data.replace('$', '$$')
+    return serialize_string(dumper, data)
 
 
 yaml.SafeDumper.add_representer(types.MountSpec, serialize_dict_type)
@@ -46,8 +50,6 @@ yaml.SafeDumper.add_representer(types.SecurityOpt, serialize_config_type)
 yaml.SafeDumper.add_representer(types.ServiceSecret, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServiceConfig, serialize_dict_type)
 yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
-yaml.SafeDumper.add_representer(str, serialize_string)
-yaml.SafeDumper.add_representer(six.text_type, serialize_string)
 
 
 def denormalize_config(config, image_digests=None):
@@ -93,7 +95,13 @@ def v3_introduced_name_key(key):
     return V3_5
 
 
-def serialize_config(config, image_digests=None):
+def serialize_config(config, image_digests=None, escape_dollar=True):
+    if escape_dollar:
+        yaml.SafeDumper.add_representer(str, serialize_string_escape_dollar)
+        yaml.SafeDumper.add_representer(six.text_type, serialize_string_escape_dollar)
+    else:
+        yaml.SafeDumper.add_representer(str, serialize_string)
+        yaml.SafeDumper.add_representer(six.text_type, serialize_string)
     return yaml.safe_dump(
         denormalize_config(config, image_digests),
         default_flow_style=False,

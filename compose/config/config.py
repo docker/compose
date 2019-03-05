@@ -373,7 +373,7 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details, compatibility=False):
+def load(config_details, compatibility=False, interpolate=True):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -383,7 +383,7 @@ def load(config_details, compatibility=False):
     validate_config_version(config_details.config_files)
 
     processed_files = [
-        process_config_file(config_file, config_details.environment)
+        process_config_file(config_file, config_details.environment, interpolate=interpolate)
         for config_file in config_details.config_files
     ]
     config_details = config_details._replace(config_files=processed_files)
@@ -505,7 +505,6 @@ def load_services(config_details, config_file, compatibility=False):
 
 
 def interpolate_config_section(config_file, config, section, environment):
-    validate_config_section(config_file.filename, config, section)
     return interpolate_environment_variables(
         config_file.version,
         config,
@@ -514,38 +513,60 @@ def interpolate_config_section(config_file, config, section, environment):
     )
 
 
-def process_config_file(config_file, environment, service_name=None):
-    services = interpolate_config_section(
+def process_config_section(config_file, config, section, environment, interpolate):
+    validate_config_section(config_file.filename, config, section)
+    if interpolate:
+        return interpolate_environment_variables(
+            config_file.version,
+            config,
+            section,
+            environment
+            )
+    else:
+        return config
+
+
+def process_config_file(config_file, environment, service_name=None, interpolate=True):
+    services = process_config_section(
         config_file,
         config_file.get_service_dicts(),
         'service',
-        environment)
+        environment,
+        interpolate,
+    )
 
     if config_file.version > V1:
         processed_config = dict(config_file.config)
         processed_config['services'] = services
-        processed_config['volumes'] = interpolate_config_section(
+        processed_config['volumes'] = process_config_section(
             config_file,
             config_file.get_volumes(),
             'volume',
-            environment)
-        processed_config['networks'] = interpolate_config_section(
+            environment,
+            interpolate,
+        )
+        processed_config['networks'] = process_config_section(
             config_file,
             config_file.get_networks(),
             'network',
-            environment)
+            environment,
+            interpolate,
+        )
         if config_file.version >= const.COMPOSEFILE_V3_1:
-            processed_config['secrets'] = interpolate_config_section(
+            processed_config['secrets'] = process_config_section(
                 config_file,
                 config_file.get_secrets(),
                 'secret',
-                environment)
+                environment,
+                interpolate,
+            )
         if config_file.version >= const.COMPOSEFILE_V3_3:
-            processed_config['configs'] = interpolate_config_section(
+            processed_config['configs'] = process_config_section(
                 config_file,
                 config_file.get_configs(),
                 'config',
-                environment
+                environment,
+                interpolate,
             )
     else:
         processed_config = services

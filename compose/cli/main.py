@@ -331,6 +331,7 @@ class TopLevelCommand(object):
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
+            --no-interpolate         Don't interpolate environment variables
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
             --services               Print the service names, one per line.
@@ -340,11 +341,12 @@ class TopLevelCommand(object):
                                      or use the wildcard symbol to display all services
         """
 
-        compose_config = get_config_from_options('.', self.toplevel_options)
+        additional_options = {'--no-interpolate': options.get('--no-interpolate')}
+        compose_config = get_config_from_options('.', self.toplevel_options, additional_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', self.toplevel_options)
+            self.project = project_from_options('.', self.toplevel_options, additional_options)
             with errors.handle_connection_errors(self.project.client):
                 image_digests = image_digests_for_project(self.project)
 
@@ -361,14 +363,14 @@ class TopLevelCommand(object):
 
         if options['--hash'] is not None:
             h = options['--hash']
-            self.project = project_from_options('.', self.toplevel_options)
+            self.project = project_from_options('.', self.toplevel_options, additional_options)
             services = [svc for svc in options['--hash'].split(',')] if h != '*' else None
             with errors.handle_connection_errors(self.project.client):
                 for service in self.project.get_services(services):
                     print('{} {}'.format(service.name, service.config_hash))
             return
 
-        print(serialize_config(compose_config, image_digests))
+        print(serialize_config(compose_config, image_digests, not options['--no-interpolate']))
 
     def create(self, options):
         """
