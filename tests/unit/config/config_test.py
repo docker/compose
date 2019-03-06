@@ -3932,6 +3932,24 @@ class MergeNetworksTest(unittest.TestCase, MergeListsTest):
             }
         }
 
+    def test_network_has_none_value(self):
+        service_dict = config.merge_service_dicts(
+            {self.config_name: {
+                'default': None
+            }},
+            {self.config_name: {
+                'default': {
+                    'aliases': []
+                }
+            }},
+            DEFAULT_VERSION)
+
+        assert service_dict[self.config_name] == {
+            'default': {
+                'aliases': []
+            }
+        }
+
     def test_all_properties(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: {
