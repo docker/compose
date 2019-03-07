@@ -21,16 +21,10 @@ WORKDIR /code/
 RUN pip install virtualenv==16.2.0
 RUN pip install tox==3.7.0
 
-ADD requirements.txt /code/
-ADD requirements-dev.txt /code/
-ADD .pre-commit-config.yaml /code/
-ADD setup.py /code/
-ADD tox.ini /code/
-ADD compose /code/compose/
-ADD README.md /code/
+COPY requirements.txt requirements-dev.txt .pre-commit-config.yaml setup.py tox.ini README.md /code/
+ADD compose/ /code/compose/
 RUN tox --notest
 
-ADD . /code/
 RUN chown -R user /code/
 
 ENTRYPOINT ["/code/.tox/py37/bin/docker-compose"]
