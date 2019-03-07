@@ -47,6 +47,7 @@ git push $GITHUB_REPO $VERSION
 
 echo "Uploading the docker image"
 docker push docker/compose:$VERSION
+docker push docker/compose:latest
 
 echo "Uploading the compose-tests image"
 docker push docker/compose-tests:latest
