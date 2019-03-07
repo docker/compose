@@ -5,5 +5,9 @@ services:
         command: top
         scale: 2
     db:
-      image: busybox
-      command: top
+        image: busybox
+        command: top
+    worker:
+        image: busybox
+        command: top
+        scale: 0
