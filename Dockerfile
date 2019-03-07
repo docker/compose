@@ -1,4 +1,4 @@
-FROM docker:18.06.1 as docker
+FROM docker:18.09.3 as docker
 FROM python:3.6
 
 RUN set -ex; \
