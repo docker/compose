@@ -1,5 +1,5 @@
 FROM docker:18.09.3 as docker
-FROM python:3.6
+FROM python:3.7
 
 RUN set -ex; \
     apt-get update -qq; \
@@ -33,4 +33,4 @@ RUN tox --notest
 ADD . /code/
 RUN chown -R user /code/
 
-ENTRYPOINT ["/code/.tox/py36/bin/docker-compose"]
+ENTRYPOINT ["/code/.tox/py37/bin/docker-compose"]
