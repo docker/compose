@@ -176,7 +176,7 @@ class Service(object):
         network_mode=None,
         networks=None,
         secrets=None,
-        scale=None,
+        scale=1,
         pid_mode=None,
         default_platform=None,
         **options
@@ -191,7 +191,7 @@ class Service(object):
         self.pid_mode = pid_mode or PidMode(None)
         self.networks = networks or {}
         self.secrets = secrets or []
-        self.scale_num = scale or 1
+        self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
 
@@ -685,6 +685,7 @@ class Service(object):
             'links': self.get_link_names(),
             'net': self.network_mode.id,
             'networks': self.networks,
+            'secrets': self.secrets,
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
