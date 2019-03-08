@@ -37,7 +37,7 @@ def runTests = { Map settings ->
   def pythonVersions = settings.get("pythonVersions", null)
 
   if (!pythonVersions) {
-    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py36')`")
+    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py37')`")
   }
   if (!dockerVersions) {
     throw new Exception("Need Docker versions to test. e.g.: `runTests(dockerVersions: 'all')`")
@@ -77,7 +77,6 @@ def docker_versions = get_versions(2)
 for (int i = 0; i < docker_versions.length; i++) {
   def dockerVersion = docker_versions[i]
   testMatrix["${dockerVersion}_py27"] = runTests([dockerVersions: dockerVersion, pythonVersions: "py27"])
-  testMatrix["${dockerVersion}_py36"] = runTests([dockerVersions: dockerVersion, pythonVersions: "py36"])
   testMatrix["${dockerVersion}_py37"] = runTests([dockerVersions: dockerVersion, pythonVersions: "py37"])
 }
 
