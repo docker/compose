@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import copy
 import json
 import os
 import random
@@ -1485,6 +1486,60 @@ class ProjectTest(DockerClientTestCase):
             client=self.client,
             name='composetest',
             config_data=config_data,
+        )
+        project.up()
+        project.stop()
+
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        container, = containers
+
+        output = container.logs()
+        assert output == b"This is the secret\n"
+
+    @v3_only()
+    def test_project_up_with_added_secrets(self):
+        node = create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
+
+        config_input1 = {
+            'version': V3_1,
+            'services': [
+                {
+                    'name': 'web',
+                    'image': 'busybox:latest',
+                    'command': 'cat /run/secrets/special',
+                    'environment': ['constraint:node=={}'.format(node if node is not None else '')]
+                }
+
+            ],
+            'secrets': {
+                'super': {
+                    'file': os.path.abspath('tests/fixtures/secrets/default')
+                }
+            }
+        }
+        config_input2 = copy.deepcopy(config_input1)
+        # Add the secret
+        config_input2['services'][0]['secrets'] = [
+            types.ServiceSecret.parse({'source': 'super', 'target': 'special'})
+        ]
+
+        config_data1 = build_config(**config_input1)
+        config_data2 = build_config(**config_input2)
+
+        # First up with non-secret
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data1,
+        )
+        project.up()
+
+        # Then up with secret
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data2,
         )
         project.up()
         project.stop()
