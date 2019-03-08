@@ -13,7 +13,7 @@ rm -rf coverage-html
 # Create the host directory so it's owned by $USER
 mkdir -p coverage-html
 
-docker build -f ${DOCKERFILE} -t "$TAG" .
+docker build --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${DOCKERFILE} -t "$TAG" .
 
 GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
 . script/test/all
