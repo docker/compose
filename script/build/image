@@ -16,5 +16,7 @@ echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
 python setup.py sdist bdist_wheel
 
 docker build \
+    --build-arg http_proxy=$http_proxy \
+    --build-arg https_proxy=$https_proxy \
     --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}" \
     -t "${TAG}" .

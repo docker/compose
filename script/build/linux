@@ -8,6 +8,8 @@ DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
 TAG="docker/compose:tmp-glibc-linux-binary-${DOCKER_COMPOSE_GITSHA}"
 
 docker build -t "${TAG}" . \
+       --build-arg http_proxy=$http_proxy \
+       --build-arg https_proxy=$https_proxy \
        --build-arg BUILD_PLATFORM=debian \
        --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
 TMP_CONTAINER=$(docker create "${TAG}")
