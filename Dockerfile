@@ -1,9 +1,10 @@
 FROM docker:18.06.1 as docker
-FROM python:3.7.2-stretch
+FROM python:3.7.2-slim-stretch
 
 RUN set -ex; \
     apt-get update -qq; \
     apt-get install -y \
+        gcc \
         locales \
         python-dev \
         git
