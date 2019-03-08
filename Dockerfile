@@ -1,5 +1,5 @@
 FROM docker:18.06.1 as docker
-FROM python:3.6
+FROM python:3.7.2-stretch
 
 RUN set -ex; \
     apt-get update -qq; \
@@ -19,7 +19,7 @@ WORKDIR /code/
 
 # FIXME(chris-crone): virtualenv 16.3.0 breaks build, force 16.2.0 until fixed
 RUN pip install virtualenv==16.2.0
-RUN pip install tox==2.1.1
+RUN pip install tox==2.9.1
 
 ADD requirements.txt /code/
 ADD requirements-dev.txt /code/
@@ -33,4 +33,4 @@ RUN tox --notest
 ADD . /code/
 RUN chown -R user /code/
 
-ENTRYPOINT ["/code/.tox/py36/bin/docker-compose"]
+ENTRYPOINT ["/code/.tox/py37/bin/docker-compose"]
