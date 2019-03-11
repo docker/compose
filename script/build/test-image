@@ -1,18 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 set -e
 
-if [ -z "$1" ]; then
-    >&2 echo "First argument must be image tag."
-    exit 1
-fi
+[ -n "$1" ] || {
+	>&2 echo First argument must be image tag.
+	exit 1
+}
 
-TAG="$1"
-IMAGE="docker/compose-tests"
+TAG=$1
+IMAGE=docker/compose-tests
 
-DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
+DOCKER_COMPOSE_GITSHA=$(script/build/write-git-sha)
 docker build -t "${IMAGE}:${TAG}" . \
-       --target build \
-       --build-arg BUILD_PLATFORM="debian" \
-       --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
+	--target build \
+	--build-arg BUILD_PLATFORM=debian \
+	--build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
 docker tag "${IMAGE}":"${TAG}" "${IMAGE}":latest

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 set -ex
 
@@ -12,24 +12,22 @@ chmod 777 dist
 "${VENV}"/bin/pip3 install -q -r requirements-build.txt
 
 # TODO(ulyssessouza) To check if really needed
-if [ -z "${DOCKER_COMPOSE_GITSHA}" ]; then
-    DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
-fi
+[ -n "${DOCKER_COMPOSE_GITSHA}" ] || DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
 echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
 
 export PATH="${CODE_PATH}/pyinstaller:${PATH}"
 
-if [ ! -z "${BUILD_BOOTLOADER}" ]; then
-    # Build bootloader for alpine
-    git clone --single-branch --branch master https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
-    cd /tmp/pyinstaller/bootloader
-    git checkout v3.4
-    "${VENV}"/bin/python3 ./waf configure --no-lsb all
-    "${VENV}"/bin/pip3 install ..
-    cd "${CODE_PATH}"
-    rm -Rf /tmp/pyinstaller
+if [ -n "${BUILD_BOOTLOADER}" ]; then
+	# Build bootloader for alpine
+	git clone --single-branch --branch master https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
+	cd /tmp/pyinstaller/bootloader
+	git checkout v3.4
+	"${VENV}"/bin/python3 ./waf configure --no-lsb all
+	"${VENV}"/bin/pip3 install ..
+	cd "${CODE_PATH}"
+	rm -Rf /tmp/pyinstaller
 else
-    echo "NOT compiling bootloader!!!"
+	echo 'NOT compiling bootloader!!!'
 fi
 
 "${VENV}"/bin/pyinstaller --exclude-module pycrypto --exclude-module PyInstaller docker-compose.spec

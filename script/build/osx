@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env sh
+
 set -ex
 
-TOOLCHAIN_PATH="$(realpath $(dirname $0)/../../build/toolchain)"
+TOOLCHAIN_PATH=$(realpath ${0%/*}/../../build/toolchain)
 
 rm -rf venv
 
