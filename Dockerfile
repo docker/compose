@@ -1,36 +1,20 @@
-FROM docker:18.06.1 as docker
-FROM python:3.7.2-stretch
+FROM docker:18.09.3 AS docker
+FROM python:3.7.2-alpine3.9 AS builder
+RUN apk --update add \
+        gcc \
+        libffi-dev \
+        musl-dev \
+        openssl-dev \
+        yaml-dev \
+        make \
+        python3-dev
 
-RUN set -ex; \
-    apt-get update -qq; \
-    apt-get install -y \
-        locales \
-        python-dev \
-        git
+WORKDIR /code
+COPY setup.py LICENSE README.md MANIFEST.in ./
+COPY compose ./compose
+RUN python setup.py install --user
 
+FROM python:3.7.2-alpine3.9
+COPY --from=builder /root/.local /usr/local
 COPY --from=docker /usr/local/bin/docker /usr/local/bin/docker
-
-# Python3 requires a valid locale
-RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
-ENV LANG en_US.UTF-8
-
-RUN useradd -d /home/user -m -s /bin/bash user
-WORKDIR /code/
-
-# FIXME(chris-crone): virtualenv 16.3.0 breaks build, force 16.2.0 until fixed
-RUN pip install virtualenv==16.2.0
-RUN pip install tox==2.9.1
-
-ADD requirements.txt /code/
-ADD requirements-dev.txt /code/
-ADD .pre-commit-config.yaml /code/
-ADD setup.py /code/
-ADD tox.ini /code/
-ADD compose /code/compose/
-ADD README.md /code/
-RUN tox --notest
-
-ADD . /code/
-RUN chown -R user /code/
-
-ENTRYPOINT ["/code/.tox/py37/bin/docker-compose"]
+ENTRYPOINT ["/usr/local/bin/docker-compose"]
