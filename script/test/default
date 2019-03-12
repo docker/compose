@@ -1,7 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env sh
 # See CONTRIBUTING.md for usage.
 
 set -ex
+
+BASEDIR=$(realpath $0)
+BASEDIR=${BASEDIR%/*}
 
 TAG="docker-compose:alpine-$(git rev-parse --short HEAD)"
 
@@ -17,4 +20,4 @@ mkdir -p coverage-html
 docker build -f "${DOCKERFILE}" -t "${TAG}" --target "${DOCKER_BUILD_TARGET}" .
 
 GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
-. script/test/all
+. "$BASEDIR"/all

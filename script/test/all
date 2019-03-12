@@ -1,24 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env sh
 # This should be run inside a container built from the Dockerfile
 # at the root of the repo - script/test will do it automatically.
 
 set -e
 
->&2 echo "Running lint checks"
+>&2 echo Running lint checks
 docker run --rm \
-  --tty \
-  ${GIT_VOLUME} \
-  "$TAG" tox -e pre-commit
+	--tty \
+	${GIT_VOLUME} \
+	"$TAG" tox -e pre-commit
 
 get_versions="docker run --rm
-    --entrypoint=/code/.tox/py27/bin/python
-    $TAG
-    /code/script/test/versions.py docker/docker-ce,moby/moby"
+	--entrypoint=/code/.tox/py27/bin/python
+	$TAG
+	/code/script/test/versions.py docker/docker-ce,moby/moby"
 
-if [ "$DOCKER_VERSIONS" == "" ]; then
-  DOCKER_VERSIONS="$($get_versions default)"
-elif [ "$DOCKER_VERSIONS" == "all" ]; then
-  DOCKER_VERSIONS=$($get_versions -n 2 recent)
+if [ -z "$DOCKER_VERSIONS" ]; then
+	DOCKER_VERSIONS="$($get_versions default)"
+elif [ "$DOCKER_VERSIONS" = all ]; then
+	DOCKER_VERSIONS=$($get_versions -n 2 recent)
 fi
 
 
@@ -26,38 +26,36 @@ BUILD_NUMBER=${BUILD_NUMBER-$USER}
 PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py27,py37}
 
 for version in $DOCKER_VERSIONS; do
-  >&2 echo "Running tests against Docker $version"
+	>&2 echo "Running tests against Docker $version"
 
-  daemon_container="compose-dind-$version-$BUILD_NUMBER"
+	daemon_container="compose-dind-$version-$BUILD_NUMBER"
 
-  function on_exit() {
-    if [[ "$?" != "0" ]]; then
-        docker logs "$daemon_container" 2>&1 | tail -n 100
-    fi
-    docker rm -vf "$daemon_container"
-  }
+	on_exit() {
+		[ $? -eq 0 ] || docker logs "$daemon_container" 2>&1 | tail -n 100
+		docker rm -vf "$daemon_container"
+	}
 
-  trap "on_exit" EXIT
+	trap on_exit EXIT
 
-  repo="dockerswarm/dind"
+	repo=dockerswarm/dind
 
-  docker run \
-    -d \
-    --name "$daemon_container" \
-    --privileged \
-    --volume="/var/lib/docker" \
-    "$repo:$version" \
-    dockerd -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
-    2>&1 | tail -n 10
+	docker run \
+		-d \
+		--name "$daemon_container" \
+		--privileged \
+		--volume="/var/lib/docker" \
+		"$repo:$version" \
+		dockerd -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
+		2>&1 | tail -n 10
 
-  docker run \
-    --rm \
-    --tty \
-    --link="$daemon_container:docker" \
-    --env="DOCKER_HOST=tcp://docker:2375" \
-    --env="DOCKER_VERSION=$version" \
-    --entrypoint="tox" \
-    "$TAG" \
-    -e "$PY_TEST_VERSIONS" -- "$@"
+	docker run \
+		--rm \
+		--tty \
+		--link="$daemon_container:docker" \
+		--env="DOCKER_HOST=tcp://docker:2375" \
+		--env="DOCKER_VERSION=$version" \
+		--entrypoint="tox" \
+		"$TAG" \
+		-e "$PY_TEST_VERSIONS" -- "$@"
 
 done

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 # This should be run inside a container built from the Dockerfile
 # at the root of the repo:
 #
@@ -12,6 +12,9 @@
 
 set -ex
 
+BASEDIR=$(realpath $0)
+BASEDIR=${BASEDIR%/*}
+
 docker version
 
 export DOCKER_VERSIONS=${DOCKER_VERSIONS:-all}
@@ -19,4 +22,4 @@ STORAGE_DRIVER=${STORAGE_DRIVER:-overlay}
 export DOCKER_DAEMON_ARGS="--storage-driver=$STORAGE_DRIVER"
 
 GIT_VOLUME="--volumes-from=$(hostname)"
-. script/test/all
+. "$BASEDIR"/all
