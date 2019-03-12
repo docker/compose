@@ -98,4 +98,5 @@ exe = EXE(pyz,
           debug=False,
           strip=None,
           upx=True,
-          console=True)
+          console=True,
+          bootloader_ignore_signals=True)
