@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
@@ -1793,15 +1794,28 @@ def exec_build(path=None, tag=None, quiet=False, fileobj=None,
     command_builder.add_arg("--platform", platform)
     command_builder.add_arg("--isolation", isolation)
     command_builder.add_arg("--progress", "plain")
+
+    iidfile = tempfile.mktemp()
+    command_builder.add_arg("--iidfile", iidfile)
     args = command_builder.build([path])
 
+    magic_word = "Successfully built "
+    appear = False
     with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
         while True:
             line = p.stdout.readline()
             if line == "":
                 break
-            line = line.replace("writing image sha256:", "Successfully built ")
+            if magic_word in line:
+                appear = True
             yield json.dumps({"stream": line})
+
+    with open(iidfile) as f:
+        image_id = f.readline().split(":")[1].strip()
+    os.remove(iidfile)
+
+    if not appear:
+        yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
 
 
 class _CommandBuilder(object):
