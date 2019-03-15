@@ -32,6 +32,7 @@ from .config import merge_environment
 from .config import merge_labels
 from .config.errors import DependencyError
 from .config.types import MountSpec
+from .config.types import normalize_path_for_engine
 from .config.types import ServicePort
 from .config.types import VolumeSpec
 from .const import DEFAULT_TIMEOUT
@@ -1044,7 +1045,7 @@ class Service(object):
             elif not os.path.isabs(target):
                 target = '{}/{}'.format(const.SECRETS_PATH, target)
 
-            return MountSpec('bind', secret['file'], target, read_only=True)
+            return MountSpec('bind', normalize_path_for_engine(secret['file']), target, read_only=True)
 
         return [build_spec(secret) for secret in self.secrets]
 
