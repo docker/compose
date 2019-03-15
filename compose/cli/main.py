@@ -272,6 +272,7 @@ class TopLevelCommand(object):
             --build-arg key=val     Set build-time variables for services.
             --parallel              Build images in parallel.
             -q, --quiet             Don't print anything to STDOUT
+            --exec                  Run docker build command
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -293,7 +294,8 @@ class TopLevelCommand(object):
             build_args=build_args,
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
-            silent=options.get('--quiet', False)
+            silent=options.get('--quiet', False),
+            _exec=bool(options.get('--exec', False)),
         )
 
     def bundle(self, options):

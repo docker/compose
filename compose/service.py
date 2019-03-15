@@ -2,9 +2,11 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import itertools
+import json
 import logging
 import os
 import re
+import subprocess
 import sys
 from collections import namedtuple
 from collections import OrderedDict
@@ -1049,7 +1051,7 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False, rm=True, silent=False):
+              gzip=False, rm=True, silent=False, _exec=False):
         output_stream = open(os.devnull, 'w')
         if not silent:
             output_stream = sys.stdout
@@ -1070,7 +1072,8 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        build_output = self.client.build(
+        build = self.client.build if not _exec else exec_build
+        build_output = build(
             path=path,
             tag=self.image_name,
             rm=rm,
@@ -1701,3 +1704,127 @@ def rewrite_build_path(path):
         path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
 
     return path
+
+
+def exec_build(path=None, tag=None, quiet=False, fileobj=None,
+               nocache=False, rm=False, timeout=None,
+               custom_context=False, encoding=None, pull=False,
+               forcerm=False, dockerfile=None, container_limits=None,
+               decode=False, buildargs=None, gzip=False, shmsize=None,
+               labels=None, cache_from=None, target=None, network_mode=None,
+               squash=None, extra_hosts=None, platform=None, isolation=None):
+    """
+    Args:
+        path (str): Path to the directory containing the Dockerfile
+        fileobj: A file object to use as the Dockerfile. (Or a file-like
+            object)
+        tag (str): A tag to add to the final image
+        quiet (bool): Whether to return the status
+        nocache (bool): Don't use the cache when set to ``True``
+        rm (bool): Remove intermediate containers. The ``docker build``
+            command now defaults to ``--rm=true``, but we have kept the old
+            default of `False` to preserve backward compatibility
+        timeout (int): HTTP timeout
+        custom_context (bool): Optional if using ``fileobj``
+        encoding (str): The encoding for a stream. Set to ``gzip`` for
+            compressing
+        pull (bool): Downloads any updates to the FROM image in Dockerfiles
+        forcerm (bool): Always remove intermediate containers, even after
+            unsuccessful builds
+        dockerfile (str): path within the build context to the Dockerfile
+        buildargs (dict): A dictionary of build arguments
+        container_limits (dict): A dictionary of limits applied to each
+            container created by the build process. Valid keys:
+            - memory (int): set memory limit for build
+            - memswap (int): Total memory (memory + swap), -1 to disable
+                swap
+            - cpushares (int): CPU shares (relative weight)
+            - cpusetcpus (str): CPUs in which to allow execution, e.g.,
+                ``"0-3"``, ``"0,1"``
+        decode (bool): If set to ``True``, the returned stream will be
+            decoded into dicts on the fly. Default ``False``
+        shmsize (int): Size of `/dev/shm` in bytes. The size must be
+            greater than 0. If omitted the system uses 64MB
+        labels (dict): A dictionary of labels to set on the image
+        cache_from (:py:class:`list`): A list of images used for build
+            cache resolution
+        target (str): Name of the build-stage to build in a multi-stage
+            Dockerfile
+        network_mode (str): networking mode for the run commands during
+            build
+        squash (bool): Squash the resulting images layers into a
+            single layer.
+        extra_hosts (dict): Extra hosts to add to /etc/hosts in building
+            containers, as a mapping of hostname to IP address.
+        platform (str): Platform in the format ``os[/arch[/variant]]``
+        isolation (str): Isolation technology used during build.
+            Default: `None`.
+    Returns:
+        A generator for the build output.
+    """
+    command_builder = _CommandBuilder()
+    command_builder.add_arg("--tag", tag)
+    command_builder.add_flag("--quiet", quiet)
+    _ = fileobj
+    command_builder.add_flag("--no-cache", nocache)
+    command_builder.add_flag("--rm", rm)
+    _ = timeout
+    _ = custom_context
+    _ = encoding
+    command_builder.add_flag("--pull", pull)
+    command_builder.add_flag("--force-rm", forcerm)
+
+    if dockerfile:
+        dockerfile = os.path.join(path, dockerfile)
+
+    command_builder.add_arg("--file", dockerfile)
+    command_builder.add_params("--build-arg", buildargs)
+    command_builder.add_arg("--memory", container_limits.get("memory"))
+
+    _ = decode
+    _ = gzip
+    command_builder.add_arg("--shm-size", shmsize)
+    command_builder.add_params("--label", labels)
+    command_builder.add_list("--cache-from", cache_from)
+    command_builder.add_arg("--target", target)
+    command_builder.add_arg("--network", network_mode)
+    command_builder.add_flag("--squash", squash)
+    command_builder.add_params("--add-host", extra_hosts)
+    command_builder.add_arg("--platform", platform)
+    command_builder.add_arg("--isolation", isolation)
+    command_builder.add_arg("--progress", "plain")
+    args = command_builder.build([path])
+
+    with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        while True:
+            line = p.stdout.readline()
+            if line == "":
+                break
+            line = line.replace("writing image sha256:", "Successfully built ")
+            yield json.dumps({"stream": line})
+
+
+class _CommandBuilder(object):
+    def __init__(self):
+        self._args = ["docker", "build"]
+
+    def add_arg(self, name, value):
+        if value is not None:
+            self._args.extend([name, str(value)])
+
+    def add_flag(self, name, flag):
+        if flag:
+            self._args.extend([name])
+
+    def add_params(self, name, params):
+        if params:
+            for key, val in params.items():
+                self._args.extend([name, "{}={}".format(key, val)])
+
+    def add_list(self, name, values):
+        if values:
+            for val in values:
+                self._args.extend([name, val])
+
+    def build(self, args):
+        return self._args + args
