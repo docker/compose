@@ -1766,12 +1766,8 @@ def exec_build(path=None, tag=None, quiet=False, fileobj=None,
     command_builder = _CommandBuilder()
     command_builder.add_arg("--tag", tag)
     command_builder.add_flag("--quiet", quiet)
-    _ = fileobj
     command_builder.add_flag("--no-cache", nocache)
     command_builder.add_flag("--rm", rm)
-    _ = timeout
-    _ = custom_context
-    _ = encoding
     command_builder.add_flag("--pull", pull)
     command_builder.add_flag("--force-rm", forcerm)
 
@@ -1782,8 +1778,6 @@ def exec_build(path=None, tag=None, quiet=False, fileobj=None,
     command_builder.add_params("--build-arg", buildargs)
     command_builder.add_arg("--memory", container_limits.get("memory"))
 
-    _ = decode
-    _ = gzip
     command_builder.add_arg("--shm-size", shmsize)
     command_builder.add_params("--label", labels)
     command_builder.add_list("--cache-from", cache_from)
@@ -1810,12 +1804,13 @@ def exec_build(path=None, tag=None, quiet=False, fileobj=None,
                 appear = True
             yield json.dumps({"stream": line})
 
-    with open(iidfile) as f:
-        image_id = f.readline().split(":")[1].strip()
-    os.remove(iidfile)
+    if os.path.exists(iidfile):
+        with open(iidfile) as f:
+            image_id = f.readline().split(":")[1].strip()
+        os.remove(iidfile)
 
-    if not appear:
-        yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
+        if not appear:
+            yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
 
 
 class _CommandBuilder(object):
