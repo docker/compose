@@ -64,12 +64,12 @@ def interpolate_value(name, config_key, value, section, interpolator):
                 string=e.string))
     except UnsetRequiredSubstitution as e:
         raise ConfigurationError(
-            'Missing mandatory value for "{config_key}" option in {section} "{name}": {err}'.format(
-                config_key=config_key,
-                name=name,
-                section=section,
-                err=e.err
-            )
+            'Missing mandatory value for "{config_key}" option interpolating {value} '
+            'in {section} "{name}": {err}'.format(config_key=config_key,
+                                                  value=value,
+                                                  name=name,
+                                                  section=section,
+                                                  err=e.err)
         )
 
 
