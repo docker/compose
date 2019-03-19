@@ -586,8 +586,10 @@ class Project(object):
                           ", ".join(updated_dependencies))
                 containers_stopped = any(
                     service.containers(stopped=True, filters={'status': ['created', 'exited']}))
-                has_links = any(c.get('HostConfig.Links') for c in service.containers())
-                if always_recreate_deps or containers_stopped or not has_links:
+                service_has_links = any(service.get_link_names())
+                container_has_links = any(c.get('HostConfig.Links') for c in service.containers())
+                should_recreate_for_links = service_has_links ^ container_has_links
+                if always_recreate_deps or containers_stopped or should_recreate_for_links:
                     plan = service.convergence_plan(ConvergenceStrategy.always)
                 else:
                     plan = service.convergence_plan(strategy)
