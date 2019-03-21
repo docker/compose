@@ -17,6 +17,8 @@ Change log
 
 - Add `--parallel` to `docker build`'s options in `bash` and `zsh` completion
 
+- Do not tail docker build logs for Linux build
+
 ### Bugfixes
 
 - Fixed a bug where some valid credential helpers weren't properly handled by Compose
@@ -43,11 +45,19 @@ Change log
 - Missing images will no longer stop the execution of `docker-compose down` commands
   (a warning will be displayed instead).
 
-- Force virtualenv version for macOS CI
+- Force virtualenv version to 16.2.0 for macOS CI
 
 - Fix merging of compose files when network has None config
 
 - Fix CTRL+C issues by enabling bootloader_ignore_signals in pyinstaller
+
+- Fix Flake 8 linting
+
+- Force the version of virtualenv to be 16.2.0 to work around build issue with 16.3.0
+
+- Fix the version of mock instead of using floating version
+
+- Bump macOS build to use Python 3.6.8 and OpenSSL 1.1.0j
 
 - Bump docker-py version to 3.7.1 to fix SSH issues
 
