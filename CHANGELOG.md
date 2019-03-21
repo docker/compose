@@ -11,6 +11,12 @@ Change log
 - Added a `--all` flag to `docker-compose ps` to include stopped one-off containers
   in the command's output.
 
+- Support for credential_spec
+
+- Add bash completion for `ps --all|-a`
+
+- Add `--parallel` to `docker build`'s options in `bash` and `zsh` completion
+
 ### Bugfixes
 
 - Fixed a bug where some valid credential helpers weren't properly handled by Compose
@@ -36,6 +42,14 @@ Change log
 
 - Missing images will no longer stop the execution of `docker-compose down` commands
   (a warning will be displayed instead).
+
+- Force virtualenv version for macOS CI
+
+- Fix merging of compose files when network has None config
+
+- Fix Ctrl+C being ignored by enabling bootloader_ignore_signals in pyinstaller
+
+- Bump docker-py version to 3.7.1 to fix SSH issues
 
 1.23.2 (2018-11-28)
 -------------------
