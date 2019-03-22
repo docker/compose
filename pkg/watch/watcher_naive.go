@@ -21,7 +21,11 @@ type naiveNotify struct {
 	events        chan fsnotify.Event
 	wrappedEvents chan FileEvent
 	errors        chan error
-	watchList     map[string]bool
+
+	// Paths that we're watching that should be passed up to the caller.
+	// Note that we may have to watch ancestors of these paths
+	// in order to fulfill the API promise.
+	notifyList map[string]bool
 }
 
 func (d *naiveNotify) Add(name string) error {
@@ -32,24 +36,22 @@ func (d *naiveNotify) Add(name string) error {
 
 	// if it's a file that doesn't exist, watch its parent
 	if os.IsNotExist(err) {
-		err, fileWatched := d.watchUpRecursively(name)
+		err = d.watchAncestorOfMissingPath(name)
 		if err != nil {
-			return errors.Wrapf(err, "watchUpRecursively(%q)", name)
+			return errors.Wrapf(err, "watchAncestorOfMissingPath(%q)", name)
 		}
-		d.watchList[fileWatched] = true
 	} else if fi.IsDir() {
 		err = d.watchRecursively(name)
 		if err != nil {
 			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
-		d.watchList[name] = true
 	} else {
 		err = d.watcher.Add(name)
 		if err != nil {
 			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
-		d.watchList[name] = true
 	}
+	d.notifyList[name] = true
 
 	return nil
 }
@@ -71,22 +73,22 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 	})
 }
 
-func (d *naiveNotify) watchUpRecursively(path string) (error, string) {
+func (d *naiveNotify) watchAncestorOfMissingPath(path string) error {
 	if path == string(filepath.Separator) {
-		return fmt.Errorf("cannot watch root directory"), ""
+		return fmt.Errorf("cannot watch root directory")
 	}
 
 	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrapf(err, "os.Stat(%q)", path), ""
+		return errors.Wrapf(err, "os.Stat(%q)", path)
 	}
 
 	if os.IsNotExist(err) {
 		parent := filepath.Dir(path)
-		return d.watchUpRecursively(parent)
+		return d.watchAncestorOfMissingPath(parent)
 	}
 
-	return d.watcher.Add(path), path
+	return d.watcher.Add(path)
 }
 
 func (d *naiveNotify) Close() error {
@@ -122,35 +124,39 @@ func (d *naiveNotify) loop() {
 					Op:   fsnotify.Create,
 					Name: path,
 				}
-				d.sendEventIfWatched(newE)
-				// TODO(dmiller): symlinks 😭
-				err = d.Add(path)
-				if err != nil {
-					log.Printf("Error watching path %s: %s", e.Name, err)
+
+				if d.shouldNotify(newE) {
+					d.wrappedEvents <- FileEvent{newE.Name}
+
+					// TODO(dmiller): symlinks 😭
+					err = d.Add(path)
+					if err != nil {
+						log.Printf("Error watching path %s: %s", e.Name, err)
+					}
 				}
 				return nil
 			})
 			if err != nil {
 				log.Printf("Error walking directory %s: %s", e.Name, err)
 			}
-		} else {
-			d.sendEventIfWatched(e)
+		} else if d.shouldNotify(e) {
+			d.wrappedEvents <- FileEvent{e.Name}
 		}
 	}
 }
 
-func (d *naiveNotify) sendEventIfWatched(e fsnotify.Event) {
-	if _, ok := d.watchList[e.Name]; ok {
-		d.wrappedEvents <- FileEvent{e.Name}
+func (d *naiveNotify) shouldNotify(e fsnotify.Event) bool {
+	if _, ok := d.notifyList[e.Name]; ok {
+		return true
 	} else {
 		// TODO(dmiller): maybe use a prefix tree here?
-		for path := range d.watchList {
+		for path := range d.notifyList {
 			if pathIsChildOf(e.Name, path) {
-				d.wrappedEvents <- FileEvent{e.Name}
-				break
+				return true
 			}
 		}
 	}
+	return false
 }
 
 func NewWatcher() (*naiveNotify, error) {
@@ -166,7 +172,7 @@ func NewWatcher() (*naiveNotify, error) {
 		events:        fsw.Events,
 		wrappedEvents: wrappedEvents,
 		errors:        fsw.Errors,
-		watchList:     map[string]bool{},
+		notifyList:    map[string]bool{},
 	}
 
 	go wmw.loop()
