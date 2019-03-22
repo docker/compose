@@ -13,7 +13,7 @@ Change log
 
 - Add bash completion for `ps --all|-a`
 
-- Support for `credential_spec`
+- Support for credential_spec
 
 - Add `--parallel` to `docker build`'s options in `bash` and `zsh` completion
 
