@@ -129,7 +129,7 @@ assets public), proceed to the "Finalize a release" section of this guide.
 Once you're ready to make your release public, you may execute the following
 command from the root of the Compose repository:
 ```
-./script/release/release.sh -b <BINTRAY_USERNAME> finalize RELEAE_VERSION
+./script/release/release.sh -b <BINTRAY_USERNAME> finalize RELEASE_VERSION
 ```
 
 Note that this command will create and publish versioned assets to the public.
