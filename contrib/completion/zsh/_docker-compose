@@ -117,6 +117,7 @@ __docker-compose_subcommand() {
                 '--no-cache[Do not use cache when building the image.]' \
                 '--pull[Always attempt to pull a newer version of the image.]' \
                 '--compress[Compress the build context using gzip.]' \
+                '--parallel[Build images in parallel.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
         (bundle)
@@ -339,7 +340,7 @@ _docker-compose() {
         '(- :)'{-h,--help}'[Get help]' \
         '*'{-f,--file}"[${file_description}]:file:_files -g '*.yml'" \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
-        "--compatibility[If set, Compose will attempt to convert deploy keys in v3 files to their non-Swarm equivalent]" \
+        "--compatibility[If set, Compose will attempt to convert keys in v3 files to their non-Swarm equivalent]" \
         '(- :)'{-v,--version}'[Print version and exit]' \
         '--verbose[Show more output]' \
         '--log-level=[Set log level]:level:(DEBUG INFO WARNING ERROR CRITICAL)' \

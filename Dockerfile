@@ -17,6 +17,8 @@ ENV LANG en_US.UTF-8
 RUN useradd -d /home/user -m -s /bin/bash user
 WORKDIR /code/
 
+# FIXME(chris-crone): virtualenv 16.3.0 breaks build, force 16.2.0 until fixed
+RUN pip install virtualenv==16.2.0
 RUN pip install tox==2.1.1
 
 ADD requirements.txt /code/
@@ -25,6 +27,7 @@ ADD .pre-commit-config.yaml /code/
 ADD setup.py /code/
 ADD tox.ini /code/
 ADD compose /code/compose/
+ADD README.md /code/
 RUN tox --notest
 
 ADD . /code/

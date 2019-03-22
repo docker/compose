@@ -240,6 +240,18 @@ def validate_depends_on(service_config, service_names):
             )
 
 
+def validate_credential_spec(service_config):
+    credential_spec = service_config.config.get('credential_spec')
+    if not credential_spec:
+        return
+
+    if 'registry' not in credential_spec and 'file' not in credential_spec:
+        raise ConfigurationError(
+            "Service '{s.name}' is missing 'credential_spec.file' or "
+            "credential_spec.registry'".format(s=service_config)
+        )
+
+
 def get_unsupported_config_msg(path, error_key):
     msg = "Unsupported config option for {}: '{}'".format(path_string(path), error_key)
     if error_key in DOCKER_CONFIG_HINTS:
