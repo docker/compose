@@ -7,7 +7,6 @@ import os
 import shutil
 import sys
 import time
-from distutils.core import run_setup
 
 from jinja2 import Template
 from release.bintray import BintrayAPI
@@ -276,7 +275,8 @@ def finalize(args):
 
         repository.checkout_branch(br_name)
 
-        run_setup(os.path.join(REPO_ROOT, 'setup.py'), script_args=['sdist', 'bdist_wheel'])
+        os.system('python {setup_script} sdist bdist_wheel'.format(
+            setup_script=os.path.join(REPO_ROOT, 'setup.py')))
 
         merge_status = pr_data.merge()
         if not merge_status.merged and not args.finalize_resume:
