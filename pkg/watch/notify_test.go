@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -126,6 +125,26 @@ func TestWatchNonExistentPath(t *testing.T) {
 	d1 := "hello\ngo\n"
 	f.WriteFile(path, d1)
 	f.assertEvents(path)
+}
+
+func TestWatchNonExistentPathDoesNotFireSiblingEvent(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.TempDir("root")
+	watchedFile := filepath.Join(root, "a.txt")
+	unwatchedSibling := filepath.Join(root, "b.txt")
+
+	err := f.notify.Add(watchedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.fsync()
+
+	d1 := "hello\ngo\n"
+	f.WriteFile(unwatchedSibling, d1)
+	f.assertEvents()
 }
 
 func TestRemove(t *testing.T) {
@@ -319,18 +338,13 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parent := f.JoinPath("root", "parent")
 	file := f.JoinPath("root", "parent", "a")
 
 	f.watch(file)
 	f.fsync()
 	f.events = nil
 	f.WriteFile(file, "hello")
-	if runtime.GOOS == "darwin" {
-		f.assertEvents(file)
-	} else {
-		f.assertEvents(parent, file)
-	}
+	f.assertEvents(file)
 }
 
 type notifyFixture struct {
