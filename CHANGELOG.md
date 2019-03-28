@@ -49,7 +49,7 @@ Change log
 
 - Fix `CTRL+C` issues by enabling `bootloader_ignore_signals` in `pyinstaller`
 
-- Bump `docker-py` version to `3.7.1` to fix SSH issues
+- Bump `docker-py` version to `3.7.2` to fix SSH and proxy config issues
 
 - Fix release script and some typos on release documentation
 
