@@ -18,7 +18,7 @@ def pypi_upload(args):
             'dist/docker-compose-{}*.tar.gz'.format(rel)
         ])
     except HTTPError as e:
-        if e.response.status_code == 400 and 'File already exists' in e.message:
+        if e.response.status_code == 400 and 'File already exists' in str(e):
             if not args.finalize_resume:
                 raise ScriptError(
                     'Package already uploaded on PyPi.'
