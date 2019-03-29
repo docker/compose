@@ -1,6 +1,58 @@
 Change log
 ==========
 
+1.24.0 (2019-03-28)
+-------------------
+
+### Features
+
+- Added support for connecting to the Docker Engine using the `ssh` protocol.
+
+- Added a `--all` flag to `docker-compose ps` to include stopped one-off containers
+  in the command's output.
+
+- Add bash completion for `ps --all|-a`
+
+- Support for credential_spec
+
+- Add `--parallel` to `docker build`'s options in `bash` and `zsh` completion
+
+### Bugfixes
+
+- Fixed a bug where some valid credential helpers weren't properly handled by Compose
+  when attempting to pull images from private registries.
+
+- Fixed an issue where the output of `docker-compose start` before containers were created
+  was misleading
+
+- To match the Docker CLI behavior and to avoid confusing issues, Compose will no longer
+  accept whitespace in variable names sourced from environment files.
+
+- Compose will now report a configuration error if a service attempts to declare
+  duplicate mount points in the volumes section.
+
+- Fixed an issue with the containerized version of Compose that prevented users from
+  writing to stdin during interactive sessions started by `run` or `exec`.
+
+- One-off containers started by `run` no longer adopt the restart policy of the service,
+  and are instead set to never restart.
+
+- Fixed an issue that caused some container events to not appear in the output of
+  the `docker-compose events` command.
+
+- Missing images will no longer stop the execution of `docker-compose down` commands
+  (a warning will be displayed instead).
+
+- Force `virtualenv` version for macOS CI
+
+- Fix merging of compose files when network has `None` config
+
+- Fix `CTRL+C` issues by enabling `bootloader_ignore_signals` in `pyinstaller`
+
+- Bump `docker-py` version to `3.7.2` to fix SSH and proxy config issues
+
+- Fix release script and some typos on release documentation
+
 1.23.2 (2018-11-28)
 -------------------
 
