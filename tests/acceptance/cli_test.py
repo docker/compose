@@ -269,7 +269,7 @@ services:
         # assert there are no python objects encoded in the output
         assert '!!' not in result.stdout
 
-        output = yaml.load(result.stdout)
+        output = yaml.safe_load(result.stdout)
         expected = {
             'version': '2.0',
             'volumes': {'data': {'driver': 'local'}},
@@ -294,7 +294,7 @@ services:
     def test_config_restart(self):
         self.base_dir = 'tests/fixtures/restart'
         result = self.dispatch(['config'])
-        assert yaml.load(result.stdout) == {
+        assert yaml.safe_load(result.stdout) == {
             'version': '2.0',
             'services': {
                 'never': {
@@ -323,7 +323,7 @@ services:
     def test_config_external_network(self):
         self.base_dir = 'tests/fixtures/networks'
         result = self.dispatch(['-f', 'external-networks.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'networks' in json_result
         assert json_result['networks'] == {
             'networks_foo': {
@@ -337,7 +337,7 @@ services:
     def test_config_with_dot_env(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -352,7 +352,7 @@ services:
     def test_config_with_env_file(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['--env-file', '.env2', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -367,7 +367,7 @@ services:
     def test_config_with_dot_env_and_override_dir(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['--project-directory', 'alt/', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -382,7 +382,7 @@ services:
     def test_config_external_volume_v2(self):
         self.base_dir = 'tests/fixtures/volumes'
         result = self.dispatch(['-f', 'external-volumes-v2.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
@@ -398,7 +398,7 @@ services:
     def test_config_external_volume_v2_x(self):
         self.base_dir = 'tests/fixtures/volumes'
         result = self.dispatch(['-f', 'external-volumes-v2-x.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
@@ -414,7 +414,7 @@ services:
     def test_config_external_volume_v3_x(self):
         self.base_dir = 'tests/fixtures/volumes'
         result = self.dispatch(['-f', 'external-volumes-v3-x.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
@@ -430,7 +430,7 @@ services:
     def test_config_external_volume_v3_4(self):
         self.base_dir = 'tests/fixtures/volumes'
         result = self.dispatch(['-f', 'external-volumes-v3-4.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'volumes' in json_result
         assert json_result['volumes'] == {
             'foo': {
@@ -446,7 +446,7 @@ services:
     def test_config_external_network_v3_5(self):
         self.base_dir = 'tests/fixtures/networks'
         result = self.dispatch(['-f', 'external-networks-v3-5.yml', 'config'])
-        json_result = yaml.load(result.stdout)
+        json_result = yaml.safe_load(result.stdout)
         assert 'networks' in json_result
         assert json_result['networks'] == {
             'foo': {
@@ -462,7 +462,7 @@ services:
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
-        assert yaml.load(result.stdout) == {
+        assert yaml.safe_load(result.stdout) == {
             'version': '2.1',
             'services': {
                 'net': {
@@ -487,7 +487,7 @@ services:
         self.base_dir = 'tests/fixtures/v3-full'
         result = self.dispatch(['config'])
 
-        assert yaml.load(result.stdout) == {
+        assert yaml.safe_load(result.stdout) == {
             'version': '3.5',
             'volumes': {
                 'foobar': {
@@ -564,7 +564,7 @@ services:
         self.base_dir = 'tests/fixtures/compatibility-mode'
         result = self.dispatch(['--compatibility', 'config'])
 
-        assert yaml.load(result.stdout) == {
+        assert yaml.safe_load(result.stdout) == {
             'version': '2.3',
             'volumes': {'foo': {'driver': 'default'}},
             'networks': {'bar': {}},

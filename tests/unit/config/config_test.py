@@ -5060,7 +5060,7 @@ class HealthcheckTest(unittest.TestCase):
             })
         )
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['test']
 
         assert serialized_service['healthcheck'] == {
@@ -5087,7 +5087,7 @@ class HealthcheckTest(unittest.TestCase):
             })
         )
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['test']
 
         assert serialized_service['healthcheck'] == {
@@ -5294,7 +5294,7 @@ class SerializeTest(unittest.TestCase):
             'secrets': secrets_dict
         }))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
         assert 'secrets' in serialized_config
@@ -5309,7 +5309,7 @@ class SerializeTest(unittest.TestCase):
             }
         ], volumes={}, networks={}, secrets={}, configs={})
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
 
     def test_serialize_ports_with_ext_ip(self):
@@ -5321,7 +5321,7 @@ class SerializeTest(unittest.TestCase):
             }
         ], volumes={}, networks={}, secrets={}, configs={})
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         assert '127.0.0.1:8080:80/tcp' in serialized_config['services']['web']['ports']
 
     def test_serialize_configs(self):
@@ -5349,7 +5349,7 @@ class SerializeTest(unittest.TestCase):
             'configs': configs_dict
         }))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['configs']) == secret_sort(service_dict['configs'])
         assert 'configs' in serialized_config
@@ -5389,7 +5389,7 @@ class SerializeTest(unittest.TestCase):
         }
         config_dict = config.load(build_config_details(cfg))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
@@ -5411,7 +5411,7 @@ class SerializeTest(unittest.TestCase):
         }
         config_dict = config.load(build_config_details(cfg), interpolate=False)
 
-        serialized_config = yaml.load(serialize_config(config_dict, escape_dollar=False))
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['environment']['CURRENCY'] == '$'
         assert serialized_service['command'] == 'echo $FOO'
@@ -5430,7 +5430,7 @@ class SerializeTest(unittest.TestCase):
 
         config_dict = config.load(build_config_details(cfg))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['command'] == 'echo 十六夜　咲夜'
 
@@ -5446,6 +5446,6 @@ class SerializeTest(unittest.TestCase):
         }
 
         config_dict = config.load(build_config_details(cfg))
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_volume = serialized_config['volumes']['test']
         assert serialized_volume['external'] is False
