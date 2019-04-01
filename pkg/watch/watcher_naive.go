@@ -10,6 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
+
+	"github.com/windmilleng/tilt/internal/ospath"
 )
 
 // A naive file watcher that uses the plain fsnotify API.
@@ -151,7 +153,7 @@ func (d *naiveNotify) shouldNotify(e fsnotify.Event) bool {
 	} else {
 		// TODO(dmiller): maybe use a prefix tree here?
 		for path := range d.notifyList {
-			if pathIsChildOf(e.Name, path) {
+			if ospath.IsChild(path, e.Name) {
 				return true
 			}
 		}

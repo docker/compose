@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/windmilleng/tilt/internal/ospath"
+
 	"github.com/windmilleng/fsevents"
 )
 
@@ -77,8 +79,7 @@ func (d *darwinNotify) Add(name string) error {
 	// Check if this is a subdirectory of any of the paths
 	// we're already watching.
 	for _, parent := range es.Paths {
-		isChild := pathIsChildOf(name, parent)
-		if isChild {
+		if ospath.IsChild(parent, name) {
 			return nil
 		}
 	}
