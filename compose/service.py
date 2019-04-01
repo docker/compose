@@ -1078,7 +1078,7 @@ class Service(object):
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            cache_from=build_opts.get('cache_from', None),
+            cache_from=self.get_cache_from(build_opts),
             labels=build_opts.get('labels', None),
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
@@ -1115,6 +1115,12 @@ class Service(object):
             raise BuildError(self, event if all_events else 'Unknown')
 
         return image_id
+
+    def get_cache_from(self, build_opts):
+        cache_from = build_opts.get('cache_from', None)
+        if cache_from is not None:
+            cache_from = [tag for tag in cache_from if tag]
+        return cache_from
 
     def can_be_built(self):
         return 'build' in self.options
