@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# From http://wiki.musl-libc.org/wiki/FAQ#Q:_where_is_ldd_.3F
+#
+#     Musl's dynlinker comes with ldd functionality built in. just create a
+#     symlink from ld-musl-$ARCH.so to /bin/ldd. If the dynlinker was started
+#     as "ldd", it will detect that and print the appropriate DSO information.
+#
+# Instead, this string replaced "ldd" with the package so that pyinstaller
+# can find the actual lib.
+exec /usr/bin/ldd "$@" | \
+    sed -r 's/([^[:space:]]+) => ldd/\1 => \/lib\/\1/g' | \
+    sed -r 's/ldd \(.*\)//g'

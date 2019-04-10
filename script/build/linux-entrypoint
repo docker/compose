@@ -2,14 +2,35 @@
 
 set -ex
 
-TARGET=dist/docker-compose-$(uname -s)-$(uname -m)
-VENV=/code/.tox/py37
+CODE_PATH=/code
+VENV=${CODE_PATH}/.tox/py37
 
-mkdir -p `pwd`/dist
-chmod 777 `pwd`/dist
+cd ${CODE_PATH}
+mkdir -p dist
+chmod 777 dist
 
-$VENV/bin/pip install -q -r requirements-build.txt
+${VENV}/bin/pip3 install -q -r requirements-build.txt
+
+# TODO(ulyssessouza) To check if really needed
 ./script/build/write-git-sha
-su -c "$VENV/bin/pyinstaller docker-compose.spec" user
-mv dist/docker-compose $TARGET
-$TARGET version
+
+export PATH="${CODE_PATH}/pyinstaller:${PATH}"
+
+if [ ! -z "${BUILD_BOOTLOADER}" ]; then
+    # Build bootloader for alpine
+    git clone --single-branch --branch master https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
+    cd /tmp/pyinstaller/bootloader
+    git checkout v3.4
+    ${VENV}/bin/python3 ./waf configure --no-lsb all
+    ${VENV}/bin/pip3 install ..
+    cd ${CODE_PATH}
+    rm -Rf /tmp/pyinstaller
+else
+    echo "NOT compiling bootloader!!!"
+fi
+
+${VENV}/bin/pyinstaller --exclude-module pycrypto --exclude-module PyInstaller docker-compose.spec
+ls -la dist/
+ldd dist/docker-compose
+mv dist/docker-compose /usr/local/bin
+docker-compose version
