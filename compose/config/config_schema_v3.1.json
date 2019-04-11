@@ -116,7 +116,7 @@
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
-        "labels": {"$ref": "#/definitions/labels"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
@@ -252,7 +252,7 @@
       "properties": {
         "mode": {"type": "string"},
         "replicas": {"type": "integer"},
-        "labels": {"$ref": "#/definitions/labels"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "update_config": {
           "type": "object",
           "properties": {
@@ -323,7 +323,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "subnet": {"type": "string", "format": "subnet_ip_address"}
+                  "subnet": {"type": "string"}
                 },
                 "additionalProperties": false
               }
@@ -339,7 +339,7 @@
           "additionalProperties": false
         },
         "internal": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -362,7 +362,7 @@
           },
           "additionalProperties": false
         },
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -378,7 +378,7 @@
             "name": {"type": "string"}
           }
         },
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -403,21 +403,6 @@
           "patternProperties": {
             ".+": {
               "type": ["string", "number", "null"]
-            }
-          },
-          "additionalProperties": false
-        },
-        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
-      ]
-    },
-
-    "labels": {
-      "oneOf": [
-        {
-          "type": "object",
-          "patternProperties": {
-            ".+": {
-              "type": "string"
             }
           },
           "additionalProperties": false

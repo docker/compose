@@ -122,10 +122,14 @@
           }
         },
         "container_name": {"type": "string"},
-        "credential_spec": {"type": "object", "properties": {
-          "file": {"type": "string"},
-          "registry": {"type": "string"}
-        }},
+        "credential_spec": {
+          "type": "object",
+          "properties": {
+            "file": {"type": "string"},
+            "registry": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
         "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},

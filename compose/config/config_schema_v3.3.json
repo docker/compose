@@ -83,7 +83,7 @@
                 "context": {"type": "string"},
                 "dockerfile": {"type": "string"},
                 "args": {"$ref": "#/definitions/list_or_dict"},
-                "labels": {"$ref": "#/definitions/labels"},
+                "labels": {"$ref": "#/definitions/list_or_dict"},
                 "cache_from": {"$ref": "#/definitions/list_of_strings"}
               },
               "additionalProperties": false
@@ -118,10 +118,14 @@
           }
         },
         "container_name": {"type": "string"},
-        "credential_spec": {"type": "object", "properties": {
-          "file": {"type": "string"},
-          "registry": {"type": "string"}
-        }},
+        "credential_spec": {
+          "type": "object",
+          "properties": {
+            "file": {"type": "string"},
+            "registry": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
         "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
@@ -151,7 +155,7 @@
         "hostname": {"type": "string"},
         "image": {"type": "string"},
         "ipc": {"type": "string"},
-        "labels": {"$ref": "#/definitions/labels"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
 
         "logging": {
@@ -278,7 +282,6 @@
               {
                 "type": "object",
                 "required": ["type"],
-                "additionalProperties": false,
                 "properties": {
                   "type": {"type": "string"},
                   "source": {"type": "string"},
@@ -297,7 +300,8 @@
                       "nocopy": {"type": "boolean"}
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             ],
             "uniqueItems": true
@@ -332,7 +336,7 @@
         "mode": {"type": "string"},
         "endpoint_mode": {"type": "string"},
         "replicas": {"type": "integer"},
-        "labels": {"$ref": "#/definitions/labels"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "update_config": {
           "type": "object",
           "properties": {
@@ -413,7 +417,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "subnet": {"type": "string", "format": "subnet_ip_address"}
+                  "subnet": {"type": "string"}
                 },
                 "additionalProperties": false
               }
@@ -430,7 +434,7 @@
         },
         "internal": {"type": "boolean"},
         "attachable": {"type": "boolean"},
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -453,7 +457,7 @@
           },
           "additionalProperties": false
         },
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -469,7 +473,7 @@
             "name": {"type": "string"}
           }
         },
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -485,7 +489,7 @@
             "name": {"type": "string"}
           }
         },
-        "labels": {"$ref": "#/definitions/labels"}
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false
     },
@@ -510,21 +514,6 @@
           "patternProperties": {
             ".+": {
               "type": ["string", "number", "null"]
-            }
-          },
-          "additionalProperties": false
-        },
-        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
-      ]
-    },
-
-    "labels": {
-      "oneOf": [
-        {
-          "type": "object",
-          "patternProperties": {
-            ".+": {
-              "type": "string"
             }
           },
           "additionalProperties": false

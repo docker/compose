@@ -2,13 +2,13 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "id": "config_schema_v3.8.json",
   "type": "object",
-  "required": [
-    "version"
-  ],
+  "required": ["version"],
+
   "properties": {
     "version": {
       "type": "string"
     },
+
     "services": {
       "id": "#/properties/services",
       "type": "object",
@@ -19,6 +19,7 @@
       },
       "additionalProperties": false
     },
+
     "networks": {
       "id": "#/properties/networks",
       "type": "object",
@@ -28,6 +29,7 @@
         }
       }
     },
+
     "volumes": {
       "id": "#/properties/volumes",
       "type": "object",
@@ -38,6 +40,7 @@
       },
       "additionalProperties": false
     },
+
     "secrets": {
       "id": "#/properties/secrets",
       "type": "object",
@@ -48,6 +51,7 @@
       },
       "additionalProperties": false
     },
+
     "configs": {
       "id": "#/properties/configs",
       "type": "object",
@@ -59,255 +63,129 @@
       "additionalProperties": false
     }
   },
-  "patternProperties": {
-    "^x-": {}
-  },
+
+  "patternProperties": {"^x-": {}},
   "additionalProperties": false,
+
   "definitions": {
+
     "service": {
       "id": "#/definitions/service",
       "type": "object",
+
       "properties": {
-        "deploy": {
-          "$ref": "#/definitions/deployment"
-        },
+        "deploy": {"$ref": "#/definitions/deployment"},
         "build": {
           "oneOf": [
-            {
-              "type": "string"
-            },
+            {"type": "string"},
             {
               "type": "object",
               "properties": {
-                "context": {
-                  "type": "string"
-                },
-                "dockerfile": {
-                  "type": "string"
-                },
-                "args": {
-                  "$ref": "#/definitions/list_or_dict"
-                },
-                "labels": {
-                  "$ref": "#/definitions/list_or_dict"
-                },
-                "cache_from": {
-                  "$ref": "#/definitions/list_of_strings"
-                },
-                "network": {
-                  "type": "string"
-                },
-                "target": {
-                  "type": "string"
-                },
-                "shm_size": {
-                  "type": [
-                    "integer",
-                    "string"
-                  ]
-                }
+                "context": {"type": "string"},
+                "dockerfile": {"type": "string"},
+                "args": {"$ref": "#/definitions/list_or_dict"},
+                "labels": {"$ref": "#/definitions/list_or_dict"},
+                "cache_from": {"$ref": "#/definitions/list_of_strings"},
+                "network": {"type": "string"},
+                "target": {"type": "string"},
+                "shm_size": {"type": ["integer", "string"]}
               },
               "additionalProperties": false
             }
           ]
         },
-        "cap_add": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
-        "cap_drop": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
-        "cgroup_parent": {
-          "type": "string"
-        },
+        "cap_add": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "cap_drop": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "cgroup_parent": {"type": "string"},
         "command": {
           "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
           ]
         },
         "configs": {
           "type": "array",
           "items": {
             "oneOf": [
-              {
-                "type": "string"
-              },
+              {"type": "string"},
               {
                 "type": "object",
                 "properties": {
-                  "source": {
-                    "type": "string"
-                  },
-                  "target": {
-                    "type": "string"
-                  },
-                  "uid": {
-                    "type": "string"
-                  },
-                  "gid": {
-                    "type": "string"
-                  },
-                  "mode": {
-                    "type": "number"
-                  }
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "uid": {"type": "string"},
+                  "gid": {"type": "string"},
+                  "mode": {"type": "number"}
                 }
               }
             ]
           }
         },
-        "container_name": {
-          "type": "string"
-        },
+        "container_name": {"type": "string"},
         "credential_spec": {
           "type": "object",
           "properties": {
-            "config": {
-              "type": "string"
-            },
-            "file": {
-              "type": "string"
-            },
-            "registry": {
-              "type": "string"
-            }
+            "config": {"type": "string"},
+            "file": {"type": "string"},
+            "registry": {"type": "string"}
           },
           "additionalProperties": false
         },
-        "depends_on": {
-          "$ref": "#/definitions/list_of_strings"
-        },
-        "devices": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
-        "dns": {
-          "$ref": "#/definitions/string_or_list"
-        },
-        "dns_search": {
-          "$ref": "#/definitions/string_or_list"
-        },
-        "domainname": {
-          "type": "string"
-        },
+        "depends_on": {"$ref": "#/definitions/list_of_strings"},
+        "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "dns": {"$ref": "#/definitions/string_or_list"},
+        "dns_search": {"$ref": "#/definitions/string_or_list"},
+        "domainname": {"type": "string"},
         "entrypoint": {
           "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
           ]
         },
-        "env_file": {
-          "$ref": "#/definitions/string_or_list"
-        },
-        "environment": {
-          "$ref": "#/definitions/list_or_dict"
-        },
+        "env_file": {"$ref": "#/definitions/string_or_list"},
+        "environment": {"$ref": "#/definitions/list_or_dict"},
+
         "expose": {
           "type": "array",
           "items": {
-            "type": [
-              "string",
-              "number"
-            ],
+            "type": ["string", "number"],
             "format": "expose"
           },
           "uniqueItems": true
         },
-        "external_links": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
-        "extra_hosts": {
-          "$ref": "#/definitions/list_or_dict"
-        },
-        "healthcheck": {
-          "$ref": "#/definitions/healthcheck"
-        },
-        "hostname": {
-          "type": "string"
-        },
-        "image": {
-          "type": "string"
-        },
-        "init": {
-          "type": "boolean"
-        },
-        "ipc": {
-          "type": "string"
-        },
-        "isolation": {
-          "type": "string"
-        },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        },
-        "links": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
+
+        "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "healthcheck": {"$ref": "#/definitions/healthcheck"},
+        "hostname": {"type": "string"},
+        "image": {"type": "string"},
+        "init": {"type": "boolean"},
+        "ipc": {"type": "string"},
+        "isolation": {"type": "string"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+
         "logging": {
-          "type": "object",
-          "properties": {
-            "driver": {
-              "type": "string"
-            },
-            "options": {
-              "type": "object",
-              "patternProperties": {
-                "^.+$": {
-                  "type": [
-                    "string",
-                    "number",
-                    "null"
-                  ]
+            "type": "object",
+
+            "properties": {
+                "driver": {"type": "string"},
+                "options": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^.+$": {"type": ["string", "number", "null"]}
+                  }
                 }
-              }
-            }
-          },
-          "additionalProperties": false
+            },
+            "additionalProperties": false
         },
-        "mac_address": {
-          "type": "string"
-        },
-        "network_mode": {
-          "type": "string"
-        },
+
+        "mac_address": {"type": "string"},
+        "network_mode": {"type": "string"},
+
         "networks": {
           "oneOf": [
-            {
-              "$ref": "#/definitions/list_of_strings"
-            },
+            {"$ref": "#/definitions/list_of_strings"},
             {
               "type": "object",
               "patternProperties": {
@@ -316,21 +194,13 @@
                     {
                       "type": "object",
                       "properties": {
-                        "aliases": {
-                          "$ref": "#/definitions/list_of_strings"
-                        },
-                        "ipv4_address": {
-                          "type": "string"
-                        },
-                        "ipv6_address": {
-                          "type": "string"
-                        }
+                        "aliases": {"$ref": "#/definitions/list_of_strings"},
+                        "ipv4_address": {"type": "string"},
+                        "ipv6_address": {"type": "string"}
                       },
                       "additionalProperties": false
                     },
-                    {
-                      "type": "null"
-                    }
+                    {"type": "null"}
                   ]
                 }
               },
@@ -338,39 +208,21 @@
             }
           ]
         },
-        "pid": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
+        "pid": {"type": ["string", "null"]},
+
         "ports": {
           "type": "array",
           "items": {
             "oneOf": [
-              {
-                "type": "number",
-                "format": "ports"
-              },
-              {
-                "type": "string",
-                "format": "ports"
-              },
+              {"type": "number", "format": "ports"},
+              {"type": "string", "format": "ports"},
               {
                 "type": "object",
                 "properties": {
-                  "mode": {
-                    "type": "string"
-                  },
-                  "target": {
-                    "type": "integer"
-                  },
-                  "published": {
-                    "type": "integer"
-                  },
-                  "protocol": {
-                    "type": "string"
-                  }
+                  "mode": {"type": "string"},
+                  "target": {"type": "integer"},
+                  "published": {"type": "integer"},
+                  "protocol": {"type": "string"}
                 },
                 "additionalProperties": false
               }
@@ -378,153 +230,81 @@
           },
           "uniqueItems": true
         },
-        "privileged": {
-          "type": "boolean"
-        },
-        "read_only": {
-          "type": "boolean"
-        },
-        "restart": {
-          "type": "string"
-        },
-        "security_opt": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
-        "shm_size": {
-          "type": [
-            "number",
-            "string"
-          ]
-        },
+
+        "privileged": {"type": "boolean"},
+        "read_only": {"type": "boolean"},
+        "restart": {"type": "string"},
+        "security_opt": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "shm_size": {"type": ["number", "string"]},
         "secrets": {
           "type": "array",
           "items": {
             "oneOf": [
-              {
-                "type": "string"
-              },
+              {"type": "string"},
               {
                 "type": "object",
                 "properties": {
-                  "source": {
-                    "type": "string"
-                  },
-                  "target": {
-                    "type": "string"
-                  },
-                  "uid": {
-                    "type": "string"
-                  },
-                  "gid": {
-                    "type": "string"
-                  },
-                  "mode": {
-                    "type": "number"
-                  }
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "uid": {"type": "string"},
+                  "gid": {"type": "string"},
+                  "mode": {"type": "number"}
                 }
               }
             ]
           }
         },
-        "sysctls": {
-          "$ref": "#/definitions/list_or_dict"
-        },
-        "stdin_open": {
-          "type": "boolean"
-        },
-        "stop_grace_period": {
-          "type": "string",
-          "format": "duration"
-        },
-        "stop_signal": {
-          "type": "string"
-        },
-        "tmpfs": {
-          "$ref": "#/definitions/string_or_list"
-        },
-        "tty": {
-          "type": "boolean"
-        },
+        "sysctls": {"$ref": "#/definitions/list_or_dict"},
+        "stdin_open": {"type": "boolean"},
+        "stop_grace_period": {"type": "string", "format": "duration"},
+        "stop_signal": {"type": "string"},
+        "tmpfs": {"$ref": "#/definitions/string_or_list"},
+        "tty": {"type": "boolean"},
         "ulimits": {
           "type": "object",
           "patternProperties": {
             "^[a-z]+$": {
               "oneOf": [
+                {"type": "integer"},
                 {
-                  "type": "integer"
-                },
-                {
-                  "type": "object",
+                  "type":"object",
                   "properties": {
-                    "hard": {
-                      "type": "integer"
-                    },
-                    "soft": {
-                      "type": "integer"
-                    }
+                    "hard": {"type": "integer"},
+                    "soft": {"type": "integer"}
                   },
-                  "required": [
-                    "soft",
-                    "hard"
-                  ],
+                  "required": ["soft", "hard"],
                   "additionalProperties": false
                 }
               ]
             }
           }
         },
-        "user": {
-          "type": "string"
-        },
-        "userns_mode": {
-          "type": "string"
-        },
+        "user": {"type": "string"},
+        "userns_mode": {"type": "string"},
         "volumes": {
           "type": "array",
           "items": {
             "oneOf": [
-              {
-                "type": "string"
-              },
+              {"type": "string"},
               {
                 "type": "object",
-                "required": [
-                  "type"
-                ],
+                "required": ["type"],
                 "properties": {
-                  "type": {
-                    "type": "string"
-                  },
-                  "source": {
-                    "type": "string"
-                  },
-                  "target": {
-                    "type": "string"
-                  },
-                  "read_only": {
-                    "type": "boolean"
-                  },
-                  "consistency": {
-                    "type": "string"
-                  },
+                  "type": {"type": "string"},
+                  "source": {"type": "string"},
+                  "target": {"type": "string"},
+                  "read_only": {"type": "boolean"},
+                  "consistency": {"type": "string"},
                   "bind": {
                     "type": "object",
                     "properties": {
-                      "propagation": {
-                        "type": "string"
-                      }
+                      "propagation": {"type": "string"}
                     }
                   },
                   "volume": {
                     "type": "object",
                     "properties": {
-                      "nocopy": {
-                        "type": "boolean"
-                      }
+                      "nocopy": {"type": "boolean"}
                     }
                   },
                   "tmpfs": {
@@ -543,129 +323,63 @@
             "uniqueItems": true
           }
         },
-        "working_dir": {
-          "type": "string"
-        }
+        "working_dir": {"type": "string"}
       },
-      "patternProperties": {
-        "^x-": {}
-      },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
+
     "healthcheck": {
       "id": "#/definitions/healthcheck",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "disable": {
-          "type": "boolean"
-        },
-        "interval": {
-          "type": "string",
-          "format": "duration"
-        },
-        "retries": {
-          "type": "number"
-        },
+        "disable": {"type": "boolean"},
+        "interval": {"type": "string", "format": "duration"},
+        "retries": {"type": "number"},
         "test": {
           "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
           ]
         },
-        "timeout": {
-          "type": "string",
-          "format": "duration"
-        },
-        "start_period": {
-          "type": "string",
-          "format": "duration"
-        }
+        "timeout": {"type": "string", "format": "duration"},
+        "start_period": {"type": "string", "format": "duration"}
       }
     },
     "deployment": {
       "id": "#/definitions/deployment",
-      "type": [
-        "object",
-        "null"
-      ],
+      "type": ["object", "null"],
       "properties": {
-        "mode": {
-          "type": "string"
-        },
-        "endpoint_mode": {
-          "type": "string"
-        },
-        "replicas": {
-          "type": "integer"
-        },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        },
+        "mode": {"type": "string"},
+        "endpoint_mode": {"type": "string"},
+        "replicas": {"type": "integer"},
+        "labels": {"$ref": "#/definitions/list_or_dict"},
         "rollback_config": {
           "type": "object",
           "properties": {
-            "parallelism": {
-              "type": "integer"
-            },
-            "delay": {
-              "type": "string",
-              "format": "duration"
-            },
-            "failure_action": {
-              "type": "string"
-            },
-            "monitor": {
-              "type": "string",
-              "format": "duration"
-            },
-            "max_failure_ratio": {
-              "type": "number"
-            },
-            "order": {
-              "type": "string",
-              "enum": [
-                "start-first",
-                "stop-first"
-              ]
-            }
+            "parallelism": {"type": "integer"},
+            "delay": {"type": "string", "format": "duration"},
+            "failure_action": {"type": "string"},
+            "monitor": {"type": "string", "format": "duration"},
+            "max_failure_ratio": {"type": "number"},
+            "order": {"type": "string", "enum": [
+              "start-first", "stop-first"
+            ]}
           },
           "additionalProperties": false
         },
         "update_config": {
           "type": "object",
           "properties": {
-            "parallelism": {
-              "type": "integer"
-            },
-            "delay": {
-              "type": "string",
-              "format": "duration"
-            },
-            "failure_action": {
-              "type": "string"
-            },
-            "monitor": {
-              "type": "string",
-              "format": "duration"
-            },
-            "max_failure_ratio": {
-              "type": "number"
-            },
-            "order": {
-              "type": "string",
-              "enum": [
-                "start-first",
-                "stop-first"
-              ]
-            }
+            "parallelism": {"type": "integer"},
+            "delay": {"type": "string", "format": "duration"},
+            "failure_action": {"type": "string"},
+            "monitor": {"type": "string", "format": "duration"},
+            "max_failure_ratio": {"type": "number"},
+            "order": {"type": "string", "enum": [
+              "start-first", "stop-first"
+            ]}
           },
           "additionalProperties": false
         },
@@ -675,27 +389,17 @@
             "limits": {
               "type": "object",
               "properties": {
-                "cpus": {
-                  "type": "string"
-                },
-                "memory": {
-                  "type": "string"
-                }
+                "cpus": {"type": "string"},
+                "memory": {"type": "string"}
               },
               "additionalProperties": false
             },
             "reservations": {
               "type": "object",
               "properties": {
-                "cpus": {
-                  "type": "string"
-                },
-                "memory": {
-                  "type": "string"
-                },
-                "generic_resources": {
-                  "$ref": "#/definitions/generic_resources"
-                }
+                "cpus": {"type": "string"},
+                "memory": {"type": "string"},
+                "generic_resources": {"$ref": "#/definitions/generic_resources"}
               },
               "additionalProperties": false
             }
@@ -705,53 +409,35 @@
         "restart_policy": {
           "type": "object",
           "properties": {
-            "condition": {
-              "type": "string"
-            },
-            "delay": {
-              "type": "string",
-              "format": "duration"
-            },
-            "max_attempts": {
-              "type": "integer"
-            },
-            "window": {
-              "type": "string",
-              "format": "duration"
-            }
+            "condition": {"type": "string"},
+            "delay": {"type": "string", "format": "duration"},
+            "max_attempts": {"type": "integer"},
+            "window": {"type": "string", "format": "duration"}
           },
           "additionalProperties": false
         },
         "placement": {
           "type": "object",
           "properties": {
-            "constraints": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
+            "constraints": {"type": "array", "items": {"type": "string"}},
             "preferences": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "spread": {
-                    "type": "string"
-                  }
+                  "spread": {"type": "string"}
                 },
                 "additionalProperties": false
               }
             },
-            "max_replicas_per_node": {
-              "type": "integer"
-            }
+            "max_replicas_per_node": {"type": "integer"}
           },
           "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
+
     "generic_resources": {
       "id": "#/definitions/generic_resources",
       "type": "array",
@@ -761,12 +447,8 @@
           "discrete_resource_spec": {
             "type": "object",
             "properties": {
-              "kind": {
-                "type": "string"
-              },
-              "value": {
-                "type": "number"
-              }
+              "kind": {"type": "string"},
+              "value": {"type": "number"}
             },
             "additionalProperties": false
           }
@@ -774,44 +456,29 @@
         "additionalProperties": false
       }
     },
+
     "network": {
       "id": "#/definitions/network",
-      "type": [
-        "object",
-        "null"
-      ],
+      "type": ["object", "null"],
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "driver": {
-          "type": "string"
-        },
+        "name": {"type": "string"},
+        "driver": {"type": "string"},
         "driver_opts": {
           "type": "object",
           "patternProperties": {
-            "^.+$": {
-              "type": [
-                "string",
-                "number"
-              ]
-            }
+            "^.+$": {"type": ["string", "number"]}
           }
         },
         "ipam": {
           "type": "object",
           "properties": {
-            "driver": {
-              "type": "string"
-            },
+            "driver": {"type": "string"},
             "config": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "subnet": {
-                    "type": "string"
-                  }
+                  "subnet": {"type": "string"}
                 },
                 "additionalProperties": false
               }
@@ -820,218 +487,128 @@
           "additionalProperties": false
         },
         "external": {
-          "type": [
-            "boolean",
-            "object"
-          ],
+          "type": ["boolean", "object"],
           "properties": {
-            "name": {
-              "type": "string"
-            }
+            "name": {"type": "string"}
           },
           "additionalProperties": false
         },
-        "internal": {
-          "type": "boolean"
-        },
-        "attachable": {
-          "type": "boolean"
-        },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        }
+        "internal": {"type": "boolean"},
+        "attachable": {"type": "boolean"},
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
-      "patternProperties": {
-        "^x-": {}
-      },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
+
     "volume": {
       "id": "#/definitions/volume",
-      "type": [
-        "object",
-        "null"
-      ],
+      "type": ["object", "null"],
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "driver": {
-          "type": "string"
-        },
+        "name": {"type": "string"},
+        "driver": {"type": "string"},
         "driver_opts": {
           "type": "object",
           "patternProperties": {
-            "^.+$": {
-              "type": [
-                "string",
-                "number"
-              ]
-            }
+            "^.+$": {"type": ["string", "number"]}
           }
         },
         "external": {
-          "type": [
-            "boolean",
-            "object"
-          ],
+          "type": ["boolean", "object"],
           "properties": {
-            "name": {
-              "type": "string"
-            }
+            "name": {"type": "string"}
           },
           "additionalProperties": false
         },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        }
+        "labels": {"$ref": "#/definitions/list_or_dict"}
       },
-      "patternProperties": {
-        "^x-": {}
-      },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
+
     "secret": {
       "id": "#/definitions/secret",
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "file": {
-          "type": "string"
-        },
+        "name": {"type": "string"},
+        "file": {"type": "string"},
         "external": {
-          "type": [
-            "boolean",
-            "object"
-          ],
+          "type": ["boolean", "object"],
           "properties": {
-            "name": {
-              "type": "string"
-            }
+            "name": {"type": "string"}
           }
         },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        },
-        "driver": {
-          "type": "string"
-        },
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "driver": {"type": "string"},
         "driver_opts": {
           "type": "object",
           "patternProperties": {
-            "^.+$": {
-              "type": [
-                "string",
-                "number"
-              ]
-            }
+            "^.+$": {"type": ["string", "number"]}
           }
         },
-        "template_driver": {
-          "type": "string"
-        }
+        "template_driver": {"type": "string"}
       },
-      "patternProperties": {
-        "^x-": {}
-      },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
+
     "config": {
       "id": "#/definitions/config",
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "file": {
-          "type": "string"
-        },
+        "name": {"type": "string"},
+        "file": {"type": "string"},
         "external": {
-          "type": [
-            "boolean",
-            "object"
-          ],
+          "type": ["boolean", "object"],
           "properties": {
-            "name": {
-              "type": "string"
-            }
+            "name": {"type": "string"}
           }
         },
-        "labels": {
-          "$ref": "#/definitions/list_or_dict"
-        },
-        "template_driver": {
-          "type": "string"
-        }
+        "labels": {"$ref": "#/definitions/list_or_dict"},
+        "template_driver": {"type": "string"}
       },
-      "patternProperties": {
-        "^x-": {}
-      },
+      "patternProperties": {"^x-": {}},
       "additionalProperties": false
     },
+
     "string_or_list": {
       "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "$ref": "#/definitions/list_of_strings"
-        }
+        {"type": "string"},
+        {"$ref": "#/definitions/list_of_strings"}
       ]
     },
+
     "list_of_strings": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
+      "items": {"type": "string"},
       "uniqueItems": true
     },
+
     "list_or_dict": {
       "oneOf": [
         {
           "type": "object",
           "patternProperties": {
             ".+": {
-              "type": [
-                "string",
-                "number",
-                "null"
-              ]
+              "type": ["string", "number", "null"]
             }
           },
           "additionalProperties": false
         },
-        {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        }
+        {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
     },
+
     "constraints": {
       "service": {
         "id": "#/definitions/constraints/service",
         "anyOf": [
-          {
-            "required": [
-              "build"
-            ]
-          },
-          {
-            "required": [
-              "image"
-            ]
-          }
+          {"required": ["build"]},
+          {"required": ["image"]}
         ],
         "properties": {
           "build": {
-            "required": [
-              "context"
-            ]
+            "required": ["context"]
           }
         }
       }
