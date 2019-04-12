@@ -8,8 +8,7 @@ set -e
 docker run --rm \
   --tty \
   ${GIT_VOLUME} \
-  --entrypoint="tox" \
-  "$TAG" -e pre-commit
+  "$TAG" tox -e pre-commit
 
 get_versions="docker run --rm
     --entrypoint=/code/.tox/py27/bin/python

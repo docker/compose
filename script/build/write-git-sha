@@ -9,4 +9,4 @@ if [[ "${?}" != "0" ]]; then
     echo "Couldn't get revision of the git repository. Setting to 'unknown' instead"
     DOCKER_COMPOSE_GITSHA="unknown"
 fi
-echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
+echo "${DOCKER_COMPOSE_GITSHA}"

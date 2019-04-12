@@ -3,16 +3,19 @@
 set -ex
 
 CODE_PATH=/code
-VENV=${CODE_PATH}/.tox/py37
+VENV="${CODE_PATH}"/.tox/py37
 
-cd ${CODE_PATH}
+cd "${CODE_PATH}"
 mkdir -p dist
 chmod 777 dist
 
-${VENV}/bin/pip3 install -q -r requirements-build.txt
+"${VENV}"/bin/pip3 install -q -r requirements-build.txt
 
 # TODO(ulyssessouza) To check if really needed
-./script/build/write-git-sha
+if [ -z "${DOCKER_COMPOSE_GITSHA}" ]; then
+    DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
+fi
+echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
 
 export PATH="${CODE_PATH}/pyinstaller:${PATH}"
 
@@ -21,15 +24,15 @@ if [ ! -z "${BUILD_BOOTLOADER}" ]; then
     git clone --single-branch --branch master https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
     cd /tmp/pyinstaller/bootloader
     git checkout v3.4
-    ${VENV}/bin/python3 ./waf configure --no-lsb all
-    ${VENV}/bin/pip3 install ..
-    cd ${CODE_PATH}
+    "${VENV}"/bin/python3 ./waf configure --no-lsb all
+    "${VENV}"/bin/pip3 install ..
+    cd "${CODE_PATH}"
     rm -Rf /tmp/pyinstaller
 else
     echo "NOT compiling bootloader!!!"
 fi
 
-${VENV}/bin/pyinstaller --exclude-module pycrypto --exclude-module PyInstaller docker-compose.spec
+"${VENV}"/bin/pyinstaller --exclude-module pycrypto --exclude-module PyInstaller docker-compose.spec
 ls -la dist/
 ldd dist/docker-compose
 mv dist/docker-compose /usr/local/bin
