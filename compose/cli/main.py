@@ -31,6 +31,7 @@ from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
 from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
+from ..const import LABEL_CONTAINER_NUMBER
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
 from ..project import NoSuchService
@@ -1301,8 +1302,8 @@ def build_one_off_container_options(options, detach, command):
             parse_environment(options['-e'])
         )
 
-    if options['--label']:
-        container_options['labels'] = parse_labels(options['--label'])
+    options['--label'] = options.get('--label', []) + ['%s=%s' % (LABEL_CONTAINER_NUMBER, 1)]
+    container_options['labels'] = parse_labels(options['--label'])
 
     if options.get('--entrypoint') is not None:
         container_options['entrypoint'] = (
