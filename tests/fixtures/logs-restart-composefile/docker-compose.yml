@@ -3,5 +3,5 @@ simple:
   command: sh -c "echo hello && tail -f /dev/null"
 another:
   image: busybox:latest
-  command: sh -c "sleep 0.5 && echo world && /bin/false"
+  command: sh -c "sleep 2 && echo world && /bin/false"
   restart: "on-failure:2"
