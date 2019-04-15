@@ -234,7 +234,12 @@ class Service(object):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-        for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
+        from compose.project import OneOffFilter  # noqa
+
+        labels = ['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]
+        containers = self.containers(labels=labels) + \
+            self.containers(labels=labels, one_off=OneOffFilter.only)
+        for container in containers:
             return container
 
         raise ValueError("No container found for %s_%s" % (self.name, number))
