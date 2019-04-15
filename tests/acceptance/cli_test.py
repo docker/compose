@@ -1705,6 +1705,14 @@ class CLITestCase(DockerClientTestCase):
         assert stdout == "operator\n"
         assert stderr == ""
 
+    def test_exec_on_run_containers(self):
+        self.base_dir = 'tests/fixtures/links-composefile'
+        self.dispatch(['run', '--detach', 'console'])
+
+        stdout, stderr = self.dispatch(['exec', '-T', 'console', 'ls', '-1d', '/'])
+        assert stderr == ""
+        assert stdout == "/\n"
+
     @v3_only()
     def test_exec_workdir(self):
         self.base_dir = 'tests/fixtures/links-composefile'

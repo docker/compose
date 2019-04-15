@@ -399,7 +399,7 @@ class ServiceTest(unittest.TestCase):
 
         container = service.get_container(number=2)
         assert container == mock_container_class.from_ps.return_value
-        mock_container_class.from_ps.assert_called_once_with(
+        mock_container_class.from_ps.assert_called_with(
             self.mock_client, container_dict)
 
     @mock.patch('compose.service.log', autospec=True)
