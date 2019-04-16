@@ -1707,7 +1707,7 @@ def rewrite_build_path(path):
     return path
 
 
-def exec_build(path=None, tag=None, quiet=False, fileobj=None,
+def exec_build(path, tag=None, quiet=False, fileobj=None,
                nocache=False, rm=False, timeout=None,
                custom_context=False, encoding=None, pull=False,
                forcerm=False, dockerfile=None, container_limits=None,
