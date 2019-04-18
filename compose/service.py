@@ -1073,8 +1073,8 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        build = self.client.build if not _exec else exec_build
-        build_output = build(
+        build_image = self.client.build if not _exec else exec_build
+        build_output = build_image(
             path=path,
             tag=self.image_name,
             rm=rm,
