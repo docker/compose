@@ -2374,6 +2374,7 @@ class CLITestCase(DockerClientTestCase):
         assert '{} exited with code 0'.format(another_name) in result.stdout
         assert '{} exited with code 137'.format(simple_name) in result.stdout
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_follow_logs_from_restarted_containers(self):
         self.base_dir = 'tests/fixtures/logs-restart-composefile'
         proc = start_process(self.base_dir, ['up'])
