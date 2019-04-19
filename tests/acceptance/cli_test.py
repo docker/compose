@@ -2347,6 +2347,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_follow_logs_from_new_containers(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
         self.dispatch(['up', '-d', 'simple'])
@@ -2393,6 +2394,7 @@ class CLITestCase(DockerClientTestCase):
         ) == 3
         assert result.stdout.count('world') == 3
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
         self.dispatch(['up', '-d'])

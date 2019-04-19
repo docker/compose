@@ -20,6 +20,3 @@ export DOCKER_DAEMON_ARGS="--storage-driver=$STORAGE_DRIVER"
 
 GIT_VOLUME="--volumes-from=$(hostname)"
 . script/test/all
-
->&2 echo "Building Linux binary"
-. script/build/linux-entrypoint

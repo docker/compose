@@ -175,6 +175,7 @@ class Repository(object):
     def write_git_sha(self):
         with open(os.path.join(REPO_ROOT, 'compose', 'GITSHA'), 'w') as f:
             f.write(self.git_repo.head.commit.hexsha[:7])
+        return self.git_repo.head.commit.hexsha[:7]
 
     def cherry_pick_prs(self, release_branch, ids):
         if not ids:

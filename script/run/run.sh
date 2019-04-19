@@ -48,7 +48,7 @@ fi
 
 # Only allocate tty if we detect one
 if [ -t 0 -a -t 1 ]; then
-        DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
+    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
 fi
 
 # Always set -i to support piped and terminal input in run/exec
