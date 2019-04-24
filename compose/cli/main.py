@@ -263,16 +263,16 @@ class TopLevelCommand(object):
         Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
+            --build-arg key=val     Set build-time variables for services.
             --compress              Compress the build context using gzip.
+            --exec                  Run docker build command
             --force-rm              Always remove intermediate containers.
+            -m, --memory MEM        Sets memory limit for the build container.
             --no-cache              Do not use cache when building the image.
             --no-rm                 Do not remove intermediate containers after a successful build.
-            --pull                  Always attempt to pull a newer version of the image.
-            -m, --memory MEM        Sets memory limit for the build container.
-            --build-arg key=val     Set build-time variables for services.
             --parallel              Build images in parallel.
+            --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
-            --exec                  Run docker build command
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)

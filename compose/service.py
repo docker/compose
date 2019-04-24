@@ -1717,23 +1717,9 @@ def exec_build(path, tag=None, quiet=False, fileobj=None,
     """
     Args:
         path (str): Path to the directory containing the Dockerfile
-        fileobj: A file object to use as the Dockerfile. (Or a file-like
-            object)
-        tag (str): A tag to add to the final image
-        quiet (bool): Whether to return the status
-        nocache (bool): Don't use the cache when set to ``True``
-        rm (bool): Remove intermediate containers. The ``docker build``
-            command now defaults to ``--rm=true``, but we have kept the old
-            default of `False` to preserve backward compatibility
-        timeout (int): HTTP timeout
-        custom_context (bool): Optional if using ``fileobj``
-        encoding (str): The encoding for a stream. Set to ``gzip`` for
-            compressing
-        pull (bool): Downloads any updates to the FROM image in Dockerfiles
-        forcerm (bool): Always remove intermediate containers, even after
-            unsuccessful builds
-        dockerfile (str): path within the build context to the Dockerfile
         buildargs (dict): A dictionary of build arguments
+        cache_from (:py:class:`list`): A list of images used for build
+            cache resolution
         container_limits (dict): A dictionary of limits applied to each
             container created by the build process. Valid keys:
             - memory (int): set memory limit for build
@@ -1742,55 +1728,67 @@ def exec_build(path, tag=None, quiet=False, fileobj=None,
             - cpushares (int): CPU shares (relative weight)
             - cpusetcpus (str): CPUs in which to allow execution, e.g.,
                 ``"0-3"``, ``"0,1"``
+        custom_context (bool): Optional if using ``fileobj``
         decode (bool): If set to ``True``, the returned stream will be
             decoded into dicts on the fly. Default ``False``
-        shmsize (int): Size of `/dev/shm` in bytes. The size must be
-            greater than 0. If omitted the system uses 64MB
-        labels (dict): A dictionary of labels to set on the image
-        cache_from (:py:class:`list`): A list of images used for build
-            cache resolution
-        target (str): Name of the build-stage to build in a multi-stage
-            Dockerfile
-        network_mode (str): networking mode for the run commands during
-            build
-        squash (bool): Squash the resulting images layers into a
-            single layer.
+        dockerfile (str): path within the build context to the Dockerfile
+        encoding (str): The encoding for a stream. Set to ``gzip`` for
+            compressing
         extra_hosts (dict): Extra hosts to add to /etc/hosts in building
             containers, as a mapping of hostname to IP address.
-        platform (str): Platform in the format ``os[/arch[/variant]]``
+        fileobj: A file object to use as the Dockerfile. (Or a file-like
+            object)
+        forcerm (bool): Always remove intermediate containers, even after
+            unsuccessful builds
         isolation (str): Isolation technology used during build.
             Default: `None`.
+        labels (dict): A dictionary of labels to set on the image
+        network_mode (str): networking mode for the run commands during
+            build
+        nocache (bool): Don't use the cache when set to ``True``
+        platform (str): Platform in the format ``os[/arch[/variant]]``
+        pull (bool): Downloads any updates to the FROM image in Dockerfiles
+        quiet (bool): Whether to return the status
+        rm (bool): Remove intermediate containers. The ``docker build``
+            command now defaults to ``--rm=true``, but we have kept the old
+            default of `False` to preserve backward compatibility
+        shmsize (int): Size of `/dev/shm` in bytes. The size must be
+            greater than 0. If omitted the system uses 64MB
+        squash (bool): Squash the resulting images layers into a
+            single layer.
+        tag (str): A tag to add to the final image
+        target (str): Name of the build-stage to build in a multi-stage
+            Dockerfile
+        timeout (int): HTTP timeout
     Returns:
         A generator for the build output.
     """
-    command_builder = _CommandBuilder()
-    command_builder.add_arg("--tag", tag)
-    command_builder.add_flag("--quiet", quiet)
-    command_builder.add_flag("--no-cache", nocache)
-    command_builder.add_flag("--rm", rm)
-    command_builder.add_flag("--pull", pull)
-    command_builder.add_flag("--force-rm", forcerm)
-
     if dockerfile:
         dockerfile = os.path.join(path, dockerfile)
-
-    command_builder.add_arg("--file", dockerfile)
-    command_builder.add_params("--build-arg", buildargs)
-    command_builder.add_arg("--memory", container_limits.get("memory"))
-
-    command_builder.add_arg("--shm-size", shmsize)
-    command_builder.add_params("--label", labels)
-    command_builder.add_list("--cache-from", cache_from)
-    command_builder.add_arg("--target", target)
-    command_builder.add_arg("--network", network_mode)
-    command_builder.add_flag("--squash", squash)
-    command_builder.add_params("--add-host", extra_hosts)
-    command_builder.add_arg("--platform", platform)
-    command_builder.add_arg("--isolation", isolation)
-    command_builder.add_arg("--progress", "plain")
-
     iidfile = tempfile.mktemp()
+
+    command_builder = _CommandBuilder()
+    command_builder.add_params("--add-host", extra_hosts)
+    command_builder.add_params("--build-arg", buildargs)
+    command_builder.add_list("--cache-from", cache_from)
+    command_builder.add_arg("--file", dockerfile)
+    command_builder.add_flag("--force-rm", forcerm)
     command_builder.add_arg("--iidfile", iidfile)
+    command_builder.add_arg("--isolation", isolation)
+    command_builder.add_params("--label", labels)
+    command_builder.add_arg("--memory", container_limits.get("memory"))
+    command_builder.add_arg("--network", network_mode)
+    command_builder.add_flag("--no-cache", nocache)
+    command_builder.add_arg("--platform", platform)
+    command_builder.add_arg("--progress", "plain")
+    command_builder.add_flag("--pull", pull)
+    command_builder.add_flag("--quiet", quiet)
+    command_builder.add_flag("--rm", rm)
+    command_builder.add_arg("--shm-size", shmsize)
+    command_builder.add_flag("--squash", squash)
+    command_builder.add_arg("--tag", tag)
+    command_builder.add_arg("--target", target)
+
     args = command_builder.build([path])
 
     magic_word = "Successfully built "
