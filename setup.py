@@ -95,7 +95,10 @@ setup(
     tests_require=tests_require,
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
     entry_points={
-        'console_scripts': ['docker-compose=compose.cli.main:main'],
+        'console_scripts': [
+            'docompo=compose.cli.main:main',
+            'docker-compose=compose.cli.main:main'
+        ],
     },
     classifiers=[
         'Development Status :: 5 - Production/Stable',
