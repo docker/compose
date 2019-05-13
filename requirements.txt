@@ -20,5 +20,5 @@ PyYAML==4.2b1
 requests==2.20.0
 six==1.10.0
 texttable==0.9.1
-urllib3==1.21.1; python_version == '3.3'
+urllib3==1.24.2; python_version == '3.3'
 websocket-client==0.32.0
