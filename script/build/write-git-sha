@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env sh
 #
 # Write the current commit sha to the file GITSHA. This file is included in
 # packaging so that `docker-compose version` can include the git sha.
 # sets to 'unknown' and echoes a message if the command is not successful
 
 DOCKER_COMPOSE_GITSHA="$(git rev-parse --short HEAD)"
-if [[ "${?}" != "0" ]]; then
+if [ $? -ne 0 ] ; then
     echo "Couldn't get revision of the git repository. Setting to 'unknown' instead"
     DOCKER_COMPOSE_GITSHA="unknown"
 fi

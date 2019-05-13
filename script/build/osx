@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env sh
+
 set -ex
 
 TOOLCHAIN_PATH="$(realpath $(dirname $0)/../../build/toolchain)"

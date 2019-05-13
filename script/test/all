@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 # This should be run inside a container built from the Dockerfile
 # at the root of the repo - script/test will do it automatically.
 
@@ -15,9 +15,9 @@ get_versions="docker run --rm
     $TAG
     /code/script/test/versions.py docker/docker-ce,moby/moby"
 
-if [ "$DOCKER_VERSIONS" == "" ]; then
+if [ "$DOCKER_VERSIONS" = "" ]; then
   DOCKER_VERSIONS="$($get_versions default)"
-elif [ "$DOCKER_VERSIONS" == "all" ]; then
+elif [ "$DOCKER_VERSIONS" = "all" ]; then
   DOCKER_VERSIONS=$($get_versions -n 2 recent)
 fi
 
@@ -30,8 +30,8 @@ for version in $DOCKER_VERSIONS; do
 
   daemon_container="compose-dind-$version-$BUILD_NUMBER"
 
-  function on_exit() {
-    if [[ "$?" != "0" ]]; then
+  on_exit() {
+    if [ $? -ne 0 ]; then
         docker logs "$daemon_container" 2>&1 | tail -n 100
     fi
     docker rm -vf "$daemon_container"
