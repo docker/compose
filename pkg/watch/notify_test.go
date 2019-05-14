@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -329,7 +330,7 @@ func TestWatchBothDirAndFile(t *testing.T) {
 	f.assertEvents(fileB)
 }
 
-func TestWatchNonexistentDirectory(t *testing.T) {
+func TestWatchNonexistentFileInNonexistentDirectoryCreatedSimultaneously(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -347,6 +348,69 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	f.assertEvents(file)
 }
 
+func TestWatchNonexistentDirectory(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.JoinPath("root")
+	err := os.Mkdir(root, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := f.JoinPath("parent")
+	file := f.JoinPath("parent", "a")
+
+	f.watch(parent)
+	f.fsync()
+	f.events = nil
+
+	err = os.Mkdir(parent, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if runtime.GOOS == "darwin" {
+		// for directories that were the root of an Add, we don't report creation, cf. watcher_darwin.go
+		f.assertEvents()
+	} else {
+		f.assertEvents(parent)
+	}
+	f.WriteFile(file, "hello")
+
+	if runtime.GOOS == "darwin" {
+		// mac doesn't return the dir change as part of file creation
+		f.assertEvents(file)
+	} else {
+		f.assertEvents(parent, file)
+	}
+}
+
+// doesn't work on linux
+// func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
+// 	f := newNotifyFixture(t)
+// 	defer f.tearDown()
+
+// 	root := f.JoinPath("root")
+// 	err := os.Mkdir(root, 0777)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	parent := f.JoinPath("parent")
+// 	file := f.JoinPath("parent", "a")
+
+// 	f.watch(file)
+// 	f.assertEvents()
+
+// 	err = os.Mkdir(parent, 0777)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	f.assertEvents()
+// 	f.WriteFile(file, "hello")
+// 	f.assertEvents(file)
+// }
+
 type notifyFixture struct {
 	*tempdir.TempDirFixture
 	notify  Notify
@@ -355,7 +419,6 @@ type notifyFixture struct {
 }
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
-	SetLimitChecksEnabled(false)
 	notify, err := NewWatcher()
 	if err != nil {
 		t.Fatal(err)
@@ -434,12 +497,20 @@ F:
 }
 
 func (f *notifyFixture) tearDown() {
-	SetLimitChecksEnabled(true)
-
 	err := f.notify.Close()
 	if err != nil {
 		f.T().Fatal(err)
 	}
+
+	// drain channels from watcher
+	go func() {
+		for _ = range f.notify.Events() {
+		}
+	}()
+	go func() {
+		for _ = range f.notify.Errors() {
+		}
+	}()
 
 	f.TempDirFixture.TearDown()
 }

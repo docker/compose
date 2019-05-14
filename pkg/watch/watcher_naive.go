@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
@@ -23,6 +24,8 @@ type naiveNotify struct {
 	events        chan fsnotify.Event
 	wrappedEvents chan FileEvent
 	errors        chan error
+
+	mu sync.Mutex
 
 	// Paths that we're watching that should be passed up to the caller.
 	// Note that we may have to watch ancestors of these paths
@@ -48,11 +51,14 @@ func (d *naiveNotify) Add(name string) error {
 			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 	} else {
-		err = d.watcher.Add(name)
+		err = d.watcher.Add(filepath.Dir(name))
 		if err != nil {
-			return errors.Wrapf(err, "notify.Add(%q)", name)
+			return errors.Wrapf(err, "notify.Add(%q)", filepath.Dir(name))
 		}
 	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.notifyList[name] = true
 
 	return nil
@@ -64,6 +70,9 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 			return err
 		}
 
+		if !mode.IsDir() {
+			return nil
+		}
 		err = d.watcher.Add(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -106,56 +115,63 @@ func (d *naiveNotify) Errors() chan error {
 }
 
 func (d *naiveNotify) loop() {
+	defer close(d.wrappedEvents)
 	for e := range d.events {
-		isCreateOp := e.Op&fsnotify.Create == fsnotify.Create
-		shouldWalk := false
-		if isCreateOp {
-			isDir, err := isDir(e.Name)
-			if err != nil {
-				log.Printf("Error stat-ing file %s: %s", e.Name, err)
-				continue
+		shouldNotify := d.shouldNotify(e.Name)
+
+		if e.Op&fsnotify.Create != fsnotify.Create {
+			if shouldNotify {
+				d.wrappedEvents <- FileEvent{e.Name}
 			}
-			shouldWalk = isDir
+			continue
 		}
-		if shouldWalk {
-			err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				newE := fsnotify.Event{
-					Op:   fsnotify.Create,
-					Name: path,
-				}
 
-				if d.shouldNotify(newE) {
-					d.wrappedEvents <- FileEvent{newE.Name}
-
-					// TODO(dmiller): symlinks 😭
-					err = d.Add(path)
-					if err != nil {
-						log.Printf("Error watching path %s: %s", e.Name, err)
-					}
-				}
-				return nil
-			})
+		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
+		if err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
 			if err != nil {
-				log.Printf("Error walking directory %s: %s", e.Name, err)
+				return err
 			}
-		} else if d.shouldNotify(e) {
-			d.wrappedEvents <- FileEvent{e.Name}
+
+			if d.shouldNotify(path) {
+				d.wrappedEvents <- FileEvent{path}
+			}
+
+			// TODO(dmiller): symlinks 😭
+
+			shouldWatch := false
+			if mode.IsDir() {
+				// watch all directories
+				shouldWatch = true
+			} else {
+				// watch files that are explicitly named, but don't watch others
+				_, ok := d.notifyList[path]
+				if ok {
+					shouldWatch = true
+				}
+			}
+			if shouldWatch {
+				err := d.watcher.Add(path)
+				if err != nil {
+					log.Printf("Error watching path %s: %s", e.Name, err)
+				}
+			}
+			return nil
+		}); err != nil {
+			log.Printf("Error walking directory %s: %s", e.Name, err)
 		}
 	}
 }
 
-func (d *naiveNotify) shouldNotify(e fsnotify.Event) bool {
-	if _, ok := d.notifyList[e.Name]; ok {
+func (d *naiveNotify) shouldNotify(path string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.notifyList[path]; ok {
 		return true
-	} else {
-		// TODO(dmiller): maybe use a prefix tree here?
-		for path := range d.notifyList {
-			if ospath.IsChild(path, e.Name) {
-				return true
-			}
+	}
+	// TODO(dmiller): maybe use a prefix tree here?
+	for root := range d.notifyList {
+		if ospath.IsChild(root, path) {
+			return true
 		}
 	}
 	return false
