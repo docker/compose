@@ -793,6 +793,9 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert containers
 
+        for c in self.project.client.containers(all=True):
+            self.addCleanup(self.project.client.remove_container, c, force=True)
+
     def test_build_shm_size_build_option(self):
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-shm-size'
