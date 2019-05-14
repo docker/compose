@@ -721,7 +721,8 @@ class TopLevelCommand(object):
 
         if options['--all']:
             containers = sorted(self.project.containers(service_names=options['SERVICE'],
-                                                        one_off=OneOffFilter.include, stopped=True))
+                                                        one_off=OneOffFilter.include, stopped=True),
+                                key=attrgetter('name'))
         else:
             containers = sorted(
                 self.project.containers(service_names=options['SERVICE'], stopped=True) +
