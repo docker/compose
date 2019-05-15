@@ -264,8 +264,8 @@ class TopLevelCommand(object):
 
         Options:
             --build-arg key=val     Set build-time variables for services.
+            --cli                   Run docker build command
             --compress              Compress the build context using gzip.
-            --exec                  Run docker build command
             --force-rm              Always remove intermediate containers.
             -m, --memory MEM        Sets memory limit for the build container.
             --no-cache              Do not use cache when building the image.
@@ -295,7 +295,7 @@ class TopLevelCommand(object):
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
             silent=options.get('--quiet', False),
-            _exec=bool(options.get('--exec', False)),
+            cli=bool(options.get('--cli', False)),
         )
 
     def bundle(self, options):

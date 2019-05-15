@@ -1052,7 +1052,7 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False, rm=True, silent=False, _exec=False):
+              gzip=False, rm=True, silent=False, cli=False):
         output_stream = open(os.devnull, 'w')
         if not silent:
             output_stream = sys.stdout
@@ -1073,7 +1073,7 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        build_image = self.client.build if not _exec else exec_build
+        build_image = self.client.build if not cli else cli_build
         build_output = build_image(
             path=path,
             tag=self.image_name,
@@ -1707,13 +1707,13 @@ def rewrite_build_path(path):
     return path
 
 
-def exec_build(path, tag=None, quiet=False, fileobj=None,
-               nocache=False, rm=False, timeout=None,
-               custom_context=False, encoding=None, pull=False,
-               forcerm=False, dockerfile=None, container_limits=None,
-               decode=False, buildargs=None, gzip=False, shmsize=None,
-               labels=None, cache_from=None, target=None, network_mode=None,
-               squash=None, extra_hosts=None, platform=None, isolation=None):
+def cli_build(path, tag=None, quiet=False, fileobj=None,
+              nocache=False, rm=False, timeout=None,
+              custom_context=False, encoding=None, pull=False,
+              forcerm=False, dockerfile=None, container_limits=None,
+              decode=False, buildargs=None, gzip=False, shmsize=None,
+              labels=None, cache_from=None, target=None, network_mode=None,
+              squash=None, extra_hosts=None, platform=None, isolation=None):
     """
     Args:
         path (str): Path to the directory containing the Dockerfile
