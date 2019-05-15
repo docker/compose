@@ -776,13 +776,13 @@ def get_secrets(service, service_secrets, secret_defs):
                 .format(service=service, secret=secret.source))
 
         if secret_def.get('external'):
-            log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
-                     "External secrets are not available to containers created by "
-                     "docker-compose.".format(service=service, secret=secret.source))
+            log.warning("Service \"{service}\" uses secret \"{secret}\" which is external. "
+                        "External secrets are not available to containers created by "
+                        "docker-compose.".format(service=service, secret=secret.source))
             continue
 
         if secret.uid or secret.gid or secret.mode:
-            log.warn(
+            log.warning(
                 "Service \"{service}\" uses secret \"{secret}\" with uid, "
                 "gid, or mode. These fields are not supported by this "
                 "implementation of the Compose file".format(

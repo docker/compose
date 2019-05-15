@@ -94,7 +94,7 @@ def test_to_bundle():
         configs={}
     )
 
-    with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:
+    with mock.patch('compose.bundle.log.warning', autospec=True) as mock_log:
         output = bundle.to_bundle(config, image_digests)
 
     assert mock_log.mock_calls == [
@@ -128,7 +128,7 @@ def test_convert_service_to_bundle():
         'privileged': True,
     }
 
-    with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:
+    with mock.patch('compose.bundle.log.warning', autospec=True) as mock_log:
         config = bundle.convert_service_to_bundle(name, service_dict, image_digest)
 
     mock_log.assert_called_once_with(
@@ -177,7 +177,7 @@ def test_make_service_networks_default():
     name = 'theservice'
     service_dict = {}
 
-    with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:
+    with mock.patch('compose.bundle.log.warning', autospec=True) as mock_log:
         networks = bundle.make_service_networks(name, service_dict)
 
     assert not mock_log.called
@@ -195,7 +195,7 @@ def test_make_service_networks():
         },
     }
 
-    with mock.patch('compose.bundle.log.warn', autospec=True) as mock_log:
+    with mock.patch('compose.bundle.log.warning', autospec=True) as mock_log:
         networks = bundle.make_service_networks(name, service_dict)
 
     mock_log.assert_called_once_with(

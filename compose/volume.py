@@ -127,7 +127,7 @@ class ProjectVolumes(object):
             try:
                 volume.remove()
             except NotFound:
-                log.warn("Volume %s not found.", volume.true_name)
+                log.warning("Volume %s not found.", volume.true_name)
 
     def initialize(self):
         try:
@@ -209,7 +209,7 @@ def check_remote_volume_config(remote, local):
         if k.startswith('com.docker.'):  # We are only interested in user-specified labels
             continue
         if remote_labels.get(k) != local_labels.get(k):
-            log.warn(
+            log.warning(
                 'Volume {}: label "{}" has changed. It may need to be'
                 ' recreated.'.format(local.name, k)
             )

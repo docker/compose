@@ -516,8 +516,8 @@ class ServiceTest(unittest.TestCase):
 
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             service.create_container()
-            assert mock_log.warn.called
-            _, args, _ = mock_log.warn.mock_calls[0]
+            assert mock_log.warning.called
+            _, args, _ = mock_log.warning.mock_calls[0]
             assert 'was built because it did not already exist' in args[0]
 
         assert self.mock_client.build.call_count == 1
@@ -546,7 +546,7 @@ class ServiceTest(unittest.TestCase):
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             service.ensure_image_exists(do_build=BuildAction.force)
 
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
         assert self.mock_client.build.call_count == 1
         self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
@@ -847,13 +847,13 @@ class ServiceTest(unittest.TestCase):
             ports=["8080:80"])
 
         service.scale(0)
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
 
         service.scale(1)
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
 
         service.scale(2)
-        mock_log.warn.assert_called_once_with(
+        mock_log.warning.assert_called_once_with(
             'The "{}" service specifies a port on the host. If multiple containers '
             'for this service are created on a single host, the port will clash.'.format(name))
 
@@ -1391,7 +1391,7 @@ class ServiceVolumesTest(unittest.TestCase):
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
 
     def test_warn_on_masked_volume_when_masked(self):
         volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
@@ -1404,7 +1404,7 @@ class ServiceVolumesTest(unittest.TestCase):
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
-        mock_log.warn.assert_called_once_with(mock.ANY)
+        mock_log.warning.assert_called_once_with(mock.ANY)
 
     def test_warn_on_masked_no_warning_with_same_path(self):
         volumes_option = [VolumeSpec('/home/user', '/path', 'rw')]
@@ -1414,7 +1414,7 @@ class ServiceVolumesTest(unittest.TestCase):
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
 
     def test_warn_on_masked_no_warning_with_container_only_option(self):
         volumes_option = [VolumeSpec(None, '/path', 'rw')]
@@ -1426,7 +1426,7 @@ class ServiceVolumesTest(unittest.TestCase):
         with mock.patch('compose.service.log', autospec=True) as mock_log:
             warn_on_masked_volume(volumes_option, container_volumes, service)
 
-        assert not mock_log.warn.called
+        assert not mock_log.warning.called
 
     def test_create_with_special_volume_mode(self):
         self.mock_client.inspect_image.return_value = {'Id': 'imageid'}

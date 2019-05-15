@@ -164,10 +164,10 @@ def push_image(service):
 
 def to_bundle(config, image_digests):
     if config.networks:
-        log.warn("Unsupported top level key 'networks' - ignoring")
+        log.warning("Unsupported top level key 'networks' - ignoring")
 
     if config.volumes:
-        log.warn("Unsupported top level key 'volumes' - ignoring")
+        log.warning("Unsupported top level key 'volumes' - ignoring")
 
     config = denormalize_config(config)
 
@@ -192,7 +192,7 @@ def convert_service_to_bundle(name, service_dict, image_digest):
             continue
 
         if key not in SUPPORTED_KEYS:
-            log.warn("Unsupported key '{}' in services.{} - ignoring".format(key, name))
+            log.warning("Unsupported key '{}' in services.{} - ignoring".format(key, name))
             continue
 
         if key == 'environment':
@@ -239,7 +239,7 @@ def make_service_networks(name, service_dict):
 
     for network_name, network_def in get_network_defs_for_service(service_dict).items():
         for key in network_def.keys():
-            log.warn(
+            log.warning(
                 "Unsupported key '{}' in services.{}.networks.{} - ignoring"
                 .format(key, name, network_name))
 

@@ -198,9 +198,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         version = self.config['version']
 
         if isinstance(version, dict):
-            log.warn('Unexpected type for "version" key in "{}". Assuming '
-                     '"version" is the name of a service, and defaulting to '
-                     'Compose file version 1.'.format(self.filename))
+            log.warning('Unexpected type for "version" key in "{}". Assuming '
+                        '"version" is the name of a service, and defaulting to '
+                        'Compose file version 1.'.format(self.filename))
             return V1
 
         if not isinstance(version, six.string_types):
@@ -318,8 +318,8 @@ def get_default_config_files(base_dir):
     winner = candidates[0]
 
     if len(candidates) > 1:
-        log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
-        log.warn("Using %s\n", winner)
+        log.warning("Found multiple config files with supported names: %s", ", ".join(candidates))
+        log.warning("Using %s\n", winner)
 
     return [os.path.join(path, winner)] + get_default_override_file(path)
 
@@ -362,7 +362,7 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     def check_swarm_only_key(service_dicts, key):
         services = [s for s in service_dicts if s.get(key)]
         if services:
-            log.warn(
+            log.warning(
                 warning_template.format(
                     services=", ".join(sorted(s['name'] for s in services)),
                     key=key
@@ -921,7 +921,7 @@ def finalize_service(service_config, service_names, version, environment, compat
             service_dict
         )
         if ignored_keys:
-            log.warn(
+            log.warning(
                 'The following deploy sub-keys are not supported in compatibility mode and have'
                 ' been ignored: {}'.format(', '.join(ignored_keys))
             )

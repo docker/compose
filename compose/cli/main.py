@@ -391,7 +391,7 @@ class TopLevelCommand(object):
         """
         service_names = options['SERVICE']
 
-        log.warn(
+        log.warning(
             'The create command is deprecated. '
             'Use the up command with the --no-start flag instead.'
         )
@@ -765,7 +765,7 @@ class TopLevelCommand(object):
             --include-deps          Also pull services declared as dependencies
         """
         if options.get('--parallel'):
-            log.warn('--parallel option is deprecated and will be removed in future versions.')
+            log.warning('--parallel option is deprecated and will be removed in future versions.')
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
@@ -806,7 +806,7 @@ class TopLevelCommand(object):
             -a, --all     Deprecated - no effect.
         """
         if options.get('--all'):
-            log.warn(
+            log.warning(
                 '--all flag is obsolete. This is now the default behavior '
                 'of `docker-compose rm`'
             )
@@ -916,7 +916,7 @@ class TopLevelCommand(object):
                 'Use the up command with the --scale flag instead.'
             )
         else:
-            log.warn(
+            log.warning(
                 'The scale command is deprecated. '
                 'Use the up command with the --scale flag instead.'
             )
@@ -1250,7 +1250,7 @@ def exitval_from_opts(options, project):
     exit_value_from = options.get('--exit-code-from')
     if exit_value_from:
         if not options.get('--abort-on-container-exit'):
-            log.warn('using --exit-code-from implies --abort-on-container-exit')
+            log.warning('using --exit-code-from implies --abort-on-container-exit')
             options['--abort-on-container-exit'] = True
         if exit_value_from not in [s.name for s in project.get_services()]:
             log.error('No service named "%s" was found in your compose file.',
@@ -1580,7 +1580,7 @@ def warn_for_swarm_mode(client):
             # UCP does multi-node scheduling with traditional Compose files.
             return
 
-        log.warn(
+        log.warning(
             "The Docker Engine you're using is running in swarm mode.\n\n"
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
             "All containers will be scheduled on the current node.\n\n"
