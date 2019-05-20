@@ -329,7 +329,7 @@ class ConfigTest(unittest.TestCase):
             )
 
         assert 'Unexpected type for "version" key in "filename.yml"' \
-            in mock_logging.warn.call_args[0][0]
+            in mock_logging.warning.call_args[0][0]
 
         service_dicts = config_data.services
         assert service_sort(service_dicts) == service_sort([
@@ -3570,8 +3570,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
-            assert 2 == log.warn.call_count
-            warnings = sorted(args[0][0] for args in log.warn.call_args_list)
+            assert 2 == log.warning.call_count
+            warnings = sorted(args[0][0] for args in log.warning.call_args_list)
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
@@ -3601,8 +3601,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 1
-        warn_message = log.warn.call_args[0][0]
+        assert log.warning.call_count == 1
+        warn_message = log.warning.call_args[0][0]
         assert warn_message.startswith(
             'The following deploy sub-keys are not supported in compatibility mode'
         )
@@ -3641,7 +3641,7 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             cfg = config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 0
+        assert log.warning.call_count == 0
 
         service_dict = cfg.services[0]
         assert service_dict == {

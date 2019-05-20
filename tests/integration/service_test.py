@@ -695,8 +695,8 @@ class ServiceTest(DockerClientTestCase):
             new_container, = service.execute_convergence_plan(
                 ConvergencePlan('recreate', [old_container]))
 
-        mock_log.warn.assert_called_once_with(mock.ANY)
-        _, args, kwargs = mock_log.warn.mock_calls[0]
+        mock_log.warning.assert_called_once_with(mock.ANY)
+        _, args, kwargs = mock_log.warning.mock_calls[0]
         assert "Service \"db\" is using volume \"/data\" from the previous container" in args[0]
 
         assert [mount['Destination'] for mount in new_container.get('Mounts')] == ['/data']
@@ -1382,7 +1382,7 @@ class ServiceTest(DockerClientTestCase):
         with pytest.raises(OperationFailedError):
             service.scale(3)
 
-        captured_output = mock_log.warn.call_args[0][0]
+        captured_output = mock_log.warning.call_args[0][0]
 
         assert len(service.containers()) == 1
         assert "Remove the custom name to scale the service." in captured_output

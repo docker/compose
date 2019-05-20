@@ -31,7 +31,7 @@ def get_tls_version(environment):
 
     tls_attr_name = "PROTOCOL_{}".format(compose_tls_version)
     if not hasattr(ssl, tls_attr_name):
-        log.warn(
+        log.warning(
             'The "{}" protocol is unavailable. You may need to update your '
             'version of Python or OpenSSL. Falling back to TLSv1 (default).'
             .format(compose_tls_version)

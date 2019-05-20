@@ -100,7 +100,7 @@ class Environment(dict):
                 except KeyError:
                     pass
             if not self.silent and key not in self.missing_keys:
-                log.warn(
+                log.warning(
                     "The {} variable is not set. Defaulting to a blank string."
                     .format(key)
                 )

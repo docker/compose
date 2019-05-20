@@ -240,15 +240,15 @@ class Service(object):
 
     def show_scale_warnings(self, desired_num):
         if self.custom_container_name and desired_num > 1:
-            log.warn('The "%s" service is using the custom container name "%s". '
-                     'Docker requires each container to have a unique name. '
-                     'Remove the custom name to scale the service.'
-                     % (self.name, self.custom_container_name))
+            log.warning('The "%s" service is using the custom container name "%s". '
+                        'Docker requires each container to have a unique name. '
+                        'Remove the custom name to scale the service.'
+                        % (self.name, self.custom_container_name))
 
         if self.specifies_host_port() and desired_num > 1:
-            log.warn('The "%s" service specifies a port on the host. If multiple containers '
-                     'for this service are created on a single host, the port will clash.'
-                     % self.name)
+            log.warning('The "%s" service specifies a port on the host. If multiple containers '
+                        'for this service are created on a single host, the port will clash.'
+                        % self.name)
 
     def scale(self, desired_num, timeout=None):
         """
@@ -357,7 +357,7 @@ class Service(object):
             raise NeedsBuildError(self)
 
         self.build()
-        log.warn(
+        log.warning(
             "Image for service {} was built because it did not already exist. To "
             "rebuild this image you must use `docker-compose build` or "
             "`docker-compose up --build`.".format(self.name))
@@ -1325,7 +1325,7 @@ class ServicePidMode(PidMode):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn(
+        log.warning(
             "Service %s is trying to use reuse the PID namespace "
             "of another service that is not running." % (self.service_name)
         )
@@ -1388,8 +1388,8 @@ class ServiceNetworkMode(object):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn("Service %s is trying to use reuse the network stack "
-                 "of another service that is not running." % (self.id))
+        log.warning("Service %s is trying to use reuse the network stack "
+                    "of another service that is not running." % (self.id))
         return None
 
 
@@ -1540,7 +1540,7 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
             volume.internal in container_volumes and
             container_volumes.get(volume.internal) != volume.external
         ):
-            log.warn((
+            log.warning((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
                 "previous container. Host mapping \"{host_path}\" has no effect. "
                 "Remove the existing containers (with `docker-compose rm {service}`) "
