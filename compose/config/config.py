@@ -874,6 +874,30 @@ def finalize_service_volumes(service_dict, environment):
     return service_dict
 
 
+def finalize_service_secrets(service_dict, environment):
+    if 'secrets' in service_dict:
+        finalized_secrets = []
+        normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
+        win_host = environment.get_boolean('COMPOSE_FORCE_WINDOWS_HOST')
+        for v in service_dict['secrets']:
+            if isinstance(v, dict):
+                finalized_secrets.append(MountSpec.parse(v, normalize, win_host))
+
+        service_dict['secrets'] = finalized_secrets
+
+        duplicate_mounts = []
+        mounts = [v.as_volume_spec() if isinstance(v, MountSpec) else v for v in finalized_secrets]
+        for mount in mounts:
+            if list(map(attrgetter('internal'), mounts)).count(mount.internal) > 1:
+                duplicate_mounts.append(mount.repr())
+
+        if duplicate_mounts:
+            raise ConfigurationError("Duplicate mount points: [%s]" % (
+                ', '.join(duplicate_mounts)))
+
+    return service_dict
+
+
 def finalize_service(service_config, service_names, version, environment, compatibility):
     service_dict = dict(service_config.config)
 
@@ -907,6 +931,8 @@ def finalize_service(service_config, service_names, version, environment, compat
         service_dict['secrets'] = [
             types.ServiceSecret.parse(s) for s in service_dict['secrets']
         ]
+
+    service_dict = finalize_service_secrets(service_dict, environment)
 
     if 'configs' in service_dict:
         service_dict['configs'] = [
