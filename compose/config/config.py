@@ -885,16 +885,6 @@ def finalize_service_secrets(service_dict, environment):
 
         service_dict['secrets'] = finalized_secrets
 
-        duplicate_mounts = []
-        mounts = [v.as_volume_spec() if isinstance(v, MountSpec) else v for v in finalized_secrets]
-        for mount in mounts:
-            if list(map(attrgetter('internal'), mounts)).count(mount.internal) > 1:
-                duplicate_mounts.append(mount.repr())
-
-        if duplicate_mounts:
-            raise ConfigurationError("Duplicate mount points: [%s]" % (
-                ', '.join(duplicate_mounts)))
-
     return service_dict
 
 
