@@ -6,7 +6,7 @@ set -ex
 TAG="docker-compose:alpine-$(git rev-parse --short HEAD)"
 
 # By default use the Dockerfile, but can be overridden to use an alternative file
-# e.g DOCKERFILE=Dockerfile.armhf script/test/default
+# e.g DOCKERFILE=Dockerfile.s390x script/test/default
 DOCKERFILE="${DOCKERFILE:-Dockerfile}"
 DOCKER_BUILD_TARGET="${DOCKER_BUILD_TARGET:-build}"
 
