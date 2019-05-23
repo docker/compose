@@ -63,7 +63,7 @@ class ImageManager(object):
             image=compose_image_base_name,
             platform=platform
         ))
-        full_version = self.get_full_version(self, platform)
+        full_version = self.get_full_version(platform)
         build_tag = self.get_runtime_image_tag(platform)
         logstream = self.docker_client.build(
             REPO_ROOT,
