@@ -9,9 +9,12 @@ import os
 import docker
 from enum import Enum
 
+from script.release.release.const import COMPOSE_TESTS_IMAGE_BASE_NAME
+
 from .const import NAME
 from .const import REPO_ROOT
 from .utils import ScriptError
+from .utils import yesno
 
 
 class Platform(Enum):
@@ -22,9 +25,14 @@ class Platform(Enum):
         return self.value
 
 
+# Checks if this version respects the GA version format ('x.y.z') and not an RC
+def is_tag_latest(version):
+    ga_version = all(n.isdigit() for n in version.split('.')) and version.count('.') == 2
+    return ga_version and yesno('Should this release be tagged as \"latest\"? [Y/n]: ', default=True)
+
+
 class ImageManager(object):
     def __init__(self, version, latest=False):
-        self.built_tags = []
         self.docker_client = docker.APIClient(**docker.utils.kwargs_from_env())
         self.version = version
         self.latest = latest
@@ -39,7 +47,15 @@ class ImageManager(object):
         existing_repo_tag = '{image}:{tag}'.format(image=image, tag=existing_tag)
         new_repo_tag = '{image}:{tag}'.format(image=image, tag=new_tag)
         self.docker_client.tag(existing_repo_tag, new_repo_tag)
-        self.built_tags.append(new_repo_tag)
+
+    def get_full_version(self, platform=None):
+        return self.version + '-' + platform.__str__() if platform else self.version
+
+    def get_runtime_image_tag(self, tag):
+        return '{image_base_image}:{tag}'.format(
+            image_base_image=NAME,
+            tag=self.get_full_version(tag)
+        )
 
     def build_runtime_image(self, repository, platform):
         git_sha = repository.write_git_sha()
@@ -48,11 +64,8 @@ class ImageManager(object):
             image=compose_image_base_name,
             platform=platform
         ))
-        full_version = '{version}-{platform}'.format(version=self.version, platform=platform)
-        build_tag = '{image_base_image}:{full_version}'.format(
-            image_base_image=compose_image_base_name,
-            full_version=full_version
-        )
+        full_version = self.get_full_version(self, platform)
+        build_tag = self.get_runtime_image_tag(platform)
         logstream = self.docker_client.build(
             REPO_ROOT,
             tag=build_tag,
@@ -68,7 +81,6 @@ class ImageManager(object):
             if 'stream' in chunk:
                 print(chunk['stream'], end='')
 
-        self.built_tags.append(build_tag)
         if platform == Platform.ALPINE:
             self._tag(compose_image_base_name, full_version, self.version)
         if self.latest:
@@ -76,15 +88,17 @@ class ImageManager(object):
             if platform == Platform.ALPINE:
                 self._tag(compose_image_base_name, full_version, 'latest')
 
+    def get_ucp_test_image_tag(self, tag=None):
+        return '{image}:{tag}'.format(
+            image=COMPOSE_TESTS_IMAGE_BASE_NAME,
+            tag=tag or self.version
+        )
+
     # Used for producing a test image for UCP
     def build_ucp_test_image(self, repository):
         print('Building test image (debian based for UCP e2e)')
         git_sha = repository.write_git_sha()
-        compose_tests_image_base_name = NAME + '-tests'
-        ucp_test_image_tag = '{image}:{tag}'.format(
-            image=compose_tests_image_base_name,
-            tag=self.version
-        )
+        ucp_test_image_tag = self.get_ucp_test_image_tag()
         logstream = self.docker_client.build(
             REPO_ROOT,
             tag=ucp_test_image_tag,
@@ -101,8 +115,7 @@ class ImageManager(object):
             if 'stream' in chunk:
                 print(chunk['stream'], end='')
 
-        self.built_tags.append(ucp_test_image_tag)
-        self._tag(compose_tests_image_base_name, self.version, 'latest')
+        self._tag(COMPOSE_TESTS_IMAGE_BASE_NAME, self.version, 'latest')
 
     def build_images(self, repository):
         self.build_runtime_image(repository, Platform.ALPINE)
@@ -110,7 +123,7 @@ class ImageManager(object):
         self.build_ucp_test_image(repository)
 
     def check_images(self):
-        for name in self.built_tags:
+        for name in self.get_images_to_push():
             try:
                 self.docker_client.inspect_image(name)
             except docker.errors.ImageNotFound:
@@ -118,8 +131,22 @@ class ImageManager(object):
                 return False
         return True
 
+    def get_images_to_push(self):
+        tags_to_push = {
+            "{}:{}".format(NAME, self.version),
+            self.get_runtime_image_tag(Platform.ALPINE),
+            self.get_runtime_image_tag(Platform.DEBIAN),
+            self.get_ucp_test_image_tag(),
+            self.get_ucp_test_image_tag('latest'),
+        }
+        if is_tag_latest(self.version):
+            tags_to_push.add("{}:latest".format(NAME))
+        return tags_to_push
+
     def push_images(self):
-        for name in self.built_tags:
+        tags_to_push = self.get_images_to_push()
+        print('Build tags to push {}'.format(tags_to_push))
+        for name in tags_to_push:
             print('Pushing {} to Docker Hub'.format(name))
             logstream = self.docker_client.push(name, stream=True, decode=True)
             for chunk in logstream:

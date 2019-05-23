@@ -17,6 +17,7 @@ from release.downloader import BinaryDownloader
 from release.images import ImageManager
 from release.pypi import check_pypirc
 from release.pypi import pypi_upload
+from release.images import is_tag_latest
 from release.repository import delete_assets
 from release.repository import get_contributors
 from release.repository import Repository
@@ -258,7 +259,7 @@ def finalize(args):
     try:
         check_pypirc()
         repository = Repository(REPO_ROOT, args.repo)
-        tag_as_latest = _check_if_tag_latest(args.release)
+        tag_as_latest = is_tag_latest(args.release)
         img_manager = ImageManager(args.release, tag_as_latest)
         pr_data = repository.find_release_pr(args.release)
         if not pr_data:
@@ -313,12 +314,6 @@ EPILOG = '''Example uses:
     * Restart a previously aborted patch release
         release.sh -b user -p 1.21.0 resume 1.21.1
 '''
-
-
-# Checks if this version respects the GA version format ('x.y.z') and not an RC
-def _check_if_tag_latest(version):
-    ga_version = all(n.isdigit() for n in version.split('.')) and version.count('.') == 2
-    return ga_version and yesno('Should this release be tagged as \"latest\"? Y/n', default=True)
 
 
 def main():
