@@ -11,9 +11,8 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
-			"mefyl",
-			"mnottale",
-			"shin-",
+			"rumpl",
+			"ulyssessouza",
 		]
 	[Org.Alumni]
 		people = [
@@ -34,6 +33,10 @@
 			# including muti-file support, variable interpolation, secrets
 			# emulation and many more
 			"dnephin",
+
+			"shin-",
+			"mefyl",
+			"mnottale",
 		]
 
 [people]
@@ -74,7 +77,17 @@
 	Email = "mazz@houseofmnowster.com"
 	GitHub = "mnowster"
 
-	[People.shin-]
+	[people.rumpl]
+	Name = "Djordje Lukic"
+	Email = "djordje.lukic@docker.com"
+	GitHub = "rumpl"
+
+	[people.shin-]
 	Name = "Joffrey F"
-	Email = "joffrey@docker.com"
+	Email = "f.joffrey@gmail.com"
 	GitHub = "shin-"
+
+	[people.ulyssessouza]
+	Name = "Ulysses Domiciano Souza"
+	Email = "ulysses.souza@docker.com"
+	GitHub = "ulyssessouza"

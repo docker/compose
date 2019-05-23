@@ -1,0 +1,4 @@
+IMAGE=alpine:latest
+COMMAND=false
+PORT1=5644
+PORT2=9998

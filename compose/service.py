@@ -59,7 +59,6 @@ from .utils import parse_seconds_float
 from .utils import truncate_id
 from .utils import unique_everseen
 
-
 log = logging.getLogger(__name__)
 
 
@@ -177,7 +176,7 @@ class Service(object):
         network_mode=None,
         networks=None,
         secrets=None,
-        scale=None,
+        scale=1,
         pid_mode=None,
         default_platform=None,
         **options
@@ -192,7 +191,7 @@ class Service(object):
         self.pid_mode = pid_mode or PidMode(None)
         self.networks = networks or {}
         self.secrets = secrets or []
-        self.scale_num = scale or 1
+        self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
 
@@ -241,15 +240,15 @@ class Service(object):
 
     def show_scale_warnings(self, desired_num):
         if self.custom_container_name and desired_num > 1:
-            log.warn('The "%s" service is using the custom container name "%s". '
-                     'Docker requires each container to have a unique name. '
-                     'Remove the custom name to scale the service.'
-                     % (self.name, self.custom_container_name))
+            log.warning('The "%s" service is using the custom container name "%s". '
+                        'Docker requires each container to have a unique name. '
+                        'Remove the custom name to scale the service.'
+                        % (self.name, self.custom_container_name))
 
         if self.specifies_host_port() and desired_num > 1:
-            log.warn('The "%s" service specifies a port on the host. If multiple containers '
-                     'for this service are created on a single host, the port will clash.'
-                     % self.name)
+            log.warning('The "%s" service specifies a port on the host. If multiple containers '
+                        'for this service are created on a single host, the port will clash.'
+                        % self.name)
 
     def scale(self, desired_num, timeout=None):
         """
@@ -358,10 +357,16 @@ class Service(object):
             raise NeedsBuildError(self)
 
         self.build()
-        log.warn(
+        log.warning(
             "Image for service {} was built because it did not already exist. To "
             "rebuild this image you must use `docker-compose build` or "
             "`docker-compose up --build`.".format(self.name))
+
+    def get_image_registry_data(self):
+        try:
+            return self.client.inspect_distribution(self.image_name)
+        except APIError:
+            raise NoSuchImageError("Image '{}' not found".format(self.image_name))
 
     def image(self):
         try:
@@ -680,6 +685,7 @@ class Service(object):
             'links': self.get_link_names(),
             'net': self.network_mode.id,
             'networks': self.networks,
+            'secrets': self.secrets,
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
@@ -1043,8 +1049,11 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False):
-        log.info('Building %s' % self.name)
+              gzip=False, rm=True, silent=False):
+        output_stream = open(os.devnull, 'w')
+        if not silent:
+            output_stream = sys.stdout
+            log.info('Building %s' % self.name)
 
         build_opts = self.options.get('build', {})
 
@@ -1064,12 +1073,12 @@ class Service(object):
         build_output = self.client.build(
             path=path,
             tag=self.image_name,
-            rm=True,
+            rm=rm,
             forcerm=force_rm,
             pull=pull,
             nocache=no_cache,
             dockerfile=build_opts.get('dockerfile', None),
-            cache_from=build_opts.get('cache_from', None),
+            cache_from=self.get_cache_from(build_opts),
             labels=build_opts.get('labels', None),
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
@@ -1085,7 +1094,7 @@ class Service(object):
         )
 
         try:
-            all_events = list(stream_output(build_output, sys.stdout))
+            all_events = list(stream_output(build_output, output_stream))
         except StreamOutputError as e:
             raise BuildError(self, six.text_type(e))
 
@@ -1106,6 +1115,12 @@ class Service(object):
             raise BuildError(self, event if all_events else 'Unknown')
 
         return image_id
+
+    def get_cache_from(self, build_opts):
+        cache_from = build_opts.get('cache_from', None)
+        if cache_from is not None:
+            cache_from = [tag for tag in cache_from if tag]
+        return cache_from
 
     def can_be_built(self):
         return 'build' in self.options
@@ -1316,7 +1331,7 @@ class ServicePidMode(PidMode):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn(
+        log.warning(
             "Service %s is trying to use reuse the PID namespace "
             "of another service that is not running." % (self.service_name)
         )
@@ -1379,8 +1394,8 @@ class ServiceNetworkMode(object):
         if containers:
             return 'container:' + containers[0].id
 
-        log.warn("Service %s is trying to use reuse the network stack "
-                 "of another service that is not running." % (self.id))
+        log.warning("Service %s is trying to use reuse the network stack "
+                    "of another service that is not running." % (self.id))
         return None
 
 
@@ -1531,7 +1546,7 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
             volume.internal in container_volumes and
             container_volumes.get(volume.internal) != volume.external
         ):
-            log.warn((
+            log.warning((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
                 "previous container. Host mapping \"{host_path}\" has no effect. "
                 "Remove the existing containers (with `docker-compose rm {service}`) "

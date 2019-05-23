@@ -329,7 +329,7 @@ class ConfigTest(unittest.TestCase):
             )
 
         assert 'Unexpected type for "version" key in "filename.yml"' \
-            in mock_logging.warn.call_args[0][0]
+            in mock_logging.warning.call_args[0][0]
 
         service_dicts = config_data.services
         assert service_sort(service_dicts) == service_sort([
@@ -606,6 +606,25 @@ class ConfigTest(unittest.TestCase):
                     'working_dir',
                     'filename.yml'
                 )
+            )
+
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
+
+    def test_config_integer_service_name_raise_validation_error_v2_when_no_interpolate(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '2',
+                        'services': {1: {'image': 'busybox'}}
+                    },
+                    'working_dir',
+                    'filename.yml'
+                ),
+                interpolate=False
             )
 
         assert (
@@ -3466,6 +3485,25 @@ class InterpolationTest(unittest.TestCase):
         }
 
     @mock.patch.dict(os.environ)
+    def test_config_file_with_options_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir, '.env2')
+            )
+        ).services
+
+        assert service_dicts[0] == {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': [
+                types.ServicePort.parse('5644')[0],
+                types.ServicePort.parse('9998')[0]
+            ],
+            'command': 'false'
+        }
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
         project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(
@@ -3532,8 +3570,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
-            assert 2 == log.warn.call_count
-            warnings = sorted(args[0][0] for args in log.warn.call_args_list)
+            assert 2 == log.warning.call_count
+            warnings = sorted(args[0][0] for args in log.warning.call_args_list)
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
@@ -3563,8 +3601,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 1
-        warn_message = log.warn.call_args[0][0]
+        assert log.warning.call_count == 1
+        warn_message = log.warning.call_args[0][0]
         assert warn_message.startswith(
             'The following deploy sub-keys are not supported in compatibility mode'
         )
@@ -3603,7 +3641,7 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             cfg = config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 0
+        assert log.warning.call_count == 0
 
         service_dict = cfg.services[0]
         assert service_dict == {
@@ -5326,6 +5364,28 @@ class SerializeTest(unittest.TestCase):
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
         assert serialized_service['entrypoint'][0] == '$$SHELL'
+
+    def test_serialize_escape_dont_interpolate(self):
+        cfg = {
+            'version': '2.2',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': 'echo $FOO',
+                    'environment': {
+                        'CURRENCY': '$'
+                    },
+                    'entrypoint': ['$SHELL', '-c'],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg), interpolate=False)
+
+        serialized_config = yaml.load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+        assert serialized_service['environment']['CURRENCY'] == '$'
+        assert serialized_service['command'] == 'echo $FOO'
+        assert serialized_service['entrypoint'][0] == '$SHELL'
 
     def test_serialize_unicode_values(self):
         cfg = {

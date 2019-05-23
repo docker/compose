@@ -7,11 +7,12 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-TAG=$1
+TAG="$1"
+IMAGE="docker/compose-tests"
 
-docker build -t docker-compose-tests:tmp .
-ctnr_id=$(docker create --entrypoint=tox docker-compose-tests:tmp)
-docker commit $ctnr_id docker/compose-tests:latest
-docker tag docker/compose-tests:latest docker/compose-tests:$TAG
-docker rm -f $ctnr_id
-docker rmi -f docker-compose-tests:tmp
+DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
+docker build -t "${IMAGE}:${TAG}" . \
+       --target build \
+       --build-arg BUILD_PLATFORM="debian" \
+       --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
+docker tag "${IMAGE}":"${TAG}" "${IMAGE}":latest

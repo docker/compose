@@ -11,6 +11,7 @@ import subprocess
 import time
 from collections import Counter
 from collections import namedtuple
+from functools import reduce
 from operator import attrgetter
 
 import pytest
@@ -170,6 +171,13 @@ class CLITestCase(DockerClientTestCase):
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
+    def test_quiet_build(self):
+        self.base_dir = 'tests/fixtures/build-args'
+        result = self.dispatch(['build'], None)
+        quietResult = self.dispatch(['build', '-q'], None)
+        assert result.stdout != ""
+        assert quietResult.stdout == ""
+
     def test_help_nonexistent(self):
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'foobar'], returncode=1)
@@ -319,6 +327,21 @@ class CLITestCase(DockerClientTestCase):
                     'command': 'true',
                     'image': 'alpine:latest',
                     'ports': ['5643/tcp', '9999/tcp']
+                }
+            },
+            'version': '2.4'
+        }
+
+    def test_config_with_env_file(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['--env-file', '.env2', 'config'])
+        json_result = yaml.load(result.stdout)
+        assert json_result == {
+            'services': {
+                'web': {
+                    'command': 'false',
+                    'image': 'alpine:latest',
+                    'ports': ['5644/tcp', '9998/tcp']
                 }
             },
             'version': '2.4'
@@ -633,6 +656,13 @@ class CLITestCase(DockerClientTestCase):
                 'image library/nonexisting-image:latest not found' in result.stderr or
                 'pull access denied for nonexisting-image' in result.stderr)
 
+    def test_pull_with_build(self):
+        result = self.dispatch(['-f', 'pull-with-build.yml', 'pull'])
+
+        assert 'Pulling simple' not in result.stderr
+        assert 'Pulling from_simple' not in result.stderr
+        assert 'Pulling another ...' in result.stderr
+
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
         assert self.dispatch(['pull', '--quiet']).stdout == ''
@@ -746,6 +776,26 @@ class CLITestCase(DockerClientTestCase):
                 filters={"label": labels})
         ]
         assert not containers
+
+    def test_build_rm(self):
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(all=True)
+        ]
+
+        assert not containers
+
+        self.base_dir = 'tests/fixtures/simple-dockerfile'
+        self.dispatch(['build', '--no-rm', 'simple'], returncode=0)
+
+        containers = [
+            Container.from_ps(self.project.client, c)
+            for c in self.project.client.containers(all=True)
+        ]
+        assert containers
+
+        for c in self.project.client.containers(all=True):
+            self.addCleanup(self.project.client.remove_container, c, force=True)
 
     def test_build_shm_size_build_option(self):
         pull_busybox(self.client)
@@ -1107,6 +1157,22 @@ class CLITestCase(DockerClientTestCase):
             if v['Name'].split('/')[-1] == volume.full_name
         ]
         assert len(remote_volumes) > 0
+
+    @v2_only()
+    def test_up_no_start_remove_orphans(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+        self.dispatch(['up', '--no-start'], None)
+
+        services = self.project.get_services()
+
+        stopped = reduce((lambda prev, next: prev.containers(
+            stopped=True) + next.containers(stopped=True)), services)
+        assert len(stopped) == 2
+
+        self.dispatch(['-f', 'one-container.yml', 'up', '--no-start', '--remove-orphans'], None)
+        stopped2 = reduce((lambda prev, next: prev.containers(
+            stopped=True) + next.containers(stopped=True)), services)
+        assert len(stopped2) == 1
 
     @v2_only()
     def test_up_no_ansi(self):
@@ -2301,6 +2367,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_follow_logs_from_new_containers(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
         self.dispatch(['up', '-d', 'simple'])
@@ -2327,6 +2394,7 @@ class CLITestCase(DockerClientTestCase):
         assert '{} exited with code 0'.format(another_name) in result.stdout
         assert '{} exited with code 137'.format(simple_name) in result.stdout
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_follow_logs_from_restarted_containers(self):
         self.base_dir = 'tests/fixtures/logs-restart-composefile'
         proc = start_process(self.base_dir, ['up'])
@@ -2347,6 +2415,7 @@ class CLITestCase(DockerClientTestCase):
         ) == 3
         assert result.stdout.count('world') == 3
 
+    @pytest.mark.skip(reason="race condition between up and logs")
     def test_logs_default(self):
         self.base_dir = 'tests/fixtures/logs-composefile'
         self.dispatch(['up', '-d'])
@@ -2473,10 +2542,12 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 0
 
-        self.dispatch(['up', '-d', '--scale', 'web=3'])
+        self.dispatch(['up', '-d', '--scale', 'web=3', '--scale', 'worker=1'])
         assert len(project.get_service('web').containers()) == 3
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 1
 
     def test_up_scale_scale_down(self):
         self.base_dir = 'tests/fixtures/scale'
@@ -2485,22 +2556,26 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 0
 
         self.dispatch(['up', '-d', '--scale', 'web=1'])
         assert len(project.get_service('web').containers()) == 1
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 0
 
     def test_up_scale_reset(self):
         self.base_dir = 'tests/fixtures/scale'
         project = self.project
 
-        self.dispatch(['up', '-d', '--scale', 'web=3', '--scale', 'db=3'])
+        self.dispatch(['up', '-d', '--scale', 'web=3', '--scale', 'db=3', '--scale', 'worker=3'])
         assert len(project.get_service('web').containers()) == 3
         assert len(project.get_service('db').containers()) == 3
+        assert len(project.get_service('worker').containers()) == 3
 
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 0
 
     def test_up_scale_to_zero(self):
         self.base_dir = 'tests/fixtures/scale'
@@ -2509,10 +2584,12 @@ class CLITestCase(DockerClientTestCase):
         self.dispatch(['up', '-d'])
         assert len(project.get_service('web').containers()) == 2
         assert len(project.get_service('db').containers()) == 1
+        assert len(project.get_service('worker').containers()) == 0
 
-        self.dispatch(['up', '-d', '--scale', 'web=0', '--scale', 'db=0'])
+        self.dispatch(['up', '-d', '--scale', 'web=0', '--scale', 'db=0', '--scale', 'worker=0'])
         assert len(project.get_service('web').containers()) == 0
         assert len(project.get_service('db').containers()) == 0
+        assert len(project.get_service('worker').containers()) == 0
 
     def test_port(self):
         self.base_dir = 'tests/fixtures/ports-composefile'

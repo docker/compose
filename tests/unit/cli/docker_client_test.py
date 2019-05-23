@@ -247,5 +247,5 @@ class TestGetTlsVersion(object):
         environment = {'COMPOSE_TLS_VERSION': 'TLSv5_5'}
         with mock.patch('compose.cli.docker_client.log') as mock_log:
             tls_version = get_tls_version(environment)
-        mock_log.warn.assert_called_once_with(mock.ANY)
+        mock_log.warning.assert_called_once_with(mock.ANY)
         assert tls_version is None
