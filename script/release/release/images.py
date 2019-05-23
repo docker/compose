@@ -9,12 +9,11 @@ import os
 import docker
 from enum import Enum
 
-from script.release.release.const import COMPOSE_TESTS_IMAGE_BASE_NAME
-
 from .const import NAME
 from .const import REPO_ROOT
 from .utils import ScriptError
 from .utils import yesno
+from script.release.release.const import COMPOSE_TESTS_IMAGE_BASE_NAME
 
 
 class Platform(Enum):
