@@ -6,8 +6,6 @@ Change log
 
 ### Features
 
-- Drop `Dockerfile.armhf`
-
 - Bumped `docker-py` 4.0.1
 
 - Supports `requests` up to 2.22.0 version
