@@ -15,9 +15,9 @@ from release.const import NAME
 from release.const import REPO_ROOT
 from release.downloader import BinaryDownloader
 from release.images import ImageManager
+from release.images import is_tag_latest
 from release.pypi import check_pypirc
 from release.pypi import pypi_upload
-from release.images import is_tag_latest
 from release.repository import delete_assets
 from release.repository import get_contributors
 from release.repository import Repository
