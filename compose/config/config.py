@@ -405,6 +405,10 @@ def load(config_details, compatibility=False, interpolate=True):
     )
     service_dicts = load_services(config_details, main_file, compatibility)
 
+    normalize = config_details.environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
+    win_host = config_details.environment.get_boolean('COMPOSE_FORCE_WINDOWS_HOST')
+    convertPath(secrets, normalize, win_host)
+
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
