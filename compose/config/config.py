@@ -40,6 +40,8 @@ from .sort_services import get_container_name_from_network_mode
 from .sort_services import get_service_name_from_network_mode
 from .sort_services import sort_service_dicts
 from .types import MountSpec
+from .types import normalize_path_for_engine
+from .types import normpath
 from .types import parse_extra_hosts
 from .types import parse_restart_spec
 from .types import SecurityOpt
@@ -412,6 +414,20 @@ def load(config_details, compatibility=False, interpolate=True):
     version = V2_3 if compatibility and main_file.version >= V3_0 else main_file.version
 
     return Config(version, service_dicts, volumes, networks, secrets, configs)
+
+
+def convertPath(paths_dictionary, normalize, win_host):
+    if isinstance(paths_dictionary, dict):
+        for k, v in paths_dictionary.items():
+            if isinstance(v, dict):
+                for c, d in v.items():
+                    if c == 'file':
+                        d = normpath(d, win_host)
+                        if normalize:
+                            d = normalize_path_for_engine(d)
+                        v[c] = d
+
+                paths_dictionary[k] = v
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):
@@ -874,20 +890,6 @@ def finalize_service_volumes(service_dict, environment):
     return service_dict
 
 
-def finalize_service_secrets(service_dict, environment):
-    if 'secrets' in service_dict:
-        finalized_secrets = []
-        normalize = environment.get_boolean('COMPOSE_CONVERT_WINDOWS_PATHS')
-        win_host = environment.get_boolean('COMPOSE_FORCE_WINDOWS_HOST')
-        for v in service_dict['secrets']:
-            if isinstance(v, dict):
-                finalized_secrets.append(MountSpec.parse(v, normalize, win_host))
-
-        service_dict['secrets'] = finalized_secrets
-
-    return service_dict
-
-
 def finalize_service(service_config, service_names, version, environment, compatibility):
     service_dict = dict(service_config.config)
 
@@ -921,8 +923,6 @@ def finalize_service(service_config, service_names, version, environment, compat
         service_dict['secrets'] = [
             types.ServiceSecret.parse(s) for s in service_dict['secrets']
         ]
-
-    service_dict = finalize_service_secrets(service_dict, environment)
 
     if 'configs' in service_dict:
         service_dict['configs'] = [
