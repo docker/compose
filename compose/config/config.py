@@ -208,7 +208,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                 'Version in "{}" is invalid - it should be a string.'
                 .format(self.filename))
 
-        if version == '1':
+        version = version.strip()
+
+        if version in ['0', '1'] or not all(n.isdigit() for n in version.split('.')):
             raise ConfigurationError(
                 'Version in "{}" is invalid. {}'
                 .format(self.filename, VERSION_EXPLANATION)

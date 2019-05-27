@@ -237,6 +237,40 @@ class ConfigTest(unittest.TestCase):
         assert 'Version in "filename.yml" is invalid' in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
+    def test_malformed_version(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '0',
+                        'web': {'image': 'busybox'},
+                    },
+                    filename='filename.yml',
+                )
+            )
+
+        assert 'Version in "filename.yml" is invalid' in excinfo.exconly()
+        assert VERSION_EXPLANATION in excinfo.exconly()
+
+    def test_malformed_version2(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '3 .0',
+                        'web': {'image': 'busybox'},
+                    },
+                    filename='filename.yml',
+                )
+            )
+
+        assert 'Version in "filename.yml" is invalid' in excinfo.exconly()
+        assert VERSION_EXPLANATION in excinfo.exconly()
+
+    def test_version_with_trailing_space(self):
+        cfg = config.load(build_config_details({'version': '3 '}))
+        assert cfg.version == V3_0
+
     def test_v1_file_with_version_is_invalid(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
