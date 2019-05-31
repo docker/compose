@@ -3821,35 +3821,35 @@ class MergePathMappingTest(object):
             {self.config_name: ['/foo:/code', '/data']},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/foo:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/foo:/code', '/data'}
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code'}
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/data']},
             {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/data'}
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/data']},
             {self.config_name: ['/bar:/code', '/quux:/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/quux:/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/quux:/data'}
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/quux:/data']},
             {self.config_name: ['/bar:/code', '/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/data'}
 
 
 class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
@@ -4053,28 +4053,28 @@ class MergeStringsOrListsTest(unittest.TestCase):
             {'dns': '8.8.8.8'},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8'])
+        assert set(service_dict['dns']) == {'8.8.8.8'}
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {'dns': '8.8.8.8'},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8'])
+        assert set(service_dict['dns']) == {'8.8.8.8'}
 
     def test_add_string(self):
         service_dict = config.merge_service_dicts(
             {'dns': ['8.8.8.8']},
             {'dns': '9.9.9.9'},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
+        assert set(service_dict['dns']) == {'8.8.8.8', '9.9.9.9'}
 
     def test_add_list(self):
         service_dict = config.merge_service_dicts(
             {'dns': '8.8.8.8'},
             {'dns': ['9.9.9.9']},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
+        assert set(service_dict['dns']) == {'8.8.8.8', '9.9.9.9'}
 
 
 class MergeLabelsTest(unittest.TestCase):
@@ -4146,7 +4146,7 @@ class MergeBuildTest(unittest.TestCase):
         assert result['context'] == override['context']
         assert result['dockerfile'] == override['dockerfile']
         assert result['args'] == {'x': '12', 'y': '2'}
-        assert set(result['cache_from']) == set(['ubuntu', 'debian'])
+        assert set(result['cache_from']) == {'ubuntu', 'debian'}
         assert result['labels'] == override['labels']
 
     def test_empty_override(self):
@@ -4350,7 +4350,7 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
             )
         ).services[0]
-        assert set(service_dict['volumes']) == set([VolumeSpec.parse('/tmp:/host/tmp')])
+        assert set(service_dict['volumes']) == {VolumeSpec.parse('/tmp:/host/tmp')}
 
         service_dict = config.load(
             build_config_details(
@@ -4358,7 +4358,7 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
             )
         ).services[0]
-        assert set(service_dict['volumes']) == set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')])
+        assert set(service_dict['volumes']) == {VolumeSpec.parse('/opt/tmp:/opt/host/tmp')}
 
 
 def load_from_filename(filename, override_dir=None):

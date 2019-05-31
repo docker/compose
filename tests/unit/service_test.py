@@ -1334,10 +1334,8 @@ class ServiceVolumesTest(unittest.TestCase):
             number=1,
         )
 
-        assert set(self.mock_client.create_host_config.call_args[1]['binds']) == set([
-            '/host/path:/data1:rw',
-            '/host/path:/data2:rw',
-        ])
+        assert set(self.mock_client.create_host_config.call_args[1]['binds']) == {'/host/path:/data1:rw',
+                                                                                  '/host/path:/data2:rw'}
 
     def test_get_container_create_options_with_different_host_path_in_container_json(self):
         service = Service(
