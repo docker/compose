@@ -1446,7 +1446,7 @@ class CLITestCase(DockerClientTestCase):
             if v['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
-        assert set([v['Name'].split('/')[-1] for v in volumes]) == set([volume_with_label])
+        assert set([v['Name'].split('/')[-1] for v in volumes]) == {volume_with_label}
         assert 'label_key' in volumes[0]['Labels']
         assert volumes[0]['Labels']['label_key'] == 'label_val'
 
@@ -2111,7 +2111,7 @@ class CLITestCase(DockerClientTestCase):
             for _, config in networks.items():
                 # TODO: once we drop support for API <1.24, this can be changed to:
                 # assert config['Aliases'] == [container.short_id]
-                aliases = set(config['Aliases'] or []) - set([container.short_id])
+                aliases = set(config['Aliases'] or []) - {container.short_id}
                 assert not aliases
 
     @v2_only()
@@ -2131,7 +2131,7 @@ class CLITestCase(DockerClientTestCase):
         for _, config in networks.items():
             # TODO: once we drop support for API <1.24, this can be changed to:
             # assert config['Aliases'] == [container.short_id]
-            aliases = set(config['Aliases'] or []) - set([container.short_id])
+            aliases = set(config['Aliases'] or []) - {container.short_id}
             assert not aliases
 
         assert self.lookup(container, 'app')
@@ -2741,7 +2741,7 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/extends'
         self.dispatch(['up', '-d'], None)
 
-        assert set([s.name for s in self.project.services]) == set(['mydb', 'myweb'])
+        assert set([s.name for s in self.project.services]) == {'mydb', 'myweb'}
 
         # Sort by name so we get [db, web]
         containers = sorted(
@@ -2753,15 +2753,9 @@ class CLITestCase(DockerClientTestCase):
         web = containers[1]
         db_name = containers[0].name_without_project
 
-        assert set(get_links(web)) == set(
-            ['db', db_name, 'extends_{}'.format(db_name)]
-        )
+        assert set(get_links(web)) == {'db', db_name, 'extends_{}'.format(db_name)}
 
-        expected_env = set([
-            "FOO=1",
-            "BAR=2",
-            "BAZ=2",
-        ])
+        expected_env = {"FOO=1", "BAR=2", "BAZ=2"}
         assert expected_env <= set(web.get('Config.Env'))
 
     def test_top_services_not_running(self):
