@@ -21,7 +21,20 @@ from .utils import get_version_info
 
 log = logging.getLogger(__name__)
 
-SILENT_COMMANDS = {'events', 'exec', 'kill', 'logs', 'pause', 'ps', 'restart', 'rm', 'start', 'stop', 'top', 'unpause'}
+SILENT_COMMANDS = {
+    'events',
+    'exec',
+    'kill',
+    'logs',
+    'pause',
+    'ps',
+    'restart',
+    'rm',
+    'start',
+    'stop',
+    'top',
+    'unpause',
+}
 
 
 def project_from_options(project_dir, options, additional_options={}):

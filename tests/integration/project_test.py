@@ -305,20 +305,20 @@ class ProjectTest(DockerClientTestCase):
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        assert set(c.name for c in project.containers() if c.is_running) == {web_container_1.name, web_container_2.name}
+        assert set(c.name for c in project.containers() if c.is_running) == {
+            web_container_1.name, web_container_2.name}
 
         project.start()
-        assert set(c.name for c in project.containers() if c.is_running) == set(
-            [web_container_1.name, web_container_2.name, db_container.name]
-        )
+        assert set(c.name for c in project.containers() if c.is_running) == {
+            web_container_1.name, web_container_2.name, db_container.name}
 
         project.pause(service_names=['web'])
-        assert set([c.name for c in project.containers() if c.is_paused]) == {web_container_1.name,
-                                                                              web_container_2.name}
+        assert set([c.name for c in project.containers() if c.is_paused]) == {
+            web_container_1.name, web_container_2.name}
 
         project.pause()
-        assert set([c.name for c in project.containers() if c.is_paused]) == {web_container_1.name,
-                                                                              web_container_2.name, db_container.name}
+        assert set([c.name for c in project.containers() if c.is_paused]) == {
+            web_container_1.name, web_container_2.name, db_container.name}
 
         project.unpause(service_names=['db'])
         assert len([c.name for c in project.containers() if c.is_paused]) == 2
