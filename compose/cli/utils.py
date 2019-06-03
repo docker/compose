@@ -137,7 +137,7 @@ def human_readable_file_size(size):
     if order >= len(suffixes):
         order = len(suffixes) - 1
 
-    return '{0:.3g} {1}'.format(
+    return '{0:.4g} {1}'.format(
         size / float(1 << (order * 10)),
         suffixes[order]
     )
