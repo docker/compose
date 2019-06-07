@@ -4,7 +4,6 @@ package watch
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
 
+	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/ospath"
 )
 
@@ -20,6 +20,7 @@ import (
 //
 // All OS-specific codepaths are handled by fsnotify.
 type naiveNotify struct {
+	log           logger.Logger
 	watcher       *fsnotify.Watcher
 	events        chan fsnotify.Event
 	wrappedEvents chan FileEvent
@@ -127,7 +128,7 @@ func (d *naiveNotify) loop() {
 		}
 
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
-		if err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
+		err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -151,13 +152,14 @@ func (d *naiveNotify) loop() {
 			}
 			if shouldWatch {
 				err := d.watcher.Add(path)
-				if err != nil {
-					log.Printf("Error watching path %s: %s", e.Name, err)
+				if err != nil && !os.IsNotExist(err) {
+					d.log.Infof("Error watching path %s: %s", e.Name, err)
 				}
 			}
 			return nil
-		}); err != nil {
-			log.Printf("Error walking directory %s: %s", e.Name, err)
+		})
+		if err != nil && !os.IsNotExist(err) {
+			d.log.Infof("Error walking directory %s: %s", e.Name, err)
 		}
 	}
 }
@@ -177,7 +179,7 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 	return false
 }
 
-func NewWatcher() (*naiveNotify, error) {
+func NewWatcher(l logger.Logger) (*naiveNotify, error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -186,6 +188,7 @@ func NewWatcher() (*naiveNotify, error) {
 	wrappedEvents := make(chan FileEvent)
 
 	wmw := &naiveNotify{
+		log:           l,
 		watcher:       fsw,
 		events:        fsw.Events,
 		wrappedEvents: wrappedEvents,

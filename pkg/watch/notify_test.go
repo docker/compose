@@ -1,6 +1,8 @@
 package watch
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/testutils/tempdir"
 )
 
@@ -52,6 +56,65 @@ func TestEventOrdering(t *testing.T) {
 	}
 
 	f.assertEvents(expected...)
+}
+
+// Simulate a git branch switch that creates a bunch
+// of directories, creates files in them, then deletes
+// them all quickly. Make sure there are no errors.
+func TestGitBranchSwitch(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	count := 10
+	dirs := make([]string, count)
+	for i, _ := range dirs {
+		dir := f.TempDir("watched")
+		dirs[i] = dir
+		err := f.notify.Add(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	f.fsync()
+	f.events = nil
+
+	// consume all the events in the background
+	ctx, cancel := context.WithCancel(context.Background())
+	done := f.consumeEventsInBackground(ctx)
+
+	for i, dir := range dirs {
+		for j := 0; j < count; j++ {
+			base := fmt.Sprintf("x/y/dir-%d/x.txt", j)
+			p := filepath.Join(dir, base)
+			f.WriteFile(p, "contents")
+		}
+
+		if i != 0 {
+			os.RemoveAll(dir)
+		}
+	}
+
+	cancel()
+	err := <-done
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f.fsync()
+	f.events = nil
+
+	// Make sure the watch on the first dir still works.
+	dir := dirs[0]
+	path := filepath.Join(dir, "change")
+
+	f.WriteFile(path, "hello\n")
+	f.fsync()
+
+	f.assertEvents(path)
+
+	// Make sure there are no errors in the out stream
+	assert.Equal(t, "", f.out.String())
 }
 
 func TestWatchesAreRecursive(t *testing.T) {
@@ -412,6 +475,7 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 // }
 
 type notifyFixture struct {
+	out *bytes.Buffer
 	*tempdir.TempDirFixture
 	notify  Notify
 	watched string
@@ -419,7 +483,8 @@ type notifyFixture struct {
 }
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
-	notify, err := NewWatcher()
+	out := bytes.NewBuffer(nil)
+	notify, err := NewWatcher(logger.NewLogger(logger.DebugLvl, out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,6 +500,7 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 		TempDirFixture: f,
 		watched:        watched,
 		notify:         notify,
+		out:            out,
 	}
 }
 
@@ -458,6 +524,25 @@ func (f *notifyFixture) assertEvents(expected ...string) {
 			f.T().Fatalf("Got event %v (expected %v)", actual, e)
 		}
 	}
+}
+
+func (f *notifyFixture) consumeEventsInBackground(ctx context.Context) chan error {
+	done := make(chan error)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				close(done)
+				return
+			case err := <-f.notify.Errors():
+				done <- err
+				close(done)
+				return
+			case <-f.notify.Events():
+			}
+		}
+	}()
+	return done
 }
 
 func (f *notifyFixture) fsync() {
