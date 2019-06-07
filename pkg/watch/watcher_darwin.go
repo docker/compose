@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/ospath"
 
 	"github.com/windmilleng/fsevents"
@@ -120,7 +121,7 @@ func (d *darwinNotify) Errors() chan error {
 	return d.errors
 }
 
-func NewWatcher() (Notify, error) {
+func NewWatcher(l logger.Logger) (Notify, error) {
 	dw := &darwinNotify{
 		stream: &fsevents.EventStream{
 			Latency: 1 * time.Millisecond,
