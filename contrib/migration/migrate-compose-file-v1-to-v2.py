@@ -19,7 +19,7 @@ log = logging.getLogger('migrate')
 
 
 def migrate(content):
-    data = ruamel.yaml.load(content, ruamel.yaml.RoundTripLoader)
+    data = ruamel.yaml.safe_load(content, ruamel.yaml.RoundTripLoader)
 
     service_names = data.keys()
 
