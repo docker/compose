@@ -11,7 +11,8 @@ from docker.errors import APIError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import ReadTimeout
 from requests.exceptions import SSLError
-from requests.packages.urllib3.exceptions import ReadTimeoutError
+from urllib3.exceptions import ProtocolError
+from urllib3.exceptions import ReadTimeoutError
 
 from ..const import API_VERSION_TO_ENGINE_VERSION
 from .utils import binarystr_to_unicode
@@ -49,6 +50,9 @@ def handle_connection_errors(client):
     except RequestsConnectionError as e:
         if e.args and isinstance(e.args[0], ReadTimeoutError):
             log_timeout_error(client.timeout)
+            raise ConnectionError()
+        if e.args and isinstance(e.args[0], ProtocolError):
+            log_connection_abort_error()
             raise ConnectionError()
         exit_with_error(get_conn_error_message(client.base_url))
     except APIError as e:
@@ -90,6 +94,13 @@ def log_timeout_error(timeout):
         "If you encounter this issue regularly because of slow network "
         "conditions, consider setting COMPOSE_HTTP_TIMEOUT to a higher "
         "value (current value: %s)." % timeout)
+
+
+def log_connection_abort_error():
+    log.error(
+        "Docker daemon dropped connection. Retry with --verbose to "
+        "obtain debug information.\n"
+    )
 
 
 def log_api_error(e, client_version):

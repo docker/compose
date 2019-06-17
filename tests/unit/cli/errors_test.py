@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import pytest
 from docker.errors import APIError
 from requests.exceptions import ConnectionError
+from urllib3.exceptions import ProtocolError
 
 from compose.cli import errors
 from compose.cli.errors import handle_connection_errors
@@ -34,6 +35,14 @@ class TestHandleConnectionErrors(object):
 
         _, args, _ = mock_logging.error.mock_calls[0]
         assert "Couldn't connect to Docker daemon" in args[0]
+
+    def test_protocol_error(self, mock_logging):
+        with pytest.raises(errors.ConnectionError):
+            with handle_connection_errors(mock.Mock()):
+                raise ConnectionError(ProtocolError('Connection reset by peer'))
+
+        _, args, _ = mock_logging.error.mock_calls[0]
+        assert "Docker daemon dropped connection." in args[0]
 
     def test_api_error_version_mismatch(self, mock_logging):
         with pytest.raises(errors.ConnectionError):
