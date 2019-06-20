@@ -2,7 +2,7 @@ version: "2.2"
 
 services:
   service:
-    image: busybox:latest
+    image: busybox:1.27.2
     command: top
 
     environment:
