@@ -1,11 +1,11 @@
 db:
-  image: busybox:latest
+  image: busybox:1.27.2
   command: top
 web:
-  image: busybox:latest
+  image: busybox:1.27.2
   command: top
   links:
     - db:db
 console:
-  image: busybox:latest
+  image: busybox:1.27.2
   command: top
