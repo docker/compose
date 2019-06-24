@@ -198,9 +198,9 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         version = self.config['version']
 
         if isinstance(version, dict):
-            log.warning('Unexpected type for "version" key in "{}". Assuming '
-                        '"version" is the name of a service, and defaulting to '
-                        'Compose file version 1.'.format(self.filename))
+            log.warn('Unexpected type for "version" key in "{}". Assuming '
+                     '"version" is the name of a service, and defaulting to '
+                     'Compose file version 1.'.format(self.filename))
             return V1
 
         if not isinstance(version, six.string_types):
@@ -318,8 +318,8 @@ def get_default_config_files(base_dir):
     winner = candidates[0]
 
     if len(candidates) > 1:
-        log.warning("Found multiple config files with supported names: %s", ", ".join(candidates))
-        log.warning("Using %s\n", winner)
+        log.warn("Found multiple config files with supported names: %s", ", ".join(candidates))
+        log.warn("Using %s\n", winner)
 
     return [os.path.join(path, winner)] + get_default_override_file(path)
 
@@ -362,7 +362,7 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     def check_swarm_only_key(service_dicts, key):
         services = [s for s in service_dicts if s.get(key)]
         if services:
-            log.warning(
+            log.warn(
                 warning_template.format(
                     services=", ".join(sorted(s['name'] for s in services)),
                     key=key
@@ -373,7 +373,7 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details, compatibility=False, interpolate=True):
+def load(config_details, compatibility=False):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -383,7 +383,7 @@ def load(config_details, compatibility=False, interpolate=True):
     validate_config_version(config_details.config_files)
 
     processed_files = [
-        process_config_file(config_file, config_details.environment, interpolate=interpolate)
+        process_config_file(config_file, config_details.environment)
         for config_file in config_details.config_files
     ]
     config_details = config_details._replace(config_files=processed_files)
@@ -505,6 +505,7 @@ def load_services(config_details, config_file, compatibility=False):
 
 
 def interpolate_config_section(config_file, config, section, environment):
+    validate_config_section(config_file.filename, config, section)
     return interpolate_environment_variables(
         config_file.version,
         config,
@@ -513,60 +514,38 @@ def interpolate_config_section(config_file, config, section, environment):
     )
 
 
-def process_config_section(config_file, config, section, environment, interpolate):
-    validate_config_section(config_file.filename, config, section)
-    if interpolate:
-        return interpolate_environment_variables(
-            config_file.version,
-            config,
-            section,
-            environment
-            )
-    else:
-        return config
-
-
-def process_config_file(config_file, environment, service_name=None, interpolate=True):
-    services = process_config_section(
+def process_config_file(config_file, environment, service_name=None):
+    services = interpolate_config_section(
         config_file,
         config_file.get_service_dicts(),
         'service',
-        environment,
-        interpolate,
-    )
+        environment)
 
     if config_file.version > V1:
         processed_config = dict(config_file.config)
         processed_config['services'] = services
-        processed_config['volumes'] = process_config_section(
+        processed_config['volumes'] = interpolate_config_section(
             config_file,
             config_file.get_volumes(),
             'volume',
-            environment,
-            interpolate,
-        )
-        processed_config['networks'] = process_config_section(
+            environment)
+        processed_config['networks'] = interpolate_config_section(
             config_file,
             config_file.get_networks(),
             'network',
-            environment,
-            interpolate,
-        )
+            environment)
         if config_file.version >= const.COMPOSEFILE_V3_1:
-            processed_config['secrets'] = process_config_section(
+            processed_config['secrets'] = interpolate_config_section(
                 config_file,
                 config_file.get_secrets(),
                 'secret',
-                environment,
-                interpolate,
-            )
+                environment)
         if config_file.version >= const.COMPOSEFILE_V3_3:
-            processed_config['configs'] = process_config_section(
+            processed_config['configs'] = interpolate_config_section(
                 config_file,
                 config_file.get_configs(),
                 'config',
-                environment,
-                interpolate,
+                environment
             )
     else:
         processed_config = services
@@ -921,7 +900,7 @@ def finalize_service(service_config, service_names, version, environment, compat
             service_dict
         )
         if ignored_keys:
-            log.warning(
+            log.warn(
                 'The following deploy sub-keys are not supported in compatibility mode and have'
                 ' been ignored: {}'.format(', '.join(ignored_keys))
             )

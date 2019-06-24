@@ -15,8 +15,6 @@ from compose.config.types import VolumeFromSpec
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_4 as V2_4
-from compose.const import COMPOSEFILE_V3_7 as V3_7
-from compose.const import DEFAULT_TIMEOUT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.errors import OperationFailedError
@@ -766,34 +764,6 @@ class ProjectTest(unittest.TestCase):
             name='test', client=self.mock_client, config_data=config_data, default_platform='windows'
         )
         assert project.get_service('web').platform == 'linux/s390x'
-
-    def test_build_container_operation_with_timeout_func_does_not_mutate_options_with_timeout(self):
-        config_data = Config(
-            version=V3_7,
-            services=[
-                {'name': 'web', 'image': 'busybox:latest'},
-                {'name': 'db', 'image': 'busybox:latest', 'stop_grace_period': '1s'},
-            ],
-            networks={}, volumes={}, secrets=None, configs=None,
-        )
-
-        project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
-
-        stop_op = project.build_container_operation_with_timeout_func('stop', options={})
-
-        web_container = mock.create_autospec(Container, service='web')
-        db_container = mock.create_autospec(Container, service='db')
-
-        # `stop_grace_period` is not set to 'web' service,
-        # then it is stopped with the default timeout.
-        stop_op(web_container)
-        web_container.stop.assert_called_once_with(timeout=DEFAULT_TIMEOUT)
-
-        # `stop_grace_period` is set to 'db' service,
-        # then it is stopped with the specified timeout and
-        # the value is not overridden by the previous function call.
-        stop_op(db_container)
-        db_container.stop.assert_called_once_with(timeout=1)
 
     @mock.patch('compose.parallel.ParallelStreamWriter._write_noansi')
     def test_error_parallel_pull(self, mock_write):

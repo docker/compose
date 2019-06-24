@@ -13,13 +13,13 @@ if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
   SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
 fi
 
-OPENSSL_VERSION=1.1.1a
+OPENSSL_VERSION=1.1.0j
 OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
-OPENSSL_SHA1=8fae27b4f34445a5500c9dc50ae66b4d6472ce29
+OPENSSL_SHA1=dcad1efbacd9a4ed67d4514470af12bbe2a1d60a
 
-PYTHON_VERSION=3.7.2
+PYTHON_VERSION=3.6.8
 PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
-PYTHON_SHA1=0cd8e52d8ed1d0be12ac8e87a623a15df3a3b418
+PYTHON_SHA1=09fcc4edaef0915b4dedbfb462f1cd15f82d3a6f
 
 #
 # Install prerequisites.
@@ -36,7 +36,7 @@ if ! [ -x "$(command -v python3)" ]; then
   brew install python3
 fi
 if ! [ -x "$(command -v virtualenv)" ]; then
-  pip install virtualenv==16.2.0
+  pip install virtualenv
 fi
 
 #
@@ -50,7 +50,7 @@ mkdir -p ${TOOLCHAIN_PATH}
 #
 # Set macOS SDK.
 #
-if [[ ${SDK_FETCH} && ! -f ${TOOLCHAIN_PATH}/MacOSX${DEPLOYMENT_TARGET}.sdk/SDKSettings.plist ]]; then
+if [ ${SDK_FETCH} ]; then
   SDK_PATH=${TOOLCHAIN_PATH}/MacOSX${DEPLOYMENT_TARGET}.sdk
   fetch_tarball ${SDK_URL} ${SDK_PATH} ${SDK_SHA1}
 else
@@ -61,7 +61,7 @@ fi
 # Build OpenSSL.
 #
 OPENSSL_SRC_PATH=${TOOLCHAIN_PATH}/openssl-${OPENSSL_VERSION}
-if ! [[ $(${TOOLCHAIN_PATH}/bin/openssl version) == *"${OPENSSL_VERSION}"* ]]; then
+if ! [ -f ${TOOLCHAIN_PATH}/bin/openssl ]; then
   rm -rf ${OPENSSL_SRC_PATH}
   fetch_tarball ${OPENSSL_URL} ${OPENSSL_SRC_PATH} ${OPENSSL_SHA1}
   (
@@ -77,7 +77,7 @@ fi
 # Build Python.
 #
 PYTHON_SRC_PATH=${TOOLCHAIN_PATH}/Python-${PYTHON_VERSION}
-if ! [[ $(${TOOLCHAIN_PATH}/bin/python3 --version) == *"${PYTHON_VERSION}"* ]]; then
+if ! [ -f ${TOOLCHAIN_PATH}/bin/python3 ]; then
   rm -rf ${PYTHON_SRC_PATH}
   fetch_tarball ${PYTHON_URL} ${PYTHON_SRC_PATH} ${PYTHON_SHA1}
   (
@@ -87,21 +87,15 @@ if ! [[ $(${TOOLCHAIN_PATH}/bin/python3 --version) == *"${PYTHON_VERSION}"* ]]; 
       --datarootdir=${TOOLCHAIN_PATH}/share \
       --datadir=${TOOLCHAIN_PATH}/share \
       --enable-framework=${TOOLCHAIN_PATH}/Frameworks \
-      --with-openssl=${TOOLCHAIN_PATH} \
       MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET} \
       CFLAGS="-isysroot ${SDK_PATH} -I${TOOLCHAIN_PATH}/include" \
-      CPPFLAGS="-I${SDK_PATH}/usr/include -I${TOOLCHAIN_PATH}/include" \
+      CPPFLAGS="-I${SDK_PATH}/usr/include -I${TOOLCHAIN_PATH}include" \
       LDFLAGS="-isysroot ${SDK_PATH} -L ${TOOLCHAIN_PATH}/lib"
     make -j 4
     make install PYTHONAPPSDIR=${TOOLCHAIN_PATH}
     make frameworkinstallextras PYTHONAPPSDIR=${TOOLCHAIN_PATH}/share
   )
 fi
-
-#
-# Smoke test built Python.
-#
-openssl_version ${TOOLCHAIN_PATH}
 
 echo ""
 echo "*** Targeting macOS: ${DEPLOYMENT_TARGET}"

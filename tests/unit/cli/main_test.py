@@ -63,7 +63,7 @@ class TestCLIMainTestCase(object):
 
         with mock.patch('compose.cli.main.log') as fake_log:
             warn_for_swarm_mode(mock_client)
-            assert fake_log.warning.call_count == 1
+            assert fake_log.warn.call_count == 1
 
 
 class TestSetupConsoleHandlerTestCase(object):

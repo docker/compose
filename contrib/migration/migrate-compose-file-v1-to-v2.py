@@ -44,7 +44,7 @@ def warn_for_links(name, service):
     links = service.get('links')
     if links:
         example_service = links[0].partition(':')[0]
-        log.warning(
+        log.warn(
             "Service {name} has links, which no longer create environment "
             "variables such as {example_service_upper}_PORT. "
             "If you are using those in your application code, you should "
@@ -57,7 +57,7 @@ def warn_for_links(name, service):
 def warn_for_external_links(name, service):
     external_links = service.get('external_links')
     if external_links:
-        log.warning(
+        log.warn(
             "Service {name} has external_links: {ext}, which now work "
             "slightly differently. In particular, two containers must be "
             "connected to at least one network in common in order to "
@@ -107,7 +107,7 @@ def rewrite_volumes_from(service, service_names):
 def create_volumes_section(data):
     named_volumes = get_named_volumes(data['services'])
     if named_volumes:
-        log.warning(
+        log.warn(
             "Named volumes ({names}) must be explicitly declared. Creating a "
             "'volumes' section with declarations.\n\n"
             "For backwards-compatibility, they've been declared as external. "

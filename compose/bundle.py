@@ -95,10 +95,19 @@ def get_image_digest(service, allow_push=False):
     if separator == '@':
         return service.options['image']
 
-    digest = get_digest(service)
+    try:
+        image = service.image()
+    except NoSuchImageError:
+        action = 'build' if 'build' in service.options else 'pull'
+        raise UserError(
+            "Image not found for service '{service}'. "
+            "You might need to run `docker-compose {action} {service}`."
+            .format(service=service.name, action=action))
 
-    if digest:
-        return digest
+    if image['RepoDigests']:
+        # TODO: pick a digest based on the image tag if there are multiple
+        # digests
+        return image['RepoDigests'][0]
 
     if 'build' not in service.options:
         raise NeedsPull(service.image_name, service.name)
@@ -107,32 +116,6 @@ def get_image_digest(service, allow_push=False):
         raise NeedsPush(service.image_name)
 
     return push_image(service)
-
-
-def get_digest(service):
-    digest = None
-    try:
-        image = service.image()
-        # TODO: pick a digest based on the image tag if there are multiple
-        # digests
-        if image['RepoDigests']:
-            digest = image['RepoDigests'][0]
-    except NoSuchImageError:
-        try:
-            # Fetch the image digest from the registry
-            distribution = service.get_image_registry_data()
-
-            if distribution['Descriptor']['digest']:
-                digest = '{image_name}@{digest}'.format(
-                    image_name=service.image_name,
-                    digest=distribution['Descriptor']['digest']
-                )
-        except NoSuchImageError:
-            raise UserError(
-                "Digest not found for service '{service}'. "
-                "Repository does not exist or may require 'docker login'"
-                .format(service=service.name))
-    return digest
 
 
 def push_image(service):
@@ -164,10 +147,10 @@ def push_image(service):
 
 def to_bundle(config, image_digests):
     if config.networks:
-        log.warning("Unsupported top level key 'networks' - ignoring")
+        log.warn("Unsupported top level key 'networks' - ignoring")
 
     if config.volumes:
-        log.warning("Unsupported top level key 'volumes' - ignoring")
+        log.warn("Unsupported top level key 'volumes' - ignoring")
 
     config = denormalize_config(config)
 
@@ -192,7 +175,7 @@ def convert_service_to_bundle(name, service_dict, image_digest):
             continue
 
         if key not in SUPPORTED_KEYS:
-            log.warning("Unsupported key '{}' in services.{} - ignoring".format(key, name))
+            log.warn("Unsupported key '{}' in services.{} - ignoring".format(key, name))
             continue
 
         if key == 'environment':
@@ -239,7 +222,7 @@ def make_service_networks(name, service_dict):
 
     for network_name, network_def in get_network_defs_for_service(service_dict).items():
         for key in network_def.keys():
-            log.warning(
+            log.warn(
                 "Unsupported key '{}' in services.{}.networks.{} - ignoring"
                 .format(key, name, network_name))
 

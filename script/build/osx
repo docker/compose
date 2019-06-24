@@ -5,12 +5,11 @@ TOOLCHAIN_PATH="$(realpath $(dirname $0)/../../build/toolchain)"
 
 rm -rf venv
 
-virtualenv -p "${TOOLCHAIN_PATH}"/bin/python3 venv
+virtualenv -p ${TOOLCHAIN_PATH}/bin/python3 venv
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-build.txt
 venv/bin/pip install --no-deps .
-DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
-echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
+./script/build/write-git-sha
 venv/bin/pyinstaller docker-compose.spec
 mv dist/docker-compose dist/docker-compose-Darwin-x86_64
 dist/docker-compose-Darwin-x86_64 version

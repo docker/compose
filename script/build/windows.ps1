@@ -6,17 +6,17 @@
 #
 #        http://git-scm.com/download/win
 #
-# 2. Install Python 3.7.2:
+# 2. Install Python 3.6.4:
 #
 #        https://www.python.org/downloads/
 #
-# 3. Append ";C:\Python37;C:\Python37\Scripts" to the "Path" environment variable:
+# 3. Append ";C:\Python36;C:\Python36\Scripts" to the "Path" environment variable:
 #
 #        https://www.microsoft.com/resources/documentation/windows/xp/all/proddocs/en-us/sysdm_advancd_environmnt_addchange_variable.mspx?mfr=true
 #
 # 4. In Powershell, run the following commands:
 #
-#        $ pip install 'virtualenv==16.2.0'
+#        $ pip install 'virtualenv>=15.1.0'
 #        $ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # 5. Clone the repository:

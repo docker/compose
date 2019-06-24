@@ -7,14 +7,11 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-TAG="$1"
+TAG=$1
 
 VERSION="$(python setup.py --version)"
 
-DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
-echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
+./script/build/write-git-sha
 python setup.py sdist bdist_wheel
-
-docker build \
-    --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}" \
-    -t "${TAG}" .
+./script/build/linux
+docker build -t docker/compose:$TAG -f Dockerfile.run .

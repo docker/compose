@@ -355,17 +355,18 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False):
+              build_args=None, gzip=False, parallel_build=False):
 
         services = []
         for service in self.get_services(service_names):
             if service.can_be_built():
                 services.append(service)
-            elif not silent:
+            else:
                 log.info('%s uses an image, skipping' % service.name)
 
         def build_service(service):
-            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent)
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip)
+
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,
@@ -586,10 +587,8 @@ class Project(object):
                           ", ".join(updated_dependencies))
                 containers_stopped = any(
                     service.containers(stopped=True, filters={'status': ['created', 'exited']}))
-                service_has_links = any(service.get_link_names())
-                container_has_links = any(c.get('HostConfig.Links') for c in service.containers())
-                should_recreate_for_links = service_has_links ^ container_has_links
-                if always_recreate_deps or containers_stopped or should_recreate_for_links:
+                has_links = any(c.get('HostConfig.Links') for c in service.containers())
+                if always_recreate_deps or containers_stopped or not has_links:
                     plan = service.convergence_plan(ConvergenceStrategy.always)
                 else:
                     plan = service.convergence_plan(strategy)
@@ -603,9 +602,6 @@ class Project(object):
     def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
-        images_to_build = {service.image_name for service in services if service.can_be_built()}
-        services_to_pull = [service for service in services if service.image_name not in images_to_build]
-
         msg = not silent and 'Pulling' or None
 
         if parallel_pull:
@@ -631,7 +627,7 @@ class Project(object):
                     )
 
             _, errors = parallel.parallel_execute(
-                services_to_pull,
+                services,
                 pull_service,
                 operator.attrgetter('name'),
                 msg,
@@ -644,7 +640,7 @@ class Project(object):
                 raise ProjectError(combined_errors)
 
         else:
-            for service in services_to_pull:
+            for service in services:
                 service.pull(ignore_pull_failures, silent=silent)
 
     def push(self, service_names=None, ignore_push_failures=False):
@@ -690,7 +686,7 @@ class Project(object):
 
     def find_orphan_containers(self, remove_orphans):
         def _find():
-            containers = set(self._labeled_containers() + self._labeled_containers(stopped=True))
+            containers = self._labeled_containers()
             for ctnr in containers:
                 service_name = ctnr.labels.get(LABEL_SERVICE)
                 if service_name not in self.service_names:
@@ -701,10 +697,7 @@ class Project(object):
         if remove_orphans:
             for ctnr in orphans:
                 log.info('Removing orphan container "{0}"'.format(ctnr.name))
-                try:
-                    ctnr.kill()
-                except APIError:
-                    pass
+                ctnr.kill()
                 ctnr.remove(force=True)
         else:
             log.warning(
@@ -732,11 +725,10 @@ class Project(object):
 
     def build_container_operation_with_timeout_func(self, operation, options):
         def container_operation_with_timeout(container):
-            _options = options.copy()
-            if _options.get('timeout') is None:
+            if options.get('timeout') is None:
                 service = self.get_service(container.service)
-                _options['timeout'] = service.stop_timeout(None)
-            return getattr(container, operation)(**_options)
+                options['timeout'] = service.stop_timeout(None)
+            return getattr(container, operation)(**options)
         return container_operation_with_timeout
 
 
@@ -779,13 +771,13 @@ def get_secrets(service, service_secrets, secret_defs):
                 .format(service=service, secret=secret.source))
 
         if secret_def.get('external'):
-            log.warning("Service \"{service}\" uses secret \"{secret}\" which is external. "
-                        "External secrets are not available to containers created by "
-                        "docker-compose.".format(service=service, secret=secret.source))
+            log.warn("Service \"{service}\" uses secret \"{secret}\" which is external. "
+                     "External secrets are not available to containers created by "
+                     "docker-compose.".format(service=service, secret=secret.source))
             continue
 
         if secret.uid or secret.gid or secret.mode:
-            log.warning(
+            log.warn(
                 "Service \"{service}\" uses secret \"{secret}\" with uid, "
                 "gid, or mode. These fields are not supported by this "
                 "implementation of the Compose file".format(

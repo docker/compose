@@ -56,18 +56,14 @@ class Environment(dict):
     def __init__(self, *args, **kwargs):
         super(Environment, self).__init__(*args, **kwargs)
         self.missing_keys = []
-        self.silent = False
 
     @classmethod
-    def from_env_file(cls, base_dir, env_file=None):
+    def from_env_file(cls, base_dir):
         def _initialize():
             result = cls()
             if base_dir is None:
                 return result
-            if env_file:
-                env_file_path = os.path.join(base_dir, env_file)
-            else:
-                env_file_path = os.path.join(base_dir, '.env')
+            env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
             except EnvFileNotFound:
@@ -99,8 +95,8 @@ class Environment(dict):
                     return super(Environment, self).__getitem__(key.upper())
                 except KeyError:
                     pass
-            if not self.silent and key not in self.missing_keys:
-                log.warning(
+            if key not in self.missing_keys:
+                log.warn(
                     "The {} variable is not set. Defaulting to a blank string."
                     .format(key)
                 )

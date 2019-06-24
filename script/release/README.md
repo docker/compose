@@ -192,8 +192,6 @@ be handled manually by the operator:
     - Bump the version in `compose/__init__.py` to the *next* minor version
       number with `dev` appended. For example, if you just released `1.4.0`,
       update it to `1.5.0dev`
-    - Update compose_version in [github.com/docker/docker.github.io/blob/master/_config.yml](https://github.com/docker/docker.github.io/blob/master/_config.yml) and [github.com/docker/docker.github.io/blob/master/_config_authoring.yml](https://github.com/docker/docker.github.io/blob/master/_config_authoring.yml)
-    - Update the release note in [github.com/docker/docker.github.io](https://github.com/docker/docker.github.io/blob/master/release-notes/docker-compose.md)
 
 ## Advanced options
 

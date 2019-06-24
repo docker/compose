@@ -231,7 +231,7 @@ def check_remote_network_config(remote, local):
         if k.startswith('com.docker.'):  # We are only interested in user-specified labels
             continue
         if remote_labels.get(k) != local_labels.get(k):
-            log.warning(
+            log.warn(
                 'Network {}: label "{}" has changed. It may need to be'
                 ' recreated.'.format(local.true_name, k)
             )
@@ -276,7 +276,7 @@ class ProjectNetworks(object):
         }
         unused = set(networks) - set(service_networks) - {'default'}
         if unused:
-            log.warning(
+            log.warn(
                 "Some networks were defined but are not used by any service: "
                 "{}".format(", ".join(unused)))
         return cls(service_networks, use_networking)
@@ -288,7 +288,7 @@ class ProjectNetworks(object):
             try:
                 network.remove()
             except NotFound:
-                log.warning("Network %s not found.", network.true_name)
+                log.warn("Network %s not found.", network.true_name)
 
     def initialize(self):
         if not self.use_networking:

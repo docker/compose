@@ -21,27 +21,10 @@ from .utils import get_version_info
 
 log = logging.getLogger(__name__)
 
-SILENT_COMMANDS = set((
-    'events',
-    'exec',
-    'kill',
-    'logs',
-    'pause',
-    'ps',
-    'restart',
-    'rm',
-    'start',
-    'stop',
-    'top',
-    'unpause',
-))
 
-
-def project_from_options(project_dir, options, additional_options={}):
+def project_from_options(project_dir, options):
     override_dir = options.get('--project-directory')
-    environment_file = options.get('--env-file')
-    environment = Environment.from_env_file(override_dir or project_dir, environment_file)
-    environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
+    environment = Environment.from_env_file(override_dir or project_dir)
     set_parallel_limit(environment)
 
     host = options.get('--host')
@@ -57,7 +40,6 @@ def project_from_options(project_dir, options, additional_options={}):
         environment=environment,
         override_dir=override_dir,
         compatibility=options.get('--compatibility'),
-        interpolate=(not additional_options.get('--no-interpolate'))
     )
 
 
@@ -77,17 +59,15 @@ def set_parallel_limit(environment):
         parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
-def get_config_from_options(base_dir, options, additional_options={}):
+def get_config_from_options(base_dir, options):
     override_dir = options.get('--project-directory')
-    environment_file = options.get('--env-file')
-    environment = Environment.from_env_file(override_dir or base_dir, environment_file)
+    environment = Environment.from_env_file(override_dir or base_dir)
     config_path = get_config_path_from_options(
         base_dir, options, environment
     )
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
-        options.get('--compatibility'),
-        not additional_options.get('--no-interpolate')
+        options.get('--compatibility')
     )
 
 
@@ -125,14 +105,14 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 host=None, tls_config=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True):
+                compatibility=False):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details, compatibility, interpolate)
+    config_data = config.load(config_details, compatibility)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
