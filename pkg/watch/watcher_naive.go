@@ -3,6 +3,7 @@
 package watch
 
 import (
+	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,6 +35,10 @@ type naiveNotify struct {
 	notifyList map[string]bool
 }
 
+var (
+	numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
+)
+
 func (d *naiveNotify) Add(name string) error {
 	fi, err := os.Stat(name)
 	if err != nil && !os.IsNotExist(err) {
@@ -52,7 +57,7 @@ func (d *naiveNotify) Add(name string) error {
 			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 	} else {
-		err = d.watcher.Add(filepath.Dir(name))
+		err = d.add(filepath.Dir(name))
 		if err != nil {
 			return errors.Wrapf(err, "notify.Add(%q)", filepath.Dir(name))
 		}
@@ -74,7 +79,7 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		if !mode.IsDir() {
 			return nil
 		}
-		err = d.watcher.Add(path)
+		err = d.add(path)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil
@@ -100,7 +105,7 @@ func (d *naiveNotify) watchAncestorOfMissingPath(path string) error {
 		return d.watchAncestorOfMissingPath(parent)
 	}
 
-	return d.watcher.Add(path)
+	return d.add(path)
 }
 
 func (d *naiveNotify) Close() error {
@@ -151,7 +156,7 @@ func (d *naiveNotify) loop() {
 				}
 			}
 			if shouldWatch {
-				err := d.watcher.Add(path)
+				err := d.add(path)
 				if err != nil && !os.IsNotExist(err) {
 					d.log.Infof("Error watching path %s: %s", e.Name, err)
 				}
@@ -177,6 +182,15 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 		}
 	}
 	return false
+}
+
+func (d *naiveNotify) add(path string) error {
+	err := d.watcher.Add(path)
+	if err != nil {
+		return err
+	}
+	numberOfWatches.Add(1)
+	return nil
 }
 
 func NewWatcher(l logger.Logger) (*naiveNotify, error) {
