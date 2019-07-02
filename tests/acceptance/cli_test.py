@@ -41,7 +41,7 @@ ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
 
 BUILD_CACHE_TEXT = 'Using cache'
-BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:latest'
+BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
 
 
 def start_process(base_dir, options):
@@ -688,15 +688,15 @@ class CLITestCase(DockerClientTestCase):
         self.base_dir = 'tests/fixtures/links-composefile'
         result = self.dispatch(['pull', '--no-parallel', 'web'])
         assert sorted(result.stderr.split('\n'))[1:] == [
-            'Pulling web (busybox:latest)...',
+            'Pulling web (busybox:1.27.2)...',
         ]
 
     def test_pull_with_include_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         result = self.dispatch(['pull', '--no-parallel', '--include-deps', 'web'])
         assert sorted(result.stderr.split('\n'))[1:] == [
-            'Pulling db (busybox:latest)...',
-            'Pulling web (busybox:latest)...',
+            'Pulling db (busybox:1.27.2)...',
+            'Pulling web (busybox:1.27.2)...',
         ]
 
     def test_build_plain(self):
@@ -2669,7 +2669,7 @@ class CLITestCase(DockerClientTestCase):
 
         container, = self.project.containers()
         expected_template = ' container {} {}'
-        expected_meta_info = ['image=busybox:latest', 'name=simple-composefile_simple_']
+        expected_meta_info = ['image=busybox:1.27.2', 'name=simple-composefile_simple_']
 
         assert expected_template.format('create', container.id) in lines[0]
         assert expected_template.format('start', container.id) in lines[1]
