@@ -31,31 +31,31 @@ def find_version(*file_paths):
 
 install_requires = [
     'cached-property >= 1.2.0, < 2',
-    'docopt >= 0.6.1, < 0.7',
-    'PyYAML >= 3.10, < 4.3',
-    'requests >= 2.6.1, != 2.11.0, != 2.12.2, != 2.18.0, < 2.23',
-    'texttable >= 0.9.0, < 0.10',
-    'websocket-client >= 0.32.0, < 1.0',
-    'docker[ssh] >= 3.7.0, < 4.0.2',
-    'dockerpty >= 0.4.1, < 0.5',
+    'docopt >= 0.6.1, < 1',
+    'PyYAML >= 3.10, < 5',
+    'requests >= 2.20.0, < 3',
+    'texttable >= 0.9.0, < 1',
+    'websocket-client >= 0.32.0, < 1',
+    'docker[ssh] >= 3.7.0, < 5',
+    'dockerpty >= 0.4.1, < 1',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 3',
 ]
 
 
 tests_require = [
-    'pytest',
+    'pytest < 6',
 ]
 
 
 if sys.version_info[:2] < (3, 4):
-    tests_require.append('mock >= 1.0.1')
+    tests_require.append('mock >= 1.0.1, < 2')
 
 extras_require = {
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
-    ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5'],
-    ':python_version < "3.3"': ['ipaddress >= 1.0.16'],
-    ':sys_platform == "win32"': ['colorama >= 0.4, < 0.5'],
+    ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
+    ':python_version < "3.3"': ['ipaddress >= 1.0.16, < 2'],
+    ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
 
