@@ -49,7 +49,7 @@ tests_require = [
 
 
 if sys.version_info[:2] < (3, 4):
-    tests_require.append('mock >= 1.0.1, < 2')
+    tests_require.append('mock >= 1.0.1, < 4')
 
 extras_require = {
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
