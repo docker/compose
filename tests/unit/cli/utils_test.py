@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import unittest
 
 from compose.utils import unquote_path
+from compose.cli.utils import human_readable_file_size
 
 
 class UnquotePathTest(unittest.TestCase):
@@ -21,3 +22,14 @@ class UnquotePathTest(unittest.TestCase):
         assert unquote_path('""hello""') == '"hello"'
         assert unquote_path('"hel"lo"') == 'hel"lo'
         assert unquote_path('"hello""') == 'hello"'
+
+
+class HumanReadableFileSizeTest(unittest.TestCase):
+    def test_100b(self):
+        assert human_readable_file_size(100) == '100 B'
+
+    def test_1kb(self):
+        assert human_readable_file_size(1024) == '1 kB'
+
+    def test_1023b(self):
+        assert human_readable_file_size(1023) == '1023 B'
