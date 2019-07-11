@@ -36,10 +36,7 @@ func TestEventOrdering(t *testing.T) {
 	for i, _ := range dirs {
 		dir := f.TempDir("watched")
 		dirs[i] = dir
-		err := f.notify.Add(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		f.watch(dir)
 	}
 
 	f.fsync()
@@ -71,10 +68,7 @@ func TestGitBranchSwitch(t *testing.T) {
 	for i, _ := range dirs {
 		dir := f.TempDir("watched")
 		dirs[i] = dir
-		err := f.notify.Add(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		f.watch(dir)
 	}
 
 	f.fsync()
@@ -129,16 +123,13 @@ func TestWatchesAreRecursive(t *testing.T) {
 	f.MkdirAll(subPath)
 
 	// watch parent
-	err := f.notify.Add(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.watch(root)
 
 	f.fsync()
 	f.events = nil
 	// change sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err = os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,10 +144,7 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 	root := f.TempDir("root")
 
 	// watch parent
-	err := f.notify.Add(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.watch(root)
 	f.fsync()
 	f.events = nil
 
@@ -166,7 +154,7 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err = os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,11 +168,7 @@ func TestWatchNonExistentPath(t *testing.T) {
 	root := f.TempDir("root")
 	path := filepath.Join(root, "change")
 
-	err := f.notify.Add(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	f.watch(path)
 	f.fsync()
 
 	d1 := "hello\ngo\n"
@@ -200,11 +184,7 @@ func TestWatchNonExistentPathDoesNotFireSiblingEvent(t *testing.T) {
 	watchedFile := filepath.Join(root, "a.txt")
 	unwatchedSibling := filepath.Join(root, "b.txt")
 
-	err := f.notify.Add(watchedFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	f.watch(watchedFile)
 	f.fsync()
 
 	d1 := "hello\ngo\n"
@@ -222,13 +202,10 @@ func TestRemove(t *testing.T) {
 	d1 := "hello\ngo\n"
 	f.WriteFile(path, d1)
 
-	err := f.notify.Add(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.watch(path)
 	f.fsync()
 	f.events = nil
-	err = os.Remove(path)
+	err := os.Remove(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,17 +216,14 @@ func TestRemoveAndAddBack(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	path := filepath.Join(f.watched, "change")
+	path := filepath.Join(f.paths[0], "change")
 
 	d1 := []byte("hello\ngo\n")
 	err := ioutil.WriteFile(path, d1, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = f.notify.Add(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.watch(path)
 	f.assertEvents(path)
 
 	err = os.Remove(path)
@@ -278,14 +252,11 @@ func TestSingleFile(t *testing.T) {
 	d1 := "hello\ngo\n"
 	f.WriteFile(path, d1)
 
-	err := f.notify.Add(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.watch(path)
 	f.fsync()
 
 	d2 := []byte("hello\nworld\n")
-	err = ioutil.WriteFile(path, d2, 0644)
+	err := ioutil.WriteFile(path, d2, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,8 +267,8 @@ func TestWriteBrokenLink(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	link := filepath.Join(f.watched, "brokenLink")
-	missingFile := filepath.Join(f.watched, "missingFile")
+	link := filepath.Join(f.paths[0], "brokenLink")
+	missingFile := filepath.Join(f.paths[0], "missingFile")
 	err := os.Symlink(missingFile, link)
 	if err != nil {
 		t.Fatal(err)
@@ -310,13 +281,13 @@ func TestWriteGoodLink(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	goodFile := filepath.Join(f.watched, "goodFile")
+	goodFile := filepath.Join(f.paths[0], "goodFile")
 	err := ioutil.WriteFile(goodFile, []byte("hello"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	link := filepath.Join(f.watched, "goodFileSymlink")
+	link := filepath.Join(f.paths[0], "goodFileSymlink")
 	err = os.Symlink(goodFile, link)
 	if err != nil {
 		t.Fatal(err)
@@ -342,11 +313,7 @@ func TestWatchBrokenLink(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = f.notify.Add(newRoot.Path())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	f.watch(newRoot.Path())
 	os.Remove(link)
 	f.assertEvents(link)
 }
@@ -359,15 +326,11 @@ func TestMoveAndReplace(t *testing.T) {
 	file := filepath.Join(root, "myfile")
 	f.WriteFile(file, "hello")
 
-	err := f.notify.Add(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	f.watch(file)
 	tmpFile := filepath.Join(root, ".myfile.swp")
 	f.WriteFile(tmpFile, "world")
 
-	err = os.Rename(tmpFile, file)
+	err := os.Rename(tmpFile, file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,37 +441,40 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 type notifyFixture struct {
 	out *bytes.Buffer
 	*tempdir.TempDirFixture
-	notify  Notify
-	watched string
-	events  []FileEvent
+	notify Notify
+	paths  []string
+	events []FileEvent
 }
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
 	out := bytes.NewBuffer(nil)
-	notify, err := NewWatcher(logger.NewLogger(logger.DebugLvl, out))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	f := tempdir.NewTempDirFixture(t)
-	watched := f.TempDir("watched")
-
-	err = notify.Add(watched)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &notifyFixture{
-		TempDirFixture: f,
-		watched:        watched,
-		notify:         notify,
+	nf := &notifyFixture{
+		TempDirFixture: tempdir.NewTempDirFixture(t),
+		paths:          []string{},
 		out:            out,
 	}
+	nf.watch(nf.TempDir("watched"))
+	return nf
 }
 
 func (f *notifyFixture) watch(path string) {
-	err := f.notify.Add(path)
+	f.paths = append(f.paths, path)
+
+	// sync any outstanding events and close the old watcher
+	if f.notify != nil {
+		f.fsync()
+		f.closeWatcher()
+	}
+
+	// create a new watcher
+	notify, err := NewWatcher(f.paths, EmptyMatcher{}, logger.NewLogger(logger.DebugLvl, f.out))
 	if err != nil {
-		f.T().Fatalf("notify.Add: %s", path)
+		f.T().Fatal(err)
+	}
+	f.notify = notify
+	err = f.notify.Start()
+	if err != nil {
+		f.T().Fatal(err)
 	}
 }
 
@@ -548,8 +514,8 @@ func (f *notifyFixture) consumeEventsInBackground(ctx context.Context) chan erro
 
 func (f *notifyFixture) fsync() {
 	syncPathBase := fmt.Sprintf("sync-%d.txt", time.Now().UnixNano())
-	syncPath := filepath.Join(f.watched, syncPathBase)
-	anySyncPath := filepath.Join(f.watched, "sync-")
+	syncPath := filepath.Join(f.paths[0], syncPathBase)
+	anySyncPath := filepath.Join(f.paths[0], "sync-")
 	timeout := time.After(time.Second)
 
 	f.WriteFile(syncPath, fmt.Sprintf("%s", time.Now()))
@@ -582,21 +548,25 @@ F:
 	}
 }
 
-func (f *notifyFixture) tearDown() {
-	err := f.notify.Close()
+func (f *notifyFixture) closeWatcher() {
+	notify := f.notify
+	err := notify.Close()
 	if err != nil {
 		f.T().Fatal(err)
 	}
 
 	// drain channels from watcher
 	go func() {
-		for _ = range f.notify.Events() {
+		for _ = range notify.Events() {
 		}
 	}()
 	go func() {
-		for _ = range f.notify.Errors() {
+		for _ = range notify.Errors() {
 		}
 	}()
+}
 
+func (f *notifyFixture) tearDown() {
+	f.closeWatcher()
 	f.TempDirFixture.TearDown()
 }
