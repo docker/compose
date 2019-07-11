@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/windmilleng/tilt/internal/dockerignore"
 	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/testutils/tempdir"
 )
@@ -412,36 +413,99 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	}
 }
 
-// doesn't work on linux
-// func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
-// 	f := newNotifyFixture(t)
-// 	defer f.tearDown()
+func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
 
-// 	root := f.JoinPath("root")
-// 	err := os.Mkdir(root, 0777)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	parent := f.JoinPath("parent")
-// 	file := f.JoinPath("parent", "a")
+	root := f.JoinPath("root")
+	err := os.Mkdir(root, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := f.JoinPath("parent")
+	file := f.JoinPath("parent", "a")
 
-// 	f.watch(file)
-// 	f.assertEvents()
+	f.watch(file)
+	f.assertEvents()
 
-// 	err = os.Mkdir(parent, 0777)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	err = os.Mkdir(parent, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	f.assertEvents()
-// 	f.WriteFile(file, "hello")
-// 	f.assertEvents(file)
-// }
+	f.assertEvents()
+	f.WriteFile(file, "hello")
+	f.assertEvents(file)
+}
+
+func TestWatchCountInnerFile(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.paths[0]
+	a := f.JoinPath(root, "a")
+	b := f.JoinPath(a, "b")
+	file := f.JoinPath(b, "bigFile")
+	f.WriteFile(file, "hello")
+	f.assertEvents(a, b, file)
+
+	expectedWatches := 3
+	if runtime.GOOS == "darwin" {
+		expectedWatches = 1
+	}
+	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
+}
+
+func TestWatchCountInnerFileWithIgnore(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.paths[0]
+	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{
+		"a",
+		"!a/b",
+	})
+	f.setIgnore(ignore)
+
+	a := f.JoinPath(root, "a")
+	b := f.JoinPath(a, "b")
+	file := f.JoinPath(b, "bigFile")
+	f.WriteFile(file, "hello")
+	f.assertEvents(b, file)
+
+	expectedWatches := 3
+	if runtime.GOOS == "darwin" {
+		expectedWatches = 1
+	}
+	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
+}
+
+func TestIgnore(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.paths[0]
+	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
+	f.setIgnore(ignore)
+
+	a := f.JoinPath(root, "a")
+	b := f.JoinPath(a, "b")
+	file := f.JoinPath(b, "bigFile")
+	f.WriteFile(file, "hello")
+	f.assertEvents(a)
+
+	expectedWatches := 3
+	if runtime.GOOS == "darwin" {
+		expectedWatches = 1
+	}
+	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
+}
 
 type notifyFixture struct {
 	out *bytes.Buffer
 	*tempdir.TempDirFixture
 	notify Notify
+	ignore PathMatcher
 	paths  []string
 	events []FileEvent
 }
@@ -451,15 +515,24 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 	nf := &notifyFixture{
 		TempDirFixture: tempdir.NewTempDirFixture(t),
 		paths:          []string{},
+		ignore:         EmptyMatcher{},
 		out:            out,
 	}
 	nf.watch(nf.TempDir("watched"))
 	return nf
 }
 
+func (f *notifyFixture) setIgnore(ignore PathMatcher) {
+	f.ignore = ignore
+	f.rebuildWatcher()
+}
+
 func (f *notifyFixture) watch(path string) {
 	f.paths = append(f.paths, path)
+	f.rebuildWatcher()
+}
 
+func (f *notifyFixture) rebuildWatcher() {
 	// sync any outstanding events and close the old watcher
 	if f.notify != nil {
 		f.fsync()
@@ -467,7 +540,7 @@ func (f *notifyFixture) watch(path string) {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths, EmptyMatcher{}, logger.NewLogger(logger.DebugLvl, f.out))
+	notify, err := NewWatcher(f.paths, f.ignore, logger.NewLogger(logger.DebugLvl, f.out))
 	if err != nil {
 		f.T().Fatal(err)
 	}
@@ -569,4 +642,5 @@ func (f *notifyFixture) closeWatcher() {
 func (f *notifyFixture) tearDown() {
 	f.closeWatcher()
 	f.TempDirFixture.TearDown()
+	numberOfWatches.Set(0)
 }

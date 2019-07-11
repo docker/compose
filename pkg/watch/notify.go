@@ -1,6 +1,14 @@
 package watch
 
-import "github.com/windmilleng/tilt/internal/logger"
+import (
+	"expvar"
+
+	"github.com/windmilleng/tilt/internal/logger"
+)
+
+var (
+	numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
+)
 
 type FileEvent struct {
 	Path string
