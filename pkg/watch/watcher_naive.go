@@ -3,7 +3,6 @@
 package watch
 
 import (
-	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,11 +31,8 @@ type naiveNotify struct {
 	events        chan fsnotify.Event
 	wrappedEvents chan FileEvent
 	errors        chan error
+	numWatches    int64
 }
-
-var (
-	numberOfWatches = expvar.NewInt("watch.naive.numberOfWatches")
-)
 
 func (d *naiveNotify) Start() error {
 	for name := range d.notifyList {
@@ -108,6 +104,8 @@ func (d *naiveNotify) watchAncestorOfMissingPath(path string) error {
 }
 
 func (d *naiveNotify) Close() error {
+	numberOfWatches.Add(-d.numWatches)
+	d.numWatches = 0
 	return d.watcher.Close()
 }
 
@@ -191,6 +189,7 @@ func (d *naiveNotify) add(path string) error {
 	if err != nil {
 		return err
 	}
+	d.numWatches++
 	numberOfWatches.Add(1)
 	return nil
 }

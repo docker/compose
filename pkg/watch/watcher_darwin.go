@@ -89,6 +89,8 @@ func (d *darwinNotify) initAdd(name string) {
 }
 
 func (d *darwinNotify) Start() error {
+	numberOfWatches.Add(int64(len(d.stream.Paths)))
+
 	d.stream.Start()
 
 	go d.loop()
@@ -97,6 +99,8 @@ func (d *darwinNotify) Start() error {
 }
 
 func (d *darwinNotify) Close() error {
+	numberOfWatches.Add(int64(-len(d.stream.Paths)))
+
 	d.stream.Stop()
 	close(d.errors)
 	close(d.stop)
