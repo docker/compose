@@ -887,7 +887,7 @@ class TopLevelCommand(object):
         container_options = build_one_off_container_options(options, detach, command)
         run_one_off_container(
             container_options, self.project, service, options,
-            self.toplevel_options, self.project_dir
+            self.toplevel_options, self.toplevel_environment
         )
 
     def scale(self, options):
@@ -1325,7 +1325,7 @@ def build_one_off_container_options(options, detach, command):
 
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
-                          project_dir='.'):
+                          toplevel_environment):
     if not options['--no-deps']:
         deps = service.get_dependency_names()
         if deps:
@@ -1354,8 +1354,6 @@ def run_one_off_container(container_options, project, service, options, toplevel
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
-    environment_file = toplevel_options.get('--env-file')
-    toplevel_environment = Environment.from_env_file(project_dir, environment_file)
     use_cli = not toplevel_environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
     signals.set_signal_handler_to_shutdown()
