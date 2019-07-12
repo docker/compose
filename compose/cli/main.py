@@ -248,7 +248,7 @@ class TopLevelCommand(object):
         return self.toplevel_options.get('--project-directory') or '.'
 
     @property
-    def environment(self):
+    def toplevel_environment(self):
         environment_file = self.toplevel_options.get('--env-file')
         return Environment.from_env_file(self.project_dir, environment_file)
 
@@ -281,7 +281,7 @@ class TopLevelCommand(object):
                     '--build-arg is only supported when services are specified for API version < 1.25.'
                     ' Please use a Compose file version > 2.2 or specify which services to build.'
                 )
-            build_args = resolve_build_args(build_args, self.environment)
+            build_args = resolve_build_args(build_args, self.toplevel_environment)
 
         self.project.build(
             service_names=options['SERVICE'],
@@ -433,7 +433,7 @@ class TopLevelCommand(object):
             -t, --timeout TIMEOUT   Specify a shutdown timeout in seconds.
                                     (default: 10)
         """
-        ignore_orphans = self.environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+        ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and options['--remove-orphans']:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
@@ -490,7 +490,7 @@ class TopLevelCommand(object):
                               not supported in API < 1.25)
             -w, --workdir DIR Path to workdir directory for this command.
         """
-        use_cli = not self.environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+        use_cli = not self.toplevel_environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         detach = options.get('--detach')
@@ -513,7 +513,7 @@ class TopLevelCommand(object):
         if IS_WINDOWS_PLATFORM or use_cli and not detach:
             sys.exit(call_docker(
                 build_exec_command(options, container.id, command),
-                self.toplevel_options, environment)
+                self.toplevel_options, self.toplevel_environment)
             )
 
         create_exec_options = {
@@ -1062,7 +1062,7 @@ class TopLevelCommand(object):
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        ignore_orphans = self.environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+        ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
@@ -1355,8 +1355,9 @@ def run_one_off_container(container_options, project, service, options, toplevel
             project.client.remove_container(container.id, force=True, v=True)
 
     environment_file = toplevel_options.get('--env-file')
-    environment = Environment.from_env_file(project_dir, environment_file)
-    use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+    toplevel_environment = Environment.from_env_file(project_dir, environment_file)
+    use_cli = not toplevel_environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+
     signals.set_signal_handler_to_shutdown()
     signals.set_signal_handler_to_hang_up()
     try:
@@ -1365,7 +1366,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
                 service.connect_container_to_networks(container, use_network_aliases)
                 exit_code = call_docker(
                     get_docker_start_call(container_options, container.id),
-                    toplevel_options, environment
+                    toplevel_options, toplevel_environment
                 )
             else:
                 operation = RunOperation(
