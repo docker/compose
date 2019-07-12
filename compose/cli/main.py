@@ -516,7 +516,7 @@ class TopLevelCommand(object):
         if IS_WINDOWS_PLATFORM or use_cli and not detach:
             sys.exit(call_docker(
                 build_exec_command(options, container.id, command),
-                self.toplevel_options)
+                self.toplevel_options, environment)
             )
 
         create_exec_options = {
@@ -1361,7 +1361,6 @@ def run_one_off_container(container_options, project, service, options, toplevel
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(project_dir, environment_file)
     use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
-
     signals.set_signal_handler_to_shutdown()
     signals.set_signal_handler_to_hang_up()
     try:
@@ -1370,7 +1369,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
                 service.connect_container_to_networks(container, use_network_aliases)
                 exit_code = call_docker(
                     ["start", "--attach", "--interactive", container.id],
-                    toplevel_options
+                    toplevel_options, environment
                 )
             else:
                 operation = RunOperation(
@@ -1450,7 +1449,7 @@ def exit_if(condition, message, exit_code):
         raise SystemExit(exit_code)
 
 
-def call_docker(args, dockeropts):
+def call_docker(args, dockeropts, environment):
     executable_path = find_executable('docker')
     if not executable_path:
         raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
@@ -1480,7 +1479,7 @@ def call_docker(args, dockeropts):
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
-    return subprocess.call(args)
+    return subprocess.call(args, env=environment)
 
 
 def parse_scale_args(options):

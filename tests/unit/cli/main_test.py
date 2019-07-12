@@ -123,13 +123,13 @@ def mock_find_executable(exe):
 class TestCallDocker(object):
     def test_simple_no_options(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {})
+            call_docker(['ps'], {}, {})
 
         assert fake_call.call_args[0][0] == ['docker', 'ps']
 
     def test_simple_tls_option(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--tls': True})
+            call_docker(['ps'], {'--tls': True}, {})
 
         assert fake_call.call_args[0][0] == ['docker', '--tls', 'ps']
 
@@ -140,7 +140,7 @@ class TestCallDocker(object):
                 '--tlscacert': './ca.pem',
                 '--tlscert': './cert.pem',
                 '--tlskey': './key.pem',
-            })
+            }, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--tls', '--tlscacert', './ca.pem', '--tlscert',
@@ -149,7 +149,7 @@ class TestCallDocker(object):
 
     def test_with_host_option(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': 'tcp://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': 'tcp://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
@@ -157,7 +157,7 @@ class TestCallDocker(object):
 
     def test_with_http_host(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': 'http://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': 'http://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps',
@@ -165,8 +165,17 @@ class TestCallDocker(object):
 
     def test_with_host_option_shorthand_equal(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': '=tcp://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': '=tcp://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
         ]
+
+    def test_with_env(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {}, {'DOCKER_HOST': 'tcp://mydocker.net:2333'})
+
+        assert fake_call.call_args[0][0] == [
+            'docker', 'ps'
+        ]
+        assert fake_call.call_args[1]['env'] == {'DOCKER_HOST': 'tcp://mydocker.net:2333'}
