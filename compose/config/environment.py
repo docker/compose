@@ -26,7 +26,7 @@ def split_env(env):
         key = env
     if re.search(r'\s', key):
         raise ConfigurationError(
-            "environment variable name '{}' may not contains whitespace.".format(key)
+            "environment variable name '{}' may not contain whitespace.".format(key)
         )
     return key, value
 
