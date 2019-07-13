@@ -600,16 +600,16 @@ F:
 			f.T().Fatal(err)
 
 		case event := <-f.notify.Events():
-			if strings.Contains(event.Path, syncPath) {
+			if strings.Contains(event.Path(), syncPath) {
 				break F
 			}
-			if strings.Contains(event.Path, anySyncPath) {
+			if strings.Contains(event.Path(), anySyncPath) {
 				continue
 			}
 
 			// Don't bother tracking duplicate changes to the same path
 			// for testing.
-			if len(f.events) > 0 && f.events[len(f.events)-1].Path == event.Path {
+			if len(f.events) > 0 && f.events[len(f.events)-1].Path() == event.Path() {
 				continue
 			}
 

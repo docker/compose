@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/ospath"
 
@@ -62,9 +64,7 @@ func (d *darwinNotify) loop() {
 					continue
 				}
 
-				d.events <- FileEvent{
-					Path: e.Path,
-				}
+				d.events <- NewFileEvent(e.Path)
 			}
 		}
 	}
@@ -133,6 +133,10 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*darwinNot
 	}
 
 	for _, path := range paths {
+		path, err := filepath.Abs(path)
+		if err != nil {
+			return nil, errors.Wrap(err, "newWatcher")
+		}
 		dw.initAdd(path)
 	}
 

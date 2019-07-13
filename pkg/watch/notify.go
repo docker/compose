@@ -2,6 +2,8 @@ package watch
 
 import (
 	"expvar"
+	"fmt"
+	"path/filepath"
 
 	"github.com/windmilleng/tilt/internal/logger"
 )
@@ -11,7 +13,18 @@ var (
 )
 
 type FileEvent struct {
-	Path string
+	path string
+}
+
+func NewFileEvent(p string) FileEvent {
+	if !filepath.IsAbs(p) {
+		panic(fmt.Sprintf("NewFileEvent only accepts absolute paths. Actual: %s", p))
+	}
+	return FileEvent{path: p}
+}
+
+func (e FileEvent) Path() string {
+	return e.path
 }
 
 type Notify interface {
