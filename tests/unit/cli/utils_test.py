@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import unittest
 
-from compose.utils import unquote_path
 from compose.cli.utils import human_readable_file_size
+from compose.utils import unquote_path
 
 
 class UnquotePathTest(unittest.TestCase):
@@ -33,3 +33,12 @@ class HumanReadableFileSizeTest(unittest.TestCase):
 
     def test_1023b(self):
         assert human_readable_file_size(1023) == '1023 B'
+
+    def test_units(self):
+        assert human_readable_file_size((2 ** 10) ** 0) == '1 B'
+        assert human_readable_file_size((2 ** 10) ** 1) == '1 kB'
+        assert human_readable_file_size((2 ** 10) ** 2) == '1 MB'
+        assert human_readable_file_size((2 ** 10) ** 3) == '1 GB'
+        assert human_readable_file_size((2 ** 10) ** 4) == '1 TB'
+        assert human_readable_file_size((2 ** 10) ** 5) == '1 PB'
+        assert human_readable_file_size((2 ** 10) ** 6) == '1 EB'
