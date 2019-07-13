@@ -207,6 +207,10 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	wrappedEvents := make(chan FileEvent)
 	notifyList := make(map[string]bool, len(paths))
 	for _, path := range paths {
+		path, err := filepath.Abs(path)
+		if err != nil {
+			return nil, errors.Wrap(err, "newWatcher")
+		}
 		notifyList[path] = true
 	}
 
