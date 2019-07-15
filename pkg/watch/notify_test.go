@@ -28,6 +28,14 @@ func TestNoEvents(t *testing.T) {
 	f.assertEvents()
 }
 
+func TestNoWatches(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+	f.paths = nil
+	f.rebuildWatcher()
+	f.assertEvents()
+}
+
 func TestEventOrdering(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
@@ -586,6 +594,10 @@ func (f *notifyFixture) consumeEventsInBackground(ctx context.Context) chan erro
 }
 
 func (f *notifyFixture) fsync() {
+	if len(f.paths) == 0 {
+		return
+	}
+
 	syncPathBase := fmt.Sprintf("sync-%d.txt", time.Now().UnixNano())
 	syncPath := filepath.Join(f.paths[0], syncPathBase)
 	anySyncPath := filepath.Join(f.paths[0], "sync-")

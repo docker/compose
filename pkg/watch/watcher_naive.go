@@ -35,6 +35,10 @@ type naiveNotify struct {
 }
 
 func (d *naiveNotify) Start() error {
+	if len(d.notifyList) == 0 {
+		return nil
+	}
+
 	for name := range d.notifyList {
 		fi, err := os.Stat(name)
 		if err != nil && !os.IsNotExist(err) {
