@@ -89,6 +89,10 @@ func (d *darwinNotify) initAdd(name string) {
 }
 
 func (d *darwinNotify) Start() error {
+	if len(d.stream.Paths) == 0 {
+		return nil
+	}
+
 	numberOfWatches.Add(int64(len(d.stream.Paths)))
 
 	d.stream.Start()
