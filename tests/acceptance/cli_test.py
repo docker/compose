@@ -20,6 +20,7 @@ import yaml
 from docker import errors
 
 from .. import mock
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from ..helpers import create_host_file
 from compose.cli.command import get_project
 from compose.config.errors import DuplicateOverrideFileFound
@@ -266,7 +267,7 @@ class CLITestCase(DockerClientTestCase):
                     'volumes_from': ['service:other:rw'],
                 },
                 'other': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'volumes': ['/data'],
                 },
@@ -639,7 +640,7 @@ class CLITestCase(DockerClientTestCase):
     def test_pull_with_digest(self):
         result = self.dispatch(['-f', 'digest.yml', 'pull', '--no-parallel'])
 
-        assert 'Pulling simple (busybox:latest)...' in result.stderr
+        assert 'Pulling simple ({})...'.format(BUSYBOX_IMAGE_WITH_TAG) in result.stderr
         assert ('Pulling digest (busybox@'
                 'sha256:38a203e1986cf79639cfb9b2e1d6e773de84002feea2d4eb006b520'
                 '04ee8502d)...') in result.stderr
@@ -650,7 +651,7 @@ class CLITestCase(DockerClientTestCase):
             'pull', '--ignore-pull-failures', '--no-parallel']
         )
 
-        assert 'Pulling simple (busybox:latest)...' in result.stderr
+        assert 'Pulling simple ({})...'.format(BUSYBOX_IMAGE_WITH_TAG) in result.stderr
         assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
         assert ('repository nonexisting-image not found' in result.stderr or
                 'image library/nonexisting-image:latest not found' in result.stderr or
@@ -777,6 +778,7 @@ class CLITestCase(DockerClientTestCase):
         ]
         assert not containers
 
+    @pytest.mark.xfail(True, reason='Flaky on local')
     def test_build_rm(self):
         containers = [
             Container.from_ps(self.project.client, c)

@@ -1,13 +1,13 @@
 version: "2.0"
 services:
     db:
-      image: busybox:latest
+      image: busybox:1.31.0-uclibc
       command: top
     web:
-      image: busybox:latest
+      image: busybox:1.31.0-uclibc
       command: top
       depends_on:
         - db
     console:
-      image: busybox:latest
+      image: busybox:1.31.0-uclibc
       command: top

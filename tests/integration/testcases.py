@@ -9,6 +9,7 @@ from docker.errors import APIError
 from docker.utils import version_lt
 
 from .. import unittest
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.cli.docker_client import docker_client
 from compose.config.config import resolve_environment
 from compose.config.environment import Environment
@@ -32,7 +33,7 @@ SWARM_ASSUME_MULTINODE = os.environ.get('SWARM_ASSUME_MULTINODE', '0') != '0'
 
 
 def pull_busybox(client):
-    client.pull('busybox:latest', stream=False)
+    client.pull(BUSYBOX_IMAGE_WITH_TAG, stream=False)
 
 
 def get_links(container):
@@ -123,7 +124,7 @@ class DockerClientTestCase(unittest.TestCase):
 
     def create_service(self, name, **kwargs):
         if 'image' not in kwargs and 'build' not in kwargs:
-            kwargs['image'] = 'busybox:latest'
+            kwargs['image'] = BUSYBOX_IMAGE_WITH_TAG
 
         if 'command' not in kwargs:
             kwargs['command'] = ["top"]

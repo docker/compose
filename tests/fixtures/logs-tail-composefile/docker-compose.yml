@@ -1,3 +1,3 @@
 simple:
-  image: busybox:latest
+  image: busybox:1.31.0-uclibc
   command: sh -c "echo w && echo x && echo y && echo z"
