@@ -509,6 +509,32 @@ func TestIgnoreCreatedDir(t *testing.T) {
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
 }
 
+func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.paths[0]
+	ignore, _ := dockerignore.NewDockerPatternMatcher(root,
+		[]string{
+			"a/b",
+			"c",
+			"!c/d",
+		})
+	f.setIgnore(ignore)
+
+	a := f.JoinPath(root, "a")
+	b := f.JoinPath(a, "b")
+	file := f.JoinPath(b, "bigFile")
+	f.WriteFile(file, "hello")
+	f.assertEvents(a)
+
+	expectedWatches := 2
+	if runtime.GOOS == "darwin" {
+		expectedWatches = 1
+	}
+	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
+}
+
 func TestIgnoreInitialDir(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
