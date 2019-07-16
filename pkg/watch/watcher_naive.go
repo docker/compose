@@ -78,6 +78,16 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		if !mode.IsDir() {
 			return nil
 		}
+
+		shouldSkipDir, err := d.shouldSkipDir(path)
+		if err != nil {
+			return err
+		}
+
+		if shouldSkipDir {
+			return filepath.SkipDir
+		}
+
 		err = d.add(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -145,7 +155,15 @@ func (d *naiveNotify) loop() {
 
 			shouldWatch := false
 			if mode.IsDir() {
-				// watch all directories
+				// watch directories unless we can skip them entirely
+				shouldSkipDir, err := d.shouldSkipDir(path)
+				if err != nil {
+					return err
+				}
+				if shouldSkipDir {
+					return filepath.SkipDir
+				}
+
 				shouldWatch = true
 			} else {
 				// watch files that are explicitly named, but don't watch others
@@ -186,6 +204,31 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 		}
 	}
 	return false
+}
+
+func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
+	var err error
+	ignore := false
+
+	// If path is directly in the notifyList, we should always watch it.
+	if !d.notifyList[path] {
+		ignore, err = d.ignore.Matches(path)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error matching %s: %v", path, err)
+		}
+	}
+
+	// The ignore filter is telling us to ignore this file,
+	// but we may have to watch it anyway to catch files underneath it.
+	if ignore {
+		if !d.ignore.Exclusions() {
+			return true, nil
+		}
+
+		// TODO(nick): Add more complex logic for interpreting exclusion patterns.
+	}
+
+	return false, nil
 }
 
 func (d *naiveNotify) add(path string) error {
