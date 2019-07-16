@@ -49,19 +49,18 @@ type Notify interface {
 // - Watch /src/repo, but ignore everything in /src/repo/bazel-bin except /src/repo/bazel-bin/app-binary
 //
 // The PathMatcher inteface helps us manage these ignores.
-// By design, fileutils.PatternMatcher (the interface that implements dockerignore)
-// satisfies this interface
-// https://godoc.org/github.com/docker/docker/pkg/fileutils#PatternMatcher
 type PathMatcher interface {
 	Matches(file string) (bool, error)
-	Exclusions() bool
+
+	// If this matches the entire dir, we can often optimize filetree walks a bit.
+	MatchesEntireDir(file string) (bool, error)
 }
 
 type EmptyMatcher struct {
 }
 
-func (EmptyMatcher) Matches(f string) (bool, error) { return false, nil }
-func (EmptyMatcher) Exclusions() bool               { return false }
+func (EmptyMatcher) Matches(f string) (bool, error)          { return false, nil }
+func (EmptyMatcher) MatchesEntireDir(f string) (bool, error) { return false, nil }
 
 var _ PathMatcher = EmptyMatcher{}
 

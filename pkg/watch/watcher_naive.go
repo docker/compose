@@ -207,28 +207,16 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 }
 
 func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
-	var err error
-	ignore := false
-
 	// If path is directly in the notifyList, we should always watch it.
-	if !d.notifyList[path] {
-		ignore, err = d.ignore.Matches(path)
-		if err != nil {
-			return false, errors.Wrapf(err, "Error matching %s: %v", path, err)
-		}
+	if d.notifyList[path] {
+		return false, nil
 	}
 
-	// The ignore filter is telling us to ignore this file,
-	// but we may have to watch it anyway to catch files underneath it.
-	if ignore {
-		if !d.ignore.Exclusions() {
-			return true, nil
-		}
-
-		// TODO(nick): Add more complex logic for interpreting exclusion patterns.
+	skip, err := d.ignore.MatchesEntireDir(path)
+	if err != nil {
+		return false, errors.Wrap(err, "shouldSkipDir")
 	}
-
-	return false, nil
+	return skip, nil
 }
 
 func (d *naiveNotify) add(path string) error {
