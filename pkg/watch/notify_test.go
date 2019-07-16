@@ -488,7 +488,7 @@ func TestWatchCountInnerFileWithIgnore(t *testing.T) {
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
 }
 
-func TestIgnore(t *testing.T) {
+func TestIgnoreCreatedDir(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -502,9 +502,32 @@ func TestIgnore(t *testing.T) {
 	f.WriteFile(file, "hello")
 	f.assertEvents(a)
 
-	expectedWatches := 3
+	expectedWatches := 2
 	if runtime.GOOS == "darwin" {
 		expectedWatches = 1
+	}
+	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
+}
+
+func TestIgnoreInitialDir(t *testing.T) {
+	f := newNotifyFixture(t)
+	defer f.tearDown()
+
+	root := f.TempDir("root")
+	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
+	f.setIgnore(ignore)
+
+	a := f.JoinPath(root, "a")
+	b := f.JoinPath(a, "b")
+	file := f.JoinPath(b, "bigFile")
+	f.WriteFile(file, "hello")
+	f.watch(root)
+
+	f.assertEvents()
+
+	expectedWatches := 3
+	if runtime.GOOS == "darwin" {
+		expectedWatches = 2
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
 }
