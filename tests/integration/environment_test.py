@@ -20,7 +20,7 @@ class EnvironmentTest(DockerClientTestCase):
         cls.compose_file.write(bytes("""version: '3.2'
 services:
   svc:
-    image: busybox:latest
+    image: busybox:1.31.0-uclibc
     environment:
       TEST_VARIABLE: ${TEST_VARIABLE}""", encoding='utf-8'))
         cls.compose_file.flush()

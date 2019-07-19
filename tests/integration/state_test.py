@@ -10,6 +10,7 @@ import copy
 import py
 from docker.errors import ImageNotFound
 
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import no_cluster
@@ -42,8 +43,8 @@ class BasicProjectTest(ProjectTestCase):
         super(BasicProjectTest, self).setUp()
 
         self.cfg = {
-            'db': {'image': 'busybox:latest', 'command': 'top'},
-            'web': {'image': 'busybox:latest', 'command': 'top'},
+            'db': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
+            'web': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
         }
 
     def test_no_change(self):
@@ -99,16 +100,16 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.cfg = {
             'db': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
             },
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
                 'links': ['db'],
             },
             'nginx': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
                 'links': ['web'],
             },
@@ -173,7 +174,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
     def test_service_removed_while_down(self):
         next_cfg = {
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
             },
             'nginx': self.cfg['nginx'],
@@ -219,16 +220,16 @@ class ProjectWithDependsOnDependenciesTest(ProjectTestCase):
             'version': '2',
             'services': {
                 'db': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'tail -f /dev/null',
                 },
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'tail -f /dev/null',
                     'depends_on': ['db'],
                 },
                 'nginx': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'tail -f /dev/null',
                     'depends_on': ['web'],
                 },
@@ -385,7 +386,7 @@ class ServiceStateTest(DockerClientTestCase):
         assert ('recreate', [container]) == web.convergence_plan()
 
     def test_trigger_recreate_with_nonexistent_image_tag(self):
-        web = self.create_service('web', image="busybox:latest")
+        web = self.create_service('web', image=BUSYBOX_IMAGE_WITH_TAG)
         container = web.create_container()
 
         web = self.create_service('web', image="nonexistent-image")

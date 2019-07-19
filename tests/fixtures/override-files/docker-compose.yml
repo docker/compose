@@ -1,10 +1,10 @@
 version: '2.2'
 services:
   web:
-    image: busybox:latest
+    image: busybox:1.31.0-uclibc
     command: "sleep 200"
     depends_on:
         - db
   db:
-    image: busybox:latest
+    image: busybox:1.31.0-uclibc
     command: "sleep 200"

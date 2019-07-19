@@ -828,7 +828,7 @@ class ServiceTest(unittest.TestCase):
         assert service.specifies_host_port()
 
     def test_image_name_from_config(self):
-        image_name = 'example/web:latest'
+        image_name = 'example/web:mytag'
         service = Service('foo', image=image_name)
         assert service.image_name == image_name
 

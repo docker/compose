@@ -3,8 +3,8 @@ version: "2"
 
 services:
   simple:
-    image: busybox:latest
+    image: busybox:1.31.0-uclibc
     command: sleep 200
   another:
-    image: busybox:latest
+    image: busybox:1.31.0-uclibc
     command: sleep 200

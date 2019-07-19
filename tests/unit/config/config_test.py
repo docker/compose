@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from ...helpers import build_config_details
+from ...helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import config
 from compose.config import types
 from compose.config.config import resolve_build_args
@@ -343,7 +344,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError):
             config.load(
                 build_config_details(
-                    {'web': 'busybox:latest'},
+                    {'web': BUSYBOX_IMAGE_WITH_TAG},
                     'working_dir',
                     'filename.yml'
                 )
@@ -353,7 +354,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError):
             config.load(
                 build_config_details(
-                    {'version': '2', 'services': {'web': 'busybox:latest'}},
+                    {'version': '2', 'services': {'web': BUSYBOX_IMAGE_WITH_TAG}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -364,7 +365,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details({
                     'version': '2',
-                    'services': {'web': 'busybox:latest'},
+                    'services': {'web': BUSYBOX_IMAGE_WITH_TAG},
                     'networks': {
                         'invalid': {'foo', 'bar'}
                     }
@@ -847,15 +848,15 @@ class ConfigTest(unittest.TestCase):
     def test_load_sorts_in_dependency_order(self):
         config_details = build_config_details({
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'links': ['db'],
             },
             'db': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'volumes_from': ['volume:ro']
             },
             'volume': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'volumes': ['/tmp'],
             }
         })
@@ -1280,7 +1281,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': ['data0028:/data:ro'],
                     },
                 },
@@ -1296,7 +1297,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': ['./data0028:/data:ro'],
                     },
                 },
@@ -1312,7 +1313,7 @@ class ConfigTest(unittest.TestCase):
             'base.yaml',
             {
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes': ['data0028:/data:ro'],
                 },
             }
@@ -1329,7 +1330,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2.3',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {
                                 'target': '/anonymous', 'type': 'volume'
@@ -1374,7 +1375,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '3.4',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {'type': 'bind', 'source': './web', 'target': '/web'},
                         ],
@@ -1396,7 +1397,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '3.4',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {'type': 'bind', 'source': '~/web', 'target': '/web'},
                         ],
@@ -2293,7 +2294,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_merge_mixed_ports(self):
         base = {
-            'image': 'busybox:latest',
+            'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
             'ports': [
                 {
@@ -2310,7 +2311,7 @@ class ConfigTest(unittest.TestCase):
 
         actual = config.merge_service_dicts(base, override, V3_1)
         assert actual == {
-            'image': 'busybox:latest',
+            'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
             'ports': [types.ServicePort('1245', '1245', 'udp', None, None)]
         }

@@ -1,4 +1,4 @@
 service:
-  image: busybox:latest
+  image: busybox:1.31.0-uclibc
   working_dir: /etc
   command: /bin/true

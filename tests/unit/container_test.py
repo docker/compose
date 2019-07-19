@@ -5,6 +5,7 @@ import docker
 
 from .. import mock
 from .. import unittest
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.const import LABEL_ONE_OFF
 from compose.const import LABEL_SLUG
 from compose.container import Container
@@ -17,7 +18,7 @@ class ContainerTest(unittest.TestCase):
         self.container_id = "abcabcabcbabc12345"
         self.container_dict = {
             "Id": self.container_id,
-            "Image": "busybox:latest",
+            "Image": BUSYBOX_IMAGE_WITH_TAG,
             "Command": "top",
             "Created": 1387384730,
             "Status": "Up 8 seconds",
@@ -43,7 +44,7 @@ class ContainerTest(unittest.TestCase):
                                       has_been_inspected=True)
         assert container.dictionary == {
             "Id": self.container_id,
-            "Image": "busybox:latest",
+            "Image": BUSYBOX_IMAGE_WITH_TAG,
             "Name": "/composetest_db_1",
         }
 
@@ -58,7 +59,7 @@ class ContainerTest(unittest.TestCase):
             has_been_inspected=True)
         assert container.dictionary == {
             "Id": self.container_id,
-            "Image": "busybox:latest",
+            "Image": BUSYBOX_IMAGE_WITH_TAG,
             "Name": "/composetest_db_1",
         }
 
