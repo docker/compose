@@ -184,6 +184,10 @@ _docker_compose_docker_compose() {
 			_filedir -d
 			return
 			;;
+		--env-file)
+			_filedir
+			return
+			;;
 		$(__docker_compose_to_extglob "$daemon_options_with_args") )
 			return
 			;;
@@ -612,6 +616,7 @@ _docker_compose() {
 		--tlsverify
 	"
 	local daemon_options_with_args="
+		--env-file
 		--file -f
 		--host -H
 		--project-directory
