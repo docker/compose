@@ -885,6 +885,8 @@ class TopLevelCommand(object):
         else:
             command = service.options.get('command')
 
+        options['stdin_open'] = service.options.get('stdin_open', True)
+
         container_options = build_one_off_container_options(options, detach, command)
         run_one_off_container(
             container_options, self.project, service, options,
@@ -1286,7 +1288,7 @@ def build_one_off_container_options(options, detach, command):
     container_options = {
         'command': command,
         'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
-        'stdin_open': not detach,
+        'stdin_open': options.get('stdin_open'),
         'detach': detach,
     }
 
@@ -1368,7 +1370,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
             if IS_WINDOWS_PLATFORM or use_cli:
                 service.connect_container_to_networks(container, use_network_aliases)
                 exit_code = call_docker(
-                    ["start", "--attach", "--interactive", container.id],
+                    get_docker_start_call(container_options, container.id),
                     toplevel_options, environment
                 )
             else:
@@ -1393,6 +1395,16 @@ def run_one_off_container(container_options, project, service, options, toplevel
 
     remove_container()
     sys.exit(exit_code)
+
+
+def get_docker_start_call(container_options, container_id):
+    docker_call = ["start"]
+    if not container_options.get('detach'):
+        docker_call.append("--attach")
+    if container_options.get('stdin_open'):
+        docker_call.append("--interactive")
+    docker_call.append(container_id)
+    return docker_call
 
 
 def log_printer_from_project(
