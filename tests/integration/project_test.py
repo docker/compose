@@ -55,6 +55,7 @@ def build_config(**kwargs):
         networks=kwargs.get('networks'),
         secrets=kwargs.get('secrets'),
         configs=kwargs.get('configs'),
+        project_name=kwargs.get('project_name'),
     )
 
 
