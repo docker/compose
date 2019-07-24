@@ -407,6 +407,7 @@ def load(config_details, compatibility=False, interpolate=True):
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
 
+    project_name = ''
     for config_file in config_details.config_files:
         name = config_file.get_project_name()
         if name:
