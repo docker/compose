@@ -240,8 +240,11 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     def get_configs(self):
         return {} if self.version < const.COMPOSEFILE_V3_3 else self.config.get('configs', {})
 
+    def get_project_name(self):
+        return {} if self.version < const.COMPOSEFILE_V3_7 else self.config.get('project_name', '')
 
-class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
+
+class Config(namedtuple('_Config', 'version services volumes networks secrets configs project_name')):
     """
     :param version: configuration version
     :type  version: int
@@ -255,6 +258,8 @@ class Config(namedtuple('_Config', 'version services volumes networks secrets co
     :type secrets: :class:`dict`
     :param configs: Dictionary mapping config names to description dictionaries
     :type configs: :class:`dict`
+    :param project_name The name of the project
+    :type  project_name: str
     """
 
 
@@ -401,6 +406,12 @@ def load(config_details, compatibility=False, interpolate=True):
     configs = load_mapping(
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
+
+    for config_file in config_details.config_files:
+        name = config_file.get_project_name()
+        if name:
+            project_name = name
+
     service_dicts = load_services(config_details, main_file, compatibility)
 
     if main_file.version != V1:
@@ -411,7 +422,7 @@ def load(config_details, compatibility=False, interpolate=True):
 
     version = V2_3 if compatibility and main_file.version >= V3_0 else main_file.version
 
-    return Config(version, service_dicts, volumes, networks, secrets, configs)
+    return Config(version, service_dicts, volumes, networks, secrets, configs, project_name)
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):
@@ -565,6 +576,14 @@ def process_config_file(config_file, environment, service_name=None, interpolate
                 config_file,
                 config_file.get_configs(),
                 'config',
+                environment,
+                interpolate,
+            )
+        if config_file.version > const.COMPOSEFILE_V3_7:
+            processed_config['project_name'] = process_config_section(
+                config_file,
+                config_file.get_project_name(),
+                'project_name',
                 environment,
                 interpolate,
             )
