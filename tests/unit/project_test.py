@@ -760,7 +760,8 @@ class ProjectTest(unittest.TestCase):
             'image': BUSYBOX_IMAGE_WITH_TAG,
         }
         config_data = Config(
-            project_name='', version=V2_4, services=[service_config], networks={}, volumes={}, secrets=None, configs=None
+            project_name='', version=V2_4, services=[service_config], networks={},
+            volumes={}, secrets=None, configs=None
         )
 
         project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
