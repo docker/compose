@@ -91,7 +91,8 @@ def test_to_bundle():
         volumes={'special': {}},
         networks={'extra': {}},
         secrets={},
-        configs={}
+        configs={},
+        project_name=''
     )
 
     with mock.patch('compose.bundle.log.warning', autospec=True) as mock_log:
