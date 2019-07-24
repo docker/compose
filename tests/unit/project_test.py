@@ -36,6 +36,7 @@ class ProjectTest(unittest.TestCase):
 
     def test_from_config_v1(self):
         config = Config(
+            project_name='',
             version=V1,
             services=[
                 {
@@ -67,6 +68,7 @@ class ProjectTest(unittest.TestCase):
     @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
     def test_from_config_v2(self):
         config = Config(
+            project_name='',
             version=V2_0,
             services=[
                 {
@@ -174,6 +176,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[{
                     'name': 'test',
@@ -202,6 +205,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -230,6 +234,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=None,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -540,6 +545,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V1,
                 services=[
                     {
@@ -565,6 +571,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -596,6 +603,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -623,6 +631,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -644,6 +653,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[
                     {
@@ -679,6 +689,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[{
                     'name': 'web',
@@ -697,6 +708,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[{
                     'name': 'web',
@@ -748,7 +760,7 @@ class ProjectTest(unittest.TestCase):
             'image': BUSYBOX_IMAGE_WITH_TAG,
         }
         config_data = Config(
-            version=V2_4, services=[service_config], networks={}, volumes={}, secrets=None, configs=None
+            project_name='', version=V2_4, services=[service_config], networks={}, volumes={}, secrets=None, configs=None
         )
 
         project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
@@ -770,6 +782,7 @@ class ProjectTest(unittest.TestCase):
 
     def test_build_container_operation_with_timeout_func_does_not_mutate_options_with_timeout(self):
         config_data = Config(
+            project_name='',
             version=V3_7,
             services=[
                 {'name': 'web', 'image': BUSYBOX_IMAGE_WITH_TAG},
@@ -802,6 +815,7 @@ class ProjectTest(unittest.TestCase):
             name='test',
             client=self.mock_client,
             config_data=Config(
+                project_name='',
                 version=V2_0,
                 services=[{
                     'name': 'web',

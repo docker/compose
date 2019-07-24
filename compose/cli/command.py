@@ -149,7 +149,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         )
 
 
-def get_project_name(working_dir, config_data, project_name=None, environment=None):
+def get_project_name(working_dir, config_data=None, project_name=None, environment=None):
     def normalize_name(name):
         return re.sub(r'[^-_a-z0-9]', '', name.lower())
 
@@ -159,9 +159,10 @@ def get_project_name(working_dir, config_data, project_name=None, environment=No
     if project_name:
         return normalize_name(project_name)
 
-    project_name = config_data.project_name
-    if project_name:
-        return normalize_name(project_name)
+    if config_data:
+        project_name = config_data.project_name
+        if project_name:
+            return normalize_name(project_name)
 
     project = os.path.basename(os.path.abspath(working_dir))
     if project:

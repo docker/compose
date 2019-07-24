@@ -5278,7 +5278,7 @@ class SerializeTest(unittest.TestCase):
                 'image': 'alpine',
                 'name': 'web'
             }
-        ], volumes={}, networks={}, secrets={}, configs={})
+        ], volumes={}, networks={}, secrets={}, configs={}, project_name='')
 
         serialized_config = yaml.load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
@@ -5290,7 +5290,7 @@ class SerializeTest(unittest.TestCase):
                 'image': 'alpine',
                 'name': 'web'
             }
-        ], volumes={}, networks={}, secrets={}, configs={})
+        ], volumes={}, networks={}, secrets={}, configs={}, project_name='')
 
         serialized_config = yaml.load(serialize_config(config_dict))
         assert '127.0.0.1:8080:80/tcp' in serialized_config['services']['web']['ports']
