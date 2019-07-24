@@ -158,7 +158,7 @@ def get_project_name(working_dir, config_data, project_name=None, environment=No
     project_name = project_name or environment.get('COMPOSE_PROJECT_NAME')
     if project_name:
         return normalize_name(project_name)
-    
+
     project_name = config_data.project_name
     if project_name:
         return normalize_name(project_name)
