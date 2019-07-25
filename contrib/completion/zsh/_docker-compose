@@ -341,6 +341,7 @@ _docker-compose() {
         '(- :)'{-h,--help}'[Get help]' \
         '*'{-f,--file}"[${file_description}]:file:_files -g '*.yml'" \
         '(-p --project-name)'{-p,--project-name}'[Specify an alternate project name (default: directory name)]:project name:' \
+        '--env-file[Specify an alternate environment file (default: .env)]:env-file:_files' \
         "--compatibility[If set, Compose will attempt to convert keys in v3 files to their non-Swarm equivalent]" \
         '(- :)'{-v,--version}'[Print version and exit]' \
         '--verbose[Show more output]' \
@@ -359,6 +360,7 @@ _docker-compose() {
     local -a relevant_compose_flags relevant_compose_repeatable_flags relevant_docker_flags compose_options docker_options
 
     relevant_compose_flags=(
+        "--env-file"
         "--file" "-f"
         "--host" "-H"
         "--project-name" "-p"
