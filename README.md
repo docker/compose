@@ -10,7 +10,7 @@ see [the list of features](https://github.com/docker/docker.github.io/blob/maste
 
 Compose is great for development, testing, and staging environments, as well as
 CI workflows. You can learn more about each case in
-[Common Use Cases](https://docs.docker.com/compose/).
+[Common Use Cases](https://docs.docker.com/compose/#common-use-cases).
 
 Using Compose is basically a three-step process.
 
