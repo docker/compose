@@ -64,6 +64,12 @@ def wait_on_process(proc, returncode=0):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
+def dispatch(base_dir, options, project_options=None, returncode=0):
+    project_options = project_options or []
+    proc = start_process(base_dir, project_options + options)
+    return wait_on_process(proc, returncode=returncode)
+
+
 def wait_on_condition(condition, delay=0.1, timeout=40):
     start_time = time.time()
     while not condition():
@@ -151,9 +157,7 @@ class CLITestCase(DockerClientTestCase):
         return self._project
 
     def dispatch(self, options, project_options=None, returncode=0):
-        project_options = project_options or []
-        proc = start_process(self.base_dir, project_options + options)
-        return wait_on_process(proc, returncode=returncode)
+        return dispatch(self.base_dir, options, project_options, returncode)
 
     def execute(self, container, cmd):
         # Remove once Hijack and CloseNotifier sign a peace treaty
