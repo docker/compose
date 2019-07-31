@@ -1,0 +1,6 @@
+version: '3.7'
+services:
+  test:
+    image: busybox
+    env_file: .env.conf
+    entrypoint: env

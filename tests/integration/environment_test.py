@@ -7,7 +7,10 @@ from ddt import data
 from ddt import ddt
 
 from .. import mock
+from ..acceptance.cli_test import dispatch
+from compose.cli.command import get_project
 from compose.cli.command import project_from_options
+from compose.config.environment import Environment
 from tests.integration.testcases import DockerClientTestCase
 
 
@@ -50,3 +53,18 @@ services:
             # So no need to have a proper options map, the `COMMAND` key is enough
             project_from_options('.', options)
             assert fake_log.warn.call_count == 0
+
+
+class EnvironmentOverrideFileTest(DockerClientTestCase):
+    def test_env_file_override(self):
+        base_dir = 'tests/fixtures/env-file-override'
+        dispatch(base_dir, ['--env-file', '.env.override', 'up'])
+        project = get_project(project_dir=base_dir,
+                              config_path=['docker-compose.yml'],
+                              environment=Environment.from_env_file(base_dir, '.env.override'),
+                              override_dir=base_dir)
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        assert "WHEREAMI=override" in containers[0].get('Config.Env')
+        assert "DEFAULT_CONF_LOADED=true" in containers[0].get('Config.Env')
+        dispatch(base_dir, ['--env-file', '.env.override', 'down'], None)
