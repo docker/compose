@@ -264,7 +264,6 @@ class TopLevelCommand(object):
 
         Options:
             --build-arg key=val     Set build-time variables for services.
-            --cli                   Run docker build command
             --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
             -m, --memory MEM        Sets memory limit for the build container.
@@ -276,6 +275,9 @@ class TopLevelCommand(object):
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(self.project_dir, environment_file)
+        native_builder = environment.get_boolean('COMPOSE_NATIVE_BUILDER')
         if build_args:
             if not service_names and docker.utils.version_lt(self.project.client.api_version, '1.25'):
                 raise UserError(
@@ -295,7 +297,7 @@ class TopLevelCommand(object):
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
             silent=options.get('--quiet', False),
-            cli=bool(options.get('--cli', False)),
+            cli=native_builder,
         )
 
     def bundle(self, options):
