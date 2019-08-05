@@ -1780,7 +1780,6 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
     command_builder.add_arg("--network", network_mode)
     command_builder.add_flag("--no-cache", nocache)
     command_builder.add_arg("--platform", platform)
-    command_builder.add_arg("--progress", "plain")
     command_builder.add_flag("--pull", pull)
     command_builder.add_flag("--quiet", quiet)
     command_builder.add_flag("--rm", rm)
