@@ -5,9 +5,12 @@ by `docker-compose up`.
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import copy
+
 import py
 from docker.errors import ImageNotFound
 
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from .testcases import DockerClientTestCase
 from .testcases import get_links
 from .testcases import no_cluster
@@ -40,8 +43,8 @@ class BasicProjectTest(ProjectTestCase):
         super(BasicProjectTest, self).setUp()
 
         self.cfg = {
-            'db': {'image': 'busybox:latest', 'command': 'top'},
-            'web': {'image': 'busybox:latest', 'command': 'top'},
+            'db': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
+            'web': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
         }
 
     def test_no_change(self):
@@ -97,16 +100,16 @@ class ProjectWithDependenciesTest(ProjectTestCase):
 
         self.cfg = {
             'db': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
             },
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
                 'links': ['db'],
             },
             'nginx': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
                 'links': ['web'],
             },
@@ -171,7 +174,7 @@ class ProjectWithDependenciesTest(ProjectTestCase):
     def test_service_removed_while_down(self):
         next_cfg = {
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'tail -f /dev/null',
             },
             'nginx': self.cfg['nginx'],
@@ -207,6 +210,143 @@ class ProjectWithDependenciesTest(ProjectTestCase):
             'web',
             'web_1',
         }
+
+
+class ProjectWithDependsOnDependenciesTest(ProjectTestCase):
+    def setUp(self):
+        super(ProjectWithDependsOnDependenciesTest, self).setUp()
+
+        self.cfg = {
+            'version': '2',
+            'services': {
+                'db': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'tail -f /dev/null',
+                },
+                'web': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'tail -f /dev/null',
+                    'depends_on': ['db'],
+                },
+                'nginx': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'tail -f /dev/null',
+                    'depends_on': ['web'],
+                },
+            }
+        }
+
+    def test_up(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        containers = self.run_up(local_cfg)
+        assert set(c.service for c in containers) == set(['db', 'web', 'nginx'])
+
+    def test_change_leaf(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg)
+
+        local_cfg['services']['nginx']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(local_cfg)
+
+        assert set(c.service for c in new_containers - old_containers) == set(['nginx'])
+
+    def test_change_middle(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg)
+
+        local_cfg['services']['web']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(local_cfg)
+
+        assert set(c.service for c in new_containers - old_containers) == set(['web'])
+
+    def test_change_middle_always_recreate_deps(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg, always_recreate_deps=True)
+
+        local_cfg['services']['web']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(local_cfg, always_recreate_deps=True)
+
+        assert set(c.service for c in new_containers - old_containers) == set(['web', 'nginx'])
+
+    def test_change_root(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg)
+
+        local_cfg['services']['db']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(local_cfg)
+
+        assert set(c.service for c in new_containers - old_containers) == set(['db'])
+
+    def test_change_root_always_recreate_deps(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg, always_recreate_deps=True)
+
+        local_cfg['services']['db']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(local_cfg, always_recreate_deps=True)
+
+        assert set(c.service for c in new_containers - old_containers) == set(['db', 'web', 'nginx'])
+
+    def test_change_root_no_recreate(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        old_containers = self.run_up(local_cfg)
+
+        local_cfg['services']['db']['environment'] = {'NEW_VAR': '1'}
+        new_containers = self.run_up(
+            local_cfg,
+            strategy=ConvergenceStrategy.never)
+
+        assert new_containers - old_containers == set()
+
+    def test_service_removed_while_down(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        next_cfg = copy.deepcopy(self.cfg)
+        del next_cfg['services']['db']
+        del next_cfg['services']['web']['depends_on']
+
+        containers = self.run_up(local_cfg)
+        assert set(c.service for c in containers) == set(['db', 'web', 'nginx'])
+
+        project = self.make_project(local_cfg)
+        project.stop(timeout=1)
+
+        next_containers = self.run_up(next_cfg)
+        assert set(c.service for c in next_containers) == set(['web', 'nginx'])
+
+    def test_service_removed_while_up(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        containers = self.run_up(local_cfg)
+        assert set(c.service for c in containers) == set(['db', 'web', 'nginx'])
+
+        del local_cfg['services']['db']
+        del local_cfg['services']['web']['depends_on']
+
+        containers = self.run_up(local_cfg)
+        assert set(c.service for c in containers) == set(['web', 'nginx'])
+
+    def test_dependency_removed(self):
+        local_cfg = copy.deepcopy(self.cfg)
+        next_cfg = copy.deepcopy(self.cfg)
+        del next_cfg['services']['nginx']['depends_on']
+
+        containers = self.run_up(local_cfg, service_names=['nginx'])
+        assert set(c.service for c in containers) == set(['db', 'web', 'nginx'])
+
+        project = self.make_project(local_cfg)
+        project.stop(timeout=1)
+
+        next_containers = self.run_up(next_cfg, service_names=['nginx'])
+        assert set(c.service for c in next_containers if c.is_running) == set(['nginx'])
+
+    def test_dependency_added(self):
+        local_cfg = copy.deepcopy(self.cfg)
+
+        del local_cfg['services']['nginx']['depends_on']
+        containers = self.run_up(local_cfg, service_names=['nginx'])
+        assert set(c.service for c in containers) == set(['nginx'])
+
+        local_cfg['services']['nginx']['depends_on'] = ['db']
+        containers = self.run_up(local_cfg, service_names=['nginx'])
+        assert set(c.service for c in containers) == set(['nginx', 'db'])
 
 
 class ServiceStateTest(DockerClientTestCase):
@@ -246,7 +386,7 @@ class ServiceStateTest(DockerClientTestCase):
         assert ('recreate', [container]) == web.convergence_plan()
 
     def test_trigger_recreate_with_nonexistent_image_tag(self):
-        web = self.create_service('web', image="busybox:latest")
+        web = self.create_service('web', image=BUSYBOX_IMAGE_WITH_TAG)
         container = web.create_container()
 
         web = self.create_service('web', image="nonexistent-image")

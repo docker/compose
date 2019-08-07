@@ -12,6 +12,7 @@ end
 
 complete -c docker-compose -s f -l file -r                -d 'Specify an alternate compose file'
 complete -c docker-compose -s p -l project-name -x        -d 'Specify an alternate project name'
+complete -c docker-compose -l env-file -r                 -d 'Specify an alternate environment file (default: .env)'
 complete -c docker-compose -l verbose                     -d 'Show more output'
 complete -c docker-compose -s H -l host -x                -d 'Daemon socket to connect to'
 complete -c docker-compose -l tls                         -d 'Use TLS; implied by --tlsverify'

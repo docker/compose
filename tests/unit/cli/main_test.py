@@ -9,9 +9,11 @@ import pytest
 from compose import container
 from compose.cli.errors import UserError
 from compose.cli.formatter import ConsoleWarningFormatter
+from compose.cli.main import build_one_off_container_options
 from compose.cli.main import call_docker
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_containers_to_service_names
+from compose.cli.main import get_docker_start_call
 from compose.cli.main import setup_console_handler
 from compose.cli.main import warn_for_swarm_mode
 from compose.service import ConvergenceStrategy
@@ -63,7 +65,65 @@ class TestCLIMainTestCase(object):
 
         with mock.patch('compose.cli.main.log') as fake_log:
             warn_for_swarm_mode(mock_client)
-            assert fake_log.warn.call_count == 1
+            assert fake_log.warning.call_count == 1
+
+    def test_build_one_off_container_options(self):
+        command = 'build myservice'
+        detach = False
+        options = {
+            '-e': ['MYVAR=MYVALUE'],
+            '-T': True,
+            '--label': ['MYLABEL'],
+            '--entrypoint': 'bash',
+            '--user': 'MYUSER',
+            '--service-ports': [],
+            '--publish': '',
+            '--name': 'MYNAME',
+            '--workdir': '.',
+            '--volume': [],
+            'stdin_open': False,
+        }
+
+        expected_container_options = {
+            'command': command,
+            'tty': False,
+            'stdin_open': False,
+            'detach': detach,
+            'entrypoint': 'bash',
+            'environment': {'MYVAR': 'MYVALUE'},
+            'labels': {'MYLABEL': ''},
+            'name': 'MYNAME',
+            'ports': [],
+            'restart': None,
+            'user': 'MYUSER',
+            'working_dir': '.',
+        }
+
+        container_options = build_one_off_container_options(options, detach, command)
+        assert container_options == expected_container_options
+
+    def test_get_docker_start_call(self):
+        container_id = 'my_container_id'
+
+        mock_container_options = {'detach': False, 'stdin_open': True}
+        expected_docker_start_call = ['start', '--attach', '--interactive', container_id]
+        docker_start_call = get_docker_start_call(mock_container_options, container_id)
+        assert expected_docker_start_call == docker_start_call
+
+        mock_container_options = {'detach': False, 'stdin_open': False}
+        expected_docker_start_call = ['start', '--attach', container_id]
+        docker_start_call = get_docker_start_call(mock_container_options, container_id)
+        assert expected_docker_start_call == docker_start_call
+
+        mock_container_options = {'detach': True, 'stdin_open': True}
+        expected_docker_start_call = ['start', '--interactive', container_id]
+        docker_start_call = get_docker_start_call(mock_container_options, container_id)
+        assert expected_docker_start_call == docker_start_call
+
+        mock_container_options = {'detach': True, 'stdin_open': False}
+        expected_docker_start_call = ['start', container_id]
+        docker_start_call = get_docker_start_call(mock_container_options, container_id)
+        assert expected_docker_start_call == docker_start_call
 
 
 class TestSetupConsoleHandlerTestCase(object):
@@ -123,13 +183,13 @@ def mock_find_executable(exe):
 class TestCallDocker(object):
     def test_simple_no_options(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {})
+            call_docker(['ps'], {}, {})
 
         assert fake_call.call_args[0][0] == ['docker', 'ps']
 
     def test_simple_tls_option(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--tls': True})
+            call_docker(['ps'], {'--tls': True}, {})
 
         assert fake_call.call_args[0][0] == ['docker', '--tls', 'ps']
 
@@ -140,7 +200,7 @@ class TestCallDocker(object):
                 '--tlscacert': './ca.pem',
                 '--tlscert': './cert.pem',
                 '--tlskey': './key.pem',
-            })
+            }, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--tls', '--tlscacert', './ca.pem', '--tlscert',
@@ -149,7 +209,7 @@ class TestCallDocker(object):
 
     def test_with_host_option(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': 'tcp://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': 'tcp://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
@@ -157,7 +217,7 @@ class TestCallDocker(object):
 
     def test_with_http_host(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': 'http://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': 'http://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps',
@@ -165,8 +225,17 @@ class TestCallDocker(object):
 
     def test_with_host_option_shorthand_equal(self):
         with mock.patch('subprocess.call') as fake_call:
-            call_docker(['ps'], {'--host': '=tcp://mydocker.net:2333'})
+            call_docker(['ps'], {'--host': '=tcp://mydocker.net:2333'}, {})
 
         assert fake_call.call_args[0][0] == [
             'docker', '--host', 'tcp://mydocker.net:2333', 'ps'
         ]
+
+    def test_with_env(self):
+        with mock.patch('subprocess.call') as fake_call:
+            call_docker(['ps'], {}, {'DOCKER_HOST': 'tcp://mydocker.net:2333'})
+
+        assert fake_call.call_args[0][0] == [
+            'docker', 'ps'
+        ]
+        assert fake_call.call_args[1]['env'] == {'DOCKER_HOST': 'tcp://mydocker.net:2333'}

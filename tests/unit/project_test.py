@@ -10,11 +10,14 @@ from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.const import COMPOSEFILE_V2_0 as V2_0
 from compose.const import COMPOSEFILE_V2_4 as V2_4
+from compose.const import COMPOSEFILE_V3_7 as V3_7
+from compose.const import DEFAULT_TIMEOUT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.errors import OperationFailedError
@@ -37,11 +40,11 @@ class ProjectTest(unittest.TestCase):
             services=[
                 {
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 },
                 {
                     'name': 'db',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 },
             ],
             networks=None,
@@ -56,9 +59,9 @@ class ProjectTest(unittest.TestCase):
         )
         assert len(project.services) == 2
         assert project.get_service('web').name == 'web'
-        assert project.get_service('web').options['image'] == 'busybox:latest'
+        assert project.get_service('web').options['image'] == BUSYBOX_IMAGE_WITH_TAG
         assert project.get_service('db').name == 'db'
-        assert project.get_service('db').options['image'] == 'busybox:latest'
+        assert project.get_service('db').options['image'] == BUSYBOX_IMAGE_WITH_TAG
         assert not project.networks.use_networking
 
     @mock.patch('compose.network.Network.true_name', lambda n: n.full_name)
@@ -68,11 +71,11 @@ class ProjectTest(unittest.TestCase):
             services=[
                 {
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 },
                 {
                     'name': 'db',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 },
             ],
             networks=None,
@@ -89,7 +92,7 @@ class ProjectTest(unittest.TestCase):
             project='composetest',
             name='web',
             client=None,
-            image="busybox:latest",
+            image=BUSYBOX_IMAGE_WITH_TAG,
         )
         project = Project('test', [web], None)
         assert project.get_service('web') == web
@@ -174,7 +177,7 @@ class ProjectTest(unittest.TestCase):
                 version=V2_0,
                 services=[{
                     'name': 'test',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes_from': [VolumeFromSpec('aaa', 'rw', 'container')]
                 }],
                 networks=None,
@@ -192,7 +195,7 @@ class ProjectTest(unittest.TestCase):
                 "Name": container_name,
                 "Names": [container_name],
                 "Id": container_name,
-                "Image": 'busybox:latest'
+                "Image": BUSYBOX_IMAGE_WITH_TAG
             }
         ]
         project = Project.from_config(
@@ -203,11 +206,11 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'vol',
-                        'image': 'busybox:latest'
+                        'image': BUSYBOX_IMAGE_WITH_TAG
                     },
                     {
                         'name': 'test',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes_from': [VolumeFromSpec('vol', 'rw', 'service')]
                     }
                 ],
@@ -231,11 +234,11 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'vol',
-                        'image': 'busybox:latest'
+                        'image': BUSYBOX_IMAGE_WITH_TAG
                     },
                     {
                         'name': 'test',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes_from': [VolumeFromSpec('vol', 'rw', 'service')]
                     }
                 ],
@@ -541,7 +544,7 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'test',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                     }
                 ],
                 networks=None,
@@ -566,7 +569,7 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'test',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'network_mode': 'container:aaa'
                     },
                 ],
@@ -586,7 +589,7 @@ class ProjectTest(unittest.TestCase):
                 "Name": container_name,
                 "Names": [container_name],
                 "Id": container_name,
-                "Image": 'busybox:latest'
+                "Image": BUSYBOX_IMAGE_WITH_TAG
             }
         ]
         project = Project.from_config(
@@ -597,11 +600,11 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'aaa',
-                        'image': 'busybox:latest'
+                        'image': BUSYBOX_IMAGE_WITH_TAG
                     },
                     {
                         'name': 'test',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'network_mode': 'service:aaa'
                     },
                 ],
@@ -624,7 +627,7 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'foo',
-                        'image': 'busybox:latest'
+                        'image': BUSYBOX_IMAGE_WITH_TAG
                     },
                 ],
                 networks=None,
@@ -645,7 +648,7 @@ class ProjectTest(unittest.TestCase):
                 services=[
                     {
                         'name': 'foo',
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'networks': {'custom': None}
                     },
                 ],
@@ -660,9 +663,9 @@ class ProjectTest(unittest.TestCase):
 
     def test_container_without_name(self):
         self.mock_client.containers.return_value = [
-            {'Image': 'busybox:latest', 'Id': '1', 'Name': '1'},
-            {'Image': 'busybox:latest', 'Id': '2', 'Name': None},
-            {'Image': 'busybox:latest', 'Id': '3'},
+            {'Image': BUSYBOX_IMAGE_WITH_TAG, 'Id': '1', 'Name': '1'},
+            {'Image': BUSYBOX_IMAGE_WITH_TAG, 'Id': '2', 'Name': None},
+            {'Image': BUSYBOX_IMAGE_WITH_TAG, 'Id': '3'},
         ]
         self.mock_client.inspect_container.return_value = {
             'Id': '1',
@@ -679,7 +682,7 @@ class ProjectTest(unittest.TestCase):
                 version=V2_0,
                 services=[{
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 }],
                 networks=None,
                 volumes=None,
@@ -697,7 +700,7 @@ class ProjectTest(unittest.TestCase):
                 version=V2_0,
                 services=[{
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 }],
                 networks={'default': {}},
                 volumes={'data': {}},
@@ -709,7 +712,7 @@ class ProjectTest(unittest.TestCase):
         self.mock_client.remove_volume.side_effect = NotFound(None, None, 'oops')
 
         project.down(ImageType.all, True)
-        self.mock_client.remove_image.assert_called_once_with("busybox:latest")
+        self.mock_client.remove_image.assert_called_once_with(BUSYBOX_IMAGE_WITH_TAG)
 
     def test_no_warning_on_stop(self):
         self.mock_client.info.return_value = {'Swarm': {'LocalNodeState': 'active'}}
@@ -742,7 +745,7 @@ class ProjectTest(unittest.TestCase):
     def test_project_platform_value(self):
         service_config = {
             'name': 'web',
-            'image': 'busybox:latest',
+            'image': BUSYBOX_IMAGE_WITH_TAG,
         }
         config_data = Config(
             version=V2_4, services=[service_config], networks={}, volumes={}, secrets=None, configs=None
@@ -765,6 +768,34 @@ class ProjectTest(unittest.TestCase):
         )
         assert project.get_service('web').platform == 'linux/s390x'
 
+    def test_build_container_operation_with_timeout_func_does_not_mutate_options_with_timeout(self):
+        config_data = Config(
+            version=V3_7,
+            services=[
+                {'name': 'web', 'image': BUSYBOX_IMAGE_WITH_TAG},
+                {'name': 'db', 'image': BUSYBOX_IMAGE_WITH_TAG, 'stop_grace_period': '1s'},
+            ],
+            networks={}, volumes={}, secrets=None, configs=None,
+        )
+
+        project = Project.from_config(name='test', client=self.mock_client, config_data=config_data)
+
+        stop_op = project.build_container_operation_with_timeout_func('stop', options={})
+
+        web_container = mock.create_autospec(Container, service='web')
+        db_container = mock.create_autospec(Container, service='db')
+
+        # `stop_grace_period` is not set to 'web' service,
+        # then it is stopped with the default timeout.
+        stop_op(web_container)
+        web_container.stop.assert_called_once_with(timeout=DEFAULT_TIMEOUT)
+
+        # `stop_grace_period` is set to 'db' service,
+        # then it is stopped with the specified timeout and
+        # the value is not overridden by the previous function call.
+        stop_op(db_container)
+        db_container.stop.assert_called_once_with(timeout=1)
+
     @mock.patch('compose.parallel.ParallelStreamWriter._write_noansi')
     def test_error_parallel_pull(self, mock_write):
         project = Project.from_config(
@@ -774,7 +805,7 @@ class ProjectTest(unittest.TestCase):
                 version=V2_0,
                 services=[{
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                 }],
                 networks=None,
                 volumes=None,

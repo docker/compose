@@ -3,17 +3,18 @@
 
 set -ex
 
-TAG="docker-compose:$(git rev-parse --short HEAD)"
+TAG="docker-compose:alpine-$(git rev-parse --short HEAD)"
 
 # By default use the Dockerfile, but can be overridden to use an alternative file
-# e.g DOCKERFILE=Dockerfile.armhf script/test/default
+# e.g DOCKERFILE=Dockerfile.s390x script/test/default
 DOCKERFILE="${DOCKERFILE:-Dockerfile}"
+DOCKER_BUILD_TARGET="${DOCKER_BUILD_TARGET:-build}"
 
 rm -rf coverage-html
 # Create the host directory so it's owned by $USER
 mkdir -p coverage-html
 
-docker build -f ${DOCKERFILE} -t "$TAG" .
+docker build -f "${DOCKERFILE}" -t "${TAG}" --target "${DOCKER_BUILD_TARGET}" .
 
 GIT_VOLUME="--volume=$(pwd)/.git:/code/.git"
 . script/test/all

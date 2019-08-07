@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from ...helpers import build_config_details
+from ...helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import config
 from compose.config import types
 from compose.config.config import resolve_build_args
@@ -329,7 +330,7 @@ class ConfigTest(unittest.TestCase):
             )
 
         assert 'Unexpected type for "version" key in "filename.yml"' \
-            in mock_logging.warn.call_args[0][0]
+            in mock_logging.warning.call_args[0][0]
 
         service_dicts = config_data.services
         assert service_sort(service_dicts) == service_sort([
@@ -343,7 +344,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError):
             config.load(
                 build_config_details(
-                    {'web': 'busybox:latest'},
+                    {'web': BUSYBOX_IMAGE_WITH_TAG},
                     'working_dir',
                     'filename.yml'
                 )
@@ -353,7 +354,7 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError):
             config.load(
                 build_config_details(
-                    {'version': '2', 'services': {'web': 'busybox:latest'}},
+                    {'version': '2', 'services': {'web': BUSYBOX_IMAGE_WITH_TAG}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -364,7 +365,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details({
                     'version': '2',
-                    'services': {'web': 'busybox:latest'},
+                    'services': {'web': BUSYBOX_IMAGE_WITH_TAG},
                     'networks': {
                         'invalid': {'foo', 'bar'}
                     }
@@ -613,6 +614,25 @@ class ConfigTest(unittest.TestCase):
             excinfo.exconly()
         )
 
+    def test_config_integer_service_name_raise_validation_error_v2_when_no_interpolate(self):
+        with pytest.raises(ConfigurationError) as excinfo:
+            config.load(
+                build_config_details(
+                    {
+                        'version': '2',
+                        'services': {1: {'image': 'busybox'}}
+                    },
+                    'working_dir',
+                    'filename.yml'
+                ),
+                interpolate=False
+            )
+
+        assert (
+            "In file 'filename.yml', the service name 1 must be a quoted string, i.e. '1'." in
+            excinfo.exconly()
+        )
+
     def test_config_integer_service_property_raise_validation_error(self):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
@@ -828,15 +848,15 @@ class ConfigTest(unittest.TestCase):
     def test_load_sorts_in_dependency_order(self):
         config_details = build_config_details({
             'web': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'links': ['db'],
             },
             'db': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'volumes_from': ['volume:ro']
             },
             'volume': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'volumes': ['/tmp'],
             }
         })
@@ -1261,7 +1281,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': ['data0028:/data:ro'],
                     },
                 },
@@ -1277,7 +1297,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': ['./data0028:/data:ro'],
                     },
                 },
@@ -1293,7 +1313,7 @@ class ConfigTest(unittest.TestCase):
             'base.yaml',
             {
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes': ['data0028:/data:ro'],
                 },
             }
@@ -1310,7 +1330,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '2.3',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {
                                 'target': '/anonymous', 'type': 'volume'
@@ -1355,7 +1375,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '3.4',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {'type': 'bind', 'source': './web', 'target': '/web'},
                         ],
@@ -1377,7 +1397,7 @@ class ConfigTest(unittest.TestCase):
                 'version': '3.4',
                 'services': {
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'volumes': [
                             {'type': 'bind', 'source': '~/web', 'target': '/web'},
                         ],
@@ -2274,7 +2294,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_merge_mixed_ports(self):
         base = {
-            'image': 'busybox:latest',
+            'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
             'ports': [
                 {
@@ -2291,7 +2311,7 @@ class ConfigTest(unittest.TestCase):
 
         actual = config.merge_service_dicts(base, override, V3_1)
         assert actual == {
-            'image': 'busybox:latest',
+            'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
             'ports': [types.ServicePort('1245', '1245', 'udp', None, None)]
         }
@@ -3466,6 +3486,25 @@ class InterpolationTest(unittest.TestCase):
         }
 
     @mock.patch.dict(os.environ)
+    def test_config_file_with_options_environment_file(self):
+        project_dir = 'tests/fixtures/default-env-file'
+        service_dicts = config.load(
+            config.find(
+                project_dir, None, Environment.from_env_file(project_dir, '.env2')
+            )
+        ).services
+
+        assert service_dicts[0] == {
+            'name': 'web',
+            'image': 'alpine:latest',
+            'ports': [
+                types.ServicePort.parse('5644')[0],
+                types.ServicePort.parse('9998')[0]
+            ],
+            'command': 'false'
+        }
+
+    @mock.patch.dict(os.environ)
     def test_config_file_with_environment_variable(self):
         project_dir = 'tests/fixtures/environment-interpolation'
         os.environ.update(
@@ -3532,8 +3571,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.environment.log') as log:
             config.load(config_details)
 
-            assert 2 == log.warn.call_count
-            warnings = sorted(args[0][0] for args in log.warn.call_args_list)
+            assert 2 == log.warning.call_count
+            warnings = sorted(args[0][0] for args in log.warning.call_args_list)
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
@@ -3563,8 +3602,8 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 1
-        warn_message = log.warn.call_args[0][0]
+        assert log.warning.call_count == 1
+        warn_message = log.warning.call_args[0][0]
         assert warn_message.startswith(
             'The following deploy sub-keys are not supported in compatibility mode'
         )
@@ -3603,7 +3642,7 @@ class InterpolationTest(unittest.TestCase):
         with mock.patch('compose.config.config.log') as log:
             cfg = config.load(config_details, compatibility=True)
 
-        assert log.warn.call_count == 0
+        assert log.warning.call_count == 0
 
         service_dict = cfg.services[0]
         assert service_dict == {
@@ -3783,35 +3822,35 @@ class MergePathMappingTest(object):
             {self.config_name: ['/foo:/code', '/data']},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/foo:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/foo:/code', '/data'}
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code'}
 
     def test_override_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/data']},
             {self.config_name: ['/bar:/code']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/data'}
 
     def test_add_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/data']},
             {self.config_name: ['/bar:/code', '/quux:/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/quux:/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/quux:/data'}
 
     def test_remove_explicit_path(self):
         service_dict = config.merge_service_dicts(
             {self.config_name: ['/foo:/code', '/quux:/data']},
             {self.config_name: ['/bar:/code', '/data']},
             DEFAULT_VERSION)
-        assert set(service_dict[self.config_name]) == set(['/bar:/code', '/data'])
+        assert set(service_dict[self.config_name]) == {'/bar:/code', '/data'}
 
 
 class MergeVolumesTest(unittest.TestCase, MergePathMappingTest):
@@ -4015,28 +4054,28 @@ class MergeStringsOrListsTest(unittest.TestCase):
             {'dns': '8.8.8.8'},
             {},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8'])
+        assert set(service_dict['dns']) == {'8.8.8.8'}
 
     def test_no_base(self):
         service_dict = config.merge_service_dicts(
             {},
             {'dns': '8.8.8.8'},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8'])
+        assert set(service_dict['dns']) == {'8.8.8.8'}
 
     def test_add_string(self):
         service_dict = config.merge_service_dicts(
             {'dns': ['8.8.8.8']},
             {'dns': '9.9.9.9'},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
+        assert set(service_dict['dns']) == {'8.8.8.8', '9.9.9.9'}
 
     def test_add_list(self):
         service_dict = config.merge_service_dicts(
             {'dns': '8.8.8.8'},
             {'dns': ['9.9.9.9']},
             DEFAULT_VERSION)
-        assert set(service_dict['dns']) == set(['8.8.8.8', '9.9.9.9'])
+        assert set(service_dict['dns']) == {'8.8.8.8', '9.9.9.9'}
 
 
 class MergeLabelsTest(unittest.TestCase):
@@ -4108,7 +4147,7 @@ class MergeBuildTest(unittest.TestCase):
         assert result['context'] == override['context']
         assert result['dockerfile'] == override['dockerfile']
         assert result['args'] == {'x': '12', 'y': '2'}
-        assert set(result['cache_from']) == set(['ubuntu', 'debian'])
+        assert set(result['cache_from']) == {'ubuntu', 'debian'}
         assert result['labels'] == override['labels']
 
     def test_empty_override(self):
@@ -4312,7 +4351,7 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
             )
         ).services[0]
-        assert set(service_dict['volumes']) == set([VolumeSpec.parse('/tmp:/host/tmp')])
+        assert set(service_dict['volumes']) == {VolumeSpec.parse('/tmp:/host/tmp')}
 
         service_dict = config.load(
             build_config_details(
@@ -4320,7 +4359,7 @@ class EnvTest(unittest.TestCase):
                 "tests/fixtures/env",
             )
         ).services[0]
-        assert set(service_dict['volumes']) == set([VolumeSpec.parse('/opt/tmp:/opt/host/tmp')])
+        assert set(service_dict['volumes']) == {VolumeSpec.parse('/opt/tmp:/opt/host/tmp')}
 
 
 def load_from_filename(filename, override_dir=None):
@@ -5326,6 +5365,28 @@ class SerializeTest(unittest.TestCase):
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
         assert serialized_service['entrypoint'][0] == '$$SHELL'
+
+    def test_serialize_escape_dont_interpolate(self):
+        cfg = {
+            'version': '2.2',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'command': 'echo $FOO',
+                    'environment': {
+                        'CURRENCY': '$'
+                    },
+                    'entrypoint': ['$SHELL', '-c'],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg), interpolate=False)
+
+        serialized_config = yaml.load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+        assert serialized_service['environment']['CURRENCY'] == '$'
+        assert serialized_service['command'] == 'echo $FOO'
+        assert serialized_service['entrypoint'][0] == '$SHELL'
 
     def test_serialize_unicode_values(self):
         cfg = {

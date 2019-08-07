@@ -1,6 +1,6 @@
 simple:
-  image: busybox:latest
-  command: sh -c "echo hello && tail -f /dev/null"
+  image: busybox:1.31.0-uclibc
+  command: sh -c "sleep 1 && echo hello && tail -f /dev/null"
 another:
-  image: busybox:latest
-  command: sh -c "echo test"
+  image: busybox:1.31.0-uclibc
+  command: sh -c "sleep 1 && echo test"

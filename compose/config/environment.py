@@ -26,7 +26,7 @@ def split_env(env):
         key = env
     if re.search(r'\s', key):
         raise ConfigurationError(
-            "environment variable name '{}' may not contains whitespace.".format(key)
+            "environment variable name '{}' may not contain whitespace.".format(key)
         )
     return key, value
 
@@ -56,14 +56,18 @@ class Environment(dict):
     def __init__(self, *args, **kwargs):
         super(Environment, self).__init__(*args, **kwargs)
         self.missing_keys = []
+        self.silent = False
 
     @classmethod
-    def from_env_file(cls, base_dir):
+    def from_env_file(cls, base_dir, env_file=None):
         def _initialize():
             result = cls()
             if base_dir is None:
                 return result
-            env_file_path = os.path.join(base_dir, '.env')
+            if env_file:
+                env_file_path = os.path.join(base_dir, env_file)
+            else:
+                env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
             except EnvFileNotFound:
@@ -95,8 +99,8 @@ class Environment(dict):
                     return super(Environment, self).__getitem__(key.upper())
                 except KeyError:
                     pass
-            if key not in self.missing_keys:
-                log.warn(
+            if not self.silent and key not in self.missing_keys:
+                log.warning(
                     "The {} variable is not set. Defaulting to a blank string."
                     .format(key)
                 )

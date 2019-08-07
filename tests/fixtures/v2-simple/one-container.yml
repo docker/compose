@@ -1,0 +1,5 @@
+version: "2"
+services:
+  simple:
+    image: busybox:1.31.0-uclibc
+    command: top

@@ -15,6 +15,7 @@ from six import StringIO
 from six import text_type
 
 from .. import mock
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from .testcases import docker_client
 from .testcases import DockerClientTestCase
 from .testcases import get_links
@@ -373,7 +374,7 @@ class ServiceTest(DockerClientTestCase):
         self.client.create_volume(volume_name)
         service = Service('db', client=client, volumes=[
             MountSpec(type='volume', source=volume_name, target=container_path)
-        ], image='busybox:latest', command=['top'], project='composetest')
+        ], image=BUSYBOX_IMAGE_WITH_TAG, command=['top'], project='composetest')
         container = service.create_container()
         service.start_container(container)
         mount = container.get_mount(container_path)
@@ -388,7 +389,7 @@ class ServiceTest(DockerClientTestCase):
         container_path = '/container-tmpfs'
         service = Service('db', client=client, volumes=[
             MountSpec(type='tmpfs', target=container_path)
-        ], image='busybox:latest', command=['top'], project='composetest')
+        ], image=BUSYBOX_IMAGE_WITH_TAG, command=['top'], project='composetest')
         container = service.create_container()
         service.start_container(container)
         mount = container.get_mount(container_path)
@@ -474,7 +475,7 @@ class ServiceTest(DockerClientTestCase):
         volume_container_1 = volume_service.create_container()
         volume_container_2 = Container.create(
             self.client,
-            image='busybox:latest',
+            image=BUSYBOX_IMAGE_WITH_TAG,
             command=["top"],
             labels={LABEL_PROJECT: 'composetest'},
             host_config={},
@@ -695,8 +696,8 @@ class ServiceTest(DockerClientTestCase):
             new_container, = service.execute_convergence_plan(
                 ConvergencePlan('recreate', [old_container]))
 
-        mock_log.warn.assert_called_once_with(mock.ANY)
-        _, args, kwargs = mock_log.warn.mock_calls[0]
+        mock_log.warning.assert_called_once_with(mock.ANY)
+        _, args, kwargs = mock_log.warning.mock_calls[0]
         assert "Service \"db\" is using volume \"/data\" from the previous container" in args[0]
 
         assert [mount['Destination'] for mount in new_container.get('Mounts')] == ['/data']
@@ -1232,9 +1233,8 @@ class ServiceTest(DockerClientTestCase):
         # })
 
     def test_create_with_image_id(self):
-        # Get image id for the current busybox:latest
         pull_busybox(self.client)
-        image_id = self.client.inspect_image('busybox:latest')['Id'][:12]
+        image_id = self.client.inspect_image(BUSYBOX_IMAGE_WITH_TAG)['Id'][:12]
         service = self.create_service('foo', image=image_id)
         service.create_container()
 
@@ -1382,7 +1382,7 @@ class ServiceTest(DockerClientTestCase):
         with pytest.raises(OperationFailedError):
             service.scale(3)
 
-        captured_output = mock_log.warn.call_args[0][0]
+        captured_output = mock_log.warning.call_args[0][0]
 
         assert len(service.containers()) == 1
         assert "Remove the custom name to scale the service." in captured_output

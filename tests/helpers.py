@@ -7,6 +7,10 @@ from compose.config.config import ConfigDetails
 from compose.config.config import ConfigFile
 from compose.config.config import load
 
+BUSYBOX_IMAGE_NAME = 'busybox'
+BUSYBOX_DEFAULT_TAG = '1.31.0-uclibc'
+BUSYBOX_IMAGE_WITH_TAG = '{}:{}'.format(BUSYBOX_IMAGE_NAME, BUSYBOX_DEFAULT_TAG)
+
 
 def build_config(contents, **kwargs):
     return load(build_config_details(contents, **kwargs))
@@ -22,7 +26,7 @@ def build_config_details(contents, working_dir='working_dir', filename='filename
 def create_custom_host_file(client, filename, content):
     dirname = os.path.dirname(filename)
     container = client.create_container(
-        'busybox:latest',
+        BUSYBOX_IMAGE_WITH_TAG,
         ['sh', '-c', 'echo -n "{}" > {}'.format(content, filename)],
         volumes={dirname: {}},
         host_config=client.create_host_config(

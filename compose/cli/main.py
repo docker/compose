@@ -208,6 +208,7 @@ class TopLevelCommand(object):
                                   (default: the path of the Compose file)
       --compatibility             If set, Compose will attempt to convert keys
                                   in v3 files to their non-Swarm equivalent
+      --env-file PATH             Specify an alternate environment file
 
     Commands:
       build              Build or rebuild services
@@ -246,6 +247,11 @@ class TopLevelCommand(object):
     def project_dir(self):
         return self.toplevel_options.get('--project-directory') or '.'
 
+    @property
+    def toplevel_environment(self):
+        environment_file = self.toplevel_options.get('--env-file')
+        return Environment.from_env_file(self.project_dir, environment_file)
+
     def build(self, options):
         """
         Build or rebuild services.
@@ -260,10 +266,12 @@ class TopLevelCommand(object):
             --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
             --no-cache              Do not use cache when building the image.
+            --no-rm                 Do not remove intermediate containers after a successful build.
             --pull                  Always attempt to pull a newer version of the image.
             -m, --memory MEM        Sets memory limit for the build container.
             --build-arg key=val     Set build-time variables for services.
             --parallel              Build images in parallel.
+            -q, --quiet             Don't print anything to STDOUT
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -273,8 +281,7 @@ class TopLevelCommand(object):
                     '--build-arg is only supported when services are specified for API version < 1.25.'
                     ' Please use a Compose file version > 2.2 or specify which services to build.'
                 )
-            environment = Environment.from_env_file(self.project_dir)
-            build_args = resolve_build_args(build_args, environment)
+            build_args = resolve_build_args(build_args, self.toplevel_environment)
 
         self.project.build(
             service_names=options['SERVICE'],
@@ -282,9 +289,11 @@ class TopLevelCommand(object):
             pull=bool(options.get('--pull', False)),
             force_rm=bool(options.get('--force-rm', False)),
             memory=options.get('--memory'),
+            rm=not bool(options.get('--no-rm', False)),
             build_args=build_args,
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
+            silent=options.get('--quiet', False)
         )
 
     def bundle(self, options):
@@ -327,6 +336,7 @@ class TopLevelCommand(object):
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
+            --no-interpolate         Don't interpolate environment variables
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
             --services               Print the service names, one per line.
@@ -336,11 +346,12 @@ class TopLevelCommand(object):
                                      or use the wildcard symbol to display all services
         """
 
-        compose_config = get_config_from_options('.', self.toplevel_options)
+        additional_options = {'--no-interpolate': options.get('--no-interpolate')}
+        compose_config = get_config_from_options('.', self.toplevel_options, additional_options)
         image_digests = None
 
         if options['--resolve-image-digests']:
-            self.project = project_from_options('.', self.toplevel_options)
+            self.project = project_from_options('.', self.toplevel_options, additional_options)
             with errors.handle_connection_errors(self.project.client):
                 image_digests = image_digests_for_project(self.project)
 
@@ -357,14 +368,14 @@ class TopLevelCommand(object):
 
         if options['--hash'] is not None:
             h = options['--hash']
-            self.project = project_from_options('.', self.toplevel_options)
+            self.project = project_from_options('.', self.toplevel_options, additional_options)
             services = [svc for svc in options['--hash'].split(',')] if h != '*' else None
             with errors.handle_connection_errors(self.project.client):
                 for service in self.project.get_services(services):
                     print('{} {}'.format(service.name, service.config_hash))
             return
 
-        print(serialize_config(compose_config, image_digests))
+        print(serialize_config(compose_config, image_digests, not options['--no-interpolate']))
 
     def create(self, options):
         """
@@ -383,7 +394,7 @@ class TopLevelCommand(object):
         """
         service_names = options['SERVICE']
 
-        log.warn(
+        log.warning(
             'The create command is deprecated. '
             'Use the up command with the --no-start flag instead.'
         )
@@ -422,8 +433,7 @@ class TopLevelCommand(object):
             -t, --timeout TIMEOUT   Specify a shutdown timeout in seconds.
                                     (default: 10)
         """
-        environment = Environment.from_env_file(self.project_dir)
-        ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+        ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and options['--remove-orphans']:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
@@ -480,8 +490,7 @@ class TopLevelCommand(object):
                               not supported in API < 1.25)
             -w, --workdir DIR Path to workdir directory for this command.
         """
-        environment = Environment.from_env_file(self.project_dir)
-        use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+        use_cli = not self.toplevel_environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
         index = int(options.get('--index'))
         service = self.project.get_service(options['SERVICE'])
         detach = options.get('--detach')
@@ -504,7 +513,7 @@ class TopLevelCommand(object):
         if IS_WINDOWS_PLATFORM or use_cli and not detach:
             sys.exit(call_docker(
                 build_exec_command(options, container.id, command),
-                self.toplevel_options)
+                self.toplevel_options, self.toplevel_environment)
             )
 
         create_exec_options = {
@@ -709,7 +718,8 @@ class TopLevelCommand(object):
 
         if options['--all']:
             containers = sorted(self.project.containers(service_names=options['SERVICE'],
-                                                        one_off=OneOffFilter.include, stopped=True))
+                                                        one_off=OneOffFilter.include, stopped=True),
+                                key=attrgetter('name'))
         else:
             containers = sorted(
                 self.project.containers(service_names=options['SERVICE'], stopped=True) +
@@ -753,7 +763,7 @@ class TopLevelCommand(object):
             --include-deps          Also pull services declared as dependencies
         """
         if options.get('--parallel'):
-            log.warn('--parallel option is deprecated and will be removed in future versions.')
+            log.warning('--parallel option is deprecated and will be removed in future versions.')
         self.project.pull(
             service_names=options['SERVICE'],
             ignore_pull_failures=options.get('--ignore-pull-failures'),
@@ -794,7 +804,7 @@ class TopLevelCommand(object):
             -a, --all     Deprecated - no effect.
         """
         if options.get('--all'):
-            log.warn(
+            log.warning(
                 '--all flag is obsolete. This is now the default behavior '
                 'of `docker-compose rm`'
             )
@@ -872,10 +882,12 @@ class TopLevelCommand(object):
         else:
             command = service.options.get('command')
 
+        options['stdin_open'] = service.options.get('stdin_open', True)
+
         container_options = build_one_off_container_options(options, detach, command)
         run_one_off_container(
             container_options, self.project, service, options,
-            self.toplevel_options, self.project_dir
+            self.toplevel_options, self.toplevel_environment
         )
 
     def scale(self, options):
@@ -904,7 +916,7 @@ class TopLevelCommand(object):
                 'Use the up command with the --scale flag instead.'
             )
         else:
-            log.warn(
+            log.warning(
                 'The scale command is deprecated. '
                 'Use the up command with the --scale flag instead.'
             )
@@ -1050,8 +1062,7 @@ class TopLevelCommand(object):
         if detached and (cascade_stop or exit_value_from):
             raise UserError("--abort-on-container-exit and -d cannot be combined.")
 
-        environment = Environment.from_env_file(self.project_dir)
-        ignore_orphans = environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
+        ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
@@ -1236,7 +1247,7 @@ def exitval_from_opts(options, project):
     exit_value_from = options.get('--exit-code-from')
     if exit_value_from:
         if not options.get('--abort-on-container-exit'):
-            log.warn('using --exit-code-from implies --abort-on-container-exit')
+            log.warning('using --exit-code-from implies --abort-on-container-exit')
             options['--abort-on-container-exit'] = True
         if exit_value_from not in [s.name for s in project.get_services()]:
             log.error('No service named "%s" was found in your compose file.',
@@ -1271,7 +1282,7 @@ def build_one_off_container_options(options, detach, command):
     container_options = {
         'command': command,
         'tty': not (detach or options['-T'] or not sys.stdin.isatty()),
-        'stdin_open': not detach,
+        'stdin_open': options.get('stdin_open'),
         'detach': detach,
     }
 
@@ -1314,7 +1325,7 @@ def build_one_off_container_options(options, detach, command):
 
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
-                          project_dir='.'):
+                          toplevel_environment):
     if not options['--no-deps']:
         deps = service.get_dependency_names()
         if deps:
@@ -1343,8 +1354,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
-    environment = Environment.from_env_file(project_dir)
-    use_cli = not environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
+    use_cli = not toplevel_environment.get_boolean('COMPOSE_INTERACTIVE_NO_CLI')
 
     signals.set_signal_handler_to_shutdown()
     signals.set_signal_handler_to_hang_up()
@@ -1353,8 +1363,8 @@ def run_one_off_container(container_options, project, service, options, toplevel
             if IS_WINDOWS_PLATFORM or use_cli:
                 service.connect_container_to_networks(container, use_network_aliases)
                 exit_code = call_docker(
-                    ["start", "--attach", "--interactive", container.id],
-                    toplevel_options
+                    get_docker_start_call(container_options, container.id),
+                    toplevel_options, toplevel_environment
                 )
             else:
                 operation = RunOperation(
@@ -1378,6 +1388,16 @@ def run_one_off_container(container_options, project, service, options, toplevel
 
     remove_container()
     sys.exit(exit_code)
+
+
+def get_docker_start_call(container_options, container_id):
+    docker_call = ["start"]
+    if not container_options.get('detach'):
+        docker_call.append("--attach")
+    if container_options.get('stdin_open'):
+        docker_call.append("--interactive")
+    docker_call.append(container_id)
+    return docker_call
 
 
 def log_printer_from_project(
@@ -1434,7 +1454,7 @@ def exit_if(condition, message, exit_code):
         raise SystemExit(exit_code)
 
 
-def call_docker(args, dockeropts):
+def call_docker(args, dockeropts, environment):
     executable_path = find_executable('docker')
     if not executable_path:
         raise UserError(errors.docker_not_found_msg("Couldn't find `docker` binary."))
@@ -1464,7 +1484,7 @@ def call_docker(args, dockeropts):
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
-    return subprocess.call(args)
+    return subprocess.call(args, env=environment)
 
 
 def parse_scale_args(options):
@@ -1565,7 +1585,7 @@ def warn_for_swarm_mode(client):
             # UCP does multi-node scheduling with traditional Compose files.
             return
 
-        log.warn(
+        log.warning(
             "The Docker Engine you're using is running in swarm mode.\n\n"
             "Compose does not use swarm mode to deploy services to multiple nodes in a swarm. "
             "All containers will be scheduled on the current node.\n\n"

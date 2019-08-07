@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import copy
 import json
 import os
 import random
@@ -14,6 +15,7 @@ from docker.errors import NotFound
 
 from .. import mock
 from ..helpers import build_config as load_config
+from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from ..helpers import create_host_file
 from .testcases import DockerClientTestCase
 from .testcases import SWARM_SKIP_CONTAINERS_ALL
@@ -103,7 +105,7 @@ class ProjectTest(DockerClientTestCase):
         self.create_service('extra').create_container()
 
         project = Project('composetest', [web, db], self.client)
-        assert set(project.containers(stopped=True)) == set([web_1, db_1])
+        assert set(project.containers(stopped=True)) == {web_1, db_1}
 
     def test_parallel_pull_with_no_image(self):
         config_data = build_config(
@@ -127,11 +129,11 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=load_config({
                 'data': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes': ['/var/data'],
                 },
                 'db': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes_from': ['data'],
                 },
             }),
@@ -144,7 +146,7 @@ class ProjectTest(DockerClientTestCase):
     def test_volumes_from_container(self):
         data_container = Container.create(
             self.client,
-            image='busybox:latest',
+            image=BUSYBOX_IMAGE_WITH_TAG,
             volumes=['/var/data'],
             name='composetest_data_container',
             labels={LABEL_PROJECT: 'composetest'},
@@ -154,7 +156,7 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=load_config({
                 'db': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'volumes_from': ['composetest_data_container'],
                 },
             }),
@@ -173,11 +175,11 @@ class ProjectTest(DockerClientTestCase):
                 'version': str(V2_0),
                 'services': {
                     'net': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'command': ["top"]
                     },
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'network_mode': 'service:net',
                         'command': ["top"]
                     },
@@ -201,7 +203,7 @@ class ProjectTest(DockerClientTestCase):
                     'version': str(V2_0),
                     'services': {
                         'web': {
-                            'image': 'busybox:latest',
+                            'image': BUSYBOX_IMAGE_WITH_TAG,
                             'network_mode': 'container:composetest_net_container'
                         },
                     },
@@ -216,7 +218,7 @@ class ProjectTest(DockerClientTestCase):
 
         net_container = Container.create(
             self.client,
-            image='busybox:latest',
+            image=BUSYBOX_IMAGE_WITH_TAG,
             name='composetest_net_container',
             command='top',
             labels={LABEL_PROJECT: 'composetest'},
@@ -236,11 +238,11 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=load_config({
                 'net': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"]
                 },
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'net': 'container:net',
                     'command': ["top"]
                 },
@@ -261,7 +263,7 @@ class ProjectTest(DockerClientTestCase):
                 name='composetest',
                 config_data=load_config({
                     'web': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'net': 'container:composetest_net_container'
                     },
                 }),
@@ -275,7 +277,7 @@ class ProjectTest(DockerClientTestCase):
 
         net_container = Container.create(
             self.client,
-            image='busybox:latest',
+            image=BUSYBOX_IMAGE_WITH_TAG,
             name='composetest_net_container',
             command='top',
             labels={LABEL_PROJECT: 'composetest'},
@@ -304,24 +306,20 @@ class ProjectTest(DockerClientTestCase):
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        assert set(c.name for c in project.containers() if c.is_running) == set(
-            [web_container_1.name, web_container_2.name]
-        )
+        assert set(c.name for c in project.containers() if c.is_running) == {
+            web_container_1.name, web_container_2.name}
 
         project.start()
-        assert set(c.name for c in project.containers() if c.is_running) == set(
-            [web_container_1.name, web_container_2.name, db_container.name]
-        )
+        assert set(c.name for c in project.containers() if c.is_running) == {
+            web_container_1.name, web_container_2.name, db_container.name}
 
         project.pause(service_names=['web'])
-        assert set([c.name for c in project.containers() if c.is_paused]) == set(
-            [web_container_1.name, web_container_2.name]
-        )
+        assert set([c.name for c in project.containers() if c.is_paused]) == {
+            web_container_1.name, web_container_2.name}
 
         project.pause()
-        assert set([c.name for c in project.containers() if c.is_paused]) == set(
-            [web_container_1.name, web_container_2.name, db_container.name]
-        )
+        assert set([c.name for c in project.containers() if c.is_paused]) == {
+            web_container_1.name, web_container_2.name, db_container.name}
 
         project.unpause(service_names=['db'])
         assert len([c.name for c in project.containers() if c.is_paused]) == 2
@@ -330,7 +328,7 @@ class ProjectTest(DockerClientTestCase):
         assert len([c.name for c in project.containers() if c.is_paused]) == 0
 
         project.stop(service_names=['web'], timeout=1)
-        assert set(c.name for c in project.containers() if c.is_running) == set([db_container.name])
+        assert set(c.name for c in project.containers() if c.is_running) == {db_container.name}
 
         project.kill(service_names=['db'])
         assert len([c for c in project.containers() if c.is_running]) == 0
@@ -552,20 +550,20 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=load_config({
                 'console': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                 },
                 'data': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"]
                 },
                 'db': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                     'links': ['db'],
                 },
@@ -587,20 +585,20 @@ class ProjectTest(DockerClientTestCase):
             name='composetest',
             config_data=load_config({
                 'console': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                 },
                 'data': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"]
                 },
                 'db': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                     'volumes_from': ['data'],
                 },
                 'web': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': ["top"],
                     'links': ['db'],
                 },
@@ -626,7 +624,7 @@ class ProjectTest(DockerClientTestCase):
                 'version': '2.1',
                 'services': {
                     'foo': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'tmpfs': ['/dev/shm'],
                         'volumes': ['/dev/shm']
                     }
@@ -667,7 +665,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
                 'networks': {
                     'foo': None,
@@ -712,7 +710,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {'front': None},
             }],
             networks={
@@ -772,7 +770,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {'front': None},
             }],
             networks={
@@ -807,7 +805,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
                 'networks': {
                     'static_test': {
@@ -859,7 +857,7 @@ class ProjectTest(DockerClientTestCase):
                 version=V2_3,
                 services=[{
                     'name': 'web',
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'networks': {
                         'n1': {
                             'priority': p1,
@@ -922,7 +920,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
                 'networks': {
                     'static_test': {
@@ -965,7 +963,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {
                     'static_test': {
                         'ipv4_address': '172.16.100.100',
@@ -1001,7 +999,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {
                     'linklocaltest': {
                         'link_local_ips': ['169.254.8.8']
@@ -1038,7 +1036,7 @@ class ProjectTest(DockerClientTestCase):
                 'name': 'web',
                 'volumes': [VolumeSpec.parse('foo:/container-path')],
                 'networks': {'foo': {}},
-                'image': 'busybox:latest'
+                'image': BUSYBOX_IMAGE_WITH_TAG
             }],
             networks={
                 'foo': {
@@ -1074,7 +1072,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'isolation': 'default'
             }],
         )
@@ -1094,7 +1092,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'isolation': 'foobar'
             }],
         )
@@ -1114,7 +1112,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_3,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'runtime': 'runc'
             }],
         )
@@ -1134,7 +1132,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_3,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'runtime': 'foobar'
             }],
         )
@@ -1154,7 +1152,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_3,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'runtime': 'nvidia'
             }],
         )
@@ -1174,7 +1172,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {'internal': None},
             }],
             networks={
@@ -1203,7 +1201,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'networks': {network_name: None}
             }],
             networks={
@@ -1236,7 +1234,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
@@ -1263,7 +1261,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'volumes': [VolumeSpec.parse('{}:/data'.format(volume_name))]
             }],
             volumes={
@@ -1302,9 +1300,9 @@ class ProjectTest(DockerClientTestCase):
             {
                 'version': str(V2_0),
                 'services': {
-                    'simple': {'image': 'busybox:latest', 'command': 'top'},
+                    'simple': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
                     'another': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'command': 'top',
                         'logging': {
                             'driver': "json-file",
@@ -1355,7 +1353,7 @@ class ProjectTest(DockerClientTestCase):
                 'version': str(V2_0),
                 'services': {
                     'simple': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'command': 'top',
                         'ports': ['1234:1234']
                     },
@@ -1389,7 +1387,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_2,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
                 'scale': 3
             }]
@@ -1419,7 +1417,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {}},
@@ -1443,7 +1441,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {}},
@@ -1467,7 +1465,7 @@ class ProjectTest(DockerClientTestCase):
             version=V3_1,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'cat /run/secrets/special',
                 'secrets': [
                     types.ServiceSecret.parse({'source': 'super', 'target': 'special'}),
@@ -1496,6 +1494,60 @@ class ProjectTest(DockerClientTestCase):
         output = container.logs()
         assert output == b"This is the secret\n"
 
+    @v3_only()
+    def test_project_up_with_added_secrets(self):
+        node = create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
+
+        config_input1 = {
+            'version': V3_1,
+            'services': [
+                {
+                    'name': 'web',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'cat /run/secrets/special',
+                    'environment': ['constraint:node=={}'.format(node if node is not None else '')]
+                }
+
+            ],
+            'secrets': {
+                'super': {
+                    'file': os.path.abspath('tests/fixtures/secrets/default')
+                }
+            }
+        }
+        config_input2 = copy.deepcopy(config_input1)
+        # Add the secret
+        config_input2['services'][0]['secrets'] = [
+            types.ServiceSecret.parse({'source': 'super', 'target': 'special'})
+        ]
+
+        config_data1 = build_config(**config_input1)
+        config_data2 = build_config(**config_input2)
+
+        # First up with non-secret
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data1,
+        )
+        project.up()
+
+        # Then up with secret
+        project = Project.from_config(
+            client=self.client,
+            name='composetest',
+            config_data=config_data2,
+        )
+        project.up()
+        project.stop()
+
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        container, = containers
+
+        output = container.logs()
+        assert output == b"This is the secret\n"
+
     @v2_only()
     def test_initialize_volumes_invalid_volume_driver(self):
         vol_name = '{0:x}'.format(random.getrandbits(32))
@@ -1504,7 +1556,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'foobar'}},
@@ -1527,7 +1579,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
@@ -1569,7 +1621,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={
@@ -1611,7 +1663,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={vol_name: {'driver': 'local'}},
@@ -1650,7 +1702,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={
@@ -1674,7 +1726,7 @@ class ProjectTest(DockerClientTestCase):
             version=V2_0,
             services=[{
                 'name': 'web',
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top'
             }],
             volumes={
@@ -1702,7 +1754,7 @@ class ProjectTest(DockerClientTestCase):
                 'version': str(V2_0),
                 'services': {
                     'simple': {
-                        'image': 'busybox:latest',
+                        'image': BUSYBOX_IMAGE_WITH_TAG,
                         'command': 'top',
                         'volumes': ['{0}:/data'.format(vol_name)]
                     },
@@ -1731,7 +1783,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_orphans(self):
         config_dict = {
             'service1': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
             }
         }
@@ -1768,7 +1820,7 @@ class ProjectTest(DockerClientTestCase):
     def test_project_up_ignore_orphans(self):
         config_dict = {
             'service1': {
-                'image': 'busybox:latest',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
                 'command': 'top',
             }
         }
@@ -1796,7 +1848,7 @@ class ProjectTest(DockerClientTestCase):
             'version': '2.1',
             'services': {
                 'svc1': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'healthcheck': {
                         'test': 'exit 0',
@@ -1806,7 +1858,7 @@ class ProjectTest(DockerClientTestCase):
                     },
                 },
                 'svc2': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'depends_on': {
                         'svc1': {'condition': 'service_healthy'},
@@ -1833,7 +1885,7 @@ class ProjectTest(DockerClientTestCase):
             'version': '2.1',
             'services': {
                 'svc1': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'healthcheck': {
                         'test': 'exit 1',
@@ -1843,7 +1895,7 @@ class ProjectTest(DockerClientTestCase):
                     },
                 },
                 'svc2': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'depends_on': {
                         'svc1': {'condition': 'service_healthy'},
@@ -1872,14 +1924,14 @@ class ProjectTest(DockerClientTestCase):
             'version': '2.1',
             'services': {
                 'svc1': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'healthcheck': {
                         'disable': True
                     },
                 },
                 'svc2': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'depends_on': {
                         'svc1': {'condition': 'service_healthy'},
@@ -1916,7 +1968,7 @@ class ProjectTest(DockerClientTestCase):
             'version': '2.3',
             'services': {
                 'svc1': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'top',
                     'security_opt': ['seccomp:"{}"'.format(profile_path)]
                 }
@@ -1940,7 +1992,7 @@ class ProjectTest(DockerClientTestCase):
             'version': '2.3',
             'services': {
                 'svc1': {
-                    'image': 'busybox:latest',
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
                     'command': 'ls',
                     'volumes': ['foo:/foo:rw'],
                     'networks': ['bar'],

@@ -1,7 +1,7 @@
 simple:
-  image: busybox:latest
+  image: busybox:1.31.0-uclibc
   command: sh -c "echo hello && tail -f /dev/null"
 another:
-  image: busybox:latest
-  command: sh -c "sleep 0.5 && echo world && /bin/false"
+  image: busybox:1.31.0-uclibc
+  command: sh -c "sleep 2 && echo world && /bin/false"
   restart: "on-failure:2"

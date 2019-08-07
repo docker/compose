@@ -1,0 +1,11 @@
+version: "3"
+services:
+  build_simple:
+    image: simple
+    build: .
+    command: top
+  from_simple:
+    image: simple
+  another:
+    image: busybox:1.31.0-uclibc
+    command: top
