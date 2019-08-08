@@ -643,6 +643,10 @@ func (f *notifyFixture) consumeEventsInBackground(ctx context.Context) chan erro
 }
 
 func (f *notifyFixture) fsync() {
+	f.fsyncWithRetryCount(3)
+}
+
+func (f *notifyFixture) fsyncWithRetryCount(retryCount int) {
 	if len(f.paths) == 0 {
 		return
 	}
@@ -650,7 +654,7 @@ func (f *notifyFixture) fsync() {
 	syncPathBase := fmt.Sprintf("sync-%d.txt", time.Now().UnixNano())
 	syncPath := filepath.Join(f.paths[0], syncPathBase)
 	anySyncPath := filepath.Join(f.paths[0], "sync-")
-	timeout := time.After(time.Second)
+	timeout := time.After(250 * time.Millisecond)
 
 	f.WriteFile(syncPath, fmt.Sprintf("%s", time.Now()))
 
@@ -677,7 +681,12 @@ F:
 			f.events = append(f.events, event)
 
 		case <-timeout:
-			f.T().Fatalf("fsync: timeout")
+			if retryCount <= 0 {
+				f.T().Fatalf("fsync: timeout")
+			} else {
+				f.fsyncWithRetryCount(retryCount - 1)
+			}
+			return
 		}
 	}
 }
