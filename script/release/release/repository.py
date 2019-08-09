@@ -87,6 +87,20 @@ class Repository(object):
             head=branch_name(version),
         )
 
+    def find_release_pull_request(self, version):
+        pullRequests = self.gh_repo.get_pulls(
+            base='release',
+        )
+        if pullRequests.totalCount == 0:
+            raise ScriptError('Unable to find release pull requests.')
+        elif pullRequests.totalCount > 1:
+            raise ScriptError('Too many release pull requests are open.')
+        else:
+            pr = pullRequests[0]
+            if pr.head.ref != branch_name(version):
+                raise ScriptError('Unable to find release pull requests.')
+            return pr
+
     def create_release(self, version, release_notes, **kwargs):
         return self.gh_repo.create_git_release(
             tag=version, name=version, message=release_notes, **kwargs

@@ -38,7 +38,7 @@ if debian_based; then
 fi
 
 $VENV_PYTHONBIN -m pip install -U Jinja2==2.10 \
-    PyGithub==1.39 \
+    PyGithub==1.43 \
     GitPython==2.1.9 \
     requests==2.18.4 \
     setuptools==40.6.2 \

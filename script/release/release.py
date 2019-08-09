@@ -38,10 +38,10 @@ def create_initial_branch(repository, args):
         cherries = input('Indicate (space-separated) PR numbers to cherry-pick then press Enter:\n')
         repository.cherry_pick_prs(release_branch, cherries.split())
 
-    return create_bump_commit(repository, release_branch, args.bintray_user, args.bintray_org)
+    return create_bump_commit(repository, release_branch)
 
 
-def create_bump_commit(repository, release_branch, bintray_user, bintray_org):
+def create_bump_commit(repository, release_branch):
     with release_branch.config_reader() as cfg:
         release = cfg.get('release')
     print('Updating version info in __init__.py and run.sh')
@@ -58,19 +58,15 @@ def create_bump_commit(repository, release_branch, bintray_user, bintray_org):
         repository.create_bump_commit(release_branch, release)
     repository.push_branch_to_remote(release_branch)
 
-    bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], bintray_user)
-    if not bintray_api.repository_exists(bintray_org, release_branch.name):
-        print('Creating data repository {} on bintray'.format(release_branch.name))
-        bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
-    else:
-        print('Bintray repository {} already exists. Skipping'.format(release_branch.name))
-
 
 def monitor_pr_status(pr_data):
     print('Waiting for CI to complete...')
     last_commit = pr_data.get_commits().reversed[0]
     while True:
         status = last_commit.get_combined_status()
+        if status.total_count == 0:
+            print('Nothing to monitor, skipping.')
+            return True
         if status.state == 'pending' or status.state == 'failure':
             summary = {
                 'pending': 0,
@@ -129,6 +125,16 @@ def create_release_draft(repository, version, pr_data, files):
     )
     print('Release draft initialized')
     return gh_release
+
+
+def init_bintray_reppository(bintray_user, bintray_org, version):
+    bintray_api = BintrayAPI(os.environ['BINTRAY_TOKEN'], bintray_user)
+    repo_name = branch_name(version)
+    if not bintray_api.repository_exists(bintray_org, repo_name):
+        print('Creating data repository {} on bintray'.format(repo_name))
+        bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
+    else:
+        print('Bintray repository {} already exists. Skipping'.format(repo_name))
 
 
 def print_final_instructions(args):
@@ -191,7 +197,8 @@ def resume(args):
             cherries = input('Indicate (space-separated) PR numbers to cherry-pick then press Enter:\n')
             repository.cherry_pick_prs(release_branch, cherries.split())
 
-        create_bump_commit(repository, release_branch, args.bintray_user, args.bintray_org)
+        create_bump_commit(repository, release_branch)
+        init_bintray_reppository(args.bintray_user, args.bintray_org, args.release)
         pr_data = repository.find_release_pr(args.release)
         if not pr_data:
             pr_data = repository.create_release_pull_request(args.release)
@@ -231,11 +238,47 @@ def cancel(args):
     return 0
 
 
+def init(args):
+    distclean()
+    try:
+        repository = Repository(REPO_ROOT, args.repo)
+        create_initial_branch(repository, args)
+        pr_data = repository.create_release_pull_request(args.release)
+    except ScriptError as e:
+        print(e)
+        return 1
+
+    return 0
+
+
+def perform(args):
+    distclean()
+    try:
+        init_bintray_reppository(args.bintray_user, args.bintray_org, args.release)
+        repository = Repository(REPO_ROOT, args.repo)
+        pr_data = repository.find_release_pull_request(args.release)
+        check_pr_mergeable(pr_data)
+        if not args.skip_ci:
+            monitor_pr_status(pr_data)
+        downloader = BinaryDownloader(args.destination)
+        files = downloader.download_all(args.release)
+        gh_release = create_release_draft(repository, args.release, pr_data, files)
+        upload_assets(gh_release, files)
+        img_manager = ImageManager(args.release)
+        img_manager.build_images(repository)
+    except ScriptError as e:
+        print(e)
+        return 1
+
+    return 0
+
+
 def start(args):
     distclean()
     try:
         repository = Repository(REPO_ROOT, args.repo)
         create_initial_branch(repository, args)
+        init_bintray_reppository(args.bintray_user, args.bintray_org, args.release)
         pr_data = repository.create_release_pull_request(args.release)
         check_pr_mergeable(pr_data)
         if not args.skip_ci:
@@ -298,6 +341,8 @@ def finalize(args):
 
 
 ACTIONS = [
+    'init',
+    'perform',
     'start',
     'cancel',
     'resume',
@@ -368,7 +413,11 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.action == 'start':
+    if args.action == 'init':
+        return init(args)
+    elif args.action == 'perform':
+        return perform(args)
+    elif args.action == 'start':
         return start(args)
     elif args.action == 'resume':
         return resume(args)
