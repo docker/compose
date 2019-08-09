@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
 
-	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/ospath"
+	"github.com/windmilleng/tilt/pkg/logger"
 )
 
 // A naive file watcher that uses the plain fsnotify API.

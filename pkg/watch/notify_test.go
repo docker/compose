@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/windmilleng/tilt/internal/dockerignore"
-	"github.com/windmilleng/tilt/internal/logger"
 	"github.com/windmilleng/tilt/internal/testutils/tempdir"
+	"github.com/windmilleng/tilt/pkg/logger"
 )
 
 // Each implementation of the notify interface should have the same basic
