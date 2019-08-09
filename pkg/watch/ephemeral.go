@@ -2,7 +2,7 @@ package ignore
 
 import (
 	"github.com/windmilleng/tilt/internal/dockerignore"
-	"github.com/windmilleng/tilt/internal/model"
+	"github.com/windmilleng/tilt/pkg/model"
 )
 
 // Filter out spurious changes that we don't want to rebuild on, like IDE
