@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/windmilleng/tilt/internal/logger"
+	"github.com/windmilleng/tilt/pkg/logger"
 )
 
 var (
