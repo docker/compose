@@ -30,6 +30,10 @@ def find_version(*file_paths):
 
 
 install_requires = [
+    'enum34 >= 1.0.4, < 2;python_version<"3.4"',
+    'backports.ssl_match_hostname >= 3.5, < 4;python_version<"3.5"',
+    'ipaddress >= 1.0.16, < 2;python_version<"3.3"',
+    'colorama >= 0.4, < 1;sys_platform=="win32"',
     'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 1',
     'PyYAML >= 3.10, < 5',
@@ -44,33 +48,14 @@ install_requires = [
 
 
 tests_require = [
+    'mock >= 1.0.1, < 4; python_version<"3.4"',
     'pytest < 6',
 ]
 
 
-if sys.version_info[:2] < (3, 4):
-    tests_require.append('mock >= 1.0.1, < 4')
-
 extras_require = {
-    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
-    ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
-    ':python_version < "3.3"': ['ipaddress >= 1.0.16, < 2'],
-    ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
-
-
-try:
-    if 'bdist_wheel' not in sys.argv:
-        for key, value in extras_require.items():
-            if key.startswith(':') and pkg_resources.evaluate_marker(key[1:]):
-                install_requires.extend(value)
-except Exception as e:
-    print("Failed to compute platform dependencies: {}. ".format(e) +
-          "All dependencies will be installed as a result.", file=sys.stderr)
-    for key, value in extras_require.items():
-        if key.startswith(':'):
-            install_requires.extend(value)
 
 
 setup(
