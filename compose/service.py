@@ -1713,7 +1713,8 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
               forcerm=False, dockerfile=None, container_limits=None,
               decode=False, buildargs=None, gzip=False, shmsize=None,
               labels=None, cache_from=None, target=None, network_mode=None,
-              squash=None, extra_hosts=None, platform=None, isolation=None):
+              squash=None, extra_hosts=None, platform=None, isolation=None,
+              use_config_proxy=True):
     """
     Args:
         path (str): Path to the directory containing the Dockerfile
@@ -1760,6 +1761,10 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
         target (str): Name of the build-stage to build in a multi-stage
             Dockerfile
         timeout (int): HTTP timeout
+        use_config_proxy (bool): If ``True``, and if the docker client
+            configuration file (``~/.docker/config.json`` by default)
+            contains a proxy configuration, the corresponding environment
+            variables will be set in the container being built.
     Returns:
         A generator for the build output.
     """
@@ -1768,26 +1773,13 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
     iidfile = tempfile.mktemp()
 
     command_builder = _CommandBuilder()
-    command_builder.add_params("--add-host", extra_hosts)
     command_builder.add_params("--build-arg", buildargs)
-    command_builder.add_list("--cache-from", cache_from)
     command_builder.add_arg("--file", dockerfile)
     command_builder.add_flag("--force-rm", forcerm)
-    command_builder.add_arg("--iidfile", iidfile)
-    command_builder.add_arg("--isolation", isolation)
-    command_builder.add_params("--label", labels)
     command_builder.add_arg("--memory", container_limits.get("memory"))
-    command_builder.add_arg("--network", network_mode)
     command_builder.add_flag("--no-cache", nocache)
-    command_builder.add_arg("--platform", platform)
     command_builder.add_flag("--pull", pull)
-    command_builder.add_flag("--quiet", quiet)
-    command_builder.add_flag("--rm", rm)
-    command_builder.add_arg("--shm-size", shmsize)
-    command_builder.add_flag("--squash", squash)
-    command_builder.add_arg("--tag", tag)
-    command_builder.add_arg("--target", target)
-
+    command_builder.add_arg("--iidfile", iidfile)
     args = command_builder.build([path])
 
     magic_word = "Successfully built "
@@ -1795,19 +1787,19 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
     with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
         while True:
             line = p.stdout.readline()
-            if line == "":
+            if not line:
                 break
-            if magic_word in line:
+            if line.startswith(magic_word):
                 appear = True
             yield json.dumps({"stream": line})
 
-    if os.path.exists(iidfile):
-        with open(iidfile) as f:
-            image_id = f.readline().split(":")[1].strip()
-        os.remove(iidfile)
+    with open(iidfile) as f:
+        line = f.readline()
+        image_id = line.split(":")[1].strip()
+    os.remove(iidfile)
 
-        if not appear:
-            yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
+    if not appear:
+        yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
 
 
 class _CommandBuilder(object):
@@ -1815,7 +1807,7 @@ class _CommandBuilder(object):
         self._args = ["docker", "build"]
 
     def add_arg(self, name, value):
-        if value is not None:
+        if value:
             self._args.extend([name, str(value)])
 
     def add_flag(self, name, flag):
