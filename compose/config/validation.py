@@ -245,10 +245,13 @@ def validate_credential_spec(service_config):
     if not credential_spec:
         return
 
-    if 'registry' not in credential_spec and 'file' not in credential_spec:
+    allowed = ['registry', 'file', 'raw']
+    found =  any(elem in credential_spec for elem in allowed)
+
+    if not found:
         raise ConfigurationError(
             "Service '{s.name}' is missing 'credential_spec.file' or "
-            "credential_spec.registry'".format(s=service_config)
+            "'credential_spec.registry' or 'credential_spec.raw'".format(s=service_config)
         )
 
 

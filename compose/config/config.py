@@ -956,6 +956,8 @@ def convert_restart_policy(name):
 def convert_credential_spec_to_security_opt(credential_spec):
     if 'file' in credential_spec:
         return 'file://{file}'.format(file=credential_spec['file'])
+    if 'raw' in credential_spec:
+        return 'raw://{raw}'.format(raw=credential_spec['raw'])
     return 'registry://{registry}'.format(registry=credential_spec['registry'])
 
 
