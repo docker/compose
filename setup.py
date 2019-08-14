@@ -7,9 +7,7 @@ from __future__ import unicode_literals
 import codecs
 import os
 import re
-import sys
 
-import pkg_resources
 from setuptools import find_packages
 from setuptools import setup
 
