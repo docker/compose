@@ -1,0 +1,9 @@
+version: '3'
+services:
+  show_env:
+    image: alpine:latest
+    environment:
+      VAR1: VAL1
+      VAR2: $VAR2
+    command:
+      env

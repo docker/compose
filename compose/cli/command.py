@@ -39,8 +39,12 @@ SILENT_COMMANDS = {
 
 def project_from_options(project_dir, options, additional_options={}):
     override_dir = options.get('--project-directory')
-    environment_file = options.get('--env-file')
-    environment = Environment.from_env_file(override_dir or project_dir, environment_file)
+    skip_environment_file = options.get('--skip-env-file')
+    if skip_environment_file:
+        environment = Environment.from_nothing()
+    else:
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(override_dir or project_dir, environment_file)
     environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
     set_parallel_limit(environment)
 
@@ -79,8 +83,12 @@ def set_parallel_limit(environment):
 
 def get_config_from_options(base_dir, options, additional_options={}):
     override_dir = options.get('--project-directory')
-    environment_file = options.get('--env-file')
-    environment = Environment.from_env_file(override_dir or base_dir, environment_file)
+    skip_environment_file = options.get('--skip-env-file')
+    if skip_environment_file:
+        environment = Environment.from_nothing()
+    else:
+        environment_file = options.get('--env-file')
+        environment = Environment.from_env_file(override_dir or base_dir, environment_file)
     config_path = get_config_path_from_options(
         base_dir, options, environment
     )

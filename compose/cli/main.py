@@ -209,6 +209,7 @@ class TopLevelCommand(object):
       --compatibility             If set, Compose will attempt to convert keys
                                   in v3 files to their non-Swarm equivalent
       --env-file PATH             Specify an alternate environment file
+      --skip-env-file             Skip loading an environment file
 
     Commands:
       build              Build or rebuild services
@@ -249,8 +250,13 @@ class TopLevelCommand(object):
 
     @property
     def toplevel_environment(self):
-        environment_file = self.toplevel_options.get('--env-file')
-        return Environment.from_env_file(self.project_dir, environment_file)
+        skip_environment_file = self.toplevel_options.get('--skip-env-file')
+        if skip_environment_file:
+            environment = Environment.from_nothing()
+        else:
+            environment_file = self.toplevel_options.get('--env-file')
+            environment = Environment.from_env_file(self.project_dir, environment_file)
+        return environment
 
     def build(self, options):
         """

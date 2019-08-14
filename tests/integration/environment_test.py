@@ -68,3 +68,16 @@ class EnvironmentOverrideFileTest(DockerClientTestCase):
         assert "WHEREAMI=override" in containers[0].get('Config.Env')
         assert "DEFAULT_CONF_LOADED=true" in containers[0].get('Config.Env')
         dispatch(base_dir, ['--env-file', '.env.override', 'down'], None)
+
+
+class EnvironmentSkipFileTest(DockerClientTestCase):
+    def test_env_file_skip(self):
+        base_dir = 'tests/fixtures/env-file-skip'
+
+        result = dispatch(base_dir, ['up'])
+        assert "VAR1=VAL1" in result.stdout
+        assert "VAR2=VAL2" in result.stdout
+
+        result = dispatch(base_dir, ['--skip-env-file', 'up'])
+        assert "VAR1=VAL1" in result.stdout
+        assert "VAR2=VAL2" not in result.stdout

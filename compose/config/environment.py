@@ -59,6 +59,12 @@ class Environment(dict):
         self.silent = False
 
     @classmethod
+    def from_nothing(cls):
+        instance = cls()
+        instance.update(os.environ)
+        return instance
+
+    @classmethod
     def from_env_file(cls, base_dir, env_file=None):
         def _initialize():
             result = cls()
