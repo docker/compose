@@ -17,7 +17,7 @@ import (
 var ephemeralPathMatcher = initEphemeralPathMatcher()
 
 func initEphemeralPathMatcher() model.PathMatcher {
-	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___"}
+	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___", "**/.idea/**"}
 	emacsPatterns := []string{"**/.#*"}
 	vimPatterns := []string{"**/4913", "**/*~", "**/.*.swp", "**/.*.swx"}
 
