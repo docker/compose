@@ -122,15 +122,11 @@
           }
         },
         "container_name": {"type": "string"},
-        "credential_spec": {
-          "type": "object",
-          "properties": {
-            "config": {"type": "string"},
-            "file": {"type": "string"},
-            "registry": {"type": "string"}
-          },
-          "additionalProperties": false
-        },
+        "credential_spec": {"type": "object", "properties": {
+          "config": {"type": "string"},
+          "file": {"type": "string"},
+          "registry": {"type": "string"}
+        }},
         "depends_on": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
@@ -159,7 +155,7 @@
         "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
-        "init": {"type": "boolean"},
+	"init": {"type": "boolean"},
         "ipc": {"type": "string"},
         "isolation": {"type": "string"},
         "labels": {"$ref": "#/definitions/list_or_dict"},
