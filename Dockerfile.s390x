@@ -1,4 +1,4 @@
-FROM s390x/alpine:3.6
+FROM s390x/alpine:3.10.1
 
 ARG COMPOSE_VERSION=1.16.1
 
