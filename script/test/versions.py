@@ -128,6 +128,22 @@ def get_default(versions):
             return version
 
 
+def get_default_versions(versions, num=1):
+    """Return a list of the latest stable versions for each major.minor version
+    group.
+    """
+    versions = group_versions(versions)
+    num = min(len(versions), num)
+    vs = list()
+    for index in range(len(versions)):
+        v = get_default(versions[index])
+        if v is not None:
+            vs.append(v)
+        if len(vs) == num:
+            break
+    return vs
+
+
 def get_versions(tags):
     for tag in tags:
         try:
@@ -157,7 +173,7 @@ def get_github_releases(projects):
 def parse_args(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('project', help="Github project name (ex: docker/docker)")
-    parser.add_argument('command', choices=['recent', 'default'])
+    parser.add_argument('command', choices=['recent', 'default', 'stable'])
     parser.add_argument('-n', '--num', type=int, default=2,
                         help="Number of versions to return from `recent`")
     return parser.parse_args(argv)
@@ -171,6 +187,8 @@ def main(argv=None):
         print(' '.join(map(str, get_latest_versions(versions, args.num))))
     elif args.command == 'default':
         print(get_default(versions))
+    elif args.command == 'stable':
+        print(' '.join(map(str, get_default_versions(versions, args.num))))
     else:
         raise ValueError("Unknown command {}".format(args.command))
 

@@ -1,0 +1,20 @@
+ARG PYTHON_VERSION=3.7.4
+ARG BUILD_ALPINE_VERSION=3.10
+ARG RUNTIME_ALPINE_VERSION=3.10.0
+
+ARG BUILD_PLATFORM=alpine
+
+FROM python:${PYTHON_VERSION}-alpine${BUILD_ALPINE_VERSION} AS build-alpine
+RUN apk add --no-cache \
+    bash \
+    python2 \
+    python2-dev
+
+FROM build-${BUILD_PLATFORM} AS publish
+COPY . .
+RUN pip install twine
+RUN python setup.py sdist bdist_wheel
+
+FROM build-${BUILD_PLATFORM} AS bintray
+RUN pip install requests
+COPY . .

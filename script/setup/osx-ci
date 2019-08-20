@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+set -ex
+
+. $(dirname $0)/osx_helpers.sh
+
+DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET:-"$(macos_version)"}
+SDK_FETCH=
+if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
+  SDK_FETCH=1
+  # SDK URL from https://github.com/docker/golang-cross/blob/master/osx-cross.sh
+  SDK_URL=https://s3.dockerproject.org/darwin/v2/MacOSX${DEPLOYMENT_TARGET}.sdk.tar.xz
+  SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
+fi
+
+OPENSSL_VERSION=1.1.1c
+OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
+OPENSSL_SHA1=71b830a077276cbeccc994369538617a21bee808
+
+PYTHON_VERSION=3.7.4
+PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
+PYTHON_SHA1=fb1d764be8a9dcd40f2f152a610a0ab04e0d0ed3
+
+#
+# Create toolchain directory.
+#
+BUILD_PATH="$(grealpath $(dirname $0)/../../build)"
+mkdir -p ${BUILD_PATH}
+TOOLCHAIN_PATH="${BUILD_PATH}/toolchain"
+mkdir -p ${TOOLCHAIN_PATH}
+
+#
+# Set macOS SDK.
+#
+if [[ ${SDK_FETCH} && ! -f ${TOOLCHAIN_PATH}/MacOSX${DEPLOYMENT_TARGET}.sdk/SDKSettings.plist ]]; then
+  SDK_PATH=${TOOLCHAIN_PATH}/MacOSX${DEPLOYMENT_TARGET}.sdk
+  fetch_tarball ${SDK_URL} ${SDK_PATH} ${SDK_SHA1}
+else
+  SDK_PATH="$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${DEPLOYMENT_TARGET}.sdk"
+fi
+
+#
+# Build OpenSSL.
+#
+OPENSSL_SRC_PATH=${TOOLCHAIN_PATH}/openssl-${OPENSSL_VERSION}
+if ! [[ $(${TOOLCHAIN_PATH}/bin/openssl version) == *"${OPENSSL_VERSION}"* ]]; then
+  rm -rf ${OPENSSL_SRC_PATH}
+  fetch_tarball ${OPENSSL_URL} ${OPENSSL_SRC_PATH} ${OPENSSL_SHA1}
+  (
+    cd ${OPENSSL_SRC_PATH}
+    export MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET}
+    export SDKROOT=${SDK_PATH}
+    ./Configure darwin64-x86_64-cc --prefix=${TOOLCHAIN_PATH}
+    make install_sw install_dev
+  )
+fi
+
+#
+# Build Python.
+#
+PYTHON_SRC_PATH=${TOOLCHAIN_PATH}/Python-${PYTHON_VERSION}
+if ! [[ $(${TOOLCHAIN_PATH}/bin/python3 --version) == *"${PYTHON_VERSION}"* ]]; then
+  rm -rf ${PYTHON_SRC_PATH}
+  fetch_tarball ${PYTHON_URL} ${PYTHON_SRC_PATH} ${PYTHON_SHA1}
+  (
+    cd ${PYTHON_SRC_PATH}
+    ./configure --prefix=${TOOLCHAIN_PATH} \
+      --enable-ipv6 --without-ensurepip --with-dtrace --without-gcc \
+      --datarootdir=${TOOLCHAIN_PATH}/share \
+      --datadir=${TOOLCHAIN_PATH}/share \
+      --enable-framework=${TOOLCHAIN_PATH}/Frameworks \
+      --with-openssl=${TOOLCHAIN_PATH} \
+      MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET} \
+      CFLAGS="-isysroot ${SDK_PATH} -I${TOOLCHAIN_PATH}/include" \
+      CPPFLAGS="-I${SDK_PATH}/usr/include -I${TOOLCHAIN_PATH}/include" \
+      LDFLAGS="-isysroot ${SDK_PATH} -L ${TOOLCHAIN_PATH}/lib"
+    make -j 4
+    make install PYTHONAPPSDIR=${TOOLCHAIN_PATH}
+    make frameworkinstallextras PYTHONAPPSDIR=${TOOLCHAIN_PATH}/share
+  )
+fi
+
+#
+# Smoke test built Python.
+#
+openssl_version ${TOOLCHAIN_PATH}
+
+echo ""
+echo "*** Targeting macOS: ${DEPLOYMENT_TARGET}"
+echo "*** Using SDK ${SDK_PATH}"
+echo "*** Using $(python3_version ${TOOLCHAIN_PATH})"
+echo "*** Using $(openssl_version ${TOOLCHAIN_PATH})"

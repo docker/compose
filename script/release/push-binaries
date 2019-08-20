@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Push binaries to Bintray
+#
+
+set -ex
+
+DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
+IMAGE_TAG="docker/compose:bintray-${DOCKER_COMPOSE_GITSHA}"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+docker build -f Dockerfile.python --target bintray -t "${IMAGE_TAG}" .
+LINUX_BIN=$(ls dist|grep Linux|grep -v sha)
+DARWIN_BIN=$(ls dist|grep Darwin|grep -v sha)
+docker container run --rm -e BINTRAY_USER -e BINTRAY_TOKEN "${IMAGE_TAG}" python ./script/release/publish-bintray.py -f ${LINUX_BIN} --os linux --branch ${BRANCH}
+docker container run --rm -e BINTRAY_USER -e BINTRAY_TOKEN "${IMAGE_TAG}" python ./script/release/publish-bintray.py -f ${DARWIN_BIN} --os osx --branch ${BRANCH}
+docker image rm -f "${IMAGE_TAG}"

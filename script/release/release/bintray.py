@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import json
+import os
 
 import requests
 
@@ -42,6 +43,42 @@ class BintrayAPI(requests.Session):
             base=self.base_url, subject=subject, repo_name=repo_name,
         )
         return self.delete(url)
+
+    def create_package(self, subject, repo_name, package_name):
+        url = '{base}packages/{subject}/{repo_name}'.format(
+            base=self.base_url, subject=subject, repo_name=repo_name
+        )
+        data = {
+            'name': package_name,
+            'desc': 'auto',
+            'website_url': 'https://docs.docker.com/compose/',
+            'licenses': ['Apache-2.0'],
+            'vcs_url': 'git@github.com:docker/compose.git',
+        }
+        return self.post_json(url, data)
+
+    def create_version(self, subject, repo_name, package_name):
+        url = '{base}packages/{subject}/{repo_name}/{package_name}/versions'.format(
+            base=self.base_url, subject=subject, repo_name=repo_name, package_name=package_name
+        )
+        data = {
+            'name': repo_name,
+            'desc': 'Automated build of the {repo_name} branch'.format(repo_name=repo_name),
+        }
+        return self.post_json(url, data)
+
+    def upload_file(self, subject, repo_name, package_name, file):
+        url = '{base}content/{subject}/{repo_name}/{filename}'.format(
+            base=self.base_url, subject=subject, repo_name=repo_name, filename=os.path.basename(file)
+        )
+        headers = {
+            'X-Bintray-Package': package_name,
+            'X-Bintray-Version': repo_name,
+            'X-Bintray-Override': 1,
+            'X-Bintray-Publish': 1,
+        }
+        data = open(file, 'rb').read()
+        return self.put(url, data=data, headers=headers)
 
     def post_json(self, url, data, **kwargs):
         if 'headers' not in kwargs:
