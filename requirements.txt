@@ -11,14 +11,14 @@ enum34==1.1.6; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
 idna==2.5
 ipaddress==1.0.18
-jsonschema==2.6.0
+jsonschema==3.0.1
 paramiko==2.4.2
 pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
 pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.6.7
 PyYAML==4.2b1
 requests==2.22.0
-six==1.10.0
+six==1.12.0
 texttable==1.6.2
 urllib3==1.24.2; python_version == '3.3'
 websocket-client==0.32.0
