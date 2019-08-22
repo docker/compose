@@ -613,7 +613,7 @@ class TopLevelCommand(object):
                 image_id,
                 size
             ])
-        print(Formatter().table(headers, rows))
+        print(Formatter.table(headers, rows))
 
     def kill(self, options):
         """
@@ -747,7 +747,7 @@ class TopLevelCommand(object):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
-            print(Formatter().table(headers, rows))
+            print(Formatter.table(headers, rows))
 
     def pull(self, options):
         """
@@ -987,7 +987,7 @@ class TopLevelCommand(object):
                 rows.append(process)
 
             print(container.name)
-            print(Formatter().table(headers, rows))
+            print(Formatter.table(headers, rows))
 
     def unpause(self, options):
         """

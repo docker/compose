@@ -18,9 +18,11 @@ def get_tty_width():
     return int(width)
 
 
-class Formatter(object):
+class Formatter:
     """Format tabular data for printing."""
-    def table(self, headers, rows):
+
+    @staticmethod
+    def table(headers, rows):
         table = texttable.Texttable(max_width=get_tty_width())
         table.set_cols_dtype(['t' for h in headers])
         table.add_rows([headers] + rows)
