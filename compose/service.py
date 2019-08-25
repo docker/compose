@@ -1774,11 +1774,14 @@ def cli_build(path, tag=None, quiet=False, fileobj=None,
 
     command_builder = _CommandBuilder()
     command_builder.add_params("--build-arg", buildargs)
+    command_builder.add_list("--cache-from", cache_from)
     command_builder.add_arg("--file", dockerfile)
     command_builder.add_flag("--force-rm", forcerm)
     command_builder.add_arg("--memory", container_limits.get("memory"))
     command_builder.add_flag("--no-cache", nocache)
     command_builder.add_flag("--pull", pull)
+    command_builder.add_arg("--tag", tag)
+    command_builder.add_arg("--target", target)
     command_builder.add_arg("--iidfile", iidfile)
     args = command_builder.build([path])
 
