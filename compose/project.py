@@ -355,7 +355,8 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False, cli=False):
+              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False, cli=False,
+              progress=None):
 
         services = []
         for service in self.get_services(service_names):
@@ -368,7 +369,7 @@ class Project(object):
             log.warning("Native build is an experimental feature and could change at any time")
 
         def build_service(service):
-            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli)
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,

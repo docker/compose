@@ -270,6 +270,9 @@ class TopLevelCommand(object):
             --no-cache              Do not use cache when building the image.
             --no-rm                 Do not remove intermediate containers after a successful build.
             --parallel              Build images in parallel.
+            --progress string       Set type of progress output (auto, plain, tty).
+                                    EXPERIMENTAL flag for native builder.
+                                    To enable, run with COMPOSE_NATIVE_BUILDER=1)
             --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
         """
@@ -297,6 +300,7 @@ class TopLevelCommand(object):
             parallel_build=options.get('--parallel', False),
             silent=options.get('--quiet', False),
             cli=native_builder,
+            progress=options.get('--progress'),
         )
 
     def bundle(self, options):
