@@ -8,7 +8,6 @@ import random
 import shutil
 import tempfile
 
-import py
 import pytest
 from docker.errors import APIError
 from docker.errors import NotFound
@@ -16,6 +15,7 @@ from docker.errors import NotFound
 from .. import mock
 from ..helpers import build_config as load_config
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
+from ..helpers import cd
 from ..helpers import create_host_file
 from .testcases import DockerClientTestCase
 from .testcases import SWARM_SKIP_CONTAINERS_ALL
@@ -1329,9 +1329,9 @@ class ProjectTest(DockerClientTestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        tmpdir = py.test.ensuretemp('logging_test')
-        self.addCleanup(tmpdir.remove)
-        with tmpdir.as_cwd():
+        tmpdir = tempfile.mkdtemp('logging_test')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with cd(tmpdir):
             config_data = config.load(details)
         project = Project.from_config(
             name='composetest', config_data=config_data, client=self.client
