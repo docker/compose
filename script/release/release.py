@@ -132,7 +132,7 @@ def init_bintray_reppository(bintray_user, bintray_org, version):
     repo_name = branch_name(version)
     if not bintray_api.repository_exists(bintray_org, repo_name):
         print('Creating data repository {} on bintray'.format(repo_name))
-        bintray_api.create_repository(bintray_org, release_branch.name, 'generic')
+        bintray_api.create_repository(bintray_org, repo_name, 'generic')
     else:
         print('Bintray repository {} already exists. Skipping'.format(repo_name))
 
@@ -243,7 +243,7 @@ def init(args):
     try:
         repository = Repository(REPO_ROOT, args.repo)
         create_initial_branch(repository, args)
-        pr_data = repository.create_release_pull_request(args.release)
+        repository.create_release_pull_request(args.release)
     except ScriptError as e:
         print(e)
         return 1
