@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import contextlib
 import os
 
 from compose.config.config import ConfigDetails
@@ -55,3 +56,17 @@ def create_host_file(client, filename):
         content = fh.read()
 
     return create_custom_host_file(client, filename, content)
+
+
+@contextlib.contextmanager
+def cd(path):
+    """
+    A context manager which changes the working directory to the given
+    path, and then changes it back to its previous value on exit.
+    """
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
