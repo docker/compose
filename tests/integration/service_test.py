@@ -38,6 +38,8 @@ from compose.container import Container
 from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
+from compose.project import Project
+from compose.service import BuildAction
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import NetworkMode
@@ -965,6 +967,43 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(self.client.remove_image, service.image_name)
 
         assert self.client.inspect_image('composetest_web')
+
+    def test_build_cli(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('web',
+                                      build={'context': base_dir},
+                                      environment={
+                                          'COMPOSE_NATIVE_BUILDER': '1',
+                                          'DOCKER_BUILDKIT': '1',
+                                      })
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        assert self.client.inspect_image('composetest_web')
+
+    def test_up_build_cli(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        web = self.create_service('web',
+                                  build={'context': base_dir},
+                                  environment={
+                                      'COMPOSE_NATIVE_BUILDER': '1',
+                                      'DOCKER_BUILDKIT': '1',
+                                  })
+        project = Project('composetest', [web], self.client)
+        project.up(do_build=BuildAction.force)
+
+        containers = project.containers(['web'])
+        assert len(containers) == 1
+        assert containers[0].name.startswith('composetest_web_')
 
     def test_build_non_ascii_filename(self):
         base_dir = tempfile.mkdtemp()
