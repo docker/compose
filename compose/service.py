@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import re
-import subprocess
 import sys
 import tempfile
 from collections import namedtuple
@@ -61,6 +60,11 @@ from .utils import parse_bytes
 from .utils import parse_seconds_float
 from .utils import truncate_id
 from .utils import unique_everseen
+
+if six.PY2:
+    import subprocess32 as subprocess
+else:
+    import subprocess
 
 log = logging.getLogger(__name__)
 
