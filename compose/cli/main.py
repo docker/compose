@@ -266,7 +266,7 @@ class TopLevelCommand(object):
             --build-arg key=val     Set build-time variables for services.
             --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
-            -m, --memory MEM        Sets memory limit for the build container.
+            -m, --memory MEM        Set memory limit for the build container.
             --no-cache              Do not use cache when building the image.
             --no-rm                 Do not remove intermediate containers after a successful build.
             --parallel              Build images in parallel.

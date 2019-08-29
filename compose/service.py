@@ -1810,6 +1810,10 @@ class _CLIBuilder(object):
             image_id = line.split(":")[1].strip()
         os.remove(iidfile)
 
+        # In case of `DOCKER_BUILDKIT=1`
+        # there is no success message already present in the output.
+        # Since that's the way `Service::build` gets the `image_id`
+        # it has to be added `manually`
         if not appear:
             yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
 
