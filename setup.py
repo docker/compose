@@ -52,6 +52,7 @@ if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1, < 4')
 
 extras_require = {
+    ':python_version < "3.2"': ['subprocess32 >= 3.5.4, < 4'],
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
     ':python_version < "3.3"': ['ipaddress >= 1.0.16, < 2'],
