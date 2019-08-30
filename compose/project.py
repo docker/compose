@@ -369,10 +369,10 @@ class Project(object):
             log.warning("Native build is an experimental feature and could change at any time")
             if parallel_build:
                 log.warning("Flag '--parallel' is ignored when building with "
-                            "COMPOSE_NATIVE_BUILDER=1")
+                            "COMPOSE_DOCKER_CLI_BUILD=1")
             if gzip:
                 log.warning("Flag '--compress' is ignored when building with "
-                            "COMPOSE_NATIVE_BUILDER=1")
+                            "COMPOSE_DOCKER_CLI_BUILD=1")
 
         def build_service(service):
             service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)

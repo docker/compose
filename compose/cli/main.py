@@ -272,7 +272,7 @@ class TopLevelCommand(object):
             --parallel              Build images in parallel.
             --progress string       Set type of progress output (auto, plain, tty).
                                     EXPERIMENTAL flag for native builder.
-                                    To enable, run with COMPOSE_NATIVE_BUILDER=1)
+                                    To enable, run with COMPOSE_DOCKER_CLI_BUILD=1)
             --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
         """
@@ -286,7 +286,7 @@ class TopLevelCommand(object):
                 )
             build_args = resolve_build_args(build_args, self.toplevel_environment)
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_NATIVE_BUILDER')
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
 
         self.project.build(
             service_names=options['SERVICE'],
@@ -1078,7 +1078,7 @@ class TopLevelCommand(object):
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_NATIVE_BUILDER')
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)

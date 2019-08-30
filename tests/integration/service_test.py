@@ -978,7 +978,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web',
                                       build={'context': base_dir},
                                       environment={
-                                          'COMPOSE_NATIVE_BUILDER': '1',
+                                          'COMPOSE_DOCKER_CLI_BUILD': '1',
                                           'DOCKER_BUILDKIT': '1',
                                       })
         service.build(cli=True)
@@ -995,7 +995,7 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web',
                                   build={'context': base_dir},
                                   environment={
-                                      'COMPOSE_NATIVE_BUILDER': '1',
+                                      'COMPOSE_DOCKER_CLI_BUILD': '1',
                                       'DOCKER_BUILDKIT': '1',
                                   })
         project = Project('composetest', [web], self.client)
