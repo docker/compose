@@ -2,17 +2,17 @@ version: "2"
 
 services:
   web:
-    image: alpine:3.7
+    image: alpine:3.10.1
     command: top
     networks: ["front"]
   app:
-    image: alpine:3.7
+    image: alpine:3.10.1
     command: top
     networks: ["front", "back"]
     links:
       - "db:database"
   db:
-    image: alpine:3.7
+    image: alpine:3.10.1
     command: top
     networks: ["back"]
 

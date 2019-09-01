@@ -20,10 +20,11 @@ echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
 export PATH="${CODE_PATH}/pyinstaller:${PATH}"
 
 if [ ! -z "${BUILD_BOOTLOADER}" ]; then
-    # Build bootloader for alpine
-    git clone --single-branch --branch master https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
+    # Build bootloader for alpine; develop is the main branch
+    git clone --single-branch --branch develop https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
     cd /tmp/pyinstaller/bootloader
-    git checkout v3.4
+    # Checkout commit corresponding to version in requirements-build
+    git checkout v3.5
     "${VENV}"/bin/python3 ./waf configure --no-lsb all
     "${VENV}"/bin/pip3 install ..
     cd "${CODE_PATH}"

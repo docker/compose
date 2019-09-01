@@ -32,6 +32,8 @@ install_requires = [
     'backports.ssl_match_hostname >= 3.5, < 4;python_version<"3.5"',
     'ipaddress >= 1.0.16, < 2;python_version<"3.3"',
     'colorama >= 0.4, < 1;sys_platform=="win32"',
+    'subprocess >= 3.5.4, <4;python_version<"3.2"',
+
     'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 1',
     'PyYAML >= 3.10, < 5',
@@ -41,7 +43,7 @@ install_requires = [
     'docker[ssh] >= 3.7.0, < 5',
     'dockerpty >= 0.4.1, < 1',
     'six >= 1.3.0, < 2',
-    'jsonschema >= 2.5.1, < 3',
+    'jsonschema >= 2.5.1, < 4',
 ]
 
 
