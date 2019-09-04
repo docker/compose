@@ -152,6 +152,17 @@ class TestWatchEvents(object):
                 *thread_args)
         assert container_id in thread_map
 
+    def test_container_attach_event(self, thread_map, mock_presenters):
+        container_id = 'abcd'
+        mock_container = mock.Mock(is_restarting=False)
+        mock_container.attach_log_stream.side_effect = APIError("race condition")
+        event_die = {'action': 'die', 'id': container_id}
+        event_start = {'action': 'start', 'id': container_id, 'container': mock_container}
+        event_stream = [event_die, event_start]
+        thread_args = 'foo', 'bar'
+        watch_events(thread_map, event_stream, mock_presenters, thread_args)
+        assert mock_container.attach_log_stream.called
+
     def test_other_event(self, thread_map, mock_presenters):
         container_id = 'abcd'
         event_stream = [{'action': 'create', 'id': container_id}]
