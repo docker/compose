@@ -230,7 +230,13 @@ def watch_events(thread_map, event_stream, presenters, thread_args):
 
         # Container crashed so we should reattach to it
         if event['id'] in crashed_containers:
-            event['container'].attach_log_stream()
+            container = event['container']
+            if not container.is_restarting:
+                try:
+                    container.attach_log_stream()
+                except APIError:
+                    # Just ignore errors when reattaching to already crashed containers
+                    pass
             crashed_containers.remove(event['id'])
 
         thread_map[event['id']] = build_thread(
