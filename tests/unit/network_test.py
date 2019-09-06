@@ -168,3 +168,8 @@ class NetworkTest(unittest.TestCase):
         mock_log.warning.assert_called_once_with(mock.ANY)
         _, args, kwargs = mock_log.warning.mock_calls[0]
         assert 'label "com.project.touhou.character" has changed' in args[0]
+
+    def test_remote_config_labels_none(self):
+        remote = {'Labels': None}
+        local = Network(None, 'test_project', 'test_network')
+        check_remote_network_config(remote, local)

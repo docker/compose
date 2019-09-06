@@ -226,7 +226,7 @@ def check_remote_network_config(remote, local):
         raise NetworkConfigChangedError(local.true_name, 'enable_ipv6')
 
     local_labels = local.labels or {}
-    remote_labels = remote.get('Labels', {})
+    remote_labels = remote.get('Labels') or {}
     for k in set.union(set(remote_labels.keys()), set(local_labels.keys())):
         if k.startswith('com.docker.'):  # We are only interested in user-specified labels
             continue
