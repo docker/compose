@@ -892,6 +892,14 @@ class CLITestCase(DockerClientTestCase):
         assert 'Successfully tagged build-multiple-composefile_b:latest' in result.stdout
         assert 'Successfully built' in result.stdout
 
+    def test_build_target(self):
+        self.base_dir = 'tests/fixtures/build-target'
+        result = self.dispatch(['build', '--target', 'testpoint'])
+        assert 'Successfully tagged build-target_simple:latest' in result.stdout
+        assert 'Successfully tagged build-target_multi:latest' in result.stdout
+        assert 'Successfully built' in result.stdout
+        assert "as too_far" not in result.stdout
+
     def test_create(self):
         self.dispatch(['create'])
         service = self.project.get_service('simple')

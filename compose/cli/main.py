@@ -275,6 +275,7 @@ class TopLevelCommand(object):
                                     To enable, run with COMPOSE_DOCKER_CLI_BUILD=1)
             --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
+            --target string         Set the target build stage to build
         """
         service_names = options['SERVICE']
         build_args = options.get('--build-arg', None)
@@ -301,6 +302,7 @@ class TopLevelCommand(object):
             silent=options.get('--quiet', False),
             cli=native_builder,
             progress=options.get('--progress'),
+            target=options.get('--target'),
         )
 
     def bundle(self, options):

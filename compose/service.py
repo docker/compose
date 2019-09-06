@@ -1056,7 +1056,7 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False, rm=True, silent=False, cli=False, progress=None):
+              gzip=False, rm=True, silent=False, cli=False, progress=None, target=None):
         output_stream = open(os.devnull, 'w')
         if not silent:
             output_stream = sys.stdout
@@ -1090,7 +1090,7 @@ class Service(object):
             labels=build_opts.get('labels', None),
             buildargs=build_args,
             network_mode=build_opts.get('network', None),
-            target=build_opts.get('target', None),
+            target=target or build_opts.get('target', None),
             shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
             extra_hosts=build_opts.get('extra_hosts', None),
             container_limits={

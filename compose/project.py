@@ -356,7 +356,7 @@ class Project(object):
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
               build_args=None, gzip=False, parallel_build=False, rm=True, silent=False, cli=False,
-              progress=None):
+              progress=None, target=None):
 
         services = []
         for service in self.get_services(service_names):
@@ -375,7 +375,8 @@ class Project(object):
                             "COMPOSE_DOCKER_CLI_BUILD=1")
 
         def build_service(service):
-            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent,
+                          cli, progress, target)
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,
