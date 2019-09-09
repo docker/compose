@@ -382,7 +382,11 @@ class TopLevelCommand(object):
                     print('{} {}'.format(service.name, service.config_hash))
             return
 
-        print(serialize_config(compose_config, image_digests, not options['--no-interpolate']))
+        successful_msg = 'PASS: Validate the compose file'
+        validated_config = serialize_config(compose_config,
+                                            image_digests,
+                                            not options['--no-interpolate'])
+        print('{}\n{}'.format(successful_msg, validated_config))
 
     def create(self, options):
         """
