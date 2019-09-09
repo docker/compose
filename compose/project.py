@@ -810,7 +810,7 @@ def get_secrets(service, service_secrets, secret_defs):
 
         secret_file = secret_def.get('file')
         if not path.isfile(str(secret_file)):
-            log.warn(
+            log.warning(
                 "Service \"{service}\" uses an undefined secret file \"{secret_file}\", "
                 "the following folder is created \"{secret_file}\"".format(
                     service=service, secret_file=secret_file
