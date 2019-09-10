@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import os
 import pipes
 import re
 import subprocess
@@ -210,6 +211,7 @@ class TopLevelCommand(object):
                                   in v3 files to their non-Swarm equivalent
       --env-file PATH             Specify an alternate environment file
       --skip-env-file             Skip loading an environment file
+                                  (You can also specify this flag by setting COMPOSE_SKIP_ENV_FILE=1)
 
     Commands:
       build              Build or rebuild services
@@ -250,7 +252,8 @@ class TopLevelCommand(object):
 
     @property
     def toplevel_environment(self):
-        skip_environment_file = self.toplevel_options.get('--skip-env-file')
+        skip_environment_file = self.toplevel_options.get('--skip-env-file') \
+            or os.getenv("COMPOSE_SKIP_ENV_FILE")
         if skip_environment_file:
             environment = Environment.from_nothing()
         else:

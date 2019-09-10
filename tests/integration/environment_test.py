@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import os
 import tempfile
 
 from ddt import data
@@ -79,5 +80,9 @@ class EnvironmentSkipFileTest(DockerClientTestCase):
         assert "VAR2=VAL2" in result.stdout
 
         result = dispatch(base_dir, ['--skip-env-file', 'up'])
+        assert "VAR1=VAL1" in result.stdout
+        assert "VAR2=VAL2" not in result.stdout
+
+        result = dispatch(base_dir, ['up'], env=dict(os.environ, COMPOSE_SKIP_ENV_FILE="1"))
         assert "VAR1=VAL1" in result.stdout
         assert "VAR2=VAL2" not in result.stdout

@@ -39,7 +39,7 @@ SILENT_COMMANDS = {
 
 def project_from_options(project_dir, options, additional_options={}):
     override_dir = options.get('--project-directory')
-    skip_environment_file = options.get('--skip-env-file')
+    skip_environment_file = options.get('--skip-env-file') or os.getenv("COMPOSE_SKIP_ENV_FILE")
     if skip_environment_file:
         environment = Environment.from_nothing()
     else:
@@ -83,7 +83,7 @@ def set_parallel_limit(environment):
 
 def get_config_from_options(base_dir, options, additional_options={}):
     override_dir = options.get('--project-directory')
-    skip_environment_file = options.get('--skip-env-file')
+    skip_environment_file = options.get('--skip-env-file') or os.getenv("COMPOSE_SKIP_ENV_FILE")
     if skip_environment_file:
         environment = Environment.from_nothing()
     else:

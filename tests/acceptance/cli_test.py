@@ -45,12 +45,13 @@ BUILD_CACHE_TEXT = 'Using cache'
 BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
 
 
-def start_process(base_dir, options):
+def start_process(base_dir, options, env=None):
     proc = subprocess.Popen(
         ['docker-compose'] + options,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=base_dir)
+        cwd=base_dir,
+        env=env)
     print("Running process: %s" % proc.pid)
     return proc
 
@@ -64,9 +65,9 @@ def wait_on_process(proc, returncode=0):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def dispatch(base_dir, options, project_options=None, returncode=0):
+def dispatch(base_dir, options, project_options=None, returncode=0, env=None):
     project_options = project_options or []
-    proc = start_process(base_dir, project_options + options)
+    proc = start_process(base_dir, project_options + options, env=env)
     return wait_on_process(proc, returncode=returncode)
 
 
