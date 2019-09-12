@@ -19,7 +19,12 @@ var ephemeralPathMatcher = initEphemeralPathMatcher()
 func initEphemeralPathMatcher() model.PathMatcher {
 	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___", "**/.idea/**"}
 	emacsPatterns := []string{"**/.#*"}
-	vimPatterns := []string{"**/4913", "**/*~", "**/.*.swp", "**/.*.swx"}
+	// if .swp is taken (presumably because multiple vims are running in that dir),
+	// vim will go with .swo, .swn, etc, and then even .svz, .svy!
+	// https://github.com/vim/vim/blob/ea781459b9617aa47335061fcc78403495260315/src/memline.c#L5076
+	// ignoring .sw? seems dangerous, since things like .swf or .swi exist, but ignoring the first few
+	// seems safe and should catch most cases
+	vimPatterns := []string{"**/4913", "**/*~", "**/.*.swp", "**/.*.swx", "**/.*.swo", "**/.*.swn"}
 
 	allPatterns := []string{}
 	allPatterns = append(allPatterns, golandPatterns...)
