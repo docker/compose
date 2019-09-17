@@ -5,6 +5,8 @@ from functools import reduce
 
 import six
 from docker.errors import ImageNotFound
+from datetime import date
+from datetime import datetime
 
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -205,6 +207,17 @@ class Container(object):
             status_string += ' (health: starting)'
         elif container_status is not None:
             status_string += ' (%s)' % container_status
+        return status_string
+    
+    @property
+    def human_readable_start_time(self):
+        """ Generate a start time string
+        """
+        status_string = 'Not yet Started'
+        date_string = self.get('State.StartedAt').split(".")[0].replace('Z', '')
+        container_status = datetime.strptime(date_string, '%Y-%m-%dT%H:%M:%S')
+        if container_status is not None:
+            status_string = container_status
         return status_string
 
     def attach_log_stream(self):

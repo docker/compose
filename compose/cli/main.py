@@ -742,6 +742,7 @@ class TopLevelCommand(object):
                 'Command',
                 'State',
                 'Ports',
+                'Started At',
             ]
             rows = []
             for container in containers:
@@ -753,6 +754,7 @@ class TopLevelCommand(object):
                     command,
                     container.human_readable_state,
                     container.human_readable_ports,
+                    container.human_readable_start_time,
                 ])
             print(Formatter().table(headers, rows))
 
@@ -883,10 +885,12 @@ class TopLevelCommand(object):
             )
 
         if options['COMMAND'] is not None:
+            print("ASDF - options['COMMAND']: ", options['COMMAND'])
             command = [options['COMMAND']] + options['ARGS']
         elif options['--entrypoint'] is not None:
             command = []
         else:
+            print("ASDF - getting command from service")
             command = service.options.get('command')
 
         options['stdin_open'] = service.options.get('stdin_open', True)
