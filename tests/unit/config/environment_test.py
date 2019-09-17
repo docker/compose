@@ -53,12 +53,3 @@ class EnvironmentTest(unittest.TestCase):
         assert env_vars_from_file(str(tmpdir.join('bom.env'))) == {
             'PARK_BOM': '박봄'
         }
-
-    def test_env_vars_from_file_whitespace(self):
-        tmpdir = pytest.ensuretemp('env_file')
-        self.addCleanup(tmpdir.remove)
-        with codecs.open('{}/whitespace.env'.format(str(tmpdir)), 'w', encoding='utf-8') as f:
-            f.write('WHITESPACE =yes\n')
-        with pytest.raises(ConfigurationError) as exc:
-            env_vars_from_file(str(tmpdir.join('whitespace.env')))
-        assert 'environment variable' in exc.exconly()

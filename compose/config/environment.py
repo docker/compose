@@ -19,17 +19,11 @@ log = logging.getLogger(__name__)
 def split_env(env):
     if isinstance(env, six.binary_type):
         env = env.decode('utf-8', 'replace')
-    key = value = None
+
     if '=' in env:
         key, value = env.split('=', 1)
     else:
-        key = env
-    if re.search(r'\s', key):
-        raise ConfigurationError(
-            "environment variable name '{}' may not contain whitespace.".format(key)
-        )
-    return key, value
-
+        return env, None
 
 def env_vars_from_file(filename):
     """
