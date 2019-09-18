@@ -570,7 +570,8 @@ class Project(object):
         )
         if errors:
             raise ProjectError(
-                'Encountered errors while bringing up the project.'
+                'Encountered errors while bringing up the project.',
+                errors=errors
             )
 
         return [
@@ -833,5 +834,12 @@ class NoSuchService(Exception):
 
 
 class ProjectError(Exception):
-    def __init__(self, msg):
+    def __init__(self, msg, errors=None):
         self.msg = msg
+        self.value = errors
+
+    def __str__(self):
+        if self.value:
+            return self.msg + "\n" + "\n".join(self.value)
+        else:
+            return self.msg
