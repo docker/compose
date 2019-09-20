@@ -1,12 +1,13 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from datetime import datetime
 from functools import reduce
 
+import pytz
 import six
+from dateutil import parser
 from docker.errors import ImageNotFound
-from datetime import date
-from datetime import datetime
 
 from .const import LABEL_CONTAINER_NUMBER
 from .const import LABEL_ONE_OFF
@@ -208,17 +209,31 @@ class Container(object):
         elif container_status is not None:
             status_string += ' (%s)' % container_status
         return status_string
-    
+
     @property
-    def human_readable_start_time(self):
-        """ Generate a start time string
+    def human_readable_uptime(self):
+        """ Generate a string displaying the uptime
         """
-        status_string = 'Not yet Started'
-        date_string = self.get('State.StartedAt').split(".")[0].replace('Z', '')
-        container_status = datetime.strptime(date_string, '%Y-%m-%dT%H:%M:%S')
-        if container_status is not None:
-            status_string = container_status
-        return status_string
+        def convert_timedelta(td):
+            days = abs(td.days)
+            hours, remainder = divmod(td.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return days, hours, minutes, seconds
+
+        start_time = parser.parse(self.get('State.StartedAt'))
+        finished_time = parser.parse(self.get('State.FinishedAt'))
+
+        if self.get('State.Status') == 'running':
+            curr_time = datetime.utcnow()
+            finished_time = parser.parse(curr_time.replace(tzinfo=pytz.UTC).isoformat())
+
+        time_diff = finished_time - start_time
+        days, hours, minutes, seconds = convert_timedelta(time_diff)
+
+        uptime_format = "{} Days {} Hours {} Minutes {} Seconds"
+        time_string = uptime_format.format(days, hours, minutes, seconds)
+
+        return time_string
 
     def attach_log_stream(self):
         """A log stream can only be attached if the container uses a json-file

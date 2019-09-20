@@ -208,6 +208,27 @@ class ContainerTest(unittest.TestCase):
         expected = "Up (healthy)"
         assert container.human_readable_state == expected
 
+    def test_human_readable_created_uptime(self):
+        container = Container(None, {
+            "State": {
+                "Status": "created",
+                "Running": True,
+                "Paused": False,
+                "Restarting": False,
+                "OOMKilled": False,
+                "Dead": False,
+                "Pid": 7623,
+                "ExitCode": 0,
+                "Error": "",
+                "StartedAt": "2018-01-29T00:34:25.2052414Z",
+                "FinishedAt": "2018-01-30T00:35:10.2052414Z"
+            },
+        }, has_been_inspected=True)
+
+        expected = "1 Days 0 Hours 0 Minutes 45 Seconds"
+        assert container.human_readable_uptime is not None
+        assert container.human_readable_uptime == expected
+
     def test_get(self):
         container = Container(None, {
             "Status": "Up 8 seconds",
