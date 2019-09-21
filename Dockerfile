@@ -30,15 +30,18 @@ RUN apk add --no-cache \
 ENV BUILD_BOOTLOADER=1
 
 FROM python:${PYTHON_VERSION}-${BUILD_DEBIAN_VERSION} AS build-debian
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install --no-install-recommends -y \
     curl \
     gcc \
     git \
     libc-dev \
+    libffi-dev \
     libgcc-6-dev \
+    libssl-dev \
     make \
     openssl \
-    python2.7-dev
+    python2.7-dev \
+    zlib1g-dev
 
 FROM build-${BUILD_PLATFORM} AS build
 COPY docker-compose-entrypoint.sh /usr/local/bin/
