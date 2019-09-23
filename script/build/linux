@@ -12,6 +12,7 @@ docker build -t "${TAG}" . \
        --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
 TMP_CONTAINER=$(docker create "${TAG}")
 mkdir -p dist
-docker cp "${TMP_CONTAINER}":/usr/local/bin/docker-compose dist/docker-compose-Linux-x86_64
+ARCH=$(uname -m)
+docker cp "${TMP_CONTAINER}":/usr/local/bin/docker-compose "dist/docker-compose-Linux-${ARCH}"
 docker container rm -f "${TMP_CONTAINER}"
 docker image rm -f "${TAG}"
