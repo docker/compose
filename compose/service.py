@@ -1787,7 +1787,7 @@ class _CLIBuilder(object):
         command_builder.add_flag("--force-rm", forcerm)
         command_builder.add_arg("--memory", container_limits.get("memory"))
         command_builder.add_flag("--no-cache", nocache)
-        command_builder.add_flag("--progress", self._progress)
+        command_builder.add_arg("--progress", self._progress)
         command_builder.add_flag("--pull", pull)
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
