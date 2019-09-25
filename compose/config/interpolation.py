@@ -100,7 +100,7 @@ class TemplateWithDefaults(Template):
         """ % {
         'delim': re.escape('$'),
         'id': r'[_a-z][_a-z0-9]*',
-        'bid': r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+        'bid': r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?+])[^}]*)?',
     }
 
     @staticmethod
@@ -111,6 +111,13 @@ class TemplateWithDefaults(Template):
         elif '-' == sep:
             var, _, default = braced.partition('-')
             return mapping.get(var, default)
+
+        elif ':+' == sep:
+            var, _, alt = braced.partition(':+')
+            return alt if mapping.get(var) else ""
+        elif '+' == sep:
+            var, _, alt = braced.partition('+')
+            return alt if var in mapping else ""
 
         elif ':?' == sep:
             var, _, err = braced.partition(':?')
