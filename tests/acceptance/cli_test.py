@@ -43,6 +43,7 @@ ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
 BUILD_CACHE_TEXT = 'Using cache'
 BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
+PASS_VALIDATION_TEXT = 'PASS: Validate the compose file'
 
 
 def start_process(base_dir, options):
@@ -257,7 +258,8 @@ class CLITestCase(DockerClientTestCase):
         # assert there are no python objects encoded in the output
         assert '!!' not in result.stdout
 
-        output = yaml.load(result.stdout)
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        output = yaml.load(result_stdout)
         expected = {
             'version': '2.0',
             'volumes': {'data': {'driver': 'local'}},
@@ -282,7 +284,8 @@ class CLITestCase(DockerClientTestCase):
     def test_config_restart(self):
         self.base_dir = 'tests/fixtures/restart'
         result = self.dispatch(['config'])
-        assert yaml.load(result.stdout) == {
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        assert yaml.load(result_stdout) == {
             'version': '2.0',
             'services': {
                 'never': {
@@ -325,7 +328,8 @@ class CLITestCase(DockerClientTestCase):
     def test_config_with_dot_env(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['config'])
-        json_result = yaml.load(result.stdout)
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        json_result = yaml.load(result_stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -340,7 +344,8 @@ class CLITestCase(DockerClientTestCase):
     def test_config_with_env_file(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['--env-file', '.env2', 'config'])
-        json_result = yaml.load(result.stdout)
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        json_result = yaml.load(result_stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -355,7 +360,8 @@ class CLITestCase(DockerClientTestCase):
     def test_config_with_dot_env_and_override_dir(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['--project-directory', 'alt/', 'config'])
-        json_result = yaml.load(result.stdout)
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        json_result = yaml.load(result_stdout)
         assert json_result == {
             'services': {
                 'web': {
@@ -450,7 +456,8 @@ class CLITestCase(DockerClientTestCase):
     def test_config_v1(self):
         self.base_dir = 'tests/fixtures/v1-config'
         result = self.dispatch(['config'])
-        assert yaml.load(result.stdout) == {
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
+        assert yaml.load(result_stdout) == {
             'version': '2.1',
             'services': {
                 'net': {
@@ -474,8 +481,9 @@ class CLITestCase(DockerClientTestCase):
     def test_config_v3(self):
         self.base_dir = 'tests/fixtures/v3-full'
         result = self.dispatch(['config'])
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
 
-        assert yaml.load(result.stdout) == {
+        assert yaml.load(result_stdout) == {
             'version': '3.5',
             'volumes': {
                 'foobar': {
@@ -551,8 +559,9 @@ class CLITestCase(DockerClientTestCase):
     def test_config_compatibility_mode(self):
         self.base_dir = 'tests/fixtures/compatibility-mode'
         result = self.dispatch(['--compatibility', 'config'])
+        result_stdout = result.stdout.replace(PASS_VALIDATION_TEXT, '')
 
-        assert yaml.load(result.stdout) == {
+        assert yaml.load(result_stdout) == {
             'version': '2.3',
             'volumes': {'foo': {'driver': 'default'}},
             'networks': {'bar': {}},
