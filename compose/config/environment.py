@@ -22,6 +22,12 @@ def split_env(env):
     key = value = None
     if '=' in env:
         key, value = env.split('=', 1)
+        # If the value is quoted, remove the quotes
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ['"', "'"]:
+            value = value[1:-1]
+            # unescape quoted values
+            quote = value[0]
+            value.replace("\\"+quote, quote)
     else:
         key = env
     if re.search(r'\s', key):

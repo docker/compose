@@ -62,3 +62,14 @@ class EnvironmentTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             env_vars_from_file(str(tmpdir.join('whitespace.env')))
         assert 'environment variable' in exc.exconly()
+
+    def test_env_vars_from_file_quoted(self):
+        tmpdir = pytest.ensuretemp('env_file')
+        self.addCleanup(tmpdir.remove)
+        with codecs.open('{}/quoted.env'.format(str(tmpdir)), 'w', encoding='utf-8') as f:
+            f.write('DOUBLE_QUOTES="testing \"double\" quotes"\n')
+            f.write("SINGLE_QUOTES='testing \'single\' quotes'\n")
+        assert env_vars_from_file(str(tmpdir.join('quoted.env'))) == {
+            'DOUBLE_QUOTES': 'testing "double" quotes',
+            'SINGLE_QUOTES': "testing 'single' quotes",
+        }
