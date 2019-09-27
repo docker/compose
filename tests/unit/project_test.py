@@ -922,6 +922,6 @@ class ProjectTest(unittest.TestCase):
             get_secrets(service, [secret], secret_defs)
 
         mock_log.warning.assert_called_with("Service \"{service}\" uses an undefined secret file "
-                                            "\"{secret_file}\", the following folder is created "
+                                            "\"{secret_file}\", the following file should be created "
                                             "\"{secret_file}\""
                                             .format(service=service, secret_file=not_a_path))
