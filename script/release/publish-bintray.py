@@ -43,7 +43,6 @@ def parse_args(argv):
 
 def main(argv=None):
     args = parse_args(argv)
-    # print("publish_bintray(%s, %s, %s, %s)" % (args.file, args.bintray_org, args.branch, args.os))
     publish_bintray(args.file, args.bintray_org, args.branch, args.os)
 
 
