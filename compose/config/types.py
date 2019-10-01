@@ -423,7 +423,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
 
     @property
     def merge_field(self):
-        return (self.target, self.published, self.external_ip, self.protocol)
+        return (self.protocol, self.target)
 
     def repr(self):
         return dict(
