@@ -3922,7 +3922,7 @@ class MergePortsTest(unittest.TestCase, MergeListsTest):
     override_config = ['20:8000']
 
     def merged_config(self):
-        return self.convert(self.base_config) | self.convert(self.override_config)
+        return self.convert(['20:8000', '9000'])
 
     def convert(self, port_config):
         return set(config.merge_service_dicts(
