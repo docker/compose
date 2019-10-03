@@ -30,7 +30,7 @@ def split_env(env):
     return key, value
 
 
-def env_vars_from_file(filename):
+def env_vars_from_file(filename, interpolate=True):
     """
     Read in a line delimited file of environment variables.
     """
@@ -39,6 +39,7 @@ def env_vars_from_file(filename):
     elif not os.path.isfile(filename):
         raise EnvFileNotFound("{} is not a file.".format(filename))
 
+    # TODO: now we should do something with interpolate here, but what?
     return dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig')
 
 

@@ -5420,15 +5420,19 @@ class SerializeTest(unittest.TestCase):
                     'environment': {
                         'CURRENCY': '$'
                     },
+                    'env_file': ['tests/fixtures/env/three.env'],
                     'entrypoint': ['$SHELL', '-c'],
                 }
             }
         }
-        config_dict = config.load(build_config_details(cfg), interpolate=False)
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=False)
 
         serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['environment']['CURRENCY'] == '$'
+        # Values coming from env_files are not allowed to have variables
+        assert serialized_service['environment']['FOO'] == 'NO $$ENV VAR'
+        assert serialized_service['environment']['DOO'] == 'NO $${ENV} VAR'
         assert serialized_service['command'] == 'echo $FOO'
         assert serialized_service['entrypoint'][0] == '$SHELL'
 
