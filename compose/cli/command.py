@@ -17,6 +17,7 @@ from ..project import Project
 from .docker_client import docker_client
 from .docker_client import get_tls_version
 from .docker_client import tls_config_from_options
+from .docker_client import get_checksums_path
 from .utils import get_version_info
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def project_from_options(project_dir, options, additional_options={}):
         verbose=options.get('--verbose'),
         host=host,
         tls_config=tls_config_from_options(options, environment),
+        checksums_path=get_checksums_path(),
         environment=environment,
         override_dir=override_dir,
         compatibility=options.get('--compatibility'),
@@ -125,7 +127,7 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 host=None, tls_config=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True):
+                compatibility=False, interpolate=True, checksums_path=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
@@ -145,7 +147,8 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
 
     with errors.handle_connection_errors(client):
         return Project.from_config(
-            project_name, config_data, client, environment.get('DOCKER_DEFAULT_PLATFORM')
+            project_name, config_data, client, environment.get('DOCKER_DEFAULT_PLATFORM'),
+            checksums_path=checksums_path
         )
 
 

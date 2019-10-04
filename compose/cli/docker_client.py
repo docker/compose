@@ -23,6 +23,8 @@ log = logging.getLogger(__name__)
 def default_cert_path():
     return os.path.join(home_dir(), '.docker')
 
+def get_checksums_path():
+    return os.path.join(home_dir(), '.docker', 'checksums.json')
 
 def get_tls_version(environment):
     compose_tls_version = environment.get('COMPOSE_TLS_VERSION', None)
