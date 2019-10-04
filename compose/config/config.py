@@ -781,6 +781,11 @@ def process_build_section(service_dict, working_dir):
             service_dict['build']['context'] = resolve_build_path(working_dir, path)
         if 'labels' in service_dict['build']:
             service_dict['build']['labels'] = parse_labels(service_dict['build']['labels'])
+        if 'checksum' in service_dict['build']:
+            service_dict['build']['checksum'] = [
+                resolve_build_path(working_dir, dependency) for dependency 
+                in service_dict['build']['checksum']
+            ]
 
 
 def process_ports(service_dict):
