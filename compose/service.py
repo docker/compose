@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import tempfile
+import hashlib
 from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
@@ -33,6 +34,7 @@ from .config import is_url
 from .config import merge_environment
 from .config import merge_labels
 from .config.errors import DependencyError
+from .config import ConfigurationError
 from .config.types import MountSpec
 from .config.types import ServicePort
 from .config.types import VolumeSpec
@@ -186,6 +188,7 @@ class Service(object):
         scale=1,
         pid_mode=None,
         default_platform=None,
+        checksums_path=None,
         **options
     ):
         self.name = name
@@ -201,6 +204,11 @@ class Service(object):
         self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
+        self.checksums_path = checksums_path
+        self.current_checksum = None
+
+        if self.is_checksum_enabled():
+            self.ensure_checksum()
 
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
@@ -345,9 +353,82 @@ class Service(object):
             raise OperationFailedError("Cannot create container for service %s: %s" %
                                        (self.name, ex.explanation))
 
+    def calculate_checksum(self):
+        dependencies = self.options["build"]["checksum"]
+
+        content = b''
+        for dep in dependencies:
+            with open(dep, "rb") as f:
+                content += f.read() 
+
+        return hashlib.sha1(content).hexdigest()
+    
+    def is_checksum_enabled(self):
+        return "checksum" in self.options.get("build", {})
+
+
+    def read_checksums(self):
+        """
+        Read checksums file.
+        Checksums is a json with key a docker-compose-path:image and value is checksum
+        Create default one if its not exists
+        """
+        if not os.path.exists(self.checksums_path):
+            with open(self.checksums_path, 'w') as f:
+                json.dump({}, f)
+
+        try:
+            with open(self.checksums_path, 'r') as f:
+                checksums = json.load(f)
+        except (IOError, ValueError) as e:
+            raise ConfigurationError('Error reading checksum file: {}'.format(e))
+        return checksums
+
+
+    def update_checksums(self, checksums):
+        try:
+            with open(self.checksums_path, 'w') as f:
+                json.dump(checksums, f)
+        except (IOError, ValueError) as e:
+            raise ConfigurationError('Error writing checksum file: {}'.format(e))
+        
+    def ensure_checksum(self):
+        checksum_key = '{}:{}'.format(
+            os.path.dirname(os.path.abspath(__name__)),
+            self.options.get('image')
+        )
+
+        checksums = self.read_checksums()
+
+        def write_checksum():
+            # if no checksum in json file, calculate and store in json
+            self.current_checksum = self.calculate_checksum()
+            checksums[checksum_key] = self.current_checksum
+            self.update_checksums(checksums)
+
+        if not self.current_checksum:
+            if checksums.get(checksum_key):
+                # try to find checksum in json
+                self.current_checksum = checksums.get(checksum_key)
+            else:
+                print('write')
+                write_checksum()
+        else:
+            write_checksum()
+
+    def checksum_changed(self):
+        return self.current_checksum != self.calculate_checksum()
+            
+
     def ensure_image_exists(self, do_build=BuildAction.none, silent=False, cli=False):
         if self.can_be_built() and do_build == BuildAction.force:
             self.build(cli=cli)
+            return
+
+        if self.can_be_built() and self.is_checksum_enabled() and self.checksum_changed():
+            log.info('Image checksum for service %s has changes', self.name)
+            self.build(cli=cli)
+            self.ensure_checksum()
             return
 
         try:
