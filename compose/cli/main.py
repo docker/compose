@@ -236,6 +236,7 @@ class TopLevelCommand(object):
       top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
+      checksum           Calculate checksum for image
       version            Show the Docker-Compose version information
     """
 
@@ -1158,6 +1159,23 @@ class TopLevelCommand(object):
             print(__version__)
         else:
             print(get_version_info('full'))
+
+    def checksum(self, options):
+        """
+        Calculate service image checksum.
+
+        Usage: checksum SERVICE
+        """
+        # 1. get image or service, probably service as it is where checksum declared
+        # 2. call calculate checksum
+        service = self.project.get_service(options['SERVICE'])
+        
+        exit_if(not service, 'No such service', 1)
+
+        if not service.is_checksum_enabled():
+            print('Checksum is not declared fot this service')
+        else:
+            print(service.calculate_checksum())      
 
 
 def compute_service_exit_code(exit_value_from, attached_containers):
