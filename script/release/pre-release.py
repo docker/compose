@@ -44,15 +44,15 @@ def create_bump_commit(repository, release_branch):
     repository.push_branch_to_remote(release_branch)
 
 
-def check_pr_mergeable(pr_data):
-    if pr_data.mergeable is False:
-        # mergeable can also be null, in which case the warning would be a false positive.
-        print(
-            'WARNING!! PR #{} can not currently be merged. You will need to '
-            'resolve the conflicts manually before finalizing the release.'.format(pr_data.number)
+def print_final_instructions(args):
+    print(
+        "You're almost done! Please wait for the end of the build of the branch \"bump-{version}\" "
+        "and verify that all tests passed. When you are ready to make the release public, "
+        "then run the following command:\n"
+        "git tag -a {version} -m \"Release {version}\" ".format(
+            version=args.release
         )
-
-    return pr_data.mergeable is True
+    )
 
 
 def distclean():
@@ -88,11 +88,11 @@ def prepare(args):
     try:
         repository = Repository(REPO_ROOT, args.repo)
         create_initial_branch(repository, args)
-        pr_data = repository.create_release_pull_request(args.release)
-        check_pr_mergeable(pr_data)
     except ScriptError as e:
         print(e)
         return 1
+
+    print_final_instructions(args)
     return 0
 
 
