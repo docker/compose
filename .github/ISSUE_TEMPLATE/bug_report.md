@@ -1,6 +1,9 @@
 ---
 name: Bug report
 about: Report a bug encountered while using docker-compose
+title: ''
+labels: kind/bug
+assignees: ''
 
 ---
 
