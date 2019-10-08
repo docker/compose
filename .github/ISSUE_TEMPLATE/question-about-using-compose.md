@@ -1,6 +1,9 @@
 ---
 name: Question about using Compose
 about: This is not the appropriate channel
+title: ''
+labels: kind/question
+assignees: ''
 
 ---
 
