@@ -1012,6 +1012,7 @@ class TopLevelCommand(object):
             --build                    Build images before starting containers.
             --abort-on-container-exit  Stops all containers if any container was
                                        stopped. Incompatible with -d.
+            --attach-dependencies      Attach to dependent containers
             -t, --timeout TIMEOUT      Use this timeout in seconds for container
                                        shutdown when attached or when containers are
                                        already running. (default: 10)
@@ -1033,16 +1034,18 @@ class TopLevelCommand(object):
         remove_orphans = options['--remove-orphans']
         detached = options.get('--detach')
         no_start = options.get('--no-start')
+        attach_dependencies = options.get('--attach-dependencies')
 
-        if detached and (cascade_stop or exit_value_from):
-            raise UserError("--abort-on-container-exit and -d cannot be combined.")
+        if detached and (cascade_stop or exit_value_from or attach_dependencies):
+            raise UserError(
+                "-d cannot be combined with --abort-on-container-exit or --attach-dependencies.")
 
         ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from']
+        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--attach-dependencies']
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -1087,7 +1090,10 @@ class TopLevelCommand(object):
             if detached or no_start:
                 return
 
-            attached_containers = filter_containers_to_service_names(to_attach, service_names)
+            attached_containers = filter_attached_containers(
+                to_attach,
+                service_names,
+                attach_dependencies)
 
             log_printer = log_printer_from_project(
                 self.project,
@@ -1392,8 +1398,8 @@ def log_printer_from_project(
         log_args=log_args)
 
 
-def filter_containers_to_service_names(containers, service_names):
-    if not service_names:
+def filter_attached_containers(containers, service_names, attach_dependencies=False):
+    if attach_dependencies or not service_names:
         return containers
 
     return [

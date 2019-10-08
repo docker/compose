@@ -284,7 +284,7 @@ __docker-compose_subcommand() {
         (up)
             _arguments \
                 $opts_help \
-                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names. Incompatible with --abort-on-container-exit.]' \
+                '(--abort-on-container-exit)-d[Detached mode: Run containers in the background, print new container names. Incompatible with --abort-on-container-exit and --attach-dependencies.]' \
                 $opts_no_color \
                 $opts_no_deps \
                 $opts_force_recreate \
@@ -292,6 +292,7 @@ __docker-compose_subcommand() {
                 $opts_no_build \
                 "(--no-build)--build[Build images before starting containers.]" \
                 "(-d)--abort-on-container-exit[Stops all containers if any container was stopped. Incompatible with -d.]" \
+                "(-d)--attach-dependencies[Attach to dependent containers. Incompatible with -d.]" \
                 '(-t --timeout)'{-t,--timeout}"[Use this timeout in seconds for container shutdown when attached or when containers are already running. (default: 10)]:seconds: " \
                 '--scale[SERVICE=NUM Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.]:service scale SERVICE=NUM: ' \
                 '--exit-code-from=[Return the exit code of the selected service container. Implies --abort-on-container-exit]:service:__docker-compose_services' \
