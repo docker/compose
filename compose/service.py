@@ -624,9 +624,7 @@ class Service(object):
             container.start()
         except APIError as ex:
             if "driver failed programming external connectivity" in ex.explanation:
-                log.warn(
-                    "Port is already in use, check the docker-compose file to see if the same" +
-                    " port was allocated to multiple services")
+                log.warn("Host is already in use by another container")
             raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
