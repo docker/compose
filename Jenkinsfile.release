@@ -166,7 +166,7 @@ pipeline {
                             unstash "bin-darwin"
                             unstash "bin-linux"
                             unstash "bin-win"
-                            githubRelease("jcsirot/compose")
+                            githubRelease("docker/compose")
                         }
                     }
                 }
@@ -286,9 +286,9 @@ def pushRuntimeImage(baseImage) {
     sh "docker load -i dist/docker-compose-${baseImage}.tar"
     if (baseImage == "alpine" && env.TAG_NAME != null) {
         sh "docker tag docker/compose:alpine-${env.TAG_NAME} docker/compose:${env.TAG_NAME}"
+        sh "docker push docker/compose:${env.TAG_NAME}"
     }
-    sh 'docker image ls'
-    echo 'docker push...'
+    sh "docker push docker/compose:${baseImage}-${env.TAG_NAME}"
 }
 
 def runTests(dockerVersion, pythonVersion, baseImage) {
