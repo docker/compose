@@ -615,7 +615,7 @@ class ServiceExtendsResolver(object):
         config_path = self.get_extended_config_path(extends)
         service_name = extends['service']
 
-        if config_path == self.config_file.filename:
+        if config_path == os.path.abspath(self.config_file.filename):
             try:
                 service_config = self.config_file.get_service(service_name)
             except KeyError:
