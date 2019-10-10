@@ -12,7 +12,7 @@ functools32==3.2.3.post2; python_version < '3.2'
 idna==2.5
 ipaddress==1.0.18
 jsonschema==3.0.1
-paramiko==2.4.2
+paramiko==2.6.0
 pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
 pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.6.7
