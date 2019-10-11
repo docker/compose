@@ -273,24 +273,33 @@ class ServiceConfig(namedtuple('_ServiceConfig', 'working_dir filename name conf
 
 
 def find(base_dir, filenames, environment, override_dir=None):
-    if filenames == ['-']:
-        return ConfigDetails(
-            os.path.abspath(override_dir) if override_dir else os.getcwd(),
-            [ConfigFile(None, yaml.safe_load(sys.stdin))],
-            environment
-        )
-
     if filenames:
-        filenames = [os.path.join(base_dir, f) for f in filenames]
+        filenames = [f if f == '-' else os.path.join(base_dir, f) for f in filenames]
     else:
         filenames = get_default_config_files(base_dir)
 
+    working_dir = get_working_dir(filenames, override_dir)
+
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
-        override_dir if override_dir else os.path.dirname(filenames[0]),
-        [ConfigFile.from_filename(f) for f in filenames],
+        working_dir,
+        [config_file(f) for f in filenames],
         environment
     )
+
+
+def get_working_dir(filenames, override_dir):
+    if override_dir:
+        os.path.abspath(override_dir)
+    else:
+        return os.getcwd() if filenames[0] != '-' else os.path.dirname(filenames[0])
+
+
+def config_file(f):
+    if f == '-':
+        ConfigFile(None, yaml.safe_load(sys.stdin))
+    else:
+        ConfigFile.from_filename(f)
 
 
 def validate_config_version(config_files):
