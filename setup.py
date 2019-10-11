@@ -55,7 +55,8 @@ extras_require = {
     ':python_version < "3.2"': ['subprocess32 >= 3.5.4, < 4'],
     ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
-    ':python_version < "3.3"': ['ipaddress >= 1.0.16, < 2'],
+    ':python_version < "3.3"': ['backports.shutil_get_terminal_size == 1.0.0',
+                                'ipaddress >= 1.0.16, < 2'],
     ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
 }
