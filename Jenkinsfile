@@ -2,7 +2,7 @@
 
 def buildImage = { String baseImage ->
   def image
-  wrappedNode(label: "ubuntu && !zfs", cleanWorkspace: true) {
+  wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
     stage("build image for \"${baseImage}\"") {
       checkout(scm)
       def imageName = "dockerbuildbot/compose:${baseImage}-${gitCommit()}"
@@ -29,7 +29,7 @@ def buildImage = { String baseImage ->
 
 def get_versions = { String imageId, int number ->
   def docker_versions
-  wrappedNode(label: "ubuntu && !zfs") {
+  wrappedNode(label: "ubuntu && amd64 && !zfs") {
     def result = sh(script: """docker run --rm \\
         --entrypoint=/code/.tox/py27/bin/python \\
         ${imageId} \\
@@ -55,7 +55,7 @@ def runTests = { Map settings ->
   }
 
   { ->
-    wrappedNode(label: "ubuntu && !zfs", cleanWorkspace: true) {
+    wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
       stage("test python=${pythonVersions} / docker=${dockerVersions} / baseImage=${baseImage}") {
         checkout(scm)
         def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
