@@ -83,7 +83,7 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client, default_platform=None):
+    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=[]):
         """
         Construct a Project from a config.Config object.
         """
@@ -136,6 +136,7 @@ class Project(object):
                     pid_mode=pid_mode,
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
+                    extra_labels=extra_labels,
                     **service_dict)
             )
 
