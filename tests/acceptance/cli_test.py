@@ -2816,8 +2816,8 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['images'])
 
         assert 'busybox' in result.stdout
-        assert 'multiple-composefiles_another_1' in result.stdout
-        assert 'multiple-composefiles_simple_1' in result.stdout
+        assert '_another_1' in result.stdout
+        assert '_simple_1' in result.stdout
 
     @mock.patch.dict(os.environ)
     def test_images_tagless_image(self):
@@ -2865,4 +2865,4 @@ class CLITestCase(DockerClientTestCase):
 
         assert re.search(r'foo1.+test[ \t]+dev', result.stdout) is not None
         assert re.search(r'foo2.+test[ \t]+prod', result.stdout) is not None
-        assert re.search(r'foo3.+_foo3[ \t]+latest', result.stdout) is not None
+        assert re.search(r'foo3.+test[ \t]+latest', result.stdout) is not None
