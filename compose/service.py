@@ -68,7 +68,6 @@ else:
 
 log = logging.getLogger(__name__)
 
-
 HOST_CONFIG_KEYS = [
     'cap_add',
     'cap_drop',
@@ -137,7 +136,6 @@ class NoSuchImageError(Exception):
 
 ServiceName = namedtuple('ServiceName', 'project service number')
 
-
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
@@ -173,20 +171,21 @@ class BuildAction(enum.Enum):
 
 class Service(object):
     def __init__(
-        self,
-        name,
-        client=None,
-        project='default',
-        use_networking=False,
-        links=None,
-        volumes_from=None,
-        network_mode=None,
-        networks=None,
-        secrets=None,
-        scale=1,
-        pid_mode=None,
-        default_platform=None,
-        **options
+            self,
+            name,
+            client=None,
+            project='default',
+            use_networking=False,
+            links=None,
+            volumes_from=None,
+            network_mode=None,
+            networks=None,
+            secrets=None,
+            scale=1,
+            pid_mode=None,
+            default_platform=None,
+            extra_labels=[],
+            **options
     ):
         self.name = name
         self.client = client
@@ -201,6 +200,7 @@ class Service(object):
         self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
+        self.extra_labels = extra_labels
 
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
@@ -215,7 +215,7 @@ class Service(object):
             for container in self.client.containers(
                 all=stopped,
                 filters=filters)])
-        )
+                      )
         if result:
             return result
 
@@ -404,8 +404,8 @@ class Service(object):
             return ConvergencePlan('start', containers)
 
         if (
-            strategy is ConvergenceStrategy.always or
-            self._containers_have_diverged(containers)
+                strategy is ConvergenceStrategy.always or
+                self._containers_have_diverged(containers)
         ):
             return ConvergencePlan('recreate', containers)
 
@@ -482,6 +482,7 @@ class Service(object):
                 container, timeout=timeout, attach_logs=not detached,
                 start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
             )
+
         containers, errors = parallel_execute(
             containers,
             recreate,
@@ -705,11 +706,11 @@ class Service(object):
         net_name = self.network_mode.service_name
         pid_namespace = self.pid_mode.service_name
         return (
-            self.get_linked_service_names() +
-            self.get_volumes_from_names() +
-            ([net_name] if net_name else []) +
-            ([pid_namespace] if pid_namespace else []) +
-            list(self.options.get('depends_on', {}).keys())
+                self.get_linked_service_names() +
+                self.get_volumes_from_names() +
+                ([net_name] if net_name else []) +
+                ([pid_namespace] if pid_namespace else []) +
+                list(self.options.get('depends_on', {}).keys())
         )
 
     def get_dependency_configs(self):
@@ -899,7 +900,7 @@ class Service(object):
 
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
-            self.labels(one_off=one_off),
+            self.labels(one_off=one_off) + self.extra_labels,
             number,
             self.config_hash if add_config_hash else None,
             slug
@@ -1552,9 +1553,9 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
 
     for volume in volumes_option:
         if (
-            volume.external and
-            volume.internal in container_volumes and
-            container_volumes.get(volume.internal) != volume.external
+                volume.external and
+                volume.internal in container_volumes and
+                container_volumes.get(volume.internal) != volume.external
         ):
             log.warning((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
@@ -1600,6 +1601,7 @@ def build_mount(mount_spec):
         type=mount_spec.type, target=mount_spec.target, source=mount_spec.source,
         read_only=mount_spec.read_only, consistency=mount_spec.consistency, **kwargs
     )
+
 
 # Labels
 
@@ -1655,6 +1657,7 @@ def format_environment(environment):
         if isinstance(value, six.binary_type):
             value = value.decode('utf-8')
         return '{key}={value}'.format(key=key, value=value)
+
     return [format_env(*item) for item in environment.items()]
 
 
