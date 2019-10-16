@@ -1,7 +1,7 @@
 version: '3.5'
 services:
   foo:
-    image: alpine:3.10.1
+    image: alpine:3.10.2
     command: /bin/true
     deploy:
       replicas: 3

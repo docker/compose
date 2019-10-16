@@ -3620,7 +3620,7 @@ class InterpolationTest(unittest.TestCase):
             'version': '3.5',
             'services': {
                 'foo': {
-                    'image': 'alpine:3.10.1',
+                    'image': 'alpine:3.10.2',
                     'deploy': {
                         'replicas': 3,
                         'restart_policy': {
@@ -3646,7 +3646,7 @@ class InterpolationTest(unittest.TestCase):
 
         service_dict = cfg.services[0]
         assert service_dict == {
-            'image': 'alpine:3.10.1',
+            'image': 'alpine:3.10.2',
             'scale': 3,
             'restart': {'MaximumRetryCount': 7, 'Name': 'always'},
             'mem_limit': '300M',

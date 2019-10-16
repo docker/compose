@@ -360,7 +360,7 @@ class CLITestCase(DockerClientTestCase):
             'services': {
                 'web': {
                     'command': 'echo uwu',
-                    'image': 'alpine:3.10.1',
+                    'image': 'alpine:3.10.2',
                     'ports': ['3341/tcp', '4449/tcp']
                 }
             },
@@ -559,7 +559,7 @@ class CLITestCase(DockerClientTestCase):
             'services': {
                 'foo': {
                     'command': '/bin/true',
-                    'image': 'alpine:3.10.1',
+                    'image': 'alpine:3.10.2',
                     'scale': 3,
                     'restart': 'always:7',
                     'mem_limit': '300M',
