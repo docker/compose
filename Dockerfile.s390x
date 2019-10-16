@@ -1,6 +1,6 @@
 FROM s390x/alpine:3.10.2
 
-ARG COMPOSE_VERSION=1.16.1
+ARG COMPOSE_VERSION=1.24.1
 
 RUN apk add --update --no-cache \
     python \
