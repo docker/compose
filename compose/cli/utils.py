@@ -133,12 +133,12 @@ def generate_user_agent():
 
 def human_readable_file_size(size):
     suffixes = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', ]
-    order = int(math.log(size, 2) / 10) if size else 0
+    order = int(math.log(size, 1000)) if size else 0
     if order >= len(suffixes):
         order = len(suffixes) - 1
 
     return '{0:.4g} {1}'.format(
-        size / float(1 << (order * 10)),
+        size / pow(10, order * 3),
         suffixes[order]
     )
 
