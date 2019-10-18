@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import os
 import pipes
 import re
 import subprocess
@@ -102,9 +103,9 @@ def dispatch():
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
     setup_console_handler(console_handler,
                           options.get('--verbose'),
-                          options.get('--no-ansi'),
+                          set_no_color_if_clicolor(options.get('--no-ansi')),
                           options.get("--log-level"))
-    setup_parallel_logger(options.get('--no-ansi'))
+    setup_parallel_logger(set_no_color_if_clicolor(options.get('--no-ansi')))
     if options.get('--no-ansi'):
         command_options['--no-color'] = True
     return functools.partial(perform_command, options, handler, command_options)
@@ -666,7 +667,7 @@ class TopLevelCommand(object):
         log_printer_from_project(
             self.project,
             containers,
-            options['--no-color'],
+            set_no_color_if_clicolor(options['--no-color']),
             log_args,
             event_stream=self.project.events(service_names=options['SERVICE'])).run()
 
@@ -1124,7 +1125,7 @@ class TopLevelCommand(object):
             log_printer = log_printer_from_project(
                 self.project,
                 attached_containers,
-                options['--no-color'],
+                set_no_color_if_clicolor(options['--no-color']),
                 {'follow': True},
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names))
@@ -1602,3 +1603,7 @@ def warn_for_swarm_mode(client):
             "To deploy your application across the swarm, "
             "use `docker stack deploy`.\n"
         )
+
+
+def set_no_color_if_clicolor(no_color_flag):
+    return no_color_flag or os.environ.get('CLICOLOR') == "0"
