@@ -1806,7 +1806,7 @@ class _CLIBuilder(object):
                 line = p.stdout.readline()
                 if not line:
                     break
-                if line.startswith(magic_word):
+                if line.startswith(str(magic_word)):
                     appear = True
                 yield json.dumps({"stream": line})
 
