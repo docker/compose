@@ -880,7 +880,8 @@ class ProjectTest(unittest.TestCase):
         service = 'foo'
         secret_source = 'bar'
 
-        _, filename_path = tempfile.mkstemp()
+        fd, filename_path = tempfile.mkstemp()
+        os.close(fd)
         self.addCleanup(os.remove, filename_path)
 
         def mock_get(key):
