@@ -2,25 +2,32 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import logging
-import os
+import shutil
 
 import six
 import texttable
 
 from compose.cli import colors
 
+if hasattr(shutil, "get_terminal_size"):
+    from shutil import get_terminal_size
+else:
+    from backports.shutil_get_terminal_size import get_terminal_size
+
 
 def get_tty_width():
-    tty_size = os.popen('stty size 2> /dev/null', 'r').read().split()
-    if len(tty_size) != 2:
+    try:
+        width, _ = get_terminal_size()
+        return int(width)
+    except OSError:
         return 0
-    _, width = tty_size
-    return int(width)
 
 
-class Formatter(object):
+class Formatter:
     """Format tabular data for printing."""
-    def table(self, headers, rows):
+
+    @staticmethod
+    def table(headers, rows):
         table = texttable.Texttable(max_width=get_tty_width())
         table.set_cols_dtype(['t' for h in headers])
         table.add_rows([headers] + rows)

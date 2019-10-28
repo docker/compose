@@ -263,14 +263,17 @@ class TopLevelCommand(object):
         Usage: build [options] [--build-arg key=val...] [SERVICE...]
 
         Options:
+            --build-arg key=val     Set build-time variables for services.
             --compress              Compress the build context using gzip.
             --force-rm              Always remove intermediate containers.
+            -m, --memory MEM        Set memory limit for the build container.
             --no-cache              Do not use cache when building the image.
             --no-rm                 Do not remove intermediate containers after a successful build.
-            --pull                  Always attempt to pull a newer version of the image.
-            -m, --memory MEM        Sets memory limit for the build container.
-            --build-arg key=val     Set build-time variables for services.
             --parallel              Build images in parallel.
+            --progress string       Set type of progress output (auto, plain, tty).
+                                    EXPERIMENTAL flag for native builder.
+                                    To enable, run with COMPOSE_DOCKER_CLI_BUILD=1)
+            --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
         """
         service_names = options['SERVICE']
@@ -283,6 +286,8 @@ class TopLevelCommand(object):
                 )
             build_args = resolve_build_args(build_args, self.toplevel_environment)
 
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
+
         self.project.build(
             service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
@@ -293,7 +298,9 @@ class TopLevelCommand(object):
             build_args=build_args,
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
-            silent=options.get('--quiet', False)
+            silent=options.get('--quiet', False),
+            cli=native_builder,
+            progress=options.get('--progress'),
         )
 
     def bundle(self, options):
@@ -613,7 +620,7 @@ class TopLevelCommand(object):
                 image_id,
                 size
             ])
-        print(Formatter().table(headers, rows))
+        print(Formatter.table(headers, rows))
 
     def kill(self, options):
         """
@@ -747,7 +754,7 @@ class TopLevelCommand(object):
                     container.human_readable_state,
                     container.human_readable_ports,
                 ])
-            print(Formatter().table(headers, rows))
+            print(Formatter.table(headers, rows))
 
     def pull(self, options):
         """
@@ -987,7 +994,7 @@ class TopLevelCommand(object):
                 rows.append(process)
 
             print(container.name)
-            print(Formatter().table(headers, rows))
+            print(Formatter.table(headers, rows))
 
     def unpause(self, options):
         """
@@ -1071,6 +1078,8 @@ class TopLevelCommand(object):
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
+
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)
 
@@ -1090,6 +1099,7 @@ class TopLevelCommand(object):
                     reset_container_image=rebuild,
                     renew_anonymous_volumes=options.get('--renew-anon-volumes'),
                     silent=options.get('--quiet-pull'),
+                    cli=native_builder,
                 )
 
             try:

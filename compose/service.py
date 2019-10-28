@@ -2,10 +2,12 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import itertools
+import json
 import logging
 import os
 import re
 import sys
+import tempfile
 from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
@@ -59,8 +61,12 @@ from .utils import parse_seconds_float
 from .utils import truncate_id
 from .utils import unique_everseen
 
-log = logging.getLogger(__name__)
+if six.PY2:
+    import subprocess32 as subprocess
+else:
+    import subprocess
 
+log = logging.getLogger(__name__)
 
 HOST_CONFIG_KEYS = [
     'cap_add',
@@ -130,7 +136,6 @@ class NoSuchImageError(Exception):
 
 ServiceName = namedtuple('ServiceName', 'project service number')
 
-
 ConvergencePlan = namedtuple('ConvergencePlan', 'action containers')
 
 
@@ -166,20 +171,21 @@ class BuildAction(enum.Enum):
 
 class Service(object):
     def __init__(
-        self,
-        name,
-        client=None,
-        project='default',
-        use_networking=False,
-        links=None,
-        volumes_from=None,
-        network_mode=None,
-        networks=None,
-        secrets=None,
-        scale=1,
-        pid_mode=None,
-        default_platform=None,
-        **options
+            self,
+            name,
+            client=None,
+            project='default',
+            use_networking=False,
+            links=None,
+            volumes_from=None,
+            network_mode=None,
+            networks=None,
+            secrets=None,
+            scale=1,
+            pid_mode=None,
+            default_platform=None,
+            extra_labels=[],
+            **options
     ):
         self.name = name
         self.client = client
@@ -194,6 +200,7 @@ class Service(object):
         self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
+        self.extra_labels = extra_labels
 
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
@@ -208,7 +215,7 @@ class Service(object):
             for container in self.client.containers(
                 all=stopped,
                 filters=filters)])
-        )
+                      )
         if result:
             return result
 
@@ -338,9 +345,9 @@ class Service(object):
             raise OperationFailedError("Cannot create container for service %s: %s" %
                                        (self.name, ex.explanation))
 
-    def ensure_image_exists(self, do_build=BuildAction.none, silent=False):
+    def ensure_image_exists(self, do_build=BuildAction.none, silent=False, cli=False):
         if self.can_be_built() and do_build == BuildAction.force:
-            self.build()
+            self.build(cli=cli)
             return
 
         try:
@@ -356,7 +363,7 @@ class Service(object):
         if do_build == BuildAction.skip:
             raise NeedsBuildError(self)
 
-        self.build()
+        self.build(cli=cli)
         log.warning(
             "Image for service {} was built because it did not already exist. To "
             "rebuild this image you must use `docker-compose build` or "
@@ -397,8 +404,8 @@ class Service(object):
             return ConvergencePlan('start', containers)
 
         if (
-            strategy is ConvergenceStrategy.always or
-            self._containers_have_diverged(containers)
+                strategy is ConvergenceStrategy.always or
+                self._containers_have_diverged(containers)
         ):
             return ConvergencePlan('recreate', containers)
 
@@ -475,6 +482,7 @@ class Service(object):
                 container, timeout=timeout, attach_logs=not detached,
                 start_new_container=start, renew_anonymous_volumes=renew_anonymous_volumes
             )
+
         containers, errors = parallel_execute(
             containers,
             recreate,
@@ -616,6 +624,8 @@ class Service(object):
         try:
             container.start()
         except APIError as ex:
+            if "driver failed programming external connectivity" in ex.explanation:
+                log.warn("Host is already in use by another container")
             raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
         return container
 
@@ -696,11 +706,11 @@ class Service(object):
         net_name = self.network_mode.service_name
         pid_namespace = self.pid_mode.service_name
         return (
-            self.get_linked_service_names() +
-            self.get_volumes_from_names() +
-            ([net_name] if net_name else []) +
-            ([pid_namespace] if pid_namespace else []) +
-            list(self.options.get('depends_on', {}).keys())
+                self.get_linked_service_names() +
+                self.get_volumes_from_names() +
+                ([net_name] if net_name else []) +
+                ([pid_namespace] if pid_namespace else []) +
+                list(self.options.get('depends_on', {}).keys())
         )
 
     def get_dependency_configs(self):
@@ -890,7 +900,7 @@ class Service(object):
 
         container_options['labels'] = build_container_labels(
             container_options.get('labels', {}),
-            self.labels(one_off=one_off),
+            self.labels(one_off=one_off) + self.extra_labels,
             number,
             self.config_hash if add_config_hash else None,
             slug
@@ -1049,7 +1059,7 @@ class Service(object):
         return [build_spec(secret) for secret in self.secrets]
 
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False, rm=True, silent=False):
+              gzip=False, rm=True, silent=False, cli=False, progress=None):
         output_stream = open(os.devnull, 'w')
         if not silent:
             output_stream = sys.stdout
@@ -1070,7 +1080,8 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        build_output = self.client.build(
+        builder = self.client if not cli else _CLIBuilder(progress)
+        build_output = builder.build(
             path=path,
             tag=self.image_name,
             rm=rm,
@@ -1542,9 +1553,9 @@ def warn_on_masked_volume(volumes_option, container_volumes, service):
 
     for volume in volumes_option:
         if (
-            volume.external and
-            volume.internal in container_volumes and
-            container_volumes.get(volume.internal) != volume.external
+                volume.external and
+                volume.internal in container_volumes and
+                container_volumes.get(volume.internal) != volume.external
         ):
             log.warning((
                 "Service \"{service}\" is using volume \"{volume}\" from the "
@@ -1590,6 +1601,7 @@ def build_mount(mount_spec):
         type=mount_spec.type, target=mount_spec.target, source=mount_spec.source,
         read_only=mount_spec.read_only, consistency=mount_spec.consistency, **kwargs
     )
+
 
 # Labels
 
@@ -1645,6 +1657,7 @@ def format_environment(environment):
         if isinstance(value, six.binary_type):
             value = value.decode('utf-8')
         return '{key}={value}'.format(key=key, value=value)
+
     return [format_env(*item) for item in environment.items()]
 
 
@@ -1701,3 +1714,136 @@ def rewrite_build_path(path):
         path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
 
     return path
+
+
+class _CLIBuilder(object):
+    def __init__(self, progress):
+        self._progress = progress
+
+    def build(self, path, tag=None, quiet=False, fileobj=None,
+              nocache=False, rm=False, timeout=None,
+              custom_context=False, encoding=None, pull=False,
+              forcerm=False, dockerfile=None, container_limits=None,
+              decode=False, buildargs=None, gzip=False, shmsize=None,
+              labels=None, cache_from=None, target=None, network_mode=None,
+              squash=None, extra_hosts=None, platform=None, isolation=None,
+              use_config_proxy=True):
+        """
+        Args:
+            path (str): Path to the directory containing the Dockerfile
+            buildargs (dict): A dictionary of build arguments
+            cache_from (:py:class:`list`): A list of images used for build
+                cache resolution
+            container_limits (dict): A dictionary of limits applied to each
+                container created by the build process. Valid keys:
+                - memory (int): set memory limit for build
+                - memswap (int): Total memory (memory + swap), -1 to disable
+                    swap
+                - cpushares (int): CPU shares (relative weight)
+                - cpusetcpus (str): CPUs in which to allow execution, e.g.,
+                    ``"0-3"``, ``"0,1"``
+            custom_context (bool): Optional if using ``fileobj``
+            decode (bool): If set to ``True``, the returned stream will be
+                decoded into dicts on the fly. Default ``False``
+            dockerfile (str): path within the build context to the Dockerfile
+            encoding (str): The encoding for a stream. Set to ``gzip`` for
+                compressing
+            extra_hosts (dict): Extra hosts to add to /etc/hosts in building
+                containers, as a mapping of hostname to IP address.
+            fileobj: A file object to use as the Dockerfile. (Or a file-like
+                object)
+            forcerm (bool): Always remove intermediate containers, even after
+                unsuccessful builds
+            isolation (str): Isolation technology used during build.
+                Default: `None`.
+            labels (dict): A dictionary of labels to set on the image
+            network_mode (str): networking mode for the run commands during
+                build
+            nocache (bool): Don't use the cache when set to ``True``
+            platform (str): Platform in the format ``os[/arch[/variant]]``
+            pull (bool): Downloads any updates to the FROM image in Dockerfiles
+            quiet (bool): Whether to return the status
+            rm (bool): Remove intermediate containers. The ``docker build``
+                command now defaults to ``--rm=true``, but we have kept the old
+                default of `False` to preserve backward compatibility
+            shmsize (int): Size of `/dev/shm` in bytes. The size must be
+                greater than 0. If omitted the system uses 64MB
+            squash (bool): Squash the resulting images layers into a
+                single layer.
+            tag (str): A tag to add to the final image
+            target (str): Name of the build-stage to build in a multi-stage
+                Dockerfile
+            timeout (int): HTTP timeout
+            use_config_proxy (bool): If ``True``, and if the docker client
+                configuration file (``~/.docker/config.json`` by default)
+                contains a proxy configuration, the corresponding environment
+                variables will be set in the container being built.
+        Returns:
+            A generator for the build output.
+        """
+        if dockerfile:
+            dockerfile = os.path.join(path, dockerfile)
+        iidfile = tempfile.mktemp()
+
+        command_builder = _CommandBuilder()
+        command_builder.add_params("--build-arg", buildargs)
+        command_builder.add_list("--cache-from", cache_from)
+        command_builder.add_arg("--file", dockerfile)
+        command_builder.add_flag("--force-rm", forcerm)
+        command_builder.add_arg("--memory", container_limits.get("memory"))
+        command_builder.add_flag("--no-cache", nocache)
+        command_builder.add_arg("--progress", self._progress)
+        command_builder.add_flag("--pull", pull)
+        command_builder.add_arg("--tag", tag)
+        command_builder.add_arg("--target", target)
+        command_builder.add_arg("--iidfile", iidfile)
+        args = command_builder.build([path])
+
+        magic_word = "Successfully built "
+        appear = False
+        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+            while True:
+                line = p.stdout.readline()
+                if not line:
+                    break
+                if line.startswith(magic_word):
+                    appear = True
+                yield json.dumps({"stream": line})
+
+        with open(iidfile) as f:
+            line = f.readline()
+            image_id = line.split(":")[1].strip()
+        os.remove(iidfile)
+
+        # In case of `DOCKER_BUILDKIT=1`
+        # there is no success message already present in the output.
+        # Since that's the way `Service::build` gets the `image_id`
+        # it has to be added `manually`
+        if not appear:
+            yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
+
+
+class _CommandBuilder(object):
+    def __init__(self):
+        self._args = ["docker", "build"]
+
+    def add_arg(self, name, value):
+        if value:
+            self._args.extend([name, str(value)])
+
+    def add_flag(self, name, flag):
+        if flag:
+            self._args.extend([name])
+
+    def add_params(self, name, params):
+        if params:
+            for key, val in params.items():
+                self._args.extend([name, "{}={}".format(key, val)])
+
+    def add_list(self, name, values):
+        if values:
+            for val in values:
+                self._args.extend([name, val])
+
+    def build(self, args):
+        return self._args + args

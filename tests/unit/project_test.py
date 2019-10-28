@@ -3,6 +3,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import datetime
+import os
+import tempfile
 
 import docker
 import pytest
@@ -11,6 +13,7 @@ from docker.errors import NotFound
 from .. import mock
 from .. import unittest
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
+from compose.config import ConfigurationError
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
 from compose.const import COMPOSEFILE_V1 as V1
@@ -21,6 +24,7 @@ from compose.const import DEFAULT_TIMEOUT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.errors import OperationFailedError
+from compose.project import get_secrets
 from compose.project import NoSuchService
 from compose.project import Project
 from compose.project import ProjectError
@@ -841,3 +845,83 @@ class ProjectTest(unittest.TestCase):
         with mock.patch('compose.service.Service.push') as fake_push:
             project.push()
             assert fake_push.call_count == 2
+
+    def test_get_secrets_no_secret_def(self):
+        service = 'foo'
+        secret_source = 'bar'
+
+        secret_defs = mock.Mock()
+        secret_defs.get.return_value = None
+        secret = mock.Mock(source=secret_source)
+
+        with self.assertRaises(ConfigurationError):
+            get_secrets(service, [secret], secret_defs)
+
+    def test_get_secrets_external_warning(self):
+        service = 'foo'
+        secret_source = 'bar'
+
+        secret_def = mock.Mock()
+        secret_def.get.return_value = True
+
+        secret_defs = mock.Mock()
+        secret_defs.get.side_effect = secret_def
+        secret = mock.Mock(source=secret_source)
+
+        with mock.patch('compose.project.log') as mock_log:
+            get_secrets(service, [secret], secret_defs)
+
+        mock_log.warning.assert_called_with("Service \"{service}\" uses secret \"{secret}\" "
+                                            "which is external. External secrets are not available"
+                                            " to containers created by docker-compose."
+                                            .format(service=service, secret=secret_source))
+
+    def test_get_secrets_uid_gid_mode_warning(self):
+        service = 'foo'
+        secret_source = 'bar'
+
+        _, filename_path = tempfile.mkstemp()
+        self.addCleanup(os.remove, filename_path)
+
+        def mock_get(key):
+            return {'external': False, 'file': filename_path}[key]
+
+        secret_def = mock.MagicMock()
+        secret_def.get = mock.MagicMock(side_effect=mock_get)
+
+        secret_defs = mock.Mock()
+        secret_defs.get.return_value = secret_def
+
+        secret = mock.Mock(uid=True, gid=True, mode=True, source=secret_source)
+
+        with mock.patch('compose.project.log') as mock_log:
+            get_secrets(service, [secret], secret_defs)
+
+        mock_log.warning.assert_called_with("Service \"{service}\" uses secret \"{secret}\" with uid, "
+                                            "gid, or mode. These fields are not supported by this "
+                                            "implementation of the Compose file"
+                                            .format(service=service, secret=secret_source))
+
+    def test_get_secrets_secret_file_warning(self):
+        service = 'foo'
+        secret_source = 'bar'
+        not_a_path = 'NOT_A_PATH'
+
+        def mock_get(key):
+            return {'external': False, 'file': not_a_path}[key]
+
+        secret_def = mock.MagicMock()
+        secret_def.get = mock.MagicMock(side_effect=mock_get)
+
+        secret_defs = mock.Mock()
+        secret_defs.get.return_value = secret_def
+
+        secret = mock.Mock(uid=False, gid=False, mode=False, source=secret_source)
+
+        with mock.patch('compose.project.log') as mock_log:
+            get_secrets(service, [secret], secret_defs)
+
+        mock_log.warning.assert_called_with("Service \"{service}\" uses an undefined secret file "
+                                            "\"{secret_file}\", the following file should be created "
+                                            "\"{secret_file}\""
+                                            .format(service=service, secret_file=not_a_path))

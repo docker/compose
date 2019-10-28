@@ -6,6 +6,7 @@ import logging
 import operator
 import re
 from functools import reduce
+from os import path
 
 import enum
 import six
@@ -82,7 +83,7 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client, default_platform=None):
+    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=[]):
         """
         Construct a Project from a config.Config object.
         """
@@ -135,6 +136,7 @@ class Project(object):
                     pid_mode=pid_mode,
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
+                    extra_labels=extra_labels,
                     **service_dict)
             )
 
@@ -355,7 +357,8 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False):
+              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False, cli=False,
+              progress=None):
 
         services = []
         for service in self.get_services(service_names):
@@ -364,8 +367,17 @@ class Project(object):
             elif not silent:
                 log.info('%s uses an image, skipping' % service.name)
 
+        if cli:
+            log.warning("Native build is an experimental feature and could change at any time")
+            if parallel_build:
+                log.warning("Flag '--parallel' is ignored when building with "
+                            "COMPOSE_DOCKER_CLI_BUILD=1")
+            if gzip:
+                log.warning("Flag '--compress' is ignored when building with "
+                            "COMPOSE_DOCKER_CLI_BUILD=1")
+
         def build_service(service):
-            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent)
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,
@@ -509,7 +521,11 @@ class Project(object):
            reset_container_image=False,
            renew_anonymous_volumes=False,
            silent=False,
+           cli=False,
            ):
+
+        if cli:
+            log.warning("Native build is an experimental feature and could change at any time")
 
         self.initialize()
         if not ignore_orphans:
@@ -523,7 +539,7 @@ class Project(object):
             include_deps=start_deps)
 
         for svc in services:
-            svc.ensure_image_exists(do_build=do_build, silent=silent)
+            svc.ensure_image_exists(do_build=do_build, silent=silent, cli=cli)
         plans = self._get_convergence_plans(
             services, strategy, always_recreate_deps=always_recreate_deps)
 
@@ -793,7 +809,15 @@ def get_secrets(service, service_secrets, secret_defs):
                 )
             )
 
-        secrets.append({'secret': secret, 'file': secret_def.get('file')})
+        secret_file = secret_def.get('file')
+        if not path.isfile(str(secret_file)):
+            log.warning(
+                "Service \"{service}\" uses an undefined secret file \"{secret_file}\", "
+                "the following file should be created \"{secret_file}\"".format(
+                    service=service, secret_file=secret_file
+                )
+            )
+        secrets.append({'secret': secret, 'file': secret_file})
 
     return secrets
 

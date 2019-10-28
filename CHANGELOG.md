@@ -1,10 +1,16 @@
 Change log
 ==========
 
-1.25.0-rc2 (2019-08-06)
+1.25.0-rc3 (2019-10-28)
 -------------------
 
 ### Features
+
+- Add BuildKit support, use `DOCKER_BUILDKIT=1` and `COMPOSE_NATIVE_BUILDER=1`
+
+- Bump paramiko to 2.6.0
+
+- Add working dir, config files and env file in service labels
 
 - Add tag `docker-compose:latest`
 
@@ -12,7 +18,7 @@ Change log
 
 - Add `docker-compose:<version>-debian` image/tag
 
-- Bumped `docker-py` 4.0.1
+- Bumped `docker-py` 4.1.0
 
 - Supports `requests` up to 2.22.0 version
 
@@ -28,7 +34,7 @@ Change log
 
 - Added `--no-interpolate` to `docker-compose config`
 
-- Bump OpenSSL for macOS build (`1.1.0j` to `1.1.1a`)
+- Bump OpenSSL for macOS build (`1.1.0j` to `1.1.1c`)
 
 - Added `--no-rm` to `build` command
 
@@ -47,6 +53,12 @@ Change log
 - Removed `Dockerfile.armhf` which is no longer needed
 
 ### Bugfixes
+
+- Fix same file 'extends' optimization
+
+- Use python POSIX support to get tty size
+
+- Format image size as decimal to be align with Docker CLI
 
 - Fixed stdin_open
 

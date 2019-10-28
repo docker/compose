@@ -18,6 +18,7 @@ from ...helpers import build_config_details
 from ...helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import config
 from compose.config import types
+from compose.config.config import ConfigFile
 from compose.config.config import resolve_build_args
 from compose.config.config import resolve_environment
 from compose.config.environment import Environment
@@ -3620,7 +3621,7 @@ class InterpolationTest(unittest.TestCase):
             'version': '3.5',
             'services': {
                 'foo': {
-                    'image': 'alpine:3.7',
+                    'image': 'alpine:3.10.1',
                     'deploy': {
                         'replicas': 3,
                         'restart_policy': {
@@ -3646,7 +3647,7 @@ class InterpolationTest(unittest.TestCase):
 
         service_dict = cfg.services[0]
         assert service_dict == {
-            'image': 'alpine:3.7',
+            'image': 'alpine:3.10.1',
             'scale': 3,
             'restart': {'MaximumRetryCount': 7, 'Name': 'always'},
             'mem_limit': '300M',
@@ -4886,6 +4887,11 @@ class ExtendsTest(unittest.TestCase):
         for svc in services:
             assert types.SecurityOpt.parse('apparmor:unconfined') in svc['security_opt']
             assert types.SecurityOpt.parse('seccomp:unconfined') in svc['security_opt']
+
+    @mock.patch.object(ConfigFile, 'from_filename', wraps=ConfigFile.from_filename)
+    def test_extends_same_file_optimization(self, from_filename_mock):
+        load_from_filename('tests/fixtures/extends/no-file-specified.yml')
+        from_filename_mock.assert_called_once()
 
 
 @pytest.mark.xfail(IS_WINDOWS_PLATFORM, reason='paths use slash')

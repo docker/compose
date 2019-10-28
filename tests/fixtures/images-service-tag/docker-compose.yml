@@ -8,3 +8,4 @@ services:
     image: test:prod
   foo3:
     build: .
+    image: test:latest

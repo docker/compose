@@ -13,6 +13,9 @@ from .. import config
 from .. import parallel
 from ..config.environment import Environment
 from ..const import API_VERSIONS
+from ..const import LABEL_CONFIG_FILES
+from ..const import LABEL_ENVIRONMENT_FILE
+from ..const import LABEL_WORKING_DIR
 from ..project import Project
 from .docker_client import docker_client
 from .docker_client import get_tls_version
@@ -57,7 +60,8 @@ def project_from_options(project_dir, options, additional_options={}):
         environment=environment,
         override_dir=override_dir,
         compatibility=options.get('--compatibility'),
-        interpolate=(not additional_options.get('--no-interpolate'))
+        interpolate=(not additional_options.get('--no-interpolate')),
+        environment_file=environment_file
     )
 
 
@@ -125,7 +129,7 @@ def get_client(environment, verbose=False, version=None, tls_config=None, host=N
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 host=None, tls_config=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True):
+                compatibility=False, interpolate=True, environment_file=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
@@ -145,8 +149,28 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
 
     with errors.handle_connection_errors(client):
         return Project.from_config(
-            project_name, config_data, client, environment.get('DOCKER_DEFAULT_PLATFORM')
+            project_name,
+            config_data,
+            client,
+            environment.get('DOCKER_DEFAULT_PLATFORM'),
+            execution_context_labels(config_details, environment_file),
         )
+
+
+def execution_context_labels(config_details, environment_file):
+    extra_labels = [
+        '{0}={1}'.format(LABEL_WORKING_DIR, os.path.abspath(config_details.working_dir)),
+        '{0}={1}'.format(LABEL_CONFIG_FILES, config_files_label(config_details)),
+    ]
+    if environment_file is not None:
+        extra_labels.append('{0}={1}'.format(LABEL_ENVIRONMENT_FILE,
+                                             os.path.normpath(environment_file)))
+    return extra_labels
+
+
+def config_files_label(config_details):
+    return ",".join(
+        map(str, (os.path.normpath(c.filename) for c in config_details.config_files)))
 
 
 def get_project_name(working_dir, project_name=None, environment=None):

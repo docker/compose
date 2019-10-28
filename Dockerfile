@@ -2,8 +2,8 @@ ARG DOCKER_VERSION=18.09.7
 ARG PYTHON_VERSION=3.7.4
 ARG BUILD_ALPINE_VERSION=3.10
 ARG BUILD_DEBIAN_VERSION=slim-stretch
-ARG RUNTIME_ALPINE_VERSION=3.10.0
-ARG RUNTIME_DEBIAN_VERSION=stretch-20190708-slim
+ARG RUNTIME_ALPINE_VERSION=3.10.1
+ARG RUNTIME_DEBIAN_VERSION=stretch-20190812-slim
 
 ARG BUILD_PLATFORM=alpine
 
@@ -30,15 +30,18 @@ RUN apk add --no-cache \
 ENV BUILD_BOOTLOADER=1
 
 FROM python:${PYTHON_VERSION}-${BUILD_DEBIAN_VERSION} AS build-debian
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install --no-install-recommends -y \
     curl \
     gcc \
     git \
     libc-dev \
+    libffi-dev \
     libgcc-6-dev \
+    libssl-dev \
     make \
     openssl \
-    python2.7-dev
+    python2.7-dev \
+    zlib1g-dev
 
 FROM build-${BUILD_PLATFORM} AS build
 COPY docker-compose-entrypoint.sh /usr/local/bin/
