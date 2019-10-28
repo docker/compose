@@ -1,6 +1,89 @@
 Change log
 ==========
 
+1.25.0-rc4 (2019-10-28)
+-------------------
+
+### Features
+
+- Add BuildKit support, use `DOCKER_BUILDKIT=1` and `COMPOSE_NATIVE_BUILDER=1`
+
+- Bump paramiko to 2.6.0
+
+- Add working dir, config files and env file in service labels
+
+- Add tag `docker-compose:latest`
+
+- Add `docker-compose:<version>-alpine` image/tag
+
+- Add `docker-compose:<version>-debian` image/tag
+
+- Bumped `docker-py` 4.1.0
+
+- Supports `requests` up to 2.22.0 version
+
+- Drops empty tag on `build:cache_from`
+
+- `Dockerfile` now generates `libmusl` binaries for alpine
+
+- Only pull images that can't be built
+
+- Attribute `scale` can now accept `0` as a value
+
+- Added `--quiet` build flag
+
+- Added `--no-interpolate` to `docker-compose config`
+
+- Bump OpenSSL for macOS build (`1.1.0j` to `1.1.1c`)
+
+- Added `--no-rm` to `build` command
+
+- Added support for `credential_spec`
+
+- Resolve digests without pulling image
+
+- Upgrade `pyyaml` to `4.2b1`
+
+- Lowered severity to `warning` if `down` tries to remove nonexisting image
+
+- Use improved API fields for project events when possible
+
+- Update `setup.py` for modern `pypi/setuptools` and remove `pandoc` dependencies
+
+- Removed `Dockerfile.armhf` which is no longer needed
+
+### Bugfixes
+
+- Fix same file 'extends' optimization
+
+- Use python POSIX support to get tty size
+
+- Format image size as decimal to be align with Docker CLI
+
+- Fixed stdin_open
+
+- Fixed `--remove-orphans` when used with `up --no-start`
+
+- Fixed `docker-compose ps --all`
+
+- Fixed `depends_on` dependency recreation behavior
+
+- Fixed bash completion for `build --memory`
+
+- Fixed misleading warning concerning env vars when performing an `exec` command
+
+- Fixed failure check in parallel_execute_watch
+
+- Fixed race condition after pulling image
+
+- Fixed error on duplicate mount points.
+
+- Fixed merge on networks section
+
+- Always connect Compose container to `stdin`
+
+- Fixed the presentation of failed services on 'docker-compose start' when containers are not available
+
 1.24.0 (2019-03-28)
 -------------------
 
