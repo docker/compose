@@ -1343,7 +1343,8 @@ def run_one_off_container(container_options, project, service, options, toplevel
                 service_names=deps,
                 start_deps=True,
                 strategy=ConvergenceStrategy.never,
-                rescale=False
+                rescale=False,
+                ignore_orphans=toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS'),
             )
 
     project.initialize()
