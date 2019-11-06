@@ -891,6 +891,8 @@ class TopLevelCommand(object):
             command = service.options.get('command')
 
         options['stdin_open'] = service.options.get('stdin_open', True)
+        options['--label'] = options.get(
+            '--label', []) + ['%s=%s' % (LABEL_CONTAINER_NUMBER, len(service.containers()) + 1)]
 
         container_options = build_one_off_container_options(options, detach, command)
         run_one_off_container(
@@ -1302,7 +1304,6 @@ def build_one_off_container_options(options, detach, command):
             parse_environment(options['-e'])
         )
 
-    options['--label'] = options.get('--label', []) + ['%s=%s' % (LABEL_CONTAINER_NUMBER, 1)]
     container_options['labels'] = parse_labels(options['--label'])
 
     if options.get('--entrypoint') is not None:
