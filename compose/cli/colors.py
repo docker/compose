@@ -41,9 +41,9 @@ for (name, code) in get_pairs():
 
 
 def rainbow():
-    cs = ['cyan', 'yellow', 'green', 'magenta', 'red', 'blue',
+    cs = ['cyan', 'yellow', 'green', 'magenta', 'blue',
           'intense_cyan', 'intense_yellow', 'intense_green',
-          'intense_magenta', 'intense_red', 'intense_blue']
+          'intense_magenta', 'intense_blue']
 
     for c in cs:
         yield globals()[c]
