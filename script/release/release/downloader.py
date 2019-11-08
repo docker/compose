@@ -55,6 +55,7 @@ class BinaryDownloader(requests.Session):
 
     def download_all(self, version):
         files = {
+            'docker-compose-Darwin-x86_64.tgz': None,
             'docker-compose-Darwin-x86_64': None,
             'docker-compose-Linux-x86_64': None,
             'docker-compose-Windows-x86_64.exe': None,
