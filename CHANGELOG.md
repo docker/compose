@@ -64,9 +64,9 @@ Change log
 
 - Fix non ascii chars error. Python2 only
 
-- Format image size as decimal to be align with Docker CLI 
+- Format image size as decimal to be align with Docker CLI
 
-- Use Python Posix support to get tty size 
+- Use Python Posix support to get tty size
 
 - Fix same file 'extends' optimization
 
@@ -90,7 +90,7 @@ Change log
 
 - Fixed race condition after pulling image
 
-- Fixed error on duplicate mount points.
+- Fixed error on duplicate mount points
 
 - Fixed merge on networks section
 
