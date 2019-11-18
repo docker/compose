@@ -1806,7 +1806,10 @@ class _CLIBuilder(object):
                 line = p.stdout.readline()
                 if not line:
                     break
-                if line.startswith(str(magic_word)):
+                # Fix non ascii chars on Python2. To remove when #6890 is complete.
+                if six.PY2:
+                    magic_word = str(magic_word)
+                if line.startswith(magic_word):
                     appear = True
                 yield json.dumps({"stream": line})
 
