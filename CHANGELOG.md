@@ -6,7 +6,7 @@ Change log
 
 ### Features
 
-- Set no-colors to true if CLICOLOR env variable is set to 0 
+- Set no-colors to true if CLICOLOR env variable is set to 0
 
 - Add working dir, config files and env file in service labels
 
