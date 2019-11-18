@@ -134,7 +134,10 @@ def build_thread(container, presenter, queue, log_args):
 def build_thread_map(initial_containers, presenters, thread_args):
     return {
         container.id: build_thread(container, next(presenters), *thread_args)
-        for container in initial_containers
+        # Container order is unspecified, so they are sorted by name in order to make
+        # container:presenter (log color) assignment deterministic when given a list of containers
+        # with the same names.
+        for container in sorted(initial_containers, key=lambda c: c.name)
     }
 
 

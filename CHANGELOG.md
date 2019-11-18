@@ -1,12 +1,18 @@
 Change log
 ==========
 
-1.25.0-rc4 (2019-10-28)
+1.25.0 (2019-11-18)
 -------------------
 
 ### Features
 
-- Add BuildKit support, use `DOCKER_BUILDKIT=1` and `COMPOSE_NATIVE_BUILDER=1`
+- Set no-colors to true if CLICOLOR env variable is set to 0
+
+- Add working dir, config files and env file in service labels
+
+- Add dependencies for ARM build
+
+- Add BuildKit support, use `DOCKER_BUILDKIT=1` and `COMPOSE_DOCKER_CLI_BUILD=1`
 
 - Bump paramiko to 2.6.0
 
@@ -54,6 +60,14 @@ Change log
 
 ### Bugfixes
 
+- Make container service color deterministic, remove red from chosen colors
+
+- Fix non ascii chars error. Python2 only
+
+- Format image size as decimal to be align with Docker CLI
+
+- Use Python Posix support to get tty size
+
 - Fix same file 'extends' optimization
 
 - Use python POSIX support to get tty size
@@ -76,13 +90,20 @@ Change log
 
 - Fixed race condition after pulling image
 
-- Fixed error on duplicate mount points.
+- Fixed error on duplicate mount points
 
 - Fixed merge on networks section
 
 - Always connect Compose container to `stdin`
 
 - Fixed the presentation of failed services on 'docker-compose start' when containers are not available
+
+1.24.1 (2019-06-24)
+-------------------
+
+### Bugfixes
+
+- Fixed acceptance tests
 
 1.24.0 (2019-03-28)
 -------------------
