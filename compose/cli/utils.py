@@ -153,3 +153,12 @@ def binarystr_to_unicode(s):
         except UnicodeDecodeError:
             pass
     return s.decode('utf-8', 'replace')
+
+
+# See cli/command/container/cp.go#splitCpArg
+def splitCpArg(path):
+    if not os.path.isabs(path) and not path.startswith('.'):
+        parts = path.split(":", 2)
+        if len(parts) == 2:
+            return (parts[0], parts[1])
+    return (None, path)

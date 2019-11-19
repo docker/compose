@@ -55,6 +55,7 @@ from .log_printer import build_log_presenters
 from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import human_readable_file_size
+from .utils import splitCpArg
 from .utils import yesno
 
 
@@ -215,6 +216,7 @@ class TopLevelCommand(object):
       build              Build or rebuild services
       bundle             Generate a Docker bundle from the Compose file
       config             Validate and view the Compose file
+      cp                 Copy files/folders between a container and the local filesystem
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
       events             Receive real time events from containers
@@ -756,6 +758,44 @@ class TopLevelCommand(object):
                     container.human_readable_ports,
                 ])
             print(Formatter.table(headers, rows))
+
+    def cp(self, options):
+        """
+        Copy files/folders between a container and the local filesystem
+
+        Usage: cp [options] SOURCE DESTINATION
+
+        Options:
+            -a, --archive       Archive mode (copy all uid/gid information)
+            -L, --follow-link   Always follow symbol link in SRC_PATH
+        """
+        source = options['SOURCE']
+        destination = options['DESTINATION']
+
+        src_service, src_path = splitCpArg(source)
+        dest_service, dest_path = splitCpArg(destination)
+        if src_service is not None and dest_service is not None:
+            raise UserError('copying between containers is not supported')
+        service = src_service or dest_service
+        if service is None:
+            raise UserError('neither source nor destination path do refer to a service')
+        containers = self.project.containers(service_names=[service], stopped=True,
+                                             one_off=OneOffFilter.include)
+        if len(containers) == 0:
+            raise UserError('no container match the service definition')
+        if len(containers) > 1:
+            raise UserError('multiple containers match the service definition')
+        container = containers[0]
+
+        args = ["cp"]
+        if options["--archive"]:
+            args += ["--archive"]
+        if options["--follow-link"]:
+            args += ["--follow-link"]
+        args += [src_path if src_service is None else container.id+":"+src_path]
+        args += [dest_path if dest_service is None else container.id + ":" + dest_path]
+
+        sys.exit(call_docker(args))
 
     def pull(self, options):
         """
