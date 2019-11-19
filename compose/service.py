@@ -4,13 +4,13 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
 
-import six
 from docker.errors import APIError
 from docker.errors import ImageNotFound
 from docker.errors import NotFound
@@ -59,10 +59,6 @@ from .utils import truncate_id
 from .utils import unique_everseen
 from compose.cli.utils import binarystr_to_unicode
 
-if six.PY2:
-    import subprocess32 as subprocess
-else:
-    import subprocess
 
 log = logging.getLogger(__name__)
 
@@ -422,7 +418,7 @@ class Service(object):
         except NoSuchImageError as e:
             log.debug(
                 'Service %s has diverged: %s',
-                self.name, six.text_type(e),
+                self.name, str(e),
             )
             return True
 
@@ -972,7 +968,7 @@ class Service(object):
         blkio_config = convert_blkio_config(options.get('blkio_config', None))
         log_config = get_log_config(logging_dict)
         init_path = None
-        if isinstance(options.get('init'), six.string_types):
+        if isinstance(options.get('init'), str):
             init_path = options.get('init')
             options['init'] = True
 
@@ -1106,7 +1102,7 @@ class Service(object):
         try:
             all_events = list(stream_output(build_output, output_stream))
         except StreamOutputError as e:
-            raise BuildError(self, six.text_type(e))
+            raise BuildError(self, str(e))
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -1221,7 +1217,7 @@ class Service(object):
             if not ignore_pull_failures:
                 raise
             else:
-                log.error(six.text_type(e))
+                log.error(str(e))
 
     def pull(self, ignore_pull_failures=False, silent=False, stream=False):
         if 'image' not in self.options:
@@ -1262,7 +1258,7 @@ class Service(object):
             if not ignore_push_failures:
                 raise
             else:
-                log.error(six.text_type(e))
+                log.error(str(e))
 
     def is_healthy(self):
         """ Check that all containers for this service report healthy.
@@ -1628,8 +1624,8 @@ def build_ulimits(ulimit_config):
     if not ulimit_config:
         return None
     ulimits = []
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
-        if isinstance(soft_hard_values, six.integer_types):
+    for limit_name, soft_hard_values in ulimit_config.items():
+        if isinstance(soft_hard_values, int):
             ulimits.append({'name': limit_name, 'soft': soft_hard_values, 'hard': soft_hard_values})
         elif isinstance(soft_hard_values, dict):
             ulimit_dict = {'name': limit_name}
@@ -1653,7 +1649,7 @@ def format_environment(environment):
     def format_env(key, value):
         if value is None:
             return key
-        if isinstance(value, six.binary_type):
+        if isinstance(value, bytes):
             value = value.decode('utf-8')
         return '{key}={value}'.format(key=key, value=value)
 
@@ -1704,11 +1700,6 @@ def convert_blkio_config(blkio_config):
 
 
 def rewrite_build_path(path):
-    # python2 os.stat() doesn't support unicode on some UNIX, so we
-    # encode it to a bytestring to be safe
-    if not six.PY3 and not IS_WINDOWS_PLATFORM:
-        path = path.encode('utf8')
-
     if IS_WINDOWS_PLATFORM and not is_url(path) and not path.startswith(WINDOWS_LONGPATH_PREFIX):
         path = WINDOWS_LONGPATH_PREFIX + os.path.normpath(path)
 
@@ -1806,9 +1797,6 @@ class _CLIBuilder(object):
                 line = p.stdout.readline()
                 if not line:
                     break
-                # Fix non ascii chars on Python2. To remove when #6890 is complete.
-                if six.PY2:
-                    magic_word = str(magic_word)
                 if line.startswith(magic_word):
                     appear = True
                 yield json.dumps({"stream": line})

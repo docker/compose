@@ -2,8 +2,6 @@ import logging
 import os
 import re
 
-import six
-
 from . import errors
 from .. import config
 from .. import parallel
@@ -107,7 +105,7 @@ def get_config_from_options(base_dir, options, additional_options=None):
 
 def get_config_path_from_options(base_dir, options, environment):
     def unicode_paths(paths):
-        return [p.decode('utf-8') if isinstance(p, six.binary_type) else p for p in paths]
+        return [p.decode('utf-8') if isinstance(p, bytes) else p for p in paths]
 
     file_option = options.get('--file')
     if file_option:

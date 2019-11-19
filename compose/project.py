@@ -6,7 +6,6 @@ import re
 from functools import reduce
 from os import path
 
-import six
 from docker.errors import APIError
 from docker.errors import ImageNotFound
 from docker.errors import NotFound
@@ -391,7 +390,7 @@ class Project(object):
             )
             if len(errors):
                 combined_errors = '\n'.join([
-                    e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
+                    e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
                 ])
                 raise ProjectError(combined_errors)
 
@@ -681,7 +680,7 @@ class Project(object):
                         .format(' '.join(must_build)))
         if len(errors):
             combined_errors = '\n'.join([
-                e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
+                e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
             ])
             raise ProjectError(combined_errors)
 
@@ -931,7 +930,7 @@ class NeedsPull(Exception):
 
 class NoSuchService(Exception):
     def __init__(self, name):
-        if isinstance(name, six.binary_type):
+        if isinstance(name, bytes):
             name = name.decode('utf-8')
         self.name = name
         self.msg = "No such service: %s" % self.name
