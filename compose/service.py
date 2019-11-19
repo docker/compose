@@ -1,6 +1,4 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import enum
 import itertools
 import json
 import logging
@@ -12,7 +10,6 @@ from collections import namedtuple
 from collections import OrderedDict
 from operator import attrgetter
 
-import enum
 import six
 from docker.errors import APIError
 from docker.errors import ImageNotFound

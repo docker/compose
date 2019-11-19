@@ -1,17 +1,14 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import re
 import shutil
 import tempfile
 from distutils.spawn import find_executable
+from io import StringIO
 from os import path
 
 import pytest
 from docker.errors import APIError
 from docker.errors import ImageNotFound
-from six import StringIO
 from six import text_type
 
 from .. import mock

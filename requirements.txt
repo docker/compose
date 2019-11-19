@@ -1,5 +1,4 @@
 backports.shutil_get_terminal_size==1.0.0
-backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.5.1
 certifi==2020.4.5.1
 chardet==3.0.4

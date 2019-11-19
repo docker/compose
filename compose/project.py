@@ -1,14 +1,11 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import datetime
+import enum
 import logging
 import operator
 import re
 from functools import reduce
 from os import path
 
-import enum
 import six
 from docker.errors import APIError
 from docker.errors import ImageNotFound

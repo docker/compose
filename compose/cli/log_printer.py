@@ -1,15 +1,12 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import _thread as thread
 import sys
 from collections import namedtuple
 from itertools import cycle
+from queue import Empty
+from queue import Queue
 from threading import Thread
 
 from docker.errors import APIError
-from six.moves import _thread as thread
-from six.moves.queue import Empty
-from six.moves.queue import Queue
 
 from . import colors
 from compose import utils

@@ -3,9 +3,6 @@
 Migrate a Compose file from the V1 format in Compose 1.5 to the V2 format
 supported by Compose 1.6+
 """
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import argparse
 import logging
 import sys
