@@ -31,7 +31,7 @@ def get_versions = { String imageId, int number ->
   def docker_versions
   wrappedNode(label: "ubuntu && amd64 && !zfs") {
     def result = sh(script: """docker run --rm \\
-        --entrypoint=/code/.tox/py27/bin/python \\
+        --entrypoint=/code/.tox/py37/bin/python \\
         ${imageId} \\
         /code/script/test/versions.py -n ${number} docker/docker-ce recent
       """, returnStdout: true
@@ -48,7 +48,7 @@ def runTests = { Map settings ->
   def imageName = settings.get("image", null)
 
   if (!pythonVersions) {
-    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py37')`")
+    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py37')`")
   }
   if (!dockerVersions) {
     throw new Exception("Need Docker versions to test. e.g.: `runTests(dockerVersions: 'all')`")
@@ -82,13 +82,10 @@ def runTests = { Map settings ->
 
 def testMatrix = [failFast: true]
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py27', 'py37']
 baseImages.each { baseImage ->
   def imageName = buildImage(baseImage)
   get_versions(imageName, 2).each { dockerVersion ->
-    pythonVersions.each { pyVersion ->
-      testMatrix["${baseImage}_${dockerVersion}_${pyVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: pyVersion])
-    }
+      testMatrix["${baseImage}_${dockerVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: 'py37'])
   }
 }
 
