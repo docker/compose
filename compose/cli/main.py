@@ -774,14 +774,14 @@ class TopLevelCommand(object):
 
         src_service, src_path = splitCpArg(source)
         dest_service, dest_path = splitCpArg(destination)
-        if src_service is not None and dest_service is not None:
+        if src_service and dest_service:
             raise UserError('copying between containers is not supported')
         service = src_service or dest_service
-        if service is None:
+        if not service:
             raise UserError('neither source nor destination path do refer to a service')
         containers = self.project.containers(service_names=[service], stopped=True,
                                              one_off=OneOffFilter.include)
-        if len(containers) == 0:
+        if not containers:
             raise UserError('no container match the service definition')
         if len(containers) > 1:
             raise UserError('multiple containers match the service definition')
@@ -792,8 +792,8 @@ class TopLevelCommand(object):
             args += ["--archive"]
         if options["--follow-link"]:
             args += ["--follow-link"]
-        args += [src_path if src_service is None else container.id+":"+src_path]
-        args += [dest_path if dest_service is None else container.id + ":" + dest_path]
+        args += [src_path if not src_service else container.id+":"+src_path]
+        args += [dest_path if not dest_service else container.id + ":" + dest_path]
 
         sys.exit(call_docker(args))
 
