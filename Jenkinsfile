@@ -82,13 +82,10 @@ def runTests = { Map settings ->
 
 def testMatrix = [failFast: true]
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py27', 'py37']
 baseImages.each { baseImage ->
   def imageName = buildImage(baseImage)
   get_versions(imageName, 2).each { dockerVersion ->
-    pythonVersions.each { pyVersion ->
-      testMatrix["${baseImage}_${dockerVersion}_${pyVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: pyVersion])
-    }
+      testMatrix["${baseImage}_${dockerVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: 'py37'])
   }
 }
 
