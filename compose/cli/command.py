@@ -170,7 +170,11 @@ def execution_context_labels(config_details, environment_file):
 
 def config_files_label(config_details):
     return ",".join(
-        map(str, (os.path.normpath(c.filename) for c in config_details.config_files)))
+        map(str, (config_file_path(c.filename) for c in config_details.config_files)))
+
+
+def config_file_path(config_file):
+    return os.path.normpath(config_file) if config_file else 'stdin'
 
 
 def get_project_name(working_dir, project_name=None, environment=None):
