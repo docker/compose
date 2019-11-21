@@ -159,22 +159,28 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
 
 def execution_context_labels(config_details, environment_file):
     extra_labels = [
-        '{0}={1}'.format(LABEL_WORKING_DIR, os.path.abspath(config_details.working_dir)),
-        '{0}={1}'.format(LABEL_CONFIG_FILES, config_files_label(config_details)),
+        '{0}={1}'.format(LABEL_WORKING_DIR, os.path.abspath(config_details.working_dir))
     ]
+
+    if not use_config_from_stdin(config_details):
+        extra_labels.append('{0}={1}'.format(LABEL_CONFIG_FILES, config_files_label(config_details)))
+
     if environment_file is not None:
         extra_labels.append('{0}={1}'.format(LABEL_ENVIRONMENT_FILE,
                                              os.path.normpath(environment_file)))
     return extra_labels
 
 
+def use_config_from_stdin(config_details):
+    for c in config_details.config_files:
+        if not c.filename:
+            return True
+    return False
+
+
 def config_files_label(config_details):
     return ",".join(
-        map(str, (config_file_path(c.filename) for c in config_details.config_files)))
-
-
-def config_file_path(config_file):
-    return os.path.normpath(config_file) if config_file else 'stdin'
+        map(str, (os.path.normpath(c.filename) for c in config_details.config_files)))
 
 
 def get_project_name(working_dir, project_name=None, environment=None):
