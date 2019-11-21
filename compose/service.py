@@ -1080,7 +1080,7 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        builder = self.client if not cli else _CLIBuilder(progress)
+        builder = self.client if not cli else _CLIBuilder(progress, self.options.get('environment'))
         build_output = builder.build(
             path=path,
             tag=self.image_name,
@@ -1717,8 +1717,11 @@ def rewrite_build_path(path):
 
 
 class _CLIBuilder(object):
-    def __init__(self, progress):
+    def __init__(self, progress, environment=None):
         self._progress = progress
+        if environment is None:
+            environment = {}
+        self._environment = environment
 
     def build(self, path, tag=None, quiet=False, fileobj=None,
               nocache=False, rm=False, timeout=None,
@@ -1801,7 +1804,11 @@ class _CLIBuilder(object):
 
         magic_word = "Successfully built "
         appear = False
-        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        sub_env = merge_environment(
+            os.environ.copy(),
+            self._environment
+        )
+        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True, env=sub_env) as p:
             while True:
                 line = p.stdout.readline()
                 if not line:

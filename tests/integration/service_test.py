@@ -7,6 +7,7 @@ import shutil
 import tempfile
 from distutils.spawn import find_executable
 from os import path
+from textwrap import dedent
 
 import pytest
 from docker.errors import APIError
@@ -973,12 +974,16 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(shutil.rmtree, base_dir)
 
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
-            f.write("FROM busybox\n")
+            # f.write("FROM busybox\n")
+            f.write(dedent("""\
+                           # syntax=docker/dockerfile:1.0.0-experimental
+                           FROM busybox
+                           RUN --mount=type=secret,target=/secret_1 true
+                           """))
 
         service = self.create_service('web',
                                       build={'context': base_dir},
                                       environment={
-                                          'COMPOSE_DOCKER_CLI_BUILD': '1',
                                           'DOCKER_BUILDKIT': '1',
                                       })
         service.build(cli=True)
@@ -992,12 +997,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        web = self.create_service('web',
-                                  build={'context': base_dir},
-                                  environment={
-                                      'COMPOSE_DOCKER_CLI_BUILD': '1',
-                                      'DOCKER_BUILDKIT': '1',
-                                  })
+        web = self.create_service('web', build={'context': base_dir})
         project = Project('composetest', [web], self.client)
         project.up(do_build=BuildAction.force)
 
