@@ -1230,7 +1230,7 @@ def image_digests_for_project(project, allow_push=False):
 
         if e.needs_push:
             command_hint = (
-                "Use `docker-compose push {}` to push them. "
+                "Use `docker push {}` to push them. "
                 .format(" ".join(sorted(e.needs_push)))
             )
             paras += [
@@ -1241,7 +1241,7 @@ def image_digests_for_project(project, allow_push=False):
 
         if e.needs_pull:
             command_hint = (
-                "Use `docker-compose pull {}` to pull them. "
+                "Use `docker pull {}` to pull them. "
                 .format(" ".join(sorted(e.needs_pull)))
             )
 
