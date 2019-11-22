@@ -204,7 +204,8 @@ def resume(args):
             gh_release = create_release_draft(repository, args.release, pr_data, files)
         delete_assets(gh_release)
         upload_assets(gh_release, files)
-        img_manager = ImageManager(args.release)
+        tag_as_latest = is_tag_latest(args.release)
+        img_manager = ImageManager(args.release, tag_as_latest)
         img_manager.build_images(repository)
     except ScriptError as e:
         print(e)
@@ -244,7 +245,8 @@ def start(args):
         files = downloader.download_all(args.release)
         gh_release = create_release_draft(repository, args.release, pr_data, files)
         upload_assets(gh_release, files)
-        img_manager = ImageManager(args.release)
+        tag_as_latest = is_tag_latest(args.release)
+        img_manager = ImageManager(args.release, tag_as_latest)
         img_manager.build_images(repository)
     except ScriptError as e:
         print(e)
