@@ -1791,6 +1791,11 @@ class _CLIBuilder(object):
             dockerfile = os.path.join(path, dockerfile)
         iidfile = tempfile.mktemp()
 
+        sub_env = merge_environment(
+            os.environ.copy(),
+            self._environment
+        )
+
         command_builder = _CommandBuilder()
         command_builder.add_params("--build-arg", buildargs)
         command_builder.add_list("--cache-from", cache_from)
@@ -1803,16 +1808,16 @@ class _CLIBuilder(object):
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
-        if self._secrets is not None:
-            command_builder.add_list('--secret', self._secrets)
+
+        if "DOCKER_BUILDKIT" in sub_env and self._secrets is not None:
+            buildkit_secrets = self.get_buildkit_mounts(mount_spec=self._secrets)
+            if buildkit_secrets is not None:
+                command_builder.add_list('--secret', buildkit_secrets)
+
         args = command_builder.build([path])
 
         magic_word = "Successfully built "
         appear = False
-        sub_env = merge_environment(
-            os.environ.copy(),
-            self._environment
-        )
         with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True, env=sub_env) as p:
             while True:
                 line = p.stdout.readline()
@@ -1836,6 +1841,16 @@ class _CLIBuilder(object):
         # it has to be added `manually`
         if not appear:
             yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
+
+    def get_buildkit_mounts(self, mount_spec=None):
+        if mount_spec is None:
+            return None
+        mounts = []
+        for spec in mount_spec:
+            if isinstance(spec, six.string_types):
+                spec = {'id': spec}
+            mounts.append(','.join(["{}={}".format(k, v) for (k, v) in spec.items()]))
+        return mounts
 
 
 class _CommandBuilder(object):

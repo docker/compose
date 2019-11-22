@@ -4,4 +4,7 @@ services:
     build:
       context: .
       secrets:
-        - "id=secret,src=${FOO_SECRET:-secret_1}"
+         -
+            id: secret
+            src: "${FOO_SECRET:-secret_1}"
+         - secret_3

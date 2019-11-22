@@ -1013,8 +1013,8 @@ class ServiceTest(DockerClientTestCase):
                                       build={
                                           'context': base_dir,
                                           'secrets': [
-                                              'id=secret_1,src={}'.format(secret_path_1),
-                                              'id=secret_2,src={}'.format(secret_path_2)]
+                                              {'id': 'secret_1', 'src': secret_path_1},
+                                              {'id': 'secret_2', 'src': secret_path_2}]
                                       },
                                       environment={
                                           'DOCKER_BUILDKIT': '1',

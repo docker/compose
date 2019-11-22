@@ -5,4 +5,5 @@ FROM busybox
 ARG CACHEBUST
 
 RUN --mount=type=secret,target=/secret,required cp secret out
+RUN --mount=type=secret,target=/secret_3,required cat secret_3 >> out
 CMD cat out

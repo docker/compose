@@ -886,6 +886,7 @@ class CLITestCase(DockerClientTestCase):
         assert 'Successfully built' in build_result.stdout
         run_result = self.dispatch(['run', 'foo'])
         assert 'secret 1' in run_result.stdout
+        assert 'secret 3' in run_result.stdout
 
     @mock.patch.dict(os.environ)
     def test_build_with_secrets_substitution(self):
