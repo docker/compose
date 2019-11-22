@@ -990,6 +990,39 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
 
+    def test_build_cli_with_secrets(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+        secret_path_1 = os.path.join(base_dir, 'secret_1')
+        secret_path_2 = os.path.join(base_dir, 'secret_2')
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            # f.write("FROM busybox\n")
+            f.write(dedent("""\
+                           # syntax=docker/dockerfile:1.0.0-experimental
+                           FROM busybox
+                           RUN --mount=type=secret,target=/secret_1,required cat /secret_1
+                           RUN --mount=type=secret,target=/secret_2,required cat /secret_2
+                           """))
+        with open(secret_path_1, 'w') as f:
+            f.write("secret 1\n")
+        with open(secret_path_2, 'w') as f:
+            f.write("secret 2\n")
+
+        service = self.create_service('web',
+                                      build={
+                                          'context': base_dir,
+                                          'secrets': [
+                                              'id=secret_1,src={}'.format(secret_path_1),
+                                              'id=secret_2,src={}'.format(secret_path_2)]
+                                      },
+                                      environment={
+                                          'DOCKER_BUILDKIT': '1',
+                                      })
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        assert self.client.inspect_image('composetest_web')
+
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)

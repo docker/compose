@@ -877,6 +877,27 @@ class CLITestCase(DockerClientTestCase):
 
         assert 'Successfully built' in result.stdout
 
+    @mock.patch.dict(os.environ)
+    def test_build_with_secrets(self):
+        os.environ["COMPOSE_DOCKER_CLI_BUILD"] = "1"
+        os.environ["DOCKER_BUILDKIT"] = "1"
+        self.base_dir = 'tests/fixtures/build-secrets'
+        build_result = self.dispatch(['build', '--build-arg', 'CACHEBUST=1'])
+        assert 'Successfully built' in build_result.stdout
+        run_result = self.dispatch(['run', 'foo'])
+        assert 'secret 1' in run_result.stdout
+
+    @mock.patch.dict(os.environ)
+    def test_build_with_secrets_substitution(self):
+        os.environ["COMPOSE_DOCKER_CLI_BUILD"] = "1"
+        os.environ["DOCKER_BUILDKIT"] = "1"
+        os.environ["FOO_SECRET"] = "secret_2"
+        self.base_dir = 'tests/fixtures/build-secrets'
+        build_result = self.dispatch(['build', '--build-arg', 'CACHEBUST=2'])
+        assert 'Successfully built' in build_result.stdout
+        run_result = self.dispatch(['run', 'foo'])
+        assert 'secret 2' in run_result.stdout
+
     def test_build_override_dir_invalid_path(self):
         config_path = os.path.abspath('tests/fixtures/build-path-override-dir/docker-compose.yml')
         result = self.dispatch([

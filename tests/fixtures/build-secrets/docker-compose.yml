@@ -1,0 +1,7 @@
+version: '3.7'
+services:
+  foo:
+    build:
+      context: .
+      secrets:
+        - "id=secret,src=${FOO_SECRET:-secret_1}"

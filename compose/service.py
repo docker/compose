@@ -1080,7 +1080,9 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        builder = self.client if not cli else _CLIBuilder(progress, self.options.get('environment'))
+        builder = self.client if not cli else _CLIBuilder(progress,
+                                                          self.options.get('environment'),
+                                                          build_opts.get('secrets'))
         build_output = builder.build(
             path=path,
             tag=self.image_name,
@@ -1717,11 +1719,12 @@ def rewrite_build_path(path):
 
 
 class _CLIBuilder(object):
-    def __init__(self, progress, environment=None):
+    def __init__(self, progress, environment=None, secrets=None):
         self._progress = progress
         if environment is None:
             environment = {}
         self._environment = environment
+        self._secrets = secrets
 
     def build(self, path, tag=None, quiet=False, fileobj=None,
               nocache=False, rm=False, timeout=None,
@@ -1800,6 +1803,8 @@ class _CLIBuilder(object):
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
+        if self._secrets is not None:
+            command_builder.add_list('--secret', self._secrets)
         args = command_builder.build([path])
 
         magic_word = "Successfully built "
