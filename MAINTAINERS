@@ -11,6 +11,7 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
+			"ndeloof",
 			"rumpl",
 			"ulyssessouza",
 		]
@@ -76,6 +77,11 @@
 	Name = "Mazz Mosley"
 	Email = "mazz@houseofmnowster.com"
 	GitHub = "mnowster"
+
+	[people.ndeloof]
+	Name = "Nicolas De Loof"
+	Email = "nicolas.deloof@gmail.com"
+	GitHub = "ndeloof"
 
 	[people.rumpl]
 	Name = "Djordje Lukic"
