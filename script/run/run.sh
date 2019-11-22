@@ -56,7 +56,7 @@ DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 
 
 # Handle userns security
-if docker info 2>/dev/null | grep -q userns; then
+if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=userns'; then
     DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS --userns=host"
 fi
 
