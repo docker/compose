@@ -694,6 +694,14 @@ services:
             result.stderr
         )
 
+    def test_pull_can_build(self):
+        result = self.dispatch([
+            '-f', 'can-build-pull-failures.yml', 'pull'],
+            returncode=0
+        )
+        assert 'Some service image(s) must be built from source' in result.stderr
+        assert 'docker-compose build can_build' in result.stderr
+
     def test_pull_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         result = self.dispatch(['pull', '--no-parallel', 'web'])
