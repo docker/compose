@@ -1,4 +1,4 @@
-coverage==4.4.2
+coverage==4.5.4
 ddt==1.2.0
 flake8==3.7.9
 mock==3.0.5
