@@ -1,0 +1,6 @@
+version: '3'
+services:
+  can_build:
+    image: nonexisting-image-but-can-build:latest
+    build: .
+    command: top
