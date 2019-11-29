@@ -15,7 +15,7 @@
 
 set -e
 
-VERSION="1.25.0"
+VERSION="1.25.1-rc1"
 IMAGE="docker/compose:$VERSION"
 
 
@@ -36,18 +36,18 @@ if [ "$(pwd)" != '/' ]; then
 fi
 if [ -n "$COMPOSE_FILE" ]; then
     COMPOSE_OPTIONS="$COMPOSE_OPTIONS -e COMPOSE_FILE=$COMPOSE_FILE"
-    compose_dir=$(realpath $(dirname $COMPOSE_FILE))
+    compose_dir=$(realpath "$(dirname "$COMPOSE_FILE")")
 fi
 # TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
 if [ -n "$HOME" ]; then
-    VOLUMES="$VOLUMES -v $HOME:$HOME -v $HOME:/root" # mount $HOME in /root to share docker.config
+    VOLUMES="$VOLUMES -v $HOME:$HOME -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
 fi
 
 # Only allocate tty if we detect one
-if [ -t 0 -a -t 1 ]; then
+if [ -t 0 ] && [ -t 1 ]; then
     DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
 fi
 
@@ -56,8 +56,9 @@ DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
 
 
 # Handle userns security
-if [ ! -z "$(docker info 2>/dev/null | grep userns)" ]; then
+if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=userns'; then
     DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS --userns=host"
 fi
 
+# shellcheck disable=SC2086
 exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"

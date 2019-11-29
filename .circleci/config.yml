@@ -32,6 +32,9 @@ jobs:
       - store_artifacts:
           path: dist/docker-compose-Darwin-x86_64
           destination: docker-compose-Darwin-x86_64
+      - store_artifacts:
+          path: dist/docker-compose-Darwin-x86_64.tgz
+          destination: docker-compose-Darwin-x86_64.tgz
       - deploy:
           name: Deploy binary to bintray
           command: |

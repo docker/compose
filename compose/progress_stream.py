@@ -114,3 +114,13 @@ def get_digest_from_push(events):
         if digest:
             return digest
     return None
+
+
+def read_status(event):
+    status = event['status'].lower()
+    if 'progressDetail' in event:
+        detail = event['progressDetail']
+        if 'current' in detail and 'total' in detail:
+            percentage = float(detail['current']) / float(detail['total'])
+            status = '{} ({:.1%})'.format(status, percentage)
+    return status

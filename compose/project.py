@@ -11,6 +11,8 @@ from os import path
 import enum
 import six
 from docker.errors import APIError
+from docker.errors import ImageNotFound
+from docker.errors import NotFound
 from docker.utils import version_lt
 
 from . import parallel
@@ -25,6 +27,7 @@ from .container import Container
 from .network import build_networks
 from .network import get_networks
 from .network import ProjectNetworks
+from .progress_stream import read_status
 from .service import BuildAction
 from .service import ContainerNetworkMode
 from .service import ContainerPidMode
@@ -619,49 +622,68 @@ class Project(object):
     def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
-        images_to_build = {service.image_name for service in services if service.can_be_built()}
-        services_to_pull = [service for service in services if service.image_name not in images_to_build]
-
-        msg = not silent and 'Pulling' or None
 
         if parallel_pull:
-            def pull_service(service):
-                strm = service.pull(ignore_pull_failures, True, stream=True)
-                if strm is None:  # Attempting to pull service with no `image` key is a no-op
-                    return
+            self.parallel_pull(services, silent=silent)
 
+        else:
+            must_build = []
+            for service in services:
+                try:
+                    service.pull(ignore_pull_failures, silent=silent)
+                except (ImageNotFound, NotFound):
+                    if service.can_be_built():
+                        must_build.append(service.name)
+                    else:
+                        raise
+
+            if len(must_build):
+                log.warning('Some service image(s) must be built from source by running:\n'
+                            '    docker-compose build {}'
+                            .format(' '.join(must_build)))
+
+    def parallel_pull(self, services, ignore_pull_failures=False, silent=False):
+        msg = 'Pulling' if not silent else None
+        must_build = []
+
+        def pull_service(service):
+            strm = service.pull(ignore_pull_failures, True, stream=True)
+
+            if strm is None:  # Attempting to pull service with no `image` key is a no-op
+                return
+
+            try:
                 writer = parallel.get_stream_writer()
-
                 for event in strm:
                     if 'status' not in event:
                         continue
-                    status = event['status'].lower()
-                    if 'progressDetail' in event:
-                        detail = event['progressDetail']
-                        if 'current' in detail and 'total' in detail:
-                            percentage = float(detail['current']) / float(detail['total'])
-                            status = '{} ({:.1%})'.format(status, percentage)
-
+                    status = read_status(event)
                     writer.write(
                         msg, service.name, truncate_string(status), lambda s: s
                     )
+            except (ImageNotFound, NotFound):
+                if service.can_be_built():
+                    must_build.append(service.name)
+                else:
+                    raise
 
-            _, errors = parallel.parallel_execute(
-                services_to_pull,
-                pull_service,
-                operator.attrgetter('name'),
-                msg,
-                limit=5,
-            )
-            if len(errors):
-                combined_errors = '\n'.join([
-                    e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
-                ])
-                raise ProjectError(combined_errors)
+        _, errors = parallel.parallel_execute(
+            services,
+            pull_service,
+            operator.attrgetter('name'),
+            msg,
+            limit=5,
+        )
 
-        else:
-            for service in services_to_pull:
-                service.pull(ignore_pull_failures, silent=silent)
+        if len(must_build):
+            log.warning('Some service image(s) must be built from source by running:\n'
+                        '    docker-compose build {}'
+                        .format(' '.join(must_build)))
+        if len(errors):
+            combined_errors = '\n'.join([
+                e.decode('utf-8') if isinstance(e, six.binary_type) else e for e in errors.values()
+            ])
+            raise ProjectError(combined_errors)
 
     def push(self, service_names=None, ignore_push_failures=False):
         unique_images = set()

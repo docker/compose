@@ -48,6 +48,7 @@ BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
 def start_process(base_dir, options):
     proc = subprocess.Popen(
         ['docker-compose'] + options,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=base_dir)
@@ -55,8 +56,8 @@ def start_process(base_dir, options):
     return proc
 
 
-def wait_on_process(proc, returncode=0):
-    stdout, stderr = proc.communicate()
+def wait_on_process(proc, returncode=0, stdin=None):
+    stdout, stderr = proc.communicate(input=stdin)
     if proc.returncode != returncode:
         print("Stderr: {}".format(stderr))
         print("Stdout: {}".format(stdout))
@@ -64,10 +65,10 @@ def wait_on_process(proc, returncode=0):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def dispatch(base_dir, options, project_options=None, returncode=0):
+def dispatch(base_dir, options, project_options=None, returncode=0, stdin=None):
     project_options = project_options or []
     proc = start_process(base_dir, project_options + options)
-    return wait_on_process(proc, returncode=returncode)
+    return wait_on_process(proc, returncode=returncode, stdin=stdin)
 
 
 def wait_on_condition(condition, delay=0.1, timeout=40):
@@ -156,8 +157,8 @@ class CLITestCase(DockerClientTestCase):
             self._project = get_project(self.base_dir, override_dir=self.override_dir)
         return self._project
 
-    def dispatch(self, options, project_options=None, returncode=0):
-        return dispatch(self.base_dir, options, project_options, returncode)
+    def dispatch(self, options, project_options=None, returncode=0, stdin=None):
+        return dispatch(self.base_dir, options, project_options, returncode, stdin)
 
     def execute(self, container, cmd):
         # Remove once Hijack and CloseNotifier sign a peace treaty
@@ -240,6 +241,17 @@ class CLITestCase(DockerClientTestCase):
     def test_config_quiet(self):
         self.base_dir = 'tests/fixtures/v2-full'
         assert self.dispatch(['config', '--quiet']).stdout == ''
+
+    def test_config_stdin(self):
+        config = b"""version: "3.7"
+services:
+  web:
+    image: nginx
+  other:
+    image: alpine
+"""
+        result = self.dispatch(['-f', '-', 'config', '--services'], stdin=config)
+        assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
     def test_config_with_hash_option(self):
         self.base_dir = 'tests/fixtures/v2-full'
@@ -661,13 +673,6 @@ class CLITestCase(DockerClientTestCase):
                 'image library/nonexisting-image:latest not found' in result.stderr or
                 'pull access denied for nonexisting-image' in result.stderr)
 
-    def test_pull_with_build(self):
-        result = self.dispatch(['-f', 'pull-with-build.yml', 'pull'])
-
-        assert 'Pulling simple' not in result.stderr
-        assert 'Pulling from_simple' not in result.stderr
-        assert 'Pulling another ...' in result.stderr
-
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
         assert self.dispatch(['pull', '--quiet']).stdout == ''
@@ -688,6 +693,14 @@ class CLITestCase(DockerClientTestCase):
             re.compile('''^(ERROR: )?(b')?.* nonexisting-image''', re.MULTILINE),
             result.stderr
         )
+
+    def test_pull_can_build(self):
+        result = self.dispatch([
+            '-f', 'can-build-pull-failures.yml', 'pull'],
+            returncode=0
+        )
+        assert 'Some service image(s) must be built from source' in result.stderr
+        assert 'docker-compose build can_build' in result.stderr
 
     def test_pull_with_no_deps(self):
         self.base_dir = 'tests/fixtures/links-composefile'

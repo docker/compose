@@ -11,6 +11,14 @@ venv/bin/pip install -r requirements-build.txt
 venv/bin/pip install --no-deps .
 DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
 echo "${DOCKER_COMPOSE_GITSHA}" > compose/GITSHA
+
+# Build as a folder for macOS Catalina.
+venv/bin/pyinstaller docker-compose_darwin.spec
+dist/docker-compose-Darwin-x86_64/docker-compose version
+(cd dist/docker-compose-Darwin-x86_64/ && tar zcvf ../docker-compose-Darwin-x86_64.tgz .)
+rm -rf dist/docker-compose-Darwin-x86_64
+
+# Build static binary for legacy.
 venv/bin/pyinstaller docker-compose.spec
 mv dist/docker-compose dist/docker-compose-Darwin-x86_64
 dist/docker-compose-Darwin-x86_64 version
