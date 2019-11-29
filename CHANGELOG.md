@@ -1,6 +1,19 @@
 Change log
 ==========
 
+1.25.1-rc1 (2019-11-29)
+-----------------------
+
+### Bugfixes
+
+- Discard label `com.docker.compose.filepaths` having `None` as value. Typically, when coming from stdin
+
+- Add OSX binary as a directory to solve slow start up time caused by MacOS Catalina binary scan
+
+- Pass in HOME env-var in container mode (running with `script/run/run.sh`)
+
+- Revert behavior of "only pull images that we can't build" and replace by a warning informing the image we can't pull and must be built
+
 1.25.0 (2019-11-18)
 -------------------
 
