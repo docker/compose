@@ -30,6 +30,9 @@ jobs:
          name: build script
          command: ./script/build/osx
       - store_artifacts:
+          path: dist/docker-compose-Darwin-x86_64
+          destination: docker-compose-Darwin-x86_64
+      - store_artifacts:
           path: dist/docker-compose-Darwin-x86_64.tgz
           destination: docker-compose-Darwin-x86_64.tgz
       - deploy:
