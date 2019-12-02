@@ -1,38 +1,31 @@
 #!groovy
 
 def buildImage = { String baseImage ->
-  def image
+  def imageName = "compose:${baseImage}"
   wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
     stage("build image for \"${baseImage}\"") {
       checkout(scm)
-      def imageName = "dockerbuildbot/compose:${baseImage}-${gitCommit()}"
-      image = docker.image(imageName)
-      try {
-        image.pull()
-      } catch (Exception exc) {
-        sh """GIT_COMMIT=\$(script/build/write-git-sha) && \\
-            docker build -t ${imageName} \\
+      sh """docker build -t ${imageName} \\
             --target build \\
             --build-arg BUILD_PLATFORM="${baseImage}" \\
-            --build-arg GIT_COMMIT="${GIT_COMMIT}" \\
             .\\
-        """
-        sh "docker push ${imageName}"
-        echo "${imageName}"
-        return imageName
-      }
+      """
+      sh "docker save -o baseImage.tar ${imageName}"
+      stash( includes:"baseImage.tar", name: baseImage )
+      echo "${imageName}"
     }
   }
-  echo "image.id: ${image.id}"
-  return image.id
+  return imageName
 }
 
-def get_versions = { String imageId, int number ->
+def get_versions = { String baseImage, int number ->
   def docker_versions
   wrappedNode(label: "ubuntu && amd64 && !zfs") {
+    unstash baseImage
+    sh "docker load -i baseImage.tar"
     def result = sh(script: """docker run --rm \\
         --entrypoint=/code/.tox/py27/bin/python \\
-        ${imageId} \\
+        compose:${baseImage} \\
         /code/script/test/versions.py -n ${number} docker/docker-ce recent
       """, returnStdout: true
     )
@@ -57,6 +50,9 @@ def runTests = { Map settings ->
   { ->
     wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
       stage("test python=${pythonVersions} / docker=${dockerVersions} / baseImage=${baseImage}") {
+        unstash baseImage
+        sh "docker load -i baseImage.tar"
+
         checkout(scm)
         def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
         echo "Using local system's storage driver: ${storageDriver}"
@@ -66,13 +62,13 @@ def runTests = { Map settings ->
           --privileged \\
           --volume="\$(pwd)/.git:/code/.git" \\
           --volume="/var/run/docker.sock:/var/run/docker.sock" \\
-          -e "TAG=${imageName}" \\
+          -e "TAG=compose:${baseImage}" \\
           -e "STORAGE_DRIVER=${storageDriver}" \\
           -e "DOCKER_VERSIONS=${dockerVersions}" \\
           -e "BUILD_NUMBER=\$BUILD_TAG" \\
           -e "PY_TEST_VERSIONS=${pythonVersions}" \\
           --entrypoint="script/test/ci" \\
-          ${imageName} \\
+          compose:${baseImage} \\
           --verbose
         """
       }
@@ -84,10 +80,10 @@ def testMatrix = [failFast: true]
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py27', 'py37']
 baseImages.each { baseImage ->
-  def imageName = buildImage(baseImage)
-  get_versions(imageName, 2).each { dockerVersion ->
+  buildImage(baseImage)
+  get_versions(baseImage, 2).each { dockerVersion ->
     pythonVersions.each { pyVersion ->
-      testMatrix["${baseImage}_${dockerVersion}_${pyVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: pyVersion])
+      testMatrix["${baseImage}_${dockerVersion}_${pyVersion}"] = runTests([baseImage: baseImage, dockerVersions: dockerVersion, pythonVersions: pyVersion])
     }
   }
 }
