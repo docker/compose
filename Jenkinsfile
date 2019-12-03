@@ -1,20 +1,19 @@
 #!groovy
 
-def buildImage = { String baseImage ->
+def buildImage(baseImage) {
   def image
   wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
     stage("build image for \"${baseImage}\"") {
-      checkout(scm)
-      def imageName = "dockerbuildbot/compose:${baseImage}-${gitCommit()}"
+      def scmvar = checkout(scm)
+      def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
       image = docker.image(imageName)
       try {
         image.pull()
       } catch (Exception exc) {
-        sh """GIT_COMMIT=\$(script/build/write-git-sha) && \\
-            docker build -t ${imageName} \\
+        sh """docker build -t ${imageName} \\
             --target build \\
             --build-arg BUILD_PLATFORM="${baseImage}" \\
-            --build-arg GIT_COMMIT="${GIT_COMMIT}" \\
+            --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
             .\\
         """
         sh "docker push ${imageName}"
@@ -27,16 +26,14 @@ def buildImage = { String baseImage ->
   return image.id
 }
 
-def get_versions = { String imageId, int number ->
+def get_versions(imageId, number) {
   def docker_versions
   wrappedNode(label: "ubuntu && amd64 && !zfs") {
-    def result = sh(script: """docker run --rm \\
-        --entrypoint=/code/.tox/py27/bin/python \\
-        ${imageId} \\
-        /code/script/test/versions.py -n ${number} docker/docker-ce recent
-      """, returnStdout: true
-    )
-    docker_versions = result.split()
+    docker_versions = sh(script:"""
+        curl https://api.github.com/repos/docker/docker-ce/releases \
+         | jq -r -c '.[] | select (.prerelease == false ) | .tag_name | ltrimstr("v")' > /tmp/versions.txt
+        for v in \$(cut -f1 -d"." /tmp/versions.txt | uniq | head -${number}); do grep -m 1 "\$v" /tmp/versions.txt ; done
+    """, returnStdout: true)
   }
   return docker_versions
 }
@@ -84,7 +81,7 @@ def testMatrix = [failFast: true]
 def baseImages = ['alpine', 'debian']
 baseImages.each { baseImage ->
   def imageName = buildImage(baseImage)
-  get_versions(imageName, 2).each { dockerVersion ->
+  get_versions(imageName, 2).eachLine { dockerVersion ->
       testMatrix["${baseImage}_${dockerVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: 'py37'])
   }
 }

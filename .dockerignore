@@ -11,3 +11,4 @@ docs/_site
 .tox
 **/__pycache__
 *.pyc
+Jenkinsfile
