@@ -4,6 +4,7 @@
 .github
 .tox
 build
+Jenkinsfile
 binaries
 coverage-html
 docs/_site
