@@ -90,7 +90,7 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
       stage("test python=${pythonVersion} / docker=${dockerVersion} / baseImage=${baseImage}") {
         def scmvar = checkout(scm)
         def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
-        def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
+        def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
         echo "Using local system's storage driver: ${storageDriver}"
         sh """docker run \\
           -t \\
@@ -101,7 +101,7 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
           -e "TAG=${imageName}" \\
           -e "STORAGE_DRIVER=${storageDriver}" \\
           -e "DOCKER_VERSIONS=${dockerVersion}" \\
-          -e "BUILD_NUMBER=\$BUILD_TAG" \\
+          -e "BUILD_NUMBER=${env.BUILD_NUMBER}" \\
           -e "PY_TEST_VERSIONS=${pythonVersion}" \\
           --entrypoint="script/test/ci" \\
           ${imageName} \\
