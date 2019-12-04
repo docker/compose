@@ -14,11 +14,6 @@ pipeline {
         timestamps()
     }
 
-    environment {
-        TAG = tag()
-        BUILD_TAG = tag()
-    }
-
     stages {
         stage('Build test images') {
             // TODO use declarative 1.5.0 `matrix` once available on CI
