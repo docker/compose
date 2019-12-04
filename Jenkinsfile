@@ -43,6 +43,7 @@ pipeline {
         }
         stage('Test') {
             steps {
+                // TODO use declarative 1.5.0 `matrix` once available on CI
                 script {
                     def testMatrix = [:]
                     baseImages.each { baseImage ->
@@ -86,27 +87,31 @@ def buildImage(baseImage) {
 }
 
 def runTests(dockerVersion, pythonVersion, baseImage) {
-    wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
-      stage("test python=${pythonVersion} / docker=${dockerVersion} / baseImage=${baseImage}") {
-        def scmvar = checkout(scm)
-        def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
-        def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
-        echo "Using local system's storage driver: ${storageDriver}"
-        sh """docker run \\
-          -t \\
-          --rm \\
-          --privileged \\
-          --volume="\$(pwd)/.git:/code/.git" \\
-          --volume="/var/run/docker.sock:/var/run/docker.sock" \\
-          -e "TAG=${imageName}" \\
-          -e "STORAGE_DRIVER=${storageDriver}" \\
-          -e "DOCKER_VERSIONS=${dockerVersion}" \\
-          -e "BUILD_NUMBER=${env.BUILD_NUMBER}" \\
-          -e "PY_TEST_VERSIONS=${pythonVersion}" \\
-          --entrypoint="script/test/ci" \\
-          ${imageName} \\
-          --verbose
-        """
-     }
+    return {
+        stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
+            node("ubuntu && amd64 && !zfs") {
+                def scmvar = checkout(scm)
+                def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+                def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
+                echo "Using local system's storage driver: ${storageDriver}"
+                withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
+                    sh """docker run \\
+                      -t \\
+                      --rm \\
+                      --privileged \\
+                      --volume="\$(pwd)/.git:/code/.git" \\
+                      --volume="/var/run/docker.sock:/var/run/docker.sock" \\
+                      -e "TAG=${imageName}" \\
+                      -e "STORAGE_DRIVER=${storageDriver}" \\
+                      -e "DOCKER_VERSIONS=${dockerVersion}" \\
+                      -e "BUILD_NUMBER=${env.BUILD_NUMBER}" \\
+                      -e "PY_TEST_VERSIONS=${pythonVersion}" \\
+                      --entrypoint="script/test/ci" \\
+                      ${imageName} \\
+                      --verbose
+                    """
+                }
+            }
+        }
     }
 }
