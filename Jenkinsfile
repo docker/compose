@@ -1,5 +1,9 @@
 #!groovy
 
+def dockerVersions
+def baseImages = ['alpine', 'debian']
+def pythonVersions = ['py27', 'py37']
+
 pipeline {
     agent none
 
@@ -17,6 +21,7 @@ pipeline {
 
     stages {
         stage('Build test images') {
+            // TODO use declarative 1.5.0 `matrix` once available on CI
             parallel {
                 stage('alpine') {
                     agent {
@@ -33,6 +38,20 @@ pipeline {
                     steps {
                         buildImage('debian')
                     }
+                }
+            }
+        }
+        stage('Get Docker versions') {
+            agent {
+                label 'ubuntu'
+            }
+            steps {
+                script {
+                    dockerVersions = sh(script:"""
+                    curl https://api.github.com/repos/docker/docker-ce/releases \
+                        | jq -r -c '.[] | select (.prerelease == false ) | .tag_name | ltrimstr("v")' > /tmp/versions.txt
+                    for v in \$(cut -f1 -d"." /tmp/versions.txt | uniq | head -2); do grep -m 1 "\$v" /tmp/versions.txt ; done
+                        """, returnStdout: true)
                 }
             }
         }
@@ -64,33 +83,9 @@ def buildImage(baseImage) {
     }
 }
 
-def get_versions(number) {
-  def docker_versions
-  wrappedNode(label: "ubuntu && amd64 && !zfs") {
-    docker_versions = sh(script:"""
-        curl https://api.github.com/repos/docker/docker-ce/releases \
-         | jq -r -c '.[] | select (.prerelease == false ) | .tag_name | ltrimstr("v")' > /tmp/versions.txt
-        for v in \$(cut -f1 -d"." /tmp/versions.txt | uniq | head -${number}); do grep -m 1 "\$v" /tmp/versions.txt ; done
-    """, returnStdout: true)
-  }
-  return docker_versions
-}
-
-def runTests = { Map settings ->
-  def dockerVersions = settings.get("dockerVersions", null)
-  def pythonVersions = settings.get("pythonVersions", null)
-  def baseImage = settings.get("baseImage", null)
-
-  if (!pythonVersions) {
-    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py37')`")
-  }
-  if (!dockerVersions) {
-    throw new Exception("Need Docker versions to test. e.g.: `runTests(dockerVersions: 'all')`")
-  }
-
-  { ->
+def runTests(dockerVersion, pythonVersion, baseImage) {
     wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
-      stage("test python=${pythonVersions} / docker=${dockerVersions} / baseImage=${baseImage}") {
+      stage("test python=${pythonVersion} / docker=${dockerVersion} / baseImage=${baseImage}") {
         def scmvar = checkout(scm)
         def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
         def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
@@ -103,25 +98,25 @@ def runTests = { Map settings ->
           --volume="/var/run/docker.sock:/var/run/docker.sock" \\
           -e "TAG=${imageName}" \\
           -e "STORAGE_DRIVER=${storageDriver}" \\
-          -e "DOCKER_VERSIONS=${dockerVersions}" \\
+          -e "DOCKER_VERSIONS=${dockerVersion}" \\
           -e "BUILD_NUMBER=\$BUILD_TAG" \\
-          -e "PY_TEST_VERSIONS=${pythonVersions}" \\
+          -e "PY_TEST_VERSIONS=${pythonVersion}" \\
           --entrypoint="script/test/ci" \\
           ${imageName} \\
           --verbose
         """
-      }
+     }
+    }
+}
+
+def testMatrix = [failFast: true]
+
+baseImages.each { baseImage ->
+  dockerVersions.eachLine { dockerVersion ->
+    pythonVersions.each { pythonVersion ->
+      testMatrix["${baseImage}_${dockerVersion}_${pythonVersion}"] = runTests(dockerVersion, pythonVersion, baseImage)
     }
   }
 }
 
-def testMatrix = [failFast: true]
-def baseImages = ['alpine', 'debian']
-baseImages.each { baseImage ->
-  def imageName = buildImage(baseImage)
-  get_versions(imageName, 2).eachLine { dockerVersion ->
-      testMatrix["${baseImage}_${dockerVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: 'py37'])
-  }
-}
-
-parallel(testMatrix)
+parallel testMatrix
