@@ -1,6 +1,6 @@
 #!groovy
 
-def dockerVersions
+def dockerVersions = ['19.03.5', '18.09.9']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py27', 'py37']
 
@@ -41,17 +41,19 @@ pipeline {
                 }
             }
         }
-        stage('Get Docker versions') {
-            agent {
-                label 'ubuntu'
-            }
+        stage('Test') {
             steps {
                 script {
-                    dockerVersions = sh(script:"""
-                    curl https://api.github.com/repos/docker/docker-ce/releases \
-                        | jq -r -c '.[] | select (.prerelease == false ) | .tag_name | ltrimstr("v")' > /tmp/versions.txt
-                    for v in \$(cut -f1 -d"." /tmp/versions.txt | uniq | head -2); do grep -m 1 "\$v" /tmp/versions.txt ; done
-                        """, returnStdout: true)
+                    def testMatrix = [:]
+                    baseImages.each { baseImage ->
+                      dockerVersions.each { dockerVersion ->
+                        pythonVersions.each { pythonVersion ->
+                          testMatrix["${baseImage}_${dockerVersion}_${pythonVersion}"] = runTests(dockerVersion, pythonVersion, baseImage)
+                        }
+                      }
+                    }
+
+                    parallel testMatrix
                 }
             }
         }
@@ -108,15 +110,3 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
      }
     }
 }
-
-def testMatrix = [failFast: true]
-
-baseImages.each { baseImage ->
-  dockerVersions.eachLine { dockerVersion ->
-    pythonVersions.each { pythonVersion ->
-      testMatrix["${baseImage}_${dockerVersion}_${pythonVersion}"] = runTests(dockerVersion, pythonVersion, baseImage)
-    }
-  }
-}
-
-parallel testMatrix
