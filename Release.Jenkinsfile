@@ -61,11 +61,13 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        sh 'script/setup/osx-ci'
+                        sh './script/setup/osx'
                         sh 'tox -e py27,py37 -- tests/unit'
                         sh './script/build/osx'
-                        checksum("dist/docker-compose-Darwin-x86_64")
-                        checksum("dist/docker-compose-Darwin-x86_64.tgz")
+                        dir ('dist') {
+                          sh 'openssl sha256 -r -out docker-compose-Darwin-x86_64.sha256 docker-compose-Darwin-x86_64'
+                          sh 'openssl sha256 -r -out docker-compose-Darwin-x86_64.tgz.sha256 docker-compose-Darwin-x86_64.tgz'
+                        }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
                             stash name: "bin-darwin"
@@ -79,7 +81,9 @@ pipeline {
                     steps {
                         checkout scm
                         sh ' ./script/build/linux'
-                        checksum("dist/docker-compose-Linux-x86_64")
+                        dir ('dist') {
+                          sh 'openssl sha256 -r -out docker-compose-Linux-x86_64.sha256 docker-compose-Linux-x86_64'
+                        }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
                             stash name: "bin-linux"
@@ -97,7 +101,9 @@ pipeline {
                         checkout scm
                         bat 'tox.exe -e py27,py37 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
-                        checksum("dist/docker-compose-Windows-x86_64.exe")
+                        dir ('dist') {
+                          sh 'openssl sha256 -r -out docker-compose-Windows-x86_64.exe.sha256 docker-compose-Windows-x86_64.exe'
+                        }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
                             stash name: "bin-win"
@@ -245,7 +251,8 @@ def buildRuntimeImage(baseImage) {
     ansiColor('xterm') {
         sh """docker build -t ${imageName} \\
             --build-arg BUILD_PLATFORM="${baseImage}" \\
-            --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}"
+            --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}" \\
+            ."
         """
     }
     sh "mkdir -p dist"
