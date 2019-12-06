@@ -53,6 +53,19 @@ pipeline {
                 }
             }
         }
+        stage('Generate Changelog') {
+            agent {
+                label 'linux'
+            }
+            steps {
+                checkout scm
+                withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
+                    sh "./script/release/generate_changelog.sh"
+                }
+                archiveArtifacts artifacts: 'CHANGELOG.md'
+                stash( name: "changelog", includes: 'CHANGELOG.md' )
+            }
+        }
         stage('Package') {
             parallel {
                 stage('macosx binary') {
@@ -153,7 +166,7 @@ pipeline {
                             unstash "bin-darwin"
                             unstash "bin-linux"
                             unstash "bin-win"
-                            githubRelease("docker/compose")
+                            githubRelease()
                         }
                     }
                 }
@@ -270,5 +283,31 @@ def pushRuntimeImage(baseImage) {
             sh "docker tag docker/compose:alpine-${env.TAG_NAME} docker/compose:${env.TAG_NAME}"
             sh "docker push docker/compose:${env.TAG_NAME}"
         }
+    }
+}
+
+def githubRelease() {
+    withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
+        def prerelease = !( env.TAG_NAME ==~ /v[0-9\.]+/ )
+        def data = """{
+            \"tag_name\": \"${env.TAG_NAME}\",
+            \"name\": \"${env.TAG_NAME}\",
+            \"draft\": true,
+            \"prerelease\": ${prerelease},
+            \"body\" : \"${changelog}\"
+        """
+        echo $data
+
+        def url = "https://api.github.com/repos/docker/compose/releases"
+        def upload_url = sh(returnStdout: true, script: """
+            curl -sSf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/json' -X POST -d '$data' $url") \\
+            | jq '.upload_url | .[:rindex("{")]'
+        """)
+        sh("""
+            for f in * ; do
+                curl -sf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/octet-stream' \\
+                -X POST --data-binary @\$f ${upload_url}?name=\$f;
+            done
+        """)
     }
 }
