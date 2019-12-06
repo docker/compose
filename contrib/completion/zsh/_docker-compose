@@ -121,12 +121,6 @@ __docker-compose_subcommand() {
                 '--parallel[Build images in parallel.]' \
                 '*:services:__docker-compose_services_from_build' && ret=0
             ;;
-        (bundle)
-            _arguments \
-                $opts_help \
-                '--push-images[Automatically push images for any services which have a `build` option specified.]' \
-                '(--output -o)'{--output,-o}'[Path to write the bundle file to. Defaults to "<project name>.dab".]:file:_files' && ret=0
-            ;;
         (config)
             _arguments \
                 $opts_help \

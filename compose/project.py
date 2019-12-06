@@ -16,6 +16,7 @@ from docker.errors import NotFound
 from docker.utils import version_lt
 
 from . import parallel
+from .cli.errors import UserError
 from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
@@ -33,6 +34,7 @@ from .service import ContainerNetworkMode
 from .service import ContainerPidMode
 from .service import ConvergenceStrategy
 from .service import NetworkMode
+from .service import NoSuchImageError
 from .service import parse_repository_tag
 from .service import PidMode
 from .service import Service
@@ -41,7 +43,6 @@ from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
 from .utils import truncate_string
 from .volume import ProjectVolumes
-
 
 log = logging.getLogger(__name__)
 
@@ -381,6 +382,7 @@ class Project(object):
 
         def build_service(service):
             service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)
+
         if parallel_build:
             _, errors = parallel.parallel_execute(
                 services,
@@ -842,6 +844,91 @@ def get_secrets(service, service_secrets, secret_defs):
         secrets.append({'secret': secret, 'file': secret_file})
 
     return secrets
+
+
+def get_image_digests(project):
+    digests = {}
+    needs_push = set()
+    needs_pull = set()
+
+    for service in project.services:
+        try:
+            digests[service.name] = get_image_digest(service)
+        except NeedsPush as e:
+            needs_push.add(e.image_name)
+        except NeedsPull as e:
+            needs_pull.add(e.service_name)
+
+    if needs_push or needs_pull:
+        raise MissingDigests(needs_push, needs_pull)
+
+    return digests
+
+
+def get_image_digest(service):
+    if 'image' not in service.options:
+        raise UserError(
+            "Service '{s.name}' doesn't define an image tag. An image name is "
+            "required to generate a proper image digest. Specify an image repo "
+            "and tag with the 'image' option.".format(s=service))
+
+    _, _, separator = parse_repository_tag(service.options['image'])
+    # Compose file already uses a digest, no lookup required
+    if separator == '@':
+        return service.options['image']
+
+    digest = get_digest(service)
+
+    if digest:
+        return digest
+
+    if 'build' not in service.options:
+        raise NeedsPull(service.image_name, service.name)
+
+    raise NeedsPush(service.image_name)
+
+
+def get_digest(service):
+    digest = None
+    try:
+        image = service.image()
+        # TODO: pick a digest based on the image tag if there are multiple
+        # digests
+        if image['RepoDigests']:
+            digest = image['RepoDigests'][0]
+    except NoSuchImageError:
+        try:
+            # Fetch the image digest from the registry
+            distribution = service.get_image_registry_data()
+
+            if distribution['Descriptor']['digest']:
+                digest = '{image_name}@{digest}'.format(
+                    image_name=service.image_name,
+                    digest=distribution['Descriptor']['digest']
+                )
+        except NoSuchImageError:
+            raise UserError(
+                "Digest not found for service '{service}'. "
+                "Repository does not exist or may require 'docker login'"
+                .format(service=service.name))
+    return digest
+
+
+class MissingDigests(Exception):
+    def __init__(self, needs_push, needs_pull):
+        self.needs_push = needs_push
+        self.needs_pull = needs_pull
+
+
+class NeedsPush(Exception):
+    def __init__(self, image_name):
+        self.image_name = image_name
+
+
+class NeedsPull(Exception):
+    def __init__(self, image_name, service_name):
+        self.image_name = image_name
+        self.service_name = service_name
 
 
 class NoSuchService(Exception):
