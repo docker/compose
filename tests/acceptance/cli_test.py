@@ -855,32 +855,6 @@ services:
         )
         assert 'Favorite Touhou Character: hong.meiling' in result.stdout
 
-    def test_bundle_with_digests(self):
-        self.base_dir = 'tests/fixtures/bundle-with-digests/'
-        tmpdir = pytest.ensuretemp('cli_test_bundle')
-        self.addCleanup(tmpdir.remove)
-        filename = str(tmpdir.join('example.dab'))
-
-        self.dispatch(['bundle', '--output', filename])
-        with open(filename, 'r') as fh:
-            bundle = json.load(fh)
-
-        assert bundle == {
-            'Version': '0.1',
-            'Services': {
-                'web': {
-                    'Image': ('dockercloud/hello-world@sha256:fe79a2cfbd17eefc3'
-                              '44fb8419420808df95a1e22d93b7f621a7399fd1e9dca1d'),
-                    'Networks': ['default'],
-                },
-                'redis': {
-                    'Image': ('redis@sha256:a84cb8f53a70e19f61ff2e1d5e73fb7ae62d'
-                              '374b2b7392de1e7d77be26ef8f7b'),
-                    'Networks': ['default'],
-                }
-            },
-        }
-
     def test_build_override_dir(self):
         self.base_dir = 'tests/fixtures/build-path-override-dir'
         self.override_dir = os.path.abspath('tests/fixtures')
