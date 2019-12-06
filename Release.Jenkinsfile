@@ -252,7 +252,7 @@ def buildRuntimeImage(baseImage) {
         sh """docker build -t ${imageName} \\
             --build-arg BUILD_PLATFORM="${baseImage}" \\
             --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}" \\
-            ."
+            .
         """
     }
     sh "mkdir -p dist"
