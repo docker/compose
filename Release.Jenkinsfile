@@ -178,9 +178,17 @@ pipeline {
                     steps {
                         checkout scm
                         withCredentials([[$class: "FileBinding", credentialsId: 'pypirc-docker-dsg-cibot', variable: 'PYPIRC']]) {
-                            sh './script/release/python-package'
+                            sh """
+                                virtualenv venv-publish
+                                source venv-publish/bin/activate
+                                python setup.py sdist bdist_wheel
+                                pip install twine
+                                twine upload --config-file ${PYPIRC} ./dist/docker-compose-${env.TAG_NAME}.tar.gz ./dist/docker_compose-${env.TAG_NAME}-py2.py3-none-any.whl
+                            """
                         }
-                        archiveArtifacts artifacts: 'dist/*', fingerprint: true
+                    }
+                    post {
+                        sh 'deactivate; rm -rf venv-publish'
                     }
                 }
             }
