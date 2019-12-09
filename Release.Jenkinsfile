@@ -78,8 +78,8 @@ pipeline {
                         sh 'tox -e py27,py37 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
-                          sh 'openssl sha256 -r -out docker-compose-Darwin-x86_64.sha256 docker-compose-Darwin-x86_64'
-                          sh 'openssl sha256 -r -out docker-compose-Darwin-x86_64.tgz.sha256 docker-compose-Darwin-x86_64.tgz'
+                          checksum('docker-compose-Darwin-x86_64')
+                          checksum('docker-compose-Darwin-x86_64.tgz')
                         }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
@@ -95,7 +95,7 @@ pipeline {
                         checkout scm
                         sh ' ./script/build/linux'
                         dir ('dist') {
-                          sh 'openssl sha256 -r -out docker-compose-Linux-x86_64.sha256 docker-compose-Linux-x86_64'
+                          checksum('docker-compose-Linux-x86_64')
                         }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
@@ -115,7 +115,7 @@ pipeline {
                         bat 'tox.exe -e py27,py37 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
-                          sh 'openssl sha256 -r -out docker-compose-Windows-x86_64.exe.sha256 docker-compose-Windows-x86_64.exe'
+                            checksum('docker-compose-Windows-x86_64.exe')
                         }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
                         dir("dist") {
@@ -166,6 +166,7 @@ pipeline {
                             unstash "bin-darwin"
                             unstash "bin-linux"
                             unstash "bin-win"
+                            unstash "changelog"
                             githubRelease()
                         }
                     }
@@ -180,22 +181,6 @@ pipeline {
                             sh './script/release/python-package'
                         }
                         archiveArtifacts artifacts: 'dist/*', fingerprint: true
-                    }
-                }
-                stage('Publishing binaries to Bintray') {
-                    agent {
-                        label 'linux'
-                    }
-                    steps {
-                        checkout scm
-                        dir("dist") {
-                            unstash "bin-darwin"
-                            unstash "bin-linux"
-                            unstash "bin-win"
-                        }
-                        withCredentials([usernamePassword(credentialsId: 'bintray-docker-dsg-cibot', usernameVariable: 'BINTRAY_USER', passwordVariable: 'BINTRAY_TOKEN')]) {
-                            sh './script/release/push-binaries'
-                        }
                     }
                 }
             }
@@ -289,6 +274,7 @@ def pushRuntimeImage(baseImage) {
 def githubRelease() {
     withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
         def prerelease = !( env.TAG_NAME ==~ /v[0-9\.]+/ )
+        changelog = readFile "CHANGELOG.md"
         def data = """{
             \"tag_name\": \"${env.TAG_NAME}\",
             \"name\": \"${env.TAG_NAME}\",
@@ -309,5 +295,13 @@ def githubRelease() {
                 -X POST --data-binary @\$f ${upload_url}?name=\$f;
             done
         """)
+    }
+}
+
+def checksum(filepath) {
+    if (isUnix()) {
+        sh "openssl sha256 -r -out ${filepath}.sha256 ${filepath}"
+    } else {
+        powershell "(Get-FileHash -Path ${filepath} -Algorithm SHA256 | % hash) + ' *${filepath}' > ${filepath}.sha256"
     }
 }
