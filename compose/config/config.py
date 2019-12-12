@@ -5,6 +5,7 @@ import functools
 import io
 import logging
 import os
+import re
 import string
 import sys
 from collections import namedtuple
@@ -213,6 +214,12 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                 'Version in "{}" is invalid. {}'
                 .format(self.filename, VERSION_EXPLANATION)
             )
+
+        version_pattern = re.compile(r"^[2-9]+(\.\d+)?$")
+        if not version_pattern.match(version):
+            raise ConfigurationError(
+                'Version "{}" in "{}" is invalid.'
+                .format(version, self.filename))
 
         if version == '2':
             return const.COMPOSEFILE_V2_0
