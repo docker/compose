@@ -34,11 +34,40 @@ fi
 if [ "$(pwd)" != '/' ]; then
     VOLUMES="-v $(pwd):$(pwd)"
 fi
+if [ -z "$COMPOSE_FILE" ] ; then
+    # Iterate over $@ in a subshell, to not alter the original
+    COMPOSE_FILE=$(
+    while [ "$#" -gt 0 ] ; do
+        case "$1" in
+            -f|--file)
+                if [ -n "$2" ] ; then
+                    COMPOSE_FILE=$2
+                    shift
+                fi
+                ;;
+            --file=*)
+                COMPOSE_FILE=${1#--file=}
+                ;;
+            build|bundle|config|create|down|events|exec|help|images|kill|logs|pause|port|ps|pull|push|restart|rm|run|scale|start|stop|top|unpause|up|version)
+                # Break on any docker-compose verb,
+                # because any -f or --file after that
+                # isn't the droid we're looking for.
+                break
+                ;;
+        esac
+        shift
+    done
+    echo "$COMPOSE_FILE"
+)
+fi
 if [ -n "$COMPOSE_FILE" ]; then
+    if [ ! -s "${COMPOSE_FILE}" ]; then
+        echo "$0: Compose-file ${COMPOSE_FILE} does not exist, or is empty"
+        exit 1
+    fi
     COMPOSE_OPTIONS="$COMPOSE_OPTIONS -e COMPOSE_FILE=$COMPOSE_FILE"
     compose_dir=$(realpath "$(dirname "$COMPOSE_FILE")")
 fi
-# TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
