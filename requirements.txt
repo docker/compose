@@ -17,7 +17,7 @@ paramiko==2.6.0
 pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
 pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.6.7
-PyYAML==4.2b1
+PyYAML==5.3b1
 requests==2.22.0
 six==1.12.0
 texttable==1.6.2
