@@ -521,7 +521,7 @@ class ServiceTest(unittest.TestCase):
             assert 'was built because it did not already exist' in args[0]
 
         assert self.mock_client.build.call_count == 1
-        self.mock_client.build.call_args[1]['tag'] == 'default_foo'
+        assert self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
     def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
