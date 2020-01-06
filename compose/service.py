@@ -114,7 +114,7 @@ HOST_CONFIG_KEYS = [
     'userns_mode',
     'volumes_from',
     'volume_driver',
-    'device_requests', 
+    'device_requests',
 ]
 
 CONDITION_STARTED = 'service_started'
@@ -994,8 +994,8 @@ class Service(object):
             if 'capabilities' not in device_request:
                 continue
 
-            device_request['capabilities'] = [element.split(',') for element in device_request['capabilities']]
-
+            device_request['capabilities'] = [
+                    element.split(',') for element in device_request['capabilities']]
 
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
