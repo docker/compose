@@ -1,6 +1,6 @@
-coverage==4.4.2
+coverage==4.5.4
 ddt==1.2.0
-flake8==3.5.0
+flake8==3.7.9
 mock==3.0.5
 pytest==3.6.3
-pytest-cov==2.5.1
+pytest-cov==2.8.1

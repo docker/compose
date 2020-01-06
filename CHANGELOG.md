@@ -1,18 +1,31 @@
 Change log
 ==========
 
-1.25.1-rc1 (2019-11-29)
------------------------
+1.25.1 (2020-01-06)
+-------------------
+
+### Features
+
+- Bump `pytest-cov` 2.8.1
+
+- Bump `flake8` 3.7.9
+
+- Bump `coverage` 4.5.4
 
 ### Bugfixes
 
-- Discard label `com.docker.compose.filepaths` having `None` as value. Typically, when coming from stdin
+- Decode APIError explanation to unicode before usage on start and create of a container
 
-- Add OSX binary as a directory to solve slow start up time caused by MacOS Catalina binary scan
+- Reports when images that cannot be pulled and must be built
 
-- Pass in HOME env-var in container mode (running with `script/run/run.sh`)
+- Discard label `com.docker.compose.filepaths` having None as value. Typically, when coming from stdin
 
-- Revert behavior of "only pull images that we can't build" and replace by a warning informing the image we can't pull and must be built
+- Added OSX binary as a directory to solve slow start up time caused by MacOS Catalina binary scan
+
+- Passed in HOME env-var in container mode (running with `script/run/run.sh`)
+
+- Reverted behavior of "only pull images that we can't build" and replace by a warning informing the image we can't pull and must be built
+
 
 1.25.0 (2019-11-18)
 -------------------
