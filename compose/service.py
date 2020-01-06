@@ -114,6 +114,7 @@ HOST_CONFIG_KEYS = [
     'userns_mode',
     'volumes_from',
     'volume_driver',
+    'device_requests', 
 ]
 
 CONDITION_STARTED = 'service_started'
@@ -987,6 +988,15 @@ class Service(object):
         if 'cpus' in options:
             nano_cpus = int(options.get('cpus') * NANOCPUS_SCALE)
 
+        device_requests = options.get('device_requests')
+
+        for device_request in device_requests:
+            if 'capabilities' not in device_request:
+                continue
+
+            device_request['capabilities'] = [element.split(',') for element in device_request['capabilities']]
+
+
         return self.client.create_host_config(
             links=self._get_links(link_to_self=one_off),
             port_bindings=build_port_bindings(
@@ -1046,6 +1056,7 @@ class Service(object):
             cpu_period=options.get('cpu_period'),
             cpu_rt_period=options.get('cpu_rt_period'),
             cpu_rt_runtime=options.get('cpu_rt_runtime'),
+            device_requests=device_requests,
         )
 
     def get_secret_volumes(self):

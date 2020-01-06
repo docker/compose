@@ -151,6 +151,8 @@
 
         "external_links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
+        "device_requests": {"$ref": "#/definitions/device_requests"},
+        "": {"$ref": "#/definitions/list_or_dict"},
         "healthcheck": {"$ref": "#/definitions/healthcheck"},
         "hostname": {"type": "string"},
         "image": {"type": "string"},
@@ -597,6 +599,21 @@
           }
         }
       }
-    }
+    },
+    "device_requests": {
+      "id": "#/definitions/device_requests",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "driver": {"type": "string"},
+          "count": {"type": "number"},
+          "device_ids": {"$ref": "#/definitions/list_of_strings"},
+          "capabilities": {"$ref": "#/definitions/list_of_strings"},
+          "options": {"type": "object", "additionalProperties": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    }    
   }
 }
