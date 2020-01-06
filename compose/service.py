@@ -60,6 +60,7 @@ from .utils import parse_bytes
 from .utils import parse_seconds_float
 from .utils import truncate_id
 from .utils import unique_everseen
+from compose.cli.utils import binarystr_to_unicode
 
 if six.PY2:
     import subprocess32 as subprocess
@@ -343,7 +344,7 @@ class Service(object):
             return Container.create(self.client, **container_options)
         except APIError as ex:
             raise OperationFailedError("Cannot create container for service %s: %s" %
-                                       (self.name, ex.explanation))
+                                       (self.name, binarystr_to_unicode(ex.explanation)))
 
     def ensure_image_exists(self, do_build=BuildAction.none, silent=False, cli=False):
         if self.can_be_built() and do_build == BuildAction.force:
@@ -624,9 +625,10 @@ class Service(object):
         try:
             container.start()
         except APIError as ex:
-            if "driver failed programming external connectivity" in ex.explanation:
+            expl = binarystr_to_unicode(ex.explanation)
+            if "driver failed programming external connectivity" in expl:
                 log.warn("Host is already in use by another container")
-            raise OperationFailedError("Cannot start service %s: %s" % (self.name, ex.explanation))
+            raise OperationFailedError("Cannot start service %s: %s" % (self.name, expl))
         return container
 
     @property
