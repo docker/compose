@@ -523,6 +523,36 @@ class ServiceTest(unittest.TestCase):
         assert self.mock_client.build.call_count == 1
         assert self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
+    def test_create_container_binary_string_error(self):
+        service = Service('foo', client=self.mock_client, build={'context': '.'})
+        service.image = lambda: {'Id': 'abc123'}
+
+        self.mock_client.create_container.side_effect = APIError(None,
+                                                                 None,
+                                                                 b"Test binary string explanation")
+        with pytest.raises(OperationFailedError) as ex:
+            service.create_container()
+
+        assert ex.value.msg == "Cannot create container for service foo: Test binary string explanation"
+
+    def test_start_binary_string_error(self):
+        service = Service('foo', client=self.mock_client)
+        container = Container(self.mock_client, {'Id': 'abc123'})
+
+        self.mock_client.start.side_effect = APIError(None,
+                                                      None,
+                                                      b"Test binary string explanation with "
+                                                      b"driver failed programming external "
+                                                      b"connectivity")
+        with mock.patch('compose.service.log', autospec=True) as mock_log:
+            with pytest.raises(OperationFailedError) as ex:
+                service.start_container(container)
+
+        assert ex.value.msg == "Cannot start service foo: " \
+                               "Test binary string explanation " \
+                               "with driver failed programming external connectivity"
+        mock_log.warn.assert_called_once_with("Host is already in use by another container")
+
     def test_ensure_image_exists_no_build(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})
         self.mock_client.inspect_image.return_value = {'Id': 'abc123'}
