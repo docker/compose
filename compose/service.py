@@ -988,7 +988,7 @@ class Service(object):
         if 'cpus' in options:
             nano_cpus = int(options.get('cpus') * NANOCPUS_SCALE)
 
-        device_requests = options.get('device_requests')
+        device_requests = options.get('device_requests', [])
 
         for device_request in device_requests:
             if 'capabilities' not in device_request:
