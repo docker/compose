@@ -17,7 +17,12 @@ else:
 
 def get_tty_width():
     try:
-        width, _ = get_terminal_size()
+        # get_terminal_size can't determine the size if compose is piped
+        # to another command. But in such case it doesn't make sense to
+        # try format the output by terminal size as this output is consumed
+        # by another command. So let's pretend we have a huge terminal so
+        # output is single-lined
+        width, _ = get_terminal_size(fallback=(999, 0))
         return int(width)
     except OSError:
         return 0
