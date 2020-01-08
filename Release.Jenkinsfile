@@ -188,7 +188,9 @@ pipeline {
                         }
                     }
                     post {
-                        sh 'deactivate; rm -rf venv-publish'
+                        always {
+                            sh 'deactivate; rm -rf venv-publish'
+                        }
                     }
                 }
             }
