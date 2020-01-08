@@ -2,7 +2,7 @@
 
 def dockerVersions = ['19.03.5', '18.09.9']
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py27', 'py37']
+def pythonVersions = ['py37']
 
 pipeline {
     agent none
@@ -75,7 +75,7 @@ pipeline {
                     steps {
                         checkout scm
                         sh './script/setup/osx'
-                        sh 'tox -e py27,py37 -- tests/unit'
+                        sh 'tox -e py37 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
                           checksum('docker-compose-Darwin-x86_64')
@@ -112,7 +112,7 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        bat 'tox.exe -e py27,py37 -- tests/unit'
+                        bat 'tox.exe -e py37 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
                             checksum('docker-compose-Windows-x86_64.exe')
@@ -159,6 +159,9 @@ pipeline {
                     agent {
                         label 'linux'
                     }
+                    environment {
+                        GITHUB_TOKEN = credentials('github-release-token')
+                    }
                     steps {
                         checkout scm
                         sh 'mkdir -p dist'
@@ -167,7 +170,20 @@ pipeline {
                             unstash "bin-linux"
                             unstash "bin-win"
                             unstash "changelog"
-                            githubRelease()
+                            sh("""
+                                curl -SfL https://github.com/github/hub/releases/download/v2.13.0/hub-linux-amd64-2.13.0.tgz | tar xzv --wildcards 'hub-*/bin/hub' --strip=2
+                                ./hub release create --draft --prerelease=${env.TAG_NAME !=~ /v[0-9\.]+/} \\
+                                    -a docker-compose-Darwin-x86_64 \\
+                                    -a docker-compose-Darwin-x86_64.sha256 \\
+                                    -a docker-compose-Darwin-x86_64.tgz \\
+                                    -a docker-compose-Darwin-x86_64.tgz.sha256 \\
+                                    -a docker-compose-Linux-x86_64 \\
+                                    -a docker-compose-Linux-x86_64.sha256 \\
+                                    -a docker-compose-Windows-x86_64.exe \\
+                                    -a docker-compose-Windows-x86_64.exe.sha256 \\
+                                    -a ../script/run/run.sh \\
+                                    -F CHANGELOG.md \${TAG_NAME}
+                            """)
                         }
                     }
                 }
@@ -175,20 +191,18 @@ pipeline {
                     agent {
                         label 'linux'
                     }
+                    environment {
+                        PYPIRC = credentials('pypirc-docker-dsg-cibot')
+                    }
                     steps {
                         checkout scm
-                        withCredentials([[$class: "FileBinding", credentialsId: 'pypirc-docker-dsg-cibot', variable: 'PYPIRC']]) {
-                            sh """
-                                virtualenv venv-publish
-                                source venv-publish/bin/activate
-                                python setup.py sdist bdist_wheel
-                                pip install twine
-                                twine upload --config-file ${PYPIRC} ./dist/docker-compose-${env.TAG_NAME}.tar.gz ./dist/docker_compose-${env.TAG_NAME}-py2.py3-none-any.whl
-                            """
-                        }
-                    }
-                    post {
-                        sh 'deactivate; rm -rf venv-publish'
+                        sh """
+                            rm -rf build/ dist/
+                            pip install wheel
+                            python setup.py sdist bdist_wheel
+                            pip install twine
+                            ~/.local/bin/twine upload --config-file ${PYPIRC} ./dist/docker-compose-*.tar.gz ./dist/docker_compose-*-py2.py3-none-any.whl
+                        """
                     }
                 }
             }
@@ -268,41 +282,13 @@ def buildRuntimeImage(baseImage) {
 
 def pushRuntimeImage(baseImage) {
     unstash "compose-${baseImage}"
-    sh 'echo -n "${DOCKERHUB_CREDS_PSW}" | docker login --username "${DOCKERHUB_CREDS_USR}" --password-stdin'
     sh "docker load -i dist/docker-compose-${baseImage}.tar"
-    withDockerRegistry(credentialsId: 'dockerbuildbot-hub.docker.com') {
+    withDockerRegistry(credentialsId: 'dockerhub-dockerdsgcibot') {
         sh "docker push docker/compose:${baseImage}-${env.TAG_NAME}"
         if (baseImage == "alpine" && env.TAG_NAME != null) {
             sh "docker tag docker/compose:alpine-${env.TAG_NAME} docker/compose:${env.TAG_NAME}"
             sh "docker push docker/compose:${env.TAG_NAME}"
         }
-    }
-}
-
-def githubRelease() {
-    withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
-        def prerelease = !( env.TAG_NAME ==~ /v[0-9\.]+/ )
-        changelog = readFile "CHANGELOG.md"
-        def data = """{
-            \"tag_name\": \"${env.TAG_NAME}\",
-            \"name\": \"${env.TAG_NAME}\",
-            \"draft\": true,
-            \"prerelease\": ${prerelease},
-            \"body\" : \"${changelog}\"
-        """
-        echo $data
-
-        def url = "https://api.github.com/repos/docker/compose/releases"
-        def upload_url = sh(returnStdout: true, script: """
-            curl -sSf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/json' -X POST -d '$data' $url") \\
-            | jq '.upload_url | .[:rindex("{")]'
-        """)
-        sh("""
-            for f in * ; do
-                curl -sf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/octet-stream' \\
-                -X POST --data-binary @\$f ${upload_url}?name=\$f;
-            done
-        """)
     }
 }
 
