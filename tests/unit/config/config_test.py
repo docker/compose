@@ -13,6 +13,8 @@ from random import shuffle
 import py
 import pytest
 import yaml
+from ddt import data
+from ddt import ddt
 
 from ...helpers import build_config_details
 from ...helpers import BUSYBOX_IMAGE_WITH_TAG
@@ -68,6 +70,7 @@ def secret_sort(secrets):
     return sorted(secrets, key=itemgetter('source'))
 
 
+@ddt
 class ConfigTest(unittest.TestCase):
 
     def test_load(self):
@@ -1884,6 +1887,26 @@ class ConfigTest(unittest.TestCase):
                 'mem_swappiness': 10,
             }
         ]
+
+    @data(
+        '2 ',
+        '3.',
+        '3.0.0',
+        '3.0.a',
+        '3.a',
+        '3a')
+    def test_invalid_version_formats(self, version):
+        content = {
+            'version': version,
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                }
+            }
+        }
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(content))
+        assert 'Version "{}" in "filename.yml" is invalid.'.format(version) in exc.exconly()
 
     def test_group_add_option(self):
         actual = config.load(build_config_details({
