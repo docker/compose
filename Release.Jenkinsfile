@@ -75,7 +75,7 @@ pipeline {
                     steps {
                         checkout scm
                         sh './script/setup/osx'
-                        sh 'tox -e py27,py37 -- tests/unit'
+                        sh 'tox -e py37 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
                           checksum('docker-compose-Darwin-x86_64')
@@ -112,7 +112,7 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        bat 'tox.exe -e py27,py37 -- tests/unit'
+                        bat 'tox.exe -e py37 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
                             checksum('docker-compose-Windows-x86_64.exe')
@@ -177,7 +177,7 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        withCredentials([[$class: "FileBinding", credentialsId: 'pypirc-docker-dsg-cibot', variable: 'PYPIRC']]) {
+                        withCredentials([file(credentialsId: 'pypirc-docker-dsg-cibot', variable: 'PYPIRC')]) {
                             sh """
                                 virtualenv venv-publish
                                 source venv-publish/bin/activate
@@ -270,7 +270,6 @@ def buildRuntimeImage(baseImage) {
 
 def pushRuntimeImage(baseImage) {
     unstash "compose-${baseImage}"
-    sh 'echo -n "${DOCKERHUB_CREDS_PSW}" | docker login --username "${DOCKERHUB_CREDS_USR}" --password-stdin'
     sh "docker load -i dist/docker-compose-${baseImage}.tar"
     withDockerRegistry(credentialsId: 'dockerbuildbot-hub.docker.com') {
         sh "docker push docker/compose:${baseImage}-${env.TAG_NAME}"
@@ -285,15 +284,18 @@ def githubRelease() {
     withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
         def prerelease = !( env.TAG_NAME ==~ /v[0-9\.]+/ )
         changelog = readFile "CHANGELOG.md"
-        def data = [
-            tag_name: env.TAG_NAME,
-            name: env.TAG_NAME,
-            draft: true,
-            prerelease: prerelease,
-            body: changelog
-        ]
 
-        writeJSON(file: 'release.json', json: data)
+        def info = [:]
+        info.tag_name = env.TAG_NAME
+        info.name = env.TAG_NAME
+        info.draft = true
+        info.prerelease = prerelease
+        info.body = changelog
+
+
+        // Convert from Map --> JSON
+        def outJson = groovy.json.JsonOutput.toJson(info)
+        writeJSON file: 'release.json', text: outJson, encoding: 'UTF-8'
 
         // debug
         sh("cat release.json")
