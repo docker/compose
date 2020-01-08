@@ -285,18 +285,22 @@ def githubRelease() {
     withCredentials([string(credentialsId: 'github-compose-release-test-token', variable: 'GITHUB_TOKEN')]) {
         def prerelease = !( env.TAG_NAME ==~ /v[0-9\.]+/ )
         changelog = readFile "CHANGELOG.md"
-        def data = """{
-            \"tag_name\": \"${env.TAG_NAME}\",
-            \"name\": \"${env.TAG_NAME}\",
-            \"draft\": true,
-            \"prerelease\": ${prerelease},
-            \"body\" : \"${changelog}\"
-        """
-        echo $data
+        def data = [
+            tag_name: env.TAG_NAME,
+            name: env.TAG_NAME,
+            draft: true,
+            prerelease: prerelease,
+            body: changelog
+        ]
+
+        writeJSON(file: 'release.json', json: data)
+
+        // debug
+        sh("cat release.json")
 
         def url = "https://api.github.com/repos/docker/compose/releases"
         def upload_url = sh(returnStdout: true, script: """
-            curl -sSf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/json' -X POST -d '$data' $url") \\
+            curl -sSf -H 'Authorization: token ${GITHUB_TOKEN}' -H 'Accept: application/json' -H 'Content-type: application/json' -X POST --data-binary '@release.json' $url") \\
             | jq '.upload_url | .[:rindex("{")]'
         """)
         sh("""
