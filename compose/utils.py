@@ -16,10 +16,6 @@ json_decoder = json.JSONDecoder()
 log = logging.getLogger(__name__)
 
 
-def get_output_stream(stream):
-    return stream
-
-
 def stream_as_text(stream):
     """Given a stream of bytes or text, if any of the items in the stream
     are bytes convert them to text.

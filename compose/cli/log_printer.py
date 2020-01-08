@@ -9,7 +9,6 @@ from threading import Thread
 from docker.errors import APIError
 
 from . import colors
-from compose import utils
 from compose.cli.signals import ShutdownException
 from compose.utils import split_buffer
 
@@ -64,7 +63,7 @@ class LogPrinter(object):
         self.containers = containers
         self.presenters = presenters
         self.event_stream = event_stream
-        self.output = utils.get_output_stream(output)
+        self.output = output
         self.cascade_stop = cascade_stop
         self.log_args = log_args or {}
 
