@@ -19,7 +19,7 @@ pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.7.1
 PyYAML==5.3
 requests==2.22.0
-six==1.12.0
+six==1.13.0
 subprocess32==3.5.4; python_version < '3.2'
 texttable==1.6.2
 urllib3==1.24.2; python_version == '3.3'
