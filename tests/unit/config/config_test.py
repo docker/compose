@@ -1772,13 +1772,13 @@ class ConfigTest(unittest.TestCase):
         invalid_yaml_file = os.path.join(tmpdir, 'docker-compose.yml')
         with open(invalid_yaml_file, mode="w") as invalid_yaml_file_fh:
             invalid_yaml_file_fh.write("""
-                web:
-                  this is bogus: ok: what
+web:
+    this is bogus: ok: what
             """)
         with pytest.raises(ConfigurationError) as exc:
             config.load_yaml(str(invalid_yaml_file))
 
-        assert 'line 3, column 36' in exc.exconly()
+        assert 'line 3, column 22' in exc.exconly()
 
     def test_load_yaml_with_bom(self):
         tmpdir = tempfile.mkdtemp('bom_yaml')
