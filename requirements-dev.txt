@@ -2,6 +2,6 @@ coverage==4.5.4
 ddt==1.2.2
 flake8==3.7.9
 mock==3.0.5
-pytest==5.1.1; python_version >= '3.5'
+pytest==5.3.2; python_version >= '3.5'
 pytest==4.6.5; python_version < '3.5'
 pytest-cov==2.8.1
