@@ -6,8 +6,10 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import copy
+import os
+import shutil
+import tempfile
 
-import py
 from docker.errors import ImageNotFound
 
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
@@ -426,29 +428,32 @@ class ServiceStateTest(DockerClientTestCase):
 
     @no_cluster('Can not guarantee the build will be run on the same node the service is deployed')
     def test_trigger_recreate_with_build(self):
-        context = py.test.ensuretemp('test_trigger_recreate_with_build')
-        self.addCleanup(context.remove)
+        context = tempfile.mkdtemp('test_trigger_recreate_with_build')
+        self.addCleanup(shutil.rmtree, context)
 
         base_image = "FROM busybox\nLABEL com.docker.compose.test_image=true\n"
-        dockerfile = context.join('Dockerfile')
-        dockerfile.write(base_image)
+        dockerfile = os.path.join(context, 'Dockerfile')
+        with open(dockerfile, mode="w") as dockerfile_fh:
+            dockerfile_fh.write(base_image)
 
         web = self.create_service('web', build={'context': str(context)})
         container = web.create_container()
 
-        dockerfile.write(base_image + 'CMD echo hello world\n')
+        with open(dockerfile, mode="w") as dockerfile_fh:
+            dockerfile_fh.write(base_image + 'CMD echo hello world\n')
         web.build()
 
         web = self.create_service('web', build={'context': str(context)})
         assert ('recreate', [container]) == web.convergence_plan()
 
     def test_image_changed_to_build(self):
-        context = py.test.ensuretemp('test_image_changed_to_build')
-        self.addCleanup(context.remove)
-        context.join('Dockerfile').write("""
-            FROM busybox
-            LABEL com.docker.compose.test_image=true
-        """)
+        context = tempfile.mkdtemp('test_image_changed_to_build')
+        self.addCleanup(shutil.rmtree, context)
+        with open(os.path.join(context, 'Dockerfile'), mode="w") as dockerfile:
+            dockerfile.write("""
+                FROM busybox
+                LABEL com.docker.compose.test_image=true
+            """)
 
         web = self.create_service('web', image='busybox')
         container = web.create_container()
