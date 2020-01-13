@@ -692,6 +692,18 @@ services:
                 'image library/nonexisting-image:latest not found' in result.stderr or
                 'pull access denied for nonexisting-image' in result.stderr)
 
+    def test_pull_with_ignore_pull_failures_parallel(self):
+        result = self.dispatch([
+            '-f', 'ignore-pull-failures.yml',
+            'pull', '--ignore-pull-failures']
+        )
+
+        assert 'Pulling simple ({})...'.format(BUSYBOX_IMAGE_WITH_TAG) in result.stderr
+        assert 'Pulling another (nonexisting-image:latest)...' in result.stderr
+        assert ('repository nonexisting-image not found' in result.stderr or
+                'image library/nonexisting-image:latest not found' in result.stderr or
+                'pull access denied for nonexisting-image' in result.stderr)
+
     def test_pull_with_quiet(self):
         assert self.dispatch(['pull', '--quiet']).stderr == ''
         assert self.dispatch(['pull', '--quiet']).stdout == ''
