@@ -43,6 +43,24 @@ ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
 BUILD_CACHE_TEXT = 'Using cache'
 BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
+COMPOSE_COMPATIBILITY_DICT = {
+    'version': '2.3',
+    'volumes': {'foo': {'driver': 'default'}},
+    'networks': {'bar': {}},
+    'services': {
+        'foo': {
+            'command': '/bin/true',
+            'image': 'alpine:3.10.1',
+            'scale': 3,
+            'restart': 'always:7',
+            'mem_limit': '300M',
+            'mem_reservation': '100M',
+            'cpus': 0.7,
+            'volumes': ['foo:/bar:rw'],
+            'networks': {'bar': None},
+        }
+    },
+}
 
 
 def start_process(base_dir, options):
@@ -564,24 +582,23 @@ services:
         self.base_dir = 'tests/fixtures/compatibility-mode'
         result = self.dispatch(['--compatibility', 'config'])
 
-        assert yaml.safe_load(result.stdout) == {
-            'version': '2.3',
-            'volumes': {'foo': {'driver': 'default'}},
-            'networks': {'bar': {}},
-            'services': {
-                'foo': {
-                    'command': '/bin/true',
-                    'image': 'alpine:3.10.1',
-                    'scale': 3,
-                    'restart': 'always:7',
-                    'mem_limit': '300M',
-                    'mem_reservation': '100M',
-                    'cpus': 0.7,
-                    'volumes': ['foo:/bar:rw'],
-                    'networks': {'bar': None},
-                }
-            },
-        }
+        assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
+
+    @mock.patch.dict(os.environ)
+    def test_config_compatibility_mode_from_env(self):
+        self.base_dir = 'tests/fixtures/compatibility-mode'
+        os.environ['COMPOSE_COMPATIBILITY'] = 'true'
+        result = self.dispatch(['config'])
+
+        assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
+
+    @mock.patch.dict(os.environ)
+    def test_config_compatibility_mode_from_env_and_option_precedence(self):
+        self.base_dir = 'tests/fixtures/compatibility-mode'
+        os.environ['COMPOSE_COMPATIBILITY'] = 'false'
+        result = self.dispatch(['--compatibility', 'config'])
+
+        assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
