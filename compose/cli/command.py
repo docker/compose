@@ -40,7 +40,8 @@ SILENT_COMMANDS = {
 }
 
 
-def project_from_options(project_dir, options, additional_options={}):
+def project_from_options(project_dir, options, additional_options=None):
+    additional_options = additional_options or {}
     override_dir = options.get('--project-directory')
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or project_dir, environment_file)
@@ -81,7 +82,8 @@ def set_parallel_limit(environment):
         parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
-def get_config_from_options(base_dir, options, additional_options={}):
+def get_config_from_options(base_dir, options, additional_options=None):
+    additional_options = additional_options or {}
     override_dir = options.get('--project-directory')
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or base_dir, environment_file)

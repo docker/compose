@@ -185,7 +185,7 @@ class Service(object):
             scale=1,
             pid_mode=None,
             default_platform=None,
-            extra_labels=[],
+            extra_labels=None,
             **options
     ):
         self.name = name
@@ -201,7 +201,7 @@ class Service(object):
         self.scale_num = scale
         self.default_platform = default_platform
         self.options = options
-        self.extra_labels = extra_labels
+        self.extra_labels = extra_labels or []
 
     def __repr__(self):
         return '<Service: {}>'.format(self.name)
