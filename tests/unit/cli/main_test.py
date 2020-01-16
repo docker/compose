@@ -12,7 +12,7 @@ from compose.cli.formatter import ConsoleWarningFormatter
 from compose.cli.main import build_one_off_container_options
 from compose.cli.main import call_docker
 from compose.cli.main import convergence_strategy_from_opts
-from compose.cli.main import filter_containers_to_service_names
+from compose.cli.main import filter_attached_containers
 from compose.cli.main import get_docker_start_call
 from compose.cli.main import setup_console_handler
 from compose.cli.main import warn_for_swarm_mode
@@ -37,7 +37,7 @@ def logging_handler():
 
 class TestCLIMainTestCase(object):
 
-    def test_filter_containers_to_service_names(self):
+    def test_filter_attached_containers(self):
         containers = [
             mock_container('web', 1),
             mock_container('web', 2),
@@ -46,17 +46,29 @@ class TestCLIMainTestCase(object):
             mock_container('another', 1),
         ]
         service_names = ['web', 'db']
-        actual = filter_containers_to_service_names(containers, service_names)
+        actual = filter_attached_containers(containers, service_names)
         assert actual == containers[:3]
 
-    def test_filter_containers_to_service_names_all(self):
+    def test_filter_attached_containers_with_dependencies(self):
+        containers = [
+            mock_container('web', 1),
+            mock_container('web', 2),
+            mock_container('db', 1),
+            mock_container('other', 1),
+            mock_container('another', 1),
+        ]
+        service_names = ['web', 'db']
+        actual = filter_attached_containers(containers, service_names, attach_dependencies=True)
+        assert actual == containers
+
+    def test_filter_attached_containers_all(self):
         containers = [
             mock_container('web', 1),
             mock_container('db', 1),
             mock_container('other', 1),
         ]
         service_names = []
-        actual = filter_containers_to_service_names(containers, service_names)
+        actual = filter_attached_containers(containers, service_names)
         assert actual == containers
 
     def test_warning_in_swarm_mode(self):

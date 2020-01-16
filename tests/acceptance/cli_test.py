@@ -1571,6 +1571,26 @@ services:
         assert len(db.containers()) == 0
         assert len(console.containers()) == 0
 
+    def test_up_with_attach_dependencies(self):
+        self.base_dir = 'tests/fixtures/echo-services-dependencies'
+        result = self.dispatch(['up', '--attach-dependencies', '--no-color', 'simple'], None)
+        simple_name = self.project.get_service('simple').containers(stopped=True)[0].name_without_project
+        another_name = self.project.get_service('another').containers(
+            stopped=True
+        )[0].name_without_project
+
+        assert '{}   | simple'.format(simple_name) in result.stdout
+        assert '{}  | another'.format(another_name) in result.stdout
+
+    def test_up_handles_aborted_dependencies(self):
+        self.base_dir = 'tests/fixtures/abort-on-container-exit-dependencies'
+        proc = start_process(
+            self.base_dir,
+            ['up', 'simple', '--attach-dependencies', '--abort-on-container-exit'])
+        wait_on_condition(ContainerCountCondition(self.project, 0))
+        proc.wait()
+        assert proc.returncode == 1
+
     def test_up_with_force_recreate(self):
         self.dispatch(['up', '-d'], None)
         service = self.project.get_service('simple')
