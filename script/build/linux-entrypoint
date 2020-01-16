@@ -37,4 +37,5 @@ fi
 ls -la dist/
 ldd dist/docker-compose
 mv dist/docker-compose /usr/local/bin
+
 docker-compose version
