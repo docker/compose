@@ -126,18 +126,6 @@ _docker_compose_build() {
 }
 
 
-_docker_compose_bundle() {
-	case "$prev" in
-		--output|-o)
-			_filedir
-			return
-			;;
-	esac
-
-	COMPREPLY=( $( compgen -W "--push-images --help --output -o" -- "$cur" ) )
-}
-
-
 _docker_compose_config() {
 	case "$prev" in
 		--hash)
@@ -557,7 +545,7 @@ _docker_compose_up() {
 
 	case "$cur" in
 		-*)
-			COMPREPLY=( $( compgen -W "--abort-on-container-exit --always-recreate-deps --build -d --detach --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --no-start --renew-anon-volumes -V --remove-orphans --scale --timeout -t" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "--abort-on-container-exit --always-recreate-deps --attach-dependencies --build -d --detach --exit-code-from --force-recreate --help --no-build --no-color --no-deps --no-recreate --no-start --renew-anon-volumes -V --remove-orphans --scale --timeout -t" -- "$cur" ) )
 			;;
 		*)
 			__docker_compose_complete_services
@@ -581,7 +569,6 @@ _docker_compose() {
 
 	local commands=(
 		build
-		bundle
 		config
 		create
 		down

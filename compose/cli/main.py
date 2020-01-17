@@ -15,14 +15,12 @@ from distutils.spawn import find_executable
 from inspect import getdoc
 from operator import attrgetter
 
-import docker
+import docker.errors
+import docker.utils
 
 from . import errors
 from . import signals
 from .. import __version__
-from ..bundle import get_image_digests
-from ..bundle import MissingDigests
-from ..bundle import serialize_bundle
 from ..config import ConfigurationError
 from ..config import parse_environment
 from ..config import parse_labels
@@ -34,6 +32,8 @@ from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
+from ..project import get_image_digests
+from ..project import MissingDigests
 from ..project import NoSuchService
 from ..project import OneOffFilter
 from ..project import ProjectError
@@ -213,7 +213,6 @@ class TopLevelCommand(object):
 
     Commands:
       build              Build or rebuild services
-      bundle             Generate a Docker bundle from the Compose file
       config             Validate and view the Compose file
       create             Create services
       down               Stop and remove containers, networks, images, and volumes
@@ -303,38 +302,6 @@ class TopLevelCommand(object):
             cli=native_builder,
             progress=options.get('--progress'),
         )
-
-    def bundle(self, options):
-        """
-        Generate a Distributed Application Bundle (DAB) from the Compose file.
-
-        Images must have digests stored, which requires interaction with a
-        Docker registry. If digests aren't stored for all images, you can fetch
-        them with `docker-compose pull` or `docker-compose push`. To push images
-        automatically when bundling, pass `--push-images`. Only services with
-        a `build` option specified will have their images pushed.
-
-        Usage: bundle [options]
-
-        Options:
-            --push-images              Automatically push images for any services
-                                       which have a `build` option specified.
-
-            -o, --output PATH          Path to write the bundle file to.
-                                       Defaults to "<project name>.dab".
-        """
-        compose_config = get_config_from_options('.', self.toplevel_options)
-
-        output = options["--output"]
-        if not output:
-            output = "{}.dab".format(self.project.name)
-
-        image_digests = image_digests_for_project(self.project, options['--push-images'])
-
-        with open(output, 'w') as f:
-            f.write(serialize_bundle(compose_config, image_digests))
-
-        log.info("Wrote bundle to {}".format(output))
 
     def config(self, options):
         """
@@ -1045,6 +1012,7 @@ class TopLevelCommand(object):
             --build                    Build images before starting containers.
             --abort-on-container-exit  Stops all containers if any container was
                                        stopped. Incompatible with -d.
+            --attach-dependencies      Attach to dependent containers
             -t, --timeout TIMEOUT      Use this timeout in seconds for container
                                        shutdown when attached or when containers are
                                        already running. (default: 10)
@@ -1066,16 +1034,18 @@ class TopLevelCommand(object):
         remove_orphans = options['--remove-orphans']
         detached = options.get('--detach')
         no_start = options.get('--no-start')
+        attach_dependencies = options.get('--attach-dependencies')
 
-        if detached and (cascade_stop or exit_value_from):
-            raise UserError("--abort-on-container-exit and -d cannot be combined.")
+        if detached and (cascade_stop or exit_value_from or attach_dependencies):
+            raise UserError(
+                "-d cannot be combined with --abort-on-container-exit or --attach-dependencies.")
 
         ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
         if ignore_orphans and remove_orphans:
             raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
 
-        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from']
+        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--attach-dependencies']
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
@@ -1120,7 +1090,10 @@ class TopLevelCommand(object):
             if detached or no_start:
                 return
 
-            attached_containers = filter_containers_to_service_names(to_attach, service_names)
+            attached_containers = filter_attached_containers(
+                to_attach,
+                service_names,
+                attach_dependencies)
 
             log_printer = log_printer_from_project(
                 self.project,
@@ -1216,12 +1189,10 @@ def timeout_from_opts(options):
     return None if timeout is None else int(timeout)
 
 
-def image_digests_for_project(project, allow_push=False):
+def image_digests_for_project(project):
     try:
-        return get_image_digests(
-            project,
-            allow_push=allow_push
-        )
+        return get_image_digests(project)
+
     except MissingDigests as e:
         def list_images(images):
             return "\n".join("    {}".format(name) for name in sorted(images))
@@ -1427,8 +1398,8 @@ def log_printer_from_project(
         log_args=log_args)
 
 
-def filter_containers_to_service_names(containers, service_names):
-    if not service_names:
+def filter_attached_containers(containers, service_names, attach_dependencies=False):
+    if attach_dependencies or not service_names:
         return containers
 
     return [

@@ -1,6 +1,41 @@
 Change log
 ==========
 
+1.25.2 (2020-01-17)
+-------------------
+
+### Features
+
+- Allow compatibility option with `COMPOSE_COMPATIBILITY` environment variable
+
+- Bump PyInstaller from 3.5 to 3.6
+
+- Bump pysocks from 1.6.7 to 1.7.1
+
+- Bump websocket-client from 0.32.0 to 0.57.0
+
+- Bump urllib3 from 1.24.2 to 1.25.7
+
+- Bump jsonschema from 3.0.1 to 3.2.0
+
+- Bump PyYAML from 4.2b1 to 5.3
+
+- Bump certifi from 2017.4.17 to 2019.11.28
+
+- Bump coverage from 4.5.4 to 5.0.3
+
+- Bump paramiko from 2.6.0 to 2.7.1
+
+- Bump cached-property from 1.3.0 to 1.5.1
+
+- Bump minor Linux and MacOSX dependencies
+
+### Bugfixes
+
+- Validate version format on formats 2+
+
+- Assume infinite terminal width when not running in a terminal
+
 1.25.1 (2020-01-06)
 -------------------
 

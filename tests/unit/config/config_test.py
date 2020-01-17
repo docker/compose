@@ -10,12 +10,14 @@ import tempfile
 from operator import itemgetter
 from random import shuffle
 
-import py
 import pytest
 import yaml
+from ddt import data
+from ddt import ddt
 
 from ...helpers import build_config_details
 from ...helpers import BUSYBOX_IMAGE_WITH_TAG
+from ...helpers import cd
 from compose.config import config
 from compose.config import types
 from compose.config.config import ConfigFile
@@ -68,6 +70,7 @@ def secret_sort(secrets):
     return sorted(secrets, key=itemgetter('source'))
 
 
+@ddt
 class ConfigTest(unittest.TestCase):
 
     def test_load(self):
@@ -777,13 +780,14 @@ class ConfigTest(unittest.TestCase):
             })
         details = config.ConfigDetails('.', [base_file, override_file])
 
-        tmpdir = py.test.ensuretemp('config_test')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('common.yml').write("""
-            base:
-              labels: ['label=one']
-        """)
-        with tmpdir.as_cwd():
+        tmpdir = tempfile.mkdtemp('config_test')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'common.yml'), mode="w") as common_fh:
+            common_fh.write("""
+                base:
+                  labels: ['label=one']
+            """)
+        with cd(tmpdir):
             service_dicts = config.load(details).services
 
         expected = [
@@ -812,19 +816,20 @@ class ConfigTest(unittest.TestCase):
             }
         )
 
-        tmpdir = pytest.ensuretemp('config_test')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('base.yml').write("""
-            version: '2.2'
-            services:
-              base:
-                image: base
-              web:
-                extends: base
-        """)
+        tmpdir = tempfile.mkdtemp('config_test')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'base.yml'), mode="w") as base_fh:
+            base_fh.write("""
+                version: '2.2'
+                services:
+                  base:
+                    image: base
+                  web:
+                    extends: base
+            """)
 
         details = config.ConfigDetails('.', [main_file])
-        with tmpdir.as_cwd():
+        with cd(tmpdir):
             service_dicts = config.load(details).services
             assert service_dicts[0] == {
                 'name': 'prodweb',
@@ -1762,22 +1767,23 @@ class ConfigTest(unittest.TestCase):
         assert services[0]['environment']['SPRING_JPA_HIBERNATE_DDL-AUTO'] == 'none'
 
     def test_load_yaml_with_yaml_error(self):
-        tmpdir = py.test.ensuretemp('invalid_yaml_test')
-        self.addCleanup(tmpdir.remove)
-        invalid_yaml_file = tmpdir.join('docker-compose.yml')
-        invalid_yaml_file.write("""
-            web:
-              this is bogus: ok: what
-        """)
+        tmpdir = tempfile.mkdtemp('invalid_yaml_test')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        invalid_yaml_file = os.path.join(tmpdir, 'docker-compose.yml')
+        with open(invalid_yaml_file, mode="w") as invalid_yaml_file_fh:
+            invalid_yaml_file_fh.write("""
+web:
+    this is bogus: ok: what
+            """)
         with pytest.raises(ConfigurationError) as exc:
             config.load_yaml(str(invalid_yaml_file))
 
-        assert 'line 3, column 32' in exc.exconly()
+        assert 'line 3, column 22' in exc.exconly()
 
     def test_load_yaml_with_bom(self):
-        tmpdir = py.test.ensuretemp('bom_yaml')
-        self.addCleanup(tmpdir.remove)
-        bom_yaml = tmpdir.join('docker-compose.yml')
+        tmpdir = tempfile.mkdtemp('bom_yaml')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        bom_yaml = os.path.join(tmpdir, 'docker-compose.yml')
         with codecs.open(str(bom_yaml), 'w', encoding='utf-8') as f:
             f.write('''\ufeff
                 version: '2.3'
@@ -1884,6 +1890,26 @@ class ConfigTest(unittest.TestCase):
                 'mem_swappiness': 10,
             }
         ]
+
+    @data(
+        '2 ',
+        '3.',
+        '3.0.0',
+        '3.0.a',
+        '3.a',
+        '3a')
+    def test_invalid_version_formats(self, version):
+        content = {
+            'version': version,
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                }
+            }
+        }
+        with pytest.raises(ConfigurationError) as exc:
+            config.load(build_config_details(content))
+        assert 'Version "{}" in "filename.yml" is invalid.'.format(version) in exc.exconly()
 
     def test_group_add_option(self):
         actual = config.load(build_config_details({
@@ -4701,43 +4727,48 @@ class ExtendsTest(unittest.TestCase):
 
     @mock.patch.dict(os.environ)
     def test_extends_with_environment_and_env_files(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_environment')
-        self.addCleanup(tmpdir.remove)
-        commondir = tmpdir.mkdir('common')
-        commondir.join('base.yml').write("""
-            app:
-                image: 'example/app'
-                env_file:
-                    - 'envs'
-                environment:
-                    - SECRET
-                    - TEST_ONE=common
-                    - TEST_TWO=common
-        """)
-        tmpdir.join('docker-compose.yml').write("""
-            ext:
-                extends:
-                    file: common/base.yml
-                    service: app
-                env_file:
-                    - 'envs'
-                environment:
-                    - THING
-                    - TEST_ONE=top
-        """)
-        commondir.join('envs').write("""
-            COMMON_ENV_FILE
-            TEST_ONE=common-env-file
-            TEST_TWO=common-env-file
-            TEST_THREE=common-env-file
-            TEST_FOUR=common-env-file
-        """)
-        tmpdir.join('envs').write("""
-            TOP_ENV_FILE
-            TEST_ONE=top-env-file
-            TEST_TWO=top-env-file
-            TEST_THREE=top-env-file
-        """)
+        tmpdir = tempfile.mkdtemp('test_extends_with_environment')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        commondir = os.path.join(tmpdir, 'common')
+        os.mkdir(commondir)
+        with open(os.path.join(commondir, 'base.yml'), mode="w") as base_fh:
+            base_fh.write("""
+                app:
+                    image: 'example/app'
+                    env_file:
+                        - 'envs'
+                    environment:
+                        - SECRET
+                        - TEST_ONE=common
+                        - TEST_TWO=common
+            """)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                ext:
+                    extends:
+                        file: common/base.yml
+                        service: app
+                    env_file:
+                        - 'envs'
+                    environment:
+                        - THING
+                        - TEST_ONE=top
+            """)
+        with open(os.path.join(commondir, 'envs'), mode="w") as envs_fh:
+            envs_fh.write("""
+                COMMON_ENV_FILE
+                TEST_ONE=common-env-file
+                TEST_TWO=common-env-file
+                TEST_THREE=common-env-file
+                TEST_FOUR=common-env-file
+            """)
+        with open(os.path.join(tmpdir, 'envs'), mode="w") as envs_fh:
+            envs_fh.write("""
+                TOP_ENV_FILE
+                TEST_ONE=top-env-file
+                TEST_TWO=top-env-file
+                TEST_THREE=top-env-file
+            """)
 
         expected = [
             {
@@ -4760,72 +4791,77 @@ class ExtendsTest(unittest.TestCase):
         os.environ['THING'] = 'thing'
         os.environ['COMMON_ENV_FILE'] = 'secret'
         os.environ['TOP_ENV_FILE'] = 'secret'
-        config = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        config = load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
 
         assert config == expected
 
     def test_extends_with_mixed_versions_is_error(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_mixed_version')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('docker-compose.yml').write("""
-            version: "2"
-            services:
-              web:
-                extends:
-                  file: base.yml
-                  service: base
-                image: busybox
-        """)
-        tmpdir.join('base.yml').write("""
-            base:
-              volumes: ['/foo']
-              ports: ['3000:3000']
-        """)
-
-        with pytest.raises(ConfigurationError) as exc:
-            load_from_filename(str(tmpdir.join('docker-compose.yml')))
-        assert 'Version mismatch' in exc.exconly()
-
-    def test_extends_with_defined_version_passes(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_defined_version')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('docker-compose.yml').write("""
-            version: "2"
-            services:
-              web:
-                extends:
-                  file: base.yml
-                  service: base
-                image: busybox
-        """)
-        tmpdir.join('base.yml').write("""
-            version: "2"
-            services:
+        tmpdir = tempfile.mkdtemp('test_extends_with_mixed_version')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                version: "2"
+                services:
+                  web:
+                    extends:
+                      file: base.yml
+                      service: base
+                    image: busybox
+            """)
+        with open(os.path.join(tmpdir, 'base.yml'), mode="w") as base_fh:
+            base_fh.write("""
                 base:
                   volumes: ['/foo']
                   ports: ['3000:3000']
-                  command: top
-        """)
+            """)
 
-        service = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        with pytest.raises(ConfigurationError) as exc:
+            load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
+        assert 'Version mismatch' in exc.exconly()
+
+    def test_extends_with_defined_version_passes(self):
+        tmpdir = tempfile.mkdtemp('test_extends_with_defined_version')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                version: "2"
+                services:
+                  web:
+                    extends:
+                      file: base.yml
+                      service: base
+                    image: busybox
+            """)
+        with open(os.path.join(tmpdir, 'base.yml'), mode="w") as base_fh:
+            base_fh.write("""
+                version: "2"
+                services:
+                  base:
+                    volumes: ['/foo']
+                    ports: ['3000:3000']
+                    command: top
+            """)
+
+        service = load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
         assert service[0]['command'] == "top"
 
     def test_extends_with_depends_on(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_depends_on')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('docker-compose.yml').write("""
-            version: "2"
-            services:
-              base:
-                image: example
-              web:
-                extends: base
-                image: busybox
-                depends_on: ['other']
-              other:
-                image: example
-        """)
-        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+        tmpdir = tempfile.mkdtemp('test_extends_with_depends_on')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                version: "2"
+                services:
+                  base:
+                    image: example
+                  web:
+                    extends: base
+                    image: busybox
+                    depends_on: ['other']
+                  other:
+                    image: example
+            """)
+        services = load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
         assert service_sort(services)[2]['depends_on'] == {
             'other': {'condition': 'service_started'}
         }
@@ -4844,45 +4880,47 @@ class ExtendsTest(unittest.TestCase):
         }]
 
     def test_extends_with_ports(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_ports')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('docker-compose.yml').write("""
-            version: '2'
+        tmpdir = tempfile.mkdtemp('test_extends_with_ports')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                version: '2'
 
-            services:
-              a:
-                image: nginx
-                ports:
-                  - 80
+                services:
+                  a:
+                    image: nginx
+                    ports:
+                      - 80
 
-              b:
-                extends:
-                  service: a
-        """)
-        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+                  b:
+                    extends:
+                      service: a
+            """)
+        services = load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
 
         assert len(services) == 2
         for svc in services:
             assert svc['ports'] == [types.ServicePort('80', None, None, None, None)]
 
     def test_extends_with_security_opt(self):
-        tmpdir = py.test.ensuretemp('test_extends_with_ports')
-        self.addCleanup(tmpdir.remove)
-        tmpdir.join('docker-compose.yml').write("""
-            version: '2'
+        tmpdir = tempfile.mkdtemp('test_extends_with_ports')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        with open(os.path.join(tmpdir, 'docker-compose.yml'), mode="w") as docker_compose_fh:
+            docker_compose_fh.write("""
+                version: '2'
 
-            services:
-              a:
-                image: nginx
-                security_opt:
-                  - apparmor:unconfined
-                  - seccomp:unconfined
+                services:
+                  a:
+                    image: nginx
+                    security_opt:
+                    - apparmor:unconfined
+                    - seccomp:unconfined
 
-              b:
-                extends:
-                  service: a
-        """)
-        services = load_from_filename(str(tmpdir.join('docker-compose.yml')))
+                  b:
+                    extends:
+                      service: a
+            """)
+        services = load_from_filename(str(os.path.join(tmpdir, 'docker-compose.yml')))
         assert len(services) == 2
         for svc in services:
             assert types.SecurityOpt.parse('apparmor:unconfined') in svc['security_opt']
@@ -5037,7 +5075,7 @@ class HealthcheckTest(unittest.TestCase):
             })
         )
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['test']
 
         assert serialized_service['healthcheck'] == {
@@ -5064,7 +5102,7 @@ class HealthcheckTest(unittest.TestCase):
             })
         )
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['test']
 
         assert serialized_service['healthcheck'] == {
@@ -5271,7 +5309,7 @@ class SerializeTest(unittest.TestCase):
             'secrets': secrets_dict
         }))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
         assert 'secrets' in serialized_config
@@ -5286,7 +5324,7 @@ class SerializeTest(unittest.TestCase):
             }
         ], volumes={}, networks={}, secrets={}, configs={})
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         assert '8080:80/tcp' in serialized_config['services']['web']['ports']
 
     def test_serialize_ports_with_ext_ip(self):
@@ -5298,7 +5336,7 @@ class SerializeTest(unittest.TestCase):
             }
         ], volumes={}, networks={}, secrets={}, configs={})
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         assert '127.0.0.1:8080:80/tcp' in serialized_config['services']['web']['ports']
 
     def test_serialize_configs(self):
@@ -5326,7 +5364,7 @@ class SerializeTest(unittest.TestCase):
             'configs': configs_dict
         }))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['configs']) == secret_sort(service_dict['configs'])
         assert 'configs' in serialized_config
@@ -5366,7 +5404,7 @@ class SerializeTest(unittest.TestCase):
         }
         config_dict = config.load(build_config_details(cfg))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['environment']['CURRENCY'] == '$$'
         assert serialized_service['command'] == 'echo $$FOO'
@@ -5388,7 +5426,7 @@ class SerializeTest(unittest.TestCase):
         }
         config_dict = config.load(build_config_details(cfg), interpolate=False)
 
-        serialized_config = yaml.load(serialize_config(config_dict, escape_dollar=False))
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['environment']['CURRENCY'] == '$'
         assert serialized_service['command'] == 'echo $FOO'
@@ -5407,7 +5445,7 @@ class SerializeTest(unittest.TestCase):
 
         config_dict = config.load(build_config_details(cfg))
 
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_service = serialized_config['services']['web']
         assert serialized_service['command'] == 'echo 十六夜　咲夜'
 
@@ -5423,6 +5461,6 @@ class SerializeTest(unittest.TestCase):
         }
 
         config_dict = config.load(build_config_details(cfg))
-        serialized_config = yaml.load(serialize_config(config_dict))
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
         serialized_volume = serialized_config['volumes']['test']
         assert serialized_volume['external'] is False

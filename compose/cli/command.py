@@ -40,7 +40,8 @@ SILENT_COMMANDS = {
 }
 
 
-def project_from_options(project_dir, options, additional_options={}):
+def project_from_options(project_dir, options, additional_options=None):
+    additional_options = additional_options or {}
     override_dir = options.get('--project-directory')
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or project_dir, environment_file)
@@ -59,7 +60,7 @@ def project_from_options(project_dir, options, additional_options={}):
         tls_config=tls_config_from_options(options, environment),
         environment=environment,
         override_dir=override_dir,
-        compatibility=options.get('--compatibility'),
+        compatibility=compatibility_from_options(project_dir, options, environment),
         interpolate=(not additional_options.get('--no-interpolate')),
         environment_file=environment_file
     )
@@ -81,7 +82,8 @@ def set_parallel_limit(environment):
         parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
-def get_config_from_options(base_dir, options, additional_options={}):
+def get_config_from_options(base_dir, options, additional_options=None):
+    additional_options = additional_options or {}
     override_dir = options.get('--project-directory')
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or base_dir, environment_file)
@@ -90,7 +92,7 @@ def get_config_from_options(base_dir, options, additional_options={}):
     )
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
-        options.get('--compatibility'),
+        compatibility_from_options(config_path, options, environment),
         not additional_options.get('--no-interpolate')
     )
 
@@ -198,3 +200,13 @@ def get_project_name(working_dir, project_name=None, environment=None):
         return normalize_name(project)
 
     return 'default'
+
+
+def compatibility_from_options(working_dir, options=None, environment=None):
+    """Get compose v3 compatibility from --compatibility option
+       or from COMPOSE_COMPATIBILITY environment variable."""
+
+    compatibility_option = options.get('--compatibility')
+    compatibility_environment = environment.get_boolean('COMPOSE_COMPATIBILITY')
+
+    return compatibility_option or compatibility_environment

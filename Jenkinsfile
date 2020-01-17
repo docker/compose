@@ -1,95 +1,112 @@
 #!groovy
 
-def buildImage = { String baseImage ->
-  def image
-  wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
-    stage("build image for \"${baseImage}\"") {
-      checkout(scm)
-      def imageName = "dockerbuildbot/compose:${baseImage}-${gitCommit()}"
-      image = docker.image(imageName)
-      try {
-        image.pull()
-      } catch (Exception exc) {
-        sh """GIT_COMMIT=\$(script/build/write-git-sha) && \\
-            docker build -t ${imageName} \\
-            --target build \\
-            --build-arg BUILD_PLATFORM="${baseImage}" \\
-            --build-arg GIT_COMMIT="${GIT_COMMIT}" \\
-            .\\
-        """
-        sh "docker push ${imageName}"
-        echo "${imageName}"
-        return imageName
-      }
-    }
-  }
-  echo "image.id: ${image.id}"
-  return image.id
-}
-
-def get_versions = { String imageId, int number ->
-  def docker_versions
-  wrappedNode(label: "ubuntu && amd64 && !zfs") {
-    def result = sh(script: """docker run --rm \\
-        --entrypoint=/code/.tox/py27/bin/python \\
-        ${imageId} \\
-        /code/script/test/versions.py -n ${number} docker/docker-ce recent
-      """, returnStdout: true
-    )
-    docker_versions = result.split()
-  }
-  return docker_versions
-}
-
-def runTests = { Map settings ->
-  def dockerVersions = settings.get("dockerVersions", null)
-  def pythonVersions = settings.get("pythonVersions", null)
-  def baseImage = settings.get("baseImage", null)
-  def imageName = settings.get("image", null)
-
-  if (!pythonVersions) {
-    throw new Exception("Need Python versions to test. e.g.: `runTests(pythonVersions: 'py27,py37')`")
-  }
-  if (!dockerVersions) {
-    throw new Exception("Need Docker versions to test. e.g.: `runTests(dockerVersions: 'all')`")
-  }
-
-  { ->
-    wrappedNode(label: "ubuntu && amd64 && !zfs", cleanWorkspace: true) {
-      stage("test python=${pythonVersions} / docker=${dockerVersions} / baseImage=${baseImage}") {
-        checkout(scm)
-        def storageDriver = sh(script: 'docker info | awk -F \': \' \'$1 == "Storage Driver" { print $2; exit }\'', returnStdout: true).trim()
-        echo "Using local system's storage driver: ${storageDriver}"
-        sh """docker run \\
-          -t \\
-          --rm \\
-          --privileged \\
-          --volume="\$(pwd)/.git:/code/.git" \\
-          --volume="/var/run/docker.sock:/var/run/docker.sock" \\
-          -e "TAG=${imageName}" \\
-          -e "STORAGE_DRIVER=${storageDriver}" \\
-          -e "DOCKER_VERSIONS=${dockerVersions}" \\
-          -e "BUILD_NUMBER=\$BUILD_TAG" \\
-          -e "PY_TEST_VERSIONS=${pythonVersions}" \\
-          --entrypoint="script/test/ci" \\
-          ${imageName} \\
-          --verbose
-        """
-      }
-    }
-  }
-}
-
-def testMatrix = [failFast: true]
+def dockerVersions = ['19.03.5', '18.09.9']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py27', 'py37']
-baseImages.each { baseImage ->
-  def imageName = buildImage(baseImage)
-  get_versions(imageName, 2).each { dockerVersion ->
-    pythonVersions.each { pyVersion ->
-      testMatrix["${baseImage}_${dockerVersion}_${pyVersion}"] = runTests([baseImage: baseImage, image: imageName, dockerVersions: dockerVersion, pythonVersions: pyVersion])
+
+pipeline {
+    agent none
+
+    options {
+        skipDefaultCheckout(true)
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        timeout(time: 2, unit: 'HOURS')
+        timestamps()
     }
-  }
+
+    stages {
+        stage('Build test images') {
+            // TODO use declarative 1.5.0 `matrix` once available on CI
+            parallel {
+                stage('alpine') {
+                    agent {
+                        label 'ubuntu && amd64 && !zfs'
+                    }
+                    steps {
+                        buildImage('alpine')
+                    }
+                }
+                stage('debian') {
+                    agent {
+                        label 'ubuntu && amd64 && !zfs'
+                    }
+                    steps {
+                        buildImage('debian')
+                    }
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                // TODO use declarative 1.5.0 `matrix` once available on CI
+                script {
+                    def testMatrix = [:]
+                    baseImages.each { baseImage ->
+                      dockerVersions.each { dockerVersion ->
+                        pythonVersions.each { pythonVersion ->
+                          testMatrix["${baseImage}_${dockerVersion}_${pythonVersion}"] = runTests(dockerVersion, pythonVersion, baseImage)
+                        }
+                      }
+                    }
+
+                    parallel testMatrix
+                }
+            }
+        }
+    }
 }
 
-parallel(testMatrix)
+
+def buildImage(baseImage) {
+    def scmvar = checkout(scm)
+    def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+    image = docker.image(imageName)
+
+    withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
+        try {
+            image.pull()
+        } catch (Exception exc) {
+            ansiColor('xterm') {
+                sh """docker build -t ${imageName} \\
+                    --target build \\
+                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
+                    .\\
+                """
+                sh "docker push ${imageName}"
+            }
+            echo "${imageName}"
+            return imageName
+        }
+    }
+}
+
+def runTests(dockerVersion, pythonVersion, baseImage) {
+    return {
+        stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
+            node("ubuntu && amd64 && !zfs") {
+                def scmvar = checkout(scm)
+                def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+                def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
+                echo "Using local system's storage driver: ${storageDriver}"
+                withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
+                    sh """docker run \\
+                      -t \\
+                      --rm \\
+                      --privileged \\
+                      --volume="\$(pwd)/.git:/code/.git" \\
+                      --volume="/var/run/docker.sock:/var/run/docker.sock" \\
+                      -e "TAG=${imageName}" \\
+                      -e "STORAGE_DRIVER=${storageDriver}" \\
+                      -e "DOCKER_VERSIONS=${dockerVersion}" \\
+                      -e "BUILD_NUMBER=${env.BUILD_NUMBER}" \\
+                      -e "PY_TEST_VERSIONS=${pythonVersion}" \\
+                      --entrypoint="script/test/ci" \\
+                      ${imageName} \\
+                      --verbose
+                    """
+                }
+            }
+        }
+    }
+}
