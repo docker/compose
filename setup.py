@@ -44,6 +44,7 @@ install_requires = [
 
 
 tests_require = [
+    'ddt >= 1.2.2, < 2',
     'pytest < 6',
 ]
 
