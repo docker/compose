@@ -60,6 +60,7 @@ extras_require = {
                                 'ipaddress >= 1.0.16, < 2'],
     ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
+    'tests': tests_require,
 }
 
 
