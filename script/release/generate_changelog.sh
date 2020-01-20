@@ -10,7 +10,7 @@ set -x
 git config --add remote.origin.fetch +refs/pull/*/head:refs/remotes/origin/pull/*
 git fetch origin
 
-RANGE=${1:-"$(git describe --tags  --abbrev=0)..HEAD"}
+RANGE=${1:-"$(git describe --tags  --abbrev=0 HEAD^)..HEAD"}
 echo "Generate changelog for range ${RANGE}"
 echo
 
