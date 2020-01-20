@@ -26,14 +26,17 @@ changes=$(pullrequests | uniq)
 echo "pull requests merged within range:"
 echo $changes
 
-echo '#Features' > CHANGELOG.md
+echo '#Features' > FEATURES.md
+echo '#Bugs' > BUGS.md
 for pr in $changes; do
-    curl -fs -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/docker/compose/pulls/${pr} \
-    | jq -r ' select( .labels[].name | contains("kind/feature") ) | "* "+.title' >> CHANGELOG.md
+    curl -fs -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/docker/compose/pulls/${pr} -o PR.json
+
+    cat PR.json | jq -r ' select( .labels[].name | contains("kind/feature") ) | "- "+.title' >> FEATURES.md
+    cat PR.json | jq -r ' select( .labels[].name | contains("kind/bug") ) | "- "+.title' >> BUGS.md
 done
 
-echo '#Bugs' >> CHANGELOG.md
-for pr in $changes; do
-    curl -fs -H "Authorization: token ${GITHUB_TOKEN}" https://api.github.com/repos/docker/compose/pulls/${pr} \
-    | jq -r ' select( .labels[].name | contains("kind/bug") ) | "* "+.title' >> CHANGELOG.md
-done
+echo ${TAG_NAME} > CHANGELOG.md
+echo >> CHANGELOG.md
+cat FEATURES.md >> CHANGELOG.md
+echo >> CHANGELOG.md
+cat BUGS.md >> CHANGELOG.md
