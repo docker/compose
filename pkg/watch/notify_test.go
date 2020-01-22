@@ -42,7 +42,7 @@ func TestEventOrdering(t *testing.T) {
 
 	count := 8
 	dirs := make([]string, count)
-	for i, _ := range dirs {
+	for i := range dirs {
 		dir := f.TempDir("watched")
 		dirs[i] = dir
 		f.watch(dir)
@@ -74,7 +74,7 @@ func TestGitBranchSwitch(t *testing.T) {
 
 	count := 10
 	dirs := make([]string, count)
-	for i, _ := range dirs {
+	for i := range dirs {
 		dir := f.TempDir("watched")
 		dirs[i] = dir
 		f.watch(dir)
@@ -656,7 +656,7 @@ func (f *notifyFixture) fsyncWithRetryCount(retryCount int) {
 	anySyncPath := filepath.Join(f.paths[0], "sync-")
 	timeout := time.After(250 * time.Millisecond)
 
-	f.WriteFile(syncPath, fmt.Sprintf("%s", time.Now()))
+	f.WriteFile(syncPath, time.Now().String())
 
 F:
 	for {
@@ -700,11 +700,11 @@ func (f *notifyFixture) closeWatcher() {
 
 	// drain channels from watcher
 	go func() {
-		for _ = range notify.Events() {
+		for range notify.Events() {
 		}
 	}()
 	go func() {
-		for _ = range notify.Errors() {
+		for range notify.Errors() {
 		}
 	}()
 }
