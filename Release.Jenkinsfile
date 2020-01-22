@@ -296,6 +296,6 @@ def checksum(filepath) {
     if (isUnix()) {
         sh "openssl sha256 -r -out ${filepath}.sha256 ${filepath}"
     } else {
-        powershell "(Get-FileHash -Path ${filepath} -Algorithm SHA256 | % hash) + ' *${filepath}' > ${filepath}.sha256"
+        powershell "(Get-FileHash -Path ${filepath} -Algorithm SHA256 | % hash).ToLower() + ' *${filepath}' | Out-File -encoding ascii ${filepath}.sha256"
     }
 }
