@@ -6,7 +6,7 @@
 #
 #        http://git-scm.com/download/win
 #
-# 2. Install Python 3.7.2:
+# 2. Install Python 3.7.x:
 #
 #        https://www.python.org/downloads/
 #
@@ -39,7 +39,7 @@ if (Test-Path venv) {
 Get-ChildItem -Recurse -Include *.pyc | foreach ($_) { Remove-Item $_.FullName }
 
 # Create virtualenv
-virtualenv .\venv
+virtualenv -p C:\Python37\python.exe .\venv
 
 # pip and pyinstaller generate lots of warnings, so we need to ignore them
 $ErrorActionPreference = "Continue"
