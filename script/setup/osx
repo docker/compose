@@ -17,9 +17,9 @@ OPENSSL_VERSION=1.1.1d
 OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
 OPENSSL_SHA1=056057782325134b76d1931c48f2c7e6595d7ef4
 
-PYTHON_VERSION=3.7.5
+PYTHON_VERSION=3.7.6
 PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
-PYTHON_SHA1=8b0311d4cca19f0ea9181731189fa33c9f5aedf9
+PYTHON_SHA1=4642680fbf9a9a5382597dc0e9faa058fdfd94e2
 
 #
 # Install prerequisites.
