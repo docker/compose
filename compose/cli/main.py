@@ -192,6 +192,7 @@ class TopLevelCommand(object):
                                   (default: docker-compose.yml)
       -p, --project-name NAME     Specify an alternate project name
                                   (default: directory name)
+      -c, --context NAME          Specify a context name
       --verbose                   Show more output
       --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
       --no-ansi                   Do not print ANSI control characters
