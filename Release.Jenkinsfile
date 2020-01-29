@@ -72,6 +72,9 @@ pipeline {
                     agent {
                         label 'mac-python'
                     }
+                    environment {
+                        DEPLOYMENT_TARGET="10.11"
+                    }
                     steps {
                         checkout scm
                         sh './script/setup/osx'
