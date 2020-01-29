@@ -39,8 +39,10 @@ def env_vars_from_file(filename, interpolate=True):
     elif not os.path.isfile(filename):
         raise EnvFileNotFound("{} is not a file.".format(filename))
 
-    # TODO: now we should do something with interpolate here, but what?
-    return dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig')
+    env = dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig', interpolate=interpolate)
+    for k, v in env.items():
+        env[k] = v if interpolate else v.replace('$', '$$')
+    return env
 
 
 class Environment(dict):
