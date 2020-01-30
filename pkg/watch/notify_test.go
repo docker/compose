@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/windmilleng/tilt/internal/dockerignore"
@@ -95,7 +97,8 @@ func TestGitBranchSwitch(t *testing.T) {
 		}
 
 		if i != 0 {
-			os.RemoveAll(dir)
+			err := os.RemoveAll(dir)
+			require.NoError(t, err)
 		}
 	}
 
@@ -313,7 +316,12 @@ func TestWatchBrokenLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer newRoot.TearDown()
+	defer func() {
+		err := newRoot.TearDown()
+		if err != nil {
+			fmt.Printf("error tearing down temp dir: %v\n", err)
+		}
+	}()
 
 	link := filepath.Join(newRoot.Path(), "brokenLink")
 	missingFile := filepath.Join(newRoot.Path(), "missingFile")
@@ -323,7 +331,8 @@ func TestWatchBrokenLink(t *testing.T) {
 	}
 
 	f.watch(newRoot.Path())
-	os.Remove(link)
+	err = os.Remove(link)
+	require.NoError(t, err)
 	f.assertEvents(link)
 }
 
