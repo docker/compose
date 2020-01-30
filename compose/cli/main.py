@@ -1466,7 +1466,12 @@ def call_docker(args, dockeropts, environment):
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
-    return subprocess.call(args, env=environment)
+    filtered_env = {}
+    for k, v in environment.items():
+        if v is not None:
+            filtered_env[k] = environment[k]
+
+    return subprocess.call(args, env=filtered_env)
 
 
 def parse_scale_args(options):
