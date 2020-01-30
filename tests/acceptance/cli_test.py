@@ -1711,6 +1711,17 @@ services:
         assert stderr == ""
         assert stdout == "/\n"
 
+    @mock.patch.dict(os.environ)
+    def test_exec_novalue_var_dotenv_file(self):
+        os.environ['MYVAR'] = 'SUCCESS'
+        self.base_dir = 'tests/fixtures/exec-novalue-var'
+        self.dispatch(['up', '-d'])
+        assert len(self.project.containers()) == 1
+
+        stdout, stderr = self.dispatch(['exec', '-T', 'nginx', 'env'])
+        assert 'CHECK_VAR=SUCCESS' in stdout
+        assert not stderr
+
     def test_exec_detach_long_form(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '--detach', 'console'])
