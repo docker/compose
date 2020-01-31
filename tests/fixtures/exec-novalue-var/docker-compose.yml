@@ -1,0 +1,6 @@
+version: '3'
+services:
+  nginx:
+    image: nginx
+    environment:
+      - CHECK_VAR=${MYVAR}
