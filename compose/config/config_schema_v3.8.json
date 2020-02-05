@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.7.json",
+  "id": "config_schema_v3.8.json",
   "type": "object",
   "required": [
     "version"
@@ -177,13 +177,17 @@
         "credential_spec": {
           "type": "object",
           "properties": {
+            "config": {
+              "type": "string"
+            },
             "file": {
               "type": "string"
             },
             "registry": {
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         },
         "depends_on": {
           "$ref": "#/definitions/list_of_strings"
@@ -738,6 +742,9 @@
                 },
                 "additionalProperties": false
               }
+            },
+            "max_replicas_per_node": {
+              "type": "integer"
             }
           },
           "additionalProperties": false
@@ -907,6 +914,23 @@
         },
         "labels": {
           "$ref": "#/definitions/list_or_dict"
+        },
+        "driver": {
+          "type": "string"
+        },
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {
+              "type": [
+                "string",
+                "number"
+              ]
+            }
+          }
+        },
+        "template_driver": {
+          "type": "string"
         }
       },
       "patternProperties": {
@@ -937,6 +961,9 @@
         },
         "labels": {
           "$ref": "#/definitions/list_or_dict"
+        },
+        "template_driver": {
+          "type": "string"
         }
       },
       "patternProperties": {
