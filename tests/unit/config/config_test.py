@@ -3637,7 +3637,6 @@ class InterpolationTest(unittest.TestCase):
         assert 'labels' in warn_message
         assert 'endpoint_mode' in warn_message
         assert 'update_config' in warn_message
-        assert 'placement' in warn_message
         assert 'resources.reservations.cpus' in warn_message
         assert 'restart_policy.delay' in warn_message
         assert 'restart_policy.window' in warn_message
