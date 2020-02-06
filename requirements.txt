@@ -10,7 +10,6 @@ dockerpty==0.4.1
 docopt==0.6.2
 enum34==1.1.6; python_version < '3.4'
 functools32==3.2.3.post2; python_version < '3.2'
-git+git://github.com/ulyssessouza/python-dotenv.git@no-interpolate#egg=python-dotenv
 idna==2.8
 ipaddress==1.0.23
 jsonschema==3.2.0
@@ -18,7 +17,7 @@ paramiko==2.7.1
 pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
 pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.7.1
-#python-dotenv==0.10.5
+python-dotenv==0.11.0
 PyYAML==5.3
 requests==2.22.0
 six==1.12.0
