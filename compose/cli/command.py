@@ -8,7 +8,6 @@ import re
 import six
 
 from . import errors
-from . import verbose_proxy
 from .. import config
 from .. import parallel
 from ..config.environment import Environment
@@ -17,10 +16,10 @@ from ..const import LABEL_CONFIG_FILES
 from ..const import LABEL_ENVIRONMENT_FILE
 from ..const import LABEL_WORKING_DIR
 from ..project import Project
-from .docker_client import docker_client
-from .docker_client import get_tls_version
-from .docker_client import tls_config_from_options
-from .utils import get_version_info
+from .docker_client import get_client
+from .docker_client import load_context
+from .docker_client import make_context
+from .errors import UserError
 
 log = logging.getLogger(__name__)
 
@@ -48,16 +47,28 @@ def project_from_options(project_dir, options, additional_options=None):
     environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
     set_parallel_limit(environment)
 
-    host = options.get('--host')
+    # get the context for the run
+    context = None
+    context_name = options.get('--context', None)
+    if context_name:
+        context = load_context(context_name)
+        if not context:
+            raise UserError("Context '{}' not found".format(context_name))
+
+    host = options.get('--host', None)
     if host is not None:
+        if context:
+            raise UserError(
+                "-H, --host and -c, --context are mutually exclusive. Only one should be set.")
         host = host.lstrip('=')
+        context = make_context(host, options, environment)
+
     return get_project(
         project_dir,
         get_config_path_from_options(project_dir, options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
-        host=host,
-        tls_config=tls_config_from_options(options, environment),
+        context=context,
         environment=environment,
         override_dir=override_dir,
         compatibility=compatibility_from_options(project_dir, options, environment),
@@ -112,25 +123,8 @@ def get_config_path_from_options(base_dir, options, environment):
     return None
 
 
-def get_client(environment, verbose=False, version=None, tls_config=None, host=None,
-               tls_version=None):
-
-    client = docker_client(
-        version=version, tls_config=tls_config, host=host,
-        environment=environment, tls_version=get_tls_version(environment)
-    )
-    if verbose:
-        version_info = six.iteritems(client.version())
-        log.info(get_version_info('full'))
-        log.info("Docker base_url: %s", client.base_url)
-        log.info("Docker version: %s",
-                 ", ".join("%s=%s" % item for item in version_info))
-        return verbose_proxy.VerboseProxy('docker', client)
-    return client
-
-
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
-                host=None, tls_config=None, environment=None, override_dir=None,
+                context=None, environment=None, override_dir=None,
                 compatibility=False, interpolate=True, environment_file=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
@@ -145,8 +139,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         API_VERSIONS[config_data.version])
 
     client = get_client(
-        verbose=verbose, version=api_version, tls_config=tls_config,
-        host=host, environment=environment
+        verbose=verbose, version=api_version, context=context, environment=environment
     )
 
     with errors.handle_connection_errors(client):

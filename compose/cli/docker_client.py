@@ -5,23 +5,55 @@ import logging
 import os.path
 import ssl
 
+import six
 from docker import APIClient
+from docker import Context
+from docker import ContextAPI
+from docker import TLSConfig
 from docker.errors import TLSParameterError
-from docker.tls import TLSConfig
 from docker.utils import kwargs_from_env
 from docker.utils.config import home_dir
 
+from . import verbose_proxy
 from ..config.environment import Environment
 from ..const import HTTP_TIMEOUT
 from ..utils import unquote_path
 from .errors import UserError
 from .utils import generate_user_agent
+from .utils import get_version_info
 
 log = logging.getLogger(__name__)
 
 
 def default_cert_path():
     return os.path.join(home_dir(), '.docker')
+
+
+def make_context(host, options, environment):
+    tls = tls_config_from_options(options, environment)
+    ctx = Context("compose", host=host)
+    if tls:
+        ctx.set_endpoint("docker", host, tls, skip_tls_verify=not tls.verify)
+    return ctx
+
+
+def load_context(name=None):
+    return ContextAPI.get_context(name)
+
+
+def get_client(environment, verbose=False, version=None, context=None):
+    client = docker_client(
+        version=version, context=context,
+        environment=environment, tls_version=get_tls_version(environment)
+    )
+    if verbose:
+        version_info = six.iteritems(client.version())
+        log.info(get_version_info('full'))
+        log.info("Docker base_url: %s", client.base_url)
+        log.info("Docker version: %s",
+                 ", ".join("%s=%s" % item for item in version_info))
+        return verbose_proxy.VerboseProxy('docker', client)
+    return client
 
 
 def get_tls_version(environment):
@@ -87,8 +119,7 @@ def tls_config_from_options(options, environment=None):
     return None
 
 
-def docker_client(environment, version=None, tls_config=None, host=None,
-                  tls_version=None):
+def docker_client(environment, version=None, context=None, tls_version=None):
     """
     Returns a docker-py client configured using environment variables
     according to the same logic as the official Docker client.
@@ -101,10 +132,21 @@ def docker_client(environment, version=None, tls_config=None, host=None,
             "and DOCKER_CERT_PATH are set correctly.\n"
             "You might need to run `eval \"$(docker-machine env default)\"`")
 
-    if host:
-        kwargs['base_url'] = host
-    if tls_config:
-        kwargs['tls'] = tls_config
+    if not context:
+        # check env for DOCKER_HOST and certs path
+        host = kwargs.get("base_url", None)
+        tls = kwargs.get("tls", None)
+        verify = False if not tls else tls.verify
+        if host:
+            context = Context("compose", host=host)
+        else:
+            context = ContextAPI.get_current_context()
+        if tls:
+            context.set_endpoint("docker", host=host, tls_cfg=tls, skip_tls_verify=not verify)
+
+    kwargs['base_url'] = context.Host
+    if context.TLSConfig:
+        kwargs['tls'] = context.TLSConfig
 
     if version:
         kwargs['version'] = version
