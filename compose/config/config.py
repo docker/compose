@@ -998,6 +998,9 @@ def translate_deploy_keys_to_container_config(service_dict):
         scale = deploy_dict.get('replicas', 1)
         max_replicas = deploy_dict.get('placement', {}).get('max_replicas_per_node', scale)
         service_dict['scale'] = min(scale, max_replicas)
+        if max_replicas < scale:
+            log.warning("Scale is limited to {} ('max_replicas_per_node' field).".format(
+                max_replicas))
 
     if 'restart_policy' in deploy_dict:
         service_dict['restart'] = {
