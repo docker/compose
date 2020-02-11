@@ -44,9 +44,9 @@ ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 BUILD_CACHE_TEXT = 'Using cache'
 BUILD_PULL_TEXT = 'Status: Image is up to date for busybox:1.27.2'
 COMPOSE_COMPATIBILITY_DICT = {
-    'version': '2.3',
+    'version': '3.5',
     'volumes': {'foo': {'driver': 'default'}},
-    'networks': {'bar': {}},
+    'networks': {'bar': {'attachable': True}},
     'services': {
         'foo': {
             'command': '/bin/true',
@@ -580,7 +580,7 @@ services:
 
     def test_config_compatibility_mode(self):
         self.base_dir = 'tests/fixtures/compatibility-mode'
-        result = self.dispatch(['--compatibility', 'config'])
+        result = self.dispatch(['config'])
 
         assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
 
@@ -596,7 +596,7 @@ services:
     def test_config_compatibility_mode_from_env_and_option_precedence(self):
         self.base_dir = 'tests/fixtures/compatibility-mode'
         os.environ['COMPOSE_COMPATIBILITY'] = 'false'
-        result = self.dispatch(['--compatibility', 'config'])
+        result = self.dispatch(['config'])
 
         assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
 

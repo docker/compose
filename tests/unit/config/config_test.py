@@ -3627,12 +3627,12 @@ class InterpolationTest(unittest.TestCase):
         })
 
         with mock.patch('compose.config.config.log') as log:
-            config.load(config_details, compatibility=True)
+            config.load(config_details)
 
         assert log.warning.call_count == 1
         warn_message = log.warning.call_args[0][0]
         assert warn_message.startswith(
-            'The following deploy sub-keys are not supported in compatibility mode'
+            'The following deploy sub-keys are not supported'
         )
         assert 'labels' in warn_message
         assert 'endpoint_mode' in warn_message
@@ -3666,7 +3666,7 @@ class InterpolationTest(unittest.TestCase):
         })
 
         with mock.patch('compose.config.config.log') as log:
-            cfg = config.load(config_details, compatibility=True)
+            cfg = config.load(config_details)
 
         assert log.warning.call_count == 0
 

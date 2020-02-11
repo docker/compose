@@ -210,6 +210,7 @@ class TopLevelCommand(object):
                                   (default: the path of the Compose file)
       --compatibility             If set, Compose will attempt to convert keys
                                   in v3 files to their non-Swarm equivalent
+                                  (WARN: flag ignored due to being made implicit)
       --env-file PATH             Specify an alternate environment file
 
     Commands:
