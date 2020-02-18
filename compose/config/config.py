@@ -920,7 +920,13 @@ def finalize_service(service_config, service_names, version, environment):
     normalize_build(service_dict, service_config.working_dir, environment)
 
     service_dict = translate_credential_spec_to_security_opt(service_dict)
-
+    service_dict, ignored_keys = translate_deploy_keys_to_container_config(
+        service_dict)
+    if ignored_keys:
+        log.warning(
+            'The following deploy sub-keys are not supported and have'
+            ' been ignored: {}'.format(', '.join(ignored_keys))
+        )
     service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
 
@@ -1004,6 +1010,7 @@ def translate_deploy_keys_to_container_config(service_dict):
             deploy_dict.get('resources', {}), service_dict
         )
     )
+    del service_dict['deploy']
 
     return service_dict, ignored_keys
 
