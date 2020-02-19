@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import contextlib
 import os
+from datetime import datetime
 
 from compose.config.config import ConfigDetails
 from compose.config.config import ConfigFile
@@ -70,3 +71,12 @@ def cd(path):
         yield
     finally:
         os.chdir(prev_cwd)
+
+
+def get_datetime_from_clock_log(logstring):
+    logstring = logstring.splitlines()[1:]
+    date_fmt = '%a %b %d %H:%M:%S %Z %Y'
+    return [
+        datetime.strptime(l.split('\x1b[0m')[-1].strip(), date_fmt)
+        for l in logstring
+    ]

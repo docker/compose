@@ -2,7 +2,10 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import unittest
+from datetime import datetime
+from datetime import timedelta
 
+from compose.cli.utils import get_datetime_from_timestamp_or_duration
 from compose.cli.utils import human_readable_file_size
 from compose.utils import unquote_path
 
@@ -46,3 +49,14 @@ class HumanReadableFileSizeTest(unittest.TestCase):
         assert human_readable_file_size((10 ** 3) ** 4) == '1 TB'
         assert human_readable_file_size((10 ** 3) ** 5) == '1 PB'
         assert human_readable_file_size((10 ** 3) ** 6) == '1 EB'
+
+
+class GetDatetimeFromTimestampOrDuration(unittest.TestCase):
+    def test_duration(self):
+        expected = datetime.now() - timedelta(hours=48, minutes=30, seconds=30)
+        value = get_datetime_from_timestamp_or_duration('48h30m30s')
+        assert expected - value < timedelta(seconds=2)
+
+    def test_timestamp(self):
+        assert get_datetime_from_timestamp_or_duration('2020-01-13T17:00:00') == \
+            datetime(year=2020, month=1, day=13, hour=17, minute=0, second=0)

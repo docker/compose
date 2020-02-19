@@ -1,0 +1,3 @@
+simple:
+  image: busybox:1.31.0-uclibc
+  command: sh -c "date; sleep 1; date; sleep 1; date; sleep 1; date; sleep 1; date; sleep 1; date;"
