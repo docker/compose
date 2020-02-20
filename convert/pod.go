@@ -30,14 +30,22 @@ func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, 
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
 	}
-	limits, err := toResource(serviceConfig.Deploy)
-	if err != nil {
-		return apiv1.PodTemplateSpec{}, err
+
+	var limits apiv1.ResourceList = nil
+	if serviceConfig.Deploy != nil && serviceConfig.Deploy.Resources.Limits != nil {
+		limits, err = toResource(serviceConfig.Deploy.Resources.Limits)
+		if err != nil {
+			return apiv1.PodTemplateSpec{}, err
+		}
 	}
-	requests, err := toResource(serviceConfig.Deploy)
-	if err != nil {
-		return apiv1.PodTemplateSpec{}, err
+	var requests apiv1.ResourceList = nil
+	if serviceConfig.Deploy != nil && serviceConfig.Deploy.Resources.Reservations != nil {
+		requests, err = toResource(serviceConfig.Deploy.Resources.Reservations)
+		if err != nil {
+			return apiv1.PodTemplateSpec{}, err
+		}
 	}
+
 	volumes, err := toVolumes(serviceConfig, model)
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
@@ -252,12 +260,7 @@ func toRestartPolicy(s types.ServiceConfig) (apiv1.RestartPolicy, error) {
 	}
 }
 
-func toResource(deploy *types.DeployConfig) (apiv1.ResourceList, error) {
-	if deploy == nil || deploy.Resources.Limits == nil {
-		return nil, nil
-	}
-
-	res := deploy.Resources.Limits
+func toResource(res *types.Resource) (apiv1.ResourceList, error) {
 	list := make(apiv1.ResourceList)
 	if res.NanoCPUs != "" {
 		cpus, err := resource.ParseQuantity(res.NanoCPUs)

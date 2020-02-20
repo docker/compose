@@ -170,13 +170,13 @@ func defaultMode(mode *uint32) *int32 {
 	return defaultMode
 }
 
-func secretVolume(config types.ServiceSecretConfig, topLevelSecret types.SecretConfig, subPath string) *apiv1.VolumeSource {
+func secretVolume(config types.ServiceSecretConfig, topLevelConfig types.SecretConfig, subPath string) *apiv1.VolumeSource {
 	return &apiv1.VolumeSource{
 		Secret: &apiv1.SecretVolumeSource{
 			SecretName: config.Source,
 			Items: []apiv1.KeyToPath{
 				{
-					Key:  toKey(topLevelSecret.File),
+					Key:  toKey(topLevelConfig.File),
 					Path: subPath,
 					Mode: defaultMode(config.Mode),
 				},
