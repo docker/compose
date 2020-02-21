@@ -2,6 +2,9 @@ package convert
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/helm-prototype/pkg/compose"
 	apps "k8s.io/api/apps/v1"
@@ -9,13 +12,11 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"strings"
-	"time"
 )
 
 func MapToKubernetesObjects(model *compose.Project) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
-	for _, service :=  range model.Services {
+	for _, service := range model.Services {
 		objects[fmt.Sprintf("%s-service.yaml", service.Name)] = mapToService(model, service)
 		if service.Deploy != nil && service.Deploy.Mode == "global" {
 			daemonset, err := mapToDaemonset(service, model)
@@ -94,13 +95,13 @@ func mapToDeployment(service types.ServiceConfig, model *compose.Project) (*apps
 
 	return &apps.Deployment{
 		ObjectMeta: meta.ObjectMeta{
-			Name: service.Name,
+			Name:   service.Name,
 			Labels: labels,
 		},
-		Spec:       apps.DeploymentSpec{
-				Replicas: toReplicas(service.Deploy),
-				Strategy: toDeploymentStrategy(service.Deploy),
-				Template: podTemplate,
+		Spec: apps.DeploymentSpec{
+			Replicas: toReplicas(service.Deploy),
+			Strategy: toDeploymentStrategy(service.Deploy),
+			Template: podTemplate,
 		},
 	}, nil
 }
@@ -125,7 +126,6 @@ func mapToDaemonset(service types.ServiceConfig, model *compose.Project) (*apps.
 		},
 	}, nil
 }
-
 
 func toReplicas(deploy *types.DeployConfig) *int32 {
 	v := int32(1)
@@ -156,11 +156,11 @@ func toDeploymentStrategy(deploy *types.DeployConfig) apps.DeploymentStrategy {
 func mapToPVC(service types.ServiceConfig, vol types.ServiceVolumeConfig) runtime.Object {
 	return &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
-			Name:                       vol.Source,
-			Labels:                     map[string]string{"com.docker.compose.service": service.Name},
+			Name:   vol.Source,
+			Labels: map[string]string{"com.docker.compose.service": service.Name},
 		},
-		Spec:       core.PersistentVolumeClaimSpec{
-			VolumeName:       vol.Source,
+		Spec: core.PersistentVolumeClaimSpec{
+			VolumeName: vol.Source,
 		},
 	}
 }

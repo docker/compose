@@ -3,16 +3,17 @@ package helm
 import (
 	"bytes"
 	"encoding/json"
-	"gopkg.in/yaml.v3"
 	"html/template"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func Write(project string, objects map[string]runtime.Object, target string) error {
-	out := Outputer{ target }
+	out := Outputer{target}
 
 	if err := out.Write("README.md", []byte("This chart was created by converting a Compose file")); err != nil {
 		return err
@@ -37,7 +38,6 @@ home:
 	}
 	var chartData bytes.Buffer
 	_ = t.Execute(&chartData, ChartDetails{project})
-
 
 	if err := out.Write("Chart.yaml", chartData.Bytes()); err != nil {
 		return err

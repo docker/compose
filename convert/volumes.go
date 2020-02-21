@@ -2,11 +2,12 @@ package convert
 
 import (
 	"fmt"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/helm-prototype/pkg/compose"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/helm-prototype/pkg/compose"
 
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"

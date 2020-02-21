@@ -2,15 +2,16 @@ package convert
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"testing"
+
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/helm-prototype/pkg/compose"
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"os"
-	"runtime"
-	"testing"
 )
 
 func loadYAML(yaml string) (*compose.Project, error) {
@@ -256,7 +257,7 @@ services:
 	assert.Len(t, podTemplate.Spec.Containers[0].VolumeMounts, 2)
 }
 
-func /*FIXME Test*/ToPodWithRelativeVolumes(t *testing.T) {
+func /*FIXME Test*/ ToPodWithRelativeVolumes(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("on windows, source path validation is broken (and actually, source validation for windows workload is broken too). Skip it for now, as we don't support it yet")
 		return
@@ -401,7 +402,7 @@ services:
 	assert.Equal(t, expectedMount, podTemplate.Spec.Containers[0].VolumeMounts[0])
 }
 
-func /*FIXME Test*/ToPodWithFileBasedSecret(t *testing.T) {
+func /*FIXME Test*/ ToPodWithFileBasedSecret(t *testing.T) {
 	podTemplate := podTemplate(t, `
 version: "3"
 services:
@@ -442,7 +443,7 @@ secrets:
 	assert.Equal(t, expectedMount, podTemplate.Spec.Containers[0].VolumeMounts[0])
 }
 
-func /*FIXME Test*/ToPodWithTwoFileBasedSecrets(t *testing.T) {
+func /*FIXME Test*/ ToPodWithTwoFileBasedSecrets(t *testing.T) {
 	podTemplate := podTemplate(t, `
 version: "3"
 services:
@@ -603,7 +604,7 @@ services:
 	assert.Equal(t, expectedMount, podTemplate.Spec.Containers[0].VolumeMounts[0])
 }
 
-func /*FIXME Test*/ToPodWithFileBasedConfig(t *testing.T) {
+func /*FIXME Test*/ ToPodWithFileBasedConfig(t *testing.T) {
 	podTemplate := podTemplate(t, `
 version: "3"
 services:
@@ -653,7 +654,7 @@ configs:
 	assert.Equal(t, expectedMount, podTemplate.Spec.Containers[0].VolumeMounts[0])
 }
 
-func /*FIXME Test*/ToPodWithTargetlessFileBasedConfig(t *testing.T) {
+func /*FIXME Test*/ ToPodWithTargetlessFileBasedConfig(t *testing.T) {
 	podTemplate := podTemplate(t, `
 version: "3"
 services:
@@ -746,7 +747,7 @@ configs:
 	assert.Equal(t, expectedMount, podTemplate.Spec.Containers[0].VolumeMounts[0])
 }
 
-func /*FIXME Test*/ToPodWithTwoConfigsSameMountPoint(t *testing.T) {
+func /*FIXME Test*/ ToPodWithTwoConfigsSameMountPoint(t *testing.T) {
 	podTemplate := podTemplate(t, `
 version: "3"
 services:
@@ -897,7 +898,7 @@ configs:
 	assert.Equal(t, expectedMounts, podTemplate.Spec.Containers[0].VolumeMounts)
 }
 
-func /*FIXME Test*/ToPodWithPullSecret(t *testing.T) {
+func /*FIXME Test*/ ToPodWithPullSecret(t *testing.T) {
 	podTemplateWithSecret := podTemplate(t, `
 version: "3"
 services:
@@ -919,7 +920,7 @@ services:
 	assert.Nil(t, podTemplateNoSecret.Spec.ImagePullSecrets)
 }
 
-func /*FIXME Test*/ToPodWithPullPolicy(t *testing.T) {
+func /*FIXME Test*/ ToPodWithPullPolicy(t *testing.T) {
 	cases := []struct {
 		name           string
 		stack          string

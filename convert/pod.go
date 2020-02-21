@@ -2,13 +2,14 @@ package convert
 
 import (
 	"fmt"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/helm-prototype/pkg/compose"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/docker/api/types/swarm"
+	"github.com/docker/helm-prototype/pkg/compose"
 
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
@@ -31,14 +32,14 @@ func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, 
 		return apiv1.PodTemplateSpec{}, err
 	}
 
-	var limits apiv1.ResourceList = nil
+	var limits apiv1.ResourceList
 	if serviceConfig.Deploy != nil && serviceConfig.Deploy.Resources.Limits != nil {
 		limits, err = toResource(serviceConfig.Deploy.Resources.Limits)
 		if err != nil {
 			return apiv1.PodTemplateSpec{}, err
 		}
 	}
-	var requests apiv1.ResourceList = nil
+	var requests apiv1.ResourceList
 	if serviceConfig.Deploy != nil && serviceConfig.Deploy.Resources.Reservations != nil {
 		requests, err = toResource(serviceConfig.Deploy.Resources.Reservations)
 		if err != nil {
@@ -54,10 +55,10 @@ func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, 
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
 	}
-/*	pullPolicy, err := toImagePullPolicy(serviceConfig.Image, x-kubernetes-pull-policy)
-	if err != nil {
-		return apiv1.PodTemplateSpec{}, err
-	} */
+	/*	pullPolicy, err := toImagePullPolicy(serviceConfig.Image, x-kubernetes-pull-policy)
+		if err != nil {
+			return apiv1.PodTemplateSpec{}, err
+		} */
 	tpl.ObjectMeta = metav1.ObjectMeta{
 		Labels:      labels,
 		Annotations: serviceConfig.Labels,
