@@ -18,7 +18,7 @@ class VolumeTest(DockerClientTestCase):
             except DockerException:
                 pass
         del self.tmp_volumes
-        super(VolumeTest, self).tearDown()
+        super().tearDown()
 
     def create_volume(self, name, driver=None, opts=None, external=None, custom_name=False):
         if external:

@@ -36,7 +36,7 @@ class SplitBufferTest(unittest.TestCase):
         self.assert_produces(reader, ['abc\n', 'd'])
 
     def test_preserves_unicode_sequences_within_lines(self):
-        string = u"a\u2022c\n"
+        string = "a\u2022c\n"
 
         def reader():
             yield string.encode('utf-8')

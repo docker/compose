@@ -29,7 +29,7 @@ def stream_as_text(stream):
         yield data
 
 
-def line_splitter(buffer, separator=u'\n'):
+def line_splitter(buffer, separator='\n'):
     index = buffer.find(str(separator))
     if index == -1:
         return None
@@ -45,7 +45,7 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
     of the input.
     """
     splitter = splitter or line_splitter
-    buffered = str('')
+    buffered = ''
 
     for data in stream_as_text(stream):
         buffered += data
@@ -116,7 +116,7 @@ def parse_nanoseconds_int(value):
 
 
 def build_string_dict(source_dict):
-    return dict((k, str(v if v is not None else '')) for k, v in source_dict.items())
+    return {k: str(v if v is not None else '') for k, v in source_dict.items()}
 
 
 def splitdrive(path):

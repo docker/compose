@@ -21,7 +21,7 @@ def get_source_name_from_network_mode(network_mode, source_type):
 
 
 def get_service_names(links):
-    return [link.split(':')[0] for link in links]
+    return [link.split(':', 1)[0] for link in links]
 
 
 def get_service_names_from_volumes_from(volumes_from):
