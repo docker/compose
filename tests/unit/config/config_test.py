@@ -1,4 +1,3 @@
-# encoding: utf-8
 import codecs
 import os
 import shutil
@@ -3885,12 +3884,12 @@ class VolumeConfigTest(unittest.TestCase):
         assert d['volumes'] == ['~:/data']
 
     def test_volume_path_with_non_ascii_directory(self):
-        volume = u'/Füü/data:/data'
+        volume = '/Füü/data:/data'
         container_path = config.resolve_volume_path(".", volume)
         assert container_path == volume
 
 
-class MergePathMappingTest(object):
+class MergePathMappingTest:
     config_name = ""
 
     def test_empty(self):
@@ -3963,7 +3962,7 @@ class BuildOrImageMergeTest(unittest.TestCase):
         assert config.merge_service_dicts({'image': 'redis'}, {'build': '.'}, V1) == {'build': '.'}
 
 
-class MergeListsTest(object):
+class MergeListsTest:
     config_name = ""
     base_config = []
     override_config = []
@@ -4396,7 +4395,7 @@ class EnvTest(unittest.TestCase):
             {'env_file': ['tests/fixtures/env/resolve.env']},
             Environment.from_env_file(None)
         ) == {
-            'FILE_DEF': u'bär',
+            'FILE_DEF': 'bär',
             'FILE_DEF_EMPTY': '',
             'ENV_DEF': 'E3',
             'NO_DEF': None
@@ -5042,14 +5041,14 @@ class VolumePathTest(unittest.TestCase):
         container_path = 'c:\\scarletdevil\\data'
         expected_mapping = (container_path, (host_path, None))
 
-        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        mapping = config.split_path_mapping('{}:{}'.format(host_path, container_path))
         assert mapping == expected_mapping
 
     def test_split_path_mapping_with_root_mount(self):
         host_path = '/'
         container_path = '/var/hostroot'
         expected_mapping = (container_path, (host_path, None))
-        mapping = config.split_path_mapping('{0}:{1}'.format(host_path, container_path))
+        mapping = config.split_path_mapping('{}:{}'.format(host_path, container_path))
         assert mapping == expected_mapping
 
 

@@ -22,7 +22,7 @@ class ResilienceTest(DockerClientTestCase):
     def tearDown(self):
         del self.project
         del self.db
-        super(ResilienceTest, self).tearDown()
+        super().tearDown()
 
     def test_successful_recreate(self):
         self.project.up(strategy=ConvergenceStrategy.always)

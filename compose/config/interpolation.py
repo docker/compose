@@ -11,7 +11,7 @@ from compose.utils import parse_nanoseconds_int
 log = logging.getLogger(__name__)
 
 
-class Interpolator(object):
+class Interpolator:
 
     def __init__(self, templater, mapping):
         self.templater = templater
@@ -31,15 +31,15 @@ def interpolate_environment_variables(version, config, section, environment):
         interpolator = Interpolator(TemplateWithDefaults, environment)
 
     def process_item(name, config_dict):
-        return dict(
-            (key, interpolate_value(name, key, val, section, interpolator))
+        return {
+            key: interpolate_value(name, key, val, section, interpolator)
             for key, val in (config_dict or {}).items()
-        )
+        }
 
-    return dict(
-        (name, process_item(name, config_dict or {}))
+    return {
+        name: process_item(name, config_dict or {})
         for name, config_dict in config.items()
-    )
+    }
 
 
 def get_config_path(config_key, section, name):
@@ -75,10 +75,10 @@ def recursive_interpolate(obj, interpolator, config_path):
     if isinstance(obj, str):
         return converter.convert(config_path, interpolator.interpolate(obj))
     if isinstance(obj, dict):
-        return dict(
-            (key, recursive_interpolate(val, interpolator, append(config_path, key)))
-            for (key, val) in obj.items()
-        )
+        return {
+            key: recursive_interpolate(val, interpolator, append(config_path, key))
+            for key, val in obj.items()
+        }
     if isinstance(obj, list):
         return [recursive_interpolate(val, interpolator, config_path) for val in obj]
     return converter.convert(config_path, obj)
@@ -135,7 +135,7 @@ class TemplateWithDefaults(Template):
                 val = mapping[named]
                 if isinstance(val, bytes):
                     val = val.decode('utf-8')
-                return '%s' % (val,)
+                return '{}'.format(val)
             if mo.group('escaped') is not None:
                 return self.delimiter
             if mo.group('invalid') is not None:
@@ -224,7 +224,7 @@ def to_microseconds(v):
     return int(parse_nanoseconds_int(v) / 1000)
 
 
-class ConversionMap(object):
+class ConversionMap:
     map = {
         service_path('blkio_config', 'weight'): to_int,
         service_path('blkio_config', 'weight_device', 'weight'): to_int,

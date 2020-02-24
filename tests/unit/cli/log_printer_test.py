@@ -29,7 +29,7 @@ def mock_container():
     return mock.Mock(spec=Container, name_without_project='web_1')
 
 
-class TestLogPresenter(object):
+class TestLogPresenter:
 
     def test_monochrome(self, mock_container):
         presenters = build_log_presenters(['foo', 'bar'], True)
@@ -83,7 +83,7 @@ def test_build_no_log_generator(mock_container):
     assert "exited with code" not in output
 
 
-class TestBuildLogGenerator(object):
+class TestBuildLogGenerator:
 
     def test_no_log_stream(self, mock_container):
         mock_container.log_stream = None
@@ -108,7 +108,7 @@ class TestBuildLogGenerator(object):
         assert next(generator) == "world"
 
     def test_unicode(self, output_stream):
-        glyph = u'\u2022\n'
+        glyph = '\u2022\n'
         mock_container.log_stream = iter([glyph.encode('utf-8')])
 
         generator = build_log_generator(mock_container, {})
@@ -125,7 +125,7 @@ def mock_presenters():
     return itertools.cycle([mock.Mock()])
 
 
-class TestWatchEvents(object):
+class TestWatchEvents:
 
     def test_stop_event(self, thread_map, mock_presenters):
         event_stream = [{'action': 'stop', 'id': 'cid'}]
@@ -167,7 +167,7 @@ class TestWatchEvents(object):
         assert container_id not in thread_map
 
 
-class TestConsumeQueue(object):
+class TestConsumeQueue:
 
     def test_item_is_an_exception(self):
 

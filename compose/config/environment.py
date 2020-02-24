@@ -43,7 +43,7 @@ def env_vars_from_file(filename, interpolate=True):
 
 class Environment(dict):
     def __init__(self, *args, **kwargs):
-        super(Environment, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.missing_keys = []
         self.silent = False
 
@@ -81,11 +81,11 @@ class Environment(dict):
 
     def __getitem__(self, key):
         try:
-            return super(Environment, self).__getitem__(key)
+            return super().__getitem__(key)
         except KeyError:
             if IS_WINDOWS_PLATFORM:
                 try:
-                    return super(Environment, self).__getitem__(key.upper())
+                    return super().__getitem__(key.upper())
                 except KeyError:
                     pass
             if not self.silent and key not in self.missing_keys:
@@ -98,20 +98,20 @@ class Environment(dict):
             return ""
 
     def __contains__(self, key):
-        result = super(Environment, self).__contains__(key)
+        result = super().__contains__(key)
         if IS_WINDOWS_PLATFORM:
             return (
-                result or super(Environment, self).__contains__(key.upper())
+                result or super().__contains__(key.upper())
             )
         return result
 
     def get(self, key, *args, **kwargs):
         if IS_WINDOWS_PLATFORM:
-            return super(Environment, self).get(
+            return super().get(
                 key,
-                super(Environment, self).get(key.upper(), *args, **kwargs)
+                super().get(key.upper(), *args, **kwargs)
             )
-        return super(Environment, self).get(key, *args, **kwargs)
+        return super().get(key, *args, **kwargs)
 
     def get_boolean(self, key):
         # Convert a value to a boolean using "common sense" rules.
