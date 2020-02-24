@@ -1,4 +1,3 @@
-# encoding: utf-8
 import codecs
 import os
 import shutil

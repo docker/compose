@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 STOP = object()
 
 
-class GlobalLimit(object):
+class GlobalLimit:
     """Simple class to hold a global semaphore limiter for a project. This class
     should be treated as a singleton that is instantiated when the project is.
     """
@@ -114,7 +114,7 @@ def _no_deps(x):
     return []
 
 
-class State(object):
+class State:
     """
     Holds the state of a partially-complete parallel operation.
 
@@ -136,7 +136,7 @@ class State(object):
         return set(self.objects) - self.started - self.finished - self.failed
 
 
-class NoLimit(object):
+class NoLimit:
     def __enter__(self):
         pass
 
@@ -252,7 +252,7 @@ class UpstreamError(Exception):
     pass
 
 
-class ParallelStreamWriter(object):
+class ParallelStreamWriter:
     """Write out messages for operations happening in parallel.
 
     Each operation has its own line, and ANSI code characters are used

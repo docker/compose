@@ -73,7 +73,7 @@ def main():
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:
-        log.error("Service '%s' failed to build: %s" % (e.service.name, e.reason))
+        log.error("Service '{}' failed to build: {}".format(e.service.name, e.reason))
         sys.exit(1)
     except StreamOutputError as e:
         log.error(e)
@@ -175,7 +175,7 @@ def parse_doc_section(name, source):
     return [s.strip() for s in pattern.findall(source)]
 
 
-class TopLevelCommand(object):
+class TopLevelCommand:
     """Define and run multi-container applications with Docker.
 
     Usage:
@@ -546,7 +546,7 @@ class TopLevelCommand(object):
             key=attrgetter('name'))
 
         if options['--quiet']:
-            for image in set(c.image for c in containers):
+            for image in {c.image for c in containers}:
                 print(image.split(':')[1])
             return
 
@@ -1130,7 +1130,7 @@ def compute_service_exit_code(exit_value_from, attached_containers):
         attached_containers))
     if not candidates:
         log.error(
-            'No containers matching the spec "{0}" '
+            'No containers matching the spec "{}" '
             'were run.'.format(exit_value_from)
         )
         return 2
@@ -1453,10 +1453,7 @@ def call_docker(args, dockeropts, environment):
     args = [executable_path] + tls_options + args
     log.debug(" ".join(map(pipes.quote, args)))
 
-    filtered_env = {}
-    for k, v in environment.items():
-        if v is not None:
-            filtered_env[k] = environment[k]
+    filtered_env = {k: v for k, v in environment.items() if v is not None}
 
     return subprocess.call(args, env=filtered_env)
 

@@ -163,7 +163,7 @@ class BuildAction(enum.Enum):
     skip = 2
 
 
-class Service(object):
+class Service:
     def __init__(
             self,
             name,
@@ -230,10 +230,10 @@ class Service(object):
         """Return a :class:`compose.container.Container` for this service. The
         container must be active, and match `number`.
         """
-        for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
+        for container in self.containers(labels=['{}={}'.format(LABEL_CONTAINER_NUMBER, number)]):
             return container
 
-        raise ValueError("No container found for %s_%s" % (self.name, number))
+        raise ValueError("No container found for {}_{}".format(self.name, number))
 
     def start(self, **options):
         containers = self.containers(stopped=True)
@@ -642,7 +642,7 @@ class Service(object):
             expl = binarystr_to_unicode(ex.explanation)
             if "driver failed programming external connectivity" in expl:
                 log.warn("Host is already in use by another container")
-            raise OperationFailedError("Cannot start service %s: %s" % (self.name, expl))
+            raise OperationFailedError("Cannot start service {}: {}".format(self.name, expl))
         return container
 
     @property
@@ -736,12 +736,12 @@ class Service(object):
         pid_namespace = self.pid_mode.service_name
         ipc_namespace = self.ipc_mode.service_name
 
-        configs = dict(
-            [(name, None) for name in self.get_linked_service_names()]
+        configs = {
+            name: None for name in self.get_linked_service_names()
+        }
+        configs.update(
+            (name, None) for name in self.get_volumes_from_names()
         )
-        configs.update(dict(
-            [(name, None) for name in self.get_volumes_from_names()]
-        ))
         configs.update({net_name: None} if net_name else {})
         configs.update({pid_namespace: None} if pid_namespace else {})
         configs.update({ipc_namespace: None} if ipc_namespace else {})
@@ -863,9 +863,9 @@ class Service(object):
         add_config_hash = (not one_off and not override_options)
         slug = generate_random_id() if one_off else None
 
-        container_options = dict(
-            (k, self.options[k])
-            for k in DOCKER_CONFIG_KEYS if k in self.options)
+        container_options = {
+            k: self.options[k]
+            for k in DOCKER_CONFIG_KEYS if k in self.options}
         override_volumes = override_options.pop('volumes', [])
         container_options.update(override_options)
 
@@ -957,7 +957,7 @@ class Service(object):
         )
         container_options['environment'].update(affinity)
 
-        container_options['volumes'] = dict((v.internal, {}) for v in container_volumes or {})
+        container_options['volumes'] = {v.internal: {} for v in container_volumes or {}}
         if version_gte(self.client.api_version, '1.30'):
             override_options['mounts'] = [build_mount(v) for v in container_mounts] or None
         else:
@@ -1159,9 +1159,9 @@ class Service(object):
     def labels(self, one_off=False, legacy=False):
         proj_name = self.project if not legacy else re.sub(r'[_-]', '', self.project)
         return [
-            '{0}={1}'.format(LABEL_PROJECT, proj_name),
-            '{0}={1}'.format(LABEL_SERVICE, self.name),
-            '{0}={1}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
+            '{}={}'.format(LABEL_PROJECT, proj_name),
+            '{}={}'.format(LABEL_SERVICE, self.name),
+            '{}={}'.format(LABEL_ONE_OFF, "True" if one_off else "False"),
         ]
 
     @property
@@ -1178,7 +1178,7 @@ class Service(object):
         ext_links_origins = [link.split(':')[0] for link in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
             raise DependencyError(
-                'Service {0} has a self-referential external link: {1}'.format(
+                'Service {} has a self-referential external link: {}'.format(
                     self.name, container_name
                 )
             )
@@ -1233,11 +1233,9 @@ class Service(object):
             output = self.client.pull(repo, **pull_kwargs)
             if silent:
                 with open(os.devnull, 'w') as devnull:
-                    for event in stream_output(output, devnull):
-                        yield event
+                    yield from stream_output(output, devnull)
             else:
-                for event in stream_output(output, sys.stdout):
-                    yield event
+                yield from stream_output(output, sys.stdout)
         except (StreamOutputError, NotFound) as e:
             if not ignore_pull_failures:
                 raise
@@ -1255,7 +1253,7 @@ class Service(object):
             'platform': self.platform,
         }
         if not silent:
-            log.info('Pulling %s (%s%s%s)...' % (self.name, repo, separator, tag))
+            log.info('Pulling {} ({}{}{})...'.format(self.name, repo, separator, tag))
 
         if kwargs['platform'] and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
@@ -1273,7 +1271,7 @@ class Service(object):
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
         tag = tag or 'latest'
-        log.info('Pushing %s (%s%s%s)...' % (self.name, repo, separator, tag))
+        log.info('Pushing {} ({}{}{})...'.format(self.name, repo, separator, tag))
         output = self.client.push(repo, tag=tag, stream=True)
 
         try:
@@ -1335,7 +1333,7 @@ def short_id_alias_exists(container, network):
     return container.short_id in aliases
 
 
-class IpcMode(object):
+class IpcMode:
     def __init__(self, mode):
         self._mode = mode
 
@@ -1375,7 +1373,7 @@ class ContainerIpcMode(IpcMode):
         self._mode = 'container:{}'.format(container.id)
 
 
-class PidMode(object):
+class PidMode:
     def __init__(self, mode):
         self._mode = mode
 
@@ -1415,7 +1413,7 @@ class ContainerPidMode(PidMode):
         self._mode = 'container:{}'.format(container.id)
 
 
-class NetworkMode(object):
+class NetworkMode:
     """A `standard` network mode (ex: host, bridge)"""
 
     service_name = None
@@ -1430,7 +1428,7 @@ class NetworkMode(object):
     mode = id
 
 
-class ContainerNetworkMode(object):
+class ContainerNetworkMode:
     """A network mode that uses a container's network stack."""
 
     service_name = None
@@ -1447,7 +1445,7 @@ class ContainerNetworkMode(object):
         return 'container:' + self.container.id
 
 
-class ServiceNetworkMode(object):
+class ServiceNetworkMode:
     """A network mode that uses a service's network stack."""
 
     def __init__(self, service):
@@ -1552,10 +1550,10 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
     volumes = []
     volumes_option = volumes_option or []
 
-    container_mounts = dict(
-        (mount['Destination'], mount)
+    container_mounts = {
+        mount['Destination']: mount
         for mount in container.get('Mounts') or {}
-    )
+    }
 
     image_volumes = [
         VolumeSpec.parse(volume)
@@ -1607,9 +1605,9 @@ def get_container_data_volumes(container, volumes_option, tmpfs_option, mounts_o
 
 
 def warn_on_masked_volume(volumes_option, container_volumes, service):
-    container_volumes = dict(
-        (volume.internal, volume.external)
-        for volume in container_volumes)
+    container_volumes = {
+        volume.internal: volume.external
+        for volume in container_volumes}
 
     for volume in volumes_option:
         if (
@@ -1759,7 +1757,7 @@ def convert_blkio_config(blkio_config):
             continue
         arr = []
         for item in blkio_config[field]:
-            arr.append(dict([(k.capitalize(), v) for k, v in item.items()]))
+            arr.append({k.capitalize(): v for k, v in item.items()})
         result[field] = arr
     return result
 
@@ -1771,7 +1769,7 @@ def rewrite_build_path(path):
     return path
 
 
-class _CLIBuilder(object):
+class _CLIBuilder:
     def __init__(self, progress):
         self._progress = progress
 
@@ -1879,7 +1877,7 @@ class _CLIBuilder(object):
             yield json.dumps({"stream": "{}{}\n".format(magic_word, image_id)})
 
 
-class _CommandBuilder(object):
+class _CommandBuilder:
     def __init__(self):
         self._args = ["docker", "build"]
 

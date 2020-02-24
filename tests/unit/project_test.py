@@ -1,4 +1,3 @@
-# encoding: utf-8
 import datetime
 import os
 import tempfile
@@ -739,7 +738,7 @@ class ProjectTest(unittest.TestCase):
             assert fake_log.warn.call_count == 0
 
     def test_no_such_service_unicode(self):
-        assert NoSuchService('十六夜　咲夜'.encode('utf-8')).msg == 'No such service: 十六夜　咲夜'
+        assert NoSuchService('十六夜　咲夜'.encode()).msg == 'No such service: 十六夜　咲夜'
         assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜'
 
     def test_project_platform_value(self):

@@ -20,3 +20,9 @@
       language_version: 'python3.7'
       args:
          - --py3-plus
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v2.1.0
+    hooks:
+    -   id: pyupgrade
+        args:
+          - --py3-plus

@@ -55,7 +55,7 @@ class DockerClientTestCase(unittest.TestCase):
 
     def test_user_agent(self):
         client = docker_client(os.environ)
-        expected = "docker-compose/{0} docker-py/{1} {2}/{3}".format(
+        expected = "docker-compose/{} docker-py/{} {}/{}".format(
             compose.__version__,
             docker.__version__,
             platform.system(),
@@ -151,9 +151,9 @@ class TLSConfigTestCase(unittest.TestCase):
 
     def test_tls_client_and_ca_quoted_paths(self):
         options = {
-            '--tlscacert': '"{0}"'.format(self.ca_cert),
-            '--tlscert': '"{0}"'.format(self.client_cert),
-            '--tlskey': '"{0}"'.format(self.key),
+            '--tlscacert': '"{}"'.format(self.ca_cert),
+            '--tlscert': '"{}"'.format(self.client_cert),
+            '--tlskey': '"{}"'.format(self.key),
             '--tlsverify': True
         }
         result = tls_config_from_options(options)
@@ -185,9 +185,9 @@ class TLSConfigTestCase(unittest.TestCase):
             'DOCKER_TLS_VERIFY': 'false'
         })
         options = {
-            '--tlscacert': '"{0}"'.format(self.ca_cert),
-            '--tlscert': '"{0}"'.format(self.client_cert),
-            '--tlskey': '"{0}"'.format(self.key),
+            '--tlscacert': '"{}"'.format(self.ca_cert),
+            '--tlscert': '"{}"'.format(self.client_cert),
+            '--tlskey': '"{}"'.format(self.key),
             '--tlsverify': True
         }
 
@@ -230,7 +230,7 @@ class TLSConfigTestCase(unittest.TestCase):
         assert result.cert == (self.client_cert, self.key)
 
 
-class TestGetTlsVersion(object):
+class TestGetTlsVersion:
     def test_get_tls_version_default(self):
         environment = {}
         assert get_tls_version(environment) is None

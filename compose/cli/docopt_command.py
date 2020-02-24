@@ -11,7 +11,7 @@ def docopt_full_help(docstring, *args, **kwargs):
         raise SystemExit(docstring)
 
 
-class DocoptDispatcher(object):
+class DocoptDispatcher:
 
     def __init__(self, command_class, options):
         self.command_class = command_class
@@ -50,7 +50,7 @@ def get_handler(command_class, command):
 
 class NoSuchCommand(Exception):
     def __init__(self, command, supercommand):
-        super(NoSuchCommand, self).__init__("No such command: %s" % command)
+        super().__init__("No such command: %s" % command)
 
         self.command = command
         self.supercommand = supercommand
