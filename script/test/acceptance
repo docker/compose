@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+pytest --conformity --binary ${1:-docker-compose} tests/acceptance/
