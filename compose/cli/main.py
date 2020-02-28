@@ -482,7 +482,7 @@ class TopLevelCommand(object):
         try:
             container = service.get_container(number=index)
         except ValueError as e:
-            raise UserError(str(e))
+            raise UserError(str(e)) from e
         command = [options['COMMAND']] + options['ARGS']
         tty = not options["-T"]
 
@@ -664,7 +664,7 @@ class TopLevelCommand(object):
         try:
             container = service.get_container(number=index)
         except ValueError as e:
-            raise UserError(str(e))
+            raise UserError(str(e)) from e
         print(container.get_local_port(
             options['PRIVATE_PORT'],
             protocol=options.get('--protocol') or 'tcp') or '')
@@ -1223,7 +1223,7 @@ def image_digests_for_project(project):
                 command_hint,
             ]
 
-        raise UserError("\n\n".join(paras))
+        raise UserError("\n\n".join(paras)) from e
 
 
 def exitval_from_opts(options, project):
@@ -1244,8 +1244,8 @@ def image_type_from_opt(flag, value):
         return ImageType.none
     try:
         return ImageType[value]
-    except KeyError:
-        raise UserError("%s flag must be one of: all, local" % flag)
+    except KeyError as e:
+        raise UserError("%s flag must be one of: all, local" % flag) from e
 
 
 def build_action_from_opts(options):
@@ -1483,10 +1483,10 @@ def parse_scale_args(options):
         service_name, num = s.split('=', 1)
         try:
             num = int(num)
-        except ValueError:
+        except ValueError as e:
             raise UserError(
                 'Number of containers for service "%s" is not a number' % service_name
-            )
+            ) from e
         res[service_name] = num
     return res
 
