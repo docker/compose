@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 from functools import reduce
+from itertools import groupby
+from operator import itemgetter
 
 import six
 from docker.errors import ImageNotFound
@@ -127,10 +129,25 @@ class Container(object):
                 '{HostIp}:{HostPort}->{private}'.format(private=private, **pub)
                 for pub in public
             ]
-
+        sorted_container_ports = []
+        sorted_ports = sorted(six.iteritems(self.ports))
+        if len(sorted_ports) < 2:
+            sorted_container_ports = sorted(six.iteritems(self.ports))
+        else:
+            port_info = (port[0].split('/')[0] for port in sorted_ports if port[1] is None)
+            sorted_container_ports = [port for port in sorted_ports if port[1] is not None]
+            for k, g in groupby(enumerate(port_info), lambda i: int(i[0]) - int(i[1])):
+                grouped_ports = list(map(itemgetter(1), g))
+                if len(grouped_ports) == 1:
+                    port = '%s/tcp' % grouped_ports[0]
+                    sorted_container_ports.append((port, None))
+                else:
+                    start_port, end_port = grouped_ports[0], grouped_ports[-1]
+                    port_ranges = '%s-%s/tcp' % (start_port, end_port)
+                    sorted_container_ports.append((port_ranges, None))
         return ', '.join(
             ','.join(format_port(*item))
-            for item in sorted(six.iteritems(self.ports))
+            for item in sorted_container_ports
         )
 
     @property
