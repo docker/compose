@@ -38,6 +38,8 @@ from tests.integration.testcases import v2_2_only
 from tests.integration.testcases import v2_only
 from tests.integration.testcases import v3_only
 
+DOCKER_COMPOSE_EXECUTABLE = 'docker-compose'
+
 ProcessResult = namedtuple('ProcessResult', 'stdout stderr')
 
 
@@ -65,7 +67,7 @@ COMPOSE_COMPATIBILITY_DICT = {
 
 def start_process(base_dir, options):
     proc = subprocess.Popen(
-        ['docker-compose'] + options,
+        [DOCKER_COMPOSE_EXECUTABLE] + options,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
