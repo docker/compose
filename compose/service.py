@@ -1083,33 +1083,50 @@ class Service(object):
             )
 
         builder = self.client if not cli else _CLIBuilder(progress)
-        build_output = builder.build(
-            path=path,
-            tag=self.image_name,
-            rm=rm,
-            forcerm=force_rm,
-            pull=pull,
-            nocache=no_cache,
-            dockerfile=build_opts.get('dockerfile', None),
-            cache_from=self.get_cache_from(build_opts),
-            labels=build_opts.get('labels', None),
-            buildargs=build_args,
-            network_mode=build_opts.get('network', None),
-            target=build_opts.get('target', None),
-            shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
-            extra_hosts=build_opts.get('extra_hosts', None),
-            container_limits={
-                'memory': parse_bytes(memory) if memory else None
-            },
-            gzip=gzip,
-            isolation=build_opts.get('isolation', self.options.get('isolation', None)),
-            platform=self.platform,
-        )
+
+        if os.path.isfile(path):
+            _path = None
+            fileobj = open(path, 'rb')
+            custom_context = True
+        else:
+            _path = path
+            fileobj = None
+            custom_context = False
 
         try:
-            all_events = list(stream_output(build_output, output_stream))
-        except StreamOutputError as e:
-            raise BuildError(self, six.text_type(e))
+            build_output = builder.build(
+                path=_path,
+                tag=self.image_name,
+                rm=rm,
+                forcerm=force_rm,
+                pull=pull,
+                nocache=no_cache,
+                dockerfile=build_opts.get('dockerfile', None),
+                cache_from=self.get_cache_from(build_opts),
+                labels=build_opts.get('labels', None),
+                buildargs=build_args,
+                network_mode=build_opts.get('network', None),
+                target=build_opts.get('target', None),
+                shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
+                extra_hosts=build_opts.get('extra_hosts', None),
+                container_limits={
+                    'memory': parse_bytes(memory) if memory else None
+                },
+                gzip=gzip,
+                isolation=build_opts.get('isolation', self.options.get('isolation', None)),
+                platform=self.platform,
+                fileobj=fileobj,
+                custom_context=custom_context,
+            )
+
+            try:
+                all_events = list(stream_output(build_output, output_stream))
+            except StreamOutputError as e:
+                raise BuildError(self, six.text_type(e))
+
+        finally:
+            if fileobj is not None:
+                fileobj.close()
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -1722,7 +1739,7 @@ class _CLIBuilder(object):
     def __init__(self, progress):
         self._progress = progress
 
-    def build(self, path, tag=None, quiet=False, fileobj=None,
+    def build(self, path=None, tag=None, quiet=False, fileobj=None,
               nocache=False, rm=False, timeout=None,
               custom_context=False, encoding=None, pull=False,
               forcerm=False, dockerfile=None, container_limits=None,
@@ -1783,7 +1800,7 @@ class _CLIBuilder(object):
         Returns:
             A generator for the build output.
         """
-        if dockerfile:
+        if path and dockerfile:
             dockerfile = os.path.join(path, dockerfile)
         iidfile = tempfile.mktemp()
 
@@ -1799,11 +1816,14 @@ class _CLIBuilder(object):
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
-        args = command_builder.build([path])
+        args = command_builder.build([path or '-'])
 
         magic_word = "Successfully built "
         appear = False
-        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        with subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True) as p:
+            if fileobj:
+                p.stdin.write(fileobj.read().decode())
+            p.stdin.close()
             while True:
                 line = p.stdout.readline()
                 if not line:
