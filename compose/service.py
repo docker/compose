@@ -10,6 +10,7 @@ import sys
 import tempfile
 from collections import namedtuple
 from collections import OrderedDict
+from contextlib import contextmanager
 from operator import attrgetter
 
 import enum
@@ -1060,6 +1061,77 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
+    @contextmanager
+    def _prepare_build_args(
+            self,
+            no_cache=False,
+            pull=False,
+            force_rm=False,
+            memory=None,
+            build_args_override=None,
+            gzip=False,
+            rm=True,
+    ):
+        fileobj = None
+
+        try:
+            build_opts = self.options.get('build', {})
+
+            path = rewrite_build_path(build_opts.get('context'))
+            if os.path.isfile(path):
+                fileobj = open(path, 'rb')
+                custom_context = True
+                path = None
+            else:
+                fileobj = None
+                custom_context = False
+
+            build_args = build_opts.get('args', {}).copy()
+            if build_args_override:
+                build_args.update(build_args_override)
+            for k, v in self._parse_proxy_config().items():
+                build_args.setdefault(k, v)
+
+            shmsize = build_opts.get('shm_size')
+            if shmsize is not None:
+                shmsize = parse_bytes(shmsize)
+
+            if memory is not None:
+                memory = parse_bytes(memory)
+            container_limits = {
+                'memory': memory,
+            }
+
+            isolation = self.options.get('isolation', None)
+            isolation = build_opts.get('isolation', isolation)
+
+            yield {
+                'path': path,
+                'fileobj': fileobj,
+                'custom_context': custom_context,
+                'tag': self.image_name,
+                'rm': rm,
+                'forcerm': force_rm,
+                'pull': pull,
+                'nocache': no_cache,
+                'dockerfile': build_opts.get('dockerfile', None),
+                'cache_from': self.get_cache_from(build_opts),
+                'labels': build_opts.get('labels', None),
+                'buildargs': build_args,
+                'network_mode': build_opts.get('network', None),
+                'target': build_opts.get('target', None),
+                'shmsize': shmsize,
+                'extra_hosts': build_opts.get('extra_hosts', None),
+                'container_limits': container_limits,
+                'gzip': gzip,
+                'isolation': isolation,
+                'platform': self.platform,
+            }
+
+        finally:
+            if fileobj is not None:
+                fileobj.close()
+
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
               gzip=False, rm=True, silent=False, cli=False, progress=None):
         output_stream = open(os.devnull, 'w')
@@ -1067,16 +1139,6 @@ class Service(object):
             output_stream = sys.stdout
             log.info('Building %s' % self.name)
 
-        build_opts = self.options.get('build', {})
-
-        build_args = build_opts.get('args', {}).copy()
-        if build_args_override:
-            build_args.update(build_args_override)
-
-        for k, v in self._parse_proxy_config().items():
-            build_args.setdefault(k, v)
-
-        path = rewrite_build_path(build_opts.get('context'))
         if self.platform and version_lt(self.client.api_version, '1.35'):
             raise OperationFailedError(
                 'Impossible to perform platform-targeted builds for API version < 1.35'
@@ -1084,49 +1146,21 @@ class Service(object):
 
         builder = self.client if not cli else _CLIBuilder(progress)
 
-        if os.path.isfile(path):
-            _path = None
-            fileobj = open(path, 'rb')
-            custom_context = True
-        else:
-            _path = path
-            fileobj = None
-            custom_context = False
-
-        try:
-            build_output = builder.build(
-                path=_path,
-                tag=self.image_name,
-                rm=rm,
-                forcerm=force_rm,
-                pull=pull,
-                nocache=no_cache,
-                dockerfile=build_opts.get('dockerfile', None),
-                cache_from=self.get_cache_from(build_opts),
-                labels=build_opts.get('labels', None),
-                buildargs=build_args,
-                network_mode=build_opts.get('network', None),
-                target=build_opts.get('target', None),
-                shmsize=parse_bytes(build_opts.get('shm_size')) if build_opts.get('shm_size') else None,
-                extra_hosts=build_opts.get('extra_hosts', None),
-                container_limits={
-                    'memory': parse_bytes(memory) if memory else None
-                },
-                gzip=gzip,
-                isolation=build_opts.get('isolation', self.options.get('isolation', None)),
-                platform=self.platform,
-                fileobj=fileobj,
-                custom_context=custom_context,
-            )
+        with self._prepare_build_args(
+            no_cache=no_cache,
+            pull=pull,
+            force_rm=force_rm,
+            memory=memory,
+            build_args_override=build_args_override,
+            gzip=gzip,
+            rm=rm,
+        ) as kwargs:
+            build_output = builder.build(**kwargs)
 
             try:
                 all_events = list(stream_output(build_output, output_stream))
             except StreamOutputError as e:
                 raise BuildError(self, six.text_type(e))
-
-        finally:
-            if fileobj is not None:
-                fileobj.close()
 
         # Ensure the HTTP connection is not reused for another
         # streaming command, as the Docker daemon can sometimes
@@ -1820,7 +1854,12 @@ class _CLIBuilder(object):
 
         magic_word = "Successfully built "
         appear = False
-        with subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        with subprocess.Popen(
+                args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+        ) as p:
             if fileobj:
                 p.stdin.write(fileobj.read().decode())
             p.stdin.close()
