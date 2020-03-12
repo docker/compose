@@ -1169,6 +1169,7 @@ class Service(object):
 
         image_id = None
 
+        event = None
         for event in all_events:
             if 'stream' in event:
                 match = re.search(r'Successfully built ([0-9a-f]+)', event.get('stream', ''))
