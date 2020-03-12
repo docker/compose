@@ -8,7 +8,7 @@ from docker.errors import DockerException
 from docker.utils import parse_bytes as sdk_parse_bytes
 
 from .errors import StreamParseError
-from .timeparse import MULTIPLIERS
+from .timeparse import time_from_seconds
 from .timeparse import timeparse
 
 
@@ -101,7 +101,7 @@ def microseconds_from_time_nano(time_nano):
 
 
 def nanoseconds_from_time_seconds(time_seconds):
-    return int(time_seconds / MULTIPLIERS['nano'])
+    return int(time_from_seconds(time_seconds, unit='nano'))
 
 
 def parse_seconds_float(value):
@@ -109,9 +109,9 @@ def parse_seconds_float(value):
 
 
 def parse_nanoseconds_int(value):
-    parsed = timeparse(value or '')
-    if parsed is None:
+    if not value:
         return None
+    parsed = timeparse(value, exact=True)
     return nanoseconds_from_time_seconds(parsed)
 
 

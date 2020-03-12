@@ -31,17 +31,20 @@ https://golang.org/pkg/time/#ParseDuration
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import re
+from decimal import Decimal
 
-HOURS = r'(?P<hours>[\d.]+)h'
-MINS = r'(?P<mins>[\d.]+)m'
-SECS = r'(?P<secs>[\d.]+)s'
-MILLI = r'(?P<milli>[\d.]+)ms'
-MICRO = r'(?P<micro>[\d.]+)(?:us|µs)'
-NANO = r'(?P<nano>[\d.]+)ns'
+FLOAT_NUMBER = r"(?:\d+\.?\d*|\.\d+)"
+
+HOURS = r'(?P<hours>{})h'.format(FLOAT_NUMBER)
+MINS = r'(?P<mins>{})m'.format(FLOAT_NUMBER)
+SECS = r'(?P<secs>{})s'.format(FLOAT_NUMBER)
+MILLI = r'(?P<milli>{})ms'.format(FLOAT_NUMBER)
+MICRO = r'(?P<micro>{})(?:us|µs)'.format(FLOAT_NUMBER)
+NANO = r'(?P<nano>{})ns'.format(FLOAT_NUMBER)
 
 
 def opt(x):
-    return r'(?:{x})?'.format(x=x)
+    return r'(?:{})?'.format(x)
 
 
 TIMEFORMAT = r'{HOURS}{MINS}{SECS}{MILLI}{MICRO}{NANO}'.format(
@@ -53,17 +56,59 @@ TIMEFORMAT = r'{HOURS}{MINS}{SECS}{MILLI}{MICRO}{NANO}'.format(
     NANO=opt(NANO),
 )
 
+# You don't want to DIVIDE by the multipliers, that only causes imprecise math.
 MULTIPLIERS = {
-    'hours':   60 * 60,
-    'mins':    60,
-    'secs':    1,
-    'milli':   1.0 / 1000,
-    'micro':   1.0 / 1000.0 / 1000,
-    'nano':    1.0 / 1000.0 / 1000.0 / 1000.0,
+    'hours':    60 * 60,
+    'mins':     60,
+    'secs':     1,
+    # These are here for backwards compatibility, in case something externally was using this.
+    # They should be removed after making sure it isn't used.
+    'milli':    1. / 1000,
+    'micro':    1. / 1000. / 1000.,
+    'nano':     1. / 1000. / 1000. / 1000.,
+}
+
+INVERSE_MULTIPLIER = {
+    'secs':     1,
+    'milli':    1000,
+    'micro':    1000**2,
+    'nano':     1000**3,
 }
 
 
-def timeparse(sval):
+def time_to_seconds(value, unit):
+    """
+    Turn other units to seconds.
+
+    Arguments:
+        value  -- Numeric value
+        unit {str} -- One of 'hours', 'mins', 'secs', 'milli', 'micro', 'nano'
+
+    Returns:
+        Returns '{value} {unit}' to 'seconds'
+    """
+    if unit in INVERSE_MULTIPLIER:
+        return value / INVERSE_MULTIPLIER[unit]
+    return value * MULTIPLIERS[unit]
+
+
+def time_from_seconds(value, unit):
+    """
+    Turn seconds to other units.
+
+    Arguments:
+        value  -- Numeric value.
+        unit {str} -- One of 'hours', 'mins', 'secs', 'milli', 'micro', 'nano'
+
+    Returns:
+        Returns '`value` seconds' in '{`unit`}'
+    """
+    if unit in INVERSE_MULTIPLIER:
+        return value * INVERSE_MULTIPLIER[unit]
+    return value / MULTIPLIERS[unit]
+
+
+def timeparse(sval, exact=False):
     """Parse a time expression, returning it as a number of seconds.  If
     possible, the return value will be an `int`; if this is not
     possible, the return will be a `float`.  Returns `None` if a time
@@ -71,22 +116,15 @@ def timeparse(sval):
 
     Arguments:
     - `sval`: the string value to parse
-
-    >>> timeparse('1m24s')
-    84
-    >>> timeparse('1.2 minutes')
-    72
-    >>> timeparse('1.2 seconds')
-    1.2
+    - `exact`: If `True`, the return value is exact, using `decimal.Decimal`
     """
     match = re.match(r'\s*' + TIMEFORMAT + r'\s*$', sval, re.I)
     if not match or not match.group(0).strip():
-        return
-
+        return None
     mdict = match.groupdict()
-    return sum(
-        MULTIPLIERS[k] * cast(v) for (k, v) in mdict.items() if v is not None)
-
-
-def cast(value):
-    return int(value) if value.isdigit() else float(value)
+    dec = sum(
+        time_to_seconds(Decimal(v), unit=k) for (k, v) in mdict.items() if v is not None
+        )
+    if exact:
+        return dec
+    return float(dec)
