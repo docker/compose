@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import io
 import logging
+import tempfile
 
 import docker
 import pytest
@@ -14,8 +16,14 @@ from compose.cli.main import call_docker
 from compose.cli.main import convergence_strategy_from_opts
 from compose.cli.main import filter_attached_containers
 from compose.cli.main import get_docker_start_call
+from compose.cli.main import perform_command
 from compose.cli.main import setup_console_handler
 from compose.cli.main import warn_for_swarm_mode
+from compose.config.config import Config
+from compose.config.config import ConfigDetails
+from compose.config.config import ConfigFile
+from compose.config.environment import Environment
+from compose.const import COMPOSEFILE_V3_4
 from compose.service import ConvergenceStrategy
 from tests import mock
 
@@ -113,6 +121,161 @@ class TestCLIMainTestCase(object):
 
         container_options = build_one_off_container_options(options, detach, command)
         assert container_options == expected_container_options
+
+    @pytest.mark.parametrize('cli_build', [False, True])
+    def test_build_native_args_propagated(self, cli_build):
+        options = {
+            '--build-arg': ['MYVAR', 'ARG=123'],
+            '--no-cache': True,
+            '--pull': True,
+            '--force-rm': True,
+            '--memory': True,
+            '--compress': True,
+            '--parallel': True,
+            '--quiet': True,
+            '--progress': 'progress',
+            'SERVICE': ['service'],
+            'COMMAND': 'build',
+        }
+        env = Environment({
+            'MYVAR': 'MYVALUE',
+        })
+        if cli_build:
+            env['COMPOSE_DOCKER_CLI_BUILD'] = '1'
+        with mock.patch('compose.cli.main.TopLevelCommand.toplevel_environment', new=env), \
+                mock.patch('compose.cli.main.Environment.from_env_file', return_value=env), \
+                mock.patch('compose.project.Project.build') as mock_build, \
+                mock.patch('compose.cli.command.config.find') as mock_config_find, \
+                mock.patch('compose.cli.command.config.load') as mock_config_load:
+            mock_config_find.return_value = ConfigDetails(
+                working_dir='working_dir',
+                config_files=[ConfigFile(filename='config_file', config={})],
+                environment=env,
+            )
+            mock_config_load.return_value = Config(
+                version=COMPOSEFILE_V3_4,
+                services=[],
+                volumes={},
+                networks={},
+                secrets={},
+                configs={},
+            )
+            project = [None]
+
+            def handler(command, options):
+                project[0] = command.project
+                command.build(options)
+
+            perform_command(options, handler=handler, command_options=options)
+            assert mock_build.call_args == mock.call(
+                service_names=['service'],
+                no_cache=True,
+                pull=True,
+                force_rm=True,
+                memory=True,
+                rm=True,
+                build_args={'MYVAR': 'MYVALUE', 'ARG': '123'},
+                gzip=True,
+                parallel_build=True,
+                silent=True,
+                progress='progress',
+            )
+            assert project[0].native_build_enabled == bool(cli_build)
+
+    @pytest.mark.parametrize('cli_build', [False, True])
+    def test_build_native_builder_called(self, cli_build):
+        options = {
+            '--build-arg': ['MYVAR', 'ARG=123'],
+            '--no-cache': True,
+            '--pull': True,
+            '--force-rm': False,
+            '--memory': True,
+            '--compress': False,
+            '--parallel': False,
+            '--quiet': True,
+            '--progress': 'progress',
+            'SERVICE': ['service'],
+            'COMMAND': 'build',
+        }
+        env = Environment({
+            'MYVAR': 'MYVALUE',
+        })
+
+        if cli_build:
+            env['COMPOSE_DOCKER_CLI_BUILD'] = '1'
+            env['COMPOSE_DOCKER_CLI_BUILD_EXTRA_ARGS'] = '--extra0 --extra1=1'
+
+        iidfile = [None]
+
+        def mock_mktemp():
+            iidfile[0] = tempfile.mktemp()
+            with open(iidfile[0], 'w') as f:
+                f.write(':12345')
+            return iidfile[0]
+
+        with mock.patch('compose.cli.main.TopLevelCommand.toplevel_environment', new=env), \
+                mock.patch('compose.cli.main.Environment.from_env_file', return_value=env), \
+                mock.patch('compose.service.subprocess.Popen') as mock_subprocess_popen, \
+                mock.patch('compose.service.tempfile', new=mock.Mock(mktemp=mock_mktemp)), \
+                mock.patch('compose.cli.command.get_client') as mock_get_client, \
+                mock.patch('compose.cli.command.config.find') as mock_config_find, \
+                mock.patch('compose.cli.command.config.load') as mock_config_load:
+            mock_config_find.return_value = ConfigDetails(
+                working_dir='working_dir',
+                config_files=[ConfigFile(filename='config_file', config={})],
+                environment=env,
+            )
+            mock_config_load.return_value = Config(
+                version=COMPOSEFILE_V3_4,
+                services=[{
+                    'name': 'service',
+                    'build': {
+                        'context': '.',
+                    },
+                }],
+                volumes={},
+                networks={},
+                secrets={},
+                configs={},
+            )
+            mock_get_client.return_value.api_version = '1.35'
+            mock_build = mock_get_client.return_value.build
+            mock_build.return_value = \
+                mock_subprocess_popen.return_value.__enter__.return_value.stdout = \
+                io.StringIO('{"stream": "Successfully built 12345"}')
+
+            project = [None]
+
+            def handler(command, options):
+                project[0] = command.project
+                command.build(options)
+
+            perform_command(options, handler=handler, command_options=options)
+            if not cli_build:
+                assert mock_build.called
+                assert mock_build.call_args[1]['buildargs'] == {'MYVAR': 'MYVALUE', 'ARG': '123'}
+                assert mock_build.call_args[1]['pull']
+                assert mock_build.call_args[1]['nocache']
+                assert not mock_build.call_args[1]['forcerm']
+                assert not mock_build.call_args[1]['gzip']
+                assert not project[0].native_build_enabled
+            else:
+                assert mock_subprocess_popen.call_args[0][0] == [
+                    'docker',
+                    'build',
+                    '--build-arg', 'MYVAR=MYVALUE',
+                    '--build-arg', 'ARG=123',
+                    '--memory', 'True',
+                    '--no-cache',
+                    '--progress', 'progress',
+                    '--pull',
+                    '--tag', 'working_dir_service',
+                    '--iidfile', iidfile[0],
+                    '--extra0',
+                    '--extra1=1',
+                    '.',
+                ]
+                assert project[0].native_build_enabled
 
     def test_get_docker_start_call(self):
         container_id = 'my_container_id'

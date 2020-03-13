@@ -287,8 +287,6 @@ class TopLevelCommand(object):
                 )
             build_args = resolve_build_args(build_args, self.toplevel_environment)
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
-
         self.project.build(
             service_names=options['SERVICE'],
             no_cache=bool(options.get('--no-cache', False)),
@@ -300,7 +298,6 @@ class TopLevelCommand(object):
             gzip=options.get('--compress', False),
             parallel_build=options.get('--parallel', False),
             silent=options.get('--quiet', False),
-            cli=native_builder,
             progress=options.get('--progress'),
         )
 
@@ -1050,8 +1047,6 @@ class TopLevelCommand(object):
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
-
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)
 
@@ -1071,7 +1066,6 @@ class TopLevelCommand(object):
                     reset_container_image=rebuild,
                     renew_anonymous_volumes=options.get('--renew-anon-volumes'),
                     silent=options.get('--quiet-pull'),
-                    cli=native_builder,
                 )
 
             try:

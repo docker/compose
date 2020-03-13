@@ -39,6 +39,7 @@ from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.project import Project
+from compose.service import _CLIBuilder
 from compose.service import BuildAction
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
@@ -975,13 +976,15 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
+        builder = _CLIBuilder()
         service = self.create_service('web',
                                       build={'context': base_dir},
                                       environment={
                                           'COMPOSE_DOCKER_CLI_BUILD': '1',
                                           'DOCKER_BUILDKIT': '1',
-                                      })
-        service.build(cli=True)
+                                      },
+                                      builder=builder)
+        service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
 
@@ -1004,6 +1007,32 @@ class ServiceTest(DockerClientTestCase):
         containers = project.containers(['web'])
         assert len(containers) == 1
         assert containers[0].name.startswith('composetest_web_')
+
+    def test_up_build_cli_extra_args(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+            f.write("ARG HELLO=\n")
+            f.write("ENV WORLD ${HELLO}\n")
+
+        builder = _CLIBuilder([
+            lambda command_builder: command_builder.add_arg('--build-arg', 'HELLO=WORLD'),
+        ])
+        web = self.create_service('web',
+                                  build={'context': base_dir},
+                                  environment={
+                                      'COMPOSE_DOCKER_CLI_BUILD': '1',
+                                      'DOCKER_BUILDKIT': '1',
+                                  },
+                                  builder=builder)
+        project = Project('composetest', [web], self.client, builder=builder)
+        project.up(do_build=BuildAction.force)
+
+        containers = project.containers(['web'])
+        assert len(containers) == 1
+        assert containers[0].environment['WORLD'] == 'WORLD'
 
     def test_build_non_ascii_filename(self):
         base_dir = tempfile.mkdtemp()

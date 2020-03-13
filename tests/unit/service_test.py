@@ -27,6 +27,7 @@ from compose.container import Container
 from compose.errors import OperationFailedError
 from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
+from compose.service import _CLIBuilder
 from compose.service import build_ulimits
 from compose.service import build_volume_binding
 from compose.service import BuildAction
@@ -1095,6 +1096,44 @@ class ServiceTest(unittest.TestCase):
             override_options={},
         )
         assert override_opts['binds'] == [vol.repr() for vol in volumes]
+
+    def test_build_with_builder(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+        mock_builder = mock.create_autospec(_CLIBuilder)
+        mock_builder.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, build={'context': '.'},
+            builder=mock_builder,
+        )
+        service.build()
+
+        self.mock_client.build.assert_not_called()
+        mock_builder.build.assert_called()
+
+    def test_build_with_builder_progress_arg(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+        mock_builder = mock.create_autospec(_CLIBuilder)
+        mock_builder.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client, build={'context': '.'},
+            builder=mock_builder,
+        )
+        service.build(progress="progress")
+
+        self.mock_client.build.assert_not_called()
+        assert mock_builder.build.call_args[1]["progress"] == "progress"
 
 
 class TestServiceNetwork(unittest.TestCase):

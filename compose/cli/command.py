@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+import shlex
 
 import six
 
@@ -16,6 +17,7 @@ from ..const import LABEL_CONFIG_FILES
 from ..const import LABEL_ENVIRONMENT_FILE
 from ..const import LABEL_WORKING_DIR
 from ..project import Project
+from ..service import _CLIBuilder
 from .docker_client import get_client
 from .docker_client import load_context
 from .docker_client import make_context
@@ -142,6 +144,17 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
         verbose=verbose, version=api_version, context=context, environment=environment
     )
 
+    native_builder = environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
+    if native_builder:
+        native_builder_extra_args = environment.get('COMPOSE_DOCKER_CLI_BUILD_EXTRA_ARGS')
+        arg_modifiers = []
+        if native_builder_extra_args:
+            splitted_args = shlex.split(native_builder_extra_args)
+            arg_modifiers.append(lambda command_builder: command_builder.add_bare_args(*splitted_args))
+        builder = _CLIBuilder(arg_modifiers)
+    else:
+        builder = None
+
     with errors.handle_connection_errors(client):
         return Project.from_config(
             project_name,
@@ -149,6 +162,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
             client,
             environment.get('DOCKER_DEFAULT_PLATFORM'),
             execution_context_labels(config_details, environment_file),
+            builder=builder,
         )
 
 

@@ -69,13 +69,15 @@ class Project(object):
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None):
+    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None,
+                 builder=None):
         self.name = name
         self.services = services
         self.client = client
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
         self.config_version = config_version
+        self.builder = builder
 
     def labels(self, one_off=OneOffFilter.exclude, legacy=False):
         name = self.name
@@ -87,7 +89,8 @@ class Project(object):
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=None):
+    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=None,
+                    builder=None):
         """
         Construct a Project from a config.Config object.
         """
@@ -99,7 +102,7 @@ class Project(object):
             networks,
             use_networking)
         volumes = ProjectVolumes.from_config(name, config_data, client)
-        project = cls(name, [], client, project_networks, volumes, config_data.version)
+        project = cls(name, [], client, project_networks, volumes, config_data.version, builder=builder)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)
@@ -142,6 +145,7 @@ class Project(object):
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
                     extra_labels=extra_labels,
+                    builder=builder,
                     **service_dict)
             )
 
@@ -266,6 +270,10 @@ class Project(object):
 
         return PidMode(pid_mode)
 
+    @property
+    def native_build_enabled(self):
+        return self.builder is not None and self.builder is not self.client
+
     def start(self, service_names=None, **options):
         containers = []
 
@@ -362,7 +370,7 @@ class Project(object):
         return containers
 
     def build(self, service_names=None, no_cache=False, pull=False, force_rm=False, memory=None,
-              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False, cli=False,
+              build_args=None, gzip=False, parallel_build=False, rm=True, silent=False,
               progress=None):
 
         services = []
@@ -372,7 +380,7 @@ class Project(object):
             elif not silent:
                 log.info('%s uses an image, skipping' % service.name)
 
-        if cli:
+        if self.native_build_enabled:
             log.warning("Native build is an experimental feature and could change at any time")
             if parallel_build:
                 log.warning("Flag '--parallel' is ignored when building with "
@@ -382,7 +390,8 @@ class Project(object):
                             "COMPOSE_DOCKER_CLI_BUILD=1")
 
         def build_service(service):
-            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent, cli, progress)
+            service.build(no_cache, pull, force_rm, memory, build_args, gzip, rm, silent,
+                          progress=progress)
 
         if parallel_build:
             _, errors = parallel.parallel_execute(
@@ -527,10 +536,9 @@ class Project(object):
            reset_container_image=False,
            renew_anonymous_volumes=False,
            silent=False,
-           cli=False,
            ):
 
-        if cli:
+        if self.native_build_enabled:
             log.warning("Native build is an experimental feature and could change at any time")
 
         self.initialize()
@@ -545,7 +553,7 @@ class Project(object):
             include_deps=start_deps)
 
         for svc in services:
-            svc.ensure_image_exists(do_build=do_build, silent=silent, cli=cli)
+            svc.ensure_image_exists(do_build=do_build, silent=silent)
         plans = self._get_convergence_plans(
             services, strategy, always_recreate_deps=always_recreate_deps)
 

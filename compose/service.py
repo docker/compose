@@ -186,10 +186,12 @@ class Service(object):
             pid_mode=None,
             default_platform=None,
             extra_labels=None,
+            builder=None,
             **options
     ):
         self.name = name
         self.client = client
+        self.builder = client if builder is None else builder
         self.project = project
         self.use_networking = use_networking
         self.links = links or []
@@ -346,9 +348,9 @@ class Service(object):
             raise OperationFailedError("Cannot create container for service %s: %s" %
                                        (self.name, binarystr_to_unicode(ex.explanation)))
 
-    def ensure_image_exists(self, do_build=BuildAction.none, silent=False, cli=False):
+    def ensure_image_exists(self, do_build=BuildAction.none, silent=False):
         if self.can_be_built() and do_build == BuildAction.force:
-            self.build(cli=cli)
+            self.build()
             return
 
         try:
@@ -364,7 +366,7 @@ class Service(object):
         if do_build == BuildAction.skip:
             raise NeedsBuildError(self)
 
-        self.build(cli=cli)
+        self.build()
         log.warning(
             "Image for service {} was built because it did not already exist. To "
             "rebuild this image you must use `docker-compose build` or "
@@ -1060,8 +1062,12 @@ class Service(object):
 
         return [build_spec(secret) for secret in self.secrets]
 
+    @property
+    def native_build_enabled(self):
+        return self.builder is not self.client
+
     def build(self, no_cache=False, pull=False, force_rm=False, memory=None, build_args_override=None,
-              gzip=False, rm=True, silent=False, cli=False, progress=None):
+              gzip=False, rm=True, silent=False, progress=None):
         output_stream = open(os.devnull, 'w')
         if not silent:
             output_stream = sys.stdout
@@ -1082,8 +1088,8 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
-        builder = self.client if not cli else _CLIBuilder(progress)
-        build_output = builder.build(
+        extra = {"progress": progress} if self.native_build_enabled else {}
+        build_output = self.builder.build(
             path=path,
             tag=self.image_name,
             rm=rm,
@@ -1104,6 +1110,7 @@ class Service(object):
             gzip=gzip,
             isolation=build_opts.get('isolation', self.options.get('isolation', None)),
             platform=self.platform,
+            **extra
         )
 
         try:
@@ -1719,8 +1726,8 @@ def rewrite_build_path(path):
 
 
 class _CLIBuilder(object):
-    def __init__(self, progress):
-        self._progress = progress
+    def __init__(self, arg_modifiers=[]):
+        self._arg_modifiers = arg_modifiers
 
     def build(self, path, tag=None, quiet=False, fileobj=None,
               nocache=False, rm=False, timeout=None,
@@ -1729,7 +1736,7 @@ class _CLIBuilder(object):
               decode=False, buildargs=None, gzip=False, shmsize=None,
               labels=None, cache_from=None, target=None, network_mode=None,
               squash=None, extra_hosts=None, platform=None, isolation=None,
-              use_config_proxy=True):
+              use_config_proxy=True, progress=None):
         """
         Args:
             path (str): Path to the directory containing the Dockerfile
@@ -1794,11 +1801,13 @@ class _CLIBuilder(object):
         command_builder.add_flag("--force-rm", forcerm)
         command_builder.add_arg("--memory", container_limits.get("memory"))
         command_builder.add_flag("--no-cache", nocache)
-        command_builder.add_arg("--progress", self._progress)
+        command_builder.add_arg("--progress", progress)
         command_builder.add_flag("--pull", pull)
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
+        for arg_modifier in self._arg_modifiers:
+            arg_modifier(command_builder)
         args = command_builder.build([path])
 
         magic_word = "Successfully built "
@@ -1849,6 +1858,9 @@ class _CommandBuilder(object):
         if values:
             for val in values:
                 self._args.extend([name, val])
+
+    def add_bare_args(self, *args):
+        self._args.extend(args)
 
     def build(self, args):
         return self._args + args
