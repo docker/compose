@@ -2248,14 +2248,24 @@ services:
 
     def test_run_label_flag(self):
         self.base_dir = 'tests/fixtures/run-labels'
-        name = 'service'
-        self.dispatch(['run', '-l', 'default', '--label', 'foo=baz', name, '/bin/true'])
-        service = self.project.get_service(name)
+        self.dispatch(['build'])
+        self.dispatch(['run', '-l', 'default', '--label', 'foo=baz', 'from_image', '/bin/true'])
+        service = self.project.get_service('from_image')
         container, = service.containers(stopped=True, one_off=OneOffFilter.only)
         labels = container.labels
+
         assert labels['default'] == ''
         assert labels['foo'] == 'baz'
         assert labels['hello'] == 'world'
+
+        self.dispatch(['run', '-l', 'default', '--label', 'foo=baz', 'from_build', '/bin/true'])
+        service = self.project.get_service('from_build')
+        container, = service.containers(stopped=True, one_off=OneOffFilter.only)
+        labels = container.labels
+
+        assert labels['default'] == ''
+        assert labels['foo'] == 'baz'
+        assert labels['some_label'] == 'I am a label'
 
     def test_rm(self):
         service = self.project.get_service('simple')
