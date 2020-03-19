@@ -621,6 +621,26 @@ class ServiceTest(unittest.TestCase):
         call_args = self.mock_client.build.call_args
         assert call_args[1]['platform'] == 'linux'
 
+    def test_build_with_label(self):
+        self.mock_client.api_version = '1.35'
+        self.mock_client.build.return_value = [
+            b'{"stream": "Successfully built 12345"}',
+        ]
+
+        service = Service(
+            'foo', client=self.mock_client,
+            build={'labels': {'some_label': 'I am the label'}}
+        )
+        print('kanyaaaa')
+        print(dir(service.containers))
+        service.build()
+
+        assert self.mock_client.build.call_count == 1
+        print(dir(self.mock_client))
+        call_args = self.mock_client.build.call_args
+        assert call_args[1]['platform'] == 'linux'
+        """todo: Still need to figure out what to assert"""
+
     def test_service_platform_precedence(self):
         self.mock_client.api_version = '1.35'
 
