@@ -1,4 +1,4 @@
-// +build !darwin
+// +build !darwin,!windows
 
 package watch
 
