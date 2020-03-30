@@ -1,4 +1,4 @@
-// +build !darwin,!windows
+// +build !darwin
 
 package watch
 
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -92,6 +93,9 @@ func TestDontWatchEachFile(t *testing.T) {
 	f.events = nil
 
 	pid := os.Getpid()
+	if runtime.GOOS == "windows" {
+		return // skip the inotify count
+	}
 
 	output, err := exec.Command("bash", "-c", fmt.Sprintf(
 		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid)).Output()

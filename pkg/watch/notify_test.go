@@ -1,5 +1,3 @@
-// +build !windows
-
 package watch
 
 import (
@@ -41,6 +39,9 @@ func TestNoWatches(t *testing.T) {
 }
 
 func TestEventOrdering(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on windows for now")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -73,6 +74,9 @@ func TestEventOrdering(t *testing.T) {
 // of directories, creates files in them, then deletes
 // them all quickly. Make sure there are no errors.
 func TestGitBranchSwitch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on windows for now")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -143,10 +147,11 @@ func TestWatchesAreRecursive(t *testing.T) {
 	f.events = nil
 	// change sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	h, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
 
 	f.assertEvents(changeFilePath)
 }
@@ -168,10 +173,12 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	h, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer h.Close()
+
 	f.assertEvents(subPath, changeFilePath)
 }
 
@@ -278,6 +285,9 @@ func TestSingleFile(t *testing.T) {
 }
 
 func TestWriteBrokenLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Symlink creation requires admin privileges on Windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -292,6 +302,9 @@ func TestWriteBrokenLink(t *testing.T) {
 }
 
 func TestWriteGoodLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Symlink creation requires admin privileges on Windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -311,6 +324,9 @@ func TestWriteGoodLink(t *testing.T) {
 }
 
 func TestWatchBrokenLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Symlink creation requires admin privileges on Windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -339,6 +355,10 @@ func TestWatchBrokenLink(t *testing.T) {
 }
 
 func TestMoveAndReplace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on windows for now")
+	}
+
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/pkg/errors"
 	"github.com/windmilleng/fsnotify"
@@ -135,7 +136,7 @@ func (d *naiveNotify) loop() {
 	defer close(d.wrappedEvents)
 	for e := range d.events {
 		if e.Op&fsnotify.Create != fsnotify.Create {
-			if d.shouldNotify(e.Name) {
+			if d.shouldNotify(e.Name) && !isSpuriousWindowsDirChange(e) {
 				d.wrappedEvents <- FileEvent{e.Name}
 			}
 			continue
@@ -260,6 +261,22 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	}
 
 	return wmw, nil
+}
+
+// Windows' inotify implementation sometimes fires
+// of spurious WRITE events on directories when the
+// files inside change.
+func isSpuriousWindowsDirChange(e fsnotify.Event) bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+
+	if e.Op != fsnotify.Write {
+		return false
+	}
+
+	eIsDir, _ := isDir(e.Name)
+	return eIsDir
 }
 
 func isDir(pth string) (bool, error) {
