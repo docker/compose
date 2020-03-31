@@ -1792,6 +1792,7 @@ class _CLIBuilder(object):
         command_builder.add_list("--cache-from", cache_from)
         command_builder.add_arg("--file", dockerfile)
         command_builder.add_flag("--force-rm", forcerm)
+        command_builder.add_params("--label", labels)
         command_builder.add_arg("--memory", container_limits.get("memory"))
         command_builder.add_flag("--no-cache", nocache)
         command_builder.add_arg("--progress", self._progress)
