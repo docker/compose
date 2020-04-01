@@ -16,6 +16,7 @@ import (
 
 func MapToKubernetesObjects(model *compose.Project) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
+
 	for _, service := range model.Services {
 		objects[fmt.Sprintf("%s-service.yaml", service.Name)] = mapToService(model, service)
 		if service.Deploy != nil && service.Deploy.Mode == "global" {
@@ -53,6 +54,10 @@ func mapToService(model *compose.Project, service types.ServiceConfig) *core.Ser
 	}
 
 	return &core.Service{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Name: service.Name,
 		},
@@ -92,13 +97,22 @@ func mapToDeployment(service types.ServiceConfig, model *compose.Project) (*apps
 	if err != nil {
 		return nil, err
 	}
-
+	selector := new(meta.LabelSelector)
+	selector.MatchLabels = make(map[string]string)
+	for key, val := range labels {
+		selector.MatchLabels[key] = val
+	}
 	return &apps.Deployment{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:   service.Name,
 			Labels: labels,
 		},
 		Spec: apps.DeploymentSpec{
+			Selector: selector,
 			Replicas: toReplicas(service.Deploy),
 			Strategy: toDeploymentStrategy(service.Deploy),
 			Template: podTemplate,
