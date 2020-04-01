@@ -8,13 +8,12 @@ import (
 
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/helm-prototype/pkg/compose"
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func loadYAML(yaml string) (*compose.Project, error) {
+func loadYAML(yaml string) (*loader.Config, error) {
 	dict, err := loader.ParseYAML([]byte(yaml))
 	if err != nil {
 		return nil, err
@@ -23,12 +22,17 @@ func loadYAML(yaml string) (*compose.Project, error) {
 	if err != nil {
 		panic(err)
 	}
-	return compose.NewProject(types.ConfigDetails{
-		WorkingDir: workingDir,
-		ConfigFiles: []types.ConfigFile{
-			{Filename: "compose.yaml", Config: dict},
-		},
-	}, "test")
+	configs := ConfigFiles: []types.ConfigFile{
+		{Filename: "compose.yaml", Config: dict},
+	},
+
+	config := types.ConfigDetails{
+		WorkingDir:  workingDir,
+		ConfigFiles: configs,
+		Environment: utils.Environment(),
+	}
+	model, err := loader.Load(config)
+	return model
 }
 
 func podTemplate(t *testing.T, yaml string) apiv1.PodTemplateSpec {
@@ -38,11 +42,12 @@ func podTemplate(t *testing.T, yaml string) apiv1.PodTemplateSpec {
 }
 
 func podTemplateWithError(yaml string) (apiv1.PodTemplateSpec, error) {
-	project, err := loadYAML(yaml)
+	model, err := loadYAML(yaml)
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
 	}
-	return toPodTemplate(project.Services[0], nil, project)
+
+	return toPodTemplate(model.Services[0], nil, model)
 }
 
 func TestToPodWithDockerSocket(t *testing.T) {

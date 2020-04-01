@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/helm-prototype/pkg/compose"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,19 +13,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func MapToKubernetesObjects(model *compose.Project) (map[string]runtime.Object, error) {
+func MapToKubernetesObjects(model *types.Config, name string) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
 
 	for _, service := range model.Services {
 		objects[fmt.Sprintf("%s-service.yaml", service.Name)] = mapToService(model, service)
 		if service.Deploy != nil && service.Deploy.Mode == "global" {
-			daemonset, err := mapToDaemonset(service, model)
+			daemonset, err := mapToDaemonset(service, model, name)
 			if err != nil {
 				return nil, err
 			}
 			objects[fmt.Sprintf("%s-daemonset.yaml", service.Name)] = daemonset
 		} else {
-			deployment, err := mapToDeployment(service, model)
+			deployment, err := mapToDeployment(service, model, name)
 			if err != nil {
 				return nil, err
 			}
@@ -41,7 +40,7 @@ func MapToKubernetesObjects(model *compose.Project) (map[string]runtime.Object, 
 	return objects, nil
 }
 
-func mapToService(model *compose.Project, service types.ServiceConfig) *core.Service {
+func mapToService(model *types.Config, service types.ServiceConfig) *core.Service {
 	ports := []core.ServicePort{}
 	for _, p := range service.Ports {
 		ports = append(ports,
@@ -69,7 +68,7 @@ func mapToService(model *compose.Project, service types.ServiceConfig) *core.Ser
 	}
 }
 
-func mapServiceToServiceType(service types.ServiceConfig, model *compose.Project) core.ServiceType {
+func mapServiceToServiceType(service types.ServiceConfig, model *types.Config) core.ServiceType {
 	serviceType := core.ServiceTypeClusterIP
 	if len(service.Networks) == 0 {
 		// service is implicitly attached to "default" network
@@ -88,10 +87,10 @@ func mapServiceToServiceType(service types.ServiceConfig, model *compose.Project
 	return serviceType
 }
 
-func mapToDeployment(service types.ServiceConfig, model *compose.Project) (*apps.Deployment, error) {
+func mapToDeployment(service types.ServiceConfig, model *types.Config, name string) (*apps.Deployment, error) {
 	labels := map[string]string{
 		"com.docker.compose.service": service.Name,
-		"com.docker.compose.project": model.Name,
+		"com.docker.compose.project": name,
 	}
 	podTemplate, err := toPodTemplate(service, labels, model)
 	if err != nil {
@@ -120,10 +119,10 @@ func mapToDeployment(service types.ServiceConfig, model *compose.Project) (*apps
 	}, nil
 }
 
-func mapToDaemonset(service types.ServiceConfig, model *compose.Project) (*apps.DaemonSet, error) {
+func mapToDaemonset(service types.ServiceConfig, model *types.Config, name string) (*apps.DaemonSet, error) {
 	labels := map[string]string{
 		"com.docker.compose.service": service.Name,
-		"com.docker.compose.project": model.Name,
+		"com.docker.compose.project": name,
 	}
 	podTemplate, err := toPodTemplate(service, labels, model)
 	if err != nil {

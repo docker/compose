@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/helm-prototype/pkg/compose"
 
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
@@ -30,7 +29,7 @@ func hasPersistentVolumes(s types.ServiceConfig) bool {
 	return false
 }
 
-func toVolumeSpecs(s types.ServiceConfig, model *compose.Project) ([]volumeSpec, error) {
+func toVolumeSpecs(s types.ServiceConfig, model *types.Config) ([]volumeSpec, error) {
 	var specs []volumeSpec
 	for i, m := range s.Volumes {
 		var source *apiv1.VolumeSource
@@ -114,7 +113,7 @@ func or(v string, defaultValue string) string {
 	return defaultValue
 }
 
-func toVolumeMounts(s types.ServiceConfig, model *compose.Project) ([]apiv1.VolumeMount, error) {
+func toVolumeMounts(s types.ServiceConfig, model *types.Config) ([]apiv1.VolumeMount, error) {
 	var mounts []apiv1.VolumeMount
 	specs, err := toVolumeSpecs(s, model)
 	if err != nil {
@@ -126,7 +125,7 @@ func toVolumeMounts(s types.ServiceConfig, model *compose.Project) ([]apiv1.Volu
 	return mounts, nil
 }
 
-func toVolumes(s types.ServiceConfig, model *compose.Project) ([]apiv1.Volume, error) {
+func toVolumes(s types.ServiceConfig, model *types.Config) ([]apiv1.Volume, error) {
 	var volumes []apiv1.Volume
 	specs, err := toVolumeSpecs(s, model)
 	if err != nil {

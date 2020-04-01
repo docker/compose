@@ -1,4 +1,4 @@
-package compose
+package utils
 
 const (
 	LabelDockerComposePrefix = "com.docker.compose"

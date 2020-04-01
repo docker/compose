@@ -1,11 +1,11 @@
-package compose
+package utils
 
 import (
 	"fmt"
 	"strings"
 )
 
-func combine(errors []error) error {
+func CombineErrors(errors []error) error {
 	if len(errors) == 0 {
 		return nil
 	}

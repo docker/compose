@@ -9,7 +9,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/helm-prototype/pkg/compose"
 
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
@@ -17,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, model *compose.Project) (apiv1.PodTemplateSpec, error) {
+func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, model *types.Config) (apiv1.PodTemplateSpec, error) {
 	tpl := apiv1.PodTemplateSpec{}
 	nodeAffinity, err := toNodeAffinity(serviceConfig.Deploy)
 	if err != nil {
