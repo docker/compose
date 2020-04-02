@@ -37,7 +37,7 @@ home:
 		Name string
 	}
 	var chartData bytes.Buffer
-	_ = t.Execute(&chartData, ChartDetails{project})
+	_ = t.Execute(&chartData, ChartDetails{Name: project})
 
 	if err := out.Write("Chart.yaml", chartData.Bytes()); err != nil {
 		return err
