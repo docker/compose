@@ -238,7 +238,11 @@ class Service(object):
         for container in self.containers(labels=['{0}={1}'.format(LABEL_CONTAINER_NUMBER, number)]):
             return container
 
-        raise ValueError("No container found for %s_%s" % (self.name, number))
+        container_name = "%s_%s" % (self.name, number)
+        if self.custom_container_name:
+            container_name = self.custom_container_name
+
+        raise ValueError("No container found for %s" % (container_name))
 
     def start(self, **options):
         containers = self.containers(stopped=True)
