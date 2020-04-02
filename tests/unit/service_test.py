@@ -388,8 +388,19 @@ class ServiceTest(unittest.TestCase):
         self.mock_client.containers.return_value = []
         service = Service('foo', client=self.mock_client, image='foo')
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as ex:
             service.get_container()
+        assert str(ex.value) == 'No container found for foo_1'
+
+    def test_get_container_not_found_custom_name(self):
+        self.mock_client.containers.return_value = []
+        service = Service(
+            'foo', client=self.mock_client, image='foo', container_name='custom_foo'
+        )
+
+        with pytest.raises(ValueError) as ex:
+            service.get_container()
+        assert str(ex.value) == 'No container found for custom_foo'
 
     @mock.patch('compose.service.Container', autospec=True)
     def test_get_container(self, mock_container_class):
