@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+
+#
+# Downloads and installs protobuf
+#
+set -eu -o pipefail
+
+PROTOBUF_VERSION=3.11.4
+GOARCH=$(go env GOARCH)
+GOOS=$(go env GOOS)
+PROTOBUF_DIR=$(mktemp -d)
+
+case $GOARCH in
+
+arm64)
+	wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch64.zip"
+	unzip $PROTOBUF_DIR/protobuf -d /usr/local
+	;;
+
+amd64|386)
+	if [ "$GOOS" = windows ]; then
+		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
+	elif [ "$GOOS" = linux ]; then
+		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
+	fi
+	unzip $PROTOBUF_DIR/protobuf -d /usr/local
+	;;
+
+ppc64le)
+	wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-ppcle_64.zip"
+	unzip $PROTOBUF_DIR/protobuf -d /usr/local
+	;;
+*)
+	wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
+	unzip $PROTOBUF_DIR/protobuf -d /usr/src/protobuf
+	cd /usr/src/protobuf/protobuf-$PROTOBUF_VERSION
+	./autogen.sh
+	./configure --disable-shared
+	make
+	make check
+	make install
+	ldconfig
+	;;
+esac
+rm -rf $PROTOBUF_DIR
