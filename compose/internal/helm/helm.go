@@ -3,9 +3,9 @@ package helm
 import (
 	"errors"
 	"log"
-	"os"
 
 	action "helm.sh/helm/v3/pkg/action"
+	chart "helm.sh/helm/v3/pkg/chart"
 	loader "helm.sh/helm/v3/pkg/chart/loader"
 	env "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
@@ -28,7 +28,7 @@ func NewHelmActions(settings *env.EnvSettings) *HelmActions {
 	}
 }
 
-func (hc *HelmActions) InitKubeClient() error {
+func (hc *HelmActions) initKubeClient() error {
 	if hc.kube_conn_init {
 		return nil
 	}
@@ -47,20 +47,17 @@ func (hc *HelmActions) InitKubeClient() error {
 	return nil
 }
 
-func (hc *HelmActions) Install(name, chartpath string) error {
-	hc.InitKubeClient()
-
-	if chartpath == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil
-		}
-		chartpath = cwd
-	}
+func (hc *HelmActions) InstallChartFromDir(name string, chartpath string) error {
 	chart, err := loader.Load(chartpath)
 	if err != nil {
-		return nil
+		return err
 	}
+	return hc.InstallChart(name, chart)
+}
+
+func (hc *HelmActions) InstallChart(name string, chart *chart.Chart) error {
+	hc.initKubeClient()
+
 	actInstall := action.NewInstall(hc.Config)
 	actInstall.ReleaseName = name
 	actInstall.Namespace = hc.Settings.Namespace()
@@ -75,7 +72,7 @@ func (hc *HelmActions) Install(name, chartpath string) error {
 }
 
 func (hc *HelmActions) Uninstall(name string) error {
-	hc.InitKubeClient()
+	hc.initKubeClient()
 	release, err := hc.Get(name)
 	if err != nil {
 		return err
@@ -93,7 +90,7 @@ func (hc *HelmActions) Uninstall(name string) error {
 }
 
 func (hc *HelmActions) Get(name string) (*release.Release, error) {
-	hc.InitKubeClient()
+	hc.initKubeClient()
 
 	actGet := action.NewGet(hc.Config)
 	return actGet.Run(name)

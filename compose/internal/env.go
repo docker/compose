@@ -6,7 +6,11 @@ import (
 
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/helm-prototype/pkg/compose/internal/helm"
+	"github.com/docker/helm-prototype/pkg/compose/internal/kube"
 	"github.com/docker/helm-prototype/pkg/compose/internal/utils"
+	chart "helm.sh/helm/v3/pkg/chart"
+	util "helm.sh/helm/v3/pkg/chartutil"
 )
 
 // Kind is "kubernetes" or "docker"
@@ -67,4 +71,21 @@ func GetConfig(name string, configPaths []string) (*types.Config, string, error)
 		return nil, "", err
 	}
 	return config, workingDir, nil
+}
+
+func GetChartInMemory(config *types.Config, name string) (*chart.Chart, error) {
+	objects, err := kube.MapToKubernetesObjects(config, name)
+	if err != nil {
+		return nil, err
+	}
+	//in memory files
+	return helm.ConvertToChart(name, objects)
+}
+
+func SaveChart(config *types.Config, name, dest string) error {
+	chart, err := GetChartInMemory(config, name)
+	if err != nil {
+		return err
+	}
+	return util.SaveDir(chart, dest)
 }

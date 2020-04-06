@@ -4,20 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	chart "helm.sh/helm/v3/pkg/chart"
+	loader "helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func Write(project string, objects map[string]runtime.Object, target string) error {
-	out := Outputer{target}
+func ConvertToChart(name string, objects map[string]runtime.Object) (*chart.Chart, error) {
 
-	if err := out.Write("README.md", []byte("This chart was created by converting a Compose file")); err != nil {
-		return err
-	}
+	files := []*loader.BufferedFile{
+		&loader.BufferedFile{
+			Name: "README.md",
+			Data: []byte("This chart was created by converting a Compose file"),
+		}}
 
 	chart := `name: {{.Name}}
 description: A generated Helm Chart for {{.Name}} from Skippbox Kompose
@@ -31,42 +33,35 @@ home:
 
 	t, err := template.New("ChartTmpl").Parse(chart)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	type ChartDetails struct {
 		Name string
 	}
 	var chartData bytes.Buffer
-	_ = t.Execute(&chartData, ChartDetails{Name: project})
+	_ = t.Execute(&chartData, ChartDetails{Name: name})
 
-	if err := out.Write("Chart.yaml", chartData.Bytes()); err != nil {
-		return err
-	}
+	files = append(files, &loader.BufferedFile{
+		Name: "Chart.yaml",
+		Data: chartData.Bytes(),
+	})
 
 	for name, o := range objects {
 		j, err := json.Marshal(o)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		b, err := jsonToYaml(j, 2)
+		buf, err := jsonToYaml(j, 2)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if err := out.Write(filepath.Join("templates", name), b); err != nil {
-			return err
-		}
+		files = append(files, &loader.BufferedFile{
+			Name: filepath.Join("templates", name),
+			Data: buf,
+		})
+
 	}
-	return nil
-}
-
-type Outputer struct {
-	Dir string
-}
-
-func (o Outputer) Write(path string, content []byte) error {
-	out := filepath.Join(o.Dir, path)
-	os.MkdirAll(filepath.Dir(out), 0744)
-	return ioutil.WriteFile(out, content, 0644)
+	return loader.LoadFiles(files)
 }
 
 // Convert JSON to YAML.
@@ -90,7 +85,4 @@ func jsonToYaml(j []byte, spaces int) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
-
-	// Marshal this object into YAML.
-	// return yaml.Marshal(jsonObj)
 }

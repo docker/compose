@@ -1,12 +1,12 @@
 package compose
 
 import (
-	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	internal "github.com/docker/helm-prototype/pkg/compose/internal"
 	"github.com/docker/helm-prototype/pkg/compose/internal/helm"
-	"github.com/docker/helm-prototype/pkg/compose/internal/kube"
 )
 
 var Settings = internal.GetDefault()
@@ -41,26 +41,27 @@ func Load(name string, configpaths []string) (*ComposeProject, error) {
 }
 
 func (cp *ComposeProject) GenerateChart(dirname string) error {
-	objects, err := kube.MapToKubernetesObjects(cp.config, cp.Name)
-	if err != nil {
-		return err
+	if dirname == "" {
+		dirname = cp.config.Filename
+		if strings.Contains(dirname, ".") {
+			splits := strings.SplitN(dirname, ".", 2)
+			dirname = splits[0]
+		}
 	}
-	err = helm.Write(cp.Name, objects, dirname)
-	if err != nil {
-		return err
-	}
-	return nil
+	name := filepath.Base(dirname)
+	dirname = filepath.Dir(dirname)
+	return internal.SaveChart(cp.config, name, dirname)
 }
 
 func (cp *ComposeProject) Install(name, path string) error {
-	if path == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		path = cwd
+	if path != "" {
+		return cp.helm.InstallChartFromDir(name, path)
 	}
-	return cp.helm.Install(name, path)
+	chart, err := internal.GetChartInMemory(cp.config, name)
+	if err != nil {
+		return err
+	}
+	return cp.helm.InstallChart(name, chart)
 }
 
 func (cp *ComposeProject) Uninstall(name string) error {
