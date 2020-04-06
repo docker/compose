@@ -57,6 +57,7 @@ func (cp *ComposeProject) Install(name, path string) error {
 	if path != "" {
 		return cp.helm.InstallChartFromDir(name, path)
 	}
+
 	chart, err := internal.GetChartInMemory(cp.config, name)
 	if err != nil {
 		return err
