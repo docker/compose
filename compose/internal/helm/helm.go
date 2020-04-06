@@ -69,10 +69,9 @@ func (hc *HelmActions) Install(name, chartpath string) error {
 	if err != nil {
 		return err
 	}
-
-	println("Release status: ", release.Info.Status)
-	println("Release description: ", release.Info.Description)
-	return hc.Config.Releases.Update(release)
+	log.Println("Release status: ", release.Info.Status)
+	log.Println(release.Info.Description)
+	return nil
 }
 
 func (hc *HelmActions) Uninstall(name string) error {
@@ -85,8 +84,12 @@ func (hc *HelmActions) Uninstall(name string) error {
 		return errors.New("No release found with the name provided.")
 	}
 	actUninstall := action.NewUninstall(hc.Config)
-	_, err = actUninstall.Run(name)
-	return err
+	response, err := actUninstall.Run(name)
+	if err != nil {
+		return err
+	}
+	log.Println(response.Release.Info.Description)
+	return nil
 }
 
 func (hc *HelmActions) Get(name string) (*release.Release, error) {

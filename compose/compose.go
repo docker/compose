@@ -3,46 +3,56 @@ package compose
 import (
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	internal "github.com/docker/helm-prototype/pkg/compose/internal"
+	"github.com/docker/helm-prototype/pkg/compose/internal/helm"
+	"github.com/docker/helm-prototype/pkg/compose/internal/kube"
 )
-
-type ProjectOptions struct {
-	ConfigPaths []string
-	Name        string
-}
 
 var Settings = internal.GetDefault()
 
-type ComposeAPI struct {
-	project *internal.Project
+type ComposeProject struct {
+	config     *types.Config
+	helm       *helm.HelmActions
+	ProjectDir string
+	Name       string `yaml:"-" json:"-"`
 }
 
-// projectFromOptions load a compose project based on command line options
-func ProjectFromOptions(options *ProjectOptions) (*ComposeAPI, error) {
-	if options == nil {
-		options = &ProjectOptions{
-			ConfigPaths: []string{},
-			Name:        "docker-compose",
-		}
-	}
+type ComposeResult struct {
+	Info       string
+	Status     string
+	Descriptin string
+}
 
-	if options.Name == "" {
-		options.Name = "docker-compose"
+func Load(name string, configpaths []string) (*ComposeProject, error) {
+	if name == "" {
+		name = "docker-compose"
 	}
-
-	project, err := internal.GetProject(options.Name, options.ConfigPaths)
+	model, workingDir, err := internal.GetConfig(name, configpaths)
 	if err != nil {
 		return nil, err
 	}
-
-	return &ComposeAPI{project: project}, nil
+	return &ComposeProject{
+		config:     model,
+		helm:       helm.NewHelmActions(nil),
+		ProjectDir: workingDir,
+		Name:       name,
+	}, nil
 }
 
-func (c *ComposeAPI) GenerateChart(dirname string) error {
-	return c.project.ExportToCharts(dirname)
+func (cp *ComposeProject) GenerateChart(dirname string) error {
+	objects, err := kube.MapToKubernetesObjects(cp.config, cp.Name)
+	if err != nil {
+		return err
+	}
+	err = helm.Write(cp.Name, objects, dirname)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (c *ComposeAPI) Install(name, path string) error {
+func (cp *ComposeProject) Install(name, path string) error {
 	if path == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -50,9 +60,9 @@ func (c *ComposeAPI) Install(name, path string) error {
 		}
 		path = cwd
 	}
-	return c.project.Install(name, path)
+	return cp.helm.Install(name, path)
 }
 
-func (c *ComposeAPI) Uninstall(name string) error {
-	return c.project.Uninstall(name)
+func (cp *ComposeProject) Uninstall(name string) error {
+	return cp.helm.Uninstall(name)
 }
