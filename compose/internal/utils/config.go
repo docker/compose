@@ -20,13 +20,11 @@ func GetConfigs(name string, configPaths []string) (string, []types.ConfigFile, 
 	if err != nil {
 		return "", nil, err
 	}
+	workingDir := filepath.Dir(configPath[0])
 
 	if name == "" {
 		name = os.Getenv("COMPOSE_PROJECT_NAME")
 	}
-
-	workingDir := filepath.Dir(configPath[0])
-
 	if name == "" {
 		r := regexp.MustCompile(`[^a-z0-9\\-_]+`)
 		name = r.ReplaceAllString(strings.ToLower(filepath.Base(workingDir)), "")

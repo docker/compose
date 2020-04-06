@@ -6,15 +6,11 @@ import (
 )
 
 func Environment() map[string]string {
-	return getAsEqualsMap(os.Environ())
-}
-
-// getAsEqualsMap split key=value formatted strings into a key : value map
-func getAsEqualsMap(em []string) map[string]string {
-	m := make(map[string]string)
-	for _, v := range em {
-		kv := strings.SplitN(v, "=", 2)
-		m[kv[0]] = kv[1]
+	vars := make(map[string]string)
+	env := os.Environ()
+	for _, v := range env {
+		k := strings.SplitN(v, "=", 2)
+		vars[k[0]] = k[1]
 	}
-	return m
+	return vars
 }
