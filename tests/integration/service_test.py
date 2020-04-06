@@ -995,12 +995,76 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web',
                                       build={
                                           'context': base_dir,
-                                          'labels': {'com.docker.compose.test': 'true'}},
-                                      )
+                                          'labels': {'com.docker.compose.test': 'true'}})
+
         service.build(cli=True)
         self.addCleanup(self.client.remove_image, service.image_name)
         image = self.client.inspect_image('composetest_web')
+
         assert image['Config']['Labels']['com.docker.compose.test']
+
+    def test_build_cli_with_build_args(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+            f.write("ARG build_version\n")
+            f.write("RUN echo ${build_version}\n")
+
+        service = self.create_service('buildwithargs',
+                                      build={'context': text_type(base_dir),
+                                             'args': {"build_version": "1"}})
+
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        image = self.client.inspect_image('composetest_buildwithargs')
+
+        assert image
+        assert "build_version=1" in image['ContainerConfig']['Cmd']
+
+    @v2_3_only()
+    @no_cluster('Not supported on UCP 2.2.0-beta1')  # FIXME: remove once support is added
+    def test_build_cli_with_target(self):
+        self.require_api_version('1.30')
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('FROM busybox as one\n')
+            f.write('LABEL com.docker.compose.test=true\n')
+            f.write('LABEL com.docker.compose.test.target=one\n')
+            f.write('FROM busybox as two\n')
+            f.write('LABEL com.docker.compose.test.target=two\n')
+
+        service = self.create_service('buildtarget',
+                                      build={'context': text_type(base_dir),
+                                             'target': 'one'})
+
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        image = self.client.inspect_image('composetest_buildtarget')
+
+        assert image
+        assert image['Config']['Labels']['com.docker.compose.test.target'] == 'one'
+
+    @v3_only()
+    def test_build_cli_with_cachefrom(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('buildcachefrom',
+                                      build={'context': base_dir,
+                                             'cache_from': ['build1']})
+
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        image = self.client.inspect_image('composetest_buildcachefrom')
+
+        assert image
 
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()
