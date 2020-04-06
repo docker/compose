@@ -27,11 +27,16 @@ PACKAGES=$(shell go list ./... | grep -v /vendor/)
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 GOOS ?= $(shell go env GOOS)
 
+export GO111MODULE=off
+
 all: protos
 
 protos:
 	@protobuild --quiet ${PACKAGES}
 
+example:
+	cd example/backend && go build -v -o ../../bin/backend-example
+
 FORCE:
 
-.PHONY: protos
+.PHONY: protos example

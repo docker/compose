@@ -10,3 +10,12 @@ to install the correct version of protobufs on your system and get the protobuil
 ```bash
 > make
 ```
+
+## Build the example backend
+
+The example backend code is located in `/example/backend`.
+Build the service with the resulting binary placed in the `/bin` directory.
+
+```bash
+> make example
+```
