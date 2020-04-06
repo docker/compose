@@ -25,49 +25,39 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package client
+package main
 
 import (
-	"context"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	v1 "github.com/docker/api/backend/v1"
-	"google.golang.org/grpc"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
-// NewContext is a context that is canceled when a signal is
-// sent to the process
-func NewContext() (context.Context, func()) {
-	ctx, cancel := context.WithCancel(context.Background())
-	s := make(chan os.Signal)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-s
-		cancel()
-	}()
-	return ctx, cancel
-}
-
-// New returns a GRPC client
-func New(address string, timeout time.Duration) (*Client, error) {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(timeout))
-	if err != nil {
-		return nil, err
+func main() {
+	app := cli.NewApp()
+	app.Name = "docker"
+	app.Usage = "Docker for the 2020s"
+	app.UseShortOptionHandling = true
+	app.EnableBashCompletion = true
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "enable debug output in the logs",
+		},
 	}
-	return &Client{
-		conn:          conn,
-		BackendClient: v1.NewBackendClient(conn),
-	}, nil
-}
-
-type Client struct {
-	conn *grpc.ClientConn
-	v1.BackendClient
-}
-
-func (c *Client) Close() error {
-	return c.conn.Close()
+	app.Before = func(clix *cli.Context) error {
+		if clix.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		return nil
+	}
+	app.Commands = []cli.Command{
+		contextCommand,
+	}
+	if err := app.Run(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

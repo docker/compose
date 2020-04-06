@@ -32,12 +32,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 
+	v1 "github.com/docker/api/backend/v1"
+	"github.com/docker/api/client"
 	"github.com/docker/api/server"
 	_ "github.com/gogo/googleapis/google/rpc"
-	_ "github.com/gogo/protobuf/types"
+	"github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -67,7 +67,7 @@ func main() {
 		return nil
 	}
 	app.Action = func(clix *cli.Context) error {
-		ctx, cancel := cancelContext()
+		ctx, cancel := client.NewContext()
 		defer cancel()
 
 		// create a new GRPC server with the provided server package
@@ -79,6 +79,12 @@ func main() {
 			return errors.Wrap(err, "listen tcp")
 		}
 		defer l.Close()
+
+		// create our instance of the backend server implementation
+		backend := &backend{}
+
+		// register our instance with the GRPC server
+		v1.RegisterBackendServer(s, backend)
 
 		// handle context being closed or canceled
 		go func() {
@@ -98,15 +104,11 @@ func main() {
 	}
 }
 
-// cancelContext is a context that is canceled when a signal is
-// sent to the process
-func cancelContext() (context.Context, func()) {
-	ctx, cancel := context.WithCancel(context.Background())
-	s := make(chan os.Signal)
-	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
-	go func() {
-		<-s
-		cancel()
-	}()
-	return ctx, cancel
+type backend struct {
+}
+
+func (b *backend) BackendInformation(ctx context.Context, _ *types.Empty) (*v1.BackendInformationResponse, error) {
+	return &v1.BackendInformationResponse{
+		ID: "com.docker.api.backend.example.v1",
+	}, nil
 }
