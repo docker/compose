@@ -25,6 +25,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-./scripts/setup/install-protobufs
+./scripts/setup/install-protobuf
 
 go get github.com/stevvooe/protobuild
