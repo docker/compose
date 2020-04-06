@@ -39,8 +39,7 @@ func GetDefault() *Engine {
 
 type Project struct {
 	Config     *types.Config
-	HelmConfig *helm.HelmConfig
-	HelmChart  *helm.HelmChart
+	Helm       *helm.HelmActions
 	ProjectDir string
 	Name       string `yaml:"-" json:"-"`
 }
@@ -53,8 +52,7 @@ func NewProject(config types.ConfigDetails, name string) (*Project, error) {
 
 	p := Project{
 		Config:     model,
-		HelmConfig: helm.NewHelmConfig(nil),
-		HelmChart:  nil,
+		Helm:       helm.NewHelmActions(nil),
 		ProjectDir: config.WorkingDir,
 		Name:       name,
 	}
@@ -95,18 +93,10 @@ func (p *Project) ExportToCharts(path string) error {
 }
 
 func (p *Project) Install(name, path string) error {
-	if p.HelmChart == nil {
-		chart := helm.NewChart(name, path)
-		chart.SetActionConfig(p.HelmConfig)
-		p.HelmChart = chart
-	}
-	return p.HelmChart.Install()
+	return p.Helm.Install(name, path)
 }
 
 func (p *Project) Uninstall(name string) error {
-	if p.HelmChart == nil {
-		p.HelmChart = helm.NewChart(name, "")
-		p.HelmChart.SetActionConfig(p.HelmConfig)
-	}
-	return p.HelmChart.Uninstall()
+
+	return p.Helm.Uninstall(name)
 }
