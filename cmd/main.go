@@ -30,10 +30,21 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+func init() {
+	// initial hack to get the path of the project's bin dir
+	// into the env of this cli for development
+
+	path := filepath.Join(os.Getenv("GOPATH"), "src/github.com/docker/api/bin")
+	if err := os.Setenv("PATH", fmt.Sprintf("$PATH:%s", path)); err != nil {
+		panic(err)
+	}
+}
 
 func main() {
 	app := cli.NewApp()
@@ -55,6 +66,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		contextCommand,
+		exampleCommand,
 	}
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
