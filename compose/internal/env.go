@@ -11,34 +11,11 @@ import (
 	"github.com/docker/helm-prototype/pkg/compose/internal/utils"
 	chart "helm.sh/helm/v3/pkg/chart"
 	util "helm.sh/helm/v3/pkg/chartutil"
+	helmenv "helm.sh/helm/v3/pkg/cli"
 )
 
-// Kind is "kubernetes" or "docker"
-type Kind string
-
-const (
-	// Kubernetes specifies to use a kubernetes cluster.
-	Kubernetes Kind = "kubernetes"
-	// Docker specifies to use Docker engine.
-	DockerEngine Kind = "docker"
-)
-
-type Engine struct {
-	Namespace string
-
-	Kind Kind
-
-	Config string
-	// Context is the name of the kubeconfig/docker context.
-	Context string
-	// Token used for authentication (kubernetes)
-	Token string
-	// Kubernetes API Server Endpoint for authentication
-	APIServer string
-}
-
-func GetDefault() *Engine {
-	return &Engine{Kind: Kubernetes}
+func GetDefault() *helmenv.EnvSettings {
+	return helmenv.New()
 }
 
 func Environment() map[string]string {

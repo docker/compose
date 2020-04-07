@@ -95,3 +95,21 @@ func (hc *HelmActions) Get(name string) (*release.Release, error) {
 	actGet := action.NewGet(hc.Config)
 	return actGet.Run(name)
 }
+
+func (hc *HelmActions) ListReleases() (map[string]interface{}, error) {
+	hc.initKubeClient()
+
+	actList := action.NewList(hc.Config)
+	releases, err := actList.Run()
+	if err != nil {
+		return map[string]interface{}{}, err
+	}
+	result := map[string]interface{}{}
+	for _, rel := range releases {
+		result[rel.Name] = map[string]string{
+			"Status":      string(rel.Info.Status),
+			"Description": rel.Info.Description,
+		}
+	}
+	return result, nil
+}

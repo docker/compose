@@ -18,12 +18,6 @@ type ComposeProject struct {
 	Name       string `yaml:"-" json:"-"`
 }
 
-type ComposeResult struct {
-	Info       string
-	Status     string
-	Descriptin string
-}
-
 func Load(name string, configpaths []string) (*ComposeProject, error) {
 	if name == "" {
 		name = "docker-compose"
@@ -67,4 +61,8 @@ func (cp *ComposeProject) Install(name, path string) error {
 
 func (cp *ComposeProject) Uninstall(name string) error {
 	return cp.helm.Uninstall(name)
+}
+
+func (cp *ComposeProject) List() (map[string]interface{}, error) {
+	return cp.helm.ListReleases()
 }
