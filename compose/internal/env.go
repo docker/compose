@@ -74,6 +74,13 @@ func GetConfig(name string, configPaths []string) (*types.Config, string, error)
 }
 
 func GetChartInMemory(config *types.Config, name string) (*chart.Chart, error) {
+	for k, v := range config.Volumes {
+		volumeName := strings.ReplaceAll(k, "_", "-")
+		if volumeName != k {
+			config.Volumes[volumeName] = v
+			delete(config.Volumes, k)
+		}
+	}
 	objects, err := kube.MapToKubernetesObjects(config, name)
 	if err != nil {
 		return nil, err

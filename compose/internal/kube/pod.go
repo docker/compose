@@ -18,10 +18,10 @@ import (
 
 func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, model *types.Config) (apiv1.PodTemplateSpec, error) {
 	tpl := apiv1.PodTemplateSpec{}
-	nodeAffinity, err := toNodeAffinity(serviceConfig.Deploy)
-	if err != nil {
-		return apiv1.PodTemplateSpec{}, err
-	}
+	//nodeAffinity, err := toNodeAffinity(serviceConfig.Deploy)
+	//if err != nil {
+	//	return apiv1.PodTemplateSpec{}, err
+	//}
 	hostAliases, err := toHostAliases(serviceConfig.ExtraHosts)
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
@@ -73,7 +73,7 @@ func toPodTemplate(serviceConfig types.ServiceConfig, labels map[string]string, 
 	tpl.Spec.Hostname = serviceConfig.Hostname
 	tpl.Spec.TerminationGracePeriodSeconds = toTerminationGracePeriodSeconds(serviceConfig.StopGracePeriod)
 	tpl.Spec.HostAliases = hostAliases
-	tpl.Spec.Affinity = nodeAffinity
+	//tpl.Spec.Affinity = nodeAffinity
 	// we dont want to remove all containers and recreate them because:
 	// an admission plugin can add sidecar containers
 	// we for sure want to keep the main container to be additive

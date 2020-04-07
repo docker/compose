@@ -2,12 +2,14 @@ package kube
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -17,7 +19,13 @@ func MapToKubernetesObjects(model *types.Config, name string) (map[string]runtim
 	objects := map[string]runtime.Object{}
 
 	for _, service := range model.Services {
-		objects[fmt.Sprintf("%s-service.yaml", service.Name)] = mapToService(model, service)
+		svcObject := mapToService(model, service)
+		if svcObject != nil {
+			objects[fmt.Sprintf("%s-service.yaml", service.Name)] = svcObject
+		} else {
+			log.Println("Missing port mapping from service config.")
+		}
+
 		if service.Deploy != nil && service.Deploy.Mode == "global" {
 			daemonset, err := mapToDaemonset(service, model, name)
 			if err != nil {
@@ -33,7 +41,8 @@ func MapToKubernetesObjects(model *types.Config, name string) (map[string]runtim
 		}
 		for _, vol := range service.Volumes {
 			if vol.Type == "volume" {
-				objects[fmt.Sprintf("%s-persistentvolumeclain.yaml", service.Name)] = mapToPVC(service, vol)
+				vol.Source = strings.ReplaceAll(vol.Source, "_", "-")
+				objects[fmt.Sprintf("%s-persistentvolumeclaim.yaml", vol.Source)] = mapToPVC(service, vol)
 			}
 		}
 	}
@@ -51,7 +60,9 @@ func mapToService(model *types.Config, service types.ServiceConfig) *core.Servic
 				Protocol:   toProtocol(p.Protocol),
 			})
 	}
-
+	if len(ports) == 0 {
+		return nil
+	}
 	return &core.Service{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "Service",
@@ -167,13 +178,27 @@ func toDeploymentStrategy(deploy *types.DeployConfig) apps.DeploymentStrategy {
 }
 
 func mapToPVC(service types.ServiceConfig, vol types.ServiceVolumeConfig) runtime.Object {
+	rwaccess := core.ReadWriteOnce
+	if vol.ReadOnly {
+		rwaccess = core.ReadOnlyMany
+	}
 	return &core.PersistentVolumeClaim{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:   vol.Source,
 			Labels: map[string]string{"com.docker.compose.service": service.Name},
 		},
 		Spec: core.PersistentVolumeClaimSpec{
-			VolumeName: vol.Source,
+			VolumeName:  vol.Source,
+			AccessModes: []core.PersistentVolumeAccessMode{rwaccess},
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceStorage: resource.MustParse("100Mi"),
+				},
+			},
 		},
 	}
 }

@@ -42,7 +42,7 @@ func toVolumeSpecs(s types.ServiceConfig, model *types.Config) ([]volumeSpec, er
 			source = gitVolume(m.Source)
 		} else if m.Type == "volume" {
 			if m.Source != "" {
-				name = m.Source
+				name = strings.ReplaceAll(m.Source, "_", "-")
 			}
 		} else {
 			// bind mount
@@ -133,7 +133,7 @@ func toVolumes(s types.ServiceConfig, model *types.Config) ([]apiv1.Volume, erro
 	}
 	for _, spec := range specs {
 		if spec.source == nil {
-			continue
+			spec.source = emptyVolumeInMemory()
 		}
 		volumes = append(volumes, apiv1.Volume{
 			Name:         spec.mount.Name,
