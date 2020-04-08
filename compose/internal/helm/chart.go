@@ -39,8 +39,10 @@ home:
 		Name string
 	}
 	var chartData bytes.Buffer
-	_ = t.Execute(&chartData, ChartDetails{Name: name})
-
+	err = t.Execute(&chartData, ChartDetails{Name: name})
+	if err != nil {
+		return nil, err
+	}
 	files = append(files, &loader.BufferedFile{
 		Name: "Chart.yaml",
 		Data: chartData.Bytes(),
