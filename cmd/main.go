@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/api/context"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
@@ -57,11 +58,20 @@ func main() {
 			Name:  "debug",
 			Usage: "enable debug output in the logs",
 		},
+		context.ConfigFlag,
+		context.ContextFlag,
 	}
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
+
+		context, err := context.GetContext()
+		if err != nil {
+			return err
+		}
+		fmt.Println(context.Metadata.Type)
+		// TODO select backend based on context.Metadata.Type or delegate to legacy CLI if == "Moby"
 		return nil
 	}
 	app.Commands = []cli.Command{
