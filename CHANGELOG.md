@@ -6,6 +6,8 @@ Change log
 
 ### Features
 
+- Bump OpenSSL from 1.1.1d to 1.1.1f
+
 - Add 3.8 compose version
 
 1.25.4 (2020-01-23)
