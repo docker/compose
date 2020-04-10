@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,6 +18,9 @@ func GetConfigs(name string, configPaths []string) (string, []types.ConfigFile, 
 	configPath, err := getConfigPaths(configPaths)
 	if err != nil {
 		return "", nil, err
+	}
+	if configPath == nil {
+		return "", nil, nil
 	}
 	workingDir := filepath.Dir(configPath[0])
 
@@ -88,7 +90,7 @@ func getConfigPaths(configPaths []string) ([]string, error) {
 		}
 		parent := filepath.Dir(pwd)
 		if parent == pwd {
-			return nil, fmt.Errorf("Can't find a suitable configuration file in this directory or any parent. Are you in the right directory?")
+			return nil, nil
 		}
 		pwd = parent
 	}

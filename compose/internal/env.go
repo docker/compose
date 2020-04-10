@@ -29,15 +29,15 @@ func Environment() map[string]string {
 }
 
 func GetConfig(name string, configPaths []string) (*types.Config, string, error) {
-	if name == "" {
-		name = "docker-compose"
-	}
 	workingDir, configs, err := utils.GetConfigs(
 		name,
 		configPaths,
 	)
 	if err != nil {
 		return nil, "", err
+	}
+	if configs == nil {
+		return nil, "", nil
 	}
 	config, err := loader.Load(types.ConfigDetails{
 		WorkingDir:  workingDir,

@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 
@@ -19,13 +20,19 @@ type ComposeProject struct {
 }
 
 func Load(name string, configpaths []string) (*ComposeProject, error) {
-	if name == "" {
-		name = "docker-compose"
-	}
 	model, workingDir, err := internal.GetConfig(name, configpaths)
 	if err != nil {
 		return nil, err
 	}
+
+	if name == "" {
+		if model != nil {
+			name = filepath.Base(filepath.Dir(model.Filename))
+		} else if workingDir != "" {
+			name = filepath.Base(filepath.Dir(workingDir))
+		}
+	}
+
 	return &ComposeProject{
 		config:     model,
 		helm:       helm.NewHelmActions(nil),
@@ -35,6 +42,10 @@ func Load(name string, configpaths []string) (*ComposeProject, error) {
 }
 
 func (cp *ComposeProject) GenerateChart(dirname string) error {
+	if cp.config == nil {
+		return errors.New(`Can't find a suitable configuration file in this directory or any
+parent. Are you in the right directory?`)
+	}
 	if dirname == "" {
 		dirname = cp.config.Filename
 		if strings.Contains(dirname, ".") {
@@ -51,7 +62,13 @@ func (cp *ComposeProject) Install(name, path string) error {
 	if path != "" {
 		return cp.helm.InstallChartFromDir(name, path)
 	}
-
+	if cp.config == nil {
+		return errors.New(`Can't find a suitable configuration file in this directory or any
+parent. Are you in the right directory?`)
+	}
+	if name == "" {
+		name = cp.Name
+	}
 	chart, err := internal.GetChartInMemory(cp.config, name)
 	if err != nil {
 		return err
@@ -60,6 +77,16 @@ func (cp *ComposeProject) Install(name, path string) error {
 }
 
 func (cp *ComposeProject) Uninstall(name string) error {
+	if name == "" {
+		if cp.config == nil {
+			return errors.New(`Can't find a suitable configuration file in this directory or any
+parent. Are you in the right directory?
+		
+Alternative: uninstall [INSTALLATION NAME]
+`)
+		}
+		name = cp.Name
+	}
 	return cp.helm.Uninstall(name)
 }
 
