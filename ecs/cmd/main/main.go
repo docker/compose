@@ -5,6 +5,7 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ func main() {
 }
 
 type clusterOptions struct {
+	profile string
 	region  string
 	cluster string
 }
@@ -42,6 +44,7 @@ func NewRootCmd(name string, dockerCli command.Cli) *cobra.Command {
 		VersionCommand(),
 		ComposeCommand(&opts),
 	)
+	cmd.Flags().StringVarP(&opts.profile, "profile", "p", "default", "AWS Profile")
 	cmd.Flags().StringVarP(&opts.cluster, "cluster", "c", "default", "ECS cluster")
 	cmd.Flags().StringVarP(&opts.region, "region", "r", "", "AWS region")
 
@@ -65,5 +68,23 @@ func ComposeCommand(clusteropts *clusterOptions) *cobra.Command {
 	}
 	opts := &compose.ProjectOptions{}
 	opts.AddFlags(cmd.Flags())
+
+	cmd.AddCommand(
+		UpCommand(clusteropts, opts),
+	)
+	return cmd
+}
+
+func UpCommand(clusteropts *clusterOptions, opts *compose.ProjectOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "up",
+		RunE: compose.WithProject(opts, func(project *compose.Project, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			return client.ComposeUp(project)
+		}),
+	}
 	return cmd
 }
