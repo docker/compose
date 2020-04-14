@@ -35,6 +35,7 @@ require (
 	github.com/miekg/pkcs11 v1.0.3 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/theupdateframework/notary v0.6.1 // indirect
@@ -44,6 +45,7 @@ require (
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
+	gotest.tools/v3 v3.0.2
 	vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787 // indirect
 )
 
