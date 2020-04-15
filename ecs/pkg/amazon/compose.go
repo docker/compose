@@ -5,6 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/convert"
+	"github.com/sirupsen/logrus"
 )
 
 func (c *client) ComposeUp(project *compose.Project) error {
@@ -22,13 +24,13 @@ func (c *client) ComposeUp(project *compose.Project) error {
 		return err
 	}
 
-	logGroup, err := c.GetOrCreateLogGroup(project.Name)
+	logGroup, err := c.GetOrCreateLogGroup(project)
 	if err != nil {
 		return err
 	}
 
 	for _, service := range project.Services {
-		err = c.CreateService(service, securityGroup, subnets, logGroup)
+		_, err = c.CreateService(project, service, securityGroup, subnets, logGroup)
 		if err != nil {
 			return err
 		}
@@ -36,15 +38,15 @@ func (c *client) ComposeUp(project *compose.Project) error {
 	return nil
 }
 
-func (c *client) CreateService(service types.ServiceConfig, securityGroup *string, subnets []*string, logGroup *string) error {
-	task, err := ConvertToTaskDefinition(service)
+func (c *client) CreateService(project *compose.Project, service types.ServiceConfig, securityGroup *string, subnets []*string, logGroup *string) (*string, error) {
+	task, err := convert.Convert(project, service)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	role, err := c.GetEcsTaskExecutionRole(service)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	task.ExecutionRoleArn = role
@@ -57,10 +59,11 @@ func (c *client) CreateService(service types.ServiceConfig, securityGroup *strin
 
 	arn, err := c.RegisterTaskDefinition(task)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.ECS.CreateService(&ecs.CreateServiceInput{
+	logrus.Debug("Create Service")
+	created, err := c.ECS.CreateService(&ecs.CreateServiceInput{
 		Cluster:      aws.String(c.Cluster),
 		DesiredCount: aws.Int64(1), // FIXME get from deploy options
 		LaunchType:   aws.String(ecs.LaunchTypeFargate), //FIXME use service.Isolation tro select EC2 vs Fargate
@@ -75,5 +78,13 @@ func (c *client) CreateService(service types.ServiceConfig, securityGroup *strin
 		SchedulingStrategy: aws.String(ecs.SchedulingStrategyReplica),
 		TaskDefinition:     arn,
 	})
-	return err
+
+	for _, port := range service.Ports {
+		err = c.ExposePort(securityGroup, port)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return created.Service.ServiceArn, err
 }

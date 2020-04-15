@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
+	"strings"
 )
 
 // GetDefaultVPC retrieve the default VPC for AWS account
@@ -59,7 +61,7 @@ func (c client) GetSubNets(vpc *string) ([]*string, error) {
 // CreateSecurityGroup create a security group for the project
 func (c client) CreateSecurityGroup(project *compose.Project, vpc *string) (*string, error) {
 	logrus.Debug("Create Security Group")
-	name := fmt.Sprintf("%s Security Group", project)
+	name := fmt.Sprintf("%s Security Group", project.Name)
 	securityGroup, err := c.EC2.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
 		Description: aws.String(name),
 		GroupName:   aws.String(name),
@@ -87,4 +89,25 @@ func (c client) CreateSecurityGroup(project *compose.Project, vpc *string) (*str
 	}
 
 	return securityGroup.GroupId, nil
+}
+
+
+func (c *client) ExposePort(securityGroup *string, port types.ServicePortConfig) error {
+	logrus.Debugf("Authorize ingress port %d/%s\n", port.Published, port.Protocol)
+	_, err := c.EC2.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId: securityGroup,
+		IpPermissions: []*ec2.IpPermission{
+			{
+				IpProtocol: aws.String(strings.ToUpper(port.Protocol)),
+				IpRanges: []*ec2.IpRange{
+					{
+						CidrIp: aws.String("0.0.0.0/0"),
+					},
+				},
+				FromPort: aws.Int64(int64(port.Target)),
+				ToPort:   aws.Int64(int64(port.Target)),
+			},
+		},
+	})
+	return err
 }
