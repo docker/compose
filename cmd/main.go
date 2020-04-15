@@ -30,7 +30,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 
 	"github.com/docker/api/context"
 	"github.com/sirupsen/logrus"
@@ -61,25 +63,43 @@ func main() {
 		context.ConfigFlag,
 		context.ContextFlag,
 	}
+
+
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
-
-		context, err := context.GetContext()
+		ctx, err := context.GetContext()
 		if err != nil {
-			return err
+			logrus.Fatal(err)
 		}
-		fmt.Println(context.Metadata.Type)
-		// TODO select backend based on context.Metadata.Type or delegate to legacy CLI if == "Moby"
+		if ctx.Metadata.Type == "Moby" {
+			shellOutToDefaultEngine()
+			os.Exit(0)
+		}
+		// TODO select backend based on context.Metadata.Type
 		return nil
 	}
 	app.Commands = []cli.Command{
 		contextCommand,
 		exampleCommand,
 	}
+
+	sort.Sort(cli.FlagsByName(app.Flags))
+	sort.Sort(cli.CommandsByName(app.Commands))
+
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func shellOutToDefaultEngine()  {
+	cmd :=exec.Command("/Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logrus.Fatal(err)
 	}
 }
