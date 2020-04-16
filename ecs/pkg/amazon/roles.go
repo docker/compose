@@ -13,7 +13,7 @@ const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTa
 var defaultTaskExecutionRole *string
 
 // GetEcsTaskExecutionRole retrieve the role ARN to apply for task execution
-func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (*string, error) {
+func (c client) GetEcsTaskExecutionRole(spec *types.ServiceConfig) (*string, error) {
 	if arn, ok := spec.Extras["x-ecs-TaskExecutionRole"]; ok {
 		s := arn.(string)
 		return &s, nil

@@ -10,6 +10,22 @@ import (
 )
 
 func (c *client) ComposeUp(project *compose.Project) error {
+	type mapping struct {
+		service *types.ServiceConfig
+		task *ecs.RegisterTaskDefinitionInput
+	}
+	mappings := []mapping{}
+	for _, service := range project.Services {
+		task, err := convert.Convert(project, service)
+		if err != nil {
+			return err
+		}
+		mappings = append(mappings, mapping{
+			service: &service,
+			task:    task,
+		})
+	}
+
 	vpc, err := c.GetDefaultVPC()
 	if err != nil {
 		return err
@@ -29,8 +45,8 @@ func (c *client) ComposeUp(project *compose.Project) error {
 		return err
 	}
 
-	for _, service := range project.Services {
-		_, err = c.CreateService(project, service, securityGroup, subnets, logGroup)
+	for _, mapping := range mappings {
+		_, err = c.CreateService(project, mapping.service, mapping.task, securityGroup, subnets, logGroup)
 		if err != nil {
 			return err
 		}
@@ -38,12 +54,7 @@ func (c *client) ComposeUp(project *compose.Project) error {
 	return nil
 }
 
-func (c *client) CreateService(project *compose.Project, service types.ServiceConfig, securityGroup *string, subnets []*string, logGroup *string) (*string, error) {
-	task, err := convert.Convert(project, service)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *client) CreateService(project *compose.Project, service *types.ServiceConfig, task *ecs.RegisterTaskDefinitionInput, securityGroup *string, subnets []*string, logGroup *string) (*string, error) {
 	role, err := c.GetEcsTaskExecutionRole(service)
 	if err != nil {
 		return nil, err
