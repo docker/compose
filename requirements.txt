@@ -4,6 +4,7 @@ cached-property==1.5.1
 certifi==2019.11.28
 chardet==3.0.4
 colorama==0.4.3; sys_platform == 'win32'
+distro==1.5.0
 docker==4.2.0
 docker-pycreds==0.4.0
 dockerpty==0.4.1

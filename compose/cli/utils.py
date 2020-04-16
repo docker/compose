@@ -9,6 +9,7 @@ import ssl
 import subprocess
 import sys
 
+import distro
 import docker
 import six
 
@@ -73,7 +74,7 @@ def is_mac():
 
 
 def is_ubuntu():
-    return platform.system() == 'Linux' and platform.linux_distribution()[0] == 'Ubuntu'
+    return platform.system() == 'Linux' and distro.linux_distribution()[0] == 'Ubuntu'
 
 
 def is_windows():
