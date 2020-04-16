@@ -76,10 +76,10 @@ func ComposeCommand(clusteropts *clusterOptions) *cobra.Command {
 	return cmd
 }
 
-func UpCommand(clusteropts *clusterOptions, opts *compose.ProjectOptions) *cobra.Command {
+func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "up",
-		RunE: compose.WithProject(opts, func(project *compose.Project, args []string) error {
+		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
 			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
 			if err != nil {
 				return err

@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/compose-spec/compose-go/types"
@@ -40,13 +41,37 @@ func (c *client) ComposeUp(project *compose.Project) error {
 		return err
 	}
 
+	loadBalancer, err := c.CreateLoadBalancer(project, subnets)
+	if err != nil {
+		return err
+	}
+
 	logGroup, err := c.GetOrCreateLogGroup(project)
 	if err != nil {
 		return err
 	}
 
 	for _, mapping := range mappings {
-		_, err = c.CreateService(project, mapping.service, mapping.task, securityGroup, subnets, logGroup)
+		ingress := []*ecs.LoadBalancer{}
+		for _, port := range mapping.service.Ports {
+			name := fmt.Sprintf("%s-%s-%d-%s", project.Name, mapping.service.Name, port.Target, port.Protocol)
+			targetgroup, err := c.CreateTargetGroup(name, vpc, port)
+			if err != nil {
+				return err
+			}
+			ingress = append(ingress, &ecs.LoadBalancer{
+				ContainerName:  aws.String(mapping.service.Name),
+				ContainerPort:  aws.Int64(int64(port.Target)),
+				TargetGroupArn: targetgroup,
+			})
+
+			err = c.CreateListener(port, loadBalancer, targetgroup)
+			if err != nil {
+				return err
+			}
+		}
+
+		_, err = c.CreateService(project, mapping.service, mapping.task, securityGroup, subnets, logGroup, ingress)
 		if err != nil {
 			return err
 		}
@@ -54,7 +79,7 @@ func (c *client) ComposeUp(project *compose.Project) error {
 	return nil
 }
 
-func (c *client) CreateService(project *compose.Project, service *types.ServiceConfig, task *ecs.RegisterTaskDefinitionInput, securityGroup *string, subnets []*string, logGroup *string) (*string, error) {
+func (c *client) CreateService(project *compose.Project, service *types.ServiceConfig, task *ecs.RegisterTaskDefinitionInput, securityGroup *string, subnets []*string, logGroup *string, ingress []*ecs.LoadBalancer) (*string, error) {
 	role, err := c.GetEcsTaskExecutionRole(service)
 	if err != nil {
 		return nil, err
@@ -88,6 +113,7 @@ func (c *client) CreateService(project *compose.Project, service *types.ServiceC
 		ServiceName:        aws.String(service.Name),
 		SchedulingStrategy: aws.String(ecs.SchedulingStrategyReplica),
 		TaskDefinition:     arn,
+		LoadBalancers: ingress,
 	})
 
 	for _, port := range service.Ports {

@@ -9,6 +9,11 @@ import (
 )
 
 func (c *client) ComposeDown(project *compose.Project) error {
+	err := c.DeleteLoadBalancer(project)
+	if err != nil {
+		return err
+	}
+
 	services := []*string{}
 	// FIXME we should be able to retrieve services by tags, so we don't need the initial compose file to run "down"
 	for _, service := range project.Services {
@@ -23,18 +28,17 @@ func (c *client) ComposeDown(project *compose.Project) error {
 		if err != nil {
 			return err
 		}
-
-		logrus.Debugf("Service deleted %q\n", *out.Service.ServiceName)
-		services = append(services, out.Service.ServiceName)
+		services = append(services, out.Service.ServiceArn)
 	}
-	logrus.Info("All services stopped")
 
-	err := c.ECS.WaitUntilServicesInactive(&ecs.DescribeServicesInput{
+	logrus.Info("Stopping services...")
+	err = c.ECS.WaitUntilServicesInactive(&ecs.DescribeServicesInput{
 		Services: services,
 	})
 	if err != nil {
 		return err
 	}
+	logrus.Info("All services stopped")
 
 	logrus.Debug("Deleting security groups")
 	groups, err := c.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{

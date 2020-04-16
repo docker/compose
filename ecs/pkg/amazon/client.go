@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
@@ -31,6 +32,7 @@ func NewClient(profile string, cluster string, region string) (compose.API, erro
 		sess: sess,
 		ECS: ecs.New(sess),
 		EC2:  ec2.New(sess),
+		ELB: elbv2.New(sess),
 		CW: cloudwatchlogs.New(sess),
 		IAM: iam.New(sess),
 	}, nil
@@ -42,6 +44,7 @@ type client struct {
 	sess *session.Session
 	ECS *ecs.ECS
 	EC2 *ec2.EC2
+	ELB     *elbv2.ELBV2
 	CW *cloudwatchlogs.CloudWatchLogs
 	IAM *iam.IAM
 }
