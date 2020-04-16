@@ -76,7 +76,19 @@ func ComposeCommand(clusteropts *clusterOptions) *cobra.Command {
 	return cmd
 }
 
+type upOptions struct {
+	loadBalancerArn string
+}
+
+func (o upOptions) LoadBalancerArn() *string {
+	if o.loadBalancerArn == "" {
+		return nil
+	}
+	return &o.loadBalancerArn
+}
+
 func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
 		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
@@ -84,22 +96,30 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 			if err != nil {
 				return err
 			}
-			return client.ComposeUp(project)
+			return client.ComposeUp(project, opts.LoadBalancerArn())
 		}),
 	}
+	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
 	return cmd
 }
 
-func DownCommand(clusteropts *clusterOptions, opts *compose.ProjectOptions) *cobra.Command {
+type downOptions struct {
+	KeepLoadBalancer bool
+}
+
+
+func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: compose.WithProject(opts, func(project *compose.Project, args []string) error {
+		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
 			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
 			if err != nil {
 				return err
 			}
-			return client.ComposeDown(project)
+			return client.ComposeDown(project, opts.KeepLoadBalancer)
 		}),
 	}
+	cmd.Flags().BoolVar(&opts.KeepLoadBalancer, "keep-load-balancer", false, "Keep Load Balancer for further use")
 	return cmd
 }

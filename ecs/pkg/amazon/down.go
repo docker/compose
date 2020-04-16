@@ -8,8 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (c *client) ComposeDown(project *compose.Project) error {
-	err := c.DeleteLoadBalancer(project)
+func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer bool) error {
+	err := c.DeleteLoadBalancer(project, keepLoadBalancer)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (c *client) ComposeUp(project *compose.Project) error {
+func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) error {
 	type mapping struct {
 		service *types.ServiceConfig
 		task *ecs.RegisterTaskDefinitionInput
@@ -41,9 +41,11 @@ func (c *client) ComposeUp(project *compose.Project) error {
 		return err
 	}
 
-	loadBalancer, err := c.CreateLoadBalancer(project, subnets)
-	if err != nil {
-		return err
+	if loadBalancerArn == nil {
+		loadBalancerArn, err = c.CreateLoadBalancer(project, subnets)
+		if err != nil {
+			return err
+		}
 	}
 
 	logGroup, err := c.GetOrCreateLogGroup(project)
@@ -65,7 +67,7 @@ func (c *client) ComposeUp(project *compose.Project) error {
 				TargetGroupArn: targetgroup,
 			})
 
-			err = c.CreateListener(port, loadBalancer, targetgroup)
+			err = c.CreateListener(port, loadBalancerArn, targetgroup)
 			if err != nil {
 				return err
 			}

@@ -31,7 +31,7 @@ func (c client) CreateLoadBalancer(project *compose.Project, subnets []*string) 
 	return alb.LoadBalancers[0].LoadBalancerArn, nil
 }
 
-func (c client) DeleteLoadBalancer(project *compose.Project) error {
+func (c client) DeleteLoadBalancer(project *compose.Project, keepLoadBalancer bool) error {
 	logrus.Debug("Delete Load Balancer")
 	// FIXME We can tag LoadBalancer but not search by tag ?
 	loadBalancer, err := c.ELB.DescribeLoadBalancers(&elbv2.DescribeLoadBalancersInput{
@@ -52,7 +52,9 @@ func (c client) DeleteLoadBalancer(project *compose.Project) error {
 		return err
 	}
 
-	_, err = c.ELB.DeleteLoadBalancer(&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: arn})
+	if !keepLoadBalancer {
+		_, err = c.ELB.DeleteLoadBalancer(&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: arn})
+	}
 	return err
 }
 
