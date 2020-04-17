@@ -74,9 +74,9 @@ func main() {
 		s := server.New()
 
 		// listen on a socket to accept connects
-		l, err := net.Listen("tcp", clix.GlobalString("address"))
+		l, err := net.Listen("unix", clix.GlobalString("address"))
 		if err != nil {
-			return errors.Wrap(err, "listen tcp")
+			return errors.Wrap(err, "listen unix socket")
 		}
 		defer l.Close()
 

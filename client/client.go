@@ -36,6 +36,7 @@ import (
 
 	v1 "github.com/docker/api/backend/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 )
 
 // NewContext is a context that is canceled when a signal is
@@ -53,7 +54,20 @@ func NewContext() (context.Context, func()) {
 
 // New returns a GRPC client
 func New(address string, timeout time.Duration) (*Client, error) {
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(timeout))
+	backoffConfig := backoff.DefaultConfig
+	backoffConfig.MaxDelay = 3 * time.Second
+	backoffConfig.BaseDelay = 10 * time.Millisecond
+	connParams := grpc.ConnectParams{
+		Backoff: backoffConfig,
+	}
+	opts := []grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithConnectParams(connParams),
+		grpc.WithBlock(),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn, err := grpc.DialContext(ctx, address, opts...)
 	if err != nil {
 		return nil, err
 	}

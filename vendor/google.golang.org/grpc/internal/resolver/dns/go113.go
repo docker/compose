@@ -1,3 +1,5 @@
+// +build go1.13
+
 /*
  *
  * Copyright 2019 gRPC authors.
@@ -16,26 +18,16 @@
  *
  */
 
-// Package serviceconfig defines types and methods for operating on gRPC
-// service configs.
-//
-// This package is EXPERIMENTAL.
-package serviceconfig
+package dns
 
-// Config represents an opaque data structure holding a service config.
-type Config interface {
-	isServiceConfig()
-}
+import "net"
 
-// LoadBalancingConfig represents an opaque data structure holding a load
-// balancing config.
-type LoadBalancingConfig interface {
-	isLoadBalancingConfig()
-}
-
-// ParseResult contains a service config or an error.  Exactly one must be
-// non-nil.
-type ParseResult struct {
-	Config Config
-	Err    error
+func init() {
+	filterError = func(err error) error {
+		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
+			// The name does not exist; not an error.
+			return nil
+		}
+		return err
+	}
 }

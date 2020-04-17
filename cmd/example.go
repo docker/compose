@@ -71,7 +71,7 @@ var exampleCommand = cli.Command{
 // factor out this into a context store package
 func current(ctx context.Context) context.Context {
 	// test backend address
-	return context.WithValue(ctx, backendAddressKey{}, "127.0.0.1:7654")
+	return context.WithValue(ctx, backendAddressKey{}, "/tmp/backend.sock")
 }
 
 func connect(ctx context.Context) (*client.Client, error) {
@@ -79,7 +79,7 @@ func connect(ctx context.Context) (*client.Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "no backend address")
 	}
-	c, err := client.New(address, 500*time.Millisecond)
+	c, err := client.New("unix://"+address, 500*time.Millisecond)
 	if err != nil {
 		if err != context.DeadlineExceeded {
 			return nil, errors.Wrap(err, "connect to backend")
@@ -91,7 +91,8 @@ func connect(ctx context.Context) (*client.Client, error) {
 		if err := cmd.Start(); err != nil {
 			return nil, errors.Wrap(err, "start backend")
 		}
-		return client.New(address, 2*time.Second)
+		cl, e := client.New("unix://"+address, 10*time.Second)
+		return cl, e
 	}
 	return c, nil
 }
