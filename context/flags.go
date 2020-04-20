@@ -3,7 +3,7 @@ package context
 import (
 	"path/filepath"
 
-	"github.com/docker/docker/pkg/homedir"
+	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli"
 )
 
@@ -14,16 +14,16 @@ const (
 )
 
 var (
-	ConfigDir  string
-	ConfigFlag = cli.StringFlag{
+	ConfigDir   string
+	ContextName string
+	ConfigFlag  = cli.StringFlag{
 		Name:        "config",
 		Usage:       "Location of client config files `DIRECTORY`",
 		EnvVar:      "DOCKER_CONFIG",
-		Value:       filepath.Join(homedir.Get(), configFileDir),
+		Value:       filepath.Join(home(), configFileDir),
 		Destination: &ConfigDir,
 	}
 
-	ContextName string
 	ContextFlag = cli.StringFlag{
 		Name:        "context, c",
 		Usage:       "Name of the context `CONTEXT` to use to connect to the daemon (overrides DOCKER_HOST env var and default context set with \"docker context use\")",
@@ -31,3 +31,8 @@ var (
 		Destination: &ContextName,
 	}
 )
+
+func home() string {
+	home, _ := homedir.Dir()
+	return home
+}

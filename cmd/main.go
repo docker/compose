@@ -29,6 +29,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,24 +65,22 @@ func main() {
 		context.ContextFlag,
 	}
 
-	/*cli.HelpPrinter = func(w io.Writer, templ string, data interface{}) {
+	// Make a copy of the default HelpPrinter function
+	originalHelpPrinter := cli.HelpPrinter
+	// Change the HelpPrinter function to shell out to the Moby CLI help
+	// when the current context is pointing to Docker engine
+	// else we use the copy of the original HelpPrinter
+	cli.HelpPrinter = func(w io.Writer, templ string, data interface{}) {
 		ctx, err := context.GetContext()
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		fmt.Println(ctx.Metadata.Type)
 		if ctx.Metadata.Type == "Moby" {
-			err := shellOutToDefaultEngine()
-			if err != nil {
-				if exiterr, ok:= err.(*exec.ExitError); ok  {
-					os.Exit(exiterr.ExitCode())
-				}
-				os.Exit(1)
-			}
+			shellOutToDefaultEngine()
 		} else {
-			fmt.Fprintf(w, templ, data)
+			originalHelpPrinter(w, templ, data)
 		}
-	}*/
+	}
 
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
@@ -92,14 +91,7 @@ func main() {
 			logrus.Fatal(err)
 		}
 		if ctx.Metadata.Type == "Moby" {
-			err := shellOutToDefaultEngine()
-			if err != nil {
-				if exiterr, ok:= err.(*exec.ExitError); ok  {
-					os.Exit(exiterr.ExitCode())
-				}
-				os.Exit(1)
-			}
-			os.Exit(0)
+			shellOutToDefaultEngine()
 		}
 		// TODO select backend based on context.Metadata.Type
 		return nil
@@ -118,14 +110,18 @@ func main() {
 	}
 }
 
-func shellOutToDefaultEngine() error  {
-	cmd :=exec.Command(" /Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
+func shellOutToDefaultEngine() {
+	cmd := exec.Command("/Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	fmt.Println("Shellout")
-	if err:=  cmd.Run(); err != nil {
-		return err
+	if err := cmd.Run(); err != nil {
+		if err != nil {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				os.Exit(exiterr.ExitCode())
+			}
+			os.Exit(1)
+		}
 	}
-	return cmd.Wait()
+	os.Exit(0)
 }
