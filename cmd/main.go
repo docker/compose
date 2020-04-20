@@ -64,6 +64,24 @@ func main() {
 		context.ContextFlag,
 	}
 
+	/*cli.HelpPrinter = func(w io.Writer, templ string, data interface{}) {
+		ctx, err := context.GetContext()
+		if err != nil {
+			logrus.Fatal(err)
+		}
+		fmt.Println(ctx.Metadata.Type)
+		if ctx.Metadata.Type == "Moby" {
+			err := shellOutToDefaultEngine()
+			if err != nil {
+				if exiterr, ok:= err.(*exec.ExitError); ok  {
+					os.Exit(exiterr.ExitCode())
+				}
+				os.Exit(1)
+			}
+		} else {
+			fmt.Fprintf(w, templ, data)
+		}
+	}*/
 
 	app.Before = func(clix *cli.Context) error {
 		if clix.GlobalBool("debug") {
@@ -74,7 +92,13 @@ func main() {
 			logrus.Fatal(err)
 		}
 		if ctx.Metadata.Type == "Moby" {
-			shellOutToDefaultEngine()
+			err := shellOutToDefaultEngine()
+			if err != nil {
+				if exiterr, ok:= err.(*exec.ExitError); ok  {
+					os.Exit(exiterr.ExitCode())
+				}
+				os.Exit(1)
+			}
 			os.Exit(0)
 		}
 		// TODO select backend based on context.Metadata.Type
@@ -94,12 +118,14 @@ func main() {
 	}
 }
 
-func shellOutToDefaultEngine()  {
-	cmd :=exec.Command("/Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
+func shellOutToDefaultEngine() error  {
+	cmd :=exec.Command(" /Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logrus.Fatal(err)
+	fmt.Println("Shellout")
+	if err:=  cmd.Run(); err != nil {
+		return err
 	}
+	return cmd.Wait()
 }
