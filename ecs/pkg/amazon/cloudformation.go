@@ -30,7 +30,7 @@ func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*clo
 		for _, port := range service.Ports {
 			ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
 				CidrIp:      "0.0.0.0/0",
-				Description: fmt.Sprintf("%d/%s", port.Target, port.Protocol),
+				Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
 				FromPort:    int(port.Target),
 				IpProtocol:  strings.ToUpper(port.Protocol),
 				ToPort:      int(port.Target),
