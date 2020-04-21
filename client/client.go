@@ -71,6 +71,7 @@ func New(address string, timeout time.Duration) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &Client{
 		conn:          conn,
 		BackendClient: v1.NewBackendClient(conn),

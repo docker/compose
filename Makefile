@@ -23,11 +23,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-PACKAGES=$(shell go list ./... | grep -v /vendor/)
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 GOOS ?= $(shell go env GOOS)
+PROTOS=$(shell find . -name \*.proto)
 
-export GO111MODULE=off
+export GO111MODULE=auto
 
 all: protos example cli
 
@@ -35,7 +35,7 @@ cli:
 	cd cmd && go build -v -o ../bin/docker
 
 protos:
-	@protobuild --quiet ${PACKAGES}
+	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 example:
 	cd example/backend && go build -v -o ../../bin/backend-example

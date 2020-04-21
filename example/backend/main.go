@@ -36,8 +36,7 @@ import (
 	v1 "github.com/docker/api/backend/v1"
 	"github.com/docker/api/client"
 	"github.com/docker/api/server"
-	_ "github.com/gogo/googleapis/google/rpc"
-	"github.com/gogo/protobuf/types"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -107,8 +106,8 @@ func main() {
 type backend struct {
 }
 
-func (b *backend) BackendInformation(ctx context.Context, _ *types.Empty) (*v1.BackendInformationResponse, error) {
+func (b *backend) BackendInformation(ctx context.Context, _ *empty.Empty) (*v1.BackendInformationResponse, error) {
 	return &v1.BackendInformationResponse{
-		ID: "com.docker.api.backend.example.v1",
+		Id: "com.docker.api.backend.example.v1",
 	}, nil
 }

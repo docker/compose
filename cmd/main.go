@@ -30,6 +30,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,7 +45,10 @@ func init() {
 	// initial hack to get the path of the project's bin dir
 	// into the env of this cli for development
 
-	path := filepath.Join(os.Getenv("GOPATH"), "src/github.com/docker/api/bin")
+	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := os.Setenv("PATH", fmt.Sprintf("$PATH:%s", path)); err != nil {
 		panic(err)
 	}
