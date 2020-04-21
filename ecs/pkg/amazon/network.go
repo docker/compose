@@ -2,12 +2,13 @@ package amazon
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 // GetDefaultVPC retrieve the default VPC for AWS account
@@ -30,9 +31,8 @@ func (c client) GetDefaultVPC() (*string, error) {
 	return vpcs.Vpcs[0].VpcId, nil
 }
 
-
 // GetSubNets retrieve default subnets for a VPC
-func (c client) GetSubNets(vpc *string) ([]*string, error) {
+func (c client) GetSubNets(vpc *string) ([]string, error) {
 	logrus.Debug("Retrieve SubNets")
 	subnets, err := c.EC2.DescribeSubnets(&ec2.DescribeSubnetsInput{
 		DryRun: nil,
@@ -51,9 +51,9 @@ func (c client) GetSubNets(vpc *string) ([]*string, error) {
 		return nil, err
 	}
 
-	ids := []*string{}
+	ids := []string{}
 	for _, subnet := range subnets.Subnets {
-		ids = append(ids, subnet.SubnetId)
+		ids = append(ids, *subnet.SubnetId)
 	}
 	return ids, nil
 }
@@ -90,7 +90,6 @@ func (c client) CreateSecurityGroup(project *compose.Project, vpc *string) (*str
 
 	return securityGroup.GroupId, nil
 }
-
 
 func (c *client) ExposePort(securityGroup *string, port types.ServicePortConfig) error {
 	logrus.Debugf("Authorize ingress port %d/%s\n", port.Published, port.Protocol)

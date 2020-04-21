@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
@@ -70,6 +71,7 @@ func ComposeCommand(clusteropts *clusterOptions) *cobra.Command {
 	opts.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(
+		ConvertCommand(clusteropts, opts),
 		UpCommand(clusteropts, opts),
 		DownCommand(clusteropts, opts),
 	)
@@ -85,6 +87,32 @@ func (o upOptions) LoadBalancerArn() *string {
 		return nil
 	}
 	return &o.loadBalancerArn
+}
+
+func ConvertCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+	opts := upOptions{}
+	cmd := &cobra.Command{
+		Use: "convert",
+		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			template, err := client.Convert(project, opts.LoadBalancerArn())
+			if err != nil {
+				return err
+			}
+
+			j, err := template.JSON()
+			if err != nil {
+				fmt.Printf("Failed to generate JSON: %s\n", err)
+			} else {
+				fmt.Printf("%s\n", string(j))
+			}
+			return nil
+		}),
+	}
+	return cmd
 }
 
 func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
@@ -106,7 +134,6 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 type downOptions struct {
 	KeepLoadBalancer bool
 }
-
 
 func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
 	opts := downOptions{}

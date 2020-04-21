@@ -15,7 +15,6 @@ func (o *ProjectOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&o.name, "project-name", "n", "", "Specify an alternate project name (default: directory name)")
 }
 
-
 type ProjectFunc func(project *Project, args []string) error
 
 // WithProject wrap a ProjectFunc into a cobra command

@@ -2,9 +2,10 @@ package amazon
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/elbv2"

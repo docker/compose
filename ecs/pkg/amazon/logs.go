@@ -2,6 +2,7 @@ package amazon
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/docker/ecs-plugin/pkg/compose"

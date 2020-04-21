@@ -1,9 +1,10 @@
 package compose
 
 import (
-	"gotest.tools/v3/assert"
 	"os"
 	"testing"
+
+	"gotest.tools/v3/assert"
 )
 
 func Test_project_name(t *testing.T) {

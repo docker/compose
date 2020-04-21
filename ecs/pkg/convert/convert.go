@@ -1,118 +1,87 @@
 package convert
 
 import (
-	"github.com/docker/ecs-plugin/pkg/compose"
+	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ecs"
+	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
+	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.RegisterTaskDefinitionInput, error) {
+func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	_, err := toCPULimits(service)
 	if err != nil {
 		return nil, err
 	}
 
-	foo := int64(256)
-	logDriver := "awslogs" // FIXME could be set by service.Logging, especially to enable use of firelens
-	return &ecs.RegisterTaskDefinitionInput{
-		ContainerDefinitions: []*ecs.ContainerDefinition{
+	return &ecs.TaskDefinition{
+		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
 			{
-				Command:               toStringPtrSlice(service.Command),
-				Cpu:                   &foo,
-				DependsOn:             nil,
-				DisableNetworking:     toBoolPtr(service.NetworkMode == "none"),
-				DnsSearchDomains:      toStringPtrSlice(service.DNSSearch),
-				DnsServers:            toStringPtrSlice(service.DNS),
-				DockerLabels:          nil,
-				DockerSecurityOptions: toStringPtrSlice(service.SecurityOpt),
-				EntryPoint:            toStringPtrSlice(service.Entrypoint),
-				Environment:           toKeyValuePairPtr(service.Environment),
-				Essential:             toBoolPtr(true),
-				ExtraHosts:            toHostEntryPtr(service.ExtraHosts),
-				FirelensConfiguration: nil,
-				HealthCheck:           toHealthCheck(service.HealthCheck),
-				Hostname:              toStringPtr(service.Hostname),
-				Image:                 toStringPtr(service.Image),
-				Interactive:           nil,
-				Links:                 nil,
-				LinuxParameters:       toLinuxParameters(service),
-				LogConfiguration: &ecs.LogConfiguration{
-					LogDriver:     &logDriver,
-					Options:       map[string]*string{},
-					SecretOptions: nil,
-				},
+				Command:                service.Command,
+				Cpu:                    256,
+				DisableNetworking:      service.NetworkMode == "none",
+				DnsSearchDomains:       service.DNSSearch,
+				DnsServers:             service.DNS,
+				DockerLabels:           nil,
+				DockerSecurityOptions:  service.SecurityOpt,
+				EntryPoint:             service.Entrypoint,
+				Environment:            toKeyValuePair(service.Environment),
+				Essential:              true,
+				ExtraHosts:             toHostEntryPtr(service.ExtraHosts),
+				FirelensConfiguration:  nil,
+				HealthCheck:            toHealthCheck(service.HealthCheck),
+				Hostname:               service.Hostname,
+				Image:                  service.Image,
+				Interactive:            false,
+				Links:                  nil,
+				LinuxParameters:        toLinuxParameters(service),
 				Memory:                 toMemoryLimits(service.Deploy),
 				MemoryReservation:      toMemoryReservation(service.Deploy),
 				MountPoints:            nil,
-				Name:                   toStringPtr(service.Name),
+				Name:                   service.Name,
 				PortMappings:           toPortMappings(service.Ports),
-				Privileged:             toBoolPtr(service.Privileged),
-				PseudoTerminal:         toBoolPtr(service.Tty),
-				ReadonlyRootFilesystem: toBoolPtr(service.ReadOnly),
+				Privileged:             service.Privileged,
+				PseudoTerminal:         service.Tty,
+				ReadonlyRootFilesystem: service.ReadOnly,
 				RepositoryCredentials:  nil,
 				ResourceRequirements:   nil,
 				Secrets:                nil,
-				StartTimeout:           nil,
-				StopTimeout:            durationToInt64Ptr(service.StopGracePeriod),
+				StartTimeout:           0,
+				StopTimeout:            durationToInt(service.StopGracePeriod),
 				SystemControls:         nil,
 				Ulimits:                toUlimits(service.Ulimits),
-				User:                   toStringPtr(service.User),
+				User:                   service.User,
 				VolumesFrom:            nil,
-				WorkingDirectory:       toStringPtr(service.WorkingDir),
+				WorkingDirectory:       service.WorkingDir,
 			},
 		},
 		Cpu:                     toCPU(service),
-		ExecutionRoleArn:        nil,
-		Family:                  toStringPtr(project.Name),
-		IpcMode:                 toStringPtr(service.Ipc),
+		Family:                  project.Name,
+		IpcMode:                 service.Ipc,
 		Memory:                  toMemory(service),
-		NetworkMode:             toStringPtr("awsvpc"), // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
-		PidMode:                 toStringPtr(service.Pid),
+		NetworkMode:             ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
+		PidMode:                 service.Pid,
 		PlacementConstraints:    toPlacementConstraints(service.Deploy),
 		ProxyConfiguration:      nil,
-		RequiresCompatibilities: toRequiresCompatibilities(ecs.LaunchTypeFargate),
+		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
 		Tags:                    nil,
-		Volumes: []*ecs.Volume{
-			{
-				/* ONLY supported when using EC2 launch type
-				DockerVolumeConfiguration: {
-					Autoprovision: nil,
-					Driver:        nil,
-					DriverOpts:    nil,
-					Labels:        nil,
-					Scope:         nil,
-				}, */
-				/* Beta and ONLY supported when using EC2 launch type
-				EfsVolumeConfiguration: {
-					FileSystemId:  nil,
-					RootDirectory: nil,
-				}, */
-				/* Bind mount host volume
-				Host:                      {
-						SourcePath:
-				}, */
-				Name: aws.String("MyVolume"),
-			},
-		},
+		Volumes:                 []ecs.TaskDefinition_Volume{},
 	}, nil
 
 }
 
-func toCPU(service types.ServiceConfig) *string {
+func toCPU(service types.ServiceConfig) string {
 	// FIXME based on service's memory/cpu requirements, select the adequate Fargate CPU
-	v := "256"
-	return &v
+	return "256"
 }
 
-func toMemory(service types.ServiceConfig) *string {
+func toMemory(service types.ServiceConfig) string {
 	// FIXME based on service's memory/cpu requirements, select the adequate Fargate CPU
-	v := "512"
-	return &v
+	return "512"
 }
 
 func toCPULimits(service types.ServiceConfig) (*int64, error) {
@@ -153,45 +122,45 @@ func hasMemoryOrMemoryReservation(service types.ServiceConfig) bool {
 	return false
 }
 
-func toPlacementConstraints(deploy *types.DeployConfig) []*ecs.TaskDefinitionPlacementConstraint {
+func toPlacementConstraints(deploy *types.DeployConfig) []ecs.TaskDefinition_TaskDefinitionPlacementConstraint {
 	if deploy == nil || deploy.Placement.Constraints == nil || len(deploy.Placement.Constraints) == 0 {
 		return nil
 	}
-	pl := []*ecs.TaskDefinitionPlacementConstraint{}
+	pl := []ecs.TaskDefinition_TaskDefinitionPlacementConstraint{}
 	for _, c := range deploy.Placement.Constraints {
-		pl = append(pl, &ecs.TaskDefinitionPlacementConstraint{
-			Expression: toStringPtr(c),
-			Type:       nil,
+		pl = append(pl, ecs.TaskDefinition_TaskDefinitionPlacementConstraint{
+			Expression: c,
+			Type:       "",
 		})
 	}
 	return pl
 }
 
-func toPortMappings(ports []types.ServicePortConfig) []*ecs.PortMapping {
+func toPortMappings(ports []types.ServicePortConfig) []ecs.TaskDefinition_PortMapping {
 	if len(ports) == 0 {
 		return nil
 	}
-	m := []*ecs.PortMapping{}
+	m := []ecs.TaskDefinition_PortMapping{}
 	for _, p := range ports {
-		m = append(m, &ecs.PortMapping{
-			ContainerPort: uint32Toint64Ptr(p.Target),
-			HostPort:      uint32Toint64Ptr(p.Published),
-			Protocol:      toStringPtr(p.Protocol),
+		m = append(m, ecs.TaskDefinition_PortMapping{
+			ContainerPort: int(p.Target),
+			HostPort:      int(p.Published),
+			Protocol:      p.Protocol,
 		})
 	}
 	return m
 }
 
-func toUlimits(ulimits map[string]*types.UlimitsConfig) []*ecs.Ulimit {
+func toUlimits(ulimits map[string]*types.UlimitsConfig) []ecs.TaskDefinition_Ulimit {
 	if len(ulimits) == 0 {
 		return nil
 	}
-	u := []*ecs.Ulimit{}
+	u := []ecs.TaskDefinition_Ulimit{}
 	for k, v := range ulimits {
-		u = append(u, &ecs.Ulimit{
-			Name:      toStringPtr(k),
-			SoftLimit: intToInt64Ptr(v.Soft),
-			HardLimit: intToInt64Ptr(v.Hard),
+		u = append(u, ecs.TaskDefinition_Ulimit{
+			Name:      k,
+			SoftLimit: v.Soft,
+			HardLimit: v.Hard,
 		})
 	}
 	return u
@@ -209,79 +178,82 @@ func intToInt64Ptr(i int) *int64 {
 
 const Mb = 1024 * 1024
 
-func toMemoryLimits(deploy *types.DeployConfig) *int64 {
+func toMemoryLimits(deploy *types.DeployConfig) int {
 	if deploy == nil {
-		return nil
+		return 0
 	}
 	res := deploy.Resources.Limits
 	if res == nil {
-		return nil
+		return 0
 	}
-	v := int64(res.MemoryBytes) / Mb
-	return &v
+	v := int(res.MemoryBytes) / Mb
+	return v
 }
 
-func toMemoryReservation(deploy *types.DeployConfig) *int64 {
+func toMemoryReservation(deploy *types.DeployConfig) int {
 	if deploy == nil {
-		return nil
+		return 0
 	}
 	res := deploy.Resources.Reservations
 	if res == nil {
-		return nil
+		return 0
 	}
-	v := int64(res.MemoryBytes) / Mb
-	return &v
+	v := int(res.MemoryBytes) / Mb
+	return v
 }
 
-func toLinuxParameters(service types.ServiceConfig) *ecs.LinuxParameters {
-	return &ecs.LinuxParameters{
+func toLinuxParameters(service types.ServiceConfig) *ecs.TaskDefinition_LinuxParameters {
+	return &ecs.TaskDefinition_LinuxParameters{
 		Capabilities:       toKernelCapabilities(service.CapAdd, service.CapDrop),
 		Devices:            nil,
-		InitProcessEnabled: service.Init,
-		MaxSwap:            nil,
+		InitProcessEnabled: service.Init != nil && *service.Init,
+		MaxSwap:            0,
 		// FIXME SharedMemorySize:   service.ShmSize,
-		Swappiness: nil,
+		Swappiness: 0,
 		Tmpfs:      toTmpfs(service.Tmpfs),
 	}
 }
 
-func toTmpfs(tmpfs types.StringList) []*ecs.Tmpfs {
+func toTmpfs(tmpfs types.StringList) []ecs.TaskDefinition_Tmpfs {
 	if tmpfs == nil || len(tmpfs) == 0 {
 		return nil
 	}
-	o := []*ecs.Tmpfs{}
-	for _, t := range tmpfs {
-		path := t
-		o = append(o, &ecs.Tmpfs{
-			ContainerPath: &path,
+	o := []ecs.TaskDefinition_Tmpfs{}
+	for _, path := range tmpfs {
+		o = append(o, ecs.TaskDefinition_Tmpfs{
+			ContainerPath: path,
 			MountOptions:  nil,
-			Size:          nil,
+			Size:          0,
 		})
 	}
 	return o
 }
 
-func toKernelCapabilities(add []string, drop []string) *ecs.KernelCapabilities {
+func toKernelCapabilities(add []string, drop []string) *ecs.TaskDefinition_KernelCapabilities {
 	if len(add) == 0 && len(drop) == 0 {
 		return nil
 	}
-	return &ecs.KernelCapabilities{
-		Add:  toStringPtrSlice(add),
-		Drop: toStringPtrSlice(drop),
+	return &ecs.TaskDefinition_KernelCapabilities{
+		Add:  add,
+		Drop: drop,
 	}
 
 }
 
-func toHealthCheck(check *types.HealthCheckConfig) *ecs.HealthCheck {
+func toHealthCheck(check *types.HealthCheckConfig) *ecs.TaskDefinition_HealthCheck {
 	if check == nil {
 		return nil
 	}
-	return &ecs.HealthCheck{
-		Command:     toStringPtrSlice(check.Test),
-		Interval:    durationToInt64Ptr(check.Interval),
-		Retries:     uint64ToInt64Ptr(check.Retries),
-		StartPeriod: durationToInt64Ptr(check.StartPeriod),
-		Timeout:     durationToInt64Ptr(check.Timeout),
+	retries := 0
+	if check.Retries != nil {
+		retries = int(*check.Retries)
+	}
+	return &ecs.TaskDefinition_HealthCheck{
+		Command:     check.Test,
+		Interval:    durationToInt(check.Interval),
+		Retries:     retries,
+		StartPeriod: durationToInt(check.StartPeriod),
+		Timeout:     durationToInt(check.Timeout),
 	}
 }
 
@@ -293,66 +265,44 @@ func uint64ToInt64Ptr(i *uint64) *int64 {
 	return &v
 }
 
-func durationToInt64Ptr(interval *types.Duration) *int64 {
+func durationToInt(interval *types.Duration) int {
 	if interval == nil {
-		return nil
+		return 0
 	}
-	v := int64(time.Duration(*interval).Seconds())
-	return &v
+	v := int(time.Duration(*interval).Seconds())
+	return v
 }
 
-func toHostEntryPtr(hosts types.HostsList) []*ecs.HostEntry {
+func toHostEntryPtr(hosts types.HostsList) []ecs.TaskDefinition_HostEntry {
 	if hosts == nil || len(hosts) == 0 {
 		return nil
 	}
-	e := []*ecs.HostEntry{}
+	e := []ecs.TaskDefinition_HostEntry{}
 	for _, h := range hosts {
-		host := h
-		e = append(e, &ecs.HostEntry{
-			Hostname: &host,
+		parts := strings.SplitN(h, ":", 2) // FIXME this should be handled by compose-go
+		e = append(e, ecs.TaskDefinition_HostEntry{
+			Hostname:  parts[0],
+			IpAddress: parts[1],
 		})
 	}
 	return e
 }
 
-func toKeyValuePairPtr(environment types.MappingWithEquals) []*ecs.KeyValuePair {
+func toKeyValuePair(environment types.MappingWithEquals) []ecs.TaskDefinition_KeyValuePair {
 	if environment == nil || len(environment) == 0 {
 		return nil
 	}
-	pairs := []*ecs.KeyValuePair{}
+	pairs := []ecs.TaskDefinition_KeyValuePair{}
 	for k, v := range environment {
 		name := k
-		value := v
-		pairs = append(pairs, &ecs.KeyValuePair{
-			Name:  &name,
+		var value string
+		if v != nil {
+			value = *v
+		}
+		pairs = append(pairs, ecs.TaskDefinition_KeyValuePair{
+			Name:  name,
 			Value: value,
 		})
 	}
 	return pairs
-}
-
-func toStringPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func toStringPtrSlice(s []string) []*string {
-	if len(s) == 0 {
-		return nil
-	}
-	v := []*string{}
-	for _, x := range s {
-		value := x
-		v = append(v, &value)
-	}
-	return v
-}
-
-func toBoolPtr(b bool) *bool {
-	if !b {
-		return nil
-	}
-	return &b
 }

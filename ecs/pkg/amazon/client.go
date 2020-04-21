@@ -18,7 +18,6 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-
 const (
 	ProjectTag = "com.docker.compose.project"
 )
@@ -35,27 +34,27 @@ func NewClient(profile string, cluster string, region string) (compose.API, erro
 	}
 	return &client{
 		Cluster: cluster,
-		Region: region,
-		sess: sess,
-		ECS: ecs.New(sess),
-		EC2:  ec2.New(sess),
-		ELB: elbv2.New(sess),
-		CW: cloudwatchlogs.New(sess),
-		IAM: iam.New(sess),
-		CF: cloudformation.New(sess),
+		Region:  region,
+		sess:    sess,
+		ECS:     ecs.New(sess),
+		EC2:     ec2.New(sess),
+		ELB:     elbv2.New(sess),
+		CW:      cloudwatchlogs.New(sess),
+		IAM:     iam.New(sess),
+		CF:      cloudformation.New(sess),
 	}, nil
 }
 
 type client struct {
 	Cluster string
-	Region string
-	sess *session.Session
-	ECS ecsiface.ECSAPI
-	EC2 ec2iface.EC2API
-	ELB elbv2iface.ELBV2API
-	CW cloudwatchlogsiface.CloudWatchLogsAPI
-	IAM iamiface.IAMAPI
-	CF cloudformationiface.CloudFormationAPI
+	Region  string
+	sess    *session.Session
+	ECS     ecsiface.ECSAPI
+	EC2     ec2iface.EC2API
+	ELB     elbv2iface.ELBV2API
+	CW      cloudwatchlogsiface.CloudWatchLogsAPI
+	IAM     iamiface.IAMAPI
+	CF      cloudformationiface.CloudFormationAPI
 }
 
 var _ compose.API = &client{}

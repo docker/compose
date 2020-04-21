@@ -2,14 +2,15 @@ package compose
 
 import (
 	"fmt"
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/compose-spec/compose-go/loader"
+	"github.com/compose-spec/compose-go/types"
+	"github.com/sirupsen/logrus"
 )
 
 type Project struct {
@@ -31,7 +32,6 @@ func NewProject(config types.ConfigDetails, name string) (*Project, error) {
 	}
 	return &p, nil
 }
-
 
 // projectFromOptions load a compose project based on command line options
 func projectFromOptions(options *ProjectOptions) (*Project, error) {

@@ -5,7 +5,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-
 func (c client) RegisterTaskDefinition(task *ecs.RegisterTaskDefinitionInput) (*string, error) {
 	logrus.Debug("Register Task Definition")
 	def, err := c.ECS.RegisterTaskDefinition(task)
