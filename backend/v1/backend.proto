@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package com.docker.api.backend.v1;
 
-import weak "gogoproto/gogo.proto";
 import "google/protobuf/empty.proto";
 
 option go_package = "github.com/docker/api/backend/v1;v1";
@@ -13,5 +12,5 @@ service Backend {
 }
 
 message BackendInformationResponse {
-	string id = 1 [(gogoproto.customname) = "ID"];
+	string id = 1;
 }
