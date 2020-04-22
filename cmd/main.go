@@ -49,7 +49,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv("PATH", fmt.Sprintf("$PATH:%s", path)); err != nil {
+	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"),path)); err != nil {
 		panic(err)
 	}
 }
@@ -115,7 +115,7 @@ func main() {
 }
 
 func shellOutToDefaultEngine() {
-	cmd := exec.Command("/Applications/Docker.app/Contents/Resources/bin/docker", os.Args[1:]...)
+	cmd := exec.Command("docker", os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
