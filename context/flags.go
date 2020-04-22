@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -19,15 +19,16 @@ var (
 	ConfigFlag  = cli.StringFlag{
 		Name:        "config",
 		Usage:       "Location of client config files `DIRECTORY`",
-		EnvVar:      "DOCKER_CONFIG",
+		EnvVars:      []string{"DOCKER_CONFIG"},
 		Value:       filepath.Join(home(), configFileDir),
 		Destination: &ConfigDir,
 	}
 
 	ContextFlag = cli.StringFlag{
-		Name:        "context, c",
+		Name:        "context",
+		Aliases: 	 []string{"c"},
 		Usage:       "Name of the context `CONTEXT` to use to connect to the daemon (overrides DOCKER_HOST env var and default context set with \"docker context use\")",
-		EnvVar:      "DOCKER_CONTEXT",
+		EnvVars:      []string{"DOCKER_CONTEXT"},
 		Destination: &ContextName,
 	}
 )

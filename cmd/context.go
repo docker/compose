@@ -29,7 +29,7 @@ package main
 
 import (
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var contextCommand = cli.Command{
