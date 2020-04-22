@@ -12,7 +12,7 @@ func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer bool) er
 	if err != nil {
 		return err
 	}
-
+	c.DeleteCluster()
 	// TODO monitor progress
 	return nil
 }
