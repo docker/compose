@@ -14,7 +14,6 @@ import (
 
 func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-
 	vpc, err := c.GetDefaultVPC()
 	if err != nil {
 		return nil, err
