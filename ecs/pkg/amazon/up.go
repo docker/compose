@@ -17,7 +17,7 @@ func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) er
 	if !ok {
 		c.CreateCluster()
 	}
-	_, err := c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
+	_, err = c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
 		StackName: aws.String(project.Name),
 	})
 	if err == nil {
