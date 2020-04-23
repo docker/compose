@@ -10,13 +10,11 @@ import (
 )
 
 func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) error {
-	stacks, err := c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
+	_, err := c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
 		StackName: aws.String(project.Name),
 	})
-	if err != nil {
-		return err
-	}
-	if len(stacks.Stacks) > 0 {
+	if err == nil {
+		// FIXME no ErrNotFound err type here
 		return fmt.Errorf("we do not (yet) support updating an existing CloudFormation stack")
 	}
 
