@@ -38,7 +38,7 @@ import (
 
 	"github.com/docker/api/context"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func init() {
@@ -61,12 +61,12 @@ func main() {
 	app.UseShortOptionHandling = true
 	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in the logs",
 		},
-		context.ConfigFlag,
-		context.ContextFlag,
+		&context.ConfigFlag,
+		&context.ContextFlag,
 	}
 
 	// Make a copy of the default HelpPrinter function
@@ -87,7 +87,7 @@ func main() {
 	}
 
 	app.Before = func(clix *cli.Context) error {
-		if clix.GlobalBool("debug") {
+		if clix.Bool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		ctx, err := context.GetContext()
@@ -100,9 +100,9 @@ func main() {
 		// TODO select backend based on context.Metadata.Type
 		return nil
 	}
-	app.Commands = []cli.Command{
-		contextCommand,
-		exampleCommand,
+	app.Commands = []*cli.Command{
+		&contextCommand,
+		&exampleCommand,
 	}
 
 	sort.Sort(cli.FlagsByName(app.Flags))

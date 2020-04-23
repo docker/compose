@@ -37,7 +37,7 @@ import (
 	"github.com/docker/api/client"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var exampleCommand = cli.Command{

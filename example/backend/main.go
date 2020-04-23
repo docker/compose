@@ -39,7 +39,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
@@ -50,17 +50,17 @@ func main() {
 	app.UseShortOptionHandling = true
 	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug output in the logs",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "address,a",
 			Usage: "address of the server",
 		},
 	}
 	app.Before = func(clix *cli.Context) error {
-		if clix.GlobalBool("debug") {
+		if clix.Bool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		return nil
@@ -73,7 +73,7 @@ func main() {
 		s := server.New()
 
 		// listen on a socket to accept connects
-		l, err := net.Listen("unix", clix.GlobalString("address"))
+		l, err := net.Listen("unix", clix.String("address"))
 		if err != nil {
 			return errors.Wrap(err, "listen unix socket")
 		}
@@ -93,7 +93,7 @@ func main() {
 			s.Stop()
 		}()
 
-		logrus.WithField("address", clix.GlobalString("address")).Info("serving daemon API")
+		logrus.WithField("address", clix.String("address")).Info("serving daemon API")
 		// start the GRPC server to serve on the listener
 		return s.Serve(l)
 	}
