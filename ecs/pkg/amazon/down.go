@@ -8,7 +8,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer bool) error {
+func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer, deleteCluster bool) error {
 	_, err := c.CF.DeleteStack(&cloudformation.DeleteStackInput{
 		StackName: &project.Name,
 	})
@@ -19,7 +19,13 @@ func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer bool) er
 	if err = c.CF.WaitUntilStackDeleteComplete(&cf.DescribeStacksInput{StackName: &project.Name}); err != nil {
 		return err
 	}
-	fmt.Printf("... done.\nDelete cluster %s", c.Cluster)
+	fmt.Printf("... done.\n")
+
+	if !deleteCluster {
+		return nil
+	}
+
+	fmt.Printf("Delete cluster %s", c.Cluster)
 	if err = c.DeleteCluster(); err != nil {
 		return err
 	}
