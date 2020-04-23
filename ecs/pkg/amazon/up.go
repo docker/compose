@@ -10,6 +10,13 @@ import (
 )
 
 func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) error {
+	ok, err := c.ClusterExists()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		c.CreateCluster()
+	}
 	_, err := c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
 		StackName: aws.String(project.Name),
 	})

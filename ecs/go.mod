@@ -35,12 +35,14 @@ require (
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/miekg/pkcs11 v1.0.3 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/pflag v1.0.3
+	github.com/spf13/pflag v1.0.5
 	github.com/theupdateframework/notary v0.6.1 // indirect
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
+	golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/grpc v1.27.0 // indirect
 	gopkg.in/dancannon/gorethink.v3 v3.0.5 // indirect
