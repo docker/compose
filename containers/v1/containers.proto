@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package com.docker.container.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/docker/d2/api/containers/v1;v1";
+
+service Containers {
+	rpc List(ListRequest) returns (ListResponse);
+	rpc Create(CreateRequest) returns (CreateResponse);
+	rpc Start(StartRequest) returns (StartResponse);
+	rpc Stop(StopRequest) returns (google.protobuf.Empty);
+	rpc Kill(KillRequest) returns (google.protobuf.Empty);
+	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+	rpc Update(UpdateRequest) returns (UpdateResponse);
+	rpc Exec(ExecRequest) returns (ExecResponse);
+}
+
+message Container {
+	string id = 1;
+	string image = 2;
+	string status = 3;
+	uint64 cpu_time = 4;
+	uint64 memory_usage = 5;
+	uint64 memory_limit = 6;
+	uint64 pids_current = 7;
+	uint64 pids_limit = 8;
+	repeated string labels = 9;
+}
+
+message CreateRequest {
+	string id = 1;
+	repeated string args = 2;
+	repeated string env = 3;
+	bool tty = 4;
+	string image = 5;
+	string hostname = 6;
+	repeated string networks = 7;
+	string snapshotter = 8;
+	string logger = 9;
+	string profile = 10;
+	string restart_status = 11;
+	repeated Mount mounts = 12;
+	string working_dir = 13;
+	repeated string labels = 14;
+}
+
+message Mount {
+	string type = 1;
+	string source = 2;
+	string destination = 3;
+	repeated string options = 4;
+}
+
+message CreateResponse {
+
+}
+
+message UpdateRequest {
+	string id = 1;
+	string image = 2;
+}
+
+message UpdateResponse {
+
+}
+
+message DeleteRequest {
+	string id = 1;
+	bool force = 2;
+}
+
+message StartRequest {
+	string id = 1;
+	string stream_id = 2;
+}
+
+message StartResponse {
+
+}
+
+message StopRequest {
+	string id = 1;
+	int64 signal = 2;
+}
+
+message ExecRequest {
+	string id = 1;
+	string stream_id = 2;
+	repeated string args = 3;
+	repeated string env = 4;
+	bool tty = 5;
+	string working_dir = 6;
+}
+
+message ExecResponse {
+
+}
+
+message KillRequest {
+	string id = 1;
+	int64 signal = 2;
+}
+
+message ListRequest {
+	repeated string filters = 1;
+}
+
+message ListResponse {
+	repeated Container containers = 1;
+}
