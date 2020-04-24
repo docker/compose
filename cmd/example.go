@@ -35,6 +35,8 @@ import (
 	"time"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/util"
+
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
@@ -45,7 +47,7 @@ var exampleCommand = cli.Command{
 	Usage: "sample command using backend, to be removed later",
 	Action: func(clix *cli.Context) error {
 		// return information for the current context
-		ctx, cancel := client.NewContext()
+		ctx, cancel := util.NewSigContext()
 		defer cancel()
 
 		// get our current context

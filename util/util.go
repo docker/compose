@@ -25,49 +25,24 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package client
+package util
 
 import (
 	"context"
-	"time"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
-
-	v1 "github.com/docker/api/backend/v1"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
-// New returns a GRPC client
-func New(address string, timeout time.Duration) (*Client, error) {
-	backoffConfig := backoff.DefaultConfig
-	backoffConfig.MaxDelay = 3 * time.Second
-	backoffConfig.BaseDelay = 10 * time.Millisecond
-	connParams := grpc.ConnectParams{
-		Backoff: backoffConfig,
-	}
-	opts := []grpc.DialOption{
-		grpc.WithInsecure(),
-		grpc.WithConnectParams(connParams),
-		grpc.WithBlock(),
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, address, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Client{
-		conn:          conn,
-		BackendClient: v1.NewBackendClient(conn),
-	}, nil
-}
-
-type Client struct {
-	conn *grpc.ClientConn
-	v1.BackendClient
-}
-
-func (c *Client) Close() error {
-	return c.conn.Close()
+// NewSigContext is a context that is canceled when a signal is
+// sent to the process
+func NewSigContext() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := make(chan os.Signal)
+	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-s
+		cancel()
+	}()
+	return ctx, cancel
 }
