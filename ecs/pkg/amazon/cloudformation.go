@@ -2,6 +2,8 @@ package amazon
 
 import (
 	"fmt"
+	"github.com/compose-spec/compose-go/types"
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -14,12 +16,12 @@ import (
 
 func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	vpc, err := c.GetDefaultVPC()
+	vpc, err := c.api.GetDefaultVPC()
 	if err != nil {
 		return nil, err
 	}
 
-	subnets, err := c.GetSubNets(vpc)
+	subnets, err := c.api.GetSubNets(vpc)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +44,7 @@ func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*clo
 		GroupDescription:     securityGroup,
 		GroupName:            securityGroup,
 		SecurityGroupIngress: ingresses,
-		VpcId:                *vpc,
+		VpcId:                vpc,
 	}
 
 	for _, service := range project.Services {
@@ -55,7 +57,7 @@ func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*clo
 		if err != nil {
 			return nil, err
 		}
-		definition.TaskRoleArn = *role
+		definition.TaskRoleArn = role
 
 		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
 		template.Resources[taskDefinition] = definition
@@ -77,4 +79,36 @@ func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*clo
 		}
 	}
 	return template, nil
+}
+
+const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+var defaultTaskExecutionRole string
+
+// GetEcsTaskExecutionRole retrieve the role ARN to apply for task execution
+func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error) {
+	if arn, ok := spec.Extras["x-ecs-TaskExecutionRole"]; ok {
+		return arn.(string), nil
+	}
+	if defaultTaskExecutionRole != "" {
+		return defaultTaskExecutionRole, nil
+	}
+
+	logrus.Debug("Retrieve Task Execution Role")
+	entities, err := c.api.ListRolesForPolicy(ECSTaskExecutionPolicy)
+	if err != nil {
+		return "", err
+	}
+	if len(entities) == 0 {
+		return "", fmt.Errorf("no Role is attached to AmazonECSTaskExecutionRole Policy, please provide an explicit task execution role")
+	}
+	if len(entities) > 1 {
+		return "", fmt.Errorf("multiple Roles are attached to AmazonECSTaskExecutionRole Policy, please provide an explicit task execution role")
+	}
+
+	arn, err := c.api.GetRoleArn(entities[0])
+	if err != nil {
+		return "", err
+	}
+	defaultTaskExecutionRole = arn
+	return arn, nil
 }

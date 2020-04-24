@@ -2,26 +2,19 @@ package amazon
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
 func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) error {
-	ok, err := c.ClusterExists()
+	ok, err := c.api.ClusterExists(c.Cluster)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		c.CreateCluster()
+		c.api.CreateCluster(c.Cluster)
 	}
-	_, err = c.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
-		StackName: aws.String(project.Name),
-	})
-	if err == nil {
-		// FIXME no ErrNotFound err type here
+	update, err := c.api.StackExists(project.Name)
+	if update {
 		return fmt.Errorf("we do not (yet) support updating an existing CloudFormation stack")
 	}
 
@@ -30,40 +23,12 @@ func (c *client) ComposeUp(project *compose.Project, loadBalancerArn *string) er
 		return err
 	}
 
-	json, err := template.JSON()
+	err = c.api.CreateStack(project.Name, template)
 	if err != nil {
 		return err
 	}
 
-	_, err = c.CF.ValidateTemplate(&cloudformation.ValidateTemplateInput{
-		TemplateBody: aws.String(string(json)),
-	})
-	if err != nil {
-		return err
-	}
-
-	_, err = c.CF.CreateStack(&cloudformation.CreateStackInput{
-		OnFailure:        aws.String("DELETE"),
-		StackName:        aws.String(project.Name),
-		TemplateBody:     aws.String(string(json)),
-		TimeoutInMinutes: aws.Int64(10),
-	})
-	if err != nil {
-		return err
-	}
-
-	events, err := c.CF.DescribeStackEvents(&cloudformation.DescribeStackEventsInput{
-		StackName: aws.String(project.Name),
-	})
-	if err != nil {
-		return err
-	}
-	for _, event := range events.StackEvents {
-		fmt.Printf("%s %s\n", *event.LogicalResourceId, *event.ResourceStatus)
-		if *event.ResourceStatus == "CREATE_FAILED" {
-			fmt.Fprintln(os.Stderr, event.ResourceStatusReason)
-		}
-	}
+	err = c.api.DescribeStackEvents(project.Name)
 
 	// TODO monitor progress
 	return nil

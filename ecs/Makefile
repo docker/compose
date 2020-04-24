@@ -1,3 +1,6 @@
+clean:
+	rm -rf dist/
+
 build:
 	go build -v -o dist/docker-ecs cmd/main/main.go
 
