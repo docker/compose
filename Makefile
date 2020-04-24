@@ -40,7 +40,7 @@ protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 cli: protos
-	cd cmd && GOOS=${GOOS} 	GOARCH=${GOARCH} go build -v -o ../bin/docker
+	cd cli && GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o ../bin/docker
 
 example: protos
 	cd example/backend && go build -v -o ../../bin/backend-example
@@ -71,6 +71,9 @@ dxbins: dbins
 	docker build . \
 	--output type=local,dest=./bin \
 	--target xbins
+
+test:
+	gotestsum ./...
 
 FORCE:
 

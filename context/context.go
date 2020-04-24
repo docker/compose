@@ -25,18 +25,8 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package main
+package context
 
-import (
-	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
-)
-
-var contextCommand = cli.Command{
-	Name:  "context",
-	Usage: "manage contexts",
-	Action: func(clix *cli.Context) error {
-		// return information for the current context
-		return errors.New("Error : To be implemented")
-	},
+type TypeContext struct {
+	Type string
 }

@@ -25,41 +25,59 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package context
+package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
+	"context"
+
+	"github.com/docker/api/context/store"
+	"github.com/spf13/cobra"
 )
 
-func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error) {
-	filename := filepath.Join(configDir, configFileName)
-	configFile := &ConfigFile{
-		Filename: filename,
-	}
-
-	if _, err := os.Stat(filename); err == nil {
-		file, err := os.Open(filename)
-		if err != nil {
-			return nil, fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		defer file.Close()
-		err = json.NewDecoder(file).Decode(&configFile)
-		if err != nil {
-			err = fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		return configFile, err
-	} else if !os.IsNotExist(err) {
-		// if file is there but we can't stat it for any reason other
-		// than it doesn't exist then stop
-		return nil, fmt.Errorf("can't read %s: %w", filename, err)
-	}
-	return configFile, nil
+type CliContext struct {
 }
 
-type ConfigFile struct {
-	Filename       string `json:"-"` // Note: for internal use only
-	CurrentContext string `json:"currentContext,omitempty"`
+func ContextCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "context",
+		Short: "Manage contexts",
+	}
+
+	cmd.AddCommand(
+		createCommand(),
+	)
+
+	return cmd
+}
+
+type createOpts struct {
+	description string
+}
+
+func createCommand() *cobra.Command {
+	var opts createOpts
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a context",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCreate(cmd.Context(), opts, args[0], args[1])
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.description, "description", "", "Description of the context")
+
+	return cmd
+}
+
+func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
+	s := store.ContextStore(ctx)
+	return s.Create(name, store.TypeContext{
+		Type:        contextType,
+		Description: opts.description,
+	}, map[string]interface{}{
+		// If we don't set anything here the main docker cli
+		// doesn't know how to read the context any more
+		"docker": CliContext{},
+	})
 }

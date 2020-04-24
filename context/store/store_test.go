@@ -25,41 +25,49 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package context
+package store
 
 import (
-	"encoding/json"
-	"fmt"
+	_ "crypto/sha256"
+	"io/ioutil"
 	"os"
-	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error) {
-	filename := filepath.Join(configDir, configFileName)
-	configFile := &ConfigFile{
-		Filename: filename,
-	}
+func setup(t *testing.T, cb func(*testing.T, Store)) {
+	dir, err := ioutil.TempDir("", "store")
+	assert.Nil(t, err)
+	defer os.RemoveAll(dir)
 
-	if _, err := os.Stat(filename); err == nil {
-		file, err := os.Open(filename)
-		if err != nil {
-			return nil, fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		defer file.Close()
-		err = json.NewDecoder(file).Decode(&configFile)
-		if err != nil {
-			err = fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		return configFile, err
-	} else if !os.IsNotExist(err) {
-		// if file is there but we can't stat it for any reason other
-		// than it doesn't exist then stop
-		return nil, fmt.Errorf("can't read %s: %w", filename, err)
-	}
-	return configFile, nil
+	store, err := New(dir)
+	assert.Nil(t, err)
+
+	cb(t, store)
 }
 
-type ConfigFile struct {
-	Filename       string `json:"-"` // Note: for internal use only
-	CurrentContext string `json:"currentContext,omitempty"`
+func TestGetUnknown(t *testing.T) {
+	setup(t, func(t *testing.T, store Store) {
+		meta, err := store.Get("unknown")
+		assert.Nil(t, meta)
+		assert.Error(t, err)
+	})
+}
+
+func TestCreate(t *testing.T) {
+	setup(t, func(t *testing.T, store Store) {
+		err := store.Create("test", nil, nil)
+		assert.Nil(t, err)
+	})
+}
+
+func TestGet(t *testing.T) {
+	setup(t, func(t *testing.T, store Store) {
+		err := store.Create("test", nil, nil)
+		assert.Nil(t, err)
+		meta, err := store.Get("test")
+		assert.Nil(t, err)
+		assert.NotNil(t, meta)
+	})
 }
