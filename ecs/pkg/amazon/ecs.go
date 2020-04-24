@@ -2,8 +2,7 @@ package amazon
 
 import (
 	"errors"
-	"strings"
-
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/sirupsen/logrus"
 )
@@ -40,13 +39,11 @@ func (c client) DeleteCluster() error {
 
 func (c client) ClusterExists() (bool, error) {
 	logrus.Debug("Check if cluster was already created: ", c.Cluster)
-	clusters, err := c.ECS.ListClusters(nil)
+	clusters, err := c.ECS.DescribeClusters(&ecs.DescribeClustersInput{
+		Clusters: []*string{aws.String(c.Cluster)},
+	})
 	if err != nil {
 		return false, err
 	}
-	found := false
-	for _, arn := range clusters.ClusterArns {
-		found = found || strings.HasSuffix(*arn, "/"+c.Cluster)
-	}
-	return found, nil
+	return len(clusters.Clusters) > 0, nil
 }
