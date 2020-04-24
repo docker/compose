@@ -1,5 +1,5 @@
 /*
-	Copyright (c) 2019 Docker Inc.
+	Copyright (c) 2020 Docker Inc.
 
 	Permission is hereby granted, free of charge, to any person
 	obtaining a copy of this software and associated documentation
