@@ -33,13 +33,14 @@ import (
 	"net"
 	"os"
 
-	v1 "github.com/docker/api/backend/v1"
-	"github.com/docker/api/client"
-	"github.com/docker/api/server"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+
+	v1 "github.com/docker/api/backend/v1"
+	"github.com/docker/api/server"
+	apiUtil "github.com/docker/api/util"
 )
 
 func main() {
@@ -66,7 +67,7 @@ func main() {
 		return nil
 	}
 	app.Action = func(clix *cli.Context) error {
-		ctx, cancel := client.NewContext()
+		ctx, cancel := apiUtil.NewSigContext()
 		defer cancel()
 
 		// create a new GRPC server with the provided server package
