@@ -25,21 +25,53 @@
 
 GIT_COMMIT=$(shell git rev-parse --short HEAD)
 GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
+
 PROTOS=$(shell find . -name \*.proto)
 
-export GO111MODULE=auto
+export DOCKER_BUILDKIT=1
 
-all: protos example cli
-
-cli:
-	cd cmd && go build -v -o ../bin/docker
+all: dbins
+xall: dxbins
+bins: cli example
+xbins: xcli xexample
 
 protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
-example:
+cli: protos
+	cd cmd && GOOS=${GOOS} 	GOARCH=${GOARCH} go build -v -o ../bin/docker
+
+example: protos
 	cd example/backend && go build -v -o ../../bin/backend-example
+
+xcli: cli
+	cd cmd && GOOS=linux 	GOARCH=amd64 	go build -v -o ../bin/docker-linux-amd64
+	cd cmd && GOOS=darwin 	GOARCH=amd64 	go build -v -o ../bin/docker-darwin-amd64
+	cd cmd && GOOS=windows 	GOARCH=amd64 	go build -v -o ../bin/docker-windows-amd64.exe
+
+xexample: example
+	cd example/backend && GOOS=linux	GOARCH=amd64	go build -v -o ../../bin/backend-example-linux-amd64
+	cd example/backend && GOOS=darwin	GOARCH=amd64	go build -v -o ../../bin/backend-example-darwin-amd64
+	cd example/backend && GOOS=windows	GOARCH=amd64	go build -v -o ../../bin/backend-example-windows-amd64.exe
+
+dprotos:
+	docker build . \
+	--output type=local,dest=./backend/v1 \
+	--target protos
+
+dbins: dprotos
+	docker build . \
+	--output type=local,dest=./bin \
+	--build-arg TARGET_OS=${GOOS} \
+	--build-arg TARGET_ARCH=${GOARCH} \
+	--target bins
+
+dxbins: dbins
+	docker build . \
+	--output type=local,dest=./bin \
+	--target xbins
 
 FORCE:
 
-.PHONY: protos example cli
+.PHONY: all xall protos example xexample xcli cli bins dbins dxbins dprotos
