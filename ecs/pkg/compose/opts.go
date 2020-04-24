@@ -20,7 +20,7 @@ type ProjectFunc func(project *Project, args []string) error
 // WithProject wrap a ProjectFunc into a cobra command
 func WithProject(options *ProjectOptions, f ProjectFunc) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		project, err := projectFromOptions(options)
+		project, err := ProjectFromOptions(options)
 		if err != nil {
 			return err
 		}

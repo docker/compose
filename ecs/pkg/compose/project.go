@@ -34,7 +34,7 @@ func NewProject(config types.ConfigDetails, name string) (*Project, error) {
 }
 
 // projectFromOptions load a compose project based on command line options
-func projectFromOptions(options *ProjectOptions) (*Project, error) {
+func ProjectFromOptions(options *ProjectOptions) (*Project, error) {
 	configPath, err := getConfigPathFromOptions(options)
 	if err != nil {
 		return nil, err

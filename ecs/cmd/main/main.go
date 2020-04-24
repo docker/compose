@@ -140,13 +140,27 @@ func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOption
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
 			if err != nil {
 				return err
 			}
-			return client.ComposeDown(project, opts.KeepLoadBalancer, opts.DeleteCluster)
-		}),
+			if len(args) == 0 {
+				project, err := compose.ProjectFromOptions(projectOpts)
+				if err != nil {
+					return err
+				}
+				return client.ComposeDown(&project.Name, opts.KeepLoadBalancer, opts.DeleteCluster)
+			}
+			// project names passed as parameters
+			for _, name := range args {
+				err := client.ComposeDown(&name, opts.KeepLoadBalancer, opts.DeleteCluster)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		},
 	}
 	cmd.Flags().BoolVar(&opts.KeepLoadBalancer, "keep-load-balancer", false, "Keep Load Balancer for further use")
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")

@@ -5,18 +5,17 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
-	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (c *client) ComposeDown(project *compose.Project, keepLoadBalancer, deleteCluster bool) error {
+func (c *client) ComposeDown(projectName *string, keepLoadBalancer, deleteCluster bool) error {
 	_, err := c.CF.DeleteStack(&cloudformation.DeleteStackInput{
-		StackName: &project.Name,
+		StackName: projectName,
 	})
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Delete stack ")
-	if err = c.CF.WaitUntilStackDeleteComplete(&cf.DescribeStacksInput{StackName: &project.Name}); err != nil {
+	if err = c.CF.WaitUntilStackDeleteComplete(&cf.DescribeStacksInput{StackName: projectName}); err != nil {
 		return err
 	}
 	fmt.Printf("... done.\n")
