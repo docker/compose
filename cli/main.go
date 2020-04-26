@@ -60,13 +60,25 @@ func init() {
 	}
 }
 
+func isContextCommand(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	if cmd.Name() == "context" {
+		return true
+	}
+	return isContextCommand(cmd.Parent())
+}
+
 func main() {
 	var opts mainOpts
 	root := &cobra.Command{
 		Use:  "docker",
 		Long: "docker for the 2020s",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			execMoby(cmd.Context())
+			if !isContextCommand(cmd) {
+				execMoby(cmd.Context())
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,7 +88,9 @@ func main() {
 
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		execMoby(cmd.Context())
+		if !isContextCommand(cmd) {
+			execMoby(cmd.Context())
+		}
 		helpFunc(cmd, args)
 	})
 
@@ -128,7 +142,9 @@ func withCurrentContext(ctx context.Context, opts mainOpts) (context.Context, er
 	if currentContext == "" {
 		currentContext = "default"
 	}
+
 	logrus.Debugf("Current context %q", currentContext)
+
 	return context.WithValue(ctx, currentContextKey{}, currentContext), nil
 }
 
@@ -146,6 +162,8 @@ func execMoby(ctx context.Context) {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	// Only run original docker command if the current context is not
+	// ours.
 	_, ok := cc.Metadata.(store.TypeContext)
 	if !ok {
 		cmd := exec.Command("docker", os.Args[1:]...)
