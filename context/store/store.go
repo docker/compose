@@ -56,9 +56,16 @@ func ContextStore(ctx context.Context) Store {
 	return s
 }
 
+// Store
 type Store interface {
+	// Get returns the context with with name, it returns an error if the
+	// context doesn't exist
 	Get(name string) (*Metadata, error)
+	// Create creates a new context, it returns an error if a context with the
+	// same name exists already.
 	Create(name string, data interface{}, endpoints map[string]interface{}) error
+	// List returns the list of created contexts
+	List() ([]*Metadata, error)
 }
 
 type store struct {
@@ -92,23 +99,33 @@ func (s *store) Get(name string) (*Metadata, error) {
 	}
 
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
+	return read(meta)
+}
+
+func read(meta string) (*Metadata, error) {
 	bytes, err := ioutil.ReadFile(meta)
 	if err != nil {
 		return nil, err
 	}
 
-	r := &Metadata{
-		Endpoints: make(map[string]interface{}),
+	var r untypedContextMetadata
+	if err := json.Unmarshal(bytes, &r); err != nil {
+		return nil, err
+	}
+
+	result := &Metadata{
+		Name:      r.Name,
+		Endpoints: r.Endpoints,
 	}
 
 	typed := getter()
-	if err := json.Unmarshal(bytes, typed); err != nil {
-		return r, err
+	if err := json.Unmarshal(r.Metadata, typed); err != nil {
+		return nil, err
 	}
 
-	r.Metadata = reflect.ValueOf(typed).Elem().Interface()
+	result.Metadata = reflect.ValueOf(typed).Elem().Interface()
 
-	return r, nil
+	return result, nil
 }
 
 func (s *store) Create(name string, data interface{}, endpoints map[string]interface{}) error {
@@ -137,6 +154,28 @@ func (s *store) Create(name string, data interface{}, endpoints map[string]inter
 	return ioutil.WriteFile(filepath.Join(metaDir, metaFile), bytes, 0644)
 }
 
+func (s *store) List() ([]*Metadata, error) {
+	root := filepath.Join(s.root, contextsDir, metadataDir)
+	c, err := ioutil.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*Metadata
+	for _, fi := range c {
+		if fi.IsDir() {
+			meta := filepath.Join(root, fi.Name(), metaFile)
+			r, err := read(meta)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, r)
+		}
+	}
+
+	return result, nil
+}
+
 func contextdirOf(name string) string {
 	return digest.FromString(name).Encoded()
 }
@@ -147,9 +186,15 @@ type Metadata struct {
 	Endpoints map[string]interface{} `json:",omitempty"`
 }
 
+type untypedContextMetadata struct {
+	Metadata  json.RawMessage        `json:"metadata,omitempty"`
+	Endpoints map[string]interface{} `json:"endpoints,omitempty"`
+	Name      string                 `json:"name,omitempty"`
+}
+
 type TypeContext struct {
-	Type        string
-	Description string
+	Type        string `json:",omitempty"`
+	Description string `json:",omitempty"`
 }
 
 func getter() interface{} {

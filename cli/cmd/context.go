@@ -29,6 +29,9 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/docker/api/context/store"
 	"github.com/spf13/cobra"
@@ -45,6 +48,7 @@ func ContextCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		createCommand(),
+		listCommand(),
 	)
 
 	return cmd
@@ -70,6 +74,17 @@ func createCommand() *cobra.Command {
 	return cmd
 }
 
+func listCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runList(cmd.Context())
+		},
+	}
+	return cmd
+}
+
 func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
 	s := store.ContextStore(ctx)
 	return s.Create(name, store.TypeContext{
@@ -80,4 +95,26 @@ func runCreate(ctx context.Context, opts createOpts, name string, contextType st
 		// doesn't know how to read the context any more
 		"docker": CliContext{},
 	})
+}
+
+func runList(ctx context.Context) error {
+	s := store.ContextStore(ctx)
+	contexts, err := s.List()
+	if err != nil {
+		return err
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "NAME\tDESCRIPTION\tTYPE")
+	format := "%s\t%s\t%s\n"
+
+	for _, c := range contexts {
+		meta, ok := c.Metadata.(store.TypeContext)
+		if !ok {
+			return fmt.Errorf("Unable to list contexts, context %q is not valid", c.Name)
+		}
+		fmt.Fprintf(w, format, c.Name, meta.Description, meta.Type)
+	}
+
+	return w.Flush()
 }

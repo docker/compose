@@ -29,6 +29,7 @@ package store
 
 import (
 	_ "crypto/sha256"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -64,10 +65,38 @@ func TestCreate(t *testing.T) {
 
 func TestGet(t *testing.T) {
 	setup(t, func(t *testing.T, store Store) {
-		err := store.Create("test", nil, nil)
+		err := store.Create("test", TypeContext{
+			Type:        "type",
+			Description: "description",
+		}, nil)
 		assert.Nil(t, err)
+
 		meta, err := store.Get("test")
 		assert.Nil(t, err)
 		assert.NotNil(t, meta)
+		assert.Equal(t, "test", meta.Name)
+
+		m, ok := meta.Metadata.(TypeContext)
+		assert.Equal(t, ok, true)
+		fmt.Printf("%#v\n", meta)
+		assert.Equal(t, "description", m.Description)
+		assert.Equal(t, "type", m.Type)
+	})
+}
+
+func TestList(t *testing.T) {
+	setup(t, func(t *testing.T, store Store) {
+		err := store.Create("test1", TypeContext{}, nil)
+		assert.Nil(t, err)
+
+		err = store.Create("test2", TypeContext{}, nil)
+		assert.Nil(t, err)
+
+		contexts, err := store.List()
+		assert.Nil(t, err)
+
+		assert.Equal(t, len(contexts), 2)
+		assert.Equal(t, contexts[0].Name, "test1")
+		assert.Equal(t, contexts[1].Name, "test2")
 	})
 }
