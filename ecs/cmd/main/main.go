@@ -90,7 +90,6 @@ func (o upOptions) LoadBalancerArn() *string {
 }
 
 func ConvertCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
-	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "convert",
 		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
