@@ -2,9 +2,10 @@ package amazon
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/sirupsen/logrus"
-	"strings"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -14,7 +15,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/convert"
 )
 
-func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*cloudformation.Template, error) {
+func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
 	vpc, err := c.api.GetDefaultVPC()
 	if err != nil {
@@ -112,4 +113,11 @@ func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error
 	}
 	defaultTaskExecutionRole = arn
 	return arn, nil
+}
+
+type convertAPI interface {
+	GetDefaultVPC() (string, error)
+	GetSubNets(vpcId string) ([]string, error)
+	ListRolesForPolicy(policy string) ([]string, error)
+	GetRoleArn(name string) (string, error)
 }

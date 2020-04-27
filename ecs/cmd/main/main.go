@@ -98,7 +98,7 @@ func ConvertCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOpt
 			if err != nil {
 				return err
 			}
-			template, err := client.Convert(project, opts.LoadBalancerArn())
+			template, err := client.Convert(project)
 			if err != nil {
 				return err
 			}
@@ -124,7 +124,7 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 			if err != nil {
 				return err
 			}
-			return client.ComposeUp(project, opts.LoadBalancerArn())
+			return client.ComposeUp(project)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")

@@ -11,7 +11,6 @@ func (c *client) ComposeDown(projectName *string, keepLoadBalancer, deleteCluste
 	}
 	fmt.Printf("Delete stack ")
 
-
 	if !deleteCluster {
 		return nil
 	}
@@ -22,4 +21,9 @@ func (c *client) ComposeDown(projectName *string, keepLoadBalancer, deleteCluste
 	}
 	fmt.Printf("... done. \n")
 	return nil
+}
+
+type downAPI interface {
+	DeleteStack(name string) error
+	DeleteCluster(name string) error
 }

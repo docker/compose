@@ -1,10 +1,11 @@
 package amazon
 
 import (
+	"testing"
+
 	"github.com/docker/ecs-plugin/pkg/amazon/mock"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/golang/mock/gomock"
-	"testing"
 )
 
 func Test_down_dont_delete_cluster(t *testing.T) {
@@ -22,7 +23,7 @@ func Test_down_dont_delete_cluster(t *testing.T) {
 
 	c.ComposeDown(&compose.Project{
 		Name: "test_project",
-	}, false, false)
+	}, false)
 }
 
 func Test_down_delete_cluster(t *testing.T) {
@@ -41,5 +42,5 @@ func Test_down_delete_cluster(t *testing.T) {
 
 	c.ComposeDown(&compose.Project{
 		Name: "test_project",
-	}, false, true)
+	}, true)
 }
