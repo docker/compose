@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
     protobuf-compiler \
     libprotobuf-dev
-RUN go get github.com/golang/protobuf/protoc-gen-go
+RUN go get github.com/golang/protobuf/protoc-gen-go && \
+    go get gotest.tools/gotestsum
 WORKDIR ${PWD}
 ADD go.* ${PWD}
 RUN go mod download
@@ -24,6 +25,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGET_OS} \
     GOARCH=${TARGET_ARCH} \
     make bins
+
+FROM make-protos as make-test
+RUN make test
 
 FROM make-protos AS make-xbins
 RUN --mount=type=cache,target=/root/.cache/go-build \

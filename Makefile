@@ -72,6 +72,10 @@ dxbins: dbins
 	--output type=local,dest=./bin \
 	--target xbins
 
+dtest:
+	docker build . \
+	--target make-test
+
 test:
 	gotestsum ./...
 
