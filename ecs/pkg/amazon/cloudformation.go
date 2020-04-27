@@ -82,6 +82,7 @@ func (c client) Convert(project *compose.Project, loadBalancerArn *string) (*clo
 }
 
 const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
 var defaultTaskExecutionRole string
 
 // GetEcsTaskExecutionRole retrieve the role ARN to apply for task execution

@@ -30,7 +30,7 @@ func NewClient(profile string, cluster string, region string) (compose.API, erro
 type client struct {
 	Cluster string
 	Region  string
-	api API
+	api     API
 }
 
 var _ compose.API = &client{}

@@ -21,23 +21,23 @@ import (
 )
 
 type sdk struct {
-	sess    *session.Session
-	ECS     ecsiface.ECSAPI
-	EC2     ec2iface.EC2API
-	ELB     elbv2iface.ELBV2API
-	CW      cloudwatchlogsiface.CloudWatchLogsAPI
-	IAM     iamiface.IAMAPI
-	CF      cloudformationiface.CloudFormationAPI
+	sess *session.Session
+	ECS  ecsiface.ECSAPI
+	EC2  ec2iface.EC2API
+	ELB  elbv2iface.ELBV2API
+	CW   cloudwatchlogsiface.CloudWatchLogsAPI
+	IAM  iamiface.IAMAPI
+	CF   cloudformationiface.CloudFormationAPI
 }
 
 func NewAPI(sess *session.Session) API {
 	return sdk{
-		ECS:     ecs.New(sess),
-		EC2:     ec2.New(sess),
-		ELB:     elbv2.New(sess),
-		CW:      cloudwatchlogs.New(sess),
-		IAM:     iam.New(sess),
-		CF:      cloudformation.New(sess),
+		ECS: ecs.New(sess),
+		EC2: ec2.New(sess),
+		ELB: elbv2.New(sess),
+		CW:  cloudwatchlogs.New(sess),
+		IAM: iam.New(sess),
+		CF:  cloudformation.New(sess),
 	}
 }
 
@@ -99,7 +99,7 @@ func (s sdk) GetSubNets(vpc string) ([]string, error) {
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("vpc-id"),
-				Values: []*string{ aws.String(vpc)},
+				Values: []*string{aws.String(vpc)},
 			},
 			{
 				Name:   aws.String("default-for-az"),
