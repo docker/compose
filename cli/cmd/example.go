@@ -25,7 +25,7 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package main
+package cmd
 
 import (
 	"context"
@@ -35,20 +35,16 @@ import (
 	"time"
 
 	"github.com/docker/api/client"
-	"github.com/docker/api/util"
-
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 )
 
-var exampleCommand = cli.Command{
-	Name:  "example",
-	Usage: "sample command using backend, to be removed later",
-	Action: func(clix *cli.Context) error {
-		// return information for the current context
-		ctx, cancel := util.NewSigContext()
-		defer cancel()
+var ExampleCommand = cobra.Command{
+	Use:   "example",
+	Short: "sample command using backend, to be removed later",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 
 		// get our current context
 		ctx = current(ctx)
