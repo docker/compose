@@ -34,67 +34,74 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func setup(t *testing.T, cb func(*testing.T, Store)) {
+type StoreTestSuite struct {
+	suite.Suite
+	store Store
+	dir   string
+}
+
+func (suite *StoreTestSuite) BeforeTest(suiteName, testName string) {
 	dir, err := ioutil.TempDir("", "store")
-	assert.Nil(t, err)
-	defer os.RemoveAll(dir)
+	require.Nil(suite.T(), err)
 
 	store, err := New(dir)
-	assert.Nil(t, err)
+	require.Nil(suite.T(), err)
 
-	cb(t, store)
+	suite.dir = dir
+	suite.store = store
 }
 
-func TestGetUnknown(t *testing.T) {
-	setup(t, func(t *testing.T, store Store) {
-		meta, err := store.Get("unknown")
-		assert.Nil(t, meta)
-		assert.Error(t, err)
-	})
+func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
+	os.RemoveAll(suite.dir)
 }
 
-func TestCreate(t *testing.T) {
-	setup(t, func(t *testing.T, store Store) {
-		err := store.Create("test", nil, nil)
-		assert.Nil(t, err)
-	})
+func (suite *StoreTestSuite) TestCreate() {
+	err := suite.store.Create("test", nil, nil)
+	assert.Nil(suite.T(), err)
 }
 
-func TestGet(t *testing.T) {
-	setup(t, func(t *testing.T, store Store) {
-		err := store.Create("test", TypeContext{
-			Type:        "type",
-			Description: "description",
-		}, nil)
-		assert.Nil(t, err)
-
-		meta, err := store.Get("test")
-		assert.Nil(t, err)
-		assert.NotNil(t, meta)
-		assert.Equal(t, "test", meta.Name)
-
-		m, ok := meta.Metadata.(TypeContext)
-		assert.Equal(t, ok, true)
-		assert.Equal(t, "description", m.Description)
-		assert.Equal(t, "type", m.Type)
-	})
+func (suite *StoreTestSuite) TestGetUnknown() {
+	meta, err := suite.store.Get("unknown")
+	assert.Nil(suite.T(), meta)
+	assert.Error(suite.T(), err)
 }
 
-func TestList(t *testing.T) {
-	setup(t, func(t *testing.T, store Store) {
-		err := store.Create("test1", TypeContext{}, nil)
-		assert.Nil(t, err)
+func (suite *StoreTestSuite) TestGet() {
+	err := suite.store.Create("test", TypeContext{
+		Type:        "type",
+		Description: "description",
+	}, nil)
+	assert.Nil(suite.T(), err)
 
-		err = store.Create("test2", TypeContext{}, nil)
-		assert.Nil(t, err)
+	meta, err := suite.store.Get("test")
+	assert.Nil(suite.T(), err)
+	assert.NotNil(suite.T(), meta)
+	assert.Equal(suite.T(), "test", meta.Name)
 
-		contexts, err := store.List()
-		assert.Nil(t, err)
+	m, ok := meta.Metadata.(TypeContext)
+	assert.Equal(suite.T(), ok, true)
+	assert.Equal(suite.T(), "description", m.Description)
+	assert.Equal(suite.T(), "type", m.Type)
+}
+func (suite *StoreTestSuite) TestList() {
+	err := suite.store.Create("test1", TypeContext{}, nil)
+	assert.Nil(suite.T(), err)
 
-		assert.Equal(t, len(contexts), 2)
-		assert.Equal(t, contexts[0].Name, "test1")
-		assert.Equal(t, contexts[1].Name, "test2")
-	})
+	err = suite.store.Create("test2", TypeContext{}, nil)
+	assert.Nil(suite.T(), err)
+
+	contexts, err := suite.store.List()
+	assert.Nil(suite.T(), err)
+
+	require.Equal(suite.T(), len(contexts), 2)
+	assert.Equal(suite.T(), contexts[0].Name, "test1")
+	assert.Equal(suite.T(), contexts[1].Name, "test2")
+}
+
+func TestExampleTestSuite(t *testing.T) {
+	suite.Run(t, new(StoreTestSuite))
 }
