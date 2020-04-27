@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/api/cli/cmd"
 	apicontext "github.com/docker/api/context"
@@ -73,8 +74,9 @@ func isContextCommand(cmd *cobra.Command) bool {
 func main() {
 	var opts mainOpts
 	root := &cobra.Command{
-		Use:  "docker",
-		Long: "docker for the 2020s",
+		Use:           "docker",
+		Long:          "docker for the 2020s",
+		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isContextCommand(cmd) {
 				execMoby(cmd.Context())
@@ -123,6 +125,10 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
+		if strings.Contains(err.Error(), "unknown command") {
+			execMoby(ctx)
+		}
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }

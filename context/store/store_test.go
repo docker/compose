@@ -29,7 +29,6 @@ package store
 
 import (
 	_ "crypto/sha256"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -78,7 +77,6 @@ func TestGet(t *testing.T) {
 
 		m, ok := meta.Metadata.(TypeContext)
 		assert.Equal(t, ok, true)
-		fmt.Printf("%#v\n", meta)
 		assert.Equal(t, "description", m.Description)
 		assert.Equal(t, "type", m.Type)
 	})

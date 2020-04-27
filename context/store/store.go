@@ -58,8 +58,8 @@ func ContextStore(ctx context.Context) Store {
 
 // Store
 type Store interface {
-	// Get returns the context with with name, it returns an error if the
-	// context doesn't exist
+	// Get returns the context with name, it returns an error if the  context
+	// doesn't exist
 	Get(name string) (*Metadata, error)
 	// Create creates a new context, it returns an error if a context with the
 	// same name exists already.
