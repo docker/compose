@@ -72,9 +72,27 @@ type store struct {
 	root string
 }
 
+type StoreOpt func(*store)
+
+func WithRoot(root string) StoreOpt {
+	return func(s *store) {
+		s.root = root
+	}
+}
+
 // New returns a configured context store
-func New(root string) (Store, error) {
-	cd := filepath.Join(root, contextsDir)
+func New(opts ...StoreOpt) (Store, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	s := &store {
+		root: home,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	cd := filepath.Join(s.root, contextsDir)
 	if _, err := os.Stat(cd); os.IsNotExist(err) {
 		if err = os.Mkdir(cd, 0755); err != nil {
 			return nil, err
@@ -86,10 +104,7 @@ func New(root string) (Store, error) {
 			return nil, err
 		}
 	}
-
-	return &store{
-		root: root,
-	}, nil
+	return s, nil
 }
 
 // Get returns the context with the given name

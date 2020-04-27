@@ -48,7 +48,7 @@ func (suite *StoreTestSuite) BeforeTest(suiteName, testName string) {
 	dir, err := ioutil.TempDir("", "store")
 	require.Nil(suite.T(), err)
 
-	store, err := New(dir)
+	store, err := New(WithRoot(dir))
 	require.Nil(suite.T(), err)
 
 	suite.dir = dir
