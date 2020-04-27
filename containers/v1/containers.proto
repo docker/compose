@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package com.docker.container.v1;
+package com.docker.api.containers.v1;
 
 import "google/protobuf/empty.proto";
 

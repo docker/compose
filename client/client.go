@@ -32,8 +32,11 @@ import (
 	"errors"
 
 	"github.com/docker/api/backend"
-	v1 "github.com/docker/api/backend/v1"
+	backendv1 "github.com/docker/api/backend/v1"
+	cliv1 "github.com/docker/api/cli/v1"
+	composev1 "github.com/docker/api/compose/v1"
 	"github.com/docker/api/containers"
+	containersv1 "github.com/docker/api/containers/v1"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -64,7 +67,11 @@ func New(ctx context.Context) (*Client, error) {
 }
 
 type Client struct {
-	v1.BackendClient
+	backendv1.BackendClient
+	cliv1.CliClient
+	containersv1.ContainersClient
+	composev1.ComposeClient
+
 	backendType string
 	cc          containers.ContainerService
 }
