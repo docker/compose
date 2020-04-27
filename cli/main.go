@@ -177,12 +177,10 @@ func execMoby(ctx context.Context) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			if err != nil {
-				if exiterr, ok := err.(*exec.ExitError); ok {
-					os.Exit(exiterr.ExitCode())
-				}
-				os.Exit(1)
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				os.Exit(exiterr.ExitCode())
 			}
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
