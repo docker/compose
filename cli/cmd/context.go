@@ -61,7 +61,7 @@ type createOpts struct {
 func createCommand() *cobra.Command {
 	var opts createOpts
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create CONTEXT BACKEND [OPTIONS]",
 		Short: "Create a context",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,6 +78,7 @@ func listCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd.Context())
 		},

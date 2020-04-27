@@ -40,20 +40,20 @@ protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 cli: protos
-	cd cli && GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o ../bin/docker
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli
 
 example: protos
 	cd example/backend && go build -v -o ../../bin/backend-example
 
 xcli: cli
-	cd cmd && GOOS=linux 	GOARCH=amd64 	go build -v -o ../bin/docker-linux-amd64
-	cd cmd && GOOS=darwin 	GOARCH=amd64 	go build -v -o ../bin/docker-darwin-amd64
-	cd cmd && GOOS=windows 	GOARCH=amd64 	go build -v -o ../bin/docker-windows-amd64.exe
+	GOOS=linux   GOARCH=amd64 go build -v -o bin/docker-linux-amd64 ./cli
+	GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
+	GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
 
 xexample: example
-	cd example/backend && GOOS=linux	GOARCH=amd64	go build -v -o ../../bin/backend-example-linux-amd64
-	cd example/backend && GOOS=darwin	GOARCH=amd64	go build -v -o ../../bin/backend-example-darwin-amd64
-	cd example/backend && GOOS=windows	GOARCH=amd64	go build -v -o ../../bin/backend-example-windows-amd64.exe
+	GOOS=linux   GOARCH=amd64 go build -v -o bin/backend-example-linux-amd64 ./example/backend
+	GOOS=darwin  GOARCH=amd64 go build -v -o bin/backend-example-darwin-amd64 ./example/backend
+	GOOS=windows GOARCH=amd64 go build -v -o bin/backend-example-windows-amd64.exe ./example/backend
 
 dprotos:
 	docker build . \

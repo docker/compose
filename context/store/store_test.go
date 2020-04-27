@@ -87,6 +87,7 @@ func (suite *StoreTestSuite) TestGet() {
 	assert.Equal(suite.T(), "description", m.Description)
 	assert.Equal(suite.T(), "type", m.Type)
 }
+
 func (suite *StoreTestSuite) TestList() {
 	err := suite.store.Create("test1", TypeContext{}, nil)
 	assert.Nil(suite.T(), err)
