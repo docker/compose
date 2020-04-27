@@ -81,7 +81,6 @@ func ComposeCommand(clusteropts *clusterOptions) *cobra.Command {
 
 type upOptions struct {
 	loadBalancerArn string
-	vpcID           string
 }
 
 func (o upOptions) LoadBalancerArn() *string {
@@ -89,12 +88,6 @@ func (o upOptions) LoadBalancerArn() *string {
 		return nil
 	}
 	return &o.loadBalancerArn
-}
-func (o upOptions) GetVPC() *string {
-	if o.vpcID == "" {
-		return nil
-	}
-	return &o.vpcID
 }
 
 func ConvertCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
@@ -135,7 +128,6 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
-	cmd.Flags().StringVar(&opts.vpcID, "vpc-id", "", "")
 	return cmd
 }
 
