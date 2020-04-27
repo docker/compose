@@ -505,9 +505,7 @@ def load_services(config_details, config_file, compatibility=False, interpolate=
         file.get_service_dicts() for file in config_details.config_files
     ]
 
-    service_config = service_configs[0]
-    for next_config in service_configs[1:]:
-        service_config = merge_services(service_config, next_config)
+    service_config = functools.reduce(merge_services, service_configs)
 
     return build_services(service_config)
 

@@ -985,6 +985,23 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
 
+    def test_build_cli_with_build_labels(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('web',
+                                      build={
+                                          'context': base_dir,
+                                          'labels': {'com.docker.compose.test': 'true'}},
+                                      )
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        image = self.client.inspect_image('composetest_web')
+        assert image['Config']['Labels']['com.docker.compose.test']
+
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)

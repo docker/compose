@@ -36,10 +36,12 @@ install_requires = [
     'requests >= 2.20.0, < 3',
     'texttable >= 0.9.0, < 2',
     'websocket-client >= 0.32.0, < 1',
+    'distro >= 1.5.0, < 2',
     'docker[ssh] >= 3.7.0, < 5',
     'dockerpty >= 0.4.1, < 1',
     'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 4',
+    'python-dotenv >= 0.13.0, < 1',
 ]
 
 
