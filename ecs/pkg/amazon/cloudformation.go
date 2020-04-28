@@ -117,7 +117,7 @@ func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error
 
 type convertAPI interface {
 	GetDefaultVPC() (string, error)
-	GetSubNets(vpcId string) ([]string, error)
+	GetSubNets(vpcID string) ([]string, error)
 	ListRolesForPolicy(policy string) ([]string, error)
 	GetRoleArn(name string) (string, error)
 }

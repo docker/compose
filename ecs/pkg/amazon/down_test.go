@@ -7,7 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-func Test_down_dont_delete_cluster(t *testing.T) {
+func TestDownDontDeleteCluster(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	m := mock.NewMockAPI(ctrl)
@@ -23,7 +23,7 @@ func Test_down_dont_delete_cluster(t *testing.T) {
 	c.ComposeDown("test_project", false)
 }
 
-func Test_down_delete_cluster(t *testing.T) {
+func TestDownDeleteCluster(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	m := mock.NewMockAPI(ctrl)

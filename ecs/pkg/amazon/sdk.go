@@ -93,14 +93,14 @@ func (s sdk) GetDefaultVPC() (string, error) {
 	return *vpcs.Vpcs[0].VpcId, nil
 }
 
-func (s sdk) GetSubNets(vpc string) ([]string, error) {
+func (s sdk) GetSubNets(vpcID string) ([]string, error) {
 	logrus.Debug("Retrieve SubNets")
 	subnets, err := s.EC2.DescribeSubnets(&ec2.DescribeSubnetsInput{
 		DryRun: nil,
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("vpc-id"),
-				Values: []*string{aws.String(vpc)},
+				Values: []*string{aws.String(vpcID)},
 			},
 			{
 				Name:   aws.String("default-for-az"),

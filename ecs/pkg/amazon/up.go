@@ -16,6 +16,9 @@ func (c *client) ComposeUp(project *compose.Project) error {
 		c.api.CreateCluster(c.Cluster)
 	}
 	update, err := c.api.StackExists(project.Name)
+	if err != nil {
+		return err
+	}
 	if update {
 		return fmt.Errorf("we do not (yet) support updating an existing CloudFormation stack")
 	}
@@ -31,6 +34,9 @@ func (c *client) ComposeUp(project *compose.Project) error {
 	}
 
 	err = c.api.DescribeStackEvents(project.Name)
+	if err != nil {
+		return err
+	}
 
 	// TODO monitor progress
 	return nil
