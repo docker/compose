@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,14 +16,14 @@ import (
 	"github.com/docker/ecs-plugin/pkg/convert"
 )
 
-func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
+func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	vpc, err := c.api.GetDefaultVPC()
+	vpc, err := c.api.GetDefaultVPC(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	subnets, err := c.api.GetSubNets(vpc)
+	subnets, err := c.api.GetSubNets(ctx, vpc)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			return nil, err
 		}
 
-		role, err := c.GetEcsTaskExecutionRole(service)
+		role, err := c.GetEcsTaskExecutionRole(ctx, service)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +88,7 @@ const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTa
 var defaultTaskExecutionRole string
 
 // GetEcsTaskExecutionRole retrieve the role ARN to apply for task execution
-func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error) {
+func (c client) GetEcsTaskExecutionRole(ctx context.Context, spec types.ServiceConfig) (string, error) {
 	if arn, ok := spec.Extras["x-ecs-TaskExecutionRole"]; ok {
 		return arn.(string), nil
 	}
@@ -96,7 +97,7 @@ func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error
 	}
 
 	logrus.Debug("Retrieve Task Execution Role")
-	entities, err := c.api.ListRolesForPolicy(ECSTaskExecutionPolicy)
+	entities, err := c.api.ListRolesForPolicy(ctx, ECSTaskExecutionPolicy)
 	if err != nil {
 		return "", err
 	}
@@ -107,7 +108,7 @@ func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error
 		return "", fmt.Errorf("multiple Roles are attached to AmazonECSTaskExecutionRole Policy, please provide an explicit task execution role")
 	}
 
-	arn, err := c.api.GetRoleArn(entities[0])
+	arn, err := c.api.GetRoleArn(ctx, entities[0])
 	if err != nil {
 		return "", err
 	}
@@ -116,8 +117,8 @@ func (c client) GetEcsTaskExecutionRole(spec types.ServiceConfig) (string, error
 }
 
 type convertAPI interface {
-	GetDefaultVPC() (string, error)
-	GetSubNets(vpcID string) ([]string, error)
-	ListRolesForPolicy(policy string) ([]string, error)
-	GetRoleArn(name string) (string, error)
+	GetDefaultVPC(ctx context.Context) (string, error)
+	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
+	ListRolesForPolicy(ctx context.Context, policy string) ([]string, error)
+	GetRoleArn(ctx context.Context, name string) (string, error)
 }

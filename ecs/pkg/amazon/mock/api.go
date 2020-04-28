@@ -5,6 +5,7 @@
 package mock
 
 import (
+	context "context"
 	cloudformation "github.com/awslabs/goformation/v4/cloudformation"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -34,162 +35,162 @@ func (m *MockAPI) EXPECT() *MockAPIMockRecorder {
 }
 
 // ClusterExists mocks base method
-func (m *MockAPI) ClusterExists(arg0 string) (bool, error) {
+func (m *MockAPI) ClusterExists(arg0 context.Context, arg1 string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClusterExists", arg0)
+	ret := m.ctrl.Call(m, "ClusterExists", arg0, arg1)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ClusterExists indicates an expected call of ClusterExists
-func (mr *MockAPIMockRecorder) ClusterExists(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) ClusterExists(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClusterExists", reflect.TypeOf((*MockAPI)(nil).ClusterExists), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClusterExists", reflect.TypeOf((*MockAPI)(nil).ClusterExists), arg0, arg1)
 }
 
 // CreateCluster mocks base method
-func (m *MockAPI) CreateCluster(arg0 string) (string, error) {
+func (m *MockAPI) CreateCluster(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateCluster", arg0)
+	ret := m.ctrl.Call(m, "CreateCluster", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateCluster indicates an expected call of CreateCluster
-func (mr *MockAPIMockRecorder) CreateCluster(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCluster", reflect.TypeOf((*MockAPI)(nil).CreateCluster), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCluster", reflect.TypeOf((*MockAPI)(nil).CreateCluster), arg0, arg1)
 }
 
 // CreateStack mocks base method
-func (m *MockAPI) CreateStack(arg0 string, arg1 *cloudformation.Template) error {
+func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation.Template) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1)
+	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateStack indicates an expected call of CreateStack
-func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1, arg2)
 }
 
 // DeleteCluster mocks base method
-func (m *MockAPI) DeleteCluster(arg0 string) error {
+func (m *MockAPI) DeleteCluster(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCluster", arg0)
+	ret := m.ctrl.Call(m, "DeleteCluster", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteCluster indicates an expected call of DeleteCluster
-func (mr *MockAPIMockRecorder) DeleteCluster(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) DeleteCluster(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCluster", reflect.TypeOf((*MockAPI)(nil).DeleteCluster), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCluster", reflect.TypeOf((*MockAPI)(nil).DeleteCluster), arg0, arg1)
 }
 
 // DeleteStack mocks base method
-func (m *MockAPI) DeleteStack(arg0 string) error {
+func (m *MockAPI) DeleteStack(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteStack", arg0)
+	ret := m.ctrl.Call(m, "DeleteStack", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteStack indicates an expected call of DeleteStack
-func (mr *MockAPIMockRecorder) DeleteStack(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) DeleteStack(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStack", reflect.TypeOf((*MockAPI)(nil).DeleteStack), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStack", reflect.TypeOf((*MockAPI)(nil).DeleteStack), arg0, arg1)
 }
 
 // DescribeStackEvents mocks base method
-func (m *MockAPI) DescribeStackEvents(arg0 string) error {
+func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DescribeStackEvents", arg0)
+	ret := m.ctrl.Call(m, "DescribeStackEvents", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DescribeStackEvents indicates an expected call of DescribeStackEvents
-func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0, arg1)
 }
 
 // GetDefaultVPC mocks base method
-func (m *MockAPI) GetDefaultVPC() (string, error) {
+func (m *MockAPI) GetDefaultVPC(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDefaultVPC")
+	ret := m.ctrl.Call(m, "GetDefaultVPC", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetDefaultVPC indicates an expected call of GetDefaultVPC
-func (mr *MockAPIMockRecorder) GetDefaultVPC() *gomock.Call {
+func (mr *MockAPIMockRecorder) GetDefaultVPC(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultVPC", reflect.TypeOf((*MockAPI)(nil).GetDefaultVPC))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultVPC", reflect.TypeOf((*MockAPI)(nil).GetDefaultVPC), arg0)
 }
 
 // GetRoleArn mocks base method
-func (m *MockAPI) GetRoleArn(arg0 string) (string, error) {
+func (m *MockAPI) GetRoleArn(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRoleArn", arg0)
+	ret := m.ctrl.Call(m, "GetRoleArn", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRoleArn indicates an expected call of GetRoleArn
-func (mr *MockAPIMockRecorder) GetRoleArn(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) GetRoleArn(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoleArn", reflect.TypeOf((*MockAPI)(nil).GetRoleArn), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoleArn", reflect.TypeOf((*MockAPI)(nil).GetRoleArn), arg0, arg1)
 }
 
 // GetSubNets mocks base method
-func (m *MockAPI) GetSubNets(arg0 string) ([]string, error) {
+func (m *MockAPI) GetSubNets(arg0 context.Context, arg1 string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubNets", arg0)
+	ret := m.ctrl.Call(m, "GetSubNets", arg0, arg1)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSubNets indicates an expected call of GetSubNets
-func (mr *MockAPIMockRecorder) GetSubNets(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) GetSubNets(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubNets", reflect.TypeOf((*MockAPI)(nil).GetSubNets), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubNets", reflect.TypeOf((*MockAPI)(nil).GetSubNets), arg0, arg1)
 }
 
 // ListRolesForPolicy mocks base method
-func (m *MockAPI) ListRolesForPolicy(arg0 string) ([]string, error) {
+func (m *MockAPI) ListRolesForPolicy(arg0 context.Context, arg1 string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRolesForPolicy", arg0)
+	ret := m.ctrl.Call(m, "ListRolesForPolicy", arg0, arg1)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListRolesForPolicy indicates an expected call of ListRolesForPolicy
-func (mr *MockAPIMockRecorder) ListRolesForPolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) ListRolesForPolicy(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolesForPolicy", reflect.TypeOf((*MockAPI)(nil).ListRolesForPolicy), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolesForPolicy", reflect.TypeOf((*MockAPI)(nil).ListRolesForPolicy), arg0, arg1)
 }
 
 // StackExists mocks base method
-func (m *MockAPI) StackExists(arg0 string) (bool, error) {
+func (m *MockAPI) StackExists(arg0 context.Context, arg1 string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StackExists", arg0)
+	ret := m.ctrl.Call(m, "StackExists", arg0, arg1)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // StackExists indicates an expected call of StackExists
-func (mr *MockAPIMockRecorder) StackExists(arg0 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) StackExists(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StackExists", reflect.TypeOf((*MockAPI)(nil).StackExists), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StackExists", reflect.TypeOf((*MockAPI)(nil).StackExists), arg0, arg1)
 }

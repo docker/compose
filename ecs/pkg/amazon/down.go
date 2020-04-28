@@ -1,11 +1,12 @@
 package amazon
 
 import (
+	"context"
 	"fmt"
 )
 
-func (c *client) ComposeDown(projectName string, deleteCluster bool) error {
-	err := c.api.DeleteStack(projectName)
+func (c *client) ComposeDown(ctx context.Context, projectName string, deleteCluster bool) error {
+	err := c.api.DeleteStack(ctx, projectName)
 	if err != nil {
 		return err
 	}
@@ -16,7 +17,7 @@ func (c *client) ComposeDown(projectName string, deleteCluster bool) error {
 	}
 
 	fmt.Printf("Delete cluster %s", c.Cluster)
-	if err = c.api.DeleteCluster(c.Cluster); err != nil {
+	if err = c.api.DeleteCluster(ctx, c.Cluster); err != nil {
 		return err
 	}
 	fmt.Printf("... done. \n")
@@ -24,6 +25,6 @@ func (c *client) ComposeDown(projectName string, deleteCluster bool) error {
 }
 
 type downAPI interface {
-	DeleteStack(name string) error
-	DeleteCluster(name string) error
+	DeleteStack(ctx context.Context, name string) error
+	DeleteCluster(ctx context.Context, name string) error
 }

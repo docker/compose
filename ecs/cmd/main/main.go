@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/cli/cli-plugins/manager"
@@ -97,7 +98,7 @@ func ConvertCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOpt
 			if err != nil {
 				return err
 			}
-			template, err := client.Convert(project)
+			template, err := client.Convert(context.Background(), project)
 			if err != nil {
 				return err
 			}
@@ -123,7 +124,7 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 			if err != nil {
 				return err
 			}
-			return client.ComposeUp(project)
+			return client.ComposeUp(context.Background(), project)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
@@ -148,11 +149,11 @@ func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOption
 				if err != nil {
 					return err
 				}
-				return client.ComposeDown(project.Name, opts.DeleteCluster)
+				return client.ComposeDown(context.Background(), project.Name, opts.DeleteCluster)
 			}
 			// project names passed as parameters
 			for _, name := range args {
-				err := client.ComposeDown(name, opts.DeleteCluster)
+				err := client.ComposeDown(context.Background(), name, opts.DeleteCluster)
 				if err != nil {
 					return err
 				}

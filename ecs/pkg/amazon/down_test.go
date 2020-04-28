@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"context"
 	"testing"
 
 	"github.com/docker/ecs-plugin/pkg/amazon/mock"
@@ -16,11 +17,11 @@ func TestDownDontDeleteCluster(t *testing.T) {
 		Region:  "region",
 		api:     m,
 	}
-
+	ctx := context.TODO()
 	recorder := m.EXPECT()
-	recorder.DeleteStack("test_project").Return(nil).Times(1)
+	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
 
-	c.ComposeDown("test_project", false)
+	c.ComposeDown(ctx, "test_project", false)
 }
 
 func TestDownDeleteCluster(t *testing.T) {
@@ -33,9 +34,10 @@ func TestDownDeleteCluster(t *testing.T) {
 		api:     m,
 	}
 
+	ctx := context.TODO()
 	recorder := m.EXPECT()
-	recorder.DeleteStack("test_project").Return(nil).Times(1)
-	recorder.DeleteCluster("test_cluster").Return(nil).Times(1)
+	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
+	recorder.DeleteCluster(ctx, "test_cluster").Return(nil).Times(1)
 
-	c.ComposeDown("test_project", true)
+	c.ComposeDown(ctx, "test_project", true)
 }
