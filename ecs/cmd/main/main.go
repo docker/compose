@@ -131,8 +131,7 @@ func UpCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions)
 }
 
 type downOptions struct {
-	KeepLoadBalancer bool
-	DeleteCluster    bool
+	DeleteCluster bool
 }
 
 func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
@@ -149,11 +148,11 @@ func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOption
 				if err != nil {
 					return err
 				}
-				return client.ComposeDown(&project.Name, opts.KeepLoadBalancer, opts.DeleteCluster)
+				return client.ComposeDown(project.Name, opts.DeleteCluster)
 			}
 			// project names passed as parameters
 			for _, name := range args {
-				err := client.ComposeDown(&name, opts.KeepLoadBalancer, opts.DeleteCluster)
+				err := client.ComposeDown(name, opts.DeleteCluster)
 				if err != nil {
 					return err
 				}
@@ -161,7 +160,6 @@ func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOption
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&opts.KeepLoadBalancer, "keep-load-balancer", false, "Keep Load Balancer for further use")
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
 	return cmd
 }

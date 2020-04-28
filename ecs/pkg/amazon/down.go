@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func (c *client) ComposeDown(projectName *string, keepLoadBalancer, deleteCluster bool) error {
+func (c *client) ComposeDown(projectName string, deleteCluster bool) error {
 	err := c.api.DeleteStack(projectName)
 	if err != nil {
 		return err
