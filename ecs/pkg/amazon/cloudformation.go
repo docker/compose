@@ -1,11 +1,8 @@
 package amazon
 
 import (
-<<<<<<< HEAD
 	"context"
-=======
 	"errors"
->>>>>>> a0701b8... move to sdk
 	"fmt"
 	"strings"
 
@@ -87,12 +84,12 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 	return template, nil
 }
 
-func (c client) GetVPC(project *compose.Project) (string, error) {
+func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
 	//check compose file for the default external network
 	if net, ok := project.Networks["default"]; ok {
 		if net.External.External {
 			vpc := net.Name
-			ok, err := c.api.VpcExists(vpc)
+			ok, err := c.api.VpcExists(ctx, vpc)
 			if err != nil {
 				return "", err
 			}
@@ -102,7 +99,7 @@ func (c client) GetVPC(project *compose.Project) (string, error) {
 			return vpc, nil
 		}
 	}
-	defaultVPC, err := c.api.GetDefaultVPC()
+	defaultVPC, err := c.api.GetDefaultVPC(ctx)
 	if err != nil {
 		return "", err
 	}
