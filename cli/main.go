@@ -118,7 +118,7 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	s, err := store.New(opts.Config)
+	s, err := store.New(store.WithRoot(opts.Config))
 	if err != nil {
 		logrus.Fatal(err)
 	}
