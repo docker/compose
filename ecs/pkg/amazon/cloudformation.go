@@ -1,7 +1,11 @@
 package amazon
 
 import (
+<<<<<<< HEAD
 	"context"
+=======
+	"errors"
+>>>>>>> a0701b8... move to sdk
 	"fmt"
 	"strings"
 
@@ -18,7 +22,7 @@ import (
 
 func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	vpc, err := c.api.GetDefaultVPC(ctx)
+	vpc, err := c.GetVPC(ctx, project)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +87,28 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 	return template, nil
 }
 
+func (c client) GetVPC(project *compose.Project) (string, error) {
+	//check compose file for the default external network
+	if net, ok := project.Networks["default"]; ok {
+		if net.External.External {
+			vpc := net.Name
+			ok, err := c.api.VpcExists(vpc)
+			if err != nil {
+				return "", err
+			}
+			if !ok {
+				return "", errors.New("Vpc does not exist: " + vpc)
+			}
+			return vpc, nil
+		}
+	}
+	defaultVPC, err := c.api.GetDefaultVPC()
+	if err != nil {
+		return "", err
+	}
+	return defaultVPC, nil
+}
+
 const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 
 var defaultTaskExecutionRole string
@@ -118,6 +144,7 @@ func (c client) GetEcsTaskExecutionRole(ctx context.Context, spec types.ServiceC
 
 type convertAPI interface {
 	GetDefaultVPC(ctx context.Context) (string, error)
+	VpcExists(ctx context.Context, vpcID string) (bool, error)
 	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
 	ListRolesForPolicy(ctx context.Context, policy string) ([]string, error)
 	GetRoleArn(ctx context.Context, name string) (string, error)

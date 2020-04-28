@@ -75,6 +75,12 @@ func (s sdk) DeleteCluster(ctx context.Context, name string) error {
 	return fmt.Errorf("Failed to delete cluster, status: %s" + *response.Cluster.Status)
 }
 
+func (s sdk) VpcExists(ctx context.Context, vpcID string) (bool, error) {
+	logrus.Debug("Check if VPC exists: ", vpcID)
+	_, err := s.EC2.DescribeVpcsWithContext(aws.Context(ctx), &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
+	return err == nil, err
+}
+
 func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 	logrus.Debug("Retrieve default VPC")
 	vpcs, err := s.EC2.DescribeVpcsWithContext(aws.Context(ctx), &ec2.DescribeVpcsInput{
