@@ -3,6 +3,8 @@ package amazon
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -183,13 +185,47 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 	})
 	return err
 }
+func (s sdk) WaitStackComplete(ctx context.Context, name string, fn func() error) error {
+	for i := 0; i < 120; i++ {
+		stacks, err := s.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
+			StackName: aws.String(name),
+		})
+		if err != nil {
+			return err
+		}
 
-func (s sdk) DescribeStackEvents(ctx context.Context, name string) error {
+		err = fn()
+		if err != nil {
+			return err
+		}
+
+		status := *stacks.Stacks[0].StackStatus
+		if strings.HasSuffix(status, "_COMPLETE") || strings.HasSuffix(status, "_FAILED") {
+			return nil
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return fmt.Errorf("120s timeout waiting for CloudFormation stack %s to complete", name)
+}
+
+func (s sdk) DescribeStackEvents(ctx context.Context, name string) ([]*cloudformation.StackEvent, error) {
 	// Fixme implement Paginator on Events and return as a chan(events)
-	_, err := s.CF.DescribeStackEventsWithContext(aws.Context(ctx), &cloudformation.DescribeStackEventsInput{
-		StackName: aws.String(name),
-	})
-	return err
+	events := []*cloudformation.StackEvent{}
+	var nextToken *string
+	for {
+		resp, err := s.CF.DescribeStackEventsWithContext(aws.Context(ctx), &cloudformation.DescribeStackEventsInput{
+			StackName: aws.String(name),
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, resp.StackEvents...)
+		if resp.NextToken == nil {
+			return events, nil
+		}
+		nextToken = resp.NextToken
+	}
 }
 
 func (s sdk) DeleteStack(ctx context.Context, name string) error {

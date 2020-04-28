@@ -6,7 +6,8 @@ package mock
 
 import (
 	context "context"
-	cloudformation "github.com/awslabs/goformation/v4/cloudformation"
+	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
+	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -65,7 +66,7 @@ func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // CreateStack mocks base method
-func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation.Template) error {
+func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation0.Template) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -107,11 +108,12 @@ func (mr *MockAPIMockRecorder) DeleteStack(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // DescribeStackEvents mocks base method
-func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) error {
+func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) ([]*cloudformation.StackEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DescribeStackEvents", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].([]*cloudformation.StackEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DescribeStackEvents indicates an expected call of DescribeStackEvents
@@ -208,4 +210,18 @@ func (m *MockAPI) VpcExists(arg0 context.Context, arg1 string) (bool, error) {
 func (mr *MockAPIMockRecorder) VpcExists(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VpcExists", reflect.TypeOf((*MockAPI)(nil).VpcExists), arg0, arg1)
+}
+
+// WaitStackComplete mocks base method
+func (m *MockAPI) WaitStackComplete(arg0 context.Context, arg1 string, arg2 func() error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitStackComplete", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitStackComplete indicates an expected call of WaitStackComplete
+func (mr *MockAPIMockRecorder) WaitStackComplete(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitStackComplete", reflect.TypeOf((*MockAPI)(nil).WaitStackComplete), arg0, arg1, arg2)
 }

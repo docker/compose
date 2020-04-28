@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	cf "github.com/aws/aws-sdk-go/service/cloudformation"
+
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
@@ -34,7 +36,26 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
-	err = c.api.DescribeStackEvents(ctx, project.Name)
+	known := map[string]struct{}{}
+	err = c.api.WaitStackComplete(ctx, project.Name, func() error {
+		events, err := c.api.DescribeStackEvents(ctx, project.Name)
+		if err != nil {
+			return err
+		}
+		for _, event := range events {
+			if _, ok := known[*event.EventId]; ok {
+				continue
+			}
+			known[*event.EventId] = struct{}{}
+
+			description := "-"
+			if event.ResourceStatusReason != nil {
+				description = *event.ResourceStatusReason
+			}
+			fmt.Printf("%s %q %s %s\n", *event.ResourceType, *event.LogicalResourceId, *event.ResourceStatus, description)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -48,5 +69,6 @@ type upAPI interface {
 	CreateCluster(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template *cloudformation.Template) error
-	DescribeStackEvents(ctx context.Context, stack string) error
+	WaitStackComplete(ctx context.Context, name string, fn func() error) error
+	DescribeStackEvents(ctx context.Context, stack string) ([]*cf.StackEvent, error)
 }
