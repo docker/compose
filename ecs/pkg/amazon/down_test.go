@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/docker/ecs-plugin/pkg/amazon/mock"
-	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/golang/mock/gomock"
 )
 
@@ -21,9 +20,7 @@ func Test_down_dont_delete_cluster(t *testing.T) {
 	recorder := m.EXPECT()
 	recorder.DeleteStack("test_project").Return(nil).Times(1)
 
-	c.ComposeDown(&compose.Project{
-		Name: "test_project",
-	}, false)
+	c.ComposeDown("test_project", false)
 }
 
 func Test_down_delete_cluster(t *testing.T) {
@@ -40,7 +37,5 @@ func Test_down_delete_cluster(t *testing.T) {
 	recorder.DeleteStack("test_project").Return(nil).Times(1)
 	recorder.DeleteCluster("test_cluster").Return(nil).Times(1)
 
-	c.ComposeDown(&compose.Project{
-		Name: "test_project",
-	}, true)
+	c.ComposeDown("test_project", true)
 }
