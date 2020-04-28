@@ -7,4 +7,7 @@ test: ## Run tests
 dev: build
 	ln -f -s "${PWD}/dist/docker-ecs" "${HOME}/.docker/cli-plugins/docker-ecs"
 
-.PHONY: build test dev
+lint: ## Verify Go files
+	golangci-lint run --config ./golangci.yaml ./...
+
+.PHONY: clean build test dev lint
