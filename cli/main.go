@@ -36,6 +36,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	// Backend registrations
+	_ "github.com/docker/api/azure"
+	_ "github.com/docker/api/example"
+
 	"github.com/docker/api/cli/cmd"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
@@ -107,6 +111,7 @@ func main() {
 
 	root.AddCommand(
 		cmd.ContextCommand(),
+		&cmd.PsCommand,
 		&cmd.ExampleCommand,
 	)
 

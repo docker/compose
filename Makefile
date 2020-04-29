@@ -42,18 +42,10 @@ protos:
 cli: protos
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli
 
-example: protos
-	cd example/backend && go build -v -o ../../bin/backend-example
-
 xcli: cli
 	GOOS=linux   GOARCH=amd64 go build -v -o bin/docker-linux-amd64 ./cli
 	GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
 	GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
-
-xexample: example
-	GOOS=linux   GOARCH=amd64 go build -v -o bin/backend-example-linux-amd64 ./example/backend
-	GOOS=darwin  GOARCH=amd64 go build -v -o bin/backend-example-darwin-amd64 ./example/backend
-	GOOS=windows GOARCH=amd64 go build -v -o bin/backend-example-windows-amd64.exe ./example/backend
 
 dprotos:
 	docker build . \
@@ -81,4 +73,4 @@ test:
 
 FORCE:
 
-.PHONY: all xall protos example xexample xcli cli bins dbins dxbins dprotos
+.PHONY: all xall protos xcli cli bins dbins dxbins dprotos

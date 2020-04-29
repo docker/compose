@@ -99,6 +99,7 @@ func runCreate(ctx context.Context, opts createOpts, name string, contextType st
 	default:
 		s := store.ContextStore(ctx)
 		return s.Create(name, store.TypedContext{
+			Type:        contextType,
 			Description: opts.description,
 		})
 	}
@@ -129,7 +130,7 @@ func runList(ctx context.Context) error {
 	format := "%s\t%s\t%s\n"
 
 	for _, c := range contexts {
-		fmt.Fprintf(w, format, c.Name, c.Metadata.Description)
+		fmt.Fprintf(w, format, c.Name, c.Metadata.Description, c.Metadata.Type)
 	}
 
 	return w.Flush()
