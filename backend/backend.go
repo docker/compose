@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 var (
@@ -50,5 +51,5 @@ func Get(ctx context.Context, backendType string) (interface{}, error) {
 		}
 	}
 
-	return nil, errors.New("not found")
+	return nil, fmt.Errorf("backend not found for context %q", backendType)
 }

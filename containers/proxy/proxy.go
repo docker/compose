@@ -5,27 +5,30 @@ import (
 
 	"github.com/docker/api/client"
 	v1 "github.com/docker/api/containers/v1"
-	apicontext "github.com/docker/api/context"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-func NewContainerApi(client *client.Client) v1.ContainersServer {
-	return &proxyContainerApi{
-		client: client,
-	}
+type clientKey struct{}
+
+func WithClient(ctx context.Context, c *client.Client) (context.Context, error) {
+	return context.WithValue(ctx, clientKey{}, c), nil
 }
 
-type proxyContainerApi struct {
-	client *client.Client
+func Client(ctx context.Context) *client.Client {
+	c, _ := ctx.Value(clientKey{}).(*client.Client)
+	return c
 }
+
+func NewContainerApi() v1.ContainersServer {
+	return &proxyContainerApi{}
+}
+
+type proxyContainerApi struct{}
 
 func (p *proxyContainerApi) List(ctx context.Context, _ *v1.ListRequest) (*v1.ListResponse, error) {
-	currentContext := apicontext.CurrentContext(ctx)
-	if err := p.client.SetContext(ctx, currentContext); err != nil {
-		return &v1.ListResponse{}, nil
-	}
+	client := Client(ctx)
 
-	c, err := p.client.ContainerService().List(ctx)
+	c, err := client.ContainerService().List(ctx)
 	if err != nil {
 		return &v1.ListResponse{}, nil
 	}

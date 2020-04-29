@@ -5,7 +5,6 @@ import (
 	"net"
 
 	cliv1 "github.com/docker/api/cli/v1"
-	"github.com/docker/api/client"
 	"github.com/docker/api/containers/proxy"
 	containersv1 "github.com/docker/api/containers/v1"
 	"github.com/docker/api/context/store"
@@ -45,12 +44,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	}
 	defer l.Close()
 
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
-	p := proxy.NewContainerApi(c)
+	p := proxy.NewContainerApi()
 
 	containersv1.RegisterContainersServer(s, p)
 	cliv1.RegisterCliServer(s, &cliServer{

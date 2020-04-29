@@ -31,7 +31,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/docker/api/client"
+	"github.com/docker/api/containers/proxy"
 	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -66,9 +69,26 @@ func unaryMeta(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 	if !ok {
 		return nil, errors.New("missing metadata")
 	}
+
 	key := md[apicontext.KEY]
+
 	if len(key) == 1 {
+		s, err := store.New()
+		if err != nil {
+			return nil, err
+		}
+		ctx = store.WithContextStore(ctx, s)
+
 		ctx = apicontext.WithCurrentContext(ctx, key[0])
+
+		c, err := client.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx, err = proxy.WithClient(ctx, c)
+		if err != nil {
+			return nil, err
+		}
 	}
 	m, err := handler(ctx, req)
 	return m, err
