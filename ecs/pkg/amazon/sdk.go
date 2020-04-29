@@ -22,6 +22,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	cf "github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/sirupsen/logrus"
+
+	"github.com/docker/ecs-plugin/pkg/docker"
 )
 
 type sdk struct {
@@ -198,22 +200,68 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	return err
 }
 
-func (s sdk) CreateSecret(ctx context.Context, name string, content string) (string, error) {
+func (s sdk) CreateSecret(ctx context.Context, name string, secret string) (string, error) {
 	logrus.Debug("Create secret " + name)
-	return "test", nil
+	response, err := s.SM.CreateSecret(&secretsmanager.CreateSecretInput{Name: &name, SecretString: &secret})
+	if err != nil {
+		return "", err
+	}
+	return *response.ARN, nil
 }
 
-func (s sdk) InspectSecret(ctx context.Context, name string) error {
-	fmt.Printf("... done. \n")
-	return nil
+func (s sdk) InspectSecret(ctx context.Context, id string) (docker.Secret, error) {
+	logrus.Debug("Inspect secret " + id)
+	response, err := s.SM.DescribeSecret(&secretsmanager.DescribeSecretInput{SecretId: &id})
+	if err != nil {
+		return docker.Secret{}, err
+	}
+	labels := map[string]string{}
+	for _, tag := range response.Tags {
+		labels[*tag.Key] = *tag.Value
+	}
+	secret := docker.Secret{
+		ID:     *response.ARN,
+		Name:   *response.Name,
+		Labels: labels,
+	}
+	if response.Description != nil {
+		secret.Description = *response.Description
+	}
+	return secret, nil
 }
 
-func (s sdk) ListSecrets(ctx context.Context) error {
-	fmt.Printf("... done. \n")
-	return nil
+func (s sdk) ListSecrets(ctx context.Context) ([]docker.Secret, error) {
+
+	logrus.Debug("List secrets ...")
+	response, err := s.SM.ListSecrets(&secretsmanager.ListSecretsInput{})
+	if err != nil {
+		return []docker.Secret{}, err
+	}
+	var secrets []docker.Secret
+
+	for _, sec := range response.SecretList {
+
+		labels := map[string]string{}
+		for _, tag := range sec.Tags {
+			labels[*tag.Key] = *tag.Value
+		}
+		description := ""
+		if sec.Description != nil {
+			description = *sec.Description
+		}
+		secrets = append(secrets, docker.Secret{
+			ID:          *sec.ARN,
+			Name:        *sec.Name,
+			Labels:      labels,
+			Description: description,
+		})
+	}
+	return secrets, nil
 }
 
-func (s sdk) DeleteSecret(ctx context.Context, name string) error {
-	fmt.Printf("... done. \n")
-	return nil
+func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
+	logrus.Debug("List secrets ...")
+	force := !recover
+	_, err := s.SM.DeleteSecret(&secretsmanager.DeleteSecretInput{SecretId: &id, ForceDeleteWithoutRecovery: &force})
+	return err
 }
