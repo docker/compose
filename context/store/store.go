@@ -60,10 +60,12 @@ func ContextStore(ctx context.Context) Store {
 type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
-	Get(name string) (*Metadata, error)
+	Get(name string, getter func() interface{}) (*Metadata, error)
+	// GetType reurns the type of the context (docker, aci etc)
+	GetType(meta *Metadata) string
 	// Create creates a new context, it returns an error if a context with the
 	// same name exists already.
-	Create(name string, data interface{}, endpoints map[string]interface{}) error
+	Create(name string, data TypedContext) error
 	// List returns the list of created contexts
 	List() ([]*Metadata, error)
 }
@@ -86,8 +88,8 @@ func New(opts ...StoreOpt) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &store {
-		root: home,
+	s := &store{
+		root: filepath.Join(home, ".docker"),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -108,42 +110,72 @@ func New(opts ...StoreOpt) (Store, error) {
 }
 
 // Get returns the context with the given name
-func (s *store) Get(name string) (*Metadata, error) {
+func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	if name == "default" {
 		return &Metadata{}, nil
 	}
 
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
-	return read(meta)
+	return read(meta, getter)
 }
 
-func read(meta string) (*Metadata, error) {
+func read(meta string, getter func() interface{}) (*Metadata, error) {
 	bytes, err := ioutil.ReadFile(meta)
 	if err != nil {
 		return nil, err
 	}
 
-	var r untypedContextMetadata
-	if err := json.Unmarshal(bytes, &r); err != nil {
+	var um untypedMetadata
+	if err := json.Unmarshal(bytes, &um); err != nil {
 		return nil, err
 	}
 
-	result := &Metadata{
-		Name:      r.Name,
-		Endpoints: r.Endpoints,
-	}
-
-	typed := getter()
-	if err := json.Unmarshal(r.Metadata, typed); err != nil {
+	var uc untypedContext
+	if err := json.Unmarshal(um.Metadata, &uc); err != nil {
 		return nil, err
 	}
 
-	result.Metadata = reflect.ValueOf(typed).Elem().Interface()
+	data, err := parse(uc.Data, getter)
+	if err != nil {
+		return nil, err
+	}
 
-	return result, nil
+	return &Metadata{
+		Name:      um.Name,
+		Endpoints: um.Endpoints,
+		Metadata: TypedContext{
+			Description: uc.Description,
+			Type:        uc.Type,
+			Data:        data,
+		},
+	}, nil
 }
 
-func (s *store) Create(name string, data interface{}, endpoints map[string]interface{}) error {
+func parse(payload []byte, getter func() interface{}) (interface{}, error) {
+	if getter == nil {
+		var res map[string]interface{}
+		if err := json.Unmarshal(payload, &res); err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+	typed := getter()
+	if err := json.Unmarshal(payload, &typed); err != nil {
+		return nil, err
+	}
+	return reflect.ValueOf(typed).Elem().Interface(), nil
+}
+
+func (s *store) GetType(meta *Metadata) string {
+	for k := range meta.Endpoints {
+		if k != "docker" {
+			return k
+		}
+	}
+	return "docker"
+}
+
+func (s *store) Create(name string, data TypedContext) error {
 	dir := contextdirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
@@ -155,10 +187,16 @@ func (s *store) Create(name string, data interface{}, endpoints map[string]inter
 		return err
 	}
 
+	if data.Data == nil {
+		data.Data = DummyContext{}
+	}
+
 	meta := Metadata{
-		Name:      name,
-		Metadata:  data,
-		Endpoints: endpoints,
+		Name:     name,
+		Metadata: data,
+		Endpoints: map[string]interface{}{
+			"docker": DummyContext{},
+		},
 	}
 
 	bytes, err := json.Marshal(&meta)
@@ -180,7 +218,7 @@ func (s *store) List() ([]*Metadata, error) {
 	for _, fi := range c {
 		if fi.IsDir() {
 			meta := filepath.Join(root, fi.Name(), metaFile)
-			r, err := read(meta)
+			r, err := read(meta, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -195,23 +233,34 @@ func contextdirOf(name string) string {
 	return digest.FromString(name).Encoded()
 }
 
+type DummyContext struct{}
+
 type Metadata struct {
 	Name      string                 `json:",omitempty"`
-	Metadata  interface{}            `json:",omitempty"`
+	Metadata  TypedContext           `json:",omitempty"`
 	Endpoints map[string]interface{} `json:",omitempty"`
 }
 
-type untypedContextMetadata struct {
-	Metadata  json.RawMessage        `json:"metadata,omitempty"`
-	Endpoints map[string]interface{} `json:"endpoints,omitempty"`
-	Name      string                 `json:"name,omitempty"`
+type untypedMetadata struct {
+	Name      string                 `json:",omitempty"`
+	Metadata  json.RawMessage        `json:",omitempty"`
+	Endpoints map[string]interface{} `json:",omitempty"`
 }
 
-type TypeContext struct {
-	Type        string `json:",omitempty"`
-	Description string `json:",omitempty"`
+type untypedContext struct {
+	Data        json.RawMessage `json:",omitempty"`
+	Description string          `json:",omitempty"`
+	Type        string          `json:",omitempty"`
 }
 
-func getter() interface{} {
-	return &TypeContext{}
+type TypedContext struct {
+	Type        string      `json:",omitempty"`
+	Description string      `json:",omitempty"`
+	Data        interface{} `json:",omitempty"`
+}
+
+type AciContext struct {
+	SubscriptionID string `json:",omitempty"`
+	Location       string `json:",omitempty"`
+	ResourceGroup  string `json:",omitempty"`
 }

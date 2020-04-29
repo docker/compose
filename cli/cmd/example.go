@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/docker/api/client"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -77,7 +76,8 @@ func connect(ctx context.Context) (*client.Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "no backend address")
 	}
-	c, err := client.New("unix://"+address, 500*time.Millisecond)
+
+	c, err := client.New(ctx)
 	if err != nil {
 		if err != context.DeadlineExceeded {
 			return nil, errors.Wrap(err, "connect to backend")
@@ -89,7 +89,7 @@ func connect(ctx context.Context) (*client.Client, error) {
 		if err := cmd.Start(); err != nil {
 			return nil, errors.Wrap(err, "start backend")
 		}
-		cl, e := client.New("unix://"+address, 10*time.Second)
+		cl, e := client.New(ctx)
 		return cl, e
 	}
 	return c, nil

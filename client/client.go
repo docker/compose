@@ -29,45 +29,46 @@ package client
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
 
 	v1 "github.com/docker/api/backend/v1"
+	"github.com/docker/api/containers"
+	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
+	"github.com/docker/api/example"
 )
 
 // New returns a GRPC client
-func New(address string, timeout time.Duration) (*Client, error) {
-	backoffConfig := backoff.DefaultConfig
-	backoffConfig.MaxDelay = 3 * time.Second
-	backoffConfig.BaseDelay = 10 * time.Millisecond
-	connParams := grpc.ConnectParams{
-		Backoff: backoffConfig,
-	}
-	opts := []grpc.DialOption{
-		grpc.WithInsecure(),
-		grpc.WithConnectParams(connParams),
-		grpc.WithBlock(),
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, address, opts...)
+func New(ctx context.Context) (*Client, error) {
+	currentContext := apicontext.CurrentContext(ctx)
+	s := store.ContextStore(ctx)
+
+	cc, err := s.Get(currentContext, nil)
 	if err != nil {
 		return nil, err
 	}
+	contextType := s.GetType(cc)
 
 	return &Client{
-		conn:          conn,
-		BackendClient: v1.NewBackendClient(conn),
+		backendType: contextType,
 	}, nil
 }
 
 type Client struct {
 	conn *grpc.ClientConn
 	v1.BackendClient
+	backendType string
+}
+
+func (c *Client) ContainerService(ctx context.Context) containers.ContainerService {
+	return example.New()
+
 }
 
 func (c *Client) Close() error {
-	return c.conn.Close()
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+	return nil
 }
