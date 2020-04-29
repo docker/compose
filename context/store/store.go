@@ -114,8 +114,11 @@ func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
 	m, err := read(meta, getter)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("unknown conetxt %q", name)
+		return nil, fmt.Errorf("unknown context %q", name)
+	} else if err != nil {
+		return nil, err
 	}
+
 	return m, nil
 }
 

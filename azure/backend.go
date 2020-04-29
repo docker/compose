@@ -30,15 +30,15 @@ func getter() interface{} {
 
 func New(ctx context.Context) (containers.ContainerService, error) {
 	cc := apicontext.CurrentContext(ctx)
-	s, err := store.New()
+	contextStore, err := store.New()
 	if err != nil {
 		return nil, err
 	}
-	m, err := s.Get(cc, getter)
+	metadata, err := contextStore.Get(cc, getter)
 	if err != nil {
 		return nil, errors.Wrap(err, "wrong context type")
 	}
-	tc, _ := m.Metadata.Data.(store.AciContext)
+	tc, _ := metadata.Metadata.Data.(store.AciContext)
 
 	auth, _ := auth.NewAuthorizerFromCLI()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(tc.SubscriptionID)

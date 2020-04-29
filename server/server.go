@@ -32,9 +32,9 @@ import (
 	"errors"
 
 	"github.com/docker/api/client"
-	"github.com/docker/api/containers/proxy"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/server/proxy"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"

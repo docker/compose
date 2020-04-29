@@ -5,10 +5,10 @@ import (
 	"net"
 
 	cliv1 "github.com/docker/api/cli/v1"
-	"github.com/docker/api/containers/proxy"
 	containersv1 "github.com/docker/api/containers/v1"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/server"
+	"github.com/docker/api/server/proxy"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -38,11 +38,11 @@ func ServeCommand() *cobra.Command {
 func runServe(ctx context.Context, opts serveOpts) error {
 	s := server.New()
 
-	l, err := net.Listen("unix", opts.address)
+	listener, err := net.Listen("unix", opts.address)
 	if err != nil {
 		return errors.Wrap(err, "listen unix socket")
 	}
-	defer l.Close()
+	defer listener.Close()
 
 	p := proxy.NewContainerApi()
 
@@ -60,7 +60,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	logrus.WithField("address", opts.address).Info("serving daemon API")
 
 	// start the GRPC server to serve on the listener
-	return s.Serve(l)
+	return s.Serve(listener)
 }
 
 type cliServer struct {
