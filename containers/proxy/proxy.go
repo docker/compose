@@ -3,23 +3,29 @@ package proxy
 import (
 	"context"
 
-	"github.com/docker/api/containers"
+	"github.com/docker/api/client"
 	v1 "github.com/docker/api/containers/v1"
+	apicontext "github.com/docker/api/context"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-func NewContainerApi(client containers.ContainerService) v1.ContainersServer {
+func NewContainerApi(client *client.Client) v1.ContainersServer {
 	return &proxyContainerApi{
 		client: client,
 	}
 }
 
 type proxyContainerApi struct {
-	client containers.ContainerService
+	client *client.Client
 }
 
 func (p *proxyContainerApi) List(ctx context.Context, _ *v1.ListRequest) (*v1.ListResponse, error) {
-	c, err := p.client.List(ctx)
+	currentContext := apicontext.CurrentContext(ctx)
+	if err := p.client.SetContext(ctx, currentContext); err != nil {
+		return &v1.ListResponse{}, nil
+	}
+
+	c, err := p.client.ContainerService().List(ctx)
 	if err != nil {
 		return &v1.ListResponse{}, nil
 	}

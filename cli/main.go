@@ -119,7 +119,19 @@ func main() {
 	ctx, cancel := util.NewSigContext()
 	defer cancel()
 
-	ctx, err := apicontext.WithCurrentContext(ctx, opts.Config, opts.Context)
+	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
+	if err != nil {
+		logrus.Fatal("unable ot find configuration")
+	}
+	currentContext := opts.Context
+	if currentContext == "" {
+		currentContext = config.CurrentContext
+	}
+	if currentContext == "" {
+		currentContext = "default"
+	}
+
+	ctx = apicontext.WithCurrentContext(ctx, opts.Context)
 	if err != nil {
 		logrus.Fatal(err)
 	}

@@ -50,7 +50,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 		return err
 	}
 
-	p := proxy.NewContainerApi(c.ContainerService(ctx))
+	p := proxy.NewContainerApi(c)
 
 	containersv1.RegisterContainersServer(s, p)
 	cliv1.RegisterCliServer(s, &cliServer{
