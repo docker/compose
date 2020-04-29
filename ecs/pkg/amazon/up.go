@@ -3,11 +3,13 @@ package amazon
 import (
 	"context"
 	"fmt"
+	"sort"
 
+	"github.com/aws/aws-sdk-go/aws"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
-
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/console"
 )
 
 func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error {
@@ -36,23 +38,26 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
+	w := console.NewProgressWriter()
 	known := map[string]struct{}{}
 	err = c.api.WaitStackComplete(ctx, project.Name, func() error {
 		events, err := c.api.DescribeStackEvents(ctx, project.Name)
 		if err != nil {
 			return err
 		}
+
+		sort.Slice(events, func(i, j int) bool {
+			return events[i].Timestamp.Before(*events[j].Timestamp)
+		})
+
 		for _, event := range events {
 			if _, ok := known[*event.EventId]; ok {
 				continue
 			}
 			known[*event.EventId] = struct{}{}
 
-			description := "-"
-			if event.ResourceStatusReason != nil {
-				description = *event.ResourceStatusReason
-			}
-			fmt.Printf("%s %q %s %s\n", *event.ResourceType, *event.LogicalResourceId, *event.ResourceStatus, description)
+			resource := fmt.Sprintf("%s %q", aws.StringValue(event.ResourceType), aws.StringValue(event.LogicalResourceId))
+			w.ResourceEvent(resource, aws.StringValue(event.ResourceStatus), aws.StringValue(event.ResourceStatusReason))
 		}
 		return nil
 	})
