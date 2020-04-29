@@ -1082,6 +1082,22 @@ class Service(object):
                 'Impossible to perform platform-targeted builds for API version < 1.35'
             )
 
+        dockerfile_opt = build_opts.get('dockerfile', None)
+        # logic based on https://github.com/docker/docker-py/blob/4.2.0/docker/api/build.py#L144
+        if path.startswith(('http://', 'https://',
+                            'git://', 'github.com/', 'git@')):
+            fileobj = None
+            dockerfile = dockerfile_opt
+        elif gzip:
+            if dockerfile_opt and os.path.islink(os.path.join(path, dockerfile_opt)):
+                # let the daemon do the complaining
+                log.warning('Dockerfile is a symlink and --compress is used')
+            fileobj = None
+            dockerfile = dockerfile_opt
+        else:
+            fileobj = open(os.path.join(path, dockerfile_opt or 'Dockerfile'), 'rb')
+            dockerfile = None
+
         builder = self.client if not cli else _CLIBuilder(progress)
         build_output = builder.build(
             path=path,
@@ -1090,7 +1106,8 @@ class Service(object):
             forcerm=force_rm,
             pull=pull,
             nocache=no_cache,
-            dockerfile=build_opts.get('dockerfile', None),
+            dockerfile=dockerfile,
+            fileobj=fileobj,
             cache_from=self.get_cache_from(build_opts),
             labels=build_opts.get('labels', None),
             buildargs=build_args,
@@ -1783,14 +1800,12 @@ class _CLIBuilder(object):
         Returns:
             A generator for the build output.
         """
-        if dockerfile:
-            dockerfile = os.path.join(path, dockerfile)
         iidfile = tempfile.mktemp()
 
         command_builder = _CommandBuilder()
         command_builder.add_params("--build-arg", buildargs)
         command_builder.add_list("--cache-from", cache_from)
-        command_builder.add_arg("--file", dockerfile)
+        command_builder.add_arg("--file", "-" if fileobj else dockerfile)
         command_builder.add_flag("--force-rm", forcerm)
         command_builder.add_params("--label", labels)
         command_builder.add_arg("--memory", container_limits.get("memory"))
@@ -1804,7 +1819,7 @@ class _CLIBuilder(object):
 
         magic_word = "Successfully built "
         appear = False
-        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True, stdin=fileobj) as p:
             while True:
                 line = p.stdout.readline()
                 if not line:
