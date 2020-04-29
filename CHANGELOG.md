@@ -1,6 +1,37 @@
 Change log
 ==========
 
+1.26.0 (2020-04-29)
+-------------------
+
+### Features
+
+- Add `docker context` support
+
+- Add missing test dependency `ddt` to `setup.py`
+
+- Add `--attach-dependencies` to command `up` for attaching to dependencies
+
+- Allow compatibility option with `COMPOSE_COMPATIBILITY` environment variable
+
+- Bump `Pytest` to 5.3.4 and add refactor compatibility with new version
+
+- Bump `OpenSSL` from 1.1.1f to 1.1.1g
+
+### Bugs
+
+- Properly escape values coming from env_files
+
+- Sync compose-schemas with upstream (docker/cli)
+
+- Remove `None` entries on exec command
+
+- Add `python-dotenv` to delegate `.env` file processing
+
+- Don't adjust output on terminal width when piped into another command
+
+- Show an error message when `version` attribute is malformed
+
 1.25.5 (2020-02-04)
 -------------------
 
