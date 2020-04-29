@@ -21,7 +21,11 @@ type progress struct {
 	resources []*resource
 }
 
-func NewProgressWriter() *progress {
+type ProgressWriter interface {
+	ResourceEvent(name string, status string, details string)
+}
+
+func NewProgressWriter() ProgressWriter {
 	return &progress{
 		console: ansiConsole{os.Stdout},
 	}

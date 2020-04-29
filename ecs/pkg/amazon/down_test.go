@@ -20,6 +20,7 @@ func TestDownDontDeleteCluster(t *testing.T) {
 	ctx := context.TODO()
 	recorder := m.EXPECT()
 	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
+	recorder.WaitStackComplete(ctx, "test_project", gomock.Any()).Return(nil).Times(1)
 
 	c.ComposeDown(ctx, "test_project", false)
 }
@@ -37,6 +38,7 @@ func TestDownDeleteCluster(t *testing.T) {
 	ctx := context.TODO()
 	recorder := m.EXPECT()
 	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
+	recorder.WaitStackComplete(ctx, "test_project", gomock.Any()).Return(nil).Times(1)
 	recorder.DeleteCluster(ctx, "test_cluster").Return(nil).Times(1)
 
 	c.ComposeDown(ctx, "test_project", true)

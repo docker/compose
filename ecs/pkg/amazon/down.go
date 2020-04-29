@@ -12,6 +12,11 @@ func (c *client) ComposeDown(ctx context.Context, projectName string, deleteClus
 	}
 	fmt.Printf("Delete stack ")
 
+	err = c.WaitStackCompletion(ctx, projectName)
+	if err != nil {
+		return err
+	}
+
 	if !deleteCluster {
 		return nil
 	}

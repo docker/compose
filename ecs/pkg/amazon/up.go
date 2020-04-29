@@ -3,13 +3,9 @@ package amazon
 import (
 	"context"
 	"fmt"
-	"sort"
 
-	"github.com/aws/aws-sdk-go/aws"
-	cf "github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/compose"
-	"github.com/docker/ecs-plugin/pkg/console"
 )
 
 func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error {
@@ -38,42 +34,13 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
-	w := console.NewProgressWriter()
-	known := map[string]struct{}{}
-	err = c.api.WaitStackComplete(ctx, project.Name, func() error {
-		events, err := c.api.DescribeStackEvents(ctx, project.Name)
-		if err != nil {
-			return err
-		}
-
-		sort.Slice(events, func(i, j int) bool {
-			return events[i].Timestamp.Before(*events[j].Timestamp)
-		})
-
-		for _, event := range events {
-			if _, ok := known[*event.EventId]; ok {
-				continue
-			}
-			known[*event.EventId] = struct{}{}
-
-			resource := fmt.Sprintf("%s %q", aws.StringValue(event.ResourceType), aws.StringValue(event.LogicalResourceId))
-			w.ResourceEvent(resource, aws.StringValue(event.ResourceStatus), aws.StringValue(event.ResourceStatusReason))
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// TODO monitor progress
-	return nil
+	return c.WaitStackCompletion(ctx, project.Name)
 }
 
 type upAPI interface {
+	waitAPI
 	ClusterExists(ctx context.Context, name string) (bool, error)
 	CreateCluster(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template *cloudformation.Template) error
-	WaitStackComplete(ctx context.Context, name string, fn func() error) error
-	DescribeStackEvents(ctx context.Context, stack string) ([]*cf.StackEvent, error)
 }
