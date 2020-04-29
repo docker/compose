@@ -113,7 +113,7 @@ func main() {
 	ctx, cancel := util.NewSigContext()
 	defer cancel()
 
-	ctx, err := withCurrentContext(ctx, opts)
+	ctx, err := apicontext.WithCurrentContext(ctx, opts.Config, opts.Context)
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -133,45 +133,14 @@ func main() {
 	}
 }
 
-type currentContextKey struct{}
-
-func withCurrentContext(ctx context.Context, opts mainOpts) (context.Context, error) {
-	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
-	if err != nil {
-		return ctx, err
-	}
-
-	currentContext := opts.Context
-	if currentContext == "" {
-		currentContext = config.CurrentContext
-	}
-	if currentContext == "" {
-		currentContext = "default"
-	}
-
-	logrus.Debugf("Current context %q", currentContext)
-
-	return context.WithValue(ctx, currentContextKey{}, currentContext), nil
-}
-
-// CurrentContext returns the current context name
-func CurrentContext(ctx context.Context) string {
-	cc, _ := ctx.Value(currentContextKey{}).(string)
-	return cc
-}
-
 func execMoby(ctx context.Context) {
-	currentContext := CurrentContext(ctx)
+	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 
-	cc, err := s.Get(currentContext)
-	if err != nil {
-		logrus.Fatal(err)
-	}
+	_, err := s.Get(currentContext, nil)
 	// Only run original docker command if the current context is not
 	// ours.
-	_, ok := cc.Metadata.(store.TypeContext)
-	if !ok {
+	if err != nil {
 		cmd := exec.Command("docker", os.Args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout

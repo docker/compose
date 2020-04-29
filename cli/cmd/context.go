@@ -55,7 +55,10 @@ func ContextCommand() *cobra.Command {
 }
 
 type createOpts struct {
-	description string
+	description       string
+	aciLocation       string
+	aciSubscriptionID string
+	aciResourceGroup  string
 }
 
 func createCommand() *cobra.Command {
@@ -70,6 +73,9 @@ func createCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&opts.description, "description", "", "Description of the context")
+	cmd.Flags().StringVar(&opts.aciLocation, "aci-location", "eastus", "Location")
+	cmd.Flags().StringVar(&opts.aciSubscriptionID, "aci-subscription-id", "", "Location")
+	cmd.Flags().StringVar(&opts.aciResourceGroup, "aci-resource-group", "", "Resource group")
 
 	return cmd
 }
@@ -87,14 +93,27 @@ func listCommand() *cobra.Command {
 }
 
 func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
+	switch contextType {
+	case "aci":
+		return createACIContext(ctx, name, opts)
+	default:
+		s := store.ContextStore(ctx)
+		return s.Create(name, store.TypedContext{
+			Description: opts.description,
+		})
+	}
+}
+
+func createACIContext(ctx context.Context, name string, opts createOpts) error {
 	s := store.ContextStore(ctx)
-	return s.Create(name, store.TypeContext{
-		Type:        contextType,
+	return s.Create(name, store.TypedContext{
+		Type:        "aci",
 		Description: opts.description,
-	}, map[string]interface{}{
-		// If we don't set anything here the main docker cli
-		// doesn't know how to read the context any more
-		"docker": CliContext{},
+		Data: store.AciContext{
+			SubscriptionID: opts.aciSubscriptionID,
+			Location:       opts.aciLocation,
+			ResourceGroup:  opts.aciResourceGroup,
+		},
 	})
 }
 
@@ -110,11 +129,7 @@ func runList(ctx context.Context) error {
 	format := "%s\t%s\t%s\n"
 
 	for _, c := range contexts {
-		meta, ok := c.Metadata.(store.TypeContext)
-		if !ok {
-			return fmt.Errorf("Unable to list contexts, context %q is not valid", c.Name)
-		}
-		fmt.Fprintf(w, format, c.Name, meta.Description, meta.Type)
+		fmt.Fprintf(w, format, c.Name, c.Metadata.Description)
 	}
 
 	return w.Flush()

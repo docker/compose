@@ -33,7 +33,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -60,47 +59,45 @@ func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
 }
 
 func (suite *StoreTestSuite) TestCreate() {
-	err := suite.store.Create("test", nil, nil)
-	assert.Nil(suite.T(), err)
+	err := suite.store.Create("test", TypedContext{})
+	require.Nil(suite.T(), err)
 }
 
 func (suite *StoreTestSuite) TestGetUnknown() {
-	meta, err := suite.store.Get("unknown")
-	assert.Nil(suite.T(), meta)
-	assert.Error(suite.T(), err)
+	meta, err := suite.store.Get("unknown", nil)
+	require.Nil(suite.T(), meta)
+	require.Error(suite.T(), err)
 }
 
 func (suite *StoreTestSuite) TestGet() {
-	err := suite.store.Create("test", TypeContext{
+	err := suite.store.Create("test", TypedContext{
 		Type:        "type",
 		Description: "description",
-	}, nil)
-	assert.Nil(suite.T(), err)
+	})
+	require.Nil(suite.T(), err)
 
-	meta, err := suite.store.Get("test")
-	assert.Nil(suite.T(), err)
-	assert.NotNil(suite.T(), meta)
-	assert.Equal(suite.T(), "test", meta.Name)
+	meta, err := suite.store.Get("test", nil)
+	require.Nil(suite.T(), err)
+	require.NotNil(suite.T(), meta)
+	require.Equal(suite.T(), "test", meta.Name)
 
-	m, ok := meta.Metadata.(TypeContext)
-	assert.Equal(suite.T(), ok, true)
-	assert.Equal(suite.T(), "description", m.Description)
-	assert.Equal(suite.T(), "type", m.Type)
+	require.Equal(suite.T(), "description", meta.Metadata.Description)
+	require.Equal(suite.T(), "type", meta.Metadata.Type)
 }
 
 func (suite *StoreTestSuite) TestList() {
-	err := suite.store.Create("test1", TypeContext{}, nil)
-	assert.Nil(suite.T(), err)
+	err := suite.store.Create("test1", TypedContext{})
+	require.Nil(suite.T(), err)
 
-	err = suite.store.Create("test2", TypeContext{}, nil)
-	assert.Nil(suite.T(), err)
+	err = suite.store.Create("test2", TypedContext{})
+	require.Nil(suite.T(), err)
 
 	contexts, err := suite.store.List()
-	assert.Nil(suite.T(), err)
+	require.Nil(suite.T(), err)
 
 	require.Equal(suite.T(), len(contexts), 2)
-	assert.Equal(suite.T(), contexts[0].Name, "test1")
-	assert.Equal(suite.T(), contexts[1].Name, "test2")
+	require.Equal(suite.T(), contexts[0].Name, "test1")
+	require.Equal(suite.T(), contexts[1].Name, "test2")
 }
 
 func TestExampleTestSuite(t *testing.T) {
