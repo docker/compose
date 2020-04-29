@@ -32,7 +32,7 @@ func NewProgressWriter() ProgressWriter {
 }
 
 const (
-	cyan  = "36;1"
+	blue  = "36;2"
 	red   = "31;1"
 	green = "32;1"
 )
@@ -126,7 +126,7 @@ func (c ansiConsole) KO(s string) string {
 }
 
 func (c ansiConsole) WiP(s string) string {
-	return ansiColor(cyan, s)
+	return ansiColor(blue, s)
 }
 
 func ansiColor(code, s string) string {
