@@ -112,6 +112,7 @@ func main() {
 	root.AddCommand(
 		cmd.ContextCommand(),
 		&cmd.PsCommand,
+		cmd.ServeCommand(),
 		&cmd.ExampleCommand,
 	)
 
