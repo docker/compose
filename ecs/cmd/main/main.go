@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/docker/cli/cli-plugins/manager"
@@ -45,6 +46,7 @@ func NewRootCmd(name string, dockerCli command.Cli) *cobra.Command {
 	cmd.AddCommand(
 		VersionCommand(),
 		ComposeCommand(&opts),
+		SecretCommand(&opts),
 	)
 	cmd.Flags().StringVarP(&opts.profile, "profile", "p", "default", "AWS Profile")
 	cmd.Flags().StringVarP(&opts.cluster, "cluster", "c", "default", "ECS cluster")
@@ -162,5 +164,98 @@ func DownCommand(clusteropts *clusterOptions, projectOpts *compose.ProjectOption
 		},
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
+	return cmd
+}
+
+func SecretCommand(clusteropts *clusterOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "secret",
+	}
+	opts := &compose.ProjectOptions{}
+	opts.AddFlags(cmd.Flags())
+
+	cmd.AddCommand(
+		CreateSecret(clusteropts),
+		InspectSecret(clusteropts),
+		ListSecrets(clusteropts),
+		DeleteSecret(clusteropts),
+	)
+	return cmd
+}
+
+type createSecretOptions struct {
+	Label string
+}
+
+func CreateSecret(clusteropts *clusterOptions) *cobra.Command {
+	//opts := createSecretOptions{}
+	cmd := &cobra.Command{
+		Use: "create [NAME]",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return errors.New("Missing mandatory parameter: [NAME]")
+			}
+			name := args[0]
+			content := "blabla"
+			id, err := client.CreateSecret(context.Background(), name, content)
+			fmt.Println(id)
+			return err
+		},
+	}
+	//cmd.Flags().BoolVar(&opts.Label, "label", false, "Secret label")
+	return cmd
+}
+
+func InspectSecret(clusteropts *clusterOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "inspect [NAME]",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return errors.New("Missing mandatory parameter: [NAME]")
+			}
+			name := args[0]
+			return client.InspectSecret(context.Background(), name)
+		},
+	}
+	return cmd
+}
+
+func ListSecrets(clusteropts *clusterOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			return client.ListSecrets(context.Background())
+		},
+	}
+	return cmd
+}
+
+func DeleteSecret(clusteropts *clusterOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "delete [NAME]",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := amazon.NewClient(clusteropts.profile, clusteropts.cluster, clusteropts.region)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return errors.New("Missing mandatory parameter: [NAME]")
+			}
+			return client.DeleteSecret(context.Background(), args[0])
+		},
+	}
 	return cmd
 }

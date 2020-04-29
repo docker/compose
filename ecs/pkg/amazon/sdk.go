@@ -18,6 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
+	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	cf "github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/sirupsen/logrus"
 )
@@ -30,6 +32,7 @@ type sdk struct {
 	CW   cloudwatchlogsiface.CloudWatchLogsAPI
 	IAM  iamiface.IAMAPI
 	CF   cloudformationiface.CloudFormationAPI
+	SM   secretsmanageriface.SecretsManagerAPI
 }
 
 func NewAPI(sess *session.Session) API {
@@ -40,6 +43,7 @@ func NewAPI(sess *session.Session) API {
 		CW:  cloudwatchlogs.New(sess),
 		IAM: iam.New(sess),
 		CF:  cloudformation.New(sess),
+		SM:  secretsmanager.New(sess),
 	}
 }
 
@@ -192,4 +196,24 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 		StackName: aws.String(name),
 	})
 	return err
+}
+
+func (s sdk) CreateSecret(ctx context.Context, name string, content string) (string, error) {
+	logrus.Debug("Create secret " + name)
+	return "test", nil
+}
+
+func (s sdk) InspectSecret(ctx context.Context, name string) error {
+	fmt.Printf("... done. \n")
+	return nil
+}
+
+func (s sdk) ListSecrets(ctx context.Context) error {
+	fmt.Printf("... done. \n")
+	return nil
+}
+
+func (s sdk) DeleteSecret(ctx context.Context, name string) error {
+	fmt.Printf("... done. \n")
+	return nil
 }

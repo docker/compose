@@ -6,4 +6,5 @@ type API interface {
 	downAPI
 	upAPI
 	convertAPI
+	secretsAPI
 }
