@@ -29,17 +29,26 @@ package server
 
 import (
 	"context"
+	"errors"
 
+	"github.com/docker/api/client"
+	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
+	"github.com/docker/api/server/proxy"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 )
 
 // New returns a new GRPC server.
 func New() *grpc.Server {
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(unary),
+		grpc.ChainUnaryInterceptor(
+			unaryMeta,
+			unary,
+		),
 		grpc.StreamInterceptor(stream),
 	)
 	hs := health.NewServer()
@@ -53,4 +62,34 @@ func unary(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, han
 
 func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	return grpc_prometheus.StreamServerInterceptor(srv, ss, info, handler)
+}
+
+func unaryMeta(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("missing metadata")
+	}
+
+	key := md[apicontext.KEY]
+
+	if len(key) == 1 {
+		s, err := store.New()
+		if err != nil {
+			return nil, err
+		}
+		ctx = store.WithContextStore(ctx, s)
+
+		ctx = apicontext.WithCurrentContext(ctx, key[0])
+
+		c, err := client.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ctx, err = proxy.WithClient(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+	}
+	m, err := handler(ctx, req)
+	return m, err
 }

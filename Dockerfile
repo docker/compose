@@ -34,7 +34,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     make xbins
 
 FROM scratch AS protos
-COPY --from=make-protos /go/src/github.com/docker/api/backend/v1/*.pb.go .
+COPY --from=make-protos /go/src/github.com/docker/api/backend/v1/*.pb.go ./backend/v1/
+COPY --from=make-protos /go/src/github.com/docker/api/compose/v1/*.pb.go ./compose/v1/
+COPY --from=make-protos /go/src/github.com/docker/api/cli/v1/*.pb.go ./cli/v1/
 
 FROM scratch AS bins
 COPY --from=make-bins /go/src/github.com/docker/api/bin/* .

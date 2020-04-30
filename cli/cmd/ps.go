@@ -21,7 +21,7 @@ var PsCommand = cobra.Command{
 			return errors.Wrap(err, "cannot connect to backend")
 		}
 
-		containers, err := c.ContainerService(ctx).List(ctx)
+		containers, err := c.ContainerService().List(ctx)
 		if err != nil {
 			return errors.Wrap(err, "fetch containers")
 		}

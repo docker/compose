@@ -112,7 +112,14 @@ func New(opts ...StoreOpt) (Store, error) {
 // Get returns the context with the given name
 func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
-	return read(meta, getter)
+	m, err := read(meta, getter)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("unknown context %q", name)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 func read(meta string, getter func() interface{}) (*Metadata, error) {

@@ -69,6 +69,6 @@ type Client struct {
 	cc          containers.ContainerService
 }
 
-func (c *Client) ContainerService(ctx context.Context) containers.ContainerService {
+func (c *Client) ContainerService() containers.ContainerService {
 	return c.cc
 }

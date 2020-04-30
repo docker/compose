@@ -65,14 +65,14 @@ func init() {
 	}
 }
 
-func isContextCommand(cmd *cobra.Command) bool {
+func isOwnCommand(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	if cmd.Name() == "context" {
+	if cmd.Name() == "context" || cmd.Name() == "serve" {
 		return true
 	}
-	return isContextCommand(cmd.Parent())
+	return isOwnCommand(cmd.Parent())
 }
 
 func main() {
@@ -82,7 +82,7 @@ func main() {
 		Long:          "docker for the 2020s",
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if !isContextCommand(cmd) {
+			if !isOwnCommand(cmd) {
 				execMoby(cmd.Context())
 			}
 			return nil
@@ -94,7 +94,7 @@ func main() {
 
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if !isContextCommand(cmd) {
+		if !isOwnCommand(cmd) {
 			execMoby(cmd.Context())
 		}
 		helpFunc(cmd, args)
@@ -112,13 +112,26 @@ func main() {
 	root.AddCommand(
 		cmd.ContextCommand(),
 		&cmd.PsCommand,
+		cmd.ServeCommand(),
 		&cmd.ExampleCommand,
 	)
 
 	ctx, cancel := util.NewSigContext()
 	defer cancel()
 
-	ctx, err := apicontext.WithCurrentContext(ctx, opts.Config, opts.Context)
+	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
+	if err != nil {
+		logrus.Fatal("unable ot find configuration")
+	}
+	currentContext := opts.Context
+	if currentContext == "" {
+		currentContext = config.CurrentContext
+	}
+	if currentContext == "" {
+		currentContext = "default"
+	}
+
+	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	if err != nil {
 		logrus.Fatal(err)
 	}
