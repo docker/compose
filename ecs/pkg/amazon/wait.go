@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -22,21 +23,20 @@ func (c *client) WaitStackCompletion(ctx context.Context, name string, operation
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
-	done := make(chan error)
+	done := make(chan bool)
 
 	go func() {
-		err := c.api.WaitStackComplete(ctx, name, operation)
+		c.api.WaitStackComplete(ctx, stackID, operation) //nolint:errcheck
 		ticker.Stop()
-		done <- err
+		done <- true
 	}()
 
 	var completed bool
-	var waitErr error
+	var stackErr error
 	for !completed {
 		select {
-		case err := <-done:
+		case <-done:
 			completed = true
-			waitErr = err
 		case <-ticker.C:
 		}
 		events, err := c.api.DescribeStackEvents(ctx, stackID)
@@ -55,10 +55,15 @@ func (c *client) WaitStackCompletion(ctx context.Context, name string, operation
 			knownEvents[*event.EventId] = struct{}{}
 
 			resource := fmt.Sprintf("%s %q", aws.StringValue(event.ResourceType), aws.StringValue(event.LogicalResourceId))
-			w.ResourceEvent(resource, aws.StringValue(event.ResourceStatus), aws.StringValue(event.ResourceStatusReason))
+			reason := aws.StringValue(event.ResourceStatusReason)
+			status := aws.StringValue(event.ResourceStatus)
+			w.ResourceEvent(resource, status, reason)
+			if stackErr == nil && strings.HasSuffix(status, "_FAILED") {
+				stackErr = fmt.Errorf(reason)
+			}
 		}
 	}
-	return waitErr
+	return stackErr
 }
 
 type waitAPI interface {

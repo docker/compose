@@ -19,8 +19,10 @@ func TestDownDontDeleteCluster(t *testing.T) {
 	}
 	ctx := context.TODO()
 	recorder := m.EXPECT()
-	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
-	recorder.WaitStackComplete(ctx, "test_project", gomock.Any()).Return(nil).Times(1)
+	recorder.DeleteStack(ctx, "test_project").Return(nil)
+	recorder.GetStackID(ctx, "test_project").Return("stack-123", nil)
+	recorder.WaitStackComplete(ctx, "stack-123", StackDelete).Return(nil)
+	recorder.DescribeStackEvents(ctx, "stack-123").Return(nil, nil)
 
 	c.ComposeDown(ctx, "test_project", false)
 }
@@ -37,9 +39,11 @@ func TestDownDeleteCluster(t *testing.T) {
 
 	ctx := context.TODO()
 	recorder := m.EXPECT()
-	recorder.DeleteStack(ctx, "test_project").Return(nil).Times(1)
-	recorder.WaitStackComplete(ctx, "test_project", gomock.Any()).Return(nil).Times(1)
-	recorder.DeleteCluster(ctx, "test_cluster").Return(nil).Times(1)
+	recorder.DeleteStack(ctx, "test_project").Return(nil)
+	recorder.GetStackID(ctx, "test_project").Return("stack-123", nil)
+	recorder.WaitStackComplete(ctx, "stack-123", StackDelete).Return(nil)
+	recorder.DescribeStackEvents(ctx, "stack-123").Return(nil, nil)
+	recorder.DeleteCluster(ctx, "test_cluster").Return(nil)
 
 	c.ComposeDown(ctx, "test_project", true)
 }
