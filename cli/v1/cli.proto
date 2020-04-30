@@ -2,18 +2,21 @@ syntax = "proto3";
 
 package com.docker.api.cli.v1;
 
-import "google/protobuf/empty.proto";
 
 option go_package = "github.com/docker/api/cli/v1;v1";
 
 service Cli {
     // Returns the list of existing contexts
-    rpc Contexts(google.protobuf.Empty) returns (ContextsResponse);
+    rpc Contexts(ContextsRequest) returns (ContextsResponse);
 }
 
 message Context {
     string name = 1;
     string contextType = 2;
+}
+
+message ContextsRequest {
+
 }
 
 message ContextsResponse {

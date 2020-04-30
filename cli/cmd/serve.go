@@ -9,7 +9,6 @@ import (
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/server"
 	"github.com/docker/api/server/proxy"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -67,7 +66,7 @@ type cliServer struct {
 	ctx context.Context
 }
 
-func (cs *cliServer) Contexts(context.Context, *empty.Empty) (*cliv1.ContextsResponse, error) {
+func (cs *cliServer) Contexts(ctx context.Context, request *cliv1.ContextsRequest) (*cliv1.ContextsResponse, error) {
 	s, err := store.New()
 	if err != nil {
 		logrus.Error(err)

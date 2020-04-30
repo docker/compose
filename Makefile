@@ -49,7 +49,7 @@ xcli: cli
 
 dprotos:
 	docker build . \
-	--output type=local,dest=./backend/v1 \
+	--output type=local,dest=. \
 	--target protos
 
 dbins: dprotos
