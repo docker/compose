@@ -31,7 +31,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 
 	"github.com/docker/api/client"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -45,16 +44,12 @@ var ExampleCommand = cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		// get our current context
-		ctx = current(ctx)
-
-		client, err := connect(ctx)
+		c, err := client.New(ctx)
 		if err != nil {
 			return errors.Wrap(err, "cannot connect to backend")
 		}
-		defer client.Close()
 
-		info, err := client.BackendInformation(ctx, &empty.Empty{})
+		info, err := c.BackendInformation(ctx, &empty.Empty{})
 		if err != nil {
 			return errors.Wrap(err, "fetch backend information")
 		}
@@ -62,37 +57,6 @@ var ExampleCommand = cobra.Command{
 		enc.SetIndent("", " ")
 		return enc.Encode(info)
 	},
-}
-
-// mock information for getting context
-// factor out this into a context store package
-func current(ctx context.Context) context.Context {
-	// test backend address
-	return context.WithValue(ctx, backendAddressKey{}, "/tmp/backend.sock")
-}
-
-func connect(ctx context.Context) (*client.Client, error) {
-	address, err := BackendAddress(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "no backend address")
-	}
-
-	c, err := client.New(ctx)
-	if err != nil {
-		if err != context.DeadlineExceeded {
-			return nil, errors.Wrap(err, "connect to backend")
-		}
-		// the backend is not running so start it
-		cmd := exec.Command("backend-example", "--address", address)
-		go cmd.Wait()
-
-		if err := cmd.Start(); err != nil {
-			return nil, errors.Wrap(err, "start backend")
-		}
-		cl, e := client.New(ctx)
-		return cl, e
-	}
-	return c, nil
 }
 
 type backendAddressKey struct{}

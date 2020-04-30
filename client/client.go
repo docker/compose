@@ -31,8 +31,6 @@ import (
 	"context"
 	"errors"
 
-	"google.golang.org/grpc"
-
 	"github.com/docker/api/backend"
 	v1 "github.com/docker/api/backend/v1"
 	"github.com/docker/api/containers"
@@ -66,7 +64,6 @@ func New(ctx context.Context) (*Client, error) {
 }
 
 type Client struct {
-	conn *grpc.ClientConn
 	v1.BackendClient
 	backendType string
 	cc          containers.ContainerService
@@ -74,11 +71,4 @@ type Client struct {
 
 func (c *Client) ContainerService(ctx context.Context) containers.ContainerService {
 	return c.cc
-}
-
-func (c *Client) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
-	}
-	return nil
 }
