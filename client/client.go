@@ -29,14 +29,13 @@ package client
 
 import (
 	"context"
+	"errors"
 
-	"google.golang.org/grpc"
-
+	"github.com/docker/api/backend"
 	v1 "github.com/docker/api/backend/v1"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
-	"github.com/docker/api/example"
 )
 
 // New returns a GRPC client
@@ -50,25 +49,26 @@ func New(ctx context.Context) (*Client, error) {
 	}
 	contextType := s.GetType(cc)
 
-	return &Client{
-		backendType: contextType,
-	}, nil
+	b, err := backend.Get(ctx, contextType)
+	if err != nil {
+		return nil, err
+	}
+
+	if ba, ok := b.(containers.ContainerService); ok {
+		return &Client{
+			backendType: contextType,
+			cc:          ba,
+		}, nil
+	}
+	return nil, errors.New("backend not found")
 }
 
 type Client struct {
-	conn *grpc.ClientConn
 	v1.BackendClient
 	backendType string
+	cc          containers.ContainerService
 }
 
 func (c *Client) ContainerService(ctx context.Context) containers.ContainerService {
-	return example.New()
-
-}
-
-func (c *Client) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
-	}
-	return nil
+	return c.cc
 }

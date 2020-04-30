@@ -111,10 +111,6 @@ func New(opts ...StoreOpt) (Store, error) {
 
 // Get returns the context with the given name
 func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
-	if name == "default" {
-		return &Metadata{}, nil
-	}
-
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
 	return read(meta, getter)
 }
@@ -195,7 +191,8 @@ func (s *store) Create(name string, data TypedContext) error {
 		Name:     name,
 		Metadata: data,
 		Endpoints: map[string]interface{}{
-			"docker": DummyContext{},
+			"docker":    DummyContext{},
+			(data.Type): DummyContext{},
 		},
 	}
 
