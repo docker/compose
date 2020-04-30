@@ -71,7 +71,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 		Tags:                    nil,
 		Volumes:                 []ecs.TaskDefinition_Volume{},
 	}, nil
-
 }
 
 func toCPU(service types.ServiceConfig) string {

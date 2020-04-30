@@ -10,9 +10,8 @@ func (c *client) ComposeDown(ctx context.Context, projectName string, deleteClus
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Delete stack ")
 
-	err = c.WaitStackCompletion(ctx, projectName)
+	err = c.WaitStackCompletion(ctx, projectName, StackDelete)
 	if err != nil {
 		return err
 	}

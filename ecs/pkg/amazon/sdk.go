@@ -3,8 +3,6 @@ package amazon
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -53,7 +51,7 @@ func NewAPI(sess *session.Session) API {
 
 func (s sdk) ClusterExists(ctx context.Context, name string) (bool, error) {
 	logrus.Debug("Check if cluster was already created: ", name)
-	clusters, err := s.ECS.DescribeClustersWithContext(aws.Context(ctx), &ecs.DescribeClustersInput{
+	clusters, err := s.ECS.DescribeClustersWithContext(ctx, &ecs.DescribeClustersInput{
 		Clusters: []*string{aws.String(name)},
 	})
 	if err != nil {
@@ -64,7 +62,7 @@ func (s sdk) ClusterExists(ctx context.Context, name string) (bool, error) {
 
 func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
 	logrus.Debug("Create cluster ", name)
-	response, err := s.ECS.CreateClusterWithContext(aws.Context(ctx), &ecs.CreateClusterInput{ClusterName: aws.String(name)})
+	response, err := s.ECS.CreateClusterWithContext(ctx, &ecs.CreateClusterInput{ClusterName: aws.String(name)})
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +71,7 @@ func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
 
 func (s sdk) DeleteCluster(ctx context.Context, name string) error {
 	logrus.Debug("Delete cluster ", name)
-	response, err := s.ECS.DeleteClusterWithContext(aws.Context(ctx), &ecs.DeleteClusterInput{Cluster: aws.String(name)})
+	response, err := s.ECS.DeleteClusterWithContext(ctx, &ecs.DeleteClusterInput{Cluster: aws.String(name)})
 	if err != nil {
 		return err
 	}
@@ -85,13 +83,13 @@ func (s sdk) DeleteCluster(ctx context.Context, name string) error {
 
 func (s sdk) VpcExists(ctx context.Context, vpcID string) (bool, error) {
 	logrus.Debug("Check if VPC exists: ", vpcID)
-	_, err := s.EC2.DescribeVpcsWithContext(aws.Context(ctx), &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
+	_, err := s.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
 	return err == nil, err
 }
 
 func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 	logrus.Debug("Retrieve default VPC")
-	vpcs, err := s.EC2.DescribeVpcsWithContext(aws.Context(ctx), &ec2.DescribeVpcsInput{
+	vpcs, err := s.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("isDefault"),
@@ -110,7 +108,7 @@ func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 
 func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
 	logrus.Debug("Retrieve SubNets")
-	subnets, err := s.EC2.DescribeSubnetsWithContext(aws.Context(ctx), &ec2.DescribeSubnetsInput{
+	subnets, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 		DryRun: nil,
 		Filters: []*ec2.Filter{
 			{
@@ -135,7 +133,7 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
 }
 
 func (s sdk) ListRolesForPolicy(ctx context.Context, policy string) ([]string, error) {
-	entities, err := s.IAM.ListEntitiesForPolicyWithContext(aws.Context(ctx), &iam.ListEntitiesForPolicyInput{
+	entities, err := s.IAM.ListEntitiesForPolicyWithContext(ctx, &iam.ListEntitiesForPolicyInput{
 		EntityFilter: aws.String("Role"),
 		PolicyArn:    aws.String(policy),
 	})
@@ -150,7 +148,7 @@ func (s sdk) ListRolesForPolicy(ctx context.Context, policy string) ([]string, e
 }
 
 func (s sdk) GetRoleArn(ctx context.Context, name string) (string, error) {
-	role, err := s.IAM.GetRoleWithContext(aws.Context(ctx), &iam.GetRoleInput{
+	role, err := s.IAM.GetRoleWithContext(ctx, &iam.GetRoleInput{
 		RoleName: aws.String(name),
 	})
 	if err != nil {
@@ -160,7 +158,7 @@ func (s sdk) GetRoleArn(ctx context.Context, name string) (string, error) {
 }
 
 func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
-	stacks, err := s.CF.DescribeStacksWithContext(aws.Context(ctx), &cloudformation.DescribeStacksInput{
+	stacks, err := s.CF.DescribeStacksWithContext(ctx, &cloudformation.DescribeStacksInput{
 		StackName: aws.String(name),
 	})
 	if err != nil {
@@ -177,7 +175,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		return err
 	}
 
-	_, err = s.CF.CreateStackWithContext(aws.Context(ctx), &cloudformation.CreateStackInput{
+	_, err = s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 		OnFailure:        aws.String("DELETE"),
 		StackName:        aws.String(name),
 		TemplateBody:     aws.String(string(json)),
@@ -185,36 +183,37 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 	})
 	return err
 }
-func (s sdk) WaitStackComplete(ctx context.Context, name string, fn func() error) error {
-	for i := 0; i < 120; i++ {
-		stacks, err := s.CF.DescribeStacks(&cloudformation.DescribeStacksInput{
-			StackName: aws.String(name),
-		})
-		if err != nil {
-			return err
-		}
-
-		err = fn()
-		if err != nil {
-			return err
-		}
-
-		status := *stacks.Stacks[0].StackStatus
-		if strings.HasSuffix(status, "_COMPLETE") || strings.HasSuffix(status, "_FAILED") {
-			return nil
-		}
-		time.Sleep(1 * time.Second)
+func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) error {
+	input := &cloudformation.DescribeStacksInput{
+		StackName: aws.String(name),
 	}
-	return fmt.Errorf("120s timeout waiting for CloudFormation stack %s to complete", name)
+	switch operation {
+	case StackCreate:
+		return s.CF.WaitUntilStackCreateCompleteWithContext(ctx, input)
+	case StackDelete:
+		return s.CF.WaitUntilStackDeleteCompleteWithContext(ctx, input)
+	default:
+		return fmt.Errorf("internal error: unexpected stack operation %d", operation)
+	}
 }
 
-func (s sdk) DescribeStackEvents(ctx context.Context, name string) ([]*cloudformation.StackEvent, error) {
+func (s sdk) GetStackID(ctx context.Context, name string) (string, error) {
+	stacks, err := s.CF.DescribeStacksWithContext(ctx, &cloudformation.DescribeStacksInput{
+		StackName: aws.String(name),
+	})
+	if err != nil {
+		return "", err
+	}
+	return *stacks.Stacks[0].StackId, nil
+}
+
+func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error) {
 	// Fixme implement Paginator on Events and return as a chan(events)
 	events := []*cloudformation.StackEvent{}
 	var nextToken *string
 	for {
-		resp, err := s.CF.DescribeStackEventsWithContext(aws.Context(ctx), &cloudformation.DescribeStackEventsInput{
-			StackName: aws.String(name),
+		resp, err := s.CF.DescribeStackEventsWithContext(ctx, &cloudformation.DescribeStackEventsInput{
+			StackName: aws.String(stackID),
 			NextToken: nextToken,
 		})
 		if err != nil {
@@ -230,7 +229,7 @@ func (s sdk) DescribeStackEvents(ctx context.Context, name string) ([]*cloudform
 
 func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	logrus.Debug("Delete CloudFormation stack")
-	_, err := s.CF.DeleteStackWithContext(aws.Context(ctx), &cloudformation.DeleteStackInput{
+	_, err := s.CF.DeleteStackWithContext(ctx, &cloudformation.DeleteStackInput{
 		StackName: aws.String(name),
 	})
 	return err

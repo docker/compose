@@ -152,6 +152,21 @@ func (mr *MockAPIMockRecorder) GetRoleArn(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoleArn", reflect.TypeOf((*MockAPI)(nil).GetRoleArn), arg0, arg1)
 }
 
+// GetStackID mocks base method
+func (m *MockAPI) GetStackID(arg0 context.Context, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStackID", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStackID indicates an expected call of GetStackID
+func (mr *MockAPIMockRecorder) GetStackID(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStackID", reflect.TypeOf((*MockAPI)(nil).GetStackID), arg0, arg1)
+}
+
 // GetSubNets mocks base method
 func (m *MockAPI) GetSubNets(arg0 context.Context, arg1 string) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -213,7 +228,7 @@ func (mr *MockAPIMockRecorder) VpcExists(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // WaitStackComplete mocks base method
-func (m *MockAPI) WaitStackComplete(arg0 context.Context, arg1 string, arg2 func() error) error {
+func (m *MockAPI) WaitStackComplete(arg0 context.Context, arg1 string, arg2 int) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitStackComplete", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

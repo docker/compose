@@ -34,7 +34,7 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
-	return c.WaitStackCompletion(ctx, project.Name)
+	return c.WaitStackCompletion(ctx, project.Name, StackCreate)
 }
 
 type upAPI interface {

@@ -4,17 +4,42 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (c *client) WaitStackCompletion(ctx context.Context, name string) error {
+func (c *client) WaitStackCompletion(ctx context.Context, name string, operation int) error {
 	w := console.NewProgressWriter()
-	known := map[string]struct{}{}
-	err := c.api.WaitStackComplete(ctx, name, func() error {
-		events, err := c.api.DescribeStackEvents(ctx, name)
+	knownEvents := map[string]struct{}{}
+
+	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
+	stackID, err := c.api.GetStackID(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	done := make(chan error)
+
+	go func() {
+		err := c.api.WaitStackComplete(ctx, name, operation)
+		ticker.Stop()
+		done <- err
+	}()
+
+	var completed bool
+	var waitErr error
+	for !completed {
+		select {
+		case err := <-done:
+			completed = true
+			waitErr = err
+		case <-ticker.C:
+		}
+		events, err := c.api.DescribeStackEvents(ctx, stackID)
 		if err != nil {
 			return err
 		}
@@ -24,23 +49,25 @@ func (c *client) WaitStackCompletion(ctx context.Context, name string) error {
 		})
 
 		for _, event := range events {
-			if _, ok := known[*event.EventId]; ok {
+			if _, ok := knownEvents[*event.EventId]; ok {
 				continue
 			}
-			known[*event.EventId] = struct{}{}
+			knownEvents[*event.EventId] = struct{}{}
 
 			resource := fmt.Sprintf("%s %q", aws.StringValue(event.ResourceType), aws.StringValue(event.LogicalResourceId))
 			w.ResourceEvent(resource, aws.StringValue(event.ResourceStatus), aws.StringValue(event.ResourceStatusReason))
 		}
-		return nil
-	})
-	if err != nil {
-		return err
 	}
-	return nil
+	return waitErr
 }
 
 type waitAPI interface {
-	WaitStackComplete(ctx context.Context, name string, fn func() error) error
-	DescribeStackEvents(ctx context.Context, stack string) ([]*cloudformation.StackEvent, error)
+	GetStackID(ctx context.Context, name string) (string, error)
+	WaitStackComplete(ctx context.Context, name string, operation int) error
+	DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error)
 }
+
+const (
+	StackCreate = iota
+	StackDelete
+)

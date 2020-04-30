@@ -100,16 +100,10 @@ func (c ansiConsole) Printf(format string, a ...interface{}) {
 }
 
 func (c ansiConsole) MoveUp(i int) {
-	if i == 0 {
-		return
-	}
 	fmt.Fprintf(c.out, "\033[%dA", i) // nolint:errcheck
 }
 
 func (c ansiConsole) MoveDown(i int) {
-	if i == 0 {
-		return
-	}
 	fmt.Fprintf(c.out, "\033[%dB", i) // nolint:errcheck
 }
 
