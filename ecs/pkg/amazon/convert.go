@@ -19,7 +19,14 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 	if err != nil {
 		return nil, err
 	}
-
+	credential, err := getRepoCredentials(service)
+	if err != nil {
+		return nil, err
+	}
+	secrets, err := getSecrets(service)
+	if err != nil {
+		return nil, err
+	}
 	return &ecs.TaskDefinition{
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
@@ -55,9 +62,9 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 				Privileged:             service.Privileged,
 				PseudoTerminal:         service.Tty,
 				ReadonlyRootFilesystem: service.ReadOnly,
-				RepositoryCredentials:  nil,
+				RepositoryCredentials:  credential,
 				ResourceRequirements:   nil,
-				Secrets:                nil,
+				Secrets:                secrets,
 				StartTimeout:           0,
 				StopTimeout:            durationToInt(service.StopGracePeriod),
 				SystemControls:         nil,
@@ -273,4 +280,33 @@ func toKeyValuePair(environment types.MappingWithEquals) []ecs.TaskDefinition_Ke
 		})
 	}
 	return pairs
+}
+
+func getRepoCredentials(service types.ServiceConfig) (*ecs.TaskDefinition_RepositoryCredentials, error) {
+	// extract registry and namespace string from image name
+	fields := strings.Split(service.Image, "/")
+	regPath := ""
+	for i, field := range fields {
+		if i < len(fields)-1 {
+			regPath = regPath + field
+		}
+	}
+	if regPath == "" || len(service.Secrets) == 0 {
+		return nil, nil
+	}
+	for _, secret := range service.Secrets {
+		if secret.Source == regPath {
+			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: secret.Target}, nil
+		}
+	}
+	return nil, nil
+}
+
+func getSecrets(service types.ServiceConfig) ([]ecs.TaskDefinition_Secret, error) {
+	secrets := []ecs.TaskDefinition_Secret{}
+
+	for _, secret := range service.Secrets {
+		secrets = append(secrets, ecs.TaskDefinition_Secret{Name: secret.Target})
+	}
+	return secrets, nil
 }
