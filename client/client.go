@@ -69,21 +69,6 @@ type Client struct {
 	cc          containers.ContainerService
 }
 
-func (c *Client) SetContext(ctx context.Context, contextType string) error {
-	b, err := backend.Get(ctx, contextType)
-	if err != nil {
-		return err
-	}
-
-	ba, ok := b.(containers.ContainerService)
-	if !ok {
-		return errors.New("unknown context type")
-	}
-
-	c.cc = ba
-	return nil
-}
-
 func (c *Client) ContainerService() containers.ContainerService {
 	return c.cc
 }
