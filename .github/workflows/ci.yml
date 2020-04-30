@@ -20,6 +20,9 @@ jobs:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@master
+
       - name: Get dependencies
         run: ./setup-dev.sh
 

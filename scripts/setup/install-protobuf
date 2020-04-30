@@ -14,7 +14,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
 #
 # Downloads and installs protobuf
 #
@@ -32,13 +31,13 @@ arm64)
 	unzip $PROTOBUF_DIR/protobuf -d /usr/local
 	;;
 
-amd64|386)
+amd64 | 386)
 	if [ "$GOOS" = windows ]; then
 		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
 	elif [ "$GOOS" = linux ]; then
 		wget -O $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
-    elif [ "$GOOS" = darwin ]; then
-        curl -Lo $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-osx-x86_64.zip"
+	elif [ "$GOOS" = darwin ]; then
+		curl -Lo $PROTOBUF_DIR/protobuf "https://github.com/google/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-osx-x86_64.zip"
 	fi
 	unzip $PROTOBUF_DIR/protobuf -x readme.txt -d /usr/local
 	;;
@@ -60,7 +59,3 @@ ppc64le)
 	;;
 esac
 rm -rf $PROTOBUF_DIR
-
-go get github.com/gogo/protobuf/proto
-go get github.com/gogo/protobuf/jsonpb
-go get -u github.com/golang/protobuf/protoc-gen-go

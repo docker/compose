@@ -26,5 +26,4 @@
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ./scripts/setup/install-protobuf
-
-go get github.com/stevvooe/protobuild
+./scripts/setup/install-go-gen
