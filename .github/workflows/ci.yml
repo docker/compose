@@ -24,7 +24,7 @@ jobs:
         uses: arduino/setup-protoc@master
 
       - name: Get dependencies
-        run: ./setup-dev.sh
+        run: ./scripts/setup/install-go-gen
 
       - name: Protos
         run: make protos
