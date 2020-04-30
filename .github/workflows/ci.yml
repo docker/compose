@@ -1,0 +1,39 @@
+name: Continuous integration
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+        
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v2
+    
+    - name: Get dependencies
+      run: |
+        go get gotest.tools/gotestsum
+        go get github.com/stevvooe/protobuild
+        go get github.com/gogo/protobuf/proto
+        go get github.com/gogo/protobuf/jsonpb
+        go get github.com/golang/protobuf/protoc-gen-go
+
+    - name: Protos
+      run: make protos
+
+    - name: Build
+      run: make cli
+
+    - name: Test
+      run: make test
