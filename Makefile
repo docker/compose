@@ -47,7 +47,7 @@ xcli: cli
 	GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
 	GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
 
-dbackend-protos:
+dprotos:
 	docker build . \
 	--output type=local,dest=. \
 	--target protos

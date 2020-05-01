@@ -5,7 +5,6 @@ import (
 
 	"github.com/docker/api/client"
 	v1 "github.com/docker/api/containers/v1"
-	"github.com/golang/protobuf/ptypes/empty"
 )
 
 type clientKey struct{}
@@ -54,15 +53,15 @@ func (p *proxyContainerApi) Start(_ context.Context, _ *v1.StartRequest) (*v1.St
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Stop(_ context.Context, _ *v1.StopRequest) (*empty.Empty, error) {
+func (p *proxyContainerApi) Stop(_ context.Context, _ *v1.StopRequest) (*v1.StopResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Kill(_ context.Context, _ *v1.KillRequest) (*empty.Empty, error) {
+func (p *proxyContainerApi) Kill(_ context.Context, _ *v1.KillRequest) (*v1.KillResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Delete(_ context.Context, _ *v1.DeleteRequest) (*empty.Empty, error) {
+func (p *proxyContainerApi) Delete(_ context.Context, _ *v1.DeleteRequest) (*v1.DeleteResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
