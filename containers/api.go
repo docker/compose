@@ -18,8 +18,8 @@ type Container struct {
 }
 
 type Port struct {
-	Source      string
-	Destination string
+	Source      uint32
+	Destination uint32
 }
 
 type ContainerConfig struct {

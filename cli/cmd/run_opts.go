@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/docker/api/containers"
@@ -16,9 +17,18 @@ func toPorts(ports []string) ([]containers.Port, error) {
 
 	for _, port := range ports {
 		parts := strings.Split(port, ":")
+		source, err := strconv.ParseUint(parts[0], 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		destination, err := strconv.ParseUint(parts[1], 10, 32)
+		if err != nil {
+			return nil, err
+		}
+
 		result = append(result, containers.Port{
-			Source:      parts[0],
-			Destination: parts[1],
+			Source:      uint32(source),
+			Destination: uint32(destination),
 		})
 	}
 	return result, nil
