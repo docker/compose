@@ -19,26 +19,26 @@ RUN go mod download
 ADD . ${PWD}
 
 FROM fs AS make-protos
-RUN make protos
+RUN make -f builder.Makefile protos
 
-FROM make-protos AS make-bins
+FROM make-protos AS make-cli
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGET_OS} \
     GOARCH=${TARGET_ARCH} \
-    make bins
+    make -f  builder.Makefile cli
 
-FROM make-protos as make-test
-RUN make test
-
-FROM make-protos AS make-xbins
+FROM make-protos AS make-xcli
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    make xbins
+    make -f builder.Makefile xcli
 
 FROM scratch AS protos
 COPY --from=make-protos /go/src/github.com/docker/api .
 
-FROM scratch AS bins
-COPY --from=make-bins /go/src/github.com/docker/api/bin/* .
+FROM scratch AS cli
+COPY --from=make-cli /go/src/github.com/docker/api/bin/* .
 
-FROM scratch AS xbins
-COPY --from=make-xbins /go/src/github.com/docker/api/bin/* .
+FROM scratch AS xcli
+COPY --from=make-xcli /go/src/github.com/docker/api/bin/* .
+
+FROM make-protos as test
+RUN make -f builder.Makefile test

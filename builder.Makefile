@@ -34,27 +34,19 @@ export DOCKER_BUILDKIT=1
 all: cli
 
 protos:
-	@docker build . \
-	--target protos
+	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
+	@goimports -w -local github.com/docker/api .
 
 cli:
-	@docker build . \
-	--output type=local,dest=./bin \
-	--build-arg TARGET_OS=${GOOS} \
-	--build-arg TARGET_ARCH=${GOARCH} \
-	--target cli
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli
 
 xcli:
-	@docker build . \
-	--output type=local,dest=./bin \
-	--target xcli
+	@GOOS=linux   GOARCH=amd64 go build -v -o bin/docker-linux-amd64 ./cli
+	@GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
+	@GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
 
 test:
-	@docker build . \
-	--target test
-
-cache-clear:
-	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
+	@gotestsum ./...
 
 FORCE:
 
