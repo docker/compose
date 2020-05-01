@@ -93,6 +93,14 @@ func main() {
 		},
 	}
 
+	root.AddCommand(
+		cmd.ContextCommand(),
+		&cmd.PsCommand,
+		cmd.ServeCommand(),
+		&cmd.ExampleCommand,
+		cmd.RunCommand(),
+	)
+
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !isOwnCommand(cmd) {
@@ -109,13 +117,6 @@ func main() {
 	if opts.debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-
-	root.AddCommand(
-		cmd.ContextCommand(),
-		&cmd.PsCommand,
-		cmd.ServeCommand(),
-		&cmd.ExampleCommand,
-	)
 
 	ctx, cancel := util.NewSigContext()
 	defer cancel()

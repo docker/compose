@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/containers"
 	v1 "github.com/docker/api/containers/v1"
 )
 
@@ -45,8 +46,15 @@ func (p *proxyContainerApi) List(ctx context.Context, _ *v1.ListRequest) (*v1.Li
 	return response, nil
 }
 
-func (p *proxyContainerApi) Create(_ context.Context, _ *v1.CreateRequest) (*v1.CreateResponse, error) {
-	panic("not implemented") // TODO: Implement
+func (p *proxyContainerApi) Create(ctx context.Context, request *v1.CreateRequest) (*v1.CreateResponse, error) {
+	client := Client(ctx)
+
+	err := client.ContainerService().Run(ctx, containers.ContainerConfig{
+		ID:    request.Id,
+		Image: request.Image,
+	})
+
+	return &v1.CreateResponse{}, err
 }
 
 func (p *proxyContainerApi) Start(_ context.Context, _ *v1.StartRequest) (*v1.StartResponse, error) {

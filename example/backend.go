@@ -2,6 +2,7 @@ package example
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/containers"
@@ -30,4 +31,9 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 			Image: "alpine",
 		},
 	}, nil
+}
+
+func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
+	fmt.Printf("Running container %q with name %q\n", r.Image, r.ID)
+	return nil
 }

@@ -5,12 +5,16 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
+	"github.com/docker/api/context/store"
 
 	"github.com/docker/api/backend"
+	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
 )
 
 type containerService struct {
@@ -85,4 +89,19 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 	}
 
 	return res, nil
+}
+
+func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
+	var project compose.Project
+	project.Name = r.ID
+	project.Services = []types.ServiceConfig{
+		{
+			Name:  r.ID,
+			Image: r.Image,
+		},
+	}
+
+	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
+	_, err := CreateACIContainers(ctx, project, cs.ctx)
+	return err
 }
