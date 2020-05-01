@@ -3,12 +3,31 @@
 
 complete -e -c docker-compose
 
-for line in (docker-compose --help | \
-             string match -r '^\s+\w+\s+[^\n]+' | \
-             string trim)
-  set -l doc (string split -m 1 ' ' -- $line)
-  complete -c docker-compose -n '__fish_use_subcommand' -xa $doc[1] --description $doc[2]
-end
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'build' --description 'Build or rebuild services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'config' --description 'Validate and view the Compose file'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'create' --description 'Create services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'down' --description 'Stop and remove containers, networks, images, and volumes'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'events' --description 'Receive real time events from containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'exec' --description 'Execute a command in a running container'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'help' --description 'Get help on a command'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'images' --description 'List images'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'kill' --description 'Kill containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'logs' --description 'View output from containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'pause' --description 'Pause services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'port' --description 'Print the public port for a port binding'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'ps' --description 'List containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'pull' --description 'Pull service images'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'push' --description 'Push service images'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'restart' --description 'Restart services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'rm' --description 'Remove stopped containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'run' --description 'Run a one-off command'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'scale' --description 'Set number of containers for a service'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'start' --description 'Start services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'stop' --description 'Stop services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'top' --description 'Display the running processes'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'unpause' --description 'Unpause services'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'up' --description 'Create and start containers'
+complete -c docker-compose -n '__fish_use_subcommand' -xa 'version' --description 'Show the Docker-Compose version information'
 
 complete -c docker-compose -s f -l file -r                -d 'Specify an alternate compose file'
 complete -c docker-compose -s p -l project-name -x        -d 'Specify an alternate project name'
