@@ -57,13 +57,15 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	if ba, ok := b.(containers.ContainerService); ok {
-		return &Client{
-			backendType: contextType,
-			cc:          ba,
-		}, nil
+	ba, ok := b.(containers.ContainerService)
+	if !ok {
+		return nil, errors.New("backend not found")
 	}
-	return nil, errors.New("backend not found")
+	return &Client{
+		backendType: contextType,
+		cc:          ba,
+	}, nil
+
 }
 
 type Client struct {
