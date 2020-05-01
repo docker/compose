@@ -9,12 +9,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/api/context/store"
-
+	"github.com/docker/api/azure/convert"
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
 )
 
 type containerService struct {
@@ -102,6 +102,11 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	}
 
 	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
-	_, err := CreateACIContainers(ctx, project, cs.ctx)
+	groupDefinition, err := convert.ToContainerGroup(cs.ctx, project)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateACIContainers(ctx, cs.ctx, groupDefinition)
 	return err
 }
