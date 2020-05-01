@@ -38,6 +38,7 @@ from compose.project import Project
 from compose.service import BuildAction
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
+from compose.service import IpcMode
 from compose.service import NetworkMode
 from compose.service import PidMode
 from compose.service import Service
@@ -1479,6 +1480,17 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web', pid_mode=PidMode('host'))
         container = create_and_start_container(service)
         assert container.get('HostConfig.PidMode') == 'host'
+
+    def test_ipc_mode_none_defined(self):
+        service = self.create_service('web', ipc_mode=None)
+        container = create_and_start_container(service)
+        print(container.get('HostConfig.IpcMode'))
+        assert container.get('HostConfig.IpcMode') == 'shareable'
+
+    def test_ipc_mode_host(self):
+        service = self.create_service('web', ipc_mode=IpcMode('host'))
+        container = create_and_start_container(service)
+        assert container.get('HostConfig.IpcMode') == 'host'
 
     @v2_1_only()
     def test_userns_mode_none_defined(self):

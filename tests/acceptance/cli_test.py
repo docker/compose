@@ -1681,6 +1681,32 @@ services:
         host_mode_container = self.project.get_service('host').containers()[0]
         assert host_mode_container.get('HostConfig.PidMode') == 'host'
 
+    @v2_only()
+    @no_cluster('Container IPC mode does not work across clusters')
+    def test_up_with_ipc_mode(self):
+        c = self.client.create_container(
+            'busybox', 'top', name='composetest_ipc_mode_container',
+            host_config={}
+        )
+        self.addCleanup(self.client.remove_container, c, force=True)
+        self.client.start(c)
+        container_mode_source = 'container:{}'.format(c['Id'])
+
+        self.base_dir = 'tests/fixtures/ipc-mode'
+
+        self.dispatch(['up', '-d'], None)
+
+        service_mode_source = 'container:{}'.format(
+            self.project.get_service('shareable').containers()[0].id)
+        service_mode_container = self.project.get_service('service').containers()[0]
+        assert service_mode_container.get('HostConfig.IpcMode') == service_mode_source
+
+        container_mode_container = self.project.get_service('container').containers()[0]
+        assert container_mode_container.get('HostConfig.IpcMode') == container_mode_source
+
+        shareable_mode_container = self.project.get_service('shareable').containers()[0]
+        assert shareable_mode_container.get('HostConfig.IpcMode') == 'shareable'
+
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'console'])

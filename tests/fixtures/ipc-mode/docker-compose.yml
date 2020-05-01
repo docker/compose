@@ -1,0 +1,17 @@
+version: "2.4"
+
+services:
+  service:
+    image: busybox
+    command: top
+    ipc: "service:shareable"
+
+  container:
+    image: busybox
+    command: top
+    ipc: "container:composetest_ipc_mode_container"
+
+  shareable:
+    image: busybox
+    command: top
+    ipc: shareable
