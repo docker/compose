@@ -5,9 +5,10 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/docker/api/client"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/client"
 )
 
 var PsCommand = cobra.Command{

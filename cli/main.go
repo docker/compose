@@ -40,12 +40,13 @@ import (
 	_ "github.com/docker/api/azure"
 	_ "github.com/docker/api/example"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/docker/api/cli/cmd"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/util"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 type mainOpts struct {

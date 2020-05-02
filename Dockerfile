@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     protobuf-compiler \
     libprotobuf-dev
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
+    go get golang.org/x/tools/cmd/goimports && \
     go get gotest.tools/gotestsum
 WORKDIR ${PWD}
 ADD go.* ${PWD}
@@ -34,10 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     make xbins
 
 FROM scratch AS protos
-COPY --from=make-protos /go/src/github.com/docker/api/backend/v1/*.pb.go ./backend/v1/
-COPY --from=make-protos /go/src/github.com/docker/api/compose/v1/*.pb.go ./compose/v1/
-COPY --from=make-protos /go/src/github.com/docker/api/containers/v1/*.pb.go ./containers/v1/
-COPY --from=make-protos /go/src/github.com/docker/api/cli/v1/*.pb.go ./cli/v1/
+COPY --from=make-protos /go/src/github.com/docker/api .
 
 FROM scratch AS bins
 COPY --from=make-bins /go/src/github.com/docker/api/bin/* .
