@@ -1,0 +1,62 @@
+package cmd
+
+import (
+	"context"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/containerd/console"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
+	"github.com/docker/api/client"
+)
+
+type execOpts struct {
+	Tty bool
+}
+
+func ExecCommand() *cobra.Command {
+	var opts execOpts
+	cmd := &cobra.Command{
+		Use:   "exec",
+		Short: "Run a command in a running container",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runExec(cmd.Context(), opts, args[0], strings.Join(args[1:], " "))
+		},
+	}
+
+	cmd.Flags().BoolVarP(&opts.Tty, "tty", "t", false, "Allocate a pseudo-TTY")
+
+	return cmd
+}
+
+func runExec(ctx context.Context, opts execOpts, name string, command string) error {
+	c, err := client.New(ctx)
+	if err != nil {
+		return errors.Wrap(err, "cannot connect to backend")
+	}
+
+	var (
+		con    console.Console
+		stdout io.Writer
+	)
+
+	stdout = os.Stdout
+
+	if opts.Tty {
+		con = console.Current()
+		if err := con.SetRaw(); err != nil {
+			return err
+		}
+		defer func() {
+			con.Reset()
+		}()
+
+		stdout = con
+	}
+
+	return c.ContainerService().Exec(ctx, name, command, os.Stdin, stdout)
+}

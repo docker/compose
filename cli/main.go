@@ -83,6 +83,7 @@ func main() {
 		Use:           "docker",
 		Long:          "docker for the 2020s",
 		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isOwnCommand(cmd) {
 				execMoby(cmd.Context())
@@ -100,6 +101,7 @@ func main() {
 		cmd.ServeCommand(),
 		&cmd.ExampleCommand,
 		run.Command(),
+		cmd.ExecCommand(),
 	)
 
 	helpFunc := root.HelpFunc()
