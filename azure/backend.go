@@ -53,7 +53,6 @@ func New(ctx context.Context) (containers.ContainerService, error) {
 func (cs *containerService) List(ctx context.Context) ([]containers.Container, error) {
 	var cg []containerinstance.ContainerGroup
 	result, err := cs.cgc.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
-
 	if err != nil {
 		return []containers.Container{}, err
 	}
@@ -67,12 +66,20 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 
 	res := []containers.Container{}
 	for _, c := range cg {
-		cc := *c.Containers
-		for _, d := range cc {
+		group, err := cs.cgc.Get(ctx, cs.ctx.ResourceGroup, *c.Name)
+		if err != nil {
+			return []containers.Container{}, err
+		}
+
+		for _, d := range *group.Containers {
+			status := "Unknown"
+			if d.InstanceView != nil && d.InstanceView.CurrentState != nil {
+				status = *d.InstanceView.CurrentState.State
+			}
 			res = append(res, containers.Container{
-				ID:    *c.Name,
-				Image: *d.Image,
-				// Command: strings.Join(*d.ContainerProperties.Command, " "), // TODO command can be null
+				ID:     *d.Name,
+				Image:  *d.Image,
+				Status: status,
 			})
 		}
 	}
