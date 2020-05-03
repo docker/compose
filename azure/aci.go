@@ -224,6 +224,16 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 	}
 }
 
+func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string) (string, error) {
+	containerClient := getContainerClient(aciContext.SubscriptionID)
+
+	logs, err := containerClient.ListLogs(ctx, aciContext.ResourceGroup, containerGroupName, containerName, nil)
+	if err != nil {
+		return "", fmt.Errorf("cannot get container logs: %v", err)
+	}
+	return *logs.Content, err
+}
+
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
 	auth, _ := auth.NewAuthorizerFromCLI()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)

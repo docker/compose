@@ -45,4 +45,6 @@ type ContainerService interface {
 	Run(ctx context.Context, config ContainerConfig) error
 	// Exec executes a command inside a running container
 	Exec(ctx context.Context, containerName string, command string, reader io.Reader, writer io.Writer) error
+	// Logs returns all the logs of a container
+	Logs(ctx context.Context, name string, writer io.Writer, follow bool) error
 }

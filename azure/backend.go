@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -136,4 +137,13 @@ func (cs *containerService) Exec(ctx context.Context, name string, command strin
 		reader,
 		writer,
 	)
+}
+
+func (cs *containerService) Logs(ctx context.Context, name string, writer io.Writer, follow bool) error {
+	logs, err := getACIContainerLogs(ctx, cs.ctx, name, name)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(writer, logs)
+	return err
 }

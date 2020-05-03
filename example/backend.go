@@ -43,3 +43,8 @@ func (cs *containerService) Exec(ctx context.Context, name string, command strin
 	fmt.Printf("Executing command %q on container %q", command, name)
 	return nil
 }
+
+func (cs *containerService) Logs(ctx context.Context, name string, writer io.Writer, follow bool) error {
+	fmt.Fprintf(writer, "Following logs for container %q", name)
+	return nil
+}
