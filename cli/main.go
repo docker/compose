@@ -102,6 +102,7 @@ func main() {
 		&cmd.ExampleCommand,
 		run.Command(),
 		cmd.ExecCommand(),
+		cmd.LogsCommand(),
 	)
 
 	helpFunc := root.HelpFunc()

@@ -2,7 +2,10 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -136,4 +139,26 @@ func (cs *containerService) Exec(ctx context.Context, name string, command strin
 		reader,
 		writer,
 	)
+}
+
+func (cs *containerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
+	logs, err := getACIContainerLogs(ctx, cs.ctx, containerName, containerName)
+	if err != nil {
+		return err
+	}
+	if req.Tail != "all" {
+		tail, err := strconv.Atoi(req.Tail)
+		if err != nil {
+			return err
+		}
+		lines := strings.Split(logs, "\n")
+
+		// If asked for less lines than exist, take only those lines
+		if tail <= len(lines) {
+			logs = strings.Join(lines[len(lines)-tail:], "\n")
+		}
+	}
+
+	_, err = fmt.Fprint(req.Writer, logs)
+	return err
 }
