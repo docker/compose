@@ -25,11 +25,11 @@ import (
 )
 
 func init() {
-	// required to get auth.NewAuthorizerFromCLI() work, otherwise getting "The access token has been obtained for wrong audience or resource 'https://vault.azure.net'."
+	// required to get auth.NewAuthorizerFromCLI() to work, otherwise getting "The access token has been obtained for wrong audience or resource 'https://vault.azure.net'."
 	_ = os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
 }
 
-func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
+func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (containerinstance.ContainerGroup, error) {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return c, fmt.Errorf("cannot get container group client: %v", err)
@@ -46,7 +46,7 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 			return c, err
 		}
 	} else {
-		return c, fmt.Errorf("Container group %q already exists", *groupDefinition.Name)
+		return c, fmt.Errorf("container group %q already exists", *groupDefinition.Name)
 	}
 
 	future, err := containerGroupsClient.CreateOrUpdate(
