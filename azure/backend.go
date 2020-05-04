@@ -5,9 +5,13 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
+	"github.com/docker/api/azure/convert"
 	"github.com/docker/api/backend"
+	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
@@ -85,4 +89,35 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 	}
 
 	return res, nil
+}
+
+func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
+	var ports []types.ServicePortConfig
+	for _, p := range r.Ports {
+		ports = append(ports, types.ServicePortConfig{
+			Target:    p.Destination,
+			Published: p.Source,
+		})
+	}
+	project := compose.Project{
+		Name: r.ID,
+		Config: types.Config{
+			Services: []types.ServiceConfig{
+				{
+					Name:  r.ID,
+					Image: r.Image,
+					Ports: ports,
+				},
+			},
+		},
+	}
+
+	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
+	groupDefinition, err := convert.ToContainerGroup(cs.ctx, project)
+	if err != nil {
+		return err
+	}
+
+	_, err = createACIContainers(ctx, cs.ctx, groupDefinition)
+	return err
 }

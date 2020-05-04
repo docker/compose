@@ -44,6 +44,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/cli/cmd"
+	"github.com/docker/api/cli/cmd/run"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/util"
@@ -93,6 +94,14 @@ func main() {
 		},
 	}
 
+	root.AddCommand(
+		cmd.ContextCommand(),
+		&cmd.PsCommand,
+		cmd.ServeCommand(),
+		&cmd.ExampleCommand,
+		run.Command(),
+	)
+
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !isOwnCommand(cmd) {
@@ -109,13 +118,6 @@ func main() {
 	if opts.debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-
-	root.AddCommand(
-		cmd.ContextCommand(),
-		&cmd.PsCommand,
-		cmd.ServeCommand(),
-		&cmd.ExampleCommand,
-	)
 
 	ctx, cancel := util.NewSigContext()
 	defer cancel()

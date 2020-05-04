@@ -17,6 +17,18 @@ type Container struct {
 	Labels      []string
 }
 
+type Port struct {
+	Source      uint32
+	Destination uint32
+}
+
+type ContainerConfig struct {
+	ID    string
+	Image string
+	Ports []Port
+}
+
 type ContainerService interface {
 	List(context.Context) ([]Container, error)
+	Run(context.Context, ContainerConfig) error
 }
