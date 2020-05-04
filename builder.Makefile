@@ -40,7 +40,7 @@ protos:
 cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli
 
-xcli:
+cross:
 	@GOOS=linux   GOARCH=amd64 go build -v -o bin/docker-linux-amd64 ./cli
 	@GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
 	@GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
@@ -50,4 +50,4 @@ test:
 
 FORCE:
 
-.PHONY: all protos cli xcli
+.PHONY: all protos cli cross

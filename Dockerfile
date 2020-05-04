@@ -27,9 +27,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOARCH=${TARGET_ARCH} \
     make -f  builder.Makefile cli
 
-FROM make-protos AS make-xcli
+FROM make-protos AS make-cross
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    make -f builder.Makefile xcli
+    make -f builder.Makefile cross
 
 FROM scratch AS protos
 COPY --from=make-protos /go/src/github.com/docker/api .
@@ -37,8 +37,8 @@ COPY --from=make-protos /go/src/github.com/docker/api .
 FROM scratch AS cli
 COPY --from=make-cli /go/src/github.com/docker/api/bin/* .
 
-FROM scratch AS xcli
-COPY --from=make-xcli /go/src/github.com/docker/api/bin/* .
+FROM scratch AS cross
+COPY --from=make-cross /go/src/github.com/docker/api/bin/* .
 
 FROM make-protos as test
 RUN make -f builder.Makefile test

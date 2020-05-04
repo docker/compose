@@ -44,10 +44,10 @@ cli:
 	--build-arg TARGET_ARCH=${GOARCH} \
 	--target cli
 
-xcli:
+cross:
 	@docker build . \
 	--output type=local,dest=./bin \
-	--target xcli
+	--target cross
 
 test:
 	@docker build . \
@@ -58,4 +58,4 @@ cache-clear:
 
 FORCE:
 
-.PHONY: all protos cli xcli
+.PHONY: all protos cli cross
