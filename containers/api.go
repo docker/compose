@@ -2,8 +2,10 @@ package containers
 
 import (
 	"context"
+	"io"
 )
 
+// Container represents a created container
 type Container struct {
 	ID          string
 	Status      string
@@ -17,18 +19,30 @@ type Container struct {
 	Labels      []string
 }
 
+// Port represents a published port of a container
 type Port struct {
-	Source      uint32
+	// Source is the source port
+	Source uint32
+	// Destination is the destination port
 	Destination uint32
 }
 
+// ContainerConfig contains the configuration data about a container
 type ContainerConfig struct {
-	ID    string
+	// ID uniquely identifies the container
+	ID string
+	// Image specifies the iamge reference used for a container
 	Image string
+	// Ports provide a list of published ports
 	Ports []Port
 }
 
+// ContainerService interacts with the underlying container backend
 type ContainerService interface {
-	List(context.Context) ([]Container, error)
-	Run(context.Context, ContainerConfig) error
+	// List returns all the containers
+	List(ctx context.Context) ([]Container, error)
+	// Run creates and starts a container
+	Run(ctx context.Context, config ContainerConfig) error
+	// Exec executes a command inside a running container
+	Exec(ctx context.Context, containerName string, command string, reader io.Reader, writer io.Writer) error
 }

@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"io"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -120,4 +121,19 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 
 	_, err = createACIContainers(ctx, cs.ctx, groupDefinition)
 	return err
+}
+
+func (cs *containerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
+	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, name, name)
+	if err != nil {
+		return err
+	}
+
+	return exec(
+		context.Background(),
+		*containerExecResponse.WebSocketURI,
+		*containerExecResponse.Password,
+		reader,
+		writer,
+	)
 }
