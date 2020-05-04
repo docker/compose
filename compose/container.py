@@ -208,8 +208,8 @@ class Container(object):
         return status_string
 
     def attach_log_stream(self):
-        """A log stream can only be attached if the container uses a json-file
-        log driver.
+        """A log stream can only be attached if the container uses a
+        json-file, journald or local log driver.
         """
         if self.has_api_logs:
             self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
