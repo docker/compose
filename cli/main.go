@@ -38,8 +38,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	// Backend registrations
 	_ "github.com/docker/api/azure"
 	_ "github.com/docker/api/example"
+	_ "github.com/docker/api/moby"
 
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
