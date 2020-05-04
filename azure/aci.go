@@ -30,10 +30,7 @@ func init() {
 }
 
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
-	if err != nil {
-		return c, fmt.Errorf("cannot get container group client: %v", err)
-	}
+	containerGroupsClient := getContainerGroupsClient(aciContext.SubscriptionID)
 
 	// Check if the container group already exists
 	_, err = containerGroupsClient.Get(ctx, aciContext.ResourceGroup, *groupDefinition.Name)
@@ -94,28 +91,6 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	}
 
 	return containerGroup, err
-}
-
-func listACIContainers(aciContext store.AciContext) (c []containerinstance.ContainerGroup, err error) {
-	ctx := context.TODO()
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
-	if err != nil {
-		return c, fmt.Errorf("cannot get container group client: %v", err)
-	}
-
-	var containers []containerinstance.ContainerGroup
-	result, err := containerGroupsClient.ListByResourceGroup(ctx, aciContext.ResourceGroup)
-	if err != nil {
-		return []containerinstance.ContainerGroup{}, err
-	}
-	for result.NotDone() {
-		containers = append(containers, result.Values()...)
-		if err := result.NextWithContext(ctx); err != nil {
-			return []containerinstance.ContainerGroup{}, err
-		}
-	}
-
-	return containers, err
 }
 
 func execACIContainer(ctx context.Context, aciContext store.AciContext, command, containerGroup string, containerName string) (c containerinstance.ContainerExecResponse, err error) {
@@ -233,11 +208,11 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 	return *logs.Content, err
 }
 
-func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
+func getContainerGroupsClient(subscriptionID string) containerinstance.ContainerGroupsClient {
 	auth, _ := auth.NewAuthorizerFromCLI()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
 	containerGroupsClient.Authorizer = auth
-	return containerGroupsClient, nil
+	return containerGroupsClient
 }
 
 func getContainerClient(subscriptionID string) containerinstance.ContainerClient {

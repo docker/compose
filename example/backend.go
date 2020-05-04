@@ -13,12 +13,8 @@ type containerService struct{}
 
 func init() {
 	backend.Register("example", "example", func(ctx context.Context) (interface{}, error) {
-		return New(), nil
+		return &containerService{}, nil
 	})
-}
-
-func New() containers.ContainerService {
-	return &containerService{}
 }
 
 func (cs *containerService) List(ctx context.Context) ([]containers.Container, error) {

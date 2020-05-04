@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ type execOpts struct {
 	Tty bool
 }
 
+// ExecCommand runs a command in a running container
 func ExecCommand() *cobra.Command {
 	var opts execOpts
 	cmd := &cobra.Command{
@@ -52,7 +54,9 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 			return err
 		}
 		defer func() {
-			con.Reset()
+			if err := con.Reset(); err != nil {
+				fmt.Println("Unable to close the console")
+			}
 		}()
 
 		stdout = con

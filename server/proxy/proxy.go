@@ -10,22 +10,25 @@ import (
 
 type clientKey struct{}
 
+// WithClient adds the client to the context
 func WithClient(ctx context.Context, c *client.Client) (context.Context, error) {
 	return context.WithValue(ctx, clientKey{}, c), nil
 }
 
+// Client returns the client from the context
 func Client(ctx context.Context) *client.Client {
 	c, _ := ctx.Value(clientKey{}).(*client.Client)
 	return c
 }
 
-func NewContainerApi() v1.ContainersServer {
-	return &proxyContainerApi{}
+// NewContainerAPI creates a proxy container server
+func NewContainerAPI() v1.ContainersServer {
+	return &proxyContainerAPI{}
 }
 
-type proxyContainerApi struct{}
+type proxyContainerAPI struct{}
 
-func (p *proxyContainerApi) List(ctx context.Context, _ *v1.ListRequest) (*v1.ListResponse, error) {
+func (p *proxyContainerAPI) List(ctx context.Context, _ *v1.ListRequest) (*v1.ListResponse, error) {
 	client := Client(ctx)
 
 	c, err := client.ContainerService().List(ctx)
@@ -46,7 +49,7 @@ func (p *proxyContainerApi) List(ctx context.Context, _ *v1.ListRequest) (*v1.Li
 	return response, nil
 }
 
-func (p *proxyContainerApi) Create(ctx context.Context, request *v1.CreateRequest) (*v1.CreateResponse, error) {
+func (p *proxyContainerAPI) Create(ctx context.Context, request *v1.CreateRequest) (*v1.CreateResponse, error) {
 	client := Client(ctx)
 
 	err := client.ContainerService().Run(ctx, containers.ContainerConfig{
@@ -57,26 +60,26 @@ func (p *proxyContainerApi) Create(ctx context.Context, request *v1.CreateReques
 	return &v1.CreateResponse{}, err
 }
 
-func (p *proxyContainerApi) Start(_ context.Context, _ *v1.StartRequest) (*v1.StartResponse, error) {
+func (p *proxyContainerAPI) Start(_ context.Context, _ *v1.StartRequest) (*v1.StartResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Stop(_ context.Context, _ *v1.StopRequest) (*v1.StopResponse, error) {
+func (p *proxyContainerAPI) Stop(_ context.Context, _ *v1.StopRequest) (*v1.StopResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Kill(_ context.Context, _ *v1.KillRequest) (*v1.KillResponse, error) {
+func (p *proxyContainerAPI) Kill(_ context.Context, _ *v1.KillRequest) (*v1.KillResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Delete(_ context.Context, _ *v1.DeleteRequest) (*v1.DeleteResponse, error) {
+func (p *proxyContainerAPI) Delete(_ context.Context, _ *v1.DeleteRequest) (*v1.DeleteResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Update(_ context.Context, _ *v1.UpdateRequest) (*v1.UpdateResponse, error) {
+func (p *proxyContainerAPI) Update(_ context.Context, _ *v1.UpdateRequest) (*v1.UpdateResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerApi) Exec(_ context.Context, _ *v1.ExecRequest) (*v1.ExecResponse, error) {
+func (p *proxyContainerAPI) Exec(_ context.Context, _ *v1.ExecRequest) (*v1.ExecResponse, error) {
 	panic("not implemented") // TODO: Implement
 }

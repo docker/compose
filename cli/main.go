@@ -51,7 +51,7 @@ import (
 )
 
 type mainOpts struct {
-	apicontext.ContextFlags
+	apicontext.Flags
 	debug bool
 }
 
@@ -99,7 +99,6 @@ func main() {
 		cmd.ContextCommand(),
 		&cmd.PsCommand,
 		cmd.ServeCommand(),
-		&cmd.ExampleCommand,
 		run.Command(),
 		cmd.ExecCommand(),
 		cmd.LogsCommand(),

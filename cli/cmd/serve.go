@@ -20,6 +20,7 @@ type serveOpts struct {
 	address string
 }
 
+// ServeCommand returns the command to serve the API
 func ServeCommand() *cobra.Command {
 	var opts serveOpts
 	cmd := &cobra.Command{
@@ -42,9 +43,10 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	if err != nil {
 		return errors.Wrap(err, "listen unix socket")
 	}
+	// nolint
 	defer listener.Close()
 
-	p := proxy.NewContainerApi()
+	p := proxy.NewContainerAPI()
 
 	containersv1.RegisterContainersServer(s, p)
 	cliv1.RegisterCliServer(s, &cliServer{

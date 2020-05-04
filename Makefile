@@ -53,8 +53,14 @@ test: ## Run unit tests
 cache-clear: # Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
+lint: ## run linter(s)
+	@echo "Linting..."
+	golangci-lint run --timeout 10m0s ./...
+
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: all protos cli cross test cache-clear help
+FORCE:
+
+.PHONY: all protos cli cross test cache-clear lint help

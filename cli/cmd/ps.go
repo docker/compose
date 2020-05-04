@@ -11,6 +11,7 @@ import (
 	"github.com/docker/api/client"
 )
 
+// PsCommand lists containers
 var PsCommand = cobra.Command{
 	Use:   "ps",
 	Short: "List containers",

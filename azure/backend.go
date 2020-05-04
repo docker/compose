@@ -36,6 +36,7 @@ func getter() interface{} {
 	return &store.AciContext{}
 }
 
+// New creates a backend that can manage containers on ACI
 func New(ctx context.Context) (containers.ContainerService, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	contextStore, err := store.New()

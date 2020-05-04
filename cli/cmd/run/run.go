@@ -36,6 +36,7 @@ import (
 	"github.com/docker/api/client"
 )
 
+// Command runs a container
 func Command() *cobra.Command {
 	var opts runOpts
 	cmd := &cobra.Command{

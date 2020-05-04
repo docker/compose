@@ -34,6 +34,7 @@ import (
 	"path/filepath"
 )
 
+// LoadConfigFile loads the docker configuration
 func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error) {
 	filename := filepath.Join(configDir, configFileName)
 	configFile := &ConfigFile{
@@ -45,6 +46,7 @@ func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error
 		if err != nil {
 			return nil, fmt.Errorf("can't read %s: %w", filename, err)
 		}
+		// nolint
 		defer file.Close()
 		err = json.NewDecoder(file).Decode(&configFile)
 		if err != nil {
@@ -59,6 +61,7 @@ func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error
 	return configFile, nil
 }
 
+// ConfigFile contains the current context from the docker configuration file
 type ConfigFile struct {
 	Filename       string `json:"-"` // Note: for internal use only
 	CurrentContext string `json:"currentContext,omitempty"`
