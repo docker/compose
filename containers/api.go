@@ -37,6 +37,12 @@ type ContainerConfig struct {
 	Ports []Port
 }
 
+type LogsRequest struct {
+	Follow bool
+	Tail   string
+	Writer io.Writer
+}
+
 // ContainerService interacts with the underlying container backend
 type ContainerService interface {
 	// List returns all the containers
@@ -46,5 +52,5 @@ type ContainerService interface {
 	// Exec executes a command inside a running container
 	Exec(ctx context.Context, containerName string, command string, reader io.Reader, writer io.Writer) error
 	// Logs returns all the logs of a container
-	Logs(ctx context.Context, name string, writer io.Writer, follow bool) error
+	Logs(ctx context.Context, containerName string, request LogsRequest) error
 }

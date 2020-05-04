@@ -4,13 +4,16 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/api/client"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/client"
+	"github.com/docker/api/containers"
 )
 
 type logsOpts struct {
 	Follow bool
+	Tail   string
 }
 
 func LogsCommand() *cobra.Command {
@@ -25,15 +28,22 @@ func LogsCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&opts.Follow, "follow", "f", false, "Follow log outut")
+	cmd.Flags().StringVar(&opts.Tail, "tail", "all", "Number of lines to show from the end of the logs")
 
 	return cmd
 }
 
-func runLogs(ctx context.Context, name string, opts logsOpts) error {
+func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	return c.ContainerService().Logs(ctx, name, os.Stdout, opts.Follow)
+	req := containers.LogsRequest{
+		Follow: opts.Follow,
+		Tail:   opts.Tail,
+		Writer: os.Stdout,
+	}
+
+	return c.ContainerService().Logs(ctx, containerName, req)
 }

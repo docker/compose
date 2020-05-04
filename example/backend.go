@@ -44,7 +44,7 @@ func (cs *containerService) Exec(ctx context.Context, name string, command strin
 	return nil
 }
 
-func (cs *containerService) Logs(ctx context.Context, name string, writer io.Writer, follow bool) error {
-	fmt.Fprintf(writer, "Following logs for container %q", name)
+func (cs *containerService) Logs(ctx context.Context, containerName string, request containers.LogsRequest) error {
+	fmt.Fprintf(request.Writer, "Following logs for container %q", containerName)
 	return nil
 }
