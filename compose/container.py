@@ -193,7 +193,7 @@ class Container(object):
     @property
     def has_api_logs(self):
         log_type = self.log_driver
-        return not log_type or log_type in ('json-file', 'journald')
+        return not log_type or log_type in ('json-file', 'journald', 'local')
 
     @property
     def human_readable_health_status(self):
