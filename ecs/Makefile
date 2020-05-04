@@ -2,7 +2,7 @@ clean:
 	rm -rf dist/
 
 build:
-	go build -v -o dist/docker-ecs cmd/main.go
+	go build -v -o dist/docker-ecs cmd/main/main.go
 
 test: ## Run tests
 	go test ./... -v

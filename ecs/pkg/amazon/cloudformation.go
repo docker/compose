@@ -13,6 +13,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
+	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
@@ -54,6 +55,13 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		LogGroupName: logGroup,
 	}
 
+	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
+	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
+		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
+		Name:        fmt.Sprintf("%s.local", project.Name),
+		Vpc:         vpc,
+	}
+
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
 		if err != nil {
@@ -88,6 +96,19 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceName:        service.Name,
 			TaskDefinition:     cloudformation.Ref(taskDefinition),
+		}
+
+		var healthCheck *cloudmap.Service_HealthCheckConfig
+		if service.HealthCheck != nil && !service.HealthCheck.Disable {
+			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
+		}
+
+		serviceRegistration := fmt.Sprintf("%sServiceRegistration", service.Name)
+		template.Resources[serviceRegistration] = &cloudmap.Service{
+			Description:       fmt.Sprintf("%q registration in Service Map", service.Name),
+			HealthCheckConfig: healthCheck,
+			Name:              serviceRegistration,
+			NamespaceId:       cloudformation.Ref("CloudMap"),
 		}
 	}
 	return template, nil
