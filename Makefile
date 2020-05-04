@@ -41,6 +41,9 @@ cli: ## Compile the cli
 	--build-arg TARGET_ARCH=${GOARCH} \
 	--target cli
 
+e2e-local: ## Run End to end local tests
+	go run ./tests/e2e/e2e.go
+
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . \
 	--output type=local,dest=./bin \

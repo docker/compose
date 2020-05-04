@@ -34,7 +34,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	// Backend registrations
 	_ "github.com/docker/api/azure"
@@ -148,9 +147,7 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
-		if strings.Contains(err.Error(), "unknown command") {
-			execMoby(ctx)
-		}
+		execMoby(ctx)
 		fmt.Println(err)
 		os.Exit(1)
 	}
