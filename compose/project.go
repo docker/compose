@@ -44,15 +44,18 @@ func ProjectFromOptions(options *ProjectOptions) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	configs, err := parseConfigs(configPath)
+	if err != nil {
+		return nil, err
+	}
+
 	name := options.Name
 	if name == "" {
 		r := regexp.MustCompile(`[^a-z0-9\\-_]+`)
 		name = r.ReplaceAllString(strings.ToLower(filepath.Base(options.WorkDir)), "")
 	}
-	configs, err := parseConfigs(configPath)
-	if err != nil {
-		return nil, err
-	}
+
 	return newProject(types.ConfigDetails{
 		WorkingDir:  options.WorkDir,
 		ConfigFiles: configs,

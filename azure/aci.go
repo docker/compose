@@ -29,7 +29,7 @@ func init() {
 	_ = os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
 }
 
-func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (containerinstance.ContainerGroup, error) {
+func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return c, fmt.Errorf("cannot get container group client: %v", err)
