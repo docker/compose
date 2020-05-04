@@ -1,18 +1,43 @@
+/*
+	Copyright (c) 2020 Docker Inc.
+
+	Permission is hereby granted, free of charge, to any person
+	obtaining a copy of this software and associated documentation
+	files (the "Software"), to deal in the Software without
+	restriction, including without limitation the rights to use, copy,
+	modify, merge, publish, distribute, sublicense, and/or sell copies
+	of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be
+	included in all copies or substantial portions of the Software.
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+	EXPRESS OR IMPLIED,
+	INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+	HOLDERS BE LIABLE FOR ANY CLAIM,
+	DAMAGES OR OTHER LIABILITY,
+	WHETHER IN AN ACTION OF CONTRACT,
+	TORT OR OTHERWISE,
+	ARISING FROM, OUT OF OR IN CONNECTION WITH
+	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 syntax = "proto3";
 
-package com.docker.container.v1;
+package com.docker.api.containers.v1;
 
-import "google/protobuf/empty.proto";
-
-option go_package = "github.com/docker/d2/api/containers/v1;v1";
+option go_package = "github.com/docker/api/containers/v1;v1";
 
 service Containers {
 	rpc List(ListRequest) returns (ListResponse);
 	rpc Create(CreateRequest) returns (CreateResponse);
 	rpc Start(StartRequest) returns (StartResponse);
-	rpc Stop(StopRequest) returns (google.protobuf.Empty);
-	rpc Kill(KillRequest) returns (google.protobuf.Empty);
-	rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+	rpc Stop(StopRequest) returns (StopResponse);
+	rpc Kill(KillRequest) returns (KillResponse);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Update(UpdateRequest) returns (UpdateResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
 }
@@ -71,6 +96,9 @@ message DeleteRequest {
 	bool force = 2;
 }
 
+message DeleteResponse {
+}
+
 message StartRequest {
 	string id = 1;
 	string stream_id = 2;
@@ -84,6 +112,10 @@ message StopRequest {
 	string id = 1;
 	int64 signal = 2;
 }
+
+message StopResponse {
+}
+
 
 message ExecRequest {
 	string id = 1;
@@ -101,6 +133,9 @@ message ExecResponse {
 message KillRequest {
 	string id = 1;
 	int64 signal = 2;
+}
+
+message KillResponse {
 }
 
 message ListRequest {

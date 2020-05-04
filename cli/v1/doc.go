@@ -25,20 +25,4 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-syntax = "proto3";
-
-package com.docker.api.backend.v1;
-
-option go_package = "github.com/docker/api/backend/v1;v1";
-
-service Backend {
-	// BackendInformation returns implementation specific information on the backend.
-	rpc BackendInformation(BackendInformationRequest) returns (BackendInformationResponse);
-}
-
-message BackendInformationRequest {
-}
-
-message BackendInformationResponse {
-	string id = 1;
-}
+package v1

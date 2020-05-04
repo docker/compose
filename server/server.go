@@ -31,15 +31,16 @@ import (
 	"context"
 	"errors"
 
-	"github.com/docker/api/client"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/server/proxy"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/docker/api/client"
+	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
+	"github.com/docker/api/server/proxy"
 )
 
 // New returns a new GRPC server.

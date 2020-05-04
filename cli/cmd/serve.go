@@ -4,13 +4,14 @@ import (
 	"context"
 	"net"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
 	cliv1 "github.com/docker/api/cli/v1"
 	containersv1 "github.com/docker/api/containers/v1"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/server"
 	"github.com/docker/api/server/proxy"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )

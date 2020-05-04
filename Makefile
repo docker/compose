@@ -38,6 +38,7 @@ xbins: xcli xexample
 
 protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
+	@goimports -w -local github.com/docker/api .
 
 cli: protos
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli

@@ -32,10 +32,11 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/docker/api/client"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	v1 "github.com/docker/api/backend/v1"
+	"github.com/docker/api/client"
 )
 
 var ExampleCommand = cobra.Command{
@@ -49,7 +50,7 @@ var ExampleCommand = cobra.Command{
 			return errors.Wrap(err, "cannot connect to backend")
 		}
 
-		info, err := c.BackendInformation(ctx, &empty.Empty{})
+		info, err := c.BackendInformation(ctx, &v1.BackendInformationRequest{})
 		if err != nil {
 			return errors.Wrap(err, "fetch backend information")
 		}
