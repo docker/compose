@@ -115,6 +115,6 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 		return err
 	}
 
-	_, err = CreateACIContainers(ctx, cs.ctx, groupDefinition)
+	_, err = createACIContainers(ctx, cs.ctx, groupDefinition)
 	return err
 }

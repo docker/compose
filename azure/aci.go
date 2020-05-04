@@ -29,7 +29,7 @@ func init() {
 	_ = os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
 }
 
-func CreateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
+func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return c, fmt.Errorf("cannot get container group client: %v", err)
@@ -78,12 +78,12 @@ func CreateACIContainers(ctx context.Context, aciContext store.AciContext, group
 
 		containers := *containerGroup.Containers
 		container := containers[0]
-		response, err := ExecACIContainer(ctx, "/bin/sh", *containerGroup.Name, *container.Name, aciContext)
+		response, err := execACIContainer(ctx, "/bin/sh", *containerGroup.Name, *container.Name, aciContext)
 		if err != nil {
 			return c, err
 		}
 
-		err = ExecWebSocketLoopWithCmd(
+		err = execWebSocketLoopWithCmd(
 			ctx,
 			*response.WebSocketURI,
 			*response.Password,
@@ -97,8 +97,7 @@ func CreateACIContainers(ctx context.Context, aciContext store.AciContext, group
 	return containerGroup, err
 }
 
-// ListACIContainers List available containers
-func ListACIContainers(aciContext store.AciContext) (c []containerinstance.ContainerGroup, err error) {
+func listACIContainers(aciContext store.AciContext) (c []containerinstance.ContainerGroup, err error) {
 	ctx := context.TODO()
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
@@ -120,7 +119,7 @@ func ListACIContainers(aciContext store.AciContext) (c []containerinstance.Conta
 	return containers, err
 }
 
-func ExecACIContainer(ctx context.Context, command, containerGroup string, containerName string, aciContext store.AciContext) (c containerinstance.ContainerExecResponse, err error) {
+func execACIContainer(ctx context.Context, command, containerGroup string, containerName string, aciContext store.AciContext) (c containerinstance.ContainerExecResponse, err error) {
 	containerClient := getContainerClient(aciContext.SubscriptionID)
 	rows, cols := getTermSize()
 	containerExecRequest := containerinstance.ContainerExecRequest{
@@ -144,11 +143,11 @@ func getTermSize() (*int32, *int32) {
 	return to.Int32Ptr(int32(rows)), to.Int32Ptr(int32(cols))
 }
 
-func ExecWebSocketLoop(ctx context.Context, wsURL, passwd string) error {
-	return ExecWebSocketLoopWithCmd(ctx, wsURL, passwd, []string{}, true)
+func execWebSocketLoop(ctx context.Context, wsURL, passwd string) error {
+	return execWebSocketLoopWithCmd(ctx, wsURL, passwd, []string{}, true)
 }
 
-func ExecWebSocketLoopWithCmd(ctx context.Context, wsURL, passwd string, commands []string, outputEnabled bool) error {
+func execWebSocketLoopWithCmd(ctx context.Context, wsURL, passwd string, commands []string, outputEnabled bool) error {
 	ctx, cancel := context.WithCancel(ctx)
 	conn, _, _, err := ws.DefaultDialer.Dial(ctx, wsURL)
 	if err != nil {
