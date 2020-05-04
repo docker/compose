@@ -92,8 +92,6 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 }
 
 func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
-	var project compose.Project
-	project.Name = r.ID
 	var ports []types.ServicePortConfig
 	for _, p := range r.Ports {
 		ports = append(ports, types.ServicePortConfig{
@@ -101,11 +99,16 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 			Published: p.Source,
 		})
 	}
-	project.Services = []types.ServiceConfig{
-		{
-			Name:  r.ID,
-			Image: r.Image,
-			Ports: ports,
+	project := compose.Project{
+		Name: r.ID,
+		Config: types.Config{
+			Services: []types.ServiceConfig{
+				{
+					Name:  r.ID,
+					Image: r.Image,
+					Ports: ports,
+				},
+			},
 		},
 	}
 
