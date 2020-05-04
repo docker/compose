@@ -22,7 +22,7 @@ type deleteSecretOptions struct {
 	recover bool
 }
 
-func SecretCommand(clusteropts *ClusterOptions) *cobra.Command {
+func SecretCommand(clusteropts *docker.AwsContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: "Manages secrets",
@@ -37,7 +37,7 @@ func SecretCommand(clusteropts *ClusterOptions) *cobra.Command {
 	return cmd
 }
 
-func CreateSecret(clusteropts *ClusterOptions) *cobra.Command {
+func CreateSecret(clusteropts *docker.AwsContext) *cobra.Command {
 	//opts := createSecretOptions{}
 	cmd := &cobra.Command{
 		Use:   "create NAME SECRET",
@@ -60,7 +60,7 @@ func CreateSecret(clusteropts *ClusterOptions) *cobra.Command {
 	return cmd
 }
 
-func InspectSecret(clusteropts *ClusterOptions) *cobra.Command {
+func InspectSecret(clusteropts *docker.AwsContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect ID",
 		Short: "Displays secret details",
@@ -88,7 +88,7 @@ func InspectSecret(clusteropts *ClusterOptions) *cobra.Command {
 	return cmd
 }
 
-func ListSecrets(clusteropts *ClusterOptions) *cobra.Command {
+func ListSecrets(clusteropts *docker.AwsContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -110,7 +110,7 @@ func ListSecrets(clusteropts *ClusterOptions) *cobra.Command {
 	return cmd
 }
 
-func DeleteSecret(clusteropts *ClusterOptions) *cobra.Command {
+func DeleteSecret(clusteropts *docker.AwsContext) *cobra.Command {
 	opts := deleteSecretOptions{}
 	cmd := &cobra.Command{
 		Use:     "delete NAME",

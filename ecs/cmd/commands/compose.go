@@ -6,16 +6,11 @@ import (
 
 	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
-type ClusterOptions struct {
-	Profile string
-	Region  string
-	Cluster string
-}
-
-func ComposeCommand(clusteropts *ClusterOptions) *cobra.Command {
+func ComposeCommand(clusteropts *docker.AwsContext) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "compose",
 	}
@@ -41,7 +36,7 @@ func (o upOptions) LoadBalancerArn() *string {
 	return &o.loadBalancerArn
 }
 
-func ConvertCommand(clusteropts *ClusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+func ConvertCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
 		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
@@ -66,7 +61,7 @@ func ConvertCommand(clusteropts *ClusterOptions, projectOpts *compose.ProjectOpt
 	return cmd
 }
 
-func UpCommand(clusteropts *ClusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+func UpCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
@@ -86,7 +81,7 @@ type downOptions struct {
 	DeleteCluster bool
 }
 
-func DownCommand(clusteropts *ClusterOptions, projectOpts *compose.ProjectOptions) *cobra.Command {
+func DownCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",

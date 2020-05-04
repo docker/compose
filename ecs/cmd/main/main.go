@@ -7,6 +7,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	commands "github.com/docker/ecs-plugin/cmd/commands"
+	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -26,23 +27,29 @@ func main() {
 
 // NewRootCmd returns the base root command.
 func NewRootCmd(name string, dockerCli command.Cli) *cobra.Command {
-	var opts commands.ClusterOptions
+	var opts *docker.AwsContext
 
 	cmd := &cobra.Command{
 		Short:       "Docker ECS",
 		Long:        `run multi-container applications on Amazon ECS.`,
 		Use:         name,
 		Annotations: map[string]string{"experimentalCLI": "true"},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := plugin.PersistentPreRunE(cmd, args)
+			if err != nil {
+				return err
+			}
+			contextName := dockerCli.CurrentContext()
+			opts, err = docker.CheckAwsContextExists(contextName)
+			return err
+		},
 	}
 	cmd.AddCommand(
 		VersionCommand(),
-		commands.ComposeCommand(&opts),
-		commands.SecretCommand(&opts),
+		commands.ComposeCommand(opts),
+		commands.SecretCommand(opts),
+		commands.SetupCommand(),
 	)
-	cmd.Flags().StringVarP(&opts.Profile, "profile", "p", "default", "AWS Profile")
-	cmd.Flags().StringVarP(&opts.Cluster, "cluster", "c", "default", "ECS cluster")
-	cmd.Flags().StringVarP(&opts.Region, "region", "r", "", "AWS region")
-
 	return cmd
 }
 
