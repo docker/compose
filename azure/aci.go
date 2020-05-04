@@ -26,7 +26,10 @@ import (
 
 func init() {
 	// required to get auth.NewAuthorizerFromCLI() to work, otherwise getting "The access token has been obtained for wrong audience or resource 'https://vault.azure.net'."
-	_ = os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
+	err := os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
+	if err != nil {
+		panic("unable to set environment variable AZURE_KEYVAULT_RESOURCE")
+	}
 }
 
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
