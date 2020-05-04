@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     protobuf-compiler \
     libprotobuf-dev
 
-RUN go get github.com/golang/protobuf/protoc-gen-go && \
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1 && \
     go get golang.org/x/tools/cmd/goimports && \
-    go get gotest.tools/gotestsum && \
+    go get gotest.tools/gotestsum@v0.4.2 && \
     go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.26.0
 
 WORKDIR ${PWD}
@@ -37,13 +37,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile cross
 
 FROM scratch AS protos
-COPY --from=make-protos /go/src/github.com/docker/api .
+COPY --from=make-protos /api .
 
 FROM scratch AS cli
-COPY --from=make-cli /go/src/github.com/docker/api/bin/* .
+COPY --from=make-cli /api/bin/* .
 
 FROM scratch AS cross
-COPY --from=make-cross /go/src/github.com/docker/api/bin/* .
+COPY --from=make-cross /api/bin/* .
 
 FROM make-protos as test
 RUN make -f builder.Makefile test

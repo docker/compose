@@ -47,7 +47,7 @@ type Flags struct {
 	Context string
 }
 
-// AddFlags adds persistent (globa) flags
+// AddFlags adds persistent (global) flags
 func (c *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.Config, "config", filepath.Join(home(), configFileDir), "Location of the client config files `DIRECTORY`")
 	flags.StringVarP(&c.Context, "context", "c", os.Getenv("DOCKER_CONTEXT"), "context")

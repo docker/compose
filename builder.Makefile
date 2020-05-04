@@ -57,6 +57,10 @@ cross:
 test:
 	@gotestsum ./...
 
+lint:
+	golangci-lint run --timeout 10m0s ./...
+
+
 FORCE:
 
-.PHONY: all protos cli cross test
+.PHONY: all protos cli cross test lint

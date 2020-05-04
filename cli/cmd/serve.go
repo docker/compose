@@ -43,7 +43,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	if err != nil {
 		return errors.Wrap(err, "listen unix socket")
 	}
-	// nolint
+	// nolint errcheck
 	defer listener.Close()
 
 	p := proxy.NewContainerAPI()

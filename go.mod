@@ -1,6 +1,6 @@
 module github.com/docker/api
 
-go 1.13
+go 1.14
 
 require (
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible

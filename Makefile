@@ -54,8 +54,8 @@ cache-clear: # Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	@echo "Linting..."
-	golangci-lint run --timeout 10m0s ./...
+	@docker build . \
+	--target lint
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

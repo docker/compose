@@ -46,7 +46,7 @@ func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error
 		if err != nil {
 			return nil, fmt.Errorf("can't read %s: %w", filename, err)
 		}
-		// nolint
+		// nolint errcheck
 		defer file.Close()
 		err = json.NewDecoder(file).Decode(&configFile)
 		if err != nil {
