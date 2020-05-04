@@ -4,15 +4,20 @@ ARG GO_VERSION=1.14.2
 FROM golang:${GO_VERSION} AS fs
 ARG TARGET_OS=unknown
 ARG TARGET_ARCH=unknown
-ARG PWD=$GOPATH/src/github.com/docker/api
+ARG PWD=/api
+ENV GO111MODULE=on
+
 RUN apt-get update && apt-get install --no-install-recommends -y \
     make \
     git \
     protobuf-compiler \
     libprotobuf-dev
+
 RUN go get github.com/golang/protobuf/protoc-gen-go && \
     go get golang.org/x/tools/cmd/goimports && \
-    go get gotest.tools/gotestsum
+    go get gotest.tools/gotestsum && \
+    go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.26.0
+
 WORKDIR ${PWD}
 ADD go.* ${PWD}
 RUN go mod download
@@ -42,3 +47,6 @@ COPY --from=make-cross /go/src/github.com/docker/api/bin/* .
 
 FROM make-protos as test
 RUN make -f builder.Makefile test
+
+FROM fs AS lint
+RUN make -f builder.Makefile lint
