@@ -180,6 +180,9 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		StackName:        aws.String(name),
 		TemplateBody:     aws.String(string(json)),
 		TimeoutInMinutes: aws.Int64(10),
+		Capabilities: []*string{
+			aws.String(cloudformation.CapabilityCapabilityIam),
+		},
 	})
 	return err
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
@@ -21,24 +22,32 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
 			{
-				Command:                service.Command,
-				Cpu:                    256,
-				DisableNetworking:      service.NetworkMode == "none",
-				DnsSearchDomains:       service.DNSSearch,
-				DnsServers:             service.DNS,
-				DockerLabels:           nil,
-				DockerSecurityOptions:  service.SecurityOpt,
-				EntryPoint:             service.Entrypoint,
-				Environment:            toKeyValuePair(service.Environment),
-				Essential:              true,
-				ExtraHosts:             toHostEntryPtr(service.ExtraHosts),
-				FirelensConfiguration:  nil,
-				HealthCheck:            toHealthCheck(service.HealthCheck),
-				Hostname:               service.Hostname,
-				Image:                  service.Image,
-				Interactive:            false,
-				Links:                  nil,
-				LinuxParameters:        toLinuxParameters(service),
+				Command:               service.Command,
+				Cpu:                   256,
+				DisableNetworking:     service.NetworkMode == "none",
+				DnsSearchDomains:      service.DNSSearch,
+				DnsServers:            service.DNS,
+				DockerLabels:          nil,
+				DockerSecurityOptions: service.SecurityOpt,
+				EntryPoint:            service.Entrypoint,
+				Environment:           toKeyValuePair(service.Environment),
+				Essential:             true,
+				ExtraHosts:            toHostEntryPtr(service.ExtraHosts),
+				FirelensConfiguration: nil,
+				HealthCheck:           toHealthCheck(service.HealthCheck),
+				Hostname:              service.Hostname,
+				Image:                 service.Image,
+				Interactive:           false,
+				Links:                 nil,
+				LinuxParameters:       toLinuxParameters(service),
+				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
+					LogDriver: ecsapi.LogDriverAwslogs,
+					Options: map[string]string{
+						"awslogs-region":        cloudformation.Ref("AWS::Region"),
+						"awslogs-group":         cloudformation.Ref("LogGroup"),
+						"awslogs-stream-prefix": service.Name,
+					},
+				},
 				Memory:                 toMemoryLimits(service.Deploy),
 				MemoryReservation:      toMemoryReservation(service.Deploy),
 				MountPoints:            nil,

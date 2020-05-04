@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
-	"github.com/sirupsen/logrus"
+	"github.com/awslabs/goformation/v4/cloudformation/logs"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/iam"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/convert"
+	"github.com/sirupsen/logrus"
 )
 
 func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
@@ -50,22 +52,32 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		VpcId:                vpc,
 	}
 
+	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
+	template.Resources["LogGroup"] = &logs.LogGroup{
+		LogGroupName: logGroup,
+	}
+
 	for _, service := range project.Services {
 		definition, err := convert.Convert(project, service)
 		if err != nil {
 			return nil, err
 		}
 
-		role, err := c.GetEcsTaskExecutionRole(ctx, service)
-		if err != nil {
-			return nil, err
+		taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", service.Name)
+		template.Resources[taskExecutionRole] = &iam.Role{
+			AssumeRolePolicyDocument: assumeRolePolicyDocument,
+			// Here we can grant access to secrets/configs using a Policy { Allow,ssm:GetParameters,secret|config ARN}
+			ManagedPolicyArns: []string{
+				ECSTaskExecutionPolicy,
+			},
 		}
-		definition.TaskRoleArn = role
+		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
+		// FIXME definition.TaskRoleArn = ?
 
 		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
 		template.Resources[taskDefinition] = definition
 
-		template.Resources[service.Name] = &ecs.Service{
+		template.Resources[fmt.Sprintf("%sService", service.Name)] = &ecs.Service{
 			Cluster:      c.Cluster,
 			DesiredCount: 1,
 			LaunchType:   ecsapi.LaunchTypeFargate,
