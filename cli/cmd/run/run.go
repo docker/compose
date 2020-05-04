@@ -59,7 +59,7 @@ func runRun(ctx context.Context, image string, opts runOpts) error {
 		return err
 	}
 
-	project, err := opts.ToContainerConfig(image)
+	project, err := opts.toContainerConfig(image)
 	if err != nil {
 		return err
 	}

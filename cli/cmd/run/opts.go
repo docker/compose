@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -17,11 +18,14 @@ func toPorts(ports []string) ([]containers.Port, error) {
 
 	for _, port := range ports {
 		parts := strings.Split(port, ":")
-		source, err := strconv.ParseUint(parts[0], 10, 32)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("unable to parse ports %q", port)
+		}
+		source, err := strconv.Atoi(parts[0])
 		if err != nil {
 			return nil, err
 		}
-		destination, err := strconv.ParseUint(parts[1], 10, 32)
+		destination, err := strconv.Atoi(parts[1])
 		if err != nil {
 			return nil, err
 		}
@@ -34,7 +38,7 @@ func toPorts(ports []string) ([]containers.Port, error) {
 	return result, nil
 }
 
-func (r *runOpts) ToContainerConfig(image string) (containers.ContainerConfig, error) {
+func (r *runOpts) toContainerConfig(image string) (containers.ContainerConfig, error) {
 	publish, err := toPorts(r.publish)
 	if err != nil {
 		return containers.ContainerConfig{}, err
