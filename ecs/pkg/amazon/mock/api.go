@@ -8,6 +8,7 @@ import (
 	context "context"
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
+	docker "github.com/docker/ecs-plugin/pkg/docker"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -65,6 +66,21 @@ func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCluster", reflect.TypeOf((*MockAPI)(nil).CreateCluster), arg0, arg1)
 }
 
+// CreateSecret mocks base method
+func (m *MockAPI) CreateSecret(arg0 context.Context, arg1, arg2 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSecret", arg0, arg1, arg2)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSecret indicates an expected call of CreateSecret
+func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSecret", reflect.TypeOf((*MockAPI)(nil).CreateSecret), arg0, arg1, arg2)
+}
+
 // CreateStack mocks base method
 func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation0.Template) error {
 	m.ctrl.T.Helper()
@@ -91,6 +107,20 @@ func (m *MockAPI) DeleteCluster(arg0 context.Context, arg1 string) error {
 func (mr *MockAPIMockRecorder) DeleteCluster(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCluster", reflect.TypeOf((*MockAPI)(nil).DeleteCluster), arg0, arg1)
+}
+
+// DeleteSecret mocks base method
+func (m *MockAPI) DeleteSecret(arg0 context.Context, arg1 string, arg2 bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSecret", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSecret indicates an expected call of DeleteSecret
+func (mr *MockAPIMockRecorder) DeleteSecret(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSecret", reflect.TypeOf((*MockAPI)(nil).DeleteSecret), arg0, arg1, arg2)
 }
 
 // DeleteStack mocks base method
@@ -182,19 +212,34 @@ func (mr *MockAPIMockRecorder) GetSubNets(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubNets", reflect.TypeOf((*MockAPI)(nil).GetSubNets), arg0, arg1)
 }
 
-// ListRolesForPolicy mocks base method
-func (m *MockAPI) ListRolesForPolicy(arg0 context.Context, arg1 string) ([]string, error) {
+// InspectSecret mocks base method
+func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (docker.Secret, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRolesForPolicy", arg0, arg1)
-	ret0, _ := ret[0].([]string)
+	ret := m.ctrl.Call(m, "InspectSecret", arg0, arg1)
+	ret0, _ := ret[0].(docker.Secret)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListRolesForPolicy indicates an expected call of ListRolesForPolicy
-func (mr *MockAPIMockRecorder) ListRolesForPolicy(arg0, arg1 interface{}) *gomock.Call {
+// InspectSecret indicates an expected call of InspectSecret
+func (mr *MockAPIMockRecorder) InspectSecret(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolesForPolicy", reflect.TypeOf((*MockAPI)(nil).ListRolesForPolicy), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InspectSecret", reflect.TypeOf((*MockAPI)(nil).InspectSecret), arg0, arg1)
+}
+
+// ListSecrets mocks base method
+func (m *MockAPI) ListSecrets(arg0 context.Context) ([]docker.Secret, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListSecrets", arg0)
+	ret0, _ := ret[0].([]docker.Secret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListSecrets indicates an expected call of ListSecrets
+func (mr *MockAPIMockRecorder) ListSecrets(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSecrets", reflect.TypeOf((*MockAPI)(nil).ListSecrets), arg0)
 }
 
 // StackExists mocks base method

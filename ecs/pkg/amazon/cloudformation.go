@@ -13,10 +13,8 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/convert"
-	"github.com/sirupsen/logrus"
 )
 
 func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
@@ -118,43 +116,9 @@ func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, e
 	return defaultVPC, nil
 }
 
-const ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-
-var defaultTaskExecutionRole string
-
-// GetEcsTaskExecutionRole retrieve the role ARN to apply for task execution
-func (c client) GetEcsTaskExecutionRole(ctx context.Context, spec types.ServiceConfig) (string, error) {
-	if arn, ok := spec.Extras["x-ecs-TaskExecutionRole"]; ok {
-		return arn.(string), nil
-	}
-	if defaultTaskExecutionRole != "" {
-		return defaultTaskExecutionRole, nil
-	}
-
-	logrus.Debug("Retrieve Task Execution Role")
-	entities, err := c.api.ListRolesForPolicy(ctx, ECSTaskExecutionPolicy)
-	if err != nil {
-		return "", err
-	}
-	if len(entities) == 0 {
-		return "", fmt.Errorf("no Role is attached to AmazonECSTaskExecutionRole Policy, please provide an explicit task execution role")
-	}
-	if len(entities) > 1 {
-		return "", fmt.Errorf("multiple Roles are attached to AmazonECSTaskExecutionRole Policy, please provide an explicit task execution role")
-	}
-
-	arn, err := c.api.GetRoleArn(ctx, entities[0])
-	if err != nil {
-		return "", err
-	}
-	defaultTaskExecutionRole = arn
-	return arn, nil
-}
-
 type convertAPI interface {
 	GetDefaultVPC(ctx context.Context) (string, error)
 	VpcExists(ctx context.Context, vpcID string) (bool, error)
 	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
-	ListRolesForPolicy(ctx context.Context, policy string) ([]string, error)
 	GetRoleArn(ctx context.Context, name string) (string, error)
 }

@@ -132,21 +132,6 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
 	return ids, nil
 }
 
-func (s sdk) ListRolesForPolicy(ctx context.Context, policy string) ([]string, error) {
-	entities, err := s.IAM.ListEntitiesForPolicyWithContext(ctx, &iam.ListEntitiesForPolicyInput{
-		EntityFilter: aws.String("Role"),
-		PolicyArn:    aws.String(policy),
-	})
-	if err != nil {
-		return nil, err
-	}
-	roles := []string{}
-	for _, e := range entities.PolicyRoles {
-		roles = append(roles, *e.RoleName)
-	}
-	return roles, nil
-}
-
 func (s sdk) GetRoleArn(ctx context.Context, name string) (string, error) {
 	role, err := s.IAM.GetRoleWithContext(ctx, &iam.GetRoleInput{
 		RoleName: aws.String(name),
