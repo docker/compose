@@ -44,6 +44,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/cli/cmd"
+	"github.com/docker/api/cli/cmd/run"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/util"
@@ -98,7 +99,7 @@ func main() {
 		&cmd.PsCommand,
 		cmd.ServeCommand(),
 		&cmd.ExampleCommand,
-		cmd.RunCommand(),
+		run.Command(),
 	)
 
 	helpFunc := root.HelpFunc()

@@ -25,17 +25,18 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package cmd
+package run
 
 import (
 	"context"
 
-	"github.com/docker/api/client"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/client"
 )
 
-func RunCommand() *cobra.Command {
+func Command() *cobra.Command {
 	var opts runOpts
 	cmd := &cobra.Command{
 		Use:   "run",
