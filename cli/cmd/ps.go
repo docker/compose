@@ -27,10 +27,10 @@ var PsCommand = cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(w, "NAME\tIMAGE\tCOMMAND\n")
-		format := "%s\t%s\t%s\n"
+		fmt.Fprintf(w, "NAME\tIMAGE\tSTATUS\tCOMMAND\n")
+		format := "%s\t%s\t%s\t%s\n"
 		for _, c := range containers {
-			fmt.Fprintf(w, format, c.ID, c.Image, c.Command)
+			fmt.Fprintf(w, format, c.ID, c.Image, c.Status, c.Command)
 		}
 		return w.Flush()
 	},

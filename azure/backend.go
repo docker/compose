@@ -14,8 +14,8 @@ import (
 )
 
 type containerService struct {
-	cgc containerinstance.ContainerGroupsClient
-	ctx store.AciContext
+	containerGroupsClient containerinstance.ContainerGroupsClient
+	ctx                   store.AciContext
 }
 
 func init() {
@@ -29,50 +29,57 @@ func getter() interface{} {
 }
 
 func New(ctx context.Context) (containers.ContainerService, error) {
-	cc := apicontext.CurrentContext(ctx)
+	currentContext := apicontext.CurrentContext(ctx)
 	contextStore, err := store.New()
 	if err != nil {
 		return nil, err
 	}
-	metadata, err := contextStore.Get(cc, getter)
+	metadata, err := contextStore.Get(currentContext, getter)
 	if err != nil {
 		return nil, errors.Wrap(err, "wrong context type")
 	}
-	tc, _ := metadata.Metadata.Data.(store.AciContext)
+	aciContext, _ := metadata.Metadata.Data.(store.AciContext)
 
 	auth, _ := auth.NewAuthorizerFromCLI()
-	containerGroupsClient := containerinstance.NewContainerGroupsClient(tc.SubscriptionID)
+	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
 	return &containerService{
-		cgc: containerGroupsClient,
-		ctx: tc,
+		containerGroupsClient: containerGroupsClient,
+		ctx:                   aciContext,
 	}, nil
 }
 
 func (cs *containerService) List(ctx context.Context) ([]containers.Container, error) {
-	var cg []containerinstance.ContainerGroup
-	result, err := cs.cgc.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
-
+	var containerGroups []containerinstance.ContainerGroup
+	result, err := cs.containerGroupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
 	if err != nil {
 		return []containers.Container{}, err
 	}
 
 	for result.NotDone() {
-		cg = append(cg, result.Values()...)
+		containerGroups = append(containerGroups, result.Values()...)
 		if err := result.NextWithContext(ctx); err != nil {
 			return []containers.Container{}, err
 		}
 	}
 
 	res := []containers.Container{}
-	for _, c := range cg {
-		cc := *c.Containers
-		for _, d := range cc {
+	for _, containerGroup := range containerGroups {
+		group, err := cs.containerGroupsClient.Get(ctx, cs.ctx.ResourceGroup, *containerGroup.Name)
+		if err != nil {
+			return []containers.Container{}, err
+		}
+
+		for _, container := range *group.Containers {
+			status := "Unknown"
+			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
+				status = *container.InstanceView.CurrentState.State
+			}
 			res = append(res, containers.Container{
-				ID:    *c.Name,
-				Image: *d.Image,
-				// Command: strings.Join(*d.ContainerProperties.Command, " "), // TODO command can be null
+				ID:     *container.Name,
+				Image:  *container.Image,
+				Status: status,
 			})
 		}
 	}
