@@ -17,7 +17,7 @@ var (
 	errTypeRegistered = errors.New("backend: already registered")
 )
 
-type initFunc func(context.Context) (interface{}, error)
+type initFunc func(context.Context) (Service, error)
 
 type registeredBackend struct {
 	name        string
@@ -58,7 +58,7 @@ func Register(name string, backendType string, init initFunc) {
 
 // Get returns the backend registered for a particular type, it returns
 // an error if there is no registered backends for the given type.
-func Get(ctx context.Context, backendType string) (interface{}, error) {
+func Get(ctx context.Context, backendType string) (Service, error) {
 	for _, b := range backends.r {
 		if b.backendType == backendType {
 			return b.init(ctx)
