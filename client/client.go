@@ -29,7 +29,6 @@ package client
 
 import (
 	"context"
-	"errors"
 
 	"github.com/docker/api/backend"
 	backendv1 "github.com/docker/api/backend/v1"
@@ -53,15 +52,11 @@ func New(ctx context.Context) (*Client, error) {
 	}
 	contextType := s.GetType(cc)
 
-	b, err := backend.Get(ctx, contextType)
+	service, err := backend.Get(ctx, contextType)
 	if err != nil {
 		return nil, err
 	}
 
-	service, ok := b.(backend.Service)
-	if !ok {
-		return nil, errors.New("backend not found")
-	}
 	return &Client{
 		backendType: contextType,
 		bs:          service,

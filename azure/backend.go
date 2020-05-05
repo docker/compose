@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	backend.Register("aci", "aci", func(ctx context.Context) (interface{}, error) {
+	backend.Register("aci", "aci", func(ctx context.Context) (backend.Service, error) {
 		return New(ctx)
 	})
 }
@@ -53,11 +53,11 @@ func New(ctx context.Context) (backend.Service, error) {
 
 func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciAPIService {
 	return &aciAPIService{
-		container: aciContainerService{
+		aciContainerService: aciContainerService{
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
 		},
-		compose: aciComposeService{
+		aciComposeService: aciComposeService{
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
 		},
@@ -65,21 +65,21 @@ func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 }
 
 type aciAPIService struct {
-	container aciContainerService
-	compose   aciComposeService
+	aciContainerService
+	aciComposeService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
 	return &aciContainerService{
-		containerGroupsClient: a.container.containerGroupsClient,
-		ctx:                   a.container.ctx,
+		containerGroupsClient: a.aciContainerService.containerGroupsClient,
+		ctx:                   a.aciContainerService.ctx,
 	}
 }
 
 func (a *aciAPIService) ComposeService() compose.Service {
 	return &aciComposeService{
-		containerGroupsClient: a.compose.containerGroupsClient,
-		ctx:                   a.compose.ctx,
+		containerGroupsClient: a.aciComposeService.containerGroupsClient,
+		ctx:                   a.aciComposeService.ctx,
 	}
 }
 
