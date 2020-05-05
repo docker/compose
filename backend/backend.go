@@ -29,7 +29,7 @@ var backends = struct {
 	r []*registeredBackend
 }{}
 
-// Aggregation of service interfaces
+// Service aggregates the service interfaces
 type Service interface {
 	ContainerService() containers.Service
 	ComposeService() compose.Service

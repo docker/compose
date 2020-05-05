@@ -29,10 +29,10 @@ func init() {
 	}
 }
 
-func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
+func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
-		return c, errors.Wrapf(err, "cannot get container group client")
+		return errors.Wrapf(err, "cannot get container group client")
 	}
 
 	// Check if the container group already exists
@@ -40,13 +40,13 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	if err != nil {
 		if err, ok := err.(autorest.DetailedError); ok {
 			if err.StatusCode != http.StatusNotFound {
-				return c, err
+				return err
 			}
 		} else {
-			return c, err
+			return err
 		}
 	} else {
-		return c, fmt.Errorf("container group %q already exists", *groupDefinition.Name)
+		return fmt.Errorf("container group %q already exists", *groupDefinition.Name)
 	}
 
 	future, err := containerGroupsClient.CreateOrUpdate(
@@ -57,16 +57,16 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	)
 
 	if err != nil {
-		return c, err
+		return err
 	}
 
 	err = future.WaitForCompletionRef(ctx, containerGroupsClient.Client)
 	if err != nil {
-		return c, err
+		return err
 	}
 	containerGroup, err := future.Result(containerGroupsClient)
 	if err != nil {
-		return c, err
+		return err
 	}
 
 	if len(*containerGroup.Containers) > 1 {
@@ -80,7 +80,7 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 		container := containers[0]
 		response, err := execACIContainer(ctx, aciContext, "/bin/sh", *containerGroup.Name, *container.Name)
 		if err != nil {
-			return c, err
+			return err
 		}
 
 		if err = execCommands(
@@ -89,11 +89,11 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 			*response.Password,
 			commands,
 		); err != nil {
-			return containerinstance.ContainerGroup{}, err
+			return err
 		}
 	}
 
-	return containerGroup, err
+	return err
 }
 
 func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (c containerinstance.ContainerGroup, err error) {
