@@ -44,7 +44,7 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 				FirelensConfiguration: nil,
 				HealthCheck:           toHealthCheck(service.HealthCheck),
 				Hostname:              service.Hostname,
-				Image:                 service.Image,
+				Image:                 getImage(service.Image),
 				Interactive:           false,
 				Links:                 nil,
 				LinuxParameters:       toLinuxParameters(service),
@@ -282,22 +282,27 @@ func toKeyValuePair(environment types.MappingWithEquals) []ecs.TaskDefinition_Ke
 	return pairs
 }
 
+func getImage(image string) string {
+	switch f := strings.Split(image, "/"); len(f) {
+	case 1:
+		return "docker.io/library/" + image
+	case 2:
+		return "docker.io/" + image
+	default:
+		return image
+	}
+}
+
 func getRepoCredentials(service types.ServiceConfig) (*ecs.TaskDefinition_RepositoryCredentials, error) {
 	// extract registry and namespace string from image name
-	fields := strings.Split(service.Image, "/")
-	regPath := ""
-	for i, field := range fields {
-		if i < len(fields)-1 {
-			regPath = regPath + field
+	credential := ""
+	for key, value := range service.Extras {
+		if strings.HasPrefix(key, "x-aws-pull_credentials") {
+			credential = value.(string)
 		}
 	}
-	if regPath == "" || len(service.Secrets) == 0 {
-		return nil, nil
-	}
-	for _, secret := range service.Secrets {
-		if secret.Source == regPath {
-			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: secret.Target}, nil
-		}
+	if credential != "" {
+		return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: credential}, nil
 	}
 	return nil, nil
 }
@@ -306,7 +311,7 @@ func getSecrets(service types.ServiceConfig) ([]ecs.TaskDefinition_Secret, error
 	secrets := []ecs.TaskDefinition_Secret{}
 
 	for _, secret := range service.Secrets {
-		secrets = append(secrets, ecs.TaskDefinition_Secret{Name: secret.Target})
+		secrets = append(secrets, ecs.TaskDefinition_Secret{Name: secret.Target, ValueFrom: secret.Source})
 	}
 	return secrets, nil
 }

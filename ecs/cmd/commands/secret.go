@@ -16,7 +16,10 @@ import (
 )
 
 type createSecretOptions struct {
-	Label string
+	Label       string
+	Username    string
+	Password    string
+	Description string
 }
 
 type deleteSecretOptions struct {
@@ -39,9 +42,9 @@ func SecretCommand(dockerCli command.Cli) *cobra.Command {
 }
 
 func CreateSecret(dockerCli command.Cli) *cobra.Command {
-	//opts := createSecretOptions{}
+	opts := createSecretOptions{}
 	cmd := &cobra.Command{
-		Use:   "create NAME SECRET",
+		Use:   "create NAME",
 		Short: "Creates a secret.",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
@@ -52,12 +55,16 @@ func CreateSecret(dockerCli command.Cli) *cobra.Command {
 				return errors.New("Missing mandatory parameter: NAME")
 			}
 			name := args[0]
-			secret := args[1]
-			id, err := client.CreateSecret(context.Background(), name, secret)
+
+			secret := docker.NewSecret(name, opts.Username, opts.Password, opts.Description)
+			id, err := client.CreateSecret(context.Background(), secret)
 			fmt.Println(id)
 			return err
 		}),
 	}
+	cmd.Flags().StringVarP(&opts.Username, "username", "u", "", "username")
+	cmd.Flags().StringVarP(&opts.Password, "password", "p", "", "password")
+	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Secret description")
 	return cmd
 }
 

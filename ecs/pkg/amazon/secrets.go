@@ -7,14 +7,14 @@ import (
 )
 
 type secretsAPI interface {
-	CreateSecret(ctx context.Context, name string, content string) (string, error)
+	CreateSecret(ctx context.Context, secret docker.Secret) (string, error)
 	InspectSecret(ctx context.Context, id string) (docker.Secret, error)
 	ListSecrets(ctx context.Context) ([]docker.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
 }
 
-func (c client) CreateSecret(ctx context.Context, name string, content string) (string, error) {
-	return c.api.CreateSecret(ctx, name, content)
+func (c client) CreateSecret(ctx context.Context, secret docker.Secret) (string, error) {
+	return c.api.CreateSecret(ctx, secret)
 }
 
 func (c client) InspectSecret(ctx context.Context, id string) (docker.Secret, error) {

@@ -6,11 +6,12 @@ package mock
 
 import (
 	context "context"
+	reflect "reflect"
+
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
 	docker "github.com/docker/ecs-plugin/pkg/docker"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -67,18 +68,18 @@ func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // CreateSecret mocks base method
-func (m *MockAPI) CreateSecret(arg0 context.Context, arg1, arg2 string) (string, error) {
+func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 docker.Secret) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateSecret", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CreateSecret", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateSecret indicates an expected call of CreateSecret
-func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1 docker.Secret) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSecret", reflect.TypeOf((*MockAPI)(nil).CreateSecret), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSecret", reflect.TypeOf((*MockAPI)(nil).CreateSecret), arg0, arg1)
 }
 
 // CreateStack mocks base method

@@ -55,17 +55,28 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		}
 
 		taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", service.Name)
+		policy, err := c.getPolicy(ctx, definition)
+		if err != nil {
+			return nil, err
+		}
+		rolePolicies := []iam.Role_Policy{}
+		if policy != nil {
+			rolePolicies = append(rolePolicies, iam.Role_Policy{
+				PolicyDocument: policy,
+				PolicyName:     taskExecutionRole,
+			})
+
+		}
+		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
+
+		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
 		template.Resources[taskExecutionRole] = &iam.Role{
 			AssumeRolePolicyDocument: assumeRolePolicyDocument,
-			// Here we can grant access to secrets/configs using a Policy { Allow,ssm:GetParameters,secret|config ARN}
+			Policies:                 rolePolicies,
 			ManagedPolicyArns: []string{
 				ECSTaskExecutionPolicy,
 			},
 		}
-		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
-		// FIXME definition.TaskRoleArn = ?
-
-		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
 		template.Resources[taskDefinition] = definition
 
 		var healthCheck *cloudmap.Service_HealthCheckConfig
@@ -180,6 +191,33 @@ func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, e
 		return "", err
 	}
 	return defaultVPC, nil
+}
+
+func (c client) getPolicy(ctx context.Context, taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
+
+	arns := []string{}
+	for _, container := range taskDef.ContainerDefinitions {
+		if container.RepositoryCredentials != nil {
+			arns = append(arns, container.RepositoryCredentials.CredentialsParameter)
+		}
+		if len(container.Secrets) > 0 {
+			for _, s := range container.Secrets {
+				arns = append(arns, s.ValueFrom)
+			}
+		}
+
+	}
+	if len(arns) > 0 {
+		return &PolicyDocument{
+			Statement: []PolicyStatement{
+				{
+					Effect:   "Allow",
+					Action:   []string{"secretsmanager:GetSecretValue", "ssm:GetParameters", "kms:Decrypt"},
+					Resource: arns,
+				}},
+		}, nil
+	}
+	return nil, nil
 }
 
 type convertAPI interface {

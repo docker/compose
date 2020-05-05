@@ -223,9 +223,18 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	return err
 }
 
-func (s sdk) CreateSecret(ctx context.Context, name string, secret string) (string, error) {
-	logrus.Debug("Create secret " + name)
-	response, err := s.SM.CreateSecret(&secretsmanager.CreateSecretInput{Name: &name, SecretString: &secret})
+func (s sdk) CreateSecret(ctx context.Context, secret docker.Secret) (string, error) {
+	logrus.Debug("Create secret " + secret.Name)
+	secretStr, err := secret.GetCredString()
+	if err != nil {
+		return "", err
+	}
+
+	response, err := s.SM.CreateSecret(&secretsmanager.CreateSecretInput{
+		Name:         &secret.Name,
+		SecretString: &secretStr,
+		Description:  &secret.Description,
+	})
 	if err != nil {
 		return "", err
 	}
