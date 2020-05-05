@@ -695,7 +695,9 @@ class Project(object):
             repo, tag, sep = parse_repository_tag(service.image_name)
             service_image_name = sep.join((repo, tag)) if tag else sep.join((repo, 'latest'))
 
-            if service_image_name not in unique_images:
+            # Add service to unique if it's pushable
+            if (service_image_name not in unique_images and
+                    service.can_be_pushed()):
                 service.push(ignore_push_failures)
                 unique_images.add(service_image_name)
 

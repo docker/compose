@@ -12,6 +12,8 @@ from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
+from ..helpers import BUSYBOX_IMAGE_NAME
+from ..helpers import BUSYBOX_DEFAULT_TAG
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import ConfigurationError
 from compose.config.config import Config
@@ -845,6 +847,23 @@ class ProjectTest(unittest.TestCase):
         with mock.patch('compose.service.Service.push') as fake_push:
             project.push()
             assert fake_push.call_count == 2
+
+    def test_push_duplicate_image(self):
+        svc_no_build = Service(
+            'busy1', image=BUSYBOX_IMAGE_WITH_TAG,
+            client=self.mock_client)
+        svc_with_build = Service(
+            'busy2', image=BUSYBOX_IMAGE_WITH_TAG,
+            build='.',
+            client=self.mock_client)
+        project = Project(
+            'composetest', [svc_no_build, svc_with_build], self.mock_client
+        )
+        project.push()
+        self.mock_client.push.assert_called_once_with(
+            BUSYBOX_IMAGE_NAME,
+            tag=BUSYBOX_DEFAULT_TAG,
+            stream=True)
 
     def test_get_secrets_no_secret_def(self):
         service = 'foo'

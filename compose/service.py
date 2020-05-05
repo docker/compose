@@ -1138,6 +1138,12 @@ class Service(object):
     def can_be_built(self):
         return 'build' in self.options
 
+    def can_be_pulled(self):
+        return 'image' in self.options
+
+    def can_be_pushed(self):
+        return 'build' in self.options and 'image' in self.options
+
     def labels(self, one_off=False, legacy=False):
         proj_name = self.project if not legacy else re.sub(r'[_-]', '', self.project)
         return [
@@ -1227,7 +1233,7 @@ class Service(object):
                 log.error(six.text_type(e))
 
     def pull(self, ignore_pull_failures=False, silent=False, stream=False):
-        if 'image' not in self.options:
+        if not self.can_be_pulled():
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
@@ -1250,7 +1256,7 @@ class Service(object):
         return progress_stream.get_digest_from_pull(event_stream)
 
     def push(self, ignore_push_failures=False):
-        if 'image' not in self.options or 'build' not in self.options:
+        if not self.can_be_pushed():
             return
 
         repo, tag, separator = parse_repository_tag(self.options['image'])
