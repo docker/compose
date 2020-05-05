@@ -8,18 +8,18 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/auth"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
+	tm "github.com/buger/goterm"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/pkg/errors"
 
 	"github.com/docker/api/context/store"
-
-	tm "github.com/buger/goterm"
 )
 
 func init() {
@@ -56,7 +56,6 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 		*groupDefinition.Name,
 		groupDefinition,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -247,6 +246,9 @@ func getContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 	}
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
 	containerGroupsClient.Authorizer = auth
+	containerGroupsClient.PollingDelay = 5 * time.Second
+	containerGroupsClient.RetryAttempts = 30
+	containerGroupsClient.RetryDuration = 1 * time.Second
 	return containerGroupsClient, nil
 }
 
