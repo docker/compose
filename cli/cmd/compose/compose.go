@@ -28,11 +28,11 @@ func upCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return c.AciService().Up(cmd.Context(), *opts)
+			return c.ComposeService().Up(cmd.Context(), *opts)
 		},
 	}
-	upCmd.Flags().StringVar(&opts.Name, "name",  "", "Project name")
-	upCmd.Flags().StringVar(&opts.WorkDir, "workdir",  ".", "Work dir")
+	upCmd.Flags().StringVar(&opts.Name, "name", "", "Project name")
+	upCmd.Flags().StringVar(&opts.WorkDir, "workdir", ".", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 
@@ -48,11 +48,11 @@ func downCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return c.AciService().Down(cmd.Context(), *opts)
+			return c.ComposeService().Down(cmd.Context(), *opts)
 		},
 	}
-	downCmd.Flags().StringVar(&opts.Name, "name",  "", "Project name")
-	downCmd.Flags().StringVar(&opts.WorkDir, "workdir",  ".", "Work dir")
+	downCmd.Flags().StringVar(&opts.Name, "name", "", "Project name")
+	downCmd.Flags().StringVar(&opts.WorkDir, "workdir", ".", "Work dir")
 
 	return downCmd
 }

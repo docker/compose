@@ -21,11 +21,6 @@ import (
 	"github.com/docker/api/context/store"
 )
 
-type aciApiService struct {
-	containerGroupsClient containerinstance.ContainerGroupsClient
-	ctx                   store.AciContext
-}
-
 func init() {
 	backend.Register("aci", "aci", func(ctx context.Context) (interface{}, error) {
 		return New(ctx)
@@ -36,13 +31,8 @@ func getter() interface{} {
 	return &store.AciContext{}
 }
 
-type AciService interface {
-	containers.ContainerService
-	compose.Service
-}
-
-// New creates a backend that can manage containers on ACI
-func New(ctx context.Context) (AciService, error) {
+// New creates a backend that can manage containers
+func New(ctx context.Context) (backend.Service, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	contextStore, err := store.New()
 	if err != nil {
@@ -58,13 +48,47 @@ func New(ctx context.Context) (AciService, error) {
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
-	return &aciApiService{
-		containerGroupsClient: containerGroupsClient,
-		ctx:                   aciContext,
-	}, nil
+	return getAciApiService(containerGroupsClient, aciContext), nil
 }
 
-func (cs *aciApiService) List(ctx context.Context) ([]containers.Container, error) {
+func getAciApiService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciApiService {
+	return &aciApiService{
+		container: aciContainerService{
+			containerGroupsClient: cgc,
+			ctx:                   aciCtx,
+		},
+		compose: aciComposeService{
+			containerGroupsClient: cgc,
+			ctx:                   aciCtx,
+		},
+	}
+}
+
+type aciApiService struct {
+	container aciContainerService
+	compose   aciComposeService
+}
+
+func (a *aciApiService) ContainerService() containers.Service {
+	return &aciContainerService{
+		containerGroupsClient: a.container.containerGroupsClient,
+		ctx:                   a.container.ctx,
+	}
+}
+
+func (a *aciApiService) ComposeService() compose.Service {
+	return &aciComposeService{
+		containerGroupsClient: a.compose.containerGroupsClient,
+		ctx:                   a.compose.ctx,
+	}
+}
+
+type aciContainerService struct {
+	containerGroupsClient containerinstance.ContainerGroupsClient
+	ctx                   store.AciContext
+}
+
+func (cs *aciContainerService) List(ctx context.Context) ([]containers.Container, error) {
 	var containerGroups []containerinstance.ContainerGroup
 	result, err := cs.containerGroupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
 	if err != nil {
@@ -101,7 +125,7 @@ func (cs *aciApiService) List(ctx context.Context) ([]containers.Container, erro
 	return res, nil
 }
 
-func (cs *aciApiService) Run(ctx context.Context, r containers.ContainerConfig) error {
+func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
 	var ports []types.ServicePortConfig
 	for _, p := range r.Ports {
 		ports = append(ports, types.ServicePortConfig{
@@ -132,7 +156,7 @@ func (cs *aciApiService) Run(ctx context.Context, r containers.ContainerConfig) 
 	return err
 }
 
-func (cs *aciApiService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
+func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
 	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, name, name)
 	if err != nil {
 		return err
@@ -147,7 +171,7 @@ func (cs *aciApiService) Exec(ctx context.Context, name string, command string, 
 	)
 }
 
-func (cs *aciApiService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
+func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
 	logs, err := getACIContainerLogs(ctx, cs.ctx, containerName, containerName)
 	if err != nil {
 		return err
@@ -169,7 +193,12 @@ func (cs *aciApiService) Logs(ctx context.Context, containerName string, req con
 	return err
 }
 
-func (cs *aciApiService) Up(ctx context.Context, opts compose.ProjectOptions) error {
+type aciComposeService struct {
+	containerGroupsClient containerinstance.ContainerGroupsClient
+	ctx                   store.AciContext
+}
+
+func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions) error {
 	project, err := compose.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
@@ -183,7 +212,7 @@ func (cs *aciApiService) Up(ctx context.Context, opts compose.ProjectOptions) er
 	return err
 }
 
-func (cs *aciApiService) Down(ctx context.Context, opts compose.ProjectOptions) error {
+func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptions) error {
 	project, err := compose.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
