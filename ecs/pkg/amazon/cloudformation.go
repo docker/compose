@@ -14,7 +14,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/docker/ecs-plugin/pkg/compose"
-	"github.com/docker/ecs-plugin/pkg/convert"
 )
 
 func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
@@ -56,7 +55,7 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 	}
 
 	for _, service := range project.Services {
-		definition, err := convert.Convert(project, service)
+		definition, err := Convert(project, service)
 		if err != nil {
 			return nil, err
 		}

@@ -24,6 +24,11 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return fmt.Errorf("we do not (yet) support updating an existing CloudFormation stack")
 	}
 
+	err = c.Validate(project)
+	if err != nil {
+		return err
+	}
+
 	template, err := c.Convert(ctx, project)
 	if err != nil {
 		return err

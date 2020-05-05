@@ -1,4 +1,4 @@
-package convert
+package amazon
 
 import (
 	"strings"
@@ -174,16 +174,6 @@ func toUlimits(ulimits map[string]*types.UlimitsConfig) []ecs.TaskDefinition_Uli
 	return u
 }
 
-func uint32Toint64Ptr(i uint32) *int64 {
-	v := int64(i)
-	return &v
-}
-
-func intToInt64Ptr(i int) *int64 {
-	v := int64(i)
-	return &v
-}
-
 const Mb = 1024 * 1024
 
 func toMemoryLimits(deploy *types.DeployConfig) int {
@@ -263,14 +253,6 @@ func toHealthCheck(check *types.HealthCheckConfig) *ecs.TaskDefinition_HealthChe
 		StartPeriod: durationToInt(check.StartPeriod),
 		Timeout:     durationToInt(check.Timeout),
 	}
-}
-
-func uint64ToInt64Ptr(i *uint64) *int64 {
-	if i == nil {
-		return nil
-	}
-	v := int64(*i)
-	return &v
 }
 
 func durationToInt(interval *types.Duration) int {
