@@ -12,8 +12,8 @@ from docker.errors import NotFound
 
 from .. import mock
 from .. import unittest
-from ..helpers import BUSYBOX_IMAGE_NAME
 from ..helpers import BUSYBOX_DEFAULT_TAG
+from ..helpers import BUSYBOX_IMAGE_NAME
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import ConfigurationError
 from compose.config.config import Config
