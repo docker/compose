@@ -1,0 +1,16 @@
+[
+    {
+        "Name": "aws",
+        "Metadata": {},
+        "Endpoints": {
+            "aws": {
+                "Cluster": "clusterName",
+                "Profile": "profileName",
+                "Region": "regionName"
+            },
+            "docker": {
+                "SkipTLSVerify": false
+            }
+        },
+        "TLSMaterial": {},
+        "Storage":

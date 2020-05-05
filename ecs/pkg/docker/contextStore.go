@@ -3,6 +3,7 @@ package docker
 import (
 	"fmt"
 
+	"github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/context/store"
 	"github.com/mitchellh/mapstructure"
@@ -25,7 +26,12 @@ type AwsContext struct {
 }
 
 func NewContext(name string, awsContext *AwsContext) error {
-	contextStore := initContextStore()
+	_, err := NewContextWithStore(name, awsContext, cliconfig.ContextStoreDir())
+	return err
+}
+
+func NewContextWithStore(name string, awsContext *AwsContext, contextDirectory string) (store.Store, error) {
+	contextStore := initContextStore(contextDirectory)
 	endpoints := map[string]interface{}{
 		"aws":    awsContext,
 		"docker": awsContext,
@@ -36,16 +42,19 @@ func NewContext(name string, awsContext *AwsContext) error {
 		Endpoints: endpoints,
 		Metadata:  TypeContext{Type: contextType},
 	}
-	return contextStore.CreateOrUpdate(metadata)
+	return contextStore, contextStore.CreateOrUpdate(metadata)
 }
 
-func initContextStore() store.Store {
+func initContextStore(contextDir string) store.Store {
 	config := store.NewConfig(getter)
-	return store.New(cliconfig.ContextStoreDir(), config)
+	return store.New(contextDir, config)
 }
 
 func CheckAwsContextExists(contextName string) (*AwsContext, error) {
-	contextStore := initContextStore()
+	if contextName == command.DefaultContextName {
+		return nil, fmt.Errorf("can't use \"%s\" with ECS command because it is not an AWS context", contextName)
+	}
+	contextStore := initContextStore(cliconfig.ContextStoreDir())
 	metadata, err := contextStore.GetMetadata(contextName)
 	if err != nil {
 		return nil, err

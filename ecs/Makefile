@@ -4,7 +4,7 @@ clean:
 build:
 	go build -v -o dist/docker-ecs cmd/main/main.go
 
-test: ## Run tests
+test: build ## Run tests
 	go test ./... -v
 
 dev: build

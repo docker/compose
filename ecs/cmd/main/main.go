@@ -43,6 +43,12 @@ func NewRootCmd(name string, dockerCli command.Cli) *cobra.Command {
 			opts, err = docker.CheckAwsContextExists(contextName)
 			return err
 		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 0 {
+				return fmt.Errorf("%q is not a docker ecs command\nSee 'docker ecs --help'", args[0])
+			}
+			return nil
+		},
 	}
 	cmd.AddCommand(
 		VersionCommand(),
