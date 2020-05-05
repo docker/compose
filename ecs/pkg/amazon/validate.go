@@ -15,6 +15,15 @@ func (c *client) Validate(project *compose.Project) error {
 		}
 	}
 
+	for i, service := range project.Services {
+		if len(service.Networks) == 0 {
+			// Service without explicit network attachment are implicitly exposed on default network
+			// FIXME move this to compose-go
+			service.Networks = map[string]*types.ServiceNetworkConfig{"default": nil}
+			project.Services[i] = service
+		}
+	}
+
 	// Here we can check for incompatible attributes, inject sane defaults, etc
 	return nil
 }

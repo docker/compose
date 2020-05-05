@@ -8,6 +8,7 @@ import (
 
 const (
 	ProjectTag = "com.docker.compose.project"
+	NetworkTag = "com.docker.compose.network"
 )
 
 func NewClient(profile string, cluster string, region string) (compose.API, error) {

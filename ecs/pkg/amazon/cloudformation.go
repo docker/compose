@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"strings"
 
-	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
+
+	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
+	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
@@ -29,25 +31,9 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		return nil, err
 	}
 
-	var ingresses = []ec2.SecurityGroup_Ingress{}
-	for _, service := range project.Services {
-		for _, port := range service.Ports {
-			ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
-				CidrIp:      "0.0.0.0/0",
-				Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
-				FromPort:    int(port.Target),
-				IpProtocol:  strings.ToUpper(port.Protocol),
-				ToPort:      int(port.Target),
-			})
-		}
-	}
-
-	securityGroup := fmt.Sprintf("%s Security Group", project.Name)
-	template.Resources["SecurityGroup"] = &ec2.SecurityGroup{
-		GroupDescription:     securityGroup,
-		GroupName:            securityGroup,
-		SecurityGroupIngress: ingresses,
-		VpcId:                vpc,
+	for net := range project.Networks {
+		name, resource := convertNetwork(project, net, vpc)
+		template.Resources[name] = resource
 	}
 
 	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
@@ -104,6 +90,12 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 			},
 		}
 
+		serviceSecurityGroups := []string{}
+		for net := range service.Networks {
+			logicalName := networkResourceName(project, net)
+			serviceSecurityGroups = append(serviceSecurityGroups, cloudformation.Ref(logicalName))
+		}
+
 		template.Resources[fmt.Sprintf("%sService", service.Name)] = &ecs.Service{
 			Cluster:      c.Cluster,
 			DesiredCount: 1,
@@ -111,7 +103,7 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
-					SecurityGroups: []string{cloudformation.Ref("SecurityGroup")},
+					SecurityGroups: serviceSecurityGroups,
 					Subnets:        subnets,
 				},
 			},
@@ -126,6 +118,46 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		}
 	}
 	return template, nil
+}
+
+func convertNetwork(project *compose.Project, net string, vpc string) (string, cloudformation.Resource) {
+	var ingresses []ec2.SecurityGroup_Ingress
+	for _, service := range project.Services {
+		if _, ok := service.Networks[net]; ok {
+			for _, port := range service.Ports {
+				ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
+					CidrIp:      "0.0.0.0/0",
+					Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
+					FromPort:    int(port.Target),
+					IpProtocol:  strings.ToUpper(port.Protocol),
+					ToPort:      int(port.Target),
+				})
+			}
+		}
+	}
+
+	securityGroup := networkResourceName(project, net)
+	resource := &ec2.SecurityGroup{
+		GroupDescription:     fmt.Sprintf("%s %s Security Group", project.Name, net),
+		GroupName:            securityGroup,
+		SecurityGroupIngress: ingresses,
+		VpcId:                vpc,
+		Tags: []tags.Tag{
+			{
+				Key:   ProjectTag,
+				Value: project.Name,
+			},
+			{
+				Key:   NetworkTag,
+				Value: net,
+			},
+		},
+	}
+	return securityGroup, resource
+}
+
+func networkResourceName(project *compose.Project, network string) string {
+	return fmt.Sprintf("%s%sNetwork", project.Name, strings.Title(network))
 }
 
 func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
