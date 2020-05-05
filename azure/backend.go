@@ -48,11 +48,11 @@ func New(ctx context.Context) (backend.Service, error) {
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
-	return getAciApiService(containerGroupsClient, aciContext), nil
+	return getAciAPIService(containerGroupsClient, aciContext), nil
 }
 
-func getAciApiService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciApiService {
-	return &aciApiService{
+func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciAPIService {
+	return &aciAPIService{
 		container: aciContainerService{
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
@@ -64,19 +64,19 @@ func getAciApiService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 	}
 }
 
-type aciApiService struct {
+type aciAPIService struct {
 	container aciContainerService
 	compose   aciComposeService
 }
 
-func (a *aciApiService) ContainerService() containers.Service {
+func (a *aciAPIService) ContainerService() containers.Service {
 	return &aciContainerService{
 		containerGroupsClient: a.container.containerGroupsClient,
 		ctx:                   a.container.ctx,
 	}
 }
 
-func (a *aciApiService) ComposeService() compose.Service {
+func (a *aciAPIService) ComposeService() compose.Service {
 	return &aciComposeService{
 		containerGroupsClient: a.compose.containerGroupsClient,
 		ctx:                   a.compose.ctx,
@@ -152,8 +152,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return err
 	}
 
-	_, err = createACIContainers(ctx, cs.ctx, groupDefinition)
-	return err
+	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
 func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
@@ -208,8 +207,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions
 	if err != nil {
 		return err
 	}
-	_, err = createACIContainers(ctx, cs.ctx, groupDefinition)
-	return err
+	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptions) error {

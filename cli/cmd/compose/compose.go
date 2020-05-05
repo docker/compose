@@ -7,6 +7,7 @@ import (
 	"github.com/docker/api/compose"
 )
 
+// Command returns the compose command with its child commands
 func Command() *cobra.Command {
 	command := &cobra.Command{
 		Short: "Docker Compose",
