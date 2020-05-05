@@ -11,23 +11,17 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.13
+      - name: Set up Go 1.14
         uses: actions/setup-go@v1
         with:
-          go-version: 1.13
+          go-version: 1.14
         id: go
 
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@master
-
-      - name: Get dependencies
-        run: ./scripts/setup/install-go-gen
-
-      - name: Protos
-        run: make protos
+      - name: Lint
+        run: make lint
 
       - name: Build
         run: make cli

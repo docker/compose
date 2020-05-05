@@ -21,8 +21,10 @@ const (
 	volumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeDriveroptsAccountKeyKey  = "storage_account_key"
 	singleContainerName            = "single--container--aci"
+	secretInlineMark               = "inline:"
 )
 
+// ToContainerGroup converts a compose project into a ACI container group
 func ToContainerGroup(aciContext store.AciContext, p compose.Project) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
@@ -98,8 +100,8 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 	var secretVolumes []containerinstance.Volume
 	for secretName, filepathToRead := range p.Secrets {
 		var data []byte
-		if strings.HasPrefix(filepathToRead.File, compose.SecretInlineMark) {
-			data = []byte(filepathToRead.File[len(compose.SecretInlineMark):])
+		if strings.HasPrefix(filepathToRead.File, secretInlineMark) {
+			data = []byte(filepathToRead.File[len(secretInlineMark):])
 		} else {
 			var err error
 			data, err = ioutil.ReadFile(filepathToRead.File)

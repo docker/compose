@@ -41,12 +41,14 @@ const (
 	configFileDir  = ".docker"
 )
 
-type ContextFlags struct {
+// Flags are the global cli flags
+type Flags struct {
 	Config  string
 	Context string
 }
 
-func (c *ContextFlags) AddFlags(flags *pflag.FlagSet) {
+// AddFlags adds persistent (global) flags
+func (c *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.Config, "config", filepath.Join(home(), configFileDir), "Location of the client config files `DIRECTORY`")
 	flags.StringVarP(&c.Context, "context", "c", os.Getenv("DOCKER_CONTEXT"), "context")
 }

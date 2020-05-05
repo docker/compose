@@ -6,10 +6,13 @@ import (
 	"golang.org/x/net/context"
 )
 
-const KEY = "context_key"
+// Key is the key where the current docker context is stored in the metadata
+// of a gRPC request
+const Key = "context_key"
 
 type currentContextKey struct{}
 
+// WithCurrentContext sets the name of the current docker context
 func WithCurrentContext(ctx gocontext.Context, contextName string) context.Context {
 	return context.WithValue(ctx, currentContextKey{}, contextName)
 }

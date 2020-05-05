@@ -16,6 +16,7 @@ type logsOpts struct {
 	Tail   string
 }
 
+// LogsCommand fetches and shows logs of a container
 func LogsCommand() *cobra.Command {
 	var opts logsOpts
 	cmd := &cobra.Command{

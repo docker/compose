@@ -11,7 +11,7 @@ type Container struct {
 	Status      string
 	Image       string
 	Command     string
-	CpuTime     uint64
+	CPUTime     uint64
 	MemoryUsage uint64
 	MemoryLimit uint64
 	PidsCurrent uint64
@@ -37,6 +37,7 @@ type ContainerConfig struct {
 	Ports []Port
 }
 
+// LogsRequest contains configuration about a log request
 type LogsRequest struct {
 	Follow bool
 	Tail   string

@@ -38,9 +38,7 @@ import (
 	"github.com/docker/api/context/store"
 )
 
-type CliContext struct {
-}
-
+// ContextCommand manages contexts
 func ContextCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "context",

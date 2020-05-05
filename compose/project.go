@@ -14,17 +14,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	SecretInlineMark = "inline:"
-)
-
-var SupportedFilenames = []string{
+var supportedFilenames = []string{
 	"compose.yml",
 	"compose.yaml",
 	"docker-compose.yml",
 	"docker-compose.yaml",
 }
 
+// ProjectOptions configures a compose project
 type ProjectOptions struct {
 	Name        string
 	WorkDir     string
@@ -32,6 +29,7 @@ type ProjectOptions struct {
 	Environment []string
 }
 
+// Project represents a compose project with a name
 type Project struct {
 	types.Config
 	projectDir string
@@ -100,7 +98,7 @@ func getConfigPathFromOptions(options *ProjectOptions) ([]string, error) {
 
 	for {
 		var candidates []string
-		for _, n := range SupportedFilenames {
+		for _, n := range supportedFilenames {
 			f := filepath.Join(pwd, n)
 			if _, err := os.Stat(f); err == nil {
 				candidates = append(candidates, f)
@@ -116,7 +114,7 @@ func getConfigPathFromOptions(options *ProjectOptions) ([]string, error) {
 		}
 		parent := filepath.Dir(pwd)
 		if parent == pwd {
-			return nil, fmt.Errorf("Can't find a suitable configuration file in this directory or any parent. Is %q the right directory?", pwd)
+			return nil, fmt.Errorf("can't find a suitable configuration file in this directory or any parent. Is %q the right directory?", pwd)
 		}
 		pwd = parent
 	}
@@ -129,12 +127,11 @@ func parseConfigs(configPaths []string) ([]types.ConfigFile, error) {
 		var err error
 		if f == "-" {
 			return []types.ConfigFile{}, errors.New("reading compose file from stdin is not supported")
-		} else {
-			if _, err := os.Stat(f); err != nil {
-				return nil, err
-			}
-			b, err = ioutil.ReadFile(f)
 		}
+		if _, err := os.Stat(f); err != nil {
+			return nil, err
+		}
+		b, err = ioutil.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}

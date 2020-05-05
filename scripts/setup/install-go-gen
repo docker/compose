@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-go get -u github.com/gogo/protobuf/proto
-go get -u github.com/gogo/protobuf/jsonpb
-go get -u github.com/golang/protobuf/protoc-gen-go
-go get -u github.com/stevvooe/protobuild
-go get -u gotest.tools/gotestsum

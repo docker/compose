@@ -7,43 +7,46 @@ import (
 )
 
 var (
-	ErrNoType         = errors.New("backend: no type")
-	ErrNoName         = errors.New("backend: no name")
-	ErrTypeRegistered = errors.New("backend: already registered")
+	errNoType         = errors.New("backend: no type")
+	errNoName         = errors.New("backend: no name")
+	errTypeRegistered = errors.New("backend: already registered")
 )
 
-type InitFunc func(context.Context) (interface{}, error)
+type initFunc func(context.Context) (interface{}, error)
 
-type Backend struct {
+type registeredBackend struct {
 	name        string
 	backendType string
-	init        InitFunc
+	init        initFunc
 }
 
 var backends = struct {
-	r []*Backend
+	r []*registeredBackend
 }{}
 
-func Register(name string, backendType string, init InitFunc) {
+// Register adds a typed backend to the registry
+func Register(name string, backendType string, init initFunc) {
 	if name == "" {
-		panic(ErrNoName)
+		panic(errNoName)
 	}
 	if backendType == "" {
-		panic(ErrNoType)
+		panic(errNoType)
 	}
 	for _, b := range backends.r {
 		if b.backendType == backendType {
-			panic(ErrTypeRegistered)
+			panic(errTypeRegistered)
 		}
 	}
 
-	backends.r = append(backends.r, &Backend{
+	backends.r = append(backends.r, &registeredBackend{
 		name,
 		backendType,
 		init,
 	})
 }
 
+// Get returns the backend registered for a particular type, it returns
+// an error if there is no registered backends for the given type.
 func Get(ctx context.Context, backendType string) (interface{}, error) {
 	for _, b := range backends.r {
 		if b.backendType == backendType {

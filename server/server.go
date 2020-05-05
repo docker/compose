@@ -71,7 +71,7 @@ func unaryMeta(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 		return nil, errors.New("missing metadata")
 	}
 
-	key := md[apicontext.KEY]
+	key := md[apicontext.Key]
 
 	if len(key) == 1 {
 		s, err := store.New()

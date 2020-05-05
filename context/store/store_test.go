@@ -55,7 +55,8 @@ func (suite *StoreTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
-	os.RemoveAll(suite.dir)
+	err := os.RemoveAll(suite.dir)
+	require.Nil(suite.T(), err)
 }
 
 func (suite *StoreTestSuite) TestCreate() {

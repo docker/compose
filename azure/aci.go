@@ -32,7 +32,7 @@ func init() {
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) (c containerinstance.ContainerGroup, err error) {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
-		return c, fmt.Errorf("cannot get container group client: %v", err)
+		return c, errors.Wrapf(err, "cannot get container group client")
 	}
 
 	// Check if the container group already exists
@@ -96,30 +96,11 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	return containerGroup, err
 }
 
-func listACIContainers(aciContext store.AciContext) (c []containerinstance.ContainerGroup, err error) {
-	ctx := context.TODO()
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
-	if err != nil {
-		return c, fmt.Errorf("cannot get container group client: %v", err)
-	}
-
-	var containers []containerinstance.ContainerGroup
-	result, err := containerGroupsClient.ListByResourceGroup(ctx, aciContext.ResourceGroup)
-	if err != nil {
-		return []containerinstance.ContainerGroup{}, err
-	}
-	for result.NotDone() {
-		containers = append(containers, result.Values()...)
-		if err := result.NextWithContext(ctx); err != nil {
-			return []containerinstance.ContainerGroup{}, err
-		}
-	}
-
-	return containers, err
-}
-
 func execACIContainer(ctx context.Context, aciContext store.AciContext, command, containerGroup string, containerName string) (c containerinstance.ContainerExecResponse, err error) {
-	containerClient := getContainerClient(aciContext.SubscriptionID)
+	containerClient, err := getContainerClient(aciContext.SubscriptionID)
+	if err != nil {
+		return c, errors.Wrapf(err, "cannot get container client")
+	}
 	rows, cols := getTermSize()
 	containerExecRequest := containerinstance.ContainerExecRequest{
 		Command: to.StringPtr(command),
@@ -224,7 +205,10 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 }
 
 func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string) (string, error) {
-	containerClient := getContainerClient(aciContext.SubscriptionID)
+	containerClient, err := getContainerClient(aciContext.SubscriptionID)
+	if err != nil {
+		return "", errors.Wrapf(err, "cannot get container client")
+	}
 
 	logs, err := containerClient.ListLogs(ctx, aciContext.ResourceGroup, containerGroupName, containerName, nil)
 	if err != nil {
@@ -234,15 +218,21 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 }
 
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
-	auth, _ := auth.NewAuthorizerFromCLI()
+	auth, err := auth.NewAuthorizerFromCLI()
+	if err != nil {
+		return containerinstance.ContainerGroupsClient{}, err
+	}
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
 	containerGroupsClient.Authorizer = auth
 	return containerGroupsClient, nil
 }
 
-func getContainerClient(subscriptionID string) containerinstance.ContainerClient {
-	auth, _ := auth.NewAuthorizerFromCLI()
+func getContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
+	auth, err := auth.NewAuthorizerFromCLI()
+	if err != nil {
+		return containerinstance.ContainerClient{}, err
+	}
 	containerClient := containerinstance.NewContainerClient(subscriptionID)
 	containerClient.Authorizer = auth
-	return containerClient
+	return containerClient, nil
 }

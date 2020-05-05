@@ -47,16 +47,18 @@ const (
 
 type contextStoreKey struct{}
 
+// WithContextStore adds the store to the context
 func WithContextStore(ctx context.Context, store Store) context.Context {
 	return context.WithValue(ctx, contextStoreKey{}, store)
 }
 
+// ContextStore returns the store from the context
 func ContextStore(ctx context.Context) Store {
 	s, _ := ctx.Value(contextStoreKey{}).(Store)
 	return s
 }
 
-// Store
+// Store is the context store
 type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
@@ -74,16 +76,18 @@ type store struct {
 	root string
 }
 
-type StoreOpt func(*store)
+// Opt is a functional option for the store
+type Opt func(*store)
 
-func WithRoot(root string) StoreOpt {
+// WithRoot sets a new root to the store
+func WithRoot(root string) Opt {
 	return func(s *store) {
 		s.root = root
 	}
 }
 
-// New returns a configured context store
-func New(opts ...StoreOpt) (Store, error) {
+// New returns a configured context store with $HOME/.docker as root
+func New(opts ...Opt) (Store, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -182,7 +186,7 @@ func (s *store) Create(name string, data TypedContext) error {
 	dir := contextdirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
-		return fmt.Errorf("Context %q already exists", name)
+		return fmt.Errorf("context %q already exists", name)
 	}
 
 	err := os.Mkdir(metaDir, 0755)
@@ -191,15 +195,15 @@ func (s *store) Create(name string, data TypedContext) error {
 	}
 
 	if data.Data == nil {
-		data.Data = DummyContext{}
+		data.Data = dummyContext{}
 	}
 
 	meta := Metadata{
 		Name:     name,
 		Metadata: data,
 		Endpoints: map[string]interface{}{
-			"docker":    DummyContext{},
-			(data.Type): DummyContext{},
+			"docker":    dummyContext{},
+			(data.Type): dummyContext{},
 		},
 	}
 
@@ -237,8 +241,9 @@ func contextdirOf(name string) string {
 	return digest.FromString(name).Encoded()
 }
 
-type DummyContext struct{}
+type dummyContext struct{}
 
+// Metadata represents the docker context metadata
 type Metadata struct {
 	Name      string                 `json:",omitempty"`
 	Metadata  TypedContext           `json:",omitempty"`
@@ -257,12 +262,14 @@ type untypedContext struct {
 	Type        string          `json:",omitempty"`
 }
 
+// TypedContext is a context with a type (moby, aci, etc...)
 type TypedContext struct {
 	Type        string      `json:",omitempty"`
 	Description string      `json:",omitempty"`
 	Data        interface{} `json:",omitempty"`
 }
 
+// AciContext is the context for ACI
 type AciContext struct {
 	SubscriptionID string `json:",omitempty"`
 	Location       string `json:",omitempty"`

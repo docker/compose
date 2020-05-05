@@ -41,7 +41,7 @@ import (
 	"github.com/docker/api/context/store"
 )
 
-// New returns a GRPC client
+// New returns a backend client
 func New(ctx context.Context) (*Client, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
@@ -68,6 +68,7 @@ func New(ctx context.Context) (*Client, error) {
 
 }
 
+// Client is a multi-backend client
 type Client struct {
 	backendv1.BackendClient
 	cliv1.CliClient
@@ -78,6 +79,7 @@ type Client struct {
 	cc          containers.ContainerService
 }
 
+// ContainerService returns the backend service for the current context
 func (c *Client) ContainerService() containers.ContainerService {
 	return c.cc
 }
