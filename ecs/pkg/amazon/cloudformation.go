@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/awslabs/goformation/v4/cloudformation/logs"
-
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
+	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
+	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
@@ -82,6 +82,28 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
 		template.Resources[taskDefinition] = definition
 
+		var healthCheck *cloudmap.Service_HealthCheckConfig
+		if service.HealthCheck != nil && !service.HealthCheck.Disable {
+			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
+		}
+
+		serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", service.Name)
+		template.Resources[serviceRegistration] = &cloudmap.Service{
+			Description:       fmt.Sprintf("%q service discovery entry in Cloud Map", service.Name),
+			HealthCheckConfig: healthCheck,
+			Name:              service.Name,
+			NamespaceId:       cloudformation.Ref("CloudMap"),
+			DnsConfig: &cloudmap.Service_DnsConfig{
+				DnsRecords: []cloudmap.Service_DnsRecord{
+					{
+						TTL:  300,
+						Type: cloudmapapi.RecordTypeA,
+					},
+				},
+				RoutingPolicy: cloudmapapi.RoutingPolicyMultivalue,
+			},
+		}
+
 		template.Resources[fmt.Sprintf("%sService", service.Name)] = &ecs.Service{
 			Cluster:      c.Cluster,
 			DesiredCount: 1,
@@ -95,20 +117,12 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 			},
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceName:        service.Name,
-			TaskDefinition:     cloudformation.Ref(taskDefinition),
-		}
-
-		var healthCheck *cloudmap.Service_HealthCheckConfig
-		if service.HealthCheck != nil && !service.HealthCheck.Disable {
-			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
-		}
-
-		serviceRegistration := fmt.Sprintf("%sServiceRegistration", service.Name)
-		template.Resources[serviceRegistration] = &cloudmap.Service{
-			Description:       fmt.Sprintf("%q registration in Service Map", service.Name),
-			HealthCheckConfig: healthCheck,
-			Name:              serviceRegistration,
-			NamespaceId:       cloudformation.Ref("CloudMap"),
+			ServiceRegistries: []ecs.Service_ServiceRegistry{
+				{
+					RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
+				},
+			},
+			TaskDefinition: cloudformation.Ref(taskDefinition),
 		}
 	}
 	return template, nil
