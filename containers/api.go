@@ -44,8 +44,8 @@ type LogsRequest struct {
 	Writer io.Writer
 }
 
-// ContainerService interacts with the underlying container backend
-type ContainerService interface {
+// Service interacts with the underlying container backend
+type Service interface {
 	// List returns all the containers
 	List(ctx context.Context) ([]Container, error)
 	// Run creates and starts a container

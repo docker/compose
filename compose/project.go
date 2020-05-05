@@ -51,7 +51,11 @@ func ProjectFromOptions(options *ProjectOptions) (*Project, error) {
 	name := options.Name
 	if name == "" {
 		r := regexp.MustCompile(`[^a-z0-9\\-_]+`)
-		name = r.ReplaceAllString(strings.ToLower(filepath.Base(options.WorkDir)), "")
+		absPath, err := filepath.Abs(options.WorkDir)
+		if err != nil {
+			return nil, err
+		}
+		name = r.ReplaceAllString(strings.ToLower(filepath.Base(absPath)), "")
 	}
 
 	return newProject(types.ConfigDetails{

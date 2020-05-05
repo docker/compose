@@ -34,6 +34,7 @@ import (
 	"github.com/docker/api/backend"
 	backendv1 "github.com/docker/api/backend/v1"
 	cliv1 "github.com/docker/api/cli/v1"
+	"github.com/docker/api/compose"
 	composev1 "github.com/docker/api/compose/v1"
 	"github.com/docker/api/containers"
 	containersv1 "github.com/docker/api/containers/v1"
@@ -57,13 +58,13 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	ba, ok := b.(containers.ContainerService)
+	service, ok := b.(backend.Service)
 	if !ok {
 		return nil, errors.New("backend not found")
 	}
 	return &Client{
 		backendType: contextType,
-		cc:          ba,
+		bs:          service,
 	}, nil
 
 }
@@ -76,10 +77,15 @@ type Client struct {
 	composev1.ComposeClient
 
 	backendType string
-	cc          containers.ContainerService
+	bs          backend.Service
 }
 
 // ContainerService returns the backend service for the current context
-func (c *Client) ContainerService() containers.ContainerService {
-	return c.cc
+func (c *Client) ContainerService() containers.Service {
+	return c.bs.ContainerService()
+}
+
+// ComposeService returns the backend service for the current context
+func (c *Client) ComposeService() compose.Service {
+	return c.bs.ComposeService()
 }

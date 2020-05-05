@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/docker/api/compose"
+	"github.com/docker/api/containers"
 )
 
 var (
@@ -24,17 +29,23 @@ var backends = struct {
 	r []*registeredBackend
 }{}
 
+// Aggregation of service interfaces
+type Service interface {
+	ContainerService() containers.Service
+	ComposeService() compose.Service
+}
+
 // Register adds a typed backend to the registry
 func Register(name string, backendType string, init initFunc) {
 	if name == "" {
-		panic(errNoName)
+		logrus.Fatal(errNoName)
 	}
 	if backendType == "" {
-		panic(errNoType)
+		logrus.Fatal(errNoType)
 	}
 	for _, b := range backends.r {
 		if b.backendType == backendType {
-			panic(errTypeRegistered)
+			logrus.Fatal(errTypeRegistered)
 		}
 	}
 
