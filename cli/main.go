@@ -38,6 +38,7 @@ import (
 
 	// Backend registrations
 	_ "github.com/docker/api/azure"
+	"github.com/docker/api/cli/cmd/compose"
 	_ "github.com/docker/api/example"
 
 	"github.com/sirupsen/logrus"
@@ -102,6 +103,7 @@ func main() {
 		run.Command(),
 		cmd.ExecCommand(),
 		cmd.LogsCommand(),
+		compose.Command(),
 	)
 
 	helpFunc := root.HelpFunc()

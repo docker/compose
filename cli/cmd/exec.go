@@ -62,5 +62,5 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 		stdout = con
 	}
 
-	return c.ContainerService().Exec(ctx, name, command, os.Stdin, stdout)
+	return c.AciService().Exec(ctx, name, command, os.Stdin, stdout)
 }

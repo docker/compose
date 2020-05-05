@@ -46,5 +46,5 @@ func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 		Writer: os.Stdout,
 	}
 
-	return c.ContainerService().Logs(ctx, containerName, req)
+	return c.AciService().Logs(ctx, containerName, req)
 }

@@ -65,5 +65,5 @@ func runRun(ctx context.Context, image string, opts runOpts) error {
 		return err
 	}
 
-	return c.ContainerService().Run(ctx, project)
+	return c.AciService().Run(ctx, project)
 }

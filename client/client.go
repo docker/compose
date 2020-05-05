@@ -31,11 +31,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/docker/api/azure"
 	"github.com/docker/api/backend"
 	backendv1 "github.com/docker/api/backend/v1"
 	cliv1 "github.com/docker/api/cli/v1"
 	composev1 "github.com/docker/api/compose/v1"
-	"github.com/docker/api/containers"
 	containersv1 "github.com/docker/api/containers/v1"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
@@ -57,13 +57,13 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	ba, ok := b.(containers.ContainerService)
+	aciService, ok := b.(azure.AciService)
 	if !ok {
 		return nil, errors.New("backend not found")
 	}
 	return &Client{
 		backendType: contextType,
-		cc:          ba,
+		cc:          aciService,
 	}, nil
 
 }
@@ -76,10 +76,10 @@ type Client struct {
 	composev1.ComposeClient
 
 	backendType string
-	cc          containers.ContainerService
+	cc          azure.AciService
 }
 
-// ContainerService returns the backend service for the current context
-func (c *Client) ContainerService() containers.ContainerService {
+// AciService returns the backend service for the current context
+func (c *Client) AciService() azure.AciService {
 	return c.cc
 }

@@ -31,7 +31,7 @@ type proxyContainerAPI struct{}
 func (p *proxyContainerAPI) List(ctx context.Context, _ *v1.ListRequest) (*v1.ListResponse, error) {
 	client := Client(ctx)
 
-	c, err := client.ContainerService().List(ctx)
+	c, err := client.AciService().List(ctx)
 	if err != nil {
 		return &v1.ListResponse{}, nil
 	}
@@ -52,7 +52,7 @@ func (p *proxyContainerAPI) List(ctx context.Context, _ *v1.ListRequest) (*v1.Li
 func (p *proxyContainerAPI) Create(ctx context.Context, request *v1.CreateRequest) (*v1.CreateResponse, error) {
 	client := Client(ctx)
 
-	err := client.ContainerService().Run(ctx, containers.ContainerConfig{
+	err := client.AciService().Run(ctx, containers.ContainerConfig{
 		ID:    request.Id,
 		Image: request.Image,
 	})
