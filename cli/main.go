@@ -36,15 +36,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	// Backend registrations
-	_ "github.com/docker/api/azure"
-	"github.com/docker/api/cli/cmd/compose"
-	_ "github.com/docker/api/example"
-
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	_ "github.com/docker/api/azure"
+	_ "github.com/docker/api/example"
+
 	"github.com/docker/api/cli/cmd"
+	"github.com/docker/api/cli/cmd/compose"
 	"github.com/docker/api/cli/cmd/run"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
