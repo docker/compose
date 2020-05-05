@@ -23,13 +23,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-GIT_COMMIT=$(shell git rev-parse --short HEAD)
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
 PROTOS=$(shell find . -name \*.proto)
 
-export DOCKER_BUILDKIT=1
+EXTENSION :=
+ifeq ($(GOOS),windows)
+  EXTENSION := .exe
+endif
+
+STATIC_FLAGS= CGO_ENABLED=0
+LDFLAGS := "-s -w"
+GO_BUILD = $(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
+
+BINARY=bin/docker
+BINARY_WITH_EXTENSION=$(BINARY)$(EXTENSION)
 
 all: cli
 
@@ -38,16 +47,16 @@ protos:
 	@goimports -w -local github.com/docker/api .
 
 cli:
-	GOOS=${GOOS} GOARCH=${GOARCH} go build -v -o bin/docker ./cli
+	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) -o $(BINARY_WITH_EXTENSION) ./cli
 
 cross:
-	@GOOS=linux   GOARCH=amd64 go build -v -o bin/docker-linux-amd64 ./cli
-	@GOOS=darwin  GOARCH=amd64 go build -v -o bin/docker-darwin-amd64 ./cli
-	@GOOS=windows GOARCH=amd64 go build -v -o bin/docker-windows-amd64.exe ./cli
+	@GOOS=linux   GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-linux-amd64 ./cli
+	@GOOS=darwin  GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-darwin-amd64 ./cli
+	@GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-windows-amd64.exe ./cli
 
 test:
 	@gotestsum ./...
 
 FORCE:
 
-.PHONY: all protos cli cross
+.PHONY: all protos cli cross test

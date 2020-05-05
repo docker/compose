@@ -4,10 +4,12 @@
 
 ## Dev Setup
 
-To setup a development machine to update the API protobufs, first run the  `./setup-dev.sh` script to install the correct version of protobufs on your system and get the protobuild binary.
+Make sure you have Docker installed and running.
 
-## Building the API Project
+## Building the project
 
 ```bash
-> make
+$ make
 ```
+
+If you make changes to the `.proto` files, make sure to `make protos` to generate go code.

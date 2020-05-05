@@ -23,39 +23,38 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-GIT_COMMIT=$(shell git rev-parse --short HEAD)
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
-
-PROTOS=$(shell find . -name \*.proto)
 
 export DOCKER_BUILDKIT=1
 
 all: cli
 
-protos:
+protos: ## Generate go code from .proto files
 	@docker build . \
 	--target protos
 
-cli:
+cli: ## Compile the cli
 	@docker build . \
 	--output type=local,dest=./bin \
 	--build-arg TARGET_OS=${GOOS} \
 	--build-arg TARGET_ARCH=${GOARCH} \
 	--target cli
 
-cross:
+cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . \
 	--output type=local,dest=./bin \
 	--target cross
 
-test:
+test: ## Run unit tests
 	@docker build . \
 	--target test
 
-cache-clear:
+cache-clear: # Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
-FORCE:
+help: ## Show help
+	@echo Please specify a build target. The choices are:
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: all protos cli cross
+.PHONY: all protos cli cross test cache-clear help

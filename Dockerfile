@@ -21,13 +21,13 @@ ADD . ${PWD}
 FROM fs AS make-protos
 RUN make -f builder.Makefile protos
 
-FROM make-protos AS make-cli
+FROM fs AS make-cli
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGET_OS} \
     GOARCH=${TARGET_ARCH} \
     make -f  builder.Makefile cli
 
-FROM make-protos AS make-cross
+FROM fs AS make-cross
 RUN --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile cross
 
