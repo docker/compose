@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/auth"
@@ -133,23 +134,32 @@ func getTermSize() (*int32, *int32) {
 }
 
 type commandSender struct {
-	commands []string
+	commands string
 }
 
-func (cs commandSender) Read(p []byte) (int, error) {
+func (cs *commandSender) Read(p []byte) (int, error) {
 	if len(cs.commands) == 0 {
 		return 0, io.EOF
 	}
-	command := cs.commands[0]
-	cs.commands = cs.commands[1:]
+
+	var command string
+	if len(p) >= len(cs.commands) {
+		command = cs.commands
+		cs.commands = ""
+	} else {
+		command = cs.commands[:len(p)]
+		cs.commands = cs.commands[len(p):]
+	}
+
 	copy(p, command)
+
 	return len(command), nil
 }
 
 func execCommands(ctx context.Context, address string, password string, commands []string) error {
 	writer := ioutil.Discard
-	reader := commandSender{
-		commands: commands,
+	reader := &commandSender{
+		commands: strings.Join(commands, "\n"),
 	}
 	return exec(ctx, address, password, reader, writer)
 }
@@ -189,6 +199,10 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 			buffer := make([]byte, 1)
 			n, err := reader.Read(buffer)
 			if err != nil {
+				if err == io.EOF {
+					upstreamChannel <- nil
+					return
+				}
 				upstreamChannel <- err
 				return
 			}
@@ -197,6 +211,7 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 				err := wsutil.WriteClientMessage(conn, ws.OpText, buffer)
 				if err != nil {
 					upstreamChannel <- err
+					return
 				}
 			}
 		}
