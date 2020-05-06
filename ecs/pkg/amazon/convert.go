@@ -19,14 +19,8 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 	if err != nil {
 		return nil, err
 	}
-	credential, err := getRepoCredentials(service)
-	if err != nil {
-		return nil, err
-	}
-	secrets, err := getSecrets(service)
-	if err != nil {
-		return nil, err
-	}
+	credential := getRepoCredentials(service)
+
 	return &ecs.TaskDefinition{
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
@@ -64,7 +58,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 				ReadonlyRootFilesystem: service.ReadOnly,
 				RepositoryCredentials:  credential,
 				ResourceRequirements:   nil,
-				Secrets:                secrets,
 				StartTimeout:           0,
 				StopTimeout:            durationToInt(service.StopGracePeriod),
 				SystemControls:         nil,
@@ -293,25 +286,16 @@ func getImage(image string) string {
 	}
 }
 
-func getRepoCredentials(service types.ServiceConfig) (*ecs.TaskDefinition_RepositoryCredentials, error) {
+func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
 	// extract registry and namespace string from image name
 	credential := ""
 	for key, value := range service.Extras {
-		if strings.HasPrefix(key, "x-aws-pull_credentials") {
+		if key == "x-aws-pull_credentials" {
 			credential = value.(string)
 		}
 	}
 	if credential != "" {
-		return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: credential}, nil
+		return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: credential}
 	}
-	return nil, nil
-}
-
-func getSecrets(service types.ServiceConfig) ([]ecs.TaskDefinition_Secret, error) {
-	secrets := []ecs.TaskDefinition_Secret{}
-
-	for _, secret := range service.Secrets {
-		secrets = append(secrets, ecs.TaskDefinition_Secret{Name: secret.Target, ValueFrom: secret.Source})
-	}
-	return secrets, nil
+	return nil
 }

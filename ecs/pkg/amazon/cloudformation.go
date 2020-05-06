@@ -63,7 +63,7 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		if policy != nil {
 			rolePolicies = append(rolePolicies, iam.Role_Policy{
 				PolicyDocument: policy,
-				PolicyName:     taskExecutionRole,
+				PolicyName:     fmt.Sprintf("%sGrantAccessToSecrets", service.Name),
 			})
 
 		}
