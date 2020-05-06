@@ -31,4 +31,5 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.29.1
 	google.golang.org/protobuf v1.21.0
+	gotest.tools/v3 v3.0.2
 )
