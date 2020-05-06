@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
-func ComposeCommand(clusteropts *docker.AwsContext) *cobra.Command {
+func ComposeCommand(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "compose",
 	}
@@ -18,9 +19,9 @@ func ComposeCommand(clusteropts *docker.AwsContext) *cobra.Command {
 	opts.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(
-		ConvertCommand(clusteropts, opts),
-		UpCommand(clusteropts, opts),
-		DownCommand(clusteropts, opts),
+		ConvertCommand(dockerCli, opts),
+		UpCommand(dockerCli, opts),
+		DownCommand(dockerCli, opts),
 	)
 	return cmd
 }
@@ -36,10 +37,14 @@ func (o upOptions) LoadBalancerArn() *string {
 	return &o.loadBalancerArn
 }
 
-func ConvertCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
+func ConvertCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
 		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+			clusteropts, err := docker.GetAwsContext(dockerCli)
+			if err != nil {
+				return err
+			}
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -61,11 +66,15 @@ func ConvertCommand(clusteropts *docker.AwsContext, projectOpts *compose.Project
 	return cmd
 }
 
-func UpCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
+func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
 		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+			clusteropts, err := docker.GetAwsContext(dockerCli)
+			if err != nil {
+				return err
+			}
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -81,11 +90,11 @@ type downOptions struct {
 	DeleteCluster bool
 }
 
-func DownCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOptions) *cobra.Command {
+func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -105,7 +114,7 @@ func DownCommand(clusteropts *docker.AwsContext, projectOpts *compose.ProjectOpt
 				}
 			}
 			return nil
-		},
+		}),
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
 	return cmd

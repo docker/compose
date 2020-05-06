@@ -7,7 +7,6 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	commands "github.com/docker/ecs-plugin/cmd/commands"
-	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -27,33 +26,23 @@ func main() {
 
 // NewRootCmd returns the base root command.
 func NewRootCmd(name string, dockerCli command.Cli) *cobra.Command {
-	var opts *docker.AwsContext
-
 	cmd := &cobra.Command{
 		Short:       "Docker ECS",
 		Long:        `run multi-container applications on Amazon ECS.`,
 		Use:         name,
 		Annotations: map[string]string{"experimentalCLI": "true"},
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			err := plugin.PersistentPreRunE(cmd, args)
-			if err != nil {
-				return err
-			}
-			contextName := dockerCli.CurrentContext()
-			opts, err = docker.CheckAwsContextExists(contextName)
-			return err
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 0 {
 				return fmt.Errorf("%q is not a docker ecs command\nSee 'docker ecs --help'", args[0])
 			}
+			cmd.Help()
 			return nil
 		},
 	}
 	cmd.AddCommand(
 		VersionCommand(),
-		commands.ComposeCommand(opts),
-		commands.SecretCommand(opts),
+		commands.ComposeCommand(dockerCli),
+		commands.SecretCommand(dockerCli),
 		commands.SetupCommand(),
 	)
 	return cmd

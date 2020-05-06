@@ -7,6 +7,7 @@ import (
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/context/store"
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/cobra"
 )
 
 const contextType = "aws"
@@ -50,7 +51,7 @@ func initContextStore(contextDir string) store.Store {
 	return store.New(contextDir, config)
 }
 
-func CheckAwsContextExists(contextName string) (*AwsContext, error) {
+func checkAwsContextExists(contextName string) (*AwsContext, error) {
 	if contextName == command.DefaultContextName {
 		return nil, fmt.Errorf("can't use \"%s\" with ECS command because it is not an AWS context", contextName)
 	}
@@ -69,4 +70,21 @@ func CheckAwsContextExists(contextName string) (*AwsContext, error) {
 		return nil, fmt.Errorf("can't use \"%s\" with ECS command because it is not an AWS context", contextName)
 	}
 	return &awsContext, nil
+}
+
+type ContextFunc func(ctx AwsContext, args []string) error
+
+func WithAwsContext(dockerCli command.Cli, f ContextFunc) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		ctx, err := GetAwsContext(dockerCli)
+		if err != nil {
+			return err
+		}
+		return f(*ctx, args)
+	}
+}
+
+func GetAwsContext(dockerCli command.Cli) (*AwsContext, error) {
+	contextName := dockerCli.CurrentContext()
+	return checkAwsContextExists(contextName)
 }

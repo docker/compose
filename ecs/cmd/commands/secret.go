@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
@@ -22,27 +23,27 @@ type deleteSecretOptions struct {
 	recover bool
 }
 
-func SecretCommand(clusteropts *docker.AwsContext) *cobra.Command {
+func SecretCommand(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: "Manages secrets",
 	}
 
 	cmd.AddCommand(
-		CreateSecret(clusteropts),
-		InspectSecret(clusteropts),
-		ListSecrets(clusteropts),
-		DeleteSecret(clusteropts),
+		CreateSecret(dockerCli),
+		InspectSecret(dockerCli),
+		ListSecrets(dockerCli),
+		DeleteSecret(dockerCli),
 	)
 	return cmd
 }
 
-func CreateSecret(clusteropts *docker.AwsContext) *cobra.Command {
+func CreateSecret(dockerCli command.Cli) *cobra.Command {
 	//opts := createSecretOptions{}
 	cmd := &cobra.Command{
 		Use:   "create NAME SECRET",
 		Short: "Creates a secret.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -55,16 +56,16 @@ func CreateSecret(clusteropts *docker.AwsContext) *cobra.Command {
 			id, err := client.CreateSecret(context.Background(), name, secret)
 			fmt.Println(id)
 			return err
-		},
+		}),
 	}
 	return cmd
 }
 
-func InspectSecret(clusteropts *docker.AwsContext) *cobra.Command {
+func InspectSecret(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect ID",
 		Short: "Displays secret details",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -83,17 +84,17 @@ func InspectSecret(clusteropts *docker.AwsContext) *cobra.Command {
 			}
 			fmt.Println(out)
 			return nil
-		},
+		}),
 	}
 	return cmd
 }
 
-func ListSecrets(clusteropts *docker.AwsContext) *cobra.Command {
+func ListSecrets(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List secrets stored for the existing account.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -105,18 +106,18 @@ func ListSecrets(clusteropts *docker.AwsContext) *cobra.Command {
 
 			printList(os.Stdout, secrets)
 			return nil
-		},
+		}),
 	}
 	return cmd
 }
 
-func DeleteSecret(clusteropts *docker.AwsContext) *cobra.Command {
+func DeleteSecret(dockerCli command.Cli) *cobra.Command {
 	opts := deleteSecretOptions{}
 	cmd := &cobra.Command{
 		Use:     "delete NAME",
 		Aliases: []string{"rm", "remove"},
 		Short:   "Removes a secret.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
@@ -125,7 +126,7 @@ func DeleteSecret(clusteropts *docker.AwsContext) *cobra.Command {
 				return errors.New("Missing mandatory parameter: [NAME]")
 			}
 			return client.DeleteSecret(context.Background(), args[0], opts.recover)
-		},
+		}),
 	}
 	cmd.Flags().BoolVar(&opts.recover, "recover", false, "Enable recovery.")
 	return cmd
