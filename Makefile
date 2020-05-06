@@ -44,6 +44,9 @@ cli: ## Compile the cli
 e2e-local: ## Run End to end local tests
 	go run ./tests/e2e/e2e.go
 
+e2e-aci: ## Run End to end ACI tests (requires azure login)
+	go run ./tests/aci-e2e/e2e-aci.go
+
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . \
 	--output type=local,dest=./bin \

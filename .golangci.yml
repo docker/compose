@@ -1,6 +1,8 @@
 linters:
   run:
     concurrency: 2
+    skip-dirs:
+      - composefiles
   enable-all: false
   disable-all: true
   enable:
@@ -33,3 +35,5 @@ issues:
   # golangci hides some golint warnings (the warning about exported things
   # withtout documentation for example), this will make it show them anyway.
   exclude-use-default: false
+  exclude:
+    - should not use dot imports
