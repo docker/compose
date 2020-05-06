@@ -1,6 +1,8 @@
 package amazon
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +15,7 @@ import (
 )
 
 func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
-	_, err := toCPULimits(service)
+	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +25,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
 			{
 				Command:               service.Command,
-				Cpu:                   256,
 				DisableNetworking:     service.NetworkMode == "none",
 				DnsSearchDomains:      service.DNSSearch,
 				DnsServers:            service.DNS,
@@ -48,8 +49,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 						"awslogs-stream-prefix": service.Name,
 					},
 				},
-				Memory:                 toMemoryLimits(service.Deploy),
-				MemoryReservation:      toMemoryReservation(service.Deploy),
 				MountPoints:            nil,
 				Name:                   service.Name,
 				PortMappings:           toPortMappings(service.Ports),
@@ -68,10 +67,10 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 				WorkingDirectory:       service.WorkingDir,
 			},
 		},
-		Cpu:                     toCPU(service),
+		Cpu:                     cpu,
 		Family:                  project.Name,
 		IpcMode:                 service.Ipc,
-		Memory:                  toMemory(service),
+		Memory:                  mem,
 		NetworkMode:             ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
 		PidMode:                 service.Pid,
 		PlacementConstraints:    toPlacementConstraints(service.Deploy),
@@ -82,32 +81,48 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 	}, nil
 }
 
-func toCPU(service types.ServiceConfig) string {
-	// FIXME based on service's memory/cpu requirements, select the adequate Fargate CPU
-	return "256"
-}
+func toLimits(service types.ServiceConfig) (string, string, error) {
+	// All possible cpu/mem values for Fargate
+	cpuToMem := map[int64][]types.UnitBytes{
+		256:  {512, 1024, 2048},
+		512:  {1024, 2048, 3072, 4096},
+		1024: {2048, 3072, 4096, 5120, 6144, 7168, 8192},
+		2048: {4096, 5120, 6144, 7168, 8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384},
+		4096: {8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384, 17408, 18432, 19456, 20480, 21504, 22528, 23552, 24576, 25600, 26624, 27648, 28672, 29696, 30720},
+	}
+	cpuLimit := "256"
+	memLimit := "512"
 
-func toMemory(service types.ServiceConfig) string {
-	// FIXME based on service's memory/cpu requirements, select the adequate Fargate CPU
-	return "512"
-}
-
-func toCPULimits(service types.ServiceConfig) (*int64, error) {
 	if service.Deploy == nil {
-		return nil, nil
+		return cpuLimit, memLimit, nil
 	}
-	res := service.Deploy.Resources.Limits
-	if res == nil {
-		return nil, nil
+
+	limits := service.Deploy.Resources.Limits
+	if limits == nil {
+		return cpuLimit, memLimit, nil
 	}
-	if res.NanoCPUs == "" {
-		return nil, nil
+
+	if limits.NanoCPUs == "" {
+		return cpuLimit, memLimit, nil
 	}
-	v, err := opts.ParseCPUs(res.NanoCPUs)
+
+	v, err := opts.ParseCPUs(limits.NanoCPUs)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-	return &v, nil
+
+	for cpu, mem := range cpuToMem {
+		if v <= cpu*1024*1024 {
+			for _, m := range mem {
+				if limits.MemoryBytes <= m*1024*1024 {
+					cpuLimit = strconv.FormatInt(cpu, 10)
+					memLimit = strconv.FormatInt(int64(m), 10)
+					return cpuLimit, memLimit, nil
+				}
+			}
+		}
+	}
+	return "", "", errors.New("unable to find cpu/mem for the required resources")
 }
 
 func toRequiresCompatibilities(isolation string) []*string {
@@ -115,19 +130,6 @@ func toRequiresCompatibilities(isolation string) []*string {
 		return nil
 	}
 	return []*string{&isolation}
-}
-
-func hasMemoryOrMemoryReservation(service types.ServiceConfig) bool {
-	if service.Deploy == nil {
-		return false
-	}
-	if service.Deploy.Resources.Reservations != nil {
-		return true
-	}
-	if service.Deploy.Resources.Limits != nil {
-		return true
-	}
-	return false
 }
 
 func toPlacementConstraints(deploy *types.DeployConfig) []ecs.TaskDefinition_TaskDefinitionPlacementConstraint {
@@ -175,30 +177,6 @@ func toUlimits(ulimits map[string]*types.UlimitsConfig) []ecs.TaskDefinition_Uli
 }
 
 const Mb = 1024 * 1024
-
-func toMemoryLimits(deploy *types.DeployConfig) int {
-	if deploy == nil {
-		return 0
-	}
-	res := deploy.Resources.Limits
-	if res == nil {
-		return 0
-	}
-	v := int(res.MemoryBytes) / Mb
-	return v
-}
-
-func toMemoryReservation(deploy *types.DeployConfig) int {
-	if deploy == nil {
-		return 0
-	}
-	res := deploy.Resources.Reservations
-	if res == nil {
-		return 0
-	}
-	v := int(res.MemoryBytes) / Mb
-	return v
-}
 
 func toLinuxParameters(service types.ServiceConfig) *ecs.TaskDefinition_LinuxParameters {
 	return &ecs.TaskDefinition_LinuxParameters{
