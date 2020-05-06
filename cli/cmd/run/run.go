@@ -29,8 +29,9 @@ package run
 
 import (
 	"context"
+	"strings"
 
-	"github.com/google/uuid"
+	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
@@ -49,7 +50,7 @@ func Command() *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
-	cmd.Flags().StringVar(&opts.name, "name", uuid.New().String(), "Assign a name to the container")
+	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
 
 	return cmd
 }
@@ -66,4 +67,9 @@ func runRun(ctx context.Context, image string, opts runOpts) error {
 	}
 
 	return c.ContainerService().Run(ctx, project)
+}
+
+func getRandomName() string {
+	// Azure supports hyphen but not underscore in names
+	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
 }
