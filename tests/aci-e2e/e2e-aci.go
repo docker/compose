@@ -89,7 +89,7 @@ func main() {
 	*/
 
 	It("deploys a compose app", func() {
-		NewDockerCommand("compose", "up", "-f", "./composefiles/aci-demo/aci_demo_port.yaml").ExecOrDie()
+		NewDockerCommand("compose", "up", "-f", "./composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
 		//Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
@@ -115,15 +115,13 @@ func main() {
 		*/
 	})
 
-	/*
-		It("get logs from web service", func() {
-			output := NewDockerCommand("logs", "aci-demo_web").ExecOrDie()
-			Expect(output).To(ContainSubstring("Listening on port 80"))
-		})
-	*/
+	It("get logs from web service", func() {
+		output := NewDockerCommand("logs", "acidemo_web").ExecOrDie()
+		Expect(output).To(ContainSubstring("Listening on port 80"))
+	})
 
 	It("shutdown compose app", func() {
-		NewDockerCommand("compose", "down", "-f", "./composefiles/aci-demo/aci_demo_port.yaml").ExecOrDie()
+		NewDockerCommand("compose", "down", "-f", "./composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
 	})
 	It("switches back to default context", func() {
 		output := NewCommand("docker", "context", "use", "default").ExecOrDie()

@@ -21,6 +21,8 @@ import (
 	"github.com/docker/api/context/store"
 )
 
+const singleContainerName = "single--container--aci"
+
 func init() {
 	backend.Register("aci", "aci", func(ctx context.Context) (backend.Service, error) {
 		return New(ctx)
@@ -110,12 +112,18 @@ func (cs *aciContainerService) List(ctx context.Context) ([]containers.Container
 		}
 
 		for _, container := range *group.Containers {
+			var containerID string
+			if *container.Name == singleContainerName {
+				containerID = *containerGroup.Name
+			} else {
+				containerID = *containerGroup.Name + "_" + *container.Name
+			}
 			status := "Unknown"
 			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
 				status = *container.InstanceView.CurrentState.State
 			}
 			res = append(res, containers.Container{
-				ID:     *container.Name,
+				ID:     containerID,
 				Image:  *container.Image,
 				Status: status,
 			})
@@ -138,7 +146,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		Config: types.Config{
 			Services: []types.ServiceConfig{
 				{
-					Name:  r.ID,
+					Name:  singleContainerName,
 					Image: r.Image,
 					Ports: ports,
 				},
@@ -155,8 +163,21 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
+func getGrouNameContainername(containerID string) (groupName string, containerName string) {
+	tokens := strings.Split(containerID, "_")
+	groupName = tokens[0]
+	if len(tokens) > 1 {
+		containerName = tokens[len(tokens)-1]
+		groupName = containerID[:len(containerID)-(len(containerName)+1)]
+	} else {
+		containerName = singleContainerName
+	}
+	return groupName, containerName
+}
+
 func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
-	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, name, name)
+	groupName, containerAciName := getGrouNameContainername(name)
+	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, groupName, containerAciName)
 	if err != nil {
 		return err
 	}
@@ -171,7 +192,8 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 }
 
 func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
-	logs, err := getACIContainerLogs(ctx, cs.ctx, containerName, containerName)
+	groupName, containerAciName := getGrouNameContainername(containerName)
+	logs, err := getACIContainerLogs(ctx, cs.ctx, groupName, containerAciName)
 	if err != nil {
 		return err
 	}
@@ -204,6 +226,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions
 	}
 	logrus.Debugf("Up on project with name %q\n", project.Name)
 	groupDefinition, err := convert.ToContainerGroup(cs.ctx, *project)
+
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/context/store"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -20,7 +19,6 @@ const (
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeDriveroptsAccountKeyKey  = "storage_account_key"
-	singleContainerName            = "single--container--aci"
 	secretInlineMark               = "inline:"
 )
 
@@ -56,9 +54,6 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 
 	for _, s := range project.Services {
 		service := serviceConfigAciHelper(s)
-		if s.Name != singleContainerName {
-			logrus.Debugf("Adding %q\n", service.Name)
-		}
 		containerDefinition, err := service.getAciContainer(volumesCache)
 		if err != nil {
 			return containerinstance.ContainerGroup{}, err
