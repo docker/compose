@@ -1,0 +1,109 @@
+/* latin-ext */
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Raleway'), local('Raleway-Regular'), url('fonts/font1.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+1E00-1EFF, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Raleway'), local('Raleway-Regular'), url('fonts/font2.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215;
+}
+
+body {
+	text-align: center;
+	margin: 0;
+	padding: 0;
+	background-color: #001f5b;
+}
+
+.logo {
+	margin-top: 30px;
+}
+
+.footer {
+	position: absolute;
+	bottom: 0;
+	width: 100%;
+	z-index: -1;
+	opacity: 0.5;
+}
+
+.footer img {
+	max-width: 100%;
+	vertical-align: middle;
+}
+
+.sentence {
+	margin: 70px auto 0 auto;
+}
+
+.line {
+	margin-bottom: 30px;
+	transform: translateX(-100%) rotate(-20deg);
+}
+
+.slide-in {
+    animation: slide-in .5s forwards ease-in;
+}
+
+.line3.slide-in {
+    animation: slide-in 1s forwards ease-in;
+}
+
+.line2.slide-in {
+    animation: slide-in 1.2s forwards ease-in;
+}
+
+@keyframes slide-in {
+  100% {
+		transform: translateX(0%);
+	}
+}
+
+.result {
+	position: relative;
+	display: inline-block;
+	padding: 0 20px;
+	margin: 0 10px;
+	color: white;
+	height: 175px;
+	width: 330px;
+}
+
+.result .word {
+	display: inline-block;
+	font-family: 'Raleway', sans-serif;
+	font-size: 45px;
+	color: white;
+	line-height: 155px;
+	height: 175px;
+	vertical-align: middle;
+	margin-top: 20px;
+}
+
+.result .hostname {
+	position: absolute;
+	width: 100%;
+	left: 0;
+	bottom: 8px;
+	font-size: 0.8em;
+	height: 14px;
+}
+
+.noun {
+	background-image: url('images/lego_blue.png') !important;
+}
+
+.verb {
+	background-image: url('images/lego_yellow.png') !important;
+}
+
+.adjective {
+	background-image: url('images/lego_light_blue.png') !important;
+}

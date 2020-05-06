@@ -1,6 +1,8 @@
 linters:
   run:
     concurrency: 2
+    skip-dirs:
+      - composefiles
   enable-all: false
   disable-all: true
   enable:

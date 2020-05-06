@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+
 	. "github.com/docker/api/tests/framework"
 	. "github.com/onsi/gomega"
 )
@@ -20,6 +21,7 @@ func main() {
 	It("should be initialized with default context", func() {
 		NewCommand("docker", "context", "use", "default").ExecOrDie()
 		output := NewCommand("docker", "context", "ls").ExecOrDie()
+		Expect(output).To(Not(ContainSubstring("test-example")))
 		Expect(output).To(ContainSubstring("default *"))
 	})
 

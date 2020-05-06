@@ -28,6 +28,11 @@ func main() {
 	})
 
 	It("should be initialized with default context", func() {
+		_, err := NewCommand("docker", "context", "rm", "-f", contextName).Exec()
+		if err == nil {
+			log.Println("Cleaning existing test context")
+		}
+
 		NewCommand("docker", "context", "use", "default").ExecOrDie()
 		output := NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(Not(ContainSubstring(contextName)))
@@ -83,15 +88,16 @@ func main() {
 		})
 	*/
 
-	/*
-		It("deploys a compose app", func() {
-			output := NewDockerCommand("compose", "up", "-f", "./composefiles/aci_demo_ports_secrets_volumes/aci_demo_port.yaml", "-n", "acicompose").ExecOrDie()
-			Expect(output).To(ContainSubstring("Successfully deployed"))
-			output = NewDockerCommand("ps").ExecOrDie()
-			Lines := Lines(output)
-			Expect(len(Lines)).To(Equal(4))
-			var webChecked = false
-			for _, line := range Lines {
+	It("deploys a compose app", func() {
+		NewDockerCommand("compose", "up", "-f", "./composefiles/aci-demo/aci_demo_port.yaml").ExecOrDie()
+		//Expect(output).To(ContainSubstring("Successfully deployed"))
+		output := NewDockerCommand("ps").ExecOrDie()
+		Lines := Lines(output)
+		Expect(len(Lines)).To(Equal(4))
+		for _, line := range Lines[1:] {
+			Expect(line).To(ContainSubstring("Running"))
+		}
+		/*
 				if strings.Contains(line, "acicompose_web") {
 					webChecked = true
 					containerFields := Columns(line)
@@ -106,17 +112,19 @@ func main() {
 				}
 			}
 			Expect(webChecked).To(BeTrue())
-		})
+		*/
+	})
 
+	/*
 		It("get logs from web service", func() {
-			output := NewDockerCommand("logs", "acicompose_web").ExecOrDie()
-			Expect(output).To(ContainSubstring("Calling http://127.0.0.1:8080/noun"))
-		})
-
-		It("shutdown compose app", func() {
-			NewDockerCommand("compose", "down", "-f", "./composefiles/aci_demo_ports_secrets_volumes/aci_demo_port.yaml", "-n", "acicompose").ExecOrDie()
+			output := NewDockerCommand("logs", "aci-demo_web").ExecOrDie()
+			Expect(output).To(ContainSubstring("Listening on port 80"))
 		})
 	*/
+
+	It("shutdown compose app", func() {
+		NewDockerCommand("compose", "down", "-f", "./composefiles/aci-demo/aci_demo_port.yaml").ExecOrDie()
+	})
 	It("switches back to default context", func() {
 		output := NewCommand("docker", "context", "use", "default").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
