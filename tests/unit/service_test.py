@@ -503,6 +503,13 @@ class ServiceTest(unittest.TestCase):
         assert parse_repository_tag("url:5000/repo@sha256:digest") == (
             "url:5000/repo", "sha256:digest", "@"
         )
+        assert parse_repository_tag("root:tag@sha256:digest") == ("root", "sha256:digest", "@")
+        assert parse_repository_tag("user/repo:tag@sha256:digest") == (
+            "user/repo", "sha256:digest", "@"
+        )
+        assert parse_repository_tag("url:5000/repo:tag@sha256:digest") == (
+            "url:5000/repo", "sha256:digest", "@"
+        )
 
     def test_create_container(self):
         service = Service('foo', client=self.mock_client, build={'context': '.'})

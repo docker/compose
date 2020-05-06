@@ -1436,12 +1436,15 @@ def parse_repository_tag(repo_path):
     ('user/repo', 'sha256:digest', '@')
     >>> parse_repository_tag('user/repo:v1')
     ('user/repo', 'v1', ':')
+    >>> parse_repository_tag('user/repo:v1@sha256:digest')
+    ('user/repo', 'sha256:digest', '@')
     """
     tag_separator = ":"
     digest_separator = "@"
 
     if digest_separator in repo_path:
         repo, tag = repo_path.rsplit(digest_separator, 1)
+        repo, _, _ = parse_repository_tag(repo)
         return repo, tag, digest_separator
 
     repo, tag = repo_path, ""
