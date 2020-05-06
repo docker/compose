@@ -7,8 +7,9 @@ import (
 
 	"github.com/robpike/filter"
 
-	f "github.com/docker/api/tests/framework"
 	g "github.com/onsi/gomega"
+
+	f "github.com/docker/api/tests/framework"
 )
 
 func main() {
@@ -67,6 +68,14 @@ func main() {
 		lines := lines(output)
 		g.Expect(len(lines)).To(g.Equal(3))
 		g.Expect(lines[2]).To(g.ContainSubstring("1234  alpine"))
+	})
+
+	It("can run quiet ps command", func() {
+		output := f.NewDockerCommand("ps", "-q").ExecOrDie()
+		lines := lines(output)
+		g.Expect(len(lines)).To(g.Equal(2))
+		g.Expect(lines[0]).To(g.Equal("id"))
+		g.Expect(lines[1]).To(g.Equal("1234"))
 	})
 
 	It("can run 'run' command", func() {

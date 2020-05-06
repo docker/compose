@@ -96,7 +96,7 @@ func main() {
 
 	root.AddCommand(
 		cmd.ContextCommand(),
-		&cmd.PsCommand,
+		cmd.PsCommand(),
 		cmd.ServeCommand(),
 		run.Command(),
 		cmd.ExecCommand(),

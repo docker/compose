@@ -23,3 +23,14 @@ $ make
 ```
 
 If you make changes to the `.proto` files, make sure to `make protos` to generate go code.
+
+
+## Tests
+
+To run unit tests:
+
+```
+make test
+```
+
+If you need to update a golden file simply do `go test ./... -test.update-golden`.
