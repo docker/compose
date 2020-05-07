@@ -155,17 +155,25 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 			Published: p.HostPort,
 		})
 	}
+
+	projectVolumes, serviceConfigVolumes, err := convert.GetRunVolumes(r.Volumes)
+	if err != nil {
+		return err
+	}
+
 	project := compose.Project{
 		Name: r.ID,
 		Config: types.Config{
 			Services: []types.ServiceConfig{
 				{
-					Name:   singleContainerName,
-					Image:  r.Image,
-					Ports:  ports,
-					Labels: r.Labels,
+					Name:    singleContainerName,
+					Image:   r.Image,
+					Ports:   ports,
+					Labels:  r.Labels,
+					Volumes: serviceConfigVolumes,
 				},
 			},
+			Volumes: projectVolumes,
 		},
 	}
 

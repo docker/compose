@@ -15,6 +15,7 @@ type Opts struct {
 	Name    string
 	Publish []string
 	Labels  []string
+	Volumes []string
 }
 
 // ToContainerConfig convert run options to a container configuration
