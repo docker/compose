@@ -1,5 +1,3 @@
-// +build !windows
-
 package watch
 
 import (
@@ -14,9 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/windmilleng/tilt/internal/dockerignore"
 	"github.com/windmilleng/tilt/internal/testutils/tempdir"
@@ -41,6 +38,11 @@ func TestNoWatches(t *testing.T) {
 }
 
 func TestEventOrdering(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// https://qualapps.blogspot.com/2010/05/understanding-readdirectorychangesw_19.html
+		t.Skip("Windows doesn't make great guarantees about duplicate/out-of-order events")
+		return
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -143,10 +145,7 @@ func TestWatchesAreRecursive(t *testing.T) {
 	f.events = nil
 	// change sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.WriteFile(changeFilePath, "change")
 
 	f.assertEvents(changeFilePath)
 }
@@ -278,6 +277,9 @@ func TestSingleFile(t *testing.T) {
 }
 
 func TestWriteBrokenLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no user-space symlinks on windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -292,6 +294,9 @@ func TestWriteBrokenLink(t *testing.T) {
 }
 
 func TestWriteGoodLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no user-space symlinks on windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -311,6 +316,9 @@ func TestWriteGoodLink(t *testing.T) {
 }
 
 func TestWatchBrokenLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no user-space symlinks on windows")
+	}
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
@@ -399,6 +407,9 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
+	ignore, _ := dockerignore.NewDockerPatternMatcher(f.paths[0], []string{"./"})
+	f.setIgnore(ignore)
+
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
 	if err != nil {
@@ -422,19 +433,18 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	} else {
 		f.assertEvents(parent)
 	}
+	f.events = nil
 	f.WriteFile(file, "hello")
 
-	if runtime.GOOS == "darwin" {
-		// mac doesn't return the dir change as part of file creation
-		f.assertEvents(file)
-	} else {
-		f.assertEvents(parent, file)
-	}
+	f.assertEvents(file)
 }
 
 func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
+
+	ignore, _ := dockerignore.NewDockerPatternMatcher(f.paths[0], []string{"./"})
+	f.setIgnore(ignore)
 
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
@@ -469,7 +479,7 @@ func TestWatchCountInnerFile(t *testing.T) {
 	f.assertEvents(a, b, file)
 
 	expectedWatches := 3
-	if runtime.GOOS == "darwin" {
+	if isRecursiveWatcher() {
 		expectedWatches = 1
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
@@ -493,7 +503,7 @@ func TestWatchCountInnerFileWithIgnore(t *testing.T) {
 	f.assertEvents(b, file)
 
 	expectedWatches := 3
-	if runtime.GOOS == "darwin" {
+	if isRecursiveWatcher() {
 		expectedWatches = 1
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
@@ -514,7 +524,7 @@ func TestIgnoreCreatedDir(t *testing.T) {
 	f.assertEvents(a)
 
 	expectedWatches := 2
-	if runtime.GOOS == "darwin" {
+	if isRecursiveWatcher() {
 		expectedWatches = 1
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
@@ -540,7 +550,7 @@ func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
 	f.assertEvents(a)
 
 	expectedWatches := 2
-	if runtime.GOOS == "darwin" {
+	if isRecursiveWatcher() {
 		expectedWatches = 1
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
@@ -563,14 +573,20 @@ func TestIgnoreInitialDir(t *testing.T) {
 	f.assertEvents()
 
 	expectedWatches := 3
-	if runtime.GOOS == "darwin" {
+	if isRecursiveWatcher() {
 		expectedWatches = 2
 	}
 	assert.Equal(t, expectedWatches, int(numberOfWatches.Value()))
 }
 
+func isRecursiveWatcher() bool {
+	return runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+}
+
 type notifyFixture struct {
-	out *bytes.Buffer
+	ctx    context.Context
+	cancel func()
+	out    *bytes.Buffer
 	*tempdir.TempDirFixture
 	notify Notify
 	ignore PathMatcher
@@ -580,7 +596,10 @@ type notifyFixture struct {
 
 func newNotifyFixture(t *testing.T) *notifyFixture {
 	out := bytes.NewBuffer(nil)
+	ctx, cancel := context.WithCancel(context.Background())
 	nf := &notifyFixture{
+		ctx:            ctx,
+		cancel:         cancel,
 		TempDirFixture: tempdir.NewTempDirFixture(t),
 		paths:          []string{},
 		ignore:         EmptyMatcher{},
@@ -621,6 +640,11 @@ func (f *notifyFixture) rebuildWatcher() {
 
 func (f *notifyFixture) assertEvents(expected ...string) {
 	f.fsync()
+	if runtime.GOOS == "windows" {
+		// NOTE(nick): It's unclear to me why an extra fsync() helps
+		// here, but it makes the I/O way more predictable.
+		f.fsync()
+	}
 
 	if len(f.events) != len(expected) {
 		f.T().Fatalf("Got %d events (expected %d): %v %v", len(f.events), len(expected), f.events, expected)
@@ -639,6 +663,9 @@ func (f *notifyFixture) consumeEventsInBackground(ctx context.Context) chan erro
 	go func() {
 		for {
 			select {
+			case <-f.ctx.Done():
+				close(done)
+				return
 			case <-ctx.Done():
 				close(done)
 				return
@@ -672,6 +699,8 @@ func (f *notifyFixture) fsyncWithRetryCount(retryCount int) {
 F:
 	for {
 		select {
+		case <-f.ctx.Done():
+			return
 		case err := <-f.notify.Errors():
 			f.T().Fatal(err)
 
@@ -714,6 +743,7 @@ func (f *notifyFixture) closeWatcher() {
 		for range notify.Events() {
 		}
 	}()
+
 	go func() {
 		for range notify.Errors() {
 		}
@@ -721,6 +751,7 @@ func (f *notifyFixture) closeWatcher() {
 }
 
 func (f *notifyFixture) tearDown() {
+	f.cancel()
 	f.closeWatcher()
 	f.TempDirFixture.TearDown()
 	numberOfWatches.Set(0)

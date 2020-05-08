@@ -27,11 +27,12 @@ type naiveNotify struct {
 	ignore PathMatcher
 	log    logger.Logger
 
-	watcher       *fsnotify.Watcher
-	events        chan fsnotify.Event
-	wrappedEvents chan FileEvent
-	errors        chan error
-	numWatches    int64
+	isWatcherRecursive bool
+	watcher            *fsnotify.Watcher
+	events             chan fsnotify.Event
+	wrappedEvents      chan FileEvent
+	errors             chan error
+	numWatches         int64
 }
 
 func (d *naiveNotify) Start() error {
@@ -39,18 +40,29 @@ func (d *naiveNotify) Start() error {
 		return nil
 	}
 
-	for name := range d.notifyList {
+	pathsToWatch := []string{}
+	for path := range d.notifyList {
+		pathsToWatch = append(pathsToWatch, path)
+	}
+
+	pathsToWatch, err := greatestExistingAncestors(pathsToWatch)
+	if err != nil {
+		return err
+	}
+	if d.isWatcherRecursive {
+		pathsToWatch = dedupePathsForRecursiveWatcher(pathsToWatch)
+	}
+
+	for _, name := range pathsToWatch {
 		fi, err := os.Stat(name)
 		if err != nil && !os.IsNotExist(err) {
 			return errors.Wrapf(err, "notify.Add(%q)", name)
 		}
 
-		// if it's a file that doesn't exist, watch its parent
+		// if it's a file that doesn't exist,
+		// we should have caught that above, let's just skip it.
 		if os.IsNotExist(err) {
-			err = d.watchAncestorOfMissingPath(name)
-			if err != nil {
-				return errors.Wrapf(err, "watchAncestorOfMissingPath(%q)", name)
-			}
+			continue
 		} else if fi.IsDir() {
 			err = d.watchRecursively(name)
 			if err != nil {
@@ -70,6 +82,14 @@ func (d *naiveNotify) Start() error {
 }
 
 func (d *naiveNotify) watchRecursively(dir string) error {
+	if d.isWatcherRecursive {
+		err := d.add(dir)
+		if err == nil || os.IsNotExist(err) {
+			return nil
+		}
+		return errors.Wrapf(err, "watcher.Add(%q)", dir)
+	}
+
 	return filepath.Walk(dir, func(path string, mode os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -99,24 +119,6 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 	})
 }
 
-func (d *naiveNotify) watchAncestorOfMissingPath(path string) error {
-	if path == string(filepath.Separator) {
-		return fmt.Errorf("cannot watch root directory")
-	}
-
-	_, err := os.Stat(path)
-	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrapf(err, "os.Stat(%q)", path)
-	}
-
-	if os.IsNotExist(err) {
-		parent := filepath.Dir(path)
-		return d.watchAncestorOfMissingPath(parent)
-	}
-
-	return d.add(path)
-}
-
 func (d *naiveNotify) Close() error {
 	numberOfWatches.Add(-d.numWatches)
 	d.numWatches = 0
@@ -141,6 +143,17 @@ func (d *naiveNotify) loop() {
 			continue
 		}
 
+		if d.isWatcherRecursive {
+			if d.shouldNotify(e.Name) {
+				d.wrappedEvents <- FileEvent{e.Name}
+			}
+			continue
+		}
+
+		// If the watcher is not recursive, we have to walk the tree
+		// and add watches manually. We fire the event while we're walking the tree.
+		// because it's a bit more elegant that way.
+		//
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
 		err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
 			if err != nil {
@@ -239,8 +252,14 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 		return nil, err
 	}
 
+	err = fsw.SetRecursive()
+	isWatcherRecursive := err == nil
+
 	wrappedEvents := make(chan FileEvent)
 	notifyList := make(map[string]bool, len(paths))
+	if isWatcherRecursive {
+		paths = dedupePathsForRecursiveWatcher(paths)
+	}
 	for _, path := range paths {
 		path, err := filepath.Abs(path)
 		if err != nil {
@@ -250,13 +269,14 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	}
 
 	wmw := &naiveNotify{
-		notifyList:    notifyList,
-		ignore:        ignore,
-		log:           l,
-		watcher:       fsw,
-		events:        fsw.Events,
-		wrappedEvents: wrappedEvents,
-		errors:        fsw.Errors,
+		notifyList:         notifyList,
+		ignore:             ignore,
+		log:                l,
+		watcher:            fsw,
+		events:             fsw.Events,
+		wrappedEvents:      wrappedEvents,
+		errors:             fsw.Errors,
+		isWatcherRecursive: isWatcherRecursive,
 	}
 
 	return wmw, nil

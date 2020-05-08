@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/windmilleng/tilt/internal/ospath"
 	"github.com/windmilleng/tilt/pkg/logger"
 
 	"github.com/windmilleng/fsevents"
@@ -72,14 +71,6 @@ func (d *darwinNotify) loop() {
 
 // Add a path to be watched. Should only be called during initialization.
 func (d *darwinNotify) initAdd(name string) {
-	// Check if this is a subdirectory of any of the paths
-	// we're already watching.
-	for _, parent := range d.stream.Paths {
-		if ospath.IsChild(parent, name) {
-			return
-		}
-	}
-
 	d.stream.Paths = append(d.stream.Paths, name)
 
 	if d.pathsWereWatching == nil {
@@ -136,6 +127,7 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*darwinNot
 		stop:   make(chan struct{}),
 	}
 
+	paths = dedupePathsForRecursiveWatcher(paths)
 	for _, path := range paths {
 		path, err := filepath.Abs(path)
 		if err != nil {
