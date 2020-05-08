@@ -1,4 +1,4 @@
-// +build !darwin,!windows
+// +build !darwin
 
 package watch
 
@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 )
 
 func TestDontWatchEachFile(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("This test uses linux-specific inotify checks")
+	}
+
 	// fsnotify is not recursive, so we need to watch each directory
 	// you can watch individual files with fsnotify, but that is more prone to exhaust resources
 	// this test uses a Linux way to get the number of watches to make sure we're watching
