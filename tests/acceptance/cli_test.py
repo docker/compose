@@ -3034,3 +3034,12 @@ services:
         another = self.project.get_service('--log-service')
         assert len(service.containers()) == 1
         assert len(another.containers()) == 1
+
+    def test_up_no_log_prefix(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-log-prefix'])
+
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with code 0' in result.stdout
+        assert 'exited with code 0' in result.stdout
