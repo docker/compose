@@ -14,10 +14,11 @@ func TestSetupMandatoryArguments(t *testing.T) {
 	defer cleanup()
 
 	cmd.Command = dockerCli.Command("ecs", "setup")
-	icmd.RunCmd(cmd).Assert(t, icmd.Expected{
+	usage := icmd.RunCmd(cmd).Assert(t, icmd.Expected{
 		ExitCode: 1,
-		Err:      "required flag(s) \"cluster\", \"profile\", \"region\" not set",
-	})
+	}).Combined()
+	goldenFile := "setup-required-flags.golden"
+	golden.Assert(t, usage, goldenFile)
 }
 func TestDefaultAwsContextName(t *testing.T) {
 	cmd, cleanup := dockerCli.createTestCmd()

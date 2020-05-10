@@ -1,0 +1,13 @@
+required flag(s) ["profile" "cluster" "region"] not set
+Usage:	docker ecs setup
+
+
+
+Options:
+  -k, --aws-key-id string       AWS Access Key ID
+  -s, --aws-secret-key string   AWS Secret Access Key
+  -c, --cluster string          ECS cluster
+      --interactive             Interactively setup Context and Credentials
+  -n, --name string             Context Name (default "aws")
+  -p, --profile string          AWS Profile
+  -r, --region string           AWS region
