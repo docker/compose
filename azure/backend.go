@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,9 @@ import (
 )
 
 const singleContainerName = "single--container--aci"
+
+// ErrNoSuchContainer is returned when the mentioned container does not exist
+var ErrNoSuchContainer = errors.New("no such container")
 
 func init() {
 	backend.Register("aci", "aci", func(ctx context.Context) (backend.Service, error) {
@@ -214,6 +218,18 @@ func (cs *aciContainerService) Logs(ctx context.Context, containerName string, r
 	return err
 }
 
+func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _ bool) error {
+	cg, err := deleteACIContainerGroup(ctx, cs.ctx, containerID)
+	if err != nil {
+		return err
+	}
+	if cg.StatusCode == http.StatusNoContent {
+		return ErrNoSuchContainer
+	}
+
+	return err
+}
+
 type aciComposeService struct {
 	containerGroupsClient containerinstance.ContainerGroupsClient
 	ctx                   store.AciContext
@@ -239,6 +255,14 @@ func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptio
 		return err
 	}
 	logrus.Debugf("Down on project with name %q\n", project.Name)
-	_, err = deleteACIContainerGroup(ctx, cs.ctx, project.Name)
+
+	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project.Name)
+	if err != nil {
+		return err
+	}
+	if cg.StatusCode == http.StatusNoContent {
+		return ErrNoSuchContainer
+	}
+
 	return err
 }

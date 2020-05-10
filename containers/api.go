@@ -54,4 +54,6 @@ type Service interface {
 	Exec(ctx context.Context, containerName string, command string, reader io.Reader, writer io.Writer) error
 	// Logs returns all the logs of a container
 	Logs(ctx context.Context, containerName string, request LogsRequest) error
+	// Delete removes containers
+	Delete(ctx context.Context, id string, force bool) error
 }
