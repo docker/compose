@@ -33,6 +33,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/docker/api/errdefs"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -62,12 +63,17 @@ func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
 func (suite *StoreTestSuite) TestCreate() {
 	err := suite.store.Create("test", TypedContext{})
 	require.Nil(suite.T(), err)
+
+	err = suite.store.Create("test", TypedContext{})
+	require.EqualError(suite.T(), err, `context "test": already exists`)
+	require.True(suite.T(), errdefs.IsAlreadyExistsError(err))
 }
 
 func (suite *StoreTestSuite) TestGetUnknown() {
 	meta, err := suite.store.Get("unknown", nil)
 	require.Nil(suite.T(), meta)
-	require.Error(suite.T(), err)
+	require.EqualError(suite.T(), err, `context "unknown": not found`)
+	require.True(suite.T(), errdefs.IsNotFoundError(err))
 }
 
 func (suite *StoreTestSuite) TestGet() {

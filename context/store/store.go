@@ -30,13 +30,14 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 
+	"github.com/docker/api/errdefs"
 	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -118,7 +119,7 @@ func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
 	m, err := read(meta, getter)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("unknown context %q", name)
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "context %q", name)
 	} else if err != nil {
 		return nil, err
 	}
@@ -186,7 +187,7 @@ func (s *store) Create(name string, data TypedContext) error {
 	dir := contextdirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
-		return fmt.Errorf("context %q already exists", name)
+		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", name)
 	}
 
 	err := os.Mkdir(metaDir, 0755)
