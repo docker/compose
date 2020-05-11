@@ -9,17 +9,6 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
-func TestSetupMandatoryArguments(t *testing.T) {
-	cmd, cleanup := dockerCli.createTestCmd()
-	defer cleanup()
-
-	cmd.Command = dockerCli.Command("ecs", "setup")
-	usage := icmd.RunCmd(cmd).Assert(t, icmd.Expected{
-		ExitCode: 1,
-	}).Combined()
-	goldenFile := "setup-required-flags.golden"
-	golden.Assert(t, usage, goldenFile)
-}
 func TestDefaultAwsContextName(t *testing.T) {
 	cmd, cleanup := dockerCli.createTestCmd()
 	defer cleanup()

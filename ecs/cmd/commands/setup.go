@@ -42,7 +42,6 @@ func (s setupOptions) unsetRequiredArgs() []string {
 
 func SetupCommand() *cobra.Command {
 	var opts setupOptions
-	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "setup",
@@ -53,15 +52,9 @@ func SetupCommand() *cobra.Command {
 			return plugin.PersistentPreRunE(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if interactive {
+			if requiredFlag := opts.unsetRequiredArgs(); len(requiredFlag) > 0 {
 				if err := interactiveCli(&opts); err != nil {
 					return err
-				}
-			} else {
-				if requiredFlag := opts.unsetRequiredArgs(); len(requiredFlag) > 0 {
-					fmt.Printf("required flag(s) %q not set", requiredFlag)
-					cmd.Help()
-					os.Exit(1)
 				}
 			}
 			if opts.accessKeyID != "" && opts.secretAccessKey != "" {
@@ -78,7 +71,6 @@ func SetupCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&opts.context.Region, "region", "r", "", "AWS region")
 	cmd.Flags().StringVarP(&opts.accessKeyID, "aws-key-id", "k", "", "AWS Access Key ID")
 	cmd.Flags().StringVarP(&opts.secretAccessKey, "aws-secret-key", "s", "", "AWS Secret Access Key")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "", false, "Interactively setup Context and Credentials")
 
 	return cmd
 }
