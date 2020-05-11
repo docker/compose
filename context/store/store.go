@@ -63,7 +63,7 @@ type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
 	Get(name string, getter func() interface{}) (*Metadata, error)
-	// GetType reurns the type of the context (docker, aci etc)
+	// GetType returns the type of the context (docker, aci etc)
 	GetType(meta *Metadata) string
 	// Create creates a new context, it returns an error if a context with the
 	// same name exists already.
