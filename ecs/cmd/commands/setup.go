@@ -30,10 +30,6 @@ func (s setupOptions) unsetRequiredArgs() []string {
 	if s.context.Profile == "" {
 		unset = append(unset, "profile")
 	}
-	if s.context.Cluster == "" {
-		unset = append(unset, "cluster")
-	}
-
 	if s.context.Region == "" {
 		unset = append(unset, "region")
 	}
@@ -204,7 +200,7 @@ func setRegion(opts *setupOptions, section ini.Section) error {
 }
 
 func setCluster(opts *setupOptions, err error) error {
-	result, err := promptString(opts.context.Cluster, "cluster name", enterLabelPrefix, 2)
+	result, err := promptString(opts.context.Cluster, "cluster name", enterLabelPrefix, 0)
 	if err != nil {
 		return err
 	}
