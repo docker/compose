@@ -107,6 +107,26 @@ func (suite *StoreTestSuite) TestList() {
 	require.Equal(suite.T(), contexts[1].Name, "test2")
 }
 
+func (suite *StoreTestSuite) TestRemoveNotFound() {
+	err := suite.store.Remove("notfound")
+	require.EqualError(suite.T(), err, `context "notfound": not found`)
+	require.True(suite.T(), errdefs.IsNotFoundError(err))
+}
+
+func (suite *StoreTestSuite) TestRemove() {
+	err := suite.store.Create("testremove", TypedContext{})
+	require.Nil(suite.T(), err)
+	contexts, err := suite.store.List()
+	require.Nil(suite.T(), err)
+	require.Equal(suite.T(), len(contexts), 1)
+
+	err = suite.store.Remove("testremove")
+	require.Nil(suite.T(), err)
+	contexts, err = suite.store.List()
+	require.Nil(suite.T(), err)
+	require.Equal(suite.T(), len(contexts), 0)
+}
+
 func TestExampleTestSuite(t *testing.T) {
 	suite.Run(t, new(StoreTestSuite))
 }
