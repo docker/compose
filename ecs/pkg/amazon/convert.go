@@ -1,11 +1,12 @@
 package amazon
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
@@ -21,9 +22,17 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 	}
 	credential := getRepoCredentials(service)
 
+	// override resolve.conf search directive to also search <project>.local
+	// TODO remove once ECS support hostname-only service discovery
+	service.Environment["LOCALDOMAIN"] = aws.String(
+		cloudformation.Join("", []string{
+			cloudformation.Ref("AWS::Region"),
+			".compute.internal",
+			fmt.Sprintf(" %s.local", project.Name),
+		}))
+
 	return &ecs.TaskDefinition{
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
-			// Here we can declare sidecars and init-containers using https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_dependson
 			{
 				Command:               service.Command,
 				DisableNetworking:     service.NetworkMode == "none",
@@ -50,7 +59,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 						"awslogs-stream-prefix": service.Name,
 					},
 				},
-				MountPoints:            nil,
 				Name:                   service.Name,
 				PortMappings:           toPortMappings(service.Ports),
 				Privileged:             service.Privileged,
@@ -68,7 +76,7 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 			},
 		},
 		Cpu:                     cpu,
-		Family:                  project.Name,
+		Family:                  fmt.Sprintf("%s-%s", project.Name, service.Name),
 		IpcMode:                 service.Ipc,
 		Memory:                  mem,
 		NetworkMode:             ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
@@ -77,7 +85,6 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 		ProxyConfiguration:      nil,
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
 		Tags:                    nil,
-		Volumes:                 []ecs.TaskDefinition_Volume{},
 	}, nil
 }
 
@@ -122,7 +129,7 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 			}
 		}
 	}
-	return "", "", errors.New("unable to find cpu/mem for the required resources")
+	return "", "", fmt.Errorf("unable to find cpu/mem for the required resources")
 }
 
 func toRequiresCompatibilities(isolation string) []*string {
@@ -198,8 +205,7 @@ func toTmpfs(tmpfs types.StringList) []ecs.TaskDefinition_Tmpfs {
 	for _, path := range tmpfs {
 		o = append(o, ecs.TaskDefinition_Tmpfs{
 			ContainerPath: path,
-			MountOptions:  nil,
-			Size:          0,
+			Size:          100, // size is required on ECS, unlimited by the compose spec
 		})
 	}
 	return o

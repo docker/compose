@@ -39,3 +39,27 @@ file do not include unsupported features.
 * _Convert_ produces a CloudFormation template to define all resources required to implement the application model on AWS.
 * _Apply_ phase do apply the CloudFormation template, either by exporting to a stack file or to deploy on AWS.  
 
+## Application model
+
+### Services
+
+Compose services are mapped to ECS services. Compose specification has no support for multi-container services, nor 
+does it support sidecars. When an ECS feature requires a sidecar, we introduce custom Compose extension (`x-aws-*`)
+to actually expose ECS feature as a service-level feature, not plumbing details.
+
+### Networking
+
+We map the "network" abstraction from Compose model to AWS SecurityGroups. The whole application is created within a 
+single VPC, SecurityGroups are created per networks, including the implicit `default` one. Services are attached 
+according to the networks declared in Compose model. Doing so, services attached to a common security group can 
+communicate together, while services from distinct SecurityGroups can't. We just can't set service aliasses per network.
+
+A CloudMap private namespace is created for application as `{project}.local`. Services get registered so that we 
+get service discovery and DNS round-robin (equivalent for Compose's `endpoint_mode: dnsrr`). Hostname-only service
+discovery is enabled by running application containers with `LOCALDOMAIN={project}.local` 
+(see [resolv.conf(5)](http://man7.org/linux/man-pages/man5/resolv.conf.5.html)). This works out-of-the-box for 
+debian-based Docker images. Alpine images have to include a tiny entrypoint script to replicate this feature:
+```shell script
+if [ $LOCALDOMAIN ]; then echo "search ${LOCALDOMAIN}" >> /etc/resolv.conf; fi 
+```  
+
