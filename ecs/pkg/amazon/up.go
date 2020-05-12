@@ -29,12 +29,28 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
-	template, err := c.Convert(ctx, project)
+	template, err := c.Convert(project)
 	if err != nil {
 		return err
 	}
 
-	err = c.api.CreateStack(ctx, project.Name, template)
+	vpc, err := c.GetVPC(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	subNets, err := c.api.GetSubNets(ctx, vpc)
+	if err != nil {
+		return err
+	}
+
+	parameters := map[string]string{
+		"VPCId":     vpc,
+		"Subnet1Id": subNets[0],
+		"Subnet2Id": subNets[1],
+	}
+
+	err = c.api.CreateStack(ctx, project.Name, template, parameters)
 	if err != nil {
 		return err
 	}
@@ -42,10 +58,36 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 	return c.WaitStackCompletion(ctx, project.Name, StackCreate)
 }
 
+func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
+	//check compose file for the default external network
+	if net, ok := project.Networks["default"]; ok {
+		if net.External.External {
+			vpc := net.Name
+			ok, err := c.api.VpcExists(ctx, vpc)
+			if err != nil {
+				return "", err
+			}
+			if !ok {
+				return "", fmt.Errorf("VPC does not exist: %s", vpc)
+			}
+			return vpc, nil
+		}
+	}
+	defaultVPC, err := c.api.GetDefaultVPC(ctx)
+	if err != nil {
+		return "", err
+	}
+	return defaultVPC, nil
+}
+
 type upAPI interface {
 	waitAPI
+	GetDefaultVPC(ctx context.Context) (string, error)
+	VpcExists(ctx context.Context, vpcID string) (bool, error)
+	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
+
 	ClusterExists(ctx context.Context, name string) (bool, error)
 	CreateCluster(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
-	CreateStack(ctx context.Context, name string, template *cloudformation.Template) error
+	CreateStack(ctx context.Context, name string, template *cloudformation.Template, parameters map[string]string) error
 }

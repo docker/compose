@@ -6,12 +6,11 @@ package mock
 
 import (
 	context "context"
-	reflect "reflect"
-
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
 	docker "github.com/docker/ecs-plugin/pkg/docker"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -77,23 +76,23 @@ func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 docker.Secret) (string
 }
 
 // CreateSecret indicates an expected call of CreateSecret
-func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1 docker.Secret) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSecret", reflect.TypeOf((*MockAPI)(nil).CreateSecret), arg0, arg1)
 }
 
 // CreateStack mocks base method
-func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation0.Template) error {
+func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 *cloudformation0.Template, arg3 map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateStack indicates an expected call of CreateStack
-func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1, arg2, arg3)
 }
 
 // DeleteCluster mocks base method
@@ -166,21 +165,6 @@ func (m *MockAPI) GetDefaultVPC(arg0 context.Context) (string, error) {
 func (mr *MockAPIMockRecorder) GetDefaultVPC(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultVPC", reflect.TypeOf((*MockAPI)(nil).GetDefaultVPC), arg0)
-}
-
-// GetRoleArn mocks base method
-func (m *MockAPI) GetRoleArn(arg0 context.Context, arg1 string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRoleArn", arg0, arg1)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRoleArn indicates an expected call of GetRoleArn
-func (mr *MockAPIMockRecorder) GetRoleArn(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoleArn", reflect.TypeOf((*MockAPI)(nil).GetRoleArn), arg0, arg1)
 }
 
 // GetStackID mocks base method

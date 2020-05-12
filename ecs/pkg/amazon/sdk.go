@@ -153,17 +153,27 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 	return len(stacks.Stacks) > 0, nil
 }
 
-func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template) error {
+func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template, parameters map[string]string) error {
 	logrus.Debug("Create CloudFormation stack")
 	json, err := template.JSON()
 	if err != nil {
 		return err
 	}
 
+	param := []*cloudformation.Parameter{}
+	for name, value := range parameters {
+		param = append(param, &cloudformation.Parameter{
+			ParameterKey:     aws.String(name),
+			ParameterValue:   aws.String(value),
+			UsePreviousValue: aws.Bool(true),
+		})
+	}
+
 	_, err = s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 		OnFailure:        aws.String("DELETE"),
 		StackName:        aws.String(name),
 		TemplateBody:     aws.String(string(json)),
+		Parameters:       param,
 		TimeoutInMinutes: aws.Int64(10),
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),

@@ -1,8 +1,6 @@
 package amazon
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -19,20 +17,31 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudformation.Template, error) {
+func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	vpc, err := c.GetVPC(ctx, project)
-	if err != nil {
-		return nil, err
+	template.Parameters["VPCId"] = cloudformation.Parameter{
+		Type:        "AWS::EC2::VPC::Id",
+		Description: "ID of the VPC",
 	}
 
-	subnets, err := c.api.GetSubNets(ctx, vpc)
-	if err != nil {
-		return nil, err
+	/*
+		FIXME can't set subnets: Ref("SubnetIds") see https://github.com/awslabs/goformation/issues/282
+		template.Parameters["SubnetIds"] = cloudformation.Parameter{
+			Type:        "List<AWS::EC2::Subnet::Id>",
+			Description: "The list of SubnetIds, for at least two Availability Zones in the region in your VPC",
+		}
+	*/
+	template.Parameters["Subnet1Id"] = cloudformation.Parameter{
+		Type:        "AWS::EC2::Subnet::Id",
+		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
+	}
+	template.Parameters["Subnet2Id"] = cloudformation.Parameter{
+		Type:        "AWS::EC2::Subnet::Id",
+		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
 	}
 
 	for net := range project.Networks {
-		name, resource := convertNetwork(project, net, vpc)
+		name, resource := convertNetwork(project, net, cloudformation.Ref("VPCId"))
 		template.Resources[name] = resource
 	}
 
@@ -45,7 +54,7 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
-		Vpc:         vpc,
+		Vpc:         cloudformation.Ref("VPCId"),
 	}
 
 	for _, service := range project.Services {
@@ -55,7 +64,7 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 		}
 
 		taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", service.Name)
-		policy, err := c.getPolicy(ctx, definition)
+		policy, err := c.getPolicy(definition)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +124,10 @@ func (c client) Convert(ctx context.Context, project *compose.Project) (*cloudfo
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
 					SecurityGroups: serviceSecurityGroups,
-					Subnets:        subnets,
+					Subnets: []string{
+						cloudformation.Ref("Subnet1Id"),
+						cloudformation.Ref("Subnet2Id"),
+					},
 				},
 			},
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
@@ -171,29 +183,7 @@ func networkResourceName(project *compose.Project, network string) string {
 	return fmt.Sprintf("%s%sNetwork", project.Name, strings.Title(network))
 }
 
-func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
-	//check compose file for the default external network
-	if net, ok := project.Networks["default"]; ok {
-		if net.External.External {
-			vpc := net.Name
-			ok, err := c.api.VpcExists(ctx, vpc)
-			if err != nil {
-				return "", err
-			}
-			if !ok {
-				return "", errors.New("Vpc does not exist: " + vpc)
-			}
-			return vpc, nil
-		}
-	}
-	defaultVPC, err := c.api.GetDefaultVPC(ctx)
-	if err != nil {
-		return "", err
-	}
-	return defaultVPC, nil
-}
-
-func (c client) getPolicy(ctx context.Context, taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
+func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
 
 	arns := []string{}
 	for _, container := range taskDef.ContainerDefinitions {
@@ -212,17 +202,10 @@ func (c client) getPolicy(ctx context.Context, taskDef *ecs.TaskDefinition) (*Po
 			Statement: []PolicyStatement{
 				{
 					Effect:   "Allow",
-					Action:   []string{"secretsmanager:GetSecretValue", "ssm:GetParameters", "kms:Decrypt"},
+					Action:   []string{ActionGetSecretValue, ActionGetParameters, ActionDecrypt},
 					Resource: arns,
 				}},
 		}, nil
 	}
 	return nil, nil
-}
-
-type convertAPI interface {
-	GetDefaultVPC(ctx context.Context) (string, error)
-	VpcExists(ctx context.Context, vpcID string) (bool, error)
-	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
-	GetRoleArn(ctx context.Context, name string) (string, error)
 }

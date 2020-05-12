@@ -49,7 +49,7 @@ func ConvertCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) 
 			if err != nil {
 				return err
 			}
-			template, err := client.Convert(context.Background(), project)
+			template, err := client.Convert(project)
 			if err != nil {
 				return err
 			}
