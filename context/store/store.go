@@ -36,7 +36,9 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/docker/api/errdefs"
 	"github.com/opencontainers/go-digest"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -63,13 +65,15 @@ type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
 	Get(name string, getter func() interface{}) (*Metadata, error)
-	// GetType reurns the type of the context (docker, aci etc)
+	// GetType returns the type of the context (docker, aci etc)
 	GetType(meta *Metadata) string
 	// Create creates a new context, it returns an error if a context with the
 	// same name exists already.
 	Create(name string, data TypedContext) error
 	// List returns the list of created contexts
 	List() ([]*Metadata, error)
+	// Remove removes a context by name from the context store
+	Remove(name string) error
 }
 
 type store struct {
@@ -118,7 +122,7 @@ func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
 	m, err := read(meta, getter)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("unknown context %q", name)
+		return nil, errors.Wrap(errdefs.ErrNotFound, objectName(name))
 	} else if err != nil {
 		return nil, err
 	}
@@ -186,7 +190,7 @@ func (s *store) Create(name string, data TypedContext) error {
 	dir := contextdirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
-		return fmt.Errorf("context %q already exists", name)
+		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
 	}
 
 	err := os.Mkdir(metaDir, 0755)
@@ -237,8 +241,24 @@ func (s *store) List() ([]*Metadata, error) {
 	return result, nil
 }
 
+func (s *store) Remove(name string) error {
+	dir := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name))
+	// Check if directory exists because os.RemoveAll returns nil if it doesn't
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return errors.Wrap(errdefs.ErrNotFound, objectName(name))
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return errors.Wrapf(errdefs.ErrUnknown, "unable to remove %s: %s", objectName(name), err)
+	}
+	return nil
+}
+
 func contextdirOf(name string) string {
 	return digest.FromString(name).Encoded()
+}
+
+func objectName(name string) string {
+	return fmt.Sprintf("context %q", name)
 }
 
 type dummyContext struct{}

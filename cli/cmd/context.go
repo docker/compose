@@ -33,6 +33,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/context/store"
@@ -48,6 +49,7 @@ func ContextCommand() *cobra.Command {
 	cmd.AddCommand(
 		createCommand(),
 		listCommand(),
+		removeCommand(),
 	)
 
 	return cmd
@@ -89,6 +91,17 @@ func listCommand() *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+func removeCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:     "rm",
+		Aliases: []string{"remove"},
+		Args:    cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRemove(cmd.Context(), args)
+		},
+	}
 }
 
 func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
@@ -133,4 +146,17 @@ func runList(ctx context.Context) error {
 	}
 
 	return w.Flush()
+}
+
+func runRemove(ctx context.Context, args []string) error {
+	s := store.ContextStore(ctx)
+	var errs *multierror.Error
+	for _, n := range args {
+		if err := s.Remove(n); err != nil {
+			errs = multierror.Append(errs, err)
+		} else {
+			fmt.Println(n)
+		}
+	}
+	return errs.ErrorOrNil()
 }

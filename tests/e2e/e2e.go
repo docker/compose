@@ -50,7 +50,7 @@ func main() {
 		NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
 		//Expect(output).To(ContainSubstring("test-example context acitest created"))
 	})
-	defer NewCommand("docker", "context", "rm", "test-example", "-f").ExecOrDie()
+	defer NewDockerCommand("context", "rm", "test-example").ExecOrDie()
 
 	It("uses the test context", func() {
 		currentContext := NewCommand("docker", "context", "use", "test-example").ExecOrDie()
