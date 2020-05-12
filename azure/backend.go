@@ -11,7 +11,6 @@ import (
 	"github.com/docker/api/context/cloud"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -53,7 +52,7 @@ func New(ctx context.Context) (backend.Service, error) {
 	}
 	aciContext, _ := metadata.Metadata.Data.(store.AciContext)
 
-	auth, _ := auth.NewAuthorizerFromCLI()
+	auth, _ := login.NewAzureLoginService().NewAuthorizerFromLogin()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
@@ -67,8 +66,7 @@ func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 			ctx:                   aciCtx,
 		},
 		aciComposeService: aciComposeService{
-			containerGroupsClient: cgc,
-			ctx:                   aciCtx,
+			ctx: aciCtx,
 		},
 		aciCloudService: aciCloudService{
 			loginService: login.NewAzureLoginService(),
@@ -236,8 +234,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _
 }
 
 type aciComposeService struct {
-	containerGroupsClient containerinstance.ContainerGroupsClient
-	ctx                   store.AciContext
+	ctx store.AciContext
 }
 
 func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions) error {

@@ -253,7 +253,7 @@ func (login AzureLoginService) NewAuthorizerFromLogin() (autorest.Authorizer, er
 	token := adal.Token{
 		AccessToken:  oauthToken.AccessToken,
 		Type:         oauthToken.TokenType,
-		ExpiresIn:    json.Number(strconv.Itoa(int(oauthToken.Expiry.Sub(time.Now()).Seconds()))),
+		ExpiresIn:    json.Number(strconv.Itoa(int(time.Until(oauthToken.Expiry).Seconds()))),
 		ExpiresOn:    json.Number(strconv.Itoa(int(oauthToken.Expiry.Sub(date.UnixEpoch()).Seconds()))),
 		RefreshToken: "",
 		Resource:     "",
