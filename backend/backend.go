@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
+	"github.com/docker/api/context/cloud"
 )
 
 var (
@@ -33,6 +34,7 @@ var backends = struct {
 type Service interface {
 	ContainerService() containers.Service
 	ComposeService() compose.Service
+	CloudService() cloud.Service
 }
 
 // Register adds a typed backend to the registry

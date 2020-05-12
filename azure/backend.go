@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"github.com/docker/api/context/cloud"
 	"io"
 	"net/http"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/api/azure/convert"
+	"github.com/docker/api/azure/login"
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
@@ -67,12 +69,14 @@ func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
 		},
+		aciCloudService: aciCloudService{},
 	}
 }
 
 type aciAPIService struct {
 	aciContainerService
 	aciComposeService
+	aciCloudService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
@@ -87,6 +91,10 @@ func (a *aciAPIService) ComposeService() compose.Service {
 		containerGroupsClient: a.aciComposeService.containerGroupsClient,
 		ctx:                   a.aciComposeService.ctx,
 	}
+}
+
+func (a *aciAPIService) CloudService() cloud.Service {
+	return &aciCloudService{}
 }
 
 type aciContainerService struct {
@@ -265,4 +273,11 @@ func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptio
 	}
 
 	return err
+}
+
+type aciCloudService struct {
+}
+
+func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
+	return login.Login()
 }

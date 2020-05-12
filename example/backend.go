@@ -3,6 +3,7 @@ package example
 import (
 	"context"
 	"fmt"
+	"github.com/docker/api/context/cloud"
 	"io"
 
 	"github.com/docker/api/backend"
@@ -21,6 +22,10 @@ func (a *apiService) ContainerService() containers.Service {
 
 func (a *apiService) ComposeService() compose.Service {
 	return &a.composeService
+}
+
+func (a *apiService) CloudService() cloud.Service {
+	return nil
 }
 
 func init() {

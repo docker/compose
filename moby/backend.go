@@ -2,6 +2,7 @@ package moby
 
 import (
 	"context"
+	"github.com/docker/api/context/cloud"
 	"io"
 
 	"github.com/docker/docker/api/types"
@@ -42,6 +43,10 @@ func (ms *mobyService) ContainerService() containers.Service {
 }
 
 func (ms *mobyService) ComposeService() compose.Service {
+	return nil
+}
+
+func (ms *mobyService) CloudService() cloud.Service {
 	return nil
 }
 
