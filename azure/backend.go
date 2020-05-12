@@ -3,11 +3,12 @@ package azure
 import (
 	"context"
 	"fmt"
-	"github.com/docker/api/context/cloud"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/docker/api/context/cloud"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -69,7 +70,9 @@ func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
 		},
-		aciCloudService: aciCloudService{},
+		aciCloudService: aciCloudService{
+			loginService: login.NewAzureLoginService(),
+		},
 	}
 }
 
@@ -80,21 +83,15 @@ type aciAPIService struct {
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
-	return &aciContainerService{
-		containerGroupsClient: a.aciContainerService.containerGroupsClient,
-		ctx:                   a.aciContainerService.ctx,
-	}
+	return &a.aciContainerService
 }
 
 func (a *aciAPIService) ComposeService() compose.Service {
-	return &aciComposeService{
-		containerGroupsClient: a.aciComposeService.containerGroupsClient,
-		ctx:                   a.aciComposeService.ctx,
-	}
+	return &a.aciComposeService
 }
 
 func (a *aciAPIService) CloudService() cloud.Service {
-	return &aciCloudService{}
+	return &a.aciCloudService
 }
 
 type aciContainerService struct {
@@ -276,8 +273,9 @@ func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptio
 }
 
 type aciCloudService struct {
+	loginService login.AzureLoginService
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
-	return login.Login()
+	return cs.loginService.Login()
 }

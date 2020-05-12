@@ -7,31 +7,25 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type TokenStore struct {
+type tokenStore struct {
 	filePath string
 }
 
-type LoginInfo struct {
+// TokenInfo data stored in tokenStore
+type TokenInfo struct {
 	Token    oauth2.Token `json:"oauthToken"`
 	TenantID string       `json:"tenantId"`
 }
 
-func NewTokenStore(filePath string) TokenStore {
-	return TokenStore{
-		filePath: filePath,
-	}
-}
-
-func (store TokenStore) writeLoginInfo(info LoginInfo) error {
+func (store tokenStore) writeLoginInfo(info TokenInfo) error {
 	bytes, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile(store.filePath, bytes, 0644)
-	return nil
+	return ioutil.WriteFile(store.filePath, bytes, 0644)
 }
 
-func (store TokenStore) readToken() (loginInfo LoginInfo, err error) {
+func (store tokenStore) readToken() (loginInfo TokenInfo, err error) {
 	bytes, err := ioutil.ReadFile(store.filePath)
 	if err != nil {
 		return loginInfo, err

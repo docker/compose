@@ -40,6 +40,8 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	// ErrUnknown is returned when the error type is unmapped
 	ErrUnknown = errors.New("unknown")
+	// ErrLoginFailed is returned when login failed
+	ErrLoginFailed = errors.New("login failed")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
