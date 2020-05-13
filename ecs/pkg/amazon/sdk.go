@@ -315,7 +315,6 @@ func (s sdk) GetLogs(ctx context.Context, name string) error {
 	for {
 		var hasMore = true
 		var token *string
-		token = nil
 		for hasMore {
 			events, err := s.CW.FilterLogEvents(&cloudwatchlogs.FilterLogEventsInput{
 				LogGroupName: aws.String(logGroup),
