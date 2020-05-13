@@ -29,6 +29,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/docker/docker/pkg/namesgenerator"
@@ -45,7 +46,11 @@ func Command() *cobra.Command {
 		Short: "Run a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd.Context(), args[0], opts)
+			if err := runRun(cmd.Context(), args[0], opts); err != nil {
+				return err
+			}
+			fmt.Println(opts.name)
+			return nil
 		},
 	}
 
