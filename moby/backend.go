@@ -7,10 +7,12 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
+	"github.com/docker/api/errdefs"
 )
 
 type mobyService struct {
@@ -127,7 +129,11 @@ func (ms *mobyService) Logs(ctx context.Context, containerName string, request c
 }
 
 func (ms *mobyService) Delete(ctx context.Context, containerID string, force bool) error {
-	return ms.apiClient.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+	err := ms.apiClient.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
 		Force: force,
 	})
+	if client.IsErrNotFound(err) {
+		return errors.Wrapf(errdefs.ErrNotFound, "container %q", containerID)
+	}
+	return err
 }

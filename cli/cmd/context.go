@@ -33,10 +33,10 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/multierror"
 )
 
 // ContextCommand manages contexts
