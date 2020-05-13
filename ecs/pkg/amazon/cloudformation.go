@@ -17,9 +17,23 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
+const (
+	ParameterClusterName = "ParameterClusterName"
+	ParameterVPCId       = "ParameterVPCId"
+	ParameterSubnet1Id   = "ParameterSubnet1Id"
+	ParameterSubnet2Id   = "ParameterSubnet2Id"
+)
+
+// Convert a compose project into a CloudFormation template
 func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	template.Parameters["VPCId"] = cloudformation.Parameter{
+
+	template.Parameters[ParameterClusterName] = cloudformation.Parameter{
+		Type:        "String",
+		Description: "Name of the ECS cluster to deploy to (optional)",
+	}
+
+	template.Parameters[ParameterVPCId] = cloudformation.Parameter{
 		Type:        "AWS::EC2::VPC::Id",
 		Description: "ID of the VPC",
 	}
@@ -31,17 +45,32 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			Description: "The list of SubnetIds, for at least two Availability Zones in the region in your VPC",
 		}
 	*/
-	template.Parameters["Subnet1Id"] = cloudformation.Parameter{
+	template.Parameters[ParameterSubnet1Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
 		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
 	}
-	template.Parameters["Subnet2Id"] = cloudformation.Parameter{
+	template.Parameters[ParameterSubnet2Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
 		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
 	}
 
+	// Create Cluster is `ParameterClusterName` parameter is not set
+	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(ParameterClusterName))
+
+	template.Resources["Cluster"] = &ecs.Cluster{
+		ClusterName: project.Name,
+		Tags: []tags.Tag{
+			{
+				Key:   ProjectTag,
+				Value: project.Name,
+			},
+		},
+		AWSCloudFormationCondition: "CreateCluster",
+	}
+	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(ParameterClusterName))
+
 	for net := range project.Networks {
-		name, resource := convertNetwork(project, net, cloudformation.Ref("VPCId"))
+		name, resource := convertNetwork(project, net, cloudformation.Ref(ParameterVPCId))
 		template.Resources[name] = resource
 	}
 
@@ -54,7 +83,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
-		Vpc:         cloudformation.Ref("VPCId"),
+		Vpc:         cloudformation.Ref(ParameterVPCId),
 	}
 
 	for _, service := range project.Services {
@@ -117,7 +146,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		}
 
 		template.Resources[fmt.Sprintf("%sService", service.Name)] = &ecs.Service{
-			Cluster:      c.Cluster,
+			Cluster:      cluster,
 			DesiredCount: 1,
 			LaunchType:   ecsapi.LaunchTypeFargate,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
@@ -125,8 +154,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
 					SecurityGroups: serviceSecurityGroups,
 					Subnets: []string{
-						cloudformation.Ref("Subnet1Id"),
-						cloudformation.Ref("Subnet2Id"),
+						cloudformation.Ref(ParameterSubnet1Id),
+						cloudformation.Ref(ParameterSubnet2Id),
 					},
 				},
 			},

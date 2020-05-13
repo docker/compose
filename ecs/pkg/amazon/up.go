@@ -9,13 +9,16 @@ import (
 )
 
 func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error {
-	ok, err := c.api.ClusterExists(ctx, c.Cluster)
-	if err != nil {
-		return err
+	if c.Cluster != "" {
+		ok, err := c.api.ClusterExists(ctx, c.Cluster)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("configured cluster %q does not exist", c.Cluster)
+		}
 	}
-	if !ok {
-		c.api.CreateCluster(ctx, c.Cluster)
-	}
+
 	update, err := c.api.StackExists(ctx, project.Name)
 	if err != nil {
 		return err
@@ -45,9 +48,10 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 	}
 
 	parameters := map[string]string{
-		"VPCId":     vpc,
-		"Subnet1Id": subNets[0],
-		"Subnet2Id": subNets[1],
+		ParameterClusterName: c.Cluster,
+		ParameterVPCId:       vpc,
+		ParameterSubnet1Id:   subNets[0],
+		ParameterSubnet2Id:   subNets[1],
 	}
 
 	err = c.api.CreateStack(ctx, project.Name, template, parameters)
@@ -87,7 +91,6 @@ type upAPI interface {
 	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
 
 	ClusterExists(ctx context.Context, name string) (bool, error)
-	CreateCluster(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template *cloudformation.Template, parameters map[string]string) error
 }
