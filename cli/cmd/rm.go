@@ -32,7 +32,7 @@ func RmCommand() *cobra.Command {
 			for _, id := range args {
 				err := c.ContainerService().Delete(cmd.Context(), id, opts.force)
 				if err != nil {
-					errs = append(errs, err.Error())
+					errs = append(errs, err.Error()+" "+id)
 					continue
 				}
 				fmt.Println(id)
