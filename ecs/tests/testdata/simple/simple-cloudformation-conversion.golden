@@ -1,0 +1,164 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "Subnet1Id": {
+      "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "Subnet2Id": {
+      "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "VPCId": {
+      "Description": "ID of the VPC",
+      "Type": "AWS::EC2::VPC::Id"
+    }
+  },
+  "Resources": {
+    "CloudMap": {
+      "Properties": {
+        "Description": "Service Map for Docker Compose project TestSimpleConvert",
+        "Name": "TestSimpleConvert.local",
+        "Vpc": {
+          "Ref": "VPCId"
+        }
+      },
+      "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace"
+    },
+    "LogGroup": {
+      "Properties": {
+        "LogGroupName": "/docker-compose/TestSimpleConvert"
+      },
+      "Type": "AWS::Logs::LogGroup"
+    },
+    "simpleService": {
+      "Properties": {
+        "Cluster": "TestCluster",
+        "DesiredCount": 1,
+        "LaunchType": "FARGATE",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "Subnets": [
+              {
+                "Ref": "Subnet1Id"
+              },
+              {
+                "Ref": "Subnet2Id"
+              }
+            ]
+          }
+        },
+        "SchedulingStrategy": "REPLICA",
+        "ServiceName": "simple",
+        "ServiceRegistries": [
+          {
+            "RegistryArn": {
+              "Fn::GetAtt": [
+                "simpleServiceDiscoveryEntry",
+                "Arn"
+              ]
+            }
+          }
+        ],
+        "TaskDefinition": {
+          "Ref": "simpleTaskDefinition"
+        }
+      },
+      "Type": "AWS::ECS::Service"
+    },
+    "simpleServiceDiscoveryEntry": {
+      "Properties": {
+        "Description": "\"simple\" service discovery entry in Cloud Map",
+        "DnsConfig": {
+          "DnsRecords": [
+            {
+              "TTL": 300,
+              "Type": "A"
+            }
+          ],
+          "RoutingPolicy": "MULTIVALUE"
+        },
+        "Name": "simple",
+        "NamespaceId": {
+          "Ref": "CloudMap"
+        }
+      },
+      "Type": "AWS::ServiceDiscovery::Service"
+    },
+    "simpleTaskDefinition": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "LOCALDOMAIN",
+                "Value": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ".compute.internal",
+                      " TestSimpleConvert.local"
+                    ]
+                  ]
+                }
+              }
+            ],
+            "Essential": true,
+            "Image": "docker.io/library/nginx",
+            "LinuxParameters": {},
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "LogGroup"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "simple"
+              }
+            },
+            "Name": "simple"
+          }
+        ],
+        "Cpu": "256",
+        "ExecutionRoleArn": {
+          "Ref": "simpleTaskExecutionRole"
+        },
+        "Family": "TestSimpleConvert-simple",
+        "Memory": "512",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE"
+        ]
+      },
+      "Type": "AWS::ECS::TaskDefinition"
+    },
+    "simpleTaskExecutionRole": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    }
+  }
+}
