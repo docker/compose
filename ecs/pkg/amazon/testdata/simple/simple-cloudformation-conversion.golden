@@ -1,15 +1,29 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": {
+    "CreateCluster": {
+      "Fn::Equals": [
+        "",
+        {
+          "Ref": "ParameterClusterName"
+        }
+      ]
+    }
+  },
   "Parameters": {
-    "Subnet1Id": {
+    "ParameterClusterName": {
+      "Description": "Name of the ECS cluster to deploy to (optional)",
+      "Type": "String"
+    },
+    "ParameterSubnet1Id": {
       "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
       "Type": "AWS::EC2::Subnet::Id"
     },
-    "Subnet2Id": {
+    "ParameterSubnet2Id": {
       "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
       "Type": "AWS::EC2::Subnet::Id"
     },
-    "VPCId": {
+    "ParameterVPCId": {
       "Description": "ID of the VPC",
       "Type": "AWS::EC2::VPC::Id"
     }
@@ -20,10 +34,23 @@
         "Description": "Service Map for Docker Compose project TestSimpleConvert",
         "Name": "TestSimpleConvert.local",
         "Vpc": {
-          "Ref": "VPCId"
+          "Ref": "ParameterVPCId"
         }
       },
       "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace"
+    },
+    "Cluster": {
+      "Condition": "CreateCluster",
+      "Properties": {
+        "ClusterName": "TestSimpleConvert",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ]
+      },
+      "Type": "AWS::ECS::Cluster"
     },
     "LogGroup": {
       "Properties": {
@@ -33,7 +60,17 @@
     },
     "simpleService": {
       "Properties": {
-        "Cluster": "TestCluster",
+        "Cluster": {
+          "Fn::If": [
+            "CreateCluster",
+            {
+              "Ref": "Cluster"
+            },
+            {
+              "Ref": "ParameterClusterName"
+            }
+          ]
+        },
         "DesiredCount": 1,
         "LaunchType": "FARGATE",
         "NetworkConfiguration": {
@@ -41,10 +78,10 @@
             "AssignPublicIp": "ENABLED",
             "Subnets": [
               {
-                "Ref": "Subnet1Id"
+                "Ref": "ParameterSubnet1Id"
               },
               {
-                "Ref": "Subnet2Id"
+                "Ref": "ParameterSubnet2Id"
               }
             ]
           }
