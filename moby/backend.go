@@ -125,3 +125,9 @@ func (ms *mobyService) Logs(ctx context.Context, containerName string, request c
 	_, err = io.Copy(request.Writer, r)
 	return err
 }
+
+func (ms *mobyService) Delete(ctx context.Context, containerID string, force bool) error {
+	return ms.apiClient.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+		Force: force,
+	})
+}
