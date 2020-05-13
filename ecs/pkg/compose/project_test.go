@@ -9,14 +9,14 @@ import (
 
 func Test_project_name(t *testing.T) {
 	p, err := ProjectFromOptions(&ProjectOptions{
-		name:        "my_project",
+		Name:        "my_project",
 		ConfigPaths: []string{"testdata/simple/compose.yaml"},
 	})
 	assert.NilError(t, err)
 	assert.Equal(t, p.Name, "my_project")
 
 	p, err = ProjectFromOptions(&ProjectOptions{
-		name:        "",
+		Name:        "",
 		ConfigPaths: []string{"testdata/simple/compose.yaml"},
 	})
 	assert.NilError(t, err)
@@ -24,7 +24,7 @@ func Test_project_name(t *testing.T) {
 
 	os.Setenv("COMPOSE_PROJECT_NAME", "my_project_from_env")
 	p, err = ProjectFromOptions(&ProjectOptions{
-		name:        "",
+		Name:        "",
 		ConfigPaths: []string{"testdata/simple/compose.yaml"},
 	})
 	assert.NilError(t, err)
@@ -33,7 +33,7 @@ func Test_project_name(t *testing.T) {
 
 func Test_project_from_set_of_files(t *testing.T) {
 	p, err := ProjectFromOptions(&ProjectOptions{
-		name: "my_project",
+		Name: "my_project",
 		ConfigPaths: []string{
 			"testdata/simple/compose.yaml",
 			"testdata/simple/compose-with-overrides.yaml",

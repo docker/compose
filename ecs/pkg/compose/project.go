@@ -40,7 +40,7 @@ func ProjectFromOptions(options *ProjectOptions) (*Project, error) {
 		return nil, err
 	}
 
-	name := options.name
+	name := options.Name
 	if name == "" {
 		name = os.Getenv("COMPOSE_PROJECT_NAME")
 	}

@@ -7,12 +7,12 @@ import (
 
 type ProjectOptions struct {
 	ConfigPaths []string
-	name        string
+	Name        string
 }
 
 func (o *ProjectOptions) AddFlags(flags *pflag.FlagSet) {
 	flags.StringArrayVarP(&o.ConfigPaths, "file", "f", nil, "Specify an alternate compose file")
-	flags.StringVarP(&o.name, "project-name", "n", "", "Specify an alternate project name (default: directory name)")
+	flags.StringVarP(&o.Name, "project-name", "n", "", "Specify an alternate project name (default: directory name)")
 }
 
 type ProjectFunc func(project *Project, args []string) error
