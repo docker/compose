@@ -6,11 +6,12 @@ package mock
 
 import (
 	context "context"
+	reflect "reflect"
+
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
 	docker "github.com/docker/ecs-plugin/pkg/docker"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -269,4 +270,18 @@ func (m *MockAPI) WaitStackComplete(arg0 context.Context, arg1 string, arg2 int)
 func (mr *MockAPIMockRecorder) WaitStackComplete(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitStackComplete", reflect.TypeOf((*MockAPI)(nil).WaitStackComplete), arg0, arg1, arg2)
+}
+
+// GetLogs mocks base method
+func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GetLogs mocks base method
+func (mr *MockAPIMockRecorder) GetLogs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockAPI)(nil).GetLogs), arg0, arg1)
 }
