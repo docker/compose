@@ -3,8 +3,9 @@ package main
 import (
 	"time"
 
-	. "github.com/docker/api/tests/framework"
 	. "github.com/onsi/gomega"
+
+	. "github.com/docker/api/tests/framework"
 )
 
 func main() {

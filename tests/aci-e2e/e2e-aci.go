@@ -5,9 +5,10 @@ import (
 	"log"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
+	. "github.com/onsi/gomega"
+
 	"github.com/docker/api/azure"
 	. "github.com/docker/api/tests/framework"
-	. "github.com/onsi/gomega"
 )
 
 const resourceGroupName = "resourceGroupTest"

@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/api/compose"
 	"github.com/docker/api/context/store"
 )
