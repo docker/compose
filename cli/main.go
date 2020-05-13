@@ -108,6 +108,7 @@ func main() {
 		run.Command(),
 		cmd.ExecCommand(),
 		cmd.LogsCommand(),
+		cmd.RmCommand(),
 		compose.Command(),
 	)
 

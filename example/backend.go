@@ -59,6 +59,11 @@ func (cs *containerService) Logs(ctx context.Context, containerName string, requ
 	return nil
 }
 
+func (cs *containerService) Delete(ctx context.Context, id string, force bool) error {
+	fmt.Printf("Deleting container %q with force = %t\n", id, force)
+	return nil
+}
+
 type composeService struct{}
 
 func (cs *composeService) Up(ctx context.Context, opts compose.ProjectOptions) error {

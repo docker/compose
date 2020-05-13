@@ -5,16 +5,18 @@ import (
 	"log"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
+	"github.com/Azure/go-autorest/autorest/to"
+	. "github.com/onsi/gomega"
+
 	"github.com/docker/api/azure"
 	. "github.com/docker/api/tests/framework"
-	. "github.com/onsi/gomega"
 )
 
-const resourceGroupName = "resourceGroupTest"
-
-var location = "westeurope"
-
-const contextName = "acitest"
+const (
+	resourceGroupName = "resourceGroupTest"
+	location          = "westeurope"
+	contextName       = "acitest"
+)
 
 func main() {
 	SetupTest()
@@ -45,7 +47,7 @@ func main() {
 		Expect(err).To(BeNil())
 
 		NewDockerCommand("context", "create", contextName, "aci", "--aci-subscription-id", subscriptionID, "--aci-resource-group", resourceGroupName, "--aci-location", location).ExecOrDie()
-		//Expect(output).To(ContainSubstring("ACI context acitest created"))
+		// Expect(output).To(ContainSubstring("ACI context acitest created"))
 	})
 
 	defer deleteResourceGroup(resourceGroupName)
@@ -62,35 +64,33 @@ func main() {
 		Expect(len(Lines(output))).To(Equal(1))
 	})
 
-	/*
-		var nginxID string
-		It("runs nginx on port 80", func() {
-			NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
-			output := NewDockerCommand("ps").ExecOrDie()
-			Lines := Lines(output)
-			Expect(len(Lines)).To(Equal(2))
+	var nginxID string
+	It("runs nginx on port 80 (PORT NOT CHECKED YET!!! REMOVE THAT WHEN IMPLEMENTED)", func() {
+		NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
+		output := NewDockerCommand("ps").ExecOrDie()
+		lines := Lines(output)
+		Expect(len(lines)).To(Equal(2))
 
-			containerFields := Columns(Lines[1])
-			nginxID = containerFields[0]
-			Expect(containerFields[1]).To(Equal("nginx"))
-			Expect(containerFields[2]).To(Equal("Running"))
-			exposedIP := containerFields[3]
-			Expect(exposedIP).To(ContainSubstring(":80->80/TCP"))
+		containerFields := Columns(lines[1])
+		nginxID = containerFields[0]
+		Expect(containerFields[1]).To(Equal("nginx"))
+		Expect(containerFields[2]).To(Equal("Running"))
+		// exposedIP := containerFields[3]
+		// Expect(exposedIP).To(ContainSubstring(":80->80/TCP"))
 
-			url := strings.ReplaceAll(exposedIP, "->80/TCP", "")
-			output = NewCommand("curl", url).ExecOrDie()
-			Expect(output).To(ContainSubstring("Welcome to nginx!"))
-		})
+		// url := strings.ReplaceAll(exposedIP, "->80/TCP", "")
+		// output = NewCommand("curl", url).ExecOrDie()
+		// Expect(output).To(ContainSubstring("Welcome to nginx!"))
+	})
 
-		It("removes container nginx", func() {
-			output := NewDockerCommand("rm", nginxID).ExecOrDie()
-			Expect(Lines(output)[0]).To(Equal(nginxID))
-		})
-	*/
+	It("removes container nginx", func() {
+		output := NewDockerCommand("rm", nginxID).ExecOrDie()
+		Expect(Lines(output)[0]).To(Equal(nginxID))
+	})
 
 	It("deploys a compose app", func() {
 		NewDockerCommand("compose", "up", "-f", "./tests/composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
-		//Expect(output).To(ContainSubstring("Successfully deployed"))
+		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
 		Expect(len(Lines)).To(Equal(4))
@@ -141,7 +141,7 @@ func setupTestResourecGroup(groupName string) {
 	Expect(err).To(BeNil())
 	gc := azure.GetGroupsClient(subscriptionID)
 	_, err = gc.CreateOrUpdate(ctx, groupName, resources.Group{
-		Location: &location,
+		Location: to.StringPtr(location),
 	})
 	Expect(err).To(BeNil())
 }

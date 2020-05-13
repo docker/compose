@@ -72,8 +72,13 @@ func (p *proxyContainerAPI) Kill(_ context.Context, _ *v1.KillRequest) (*v1.Kill
 	panic("not implemented") // TODO: Implement
 }
 
-func (p *proxyContainerAPI) Delete(_ context.Context, _ *v1.DeleteRequest) (*v1.DeleteResponse, error) {
-	panic("not implemented") // TODO: Implement
+func (p *proxyContainerAPI) Delete(ctx context.Context, request *v1.DeleteRequest) (*v1.DeleteResponse, error) {
+	err := Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
+	if err != nil {
+		return &v1.DeleteResponse{}, err
+	}
+
+	return &v1.DeleteResponse{}, nil
 }
 
 func (p *proxyContainerAPI) Update(_ context.Context, _ *v1.UpdateRequest) (*v1.UpdateResponse, error) {

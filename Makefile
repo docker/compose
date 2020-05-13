@@ -32,6 +32,7 @@ all: cli
 
 protos: ## Generate go code from .proto files
 	@docker build . \
+	--output type=local,dest=. \
 	--target protos
 
 cli: ## Compile the cli
