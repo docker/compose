@@ -68,25 +68,27 @@ type AzureLoginService struct {
 	apiHelper  apiHelper
 }
 
-const tokenFilename = "dockerAccessToken.json"
+const tokenStoreFilename = "dockerAccessToken.json"
 
 func getTokenStorePath() string {
 	cliPath, _ := cli.AccessTokensPath()
-	return filepath.Join(filepath.Dir(cliPath), tokenFilename)
+	return filepath.Join(filepath.Dir(cliPath), tokenStoreFilename)
 }
 
 // NewAzureLoginService creates a NewAzureLoginService
-func NewAzureLoginService() AzureLoginService {
+func NewAzureLoginService() (AzureLoginService, error) {
 	return newAzureLoginServiceFromPath(getTokenStorePath(), azureAPIHelper{})
 }
 
-func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) AzureLoginService {
-	return AzureLoginService{
-		tokenStore: tokenStore{
-			filePath: tokenStorePath,
-		},
-		apiHelper: helper,
+func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (AzureLoginService, error) {
+	store, err := newTokenStore(tokenStorePath)
+	if err != nil {
+		return AzureLoginService{}, err
 	}
+	return AzureLoginService{
+		tokenStore: store,
+		apiHelper:  helper,
+	}, nil
 }
 
 type apiHelper interface {
@@ -229,20 +231,21 @@ func queryHandler(queryCh chan url.Values) func(w http.ResponseWriter, r *http.R
 	return queryHandler
 }
 
-func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (token azureToken, err error) {
+func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azureToken, error) {
 	res, err := http.Post(fmt.Sprintf(tokenEndpoint, tenantID), "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
-		return token, err
+		return azureToken{}, err
 	}
 	if res.StatusCode != 200 {
-		return token, errors.Errorf("error while renewing access token, status : %s", res.Status)
+		return azureToken{}, errors.Errorf("error while renewing access token, status : %s", res.Status)
 	}
 	bits, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return token, err
+		return azureToken{}, err
 	}
+	token := azureToken{}
 	if err := json.Unmarshal(bits, &token); err != nil {
-		return token, err
+		return azureToken{}, err
 	}
 	return token, nil
 }
@@ -259,7 +262,11 @@ func toOAuthToken(token azureToken) oauth2.Token {
 }
 
 // NewAuthorizerFromLogin creates an authorizer based on login access token
-func (login AzureLoginService) NewAuthorizerFromLogin() (autorest.Authorizer, error) {
+func NewAuthorizerFromLogin() (autorest.Authorizer, error) {
+	login, err := NewAzureLoginService()
+	if err != nil {
+		return nil, err
+	}
 	oauthToken, err := login.GetValidToken()
 	if err != nil {
 		return nil, err
@@ -278,28 +285,28 @@ func (login AzureLoginService) NewAuthorizerFromLogin() (autorest.Authorizer, er
 }
 
 // GetValidToken returns an access token. Refresh token if needed
-func (login AzureLoginService) GetValidToken() (token oauth2.Token, err error) {
+func (login AzureLoginService) GetValidToken() (oauth2.Token, error) {
 	loginInfo, err := login.tokenStore.readToken()
 	if err != nil {
-		return token, err
+		return oauth2.Token{}, err
 	}
-	token = loginInfo.Token
+	token := loginInfo.Token
 	if token.Valid() {
 		return token, nil
 	}
 	tenantID := loginInfo.TenantID
 	token, err = login.refreshToken(token.RefreshToken, tenantID)
 	if err != nil {
-		return token, errors.Wrap(err, "access token request failed. Maybe you need to login to azure again.")
+		return oauth2.Token{}, errors.Wrap(err, "access token request failed. Maybe you need to login to azure again.")
 	}
 	err = login.tokenStore.writeLoginInfo(TokenInfo{TenantID: tenantID, Token: token})
 	if err != nil {
-		return token, err
+		return oauth2.Token{}, err
 	}
 	return token, nil
 }
 
-func (login AzureLoginService) refreshToken(currentRefreshToken string, tenantID string) (oauthToken oauth2.Token, err error) {
+func (login AzureLoginService) refreshToken(currentRefreshToken string, tenantID string) (oauth2.Token, error) {
 	data := url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{clientID},
@@ -308,7 +315,7 @@ func (login AzureLoginService) refreshToken(currentRefreshToken string, tenantID
 	}
 	token, err := login.apiHelper.queryToken(data, tenantID)
 	if err != nil {
-		return oauthToken, err
+		return oauth2.Token{}, err
 	}
 
 	return toOAuthToken(token), nil

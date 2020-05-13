@@ -235,7 +235,7 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 }
 
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
-	auth, err := login.NewAzureLoginService().NewAuthorizerFromLogin()
+	auth, err := login.NewAuthorizerFromLogin()
 	if err != nil {
 		return containerinstance.ContainerGroupsClient{}, err
 	}
@@ -248,7 +248,7 @@ func getContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 }
 
 func getContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
-	auth, err := login.NewAzureLoginService().NewAuthorizerFromLogin()
+	auth, err := login.NewAuthorizerFromLogin()
 	if err != nil {
 		return containerinstance.ContainerClient{}, err
 	}
@@ -259,7 +259,7 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 
 func getSubscriptionsClient() subscription.SubscriptionsClient {
 	subc := subscription.NewSubscriptionsClient()
-	authorizer, _ := login.NewAzureLoginService().NewAuthorizerFromLogin()
+	authorizer, _ := login.NewAuthorizerFromLogin()
 	subc.Authorizer = authorizer
 	return subc
 }
@@ -267,7 +267,7 @@ func getSubscriptionsClient() subscription.SubscriptionsClient {
 // GetGroupsClient ...
 func GetGroupsClient(subscriptionID string) resources.GroupsClient {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
-	authorizer, _ := login.NewAzureLoginService().NewAuthorizerFromLogin()
+	authorizer, _ := login.NewAuthorizerFromLogin()
 	groupsClient.Authorizer = authorizer
 	return groupsClient
 }

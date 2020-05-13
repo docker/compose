@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -27,17 +25,18 @@ type LoginSuiteTest struct {
 
 func (suite *LoginSuiteTest) BeforeTest(suiteName, testName string) {
 	dir, err := ioutil.TempDir("", "test_store")
-	require.Nil(suite.T(), err)
+	Expect(err).To(BeNil())
 
 	suite.dir = dir
 	suite.mockHelper = MockAzureHelper{}
 	//nolint copylocks
-	suite.azureLogin = newAzureLoginServiceFromPath(filepath.Join(dir, tokenFilename), suite.mockHelper)
+	suite.azureLogin, err = newAzureLoginServiceFromPath(filepath.Join(dir, tokenStoreFilename), suite.mockHelper)
+	Expect(err).To(BeNil())
 }
 
 func (suite *LoginSuiteTest) AfterTest(suiteName, testName string) {
 	err := os.RemoveAll(suite.dir)
-	require.Nil(suite.T(), err)
+	Expect(err).To(BeNil())
 }
 
 func (suite *LoginSuiteTest) TestRefreshInValidToken() {
@@ -55,8 +54,10 @@ func (suite *LoginSuiteTest) TestRefreshInValidToken() {
 	}, nil)
 
 	//nolint copylocks
-	suite.azureLogin = newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenFilename), suite.mockHelper)
-	err := suite.azureLogin.tokenStore.writeLoginInfo(TokenInfo{
+	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
+	Expect(err).To(BeNil())
+	suite.azureLogin = azureLogin
+	err = suite.azureLogin.tokenStore.writeLoginInfo(TokenInfo{
 		TenantID: "123456",
 		Token: oauth2.Token{
 			AccessToken:  "accessToken",

@@ -52,14 +52,18 @@ func New(ctx context.Context) (backend.Service, error) {
 	}
 	aciContext, _ := metadata.Metadata.Data.(store.AciContext)
 
-	auth, _ := login.NewAzureLoginService().NewAuthorizerFromLogin()
+	auth, _ := login.NewAuthorizerFromLogin()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
-	return getAciAPIService(containerGroupsClient, aciContext), nil
+	return getAciAPIService(containerGroupsClient, aciContext)
 }
 
-func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciAPIService {
+func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) (*aciAPIService, error) {
+	service, err := login.NewAzureLoginService()
+	if err != nil {
+		return nil, err
+	}
 	return &aciAPIService{
 		aciContainerService: aciContainerService{
 			containerGroupsClient: cgc,
@@ -69,9 +73,9 @@ func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.
 			ctx: aciCtx,
 		},
 		aciCloudService: aciCloudService{
-			loginService: login.NewAzureLoginService(),
+			loginService: service,
 		},
-	}
+	}, nil
 }
 
 type aciAPIService struct {
