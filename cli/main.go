@@ -33,7 +33,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -48,7 +50,6 @@ import (
 	"github.com/docker/api/cli/cmd/run"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
-	"github.com/docker/api/util"
 )
 
 var (
@@ -129,7 +130,7 @@ func main() {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	ctx, cancel := util.NewSigContext()
+	ctx, cancel := newSigContext()
 	defer cancel()
 
 	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
@@ -165,6 +166,17 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func newSigContext() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := make(chan os.Signal)
+	signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-s
+		cancel()
+	}()
+	return ctx, cancel
 }
 
 func execMoby(ctx context.Context) {
