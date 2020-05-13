@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -97,20 +98,13 @@ type azureAPIHelper struct{}
 //Login perform azure login through browser
 func (login AzureLoginService) Login(ctx context.Context) error {
 	queryCh := make(chan url.Values, 1)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", queryHandler(queryCh))
-	server := &http.Server{Addr: ":8401", Handler: mux}
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			queryCh <- url.Values{
-				"error": []string{fmt.Sprintf("error starting http server with: %v", err)},
-			}
-		}
-	}()
+	serverPort, err := startLoginServer(queryCh)
+	if err != nil {
+		return err
+	}
 
-	state := randomString("", 10)
-	authURL := fmt.Sprintf(authorizeFormat, clientID, "http://localhost:8401", state, scopes)
-	openbrowser(authURL)
+	redirectURL := "http://localhost:" + strconv.Itoa(serverPort)
+	openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
@@ -129,7 +123,7 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 			"client_id":    []string{clientID},
 			"code":         code,
 			"scope":        []string{scopes},
-			"redirect_uri": []string{"http://localhost:8401"},
+			"redirect_uri": []string{redirectURL},
 		}
 		token, err := login.apiHelper.queryToken(data, "organizations")
 		if err != nil {
@@ -181,6 +175,32 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 
 		return fmt.Errorf("login failed: \n" + string(bits))
 	}
+}
+
+func startLoginServer(queryCh chan url.Values) (int, error) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", queryHandler(queryCh))
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+
+	availablePort := listener.Addr().(*net.TCPAddr).Port
+	server := &http.Server{Handler: mux}
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			queryCh <- url.Values{
+				"error": []string{fmt.Sprintf("error starting http server with: %v", err)},
+			}
+		}
+	}()
+	return availablePort, nil
+}
+
+func openAzureLoginPage(redirectURL string) {
+	state := randomString("", 10)
+	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
+	openbrowser(authURL)
 }
 
 func queryHandler(queryCh chan url.Values) func(w http.ResponseWriter, r *http.Request) {
