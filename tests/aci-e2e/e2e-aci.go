@@ -5,17 +5,18 @@ import (
 	"log"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
+	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/gomega"
 
 	"github.com/docker/api/azure"
 	. "github.com/docker/api/tests/framework"
 )
 
-const resourceGroupName = "resourceGroupTest"
-
-var location = "westeurope"
-
-const contextName = "acitest"
+const (
+	resourceGroupName = "resourceGroupTest"
+	location          = "westeurope"
+	contextName       = "acitest"
+)
 
 func main() {
 	SetupTest()
@@ -46,7 +47,7 @@ func main() {
 		Expect(err).To(BeNil())
 
 		NewDockerCommand("context", "create", contextName, "aci", "--aci-subscription-id", subscriptionID, "--aci-resource-group", resourceGroupName, "--aci-location", location).ExecOrDie()
-		//Expect(output).To(ContainSubstring("ACI context acitest created"))
+		// Expect(output).To(ContainSubstring("ACI context acitest created"))
 	})
 
 	defer deleteResourceGroup(resourceGroupName)
@@ -91,7 +92,7 @@ func main() {
 
 	It("deploys a compose app", func() {
 		NewDockerCommand("compose", "up", "-f", "./tests/composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
-		//Expect(output).To(ContainSubstring("Successfully deployed"))
+		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
 		Expect(len(Lines)).To(Equal(4))
@@ -142,7 +143,7 @@ func setupTestResourecGroup(groupName string) {
 	Expect(err).To(BeNil())
 	gc := azure.GetGroupsClient(subscriptionID)
 	_, err = gc.CreateOrUpdate(ctx, groupName, resources.Group{
-		Location: &location,
+		Location: to.StringPtr(location),
 	})
 	Expect(err).To(BeNil())
 }
