@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ func RmCommand() *cobra.Command {
 					errs = append(errs, err.Error())
 					continue
 				}
-				println(id)
+				fmt.Println(id)
 			}
 
 			if len(errs) > 0 {
