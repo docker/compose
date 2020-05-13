@@ -3,6 +3,7 @@ package amazon
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -306,4 +307,35 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	force := !recover
 	_, err := s.SM.DeleteSecret(&secretsmanager.DeleteSecretInput{SecretId: &id, ForceDeleteWithoutRecovery: &force})
 	return err
+}
+
+func (s sdk) GetLogs(ctx context.Context, name string) error {
+	logGroup := fmt.Sprintf("/docker-compose/%s", name)
+	var startTime int64
+	for {
+		var hasMore = true
+		var token *string
+		token = nil
+		for hasMore {
+			events, err := s.CW.FilterLogEvents(&cloudwatchlogs.FilterLogEventsInput{
+				LogGroupName: aws.String(logGroup),
+				NextToken:    token,
+				StartTime:    aws.Int64(startTime),
+			})
+			if err != nil {
+				return err
+			}
+			if events.NextToken == nil {
+				hasMore = false
+			} else {
+				token = events.NextToken
+			}
+
+			for _, event := range events.Events {
+				fmt.Println(*event.Message)
+				startTime = *event.IngestionTime
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }

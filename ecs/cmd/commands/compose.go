@@ -22,6 +22,7 @@ func ComposeCommand(dockerCli command.Cli) *cobra.Command {
 		ConvertCommand(dockerCli, opts),
 		UpCommand(dockerCli, opts),
 		DownCommand(dockerCli, opts),
+		LogsCommand(dockerCli, opts),
 	)
 	return cmd
 }
@@ -117,5 +118,30 @@ func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 		}),
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
+	return cmd
+}
+
+func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "logs [PROJECT NAME]",
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
+			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			if err != nil {
+				return err
+			}
+			var name string
+
+			if len(args) == 0 {
+				project, err := compose.ProjectFromOptions(projectOpts)
+				if err != nil {
+					return err
+				}
+				name = project.Name
+			} else {
+				name = args[0]
+			}
+			return client.ComposeLogs(context.Background(), name)
+		}),
+	}
 	return cmd
 }
