@@ -274,5 +274,5 @@ type aciCloudService struct {
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
-	return cs.loginService.Login()
+	return cs.loginService.Login(ctx)
 }

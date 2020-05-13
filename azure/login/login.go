@@ -1,6 +1,7 @@
 package login
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,14 +10,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/docker/api/errdefs"
@@ -91,16 +89,13 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) Azure
 }
 
 type apiHelper interface {
-	queryToken(data url.Values, tenantID string) (token azureToken, err error)
+	queryToken(data url.Values, tenantID string) (azureToken, error)
 }
 
 type azureAPIHelper struct{}
 
 //Login perform azure login through browser
-func (login AzureLoginService) Login() error {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
+func (login AzureLoginService) Login(ctx context.Context) error {
 	queryCh := make(chan url.Values, 1)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", queryHandler(queryCh))
@@ -118,7 +113,7 @@ func (login AzureLoginService) Login() error {
 	openbrowser(authURL)
 
 	select {
-	case <-sigs:
+	case <-ctx.Done():
 		return nil
 	case qsValues := <-queryCh:
 		errorMsg, hasError := qsValues["error"]
