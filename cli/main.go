@@ -51,6 +51,10 @@ import (
 	"github.com/docker/api/util"
 )
 
+var (
+	runningOwnCommand bool
+)
+
 type mainOpts struct {
 	apicontext.Flags
 	debug bool
@@ -86,7 +90,8 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if !isOwnCommand(cmd) {
+			runningOwnCommand = isOwnCommand(cmd)
+			if !runningOwnCommand {
 				execMoby(cmd.Context())
 			}
 			return nil
@@ -108,7 +113,8 @@ func main() {
 
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if !isOwnCommand(cmd) {
+		runningOwnCommand = isOwnCommand(cmd)
+		if !runningOwnCommand {
 			execMoby(cmd.Context())
 		}
 		helpFunc(cmd, args)
@@ -150,6 +156,11 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
+		// Context should always be handled by new CLI
+		if runningOwnCommand {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		execMoby(ctx)
 		fmt.Println(err)
 		os.Exit(1)
