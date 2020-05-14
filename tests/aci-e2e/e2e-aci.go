@@ -16,6 +16,8 @@ const (
 	resourceGroupName = "resourceGroupTest"
 	location          = "westeurope"
 	contextName       = "acitest"
+
+	testContainerName = "testcontainername"
 )
 
 func main() {
@@ -66,8 +68,9 @@ func main() {
 
 	var nginxID string
 	It("runs nginx on port 80 (PORT NOT CHECKED YET!!! REMOVE THAT WHEN IMPLEMENTED)", func() {
-		NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
-		output := NewDockerCommand("ps").ExecOrDie()
+		output := NewDockerCommand("run", "nginx", "-p", "80:80", "--name", testContainerName).ExecOrDie()
+		Expect(output).To(Equal(testContainerName + "\n"))
+		output = NewDockerCommand("ps").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(2))
 
