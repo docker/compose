@@ -47,3 +47,17 @@ func TestIsAlreadyExists(t *testing.T) {
 
 	require.False(t, IsAlreadyExistsError(errors.New("another error")))
 }
+
+func TestIsForbidden(t *testing.T) {
+	err := errors.Wrap(ErrForbidden, `object "name"`)
+	require.True(t, IsForbiddenError(err))
+
+	require.False(t, IsForbiddenError(errors.New("another error")))
+}
+
+func TestIsUnknown(t *testing.T) {
+	err := errors.Wrap(ErrUnknown, `object "name"`)
+	require.True(t, IsUnknownError(err))
+
+	require.False(t, IsUnknownError(errors.New("another error")))
+}

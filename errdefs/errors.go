@@ -36,6 +36,8 @@ var (
 	ErrNotFound = errors.New("not found")
 	// ErrAlreadyExists is returned when an object already exists
 	ErrAlreadyExists = errors.New("already exists")
+	// ErrForbidden is returned when an operation is not permitted
+	ErrForbidden = errors.New("forbidden")
 	// ErrUnknown is returned when the error type is unmapped
 	ErrUnknown = errors.New("unknown")
 )
@@ -48,6 +50,11 @@ func IsNotFoundError(err error) bool {
 // IsAlreadyExistsError returns true if the unwrapped error is ErrAlreadyExists
 func IsAlreadyExistsError(err error) bool {
 	return errors.Is(err, ErrAlreadyExists)
+}
+
+// IsForbiddenError returns true if the unwrapped error is ErrForbidden
+func IsForbiddenError(err error) bool {
+	return errors.Is(err, ErrForbidden)
 }
 
 // IsUnknownError returns true if the unwrapped error is ErrUnknown
