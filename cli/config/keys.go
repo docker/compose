@@ -25,21 +25,10 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package context
+package config
 
-import (
-	"os"
-
-	"github.com/spf13/pflag"
+const (
+	// currentContextKey is the key used in the Docker config file to set the
+	// default context
+	currentContextKey = "currentContext"
 )
-
-// ContextFlags are the global CLI flags
-// nolint stutter
-type ContextFlags struct {
-	Context string
-}
-
-// AddContextFlags adds persistent (global) flags
-func (c *ContextFlags) AddContextFlags(flags *pflag.FlagSet) {
-	flags.StringVarP(&c.Context, "context", "c", os.Getenv("DOCKER_CONTEXT"), "context")
-}

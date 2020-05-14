@@ -48,6 +48,7 @@ import (
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
 	"github.com/docker/api/cli/cmd/run"
+	cliconfig "github.com/docker/api/cli/config"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -57,7 +58,8 @@ var (
 )
 
 type mainOpts struct {
-	apicontext.Flags
+	apicontext.ContextFlags
+	cliconfig.ConfigFlags
 	debug bool
 }
 
@@ -123,7 +125,8 @@ func main() {
 	})
 
 	root.PersistentFlags().BoolVarP(&opts.debug, "debug", "d", false, "enable debug output in the logs")
-	opts.AddFlags(root.PersistentFlags())
+	opts.AddConfigFlags(root.PersistentFlags())
+	opts.AddContextFlags(root.PersistentFlags())
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
@@ -134,7 +137,7 @@ func main() {
 	ctx, cancel := newSigContext()
 	defer cancel()
 
-	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
+	config, err := cliconfig.LoadFile(opts.Config)
 	if err != nil {
 		logrus.Fatal("unable ot find configuration")
 	}
@@ -146,15 +149,11 @@ func main() {
 		currentContext = "default"
 	}
 
-	ctx = apicontext.WithCurrentContext(ctx, currentContext)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-
 	s, err := store.New(store.WithRoot(opts.Config))
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
