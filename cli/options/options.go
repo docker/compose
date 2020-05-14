@@ -28,8 +28,8 @@
 package options
 
 import (
-	apicontext "github.com/docker/api/context"
 	cliconfig "github.com/docker/api/cli/config"
+	apicontext "github.com/docker/api/context"
 )
 
 // GlobalOpts contains the global CLI options
