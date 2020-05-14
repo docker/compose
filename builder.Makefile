@@ -55,11 +55,10 @@ cross:
 	@GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-windows-amd64.exe ./cli
 
 test:
-	@gotestsum ./...
+	@go test ./...
 
 lint:
 	golangci-lint run --timeout 10m0s ./...
-
 
 FORCE:
 

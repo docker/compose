@@ -105,6 +105,11 @@ func New(opts ...Opt) (Store, error) {
 	s := &store{
 		root: filepath.Join(home, ".docker"),
 	}
+	if _, err := os.Stat(s.root); os.IsNotExist(err) {
+		if err = os.Mkdir(s.root, 0755); err != nil {
+			return nil, err
+		}
+	}
 	for _, opt := range opts {
 		opt(s)
 	}
