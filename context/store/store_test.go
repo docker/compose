@@ -33,9 +33,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/api/errdefs"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/docker/api/errdefs"
 )
 
 type StoreTestSuite struct {
