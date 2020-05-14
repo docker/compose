@@ -30,13 +30,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -68,7 +68,7 @@ func init() {
 	// into the env of this cli for development
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		log.Fatal(err)
+		fatal(errors.Wrap(err, "unable to get absolute bin path"))
 	}
 	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), path)); err != nil {
 		panic(err)
@@ -139,7 +139,7 @@ func main() {
 
 	config, err := cliconfig.LoadFile(opts.Config)
 	if err != nil {
-		logrus.Fatal("unable ot find configuration")
+		fatal(errors.Wrap(err, "unable to find configuration file"))
 	}
 	currentContext := opts.Context
 	if currentContext == "" {
@@ -151,7 +151,7 @@ func main() {
 
 	s, err := store.New(store.WithRoot(opts.Config))
 	if err != nil {
-		logrus.Fatal(err)
+		fatal(errors.Wrap(err, "unable to create context store"))
 	}
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
@@ -199,4 +199,9 @@ func execMoby(ctx context.Context) {
 		}
 		os.Exit(0)
 	}
+}
+
+func fatal(err error) {
+	fmt.Fprint(os.Stderr, err)
+	os.Exit(1)
 }
