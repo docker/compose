@@ -31,33 +31,33 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsNotFound(t *testing.T) {
 	err := errors.Wrap(ErrNotFound, `object "name"`)
-	require.True(t, IsNotFoundError(err))
+	assert.True(t, IsNotFoundError(err))
 
-	require.False(t, IsNotFoundError(errors.New("another error")))
+	assert.False(t, IsNotFoundError(errors.New("another error")))
 }
 
 func TestIsAlreadyExists(t *testing.T) {
 	err := errors.Wrap(ErrAlreadyExists, `object "name"`)
-	require.True(t, IsAlreadyExistsError(err))
+	assert.True(t, IsAlreadyExistsError(err))
 
-	require.False(t, IsAlreadyExistsError(errors.New("another error")))
+	assert.False(t, IsAlreadyExistsError(errors.New("another error")))
 }
 
 func TestIsForbidden(t *testing.T) {
 	err := errors.Wrap(ErrForbidden, `object "name"`)
-	require.True(t, IsForbiddenError(err))
+	assert.True(t, IsForbiddenError(err))
 
-	require.False(t, IsForbiddenError(errors.New("another error")))
+	assert.False(t, IsForbiddenError(errors.New("another error")))
 }
 
 func TestIsUnknown(t *testing.T) {
 	err := errors.Wrap(ErrUnknown, `object "name"`)
-	require.True(t, IsUnknownError(err))
+	assert.True(t, IsUnknownError(err))
 
-	require.False(t, IsUnknownError(errors.New("another error")))
+	assert.False(t, IsUnknownError(errors.New("another error")))
 }
