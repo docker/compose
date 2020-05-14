@@ -6,15 +6,23 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      GO111MODULE: "on"
     steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14
+        id: go
+
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
       - name: Run golangci-lint
-        env:
-          GO111MODULE: "on"
-          GOROOT: ""
-        uses: actions-contrib/golangci-lint@v1
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.27.0
+          ./golangci-lint run
+
   build:
     name: Build
     runs-on: ubuntu-latest
