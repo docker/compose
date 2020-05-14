@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os/exec"
 	"path/filepath"
@@ -35,8 +34,9 @@ func init() {
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
 const (
-	authorizeFormat = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
-	tokenEndpoint   = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
+	authorizeFormat  = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
+	tokenEndpoint    = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
+	authorizationURL = "https://management.azure.com/tenants?api-version=2019-11-01"
 	// scopes for a multi-tenant app works for openid, email, other common scopes, but fails when trying to add a token
 	// v1 scope like "https://management.azure.com/.default" for ARM access
 	scopes   = "offline_access https://management.azure.com/.default"
@@ -93,6 +93,8 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 
 type apiHelper interface {
 	queryToken(data url.Values, tenantID string) (azureToken, error)
+	openAzureLoginPage(redirectURL string)
+	queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error)
 }
 
 type azureAPIHelper struct{}
@@ -106,7 +108,7 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 	}
 
 	redirectURL := "http://localhost:" + strconv.Itoa(serverPort)
-	openAzureLoginPage(redirectURL)
+	login.apiHelper.openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
@@ -132,23 +134,12 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 			return errors.Wrap(err, "Access token request failed")
 		}
 
-		req, err := http.NewRequest(http.MethodGet, "https://management.azure.com/tenants?api-version=2019-11-01", nil)
-		if err != nil {
-			return err
-		}
-
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-		res, err := http.DefaultClient.Do(req)
+		bits, statusCode, err := login.apiHelper.queryAuthorizationAPI(authorizationURL, fmt.Sprintf("Bearer %s", token.AccessToken))
 		if err != nil {
 			return errors.Wrap(err, "login failed")
 		}
 
-		bits, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			return errors.Wrap(err, "login failed")
-		}
-
-		if res.StatusCode == 200 {
+		if statusCode == 200 {
 			var tenantResult tenantResult
 			if err := json.Unmarshal(bits, &tenantResult); err != nil {
 				return errors.Wrap(err, "login failed")
@@ -170,12 +161,7 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 			return nil
 		}
 
-		bits, err = httputil.DumpResponse(res, true)
-		if err != nil {
-			return errors.Wrap(err, "login failed")
-		}
-
-		return fmt.Errorf("login failed: \n" + string(bits))
+		return fmt.Errorf("login failed : " + string(bits))
 	}
 }
 
@@ -199,10 +185,27 @@ func startLoginServer(queryCh chan url.Values) (int, error) {
 	return availablePort, nil
 }
 
-func openAzureLoginPage(redirectURL string) {
+func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) {
 	state := randomString("", 10)
 	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
 	openbrowser(authURL)
+}
+
+func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
+	req, err := http.NewRequest(http.MethodGet, authorizationURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Add("Authorization", authorizationHeader)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	bits, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return bits, res.StatusCode, nil
 }
 
 func queryHandler(queryCh chan url.Values) func(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,8 @@
 package login
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
 	apicontext "github.com/docker/api/context"

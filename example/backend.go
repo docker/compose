@@ -3,8 +3,9 @@ package example
 import (
 	"context"
 	"fmt"
-	"github.com/docker/api/context/cloud"
 	"io"
+
+	"github.com/docker/api/context/cloud"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"

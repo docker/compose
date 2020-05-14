@@ -2,8 +2,9 @@ package moby
 
 import (
 	"context"
-	"github.com/docker/api/context/cloud"
 	"io"
+
+	"github.com/docker/api/context/cloud"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"

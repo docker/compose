@@ -28,8 +28,9 @@
 package context
 
 import (
-	"github.com/docker/api/cli/cmd/context/login"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/cli/cmd/context/login"
 
 	cliopts "github.com/docker/api/cli/options"
 )
