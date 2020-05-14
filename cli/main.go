@@ -30,13 +30,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -48,6 +48,8 @@ import (
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
 	"github.com/docker/api/cli/cmd/run"
+	cliconfig "github.com/docker/api/cli/config"
+	cliopts "github.com/docker/api/cli/options"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -56,17 +58,12 @@ var (
 	runningOwnCommand bool
 )
 
-type mainOpts struct {
-	apicontext.Flags
-	debug bool
-}
-
 func init() {
 	// initial hack to get the path of the project's bin dir
 	// into the env of this cli for development
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		log.Fatal(err)
+		fatal(errors.Wrap(err, "unable to get absolute bin path"))
 	}
 	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), path)); err != nil {
 		panic(err)
@@ -84,7 +81,7 @@ func isOwnCommand(cmd *cobra.Command) bool {
 }
 
 func main() {
-	var opts mainOpts
+	var opts cliopts.GlobalOpts
 	root := &cobra.Command{
 		Use:           "docker",
 		Long:          "docker for the 2020s",
@@ -103,7 +100,7 @@ func main() {
 	}
 
 	root.AddCommand(
-		cmd.ContextCommand(),
+		cmd.ContextCommand(&opts),
 		cmd.PsCommand(),
 		cmd.ServeCommand(),
 		run.Command(),
@@ -122,21 +119,25 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().BoolVarP(&opts.debug, "debug", "d", false, "enable debug output in the logs")
-	opts.AddFlags(root.PersistentFlags())
+	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "d", false, "enable debug output in the logs")
+	opts.AddConfigFlags(root.PersistentFlags())
+	opts.AddContextFlags(root.PersistentFlags())
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
-	if opts.debug {
+	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	ctx, cancel := newSigContext()
 	defer cancel()
 
-	config, err := apicontext.LoadConfigFile(opts.Config, "config.json")
+	if opts.Config == "" {
+		fatal(errors.New("config path cannot be empty"))
+	}
+	config, err := cliconfig.LoadFile(opts.Config)
 	if err != nil {
-		logrus.Fatal("unable ot find configuration")
+		fatal(errors.Wrap(err, "unable to find configuration file"))
 	}
 	currentContext := opts.Context
 	if currentContext == "" {
@@ -146,15 +147,11 @@ func main() {
 		currentContext = "default"
 	}
 
-	ctx = apicontext.WithCurrentContext(ctx, currentContext)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-
 	s, err := store.New(store.WithRoot(opts.Config))
 	if err != nil {
-		logrus.Fatal(err)
+		fatal(errors.Wrap(err, "unable to create context store"))
 	}
+	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
@@ -200,4 +197,9 @@ func execMoby(ctx context.Context) {
 		}
 		os.Exit(0)
 	}
+}
+
+func fatal(err error) {
+	fmt.Fprint(os.Stderr, err)
+	os.Exit(1)
 }

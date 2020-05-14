@@ -25,39 +25,10 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package errdefs
+package config
 
-import (
-	"github.com/pkg/errors"
+const (
+	// currentContextKey is the key used in the Docker config file to set the
+	// default context
+	currentContextKey = "currentContext"
 )
-
-var (
-	// ErrNotFound is returned when an object is not found
-	ErrNotFound = errors.New("not found")
-	// ErrAlreadyExists is returned when an object already exists
-	ErrAlreadyExists = errors.New("already exists")
-	// ErrForbidden is returned when an operation is not permitted
-	ErrForbidden = errors.New("forbidden")
-	// ErrUnknown is returned when the error type is unmapped
-	ErrUnknown = errors.New("unknown")
-)
-
-// IsNotFoundError returns true if the unwrapped error is ErrNotFound
-func IsNotFoundError(err error) bool {
-	return errors.Is(err, ErrNotFound)
-}
-
-// IsAlreadyExistsError returns true if the unwrapped error is ErrAlreadyExists
-func IsAlreadyExistsError(err error) bool {
-	return errors.Is(err, ErrAlreadyExists)
-}
-
-// IsForbiddenError returns true if the unwrapped error is ErrForbidden
-func IsForbiddenError(err error) bool {
-	return errors.Is(err, ErrForbidden)
-}
-
-// IsUnknownError returns true if the unwrapped error is ErrUnknown
-func IsUnknownError(err error) bool {
-	return errors.Is(err, ErrUnknown)
-}

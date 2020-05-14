@@ -25,44 +25,36 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package context
+package config
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/pflag"
 )
 
-// LoadConfigFile loads the docker configuration
-func LoadConfigFile(configDir string, configFileName string) (*ConfigFile, error) {
-	filename := filepath.Join(configDir, configFileName)
-	configFile := &ConfigFile{
-		Filename: filename,
-	}
+const (
+	// ConfigFileName is the name of config file
+	ConfigFileName = "config.json"
+	// ConfigFileDir is the default folder where the config file is stored
+	ConfigFileDir = ".docker"
+	// ConfigFlagName is the name of the config flag
+	ConfigFlagName = "config"
+)
 
-	if _, err := os.Stat(filename); err == nil {
-		file, err := os.Open(filename)
-		if err != nil {
-			return nil, fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		// nolint errcheck
-		defer file.Close()
-		err = json.NewDecoder(file).Decode(&configFile)
-		if err != nil {
-			err = fmt.Errorf("can't read %s: %w", filename, err)
-		}
-		return configFile, err
-	} else if !os.IsNotExist(err) {
-		// if file is there but we can't stat it for any reason other
-		// than it doesn't exist then stop
-		return nil, fmt.Errorf("can't read %s: %w", filename, err)
-	}
-	return configFile, nil
+// ConfigFlags are the global CLI flags
+// nolint stutter
+type ConfigFlags struct {
+	Config string
 }
 
-// ConfigFile contains the current context from the docker configuration file
-type ConfigFile struct {
-	Filename       string `json:"-"` // Note: for internal use only
-	CurrentContext string `json:"currentContext,omitempty"`
+// AddConfigFlags adds persistent (global) flags
+func (c *ConfigFlags) AddConfigFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&c.Config, ConfigFlagName, filepath.Join(home(), ConfigFileDir), "Location of the client config files `DIRECTORY`")
+}
+
+func home() string {
+	home, _ := os.UserHomeDir()
+	return home
 }

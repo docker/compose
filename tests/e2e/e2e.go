@@ -20,7 +20,7 @@ func main() {
 	})
 
 	It("should be initialized with default context", func() {
-		NewCommand("docker", "context", "use", "default").ExecOrDie()
+		NewDockerCommand("context", "use", "default").ExecOrDie()
 		output := NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(Not(ContainSubstring("test-example")))
 		Expect(output).To(ContainSubstring("default *"))
@@ -52,9 +52,10 @@ func main() {
 		// Expect(output).To(ContainSubstring("test-example context acitest created"))
 	})
 	defer NewDockerCommand("context", "rm", "test-example").ExecOrDie()
+	defer NewDockerCommand("context", "use", "default").ExecOrDie()
 
 	It("uses the test context", func() {
-		currentContext := NewCommand("docker", "context", "use", "test-example").ExecOrDie()
+		currentContext := NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example *"))

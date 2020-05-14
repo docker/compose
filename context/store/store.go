@@ -36,9 +36,15 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/docker/api/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+
+	"github.com/docker/api/errdefs"
+)
+
+const (
+	// DefaultContextName is an automatically generated local context
+	DefaultContextName = "default"
 )
 
 const (
@@ -187,6 +193,9 @@ func (s *store) GetType(meta *Metadata) string {
 }
 
 func (s *store) Create(name string, data TypedContext) error {
+	if name == DefaultContextName {
+		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
+	}
 	dir := contextdirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
@@ -242,6 +251,9 @@ func (s *store) List() ([]*Metadata, error) {
 }
 
 func (s *store) Remove(name string) error {
+	if name == DefaultContextName {
+		return errors.Wrap(errdefs.ErrForbidden, objectName(name))
+	}
 	dir := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name))
 	// Check if directory exists because os.RemoveAll returns nil if it doesn't
 	if _, err := os.Stat(dir); os.IsNotExist(err) {

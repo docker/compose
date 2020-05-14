@@ -29,31 +29,17 @@ package context
 
 import (
 	"os"
-	"path/filepath"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/pflag"
 )
 
-const (
-	// ConfigFileName is the name of config file
-	ConfigFileName = "config.json"
-	configFileDir  = ".docker"
-)
-
-// Flags are the global cli flags
-type Flags struct {
-	Config  string
+// ContextFlags are the global CLI flags
+// nolint stutter
+type ContextFlags struct {
 	Context string
 }
 
-// AddFlags adds persistent (global) flags
-func (c *Flags) AddFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&c.Config, "config", filepath.Join(home(), configFileDir), "Location of the client config files `DIRECTORY`")
+// AddContextFlags adds persistent (global) flags
+func (c *ContextFlags) AddContextFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Context, "context", "c", os.Getenv("DOCKER_CONTEXT"), "context")
-}
-
-func home() string {
-	home, _ := homedir.Dir()
-	return home
 }
