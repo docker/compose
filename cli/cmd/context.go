@@ -84,6 +84,7 @@ func createCommand() *cobra.Command {
 func listCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
+		Short:   "List available contexts",
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,7 +96,8 @@ func listCommand() *cobra.Command {
 
 func removeCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:     "rm",
+		Use:     "rm CONTEXT [CONTEXT...]",
+		Short:   "Remove one or more contexts",
 		Aliases: []string{"remove"},
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
