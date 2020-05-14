@@ -36,9 +36,9 @@ func main() {
 		Expect(output).To(ContainSubstring("\"docker swarm join\" requires exactly 1 argument."))
 	})
 
-	It("should run local container in less than 2 secs", func() {
+	It("should run local container in less than 5 secs", func() {
 		NewDockerCommand("pull", "hello-world").ExecOrDie()
-		output := NewDockerCommand("run", "hello-world").WithTimeout(time.NewTimer(2 * time.Second).C).ExecOrDie()
+		output := NewDockerCommand("run", "hello-world").WithTimeout(time.NewTimer(5 * time.Second).C).ExecOrDie()
 		Expect(output).To(ContainSubstring("Hello from Docker!"))
 	})
 
@@ -49,7 +49,7 @@ func main() {
 
 	It("creates a new test context to hardcoded example backend", func() {
 		NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
-		//Expect(output).To(ContainSubstring("test-example context acitest created"))
+		// Expect(output).To(ContainSubstring("test-example context acitest created"))
 	})
 	defer NewDockerCommand("context", "rm", "test-example").ExecOrDie()
 
