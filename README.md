@@ -9,6 +9,7 @@ The recommended way is to use the main `Makefile` that runs everything inside a 
 If you don't have or want to use Docker for building you need to make sure you have all the needed tools installed locally:
 
 * go 1.14
+* [protoc](https://github.com/protocolbuffers/protobuf)
 * `go get github.com/golang/protobuf/protoc-gen-go@v1.4.1`
 * `go get golang.org/x/tools/cmd/goimports`
 * `go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.26.0`
