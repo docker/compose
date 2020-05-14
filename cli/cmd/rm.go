@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/multierror"
 )
 
 type rmOpts struct {
@@ -23,26 +23,22 @@ func RmCommand() *cobra.Command {
 		Short:   "Remove containers",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var errs []string
 			c, err := client.New(cmd.Context())
 			if err != nil {
 				return errors.Wrap(err, "cannot connect to backend")
 			}
 
+			var errs *multierror.Error
 			for _, id := range args {
 				err := c.ContainerService().Delete(cmd.Context(), id, opts.force)
 				if err != nil {
-					errs = append(errs, err.Error()+" "+id)
+					errs = multierror.Append(errs, err)
 					continue
 				}
 				fmt.Println(id)
 			}
 
-			if len(errs) > 0 {
-				return errors.New(strings.Join(errs, "\n"))
-			}
-
-			return nil
+			return errs.ErrorOrNil()
 		},
 	}
 

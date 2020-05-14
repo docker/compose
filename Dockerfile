@@ -45,7 +45,7 @@ COPY --from=make-cli /api/bin/* .
 FROM scratch AS cross
 COPY --from=make-cross /api/bin/* .
 
-FROM make-protos as test
+FROM fs as test
 RUN make -f builder.Makefile test
 
 FROM fs AS lint
