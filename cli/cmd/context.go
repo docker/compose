@@ -34,8 +34,10 @@ import (
 	"text/tabwriter"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	cliconfig "github.com/docker/api/cli/config"
 	"github.com/docker/api/context/store"
 )
 
@@ -50,6 +52,7 @@ func ContextCommand() *cobra.Command {
 		createCommand(),
 		listCommand(),
 		removeCommand(),
+		useCommand(),
 	)
 
 	return cmd
@@ -102,6 +105,21 @@ func removeCommand() *cobra.Command {
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRemove(cmd.Context(), args)
+		},
+	}
+}
+
+func useCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "use CONTEXT",
+		Short: "Set the default context",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config := cmd.Flag(cliconfig.ConfigFlagName)
+			if config == nil || config.Value.String() == "" {
+				panic(errors.New("no value for config directory"))
+			}
+			return runUse(cmd.Context(), config.Value.String(), args[0])
 		},
 	}
 }
@@ -161,4 +179,19 @@ func runRemove(ctx context.Context, args []string) error {
 		}
 	}
 	return errs.ErrorOrNil()
+}
+
+func runUse(ctx context.Context, configDir string, name string) error {
+	s := store.ContextStore(ctx)
+	// Match behavior of existing CLI
+	if name != store.DefaultContextName {
+		if _, err := s.Get(name, nil); err != nil {
+			return err
+		}
+	}
+	if err := cliconfig.WriteCurrentContext(configDir, name); err != nil {
+		return err
+	}
+	fmt.Println(name)
+	return nil
 }
