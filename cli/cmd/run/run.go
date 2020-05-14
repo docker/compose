@@ -46,11 +46,7 @@ func Command() *cobra.Command {
 		Short: "Run a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runRun(cmd.Context(), args[0], opts); err != nil {
-				return err
-			}
-			fmt.Println(opts.name)
-			return nil
+			return runRun(cmd.Context(), args[0], opts)
 		},
 	}
 
@@ -71,7 +67,12 @@ func runRun(ctx context.Context, image string, opts runOpts) error {
 		return err
 	}
 
-	return c.ContainerService().Run(ctx, project)
+	if err = c.ContainerService().Run(ctx, project); err != nil {
+		return err
+	}
+	fmt.Println(opts.name)
+	return nil
+
 }
 
 func getRandomName() string {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -23,26 +24,30 @@ func RmCommand() *cobra.Command {
 		Short:   "Remove containers",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := client.New(cmd.Context())
-			if err != nil {
-				return errors.Wrap(err, "cannot connect to backend")
-			}
-
-			var errs *multierror.Error
-			for _, id := range args {
-				err := c.ContainerService().Delete(cmd.Context(), id, opts.force)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-					continue
-				}
-				fmt.Println(id)
-			}
-
-			return errs.ErrorOrNil()
+			return runRm(cmd.Context(), args, opts)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force removal")
 
 	return cmd
+}
+
+func runRm(ctx context.Context, args []string, opts rmOpts) error {
+	c, err := client.New(ctx)
+	if err != nil {
+		return errors.Wrap(err, "cannot connect to backend")
+	}
+
+	var errs *multierror.Error
+	for _, id := range args {
+		err := c.ContainerService().Delete(ctx, id, opts.force)
+		if err != nil {
+			errs = multierror.Append(errs, err)
+			continue
+		}
+		fmt.Println(id)
+	}
+
+	return errs.ErrorOrNil()
 }
