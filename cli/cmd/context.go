@@ -34,15 +34,15 @@ import (
 	"text/tabwriter"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	cliconfig "github.com/docker/api/cli/config"
+	cliopts "github.com/docker/api/cli/options"
 	"github.com/docker/api/context/store"
 )
 
 // ContextCommand manages contexts
-func ContextCommand() *cobra.Command {
+func ContextCommand(opts *cliopts.GlobalOpts) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "context",
 		Short: "Manage contexts",
@@ -52,7 +52,7 @@ func ContextCommand() *cobra.Command {
 		createCommand(),
 		listCommand(),
 		removeCommand(),
-		useCommand(),
+		useCommand(opts),
 	)
 
 	return cmd
@@ -109,17 +109,13 @@ func removeCommand() *cobra.Command {
 	}
 }
 
-func useCommand() *cobra.Command {
+func useCommand(opts *cliopts.GlobalOpts) *cobra.Command {
 	return &cobra.Command{
 		Use:   "use CONTEXT",
 		Short: "Set the default context",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config := cmd.Flag(cliconfig.ConfigFlagName)
-			if config == nil || config.Value.String() == "" {
-				panic(errors.New("no value for config directory"))
-			}
-			return runUse(cmd.Context(), config.Value.String(), args[0])
+			return runUse(cmd.Context(), opts.Config, args[0])
 		},
 	}
 }

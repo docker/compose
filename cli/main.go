@@ -49,6 +49,7 @@ import (
 	"github.com/docker/api/cli/cmd/compose"
 	"github.com/docker/api/cli/cmd/run"
 	cliconfig "github.com/docker/api/cli/config"
+	cliopts "github.com/docker/api/cli/options"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -56,12 +57,6 @@ import (
 var (
 	runningOwnCommand bool
 )
-
-type mainOpts struct {
-	apicontext.ContextFlags
-	cliconfig.ConfigFlags
-	debug bool
-}
 
 func init() {
 	// initial hack to get the path of the project's bin dir
@@ -86,7 +81,7 @@ func isOwnCommand(cmd *cobra.Command) bool {
 }
 
 func main() {
-	var opts mainOpts
+	var opts cliopts.GlobalOpts
 	root := &cobra.Command{
 		Use:           "docker",
 		Long:          "docker for the 2020s",
@@ -105,7 +100,7 @@ func main() {
 	}
 
 	root.AddCommand(
-		cmd.ContextCommand(),
+		cmd.ContextCommand(&opts),
 		cmd.PsCommand(),
 		cmd.ServeCommand(),
 		run.Command(),
@@ -124,19 +119,22 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().BoolVarP(&opts.debug, "debug", "d", false, "enable debug output in the logs")
+	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "d", false, "enable debug output in the logs")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
-	if opts.debug {
+	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	ctx, cancel := newSigContext()
 	defer cancel()
 
+	if opts.Config == "" {
+		fatal(errors.New("config path cannot be empty"))
+	}
 	config, err := cliconfig.LoadFile(opts.Config)
 	if err != nil {
 		fatal(errors.Wrap(err, "unable to find configuration file"))
