@@ -17,14 +17,19 @@ type Container struct {
 	PidsCurrent uint64
 	PidsLimit   uint64
 	Labels      []string
+	Ports       []Port
 }
 
 // Port represents a published port of a container
 type Port struct {
-	// Source is the source port
-	Source uint32
-	// Destination is the destination port
-	Destination uint32
+	// HostPort is the port number on the host
+	HostPort uint32
+	// ContainerPort is the port number inside the container
+	ContainerPort uint32
+	/// Protocol is the protocol of the port mapping
+	Protocol string
+	// HostIP is the host ip to use
+	HostIP string
 }
 
 // ContainerConfig contains the configuration data about a container

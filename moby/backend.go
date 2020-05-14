@@ -60,6 +60,7 @@ func (ms *mobyService) List(ctx context.Context) ([]containers.Container, error)
 			Image:   container.Image,
 			Status:  container.Status,
 			Command: container.Command,
+			Ports:   getPorts(container.Ports),
 		})
 	}
 
@@ -136,4 +137,18 @@ func (ms *mobyService) Delete(ctx context.Context, containerID string, force boo
 		return errors.Wrapf(errdefs.ErrNotFound, "container %q", containerID)
 	}
 	return err
+}
+
+func getPorts(ports []types.Port) []containers.Port {
+	result := []containers.Port{}
+	for _, port := range ports {
+		result = append(result, containers.Port{
+			ContainerPort: uint32(port.PrivatePort),
+			HostPort:      uint32(port.PublicPort),
+			HostIP:        port.IP,
+			Protocol:      port.Type,
+		})
+	}
+
+	return result
 }
