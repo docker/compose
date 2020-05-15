@@ -7,8 +7,6 @@ ARG TARGET_ARCH=unknown
 ARG PWD=/api
 ENV GO111MODULE=on
 
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1
-
 WORKDIR ${PWD}
 ADD go.* ${PWD}
 ADD . ${PWD}
@@ -23,7 +21,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     protobuf-compiler \
     libprotobuf-dev
 
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1 && \
+    go get golang.org/x/tools/cmd/goimports
 
 WORKDIR ${PWD}
 ADD go.* ${PWD}
