@@ -388,8 +388,11 @@ class Service(object):
             platform = self.default_platform
         return platform
 
-    def convergence_plan(self, strategy=ConvergenceStrategy.changed):
+    def convergence_plan(self, strategy=ConvergenceStrategy.changed, one_off=False):
         containers = self.containers(stopped=True)
+
+        if one_off:
+            return ConvergencePlan('one_off', [])
 
         if not containers:
             return ConvergencePlan('create', [])
@@ -439,17 +442,29 @@ class Service(object):
 
         return has_diverged
 
-    def _execute_convergence_create(self, scale, detached, start):
+    def _execute_convergence_create(self, scale, detached, start, one_off=False, override_options=None):
 
         i = self._next_container_number()
 
         def create_and_start(service, n):
-            container = service.create_container(number=n, quiet=True)
+            if one_off:
+                container = service.create_container(one_off=True, quiet=True, **override_options)
+            else:
+                container = service.create_container(number=n, quiet=True)
             if not detached:
                 container.attach_log_stream()
-            if start:
+            if start and not one_off:
                 self.start_container(container)
             return container
+
+        def get_name(service_name):
+            if one_off:
+                return "_".join([
+                    service_name.project,
+                    service_name.service,
+                    "run",
+                ])
+            return self.get_container_name(service_name.service, service_name.number)
 
         containers, errors = parallel_execute(
             [
@@ -457,7 +472,7 @@ class Service(object):
                 for index in range(i, i + scale)
             ],
             lambda service_name: create_and_start(self, service_name.number),
-            lambda service_name: self.get_container_name(service_name.service, service_name.number),
+            get_name,
             "Creating"
         )
         for error in errors.values():
@@ -528,16 +543,20 @@ class Service(object):
     def execute_convergence_plan(self, plan, timeout=None, detached=False,
                                  start=True, scale_override=None,
                                  rescale=True, reset_container_image=False,
-                                 renew_anonymous_volumes=False):
+                                 renew_anonymous_volumes=False, override_options=None):
         (action, containers) = plan
         scale = scale_override if scale_override is not None else self.scale_num
         containers = sorted(containers, key=attrgetter('number'))
 
         self.show_scale_warnings(scale)
 
-        if action == 'create':
+        if action in ['create', 'one_off']:
             return self._execute_convergence_create(
-                scale, detached, start
+                scale,
+                detached,
+                start,
+                one_off=(action == 'one_off'),
+                override_options=override_options
             )
 
         # The create action needs always needs an initial scale, but otherwise,

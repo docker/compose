@@ -565,6 +565,8 @@ class Project(object):
            renew_anonymous_volumes=False,
            silent=False,
            cli=False,
+           one_off=False,
+           override_options=None,
            ):
 
         if cli:
@@ -584,7 +586,11 @@ class Project(object):
         for svc in services:
             svc.ensure_image_exists(do_build=do_build, silent=silent, cli=cli)
         plans = self._get_convergence_plans(
-            services, strategy, always_recreate_deps=always_recreate_deps)
+            services,
+            strategy,
+            always_recreate_deps=always_recreate_deps,
+            one_off=service_names if one_off else [],
+        )
 
         def do(service):
 
@@ -597,6 +603,7 @@ class Project(object):
                 start=start,
                 reset_container_image=reset_container_image,
                 renew_anonymous_volumes=renew_anonymous_volumes,
+                override_options=override_options,
             )
 
         def get_deps(service):
@@ -628,7 +635,7 @@ class Project(object):
         self.networks.initialize()
         self.volumes.initialize()
 
-    def _get_convergence_plans(self, services, strategy, always_recreate_deps=False):
+    def _get_convergence_plans(self, services, strategy, always_recreate_deps=False, one_off=None):
         plans = {}
 
         for service in services:
@@ -638,6 +645,7 @@ class Project(object):
                 if name in plans and
                 plans[name].action in ('recreate', 'create')
             ]
+            is_one_off = one_off and service.name in one_off
 
             if updated_dependencies and strategy.allows_recreate:
                 log.debug('%s has upstream changes (%s)',
@@ -649,11 +657,11 @@ class Project(object):
                 container_has_links = any(c.get('HostConfig.Links') for c in service.containers())
                 should_recreate_for_links = service_has_links ^ container_has_links
                 if always_recreate_deps or containers_stopped or should_recreate_for_links:
-                    plan = service.convergence_plan(ConvergenceStrategy.always)
+                    plan = service.convergence_plan(ConvergenceStrategy.always, is_one_off)
                 else:
-                    plan = service.convergence_plan(strategy)
+                    plan = service.convergence_plan(strategy, is_one_off)
             else:
-                plan = service.convergence_plan(strategy)
+                plan = service.convergence_plan(strategy, is_one_off)
 
             plans[service.name] = plan
 
