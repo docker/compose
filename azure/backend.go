@@ -8,13 +8,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/api/context/cloud"
+
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/api/azure/convert"
+	"github.com/docker/api/azure/login"
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
@@ -50,43 +52,48 @@ func New(ctx context.Context) (backend.Service, error) {
 	}
 	aciContext, _ := metadata.Metadata.Data.(store.AciContext)
 
-	auth, _ := auth.NewAuthorizerFromCLI()
+	auth, _ := login.NewAuthorizerFromLogin()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
 	containerGroupsClient.Authorizer = auth
 
-	return getAciAPIService(containerGroupsClient, aciContext), nil
+	return getAciAPIService(containerGroupsClient, aciContext)
 }
 
-func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) *aciAPIService {
+func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) (*aciAPIService, error) {
+	service, err := login.NewAzureLoginService()
+	if err != nil {
+		return nil, err
+	}
 	return &aciAPIService{
 		aciContainerService: aciContainerService{
 			containerGroupsClient: cgc,
 			ctx:                   aciCtx,
 		},
 		aciComposeService: aciComposeService{
-			containerGroupsClient: cgc,
-			ctx:                   aciCtx,
+			ctx: aciCtx,
 		},
-	}
+		aciCloudService: aciCloudService{
+			loginService: service,
+		},
+	}, nil
 }
 
 type aciAPIService struct {
 	aciContainerService
 	aciComposeService
+	aciCloudService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
-	return &aciContainerService{
-		containerGroupsClient: a.aciContainerService.containerGroupsClient,
-		ctx:                   a.aciContainerService.ctx,
-	}
+	return &a.aciContainerService
 }
 
 func (a *aciAPIService) ComposeService() compose.Service {
-	return &aciComposeService{
-		containerGroupsClient: a.aciComposeService.containerGroupsClient,
-		ctx:                   a.aciComposeService.ctx,
-	}
+	return &a.aciComposeService
+}
+
+func (a *aciAPIService) CloudService() cloud.Service {
+	return &a.aciCloudService
 }
 
 type aciContainerService struct {
@@ -231,8 +238,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _
 }
 
 type aciComposeService struct {
-	containerGroupsClient containerinstance.ContainerGroupsClient
-	ctx                   store.AciContext
+	ctx store.AciContext
 }
 
 func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions) error {
@@ -265,4 +271,12 @@ func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptio
 	}
 
 	return err
+}
+
+type aciCloudService struct {
+	loginService login.AzureLoginService
+}
+
+func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
+	return cs.loginService.Login(ctx)
 }

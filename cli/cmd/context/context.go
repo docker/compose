@@ -30,6 +30,8 @@ package context
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/cli/cmd/context/login"
+
 	cliopts "github.com/docker/api/cli/options"
 )
 
@@ -45,6 +47,7 @@ func Command(opts *cliopts.GlobalOpts) *cobra.Command {
 		listCommand(),
 		removeCommand(),
 		useCommand(opts),
+		login.Command(),
 	)
 
 	return cmd

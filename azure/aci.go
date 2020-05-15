@@ -6,14 +6,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/docker/api/azure/login"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
-	"github.com/Azure/azure-sdk-for-go/services/keyvault/auth"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	tm "github.com/buger/goterm"
@@ -23,14 +23,6 @@ import (
 
 	"github.com/docker/api/context/store"
 )
-
-func init() {
-	// required to get auth.NewAuthorizerFromCLI() to work, otherwise getting "The access token has been obtained for wrong audience or resource 'https://vault.azure.net'."
-	err := os.Setenv("AZURE_KEYVAULT_RESOURCE", "https://management.azure.com")
-	if err != nil {
-		panic("unable to set environment variable AZURE_KEYVAULT_RESOURCE")
-	}
-}
 
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
@@ -243,7 +235,7 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 }
 
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
-	auth, err := auth.NewAuthorizerFromCLI()
+	auth, err := login.NewAuthorizerFromLogin()
 	if err != nil {
 		return containerinstance.ContainerGroupsClient{}, err
 	}
@@ -256,7 +248,7 @@ func getContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 }
 
 func getContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
-	auth, err := auth.NewAuthorizerFromCLI()
+	auth, err := login.NewAuthorizerFromLogin()
 	if err != nil {
 		return containerinstance.ContainerClient{}, err
 	}
@@ -267,7 +259,7 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 
 func getSubscriptionsClient() subscription.SubscriptionsClient {
 	subc := subscription.NewSubscriptionsClient()
-	authorizer, _ := auth.NewAuthorizerFromCLI()
+	authorizer, _ := login.NewAuthorizerFromLogin()
 	subc.Authorizer = authorizer
 	return subc
 }
@@ -275,7 +267,7 @@ func getSubscriptionsClient() subscription.SubscriptionsClient {
 // GetGroupsClient ...
 func GetGroupsClient(subscriptionID string) resources.GroupsClient {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
-	authorizer, _ := auth.NewAuthorizerFromCLI()
+	authorizer, _ := login.NewAuthorizerFromLogin()
 	groupsClient.Authorizer = authorizer
 	return groupsClient
 }

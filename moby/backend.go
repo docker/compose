@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/docker/api/context/cloud"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -42,6 +44,10 @@ func (ms *mobyService) ContainerService() containers.Service {
 }
 
 func (ms *mobyService) ComposeService() compose.Service {
+	return nil
+}
+
+func (ms *mobyService) CloudService() cloud.Service {
 	return nil
 }
 

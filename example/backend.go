@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/docker/api/context/cloud"
+
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
@@ -21,6 +23,10 @@ func (a *apiService) ContainerService() containers.Service {
 
 func (a *apiService) ComposeService() compose.Service {
 	return &a.composeService
+}
+
+func (a *apiService) CloudService() cloud.Service {
+	return nil
 }
 
 func init() {
