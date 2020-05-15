@@ -25,57 +25,39 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package run
+package context
 
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	"github.com/docker/api/context/store"
+	"github.com/docker/api/multierror"
 )
 
-// Command runs a container
-func Command() *cobra.Command {
-	var opts runOpts
-	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run a container",
-		Args:  cobra.ExactArgs(1),
+func removeCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:     "rm CONTEXT [CONTEXT...]",
+		Short:   "Remove one or more contexts",
+		Aliases: []string{"remove"},
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd.Context(), args[0], opts)
+			return runRemove(cmd.Context(), args)
 		},
 	}
-
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
-	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
-
-	return cmd
 }
 
-func runRun(ctx context.Context, image string, opts runOpts) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
+func runRemove(ctx context.Context, args []string) error {
+	s := store.ContextStore(ctx)
+	var errs *multierror.Error
+	for _, n := range args {
+		if err := s.Remove(n); err != nil {
+			errs = multierror.Append(errs, err)
+		} else {
+			fmt.Println(n)
+		}
 	}
-
-	project, err := opts.toContainerConfig(image)
-	if err != nil {
-		return err
-	}
-
-	if err = c.ContainerService().Run(ctx, project); err != nil {
-		return err
-	}
-	fmt.Println(opts.name)
-	return nil
-
-}
-
-func getRandomName() string {
-	// Azure supports hyphen but not underscore in names
-	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
+	return errs.ErrorOrNil()
 }

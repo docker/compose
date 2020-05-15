@@ -25,23 +25,23 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package compose
+package context
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+
+	"github.com/docker/api/context/store"
 )
 
-// Command returns the compose command with its child commands
-func Command() *cobra.Command {
-	command := &cobra.Command{
-		Short: "Docker Compose",
-		Use:   "compose",
-	}
-
-	command.AddCommand(
-		upCommand(),
-		downCommand(),
-	)
-
-	return command
+func createACIContext(ctx context.Context, name string, opts createOpts) error {
+	s := store.ContextStore(ctx)
+	return s.Create(name, store.TypedContext{
+		Type:        "aci",
+		Description: opts.description,
+		Data: store.AciContext{
+			SubscriptionID: opts.aciSubscriptionID,
+			Location:       opts.aciLocation,
+			ResourceGroup:  opts.aciResourceGroup,
+		},
+	})
 }

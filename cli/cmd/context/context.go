@@ -25,57 +25,27 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package run
+package context
 
 import (
-	"context"
-	"fmt"
-	"strings"
-
-	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	cliopts "github.com/docker/api/cli/options"
 )
 
-// Command runs a container
-func Command() *cobra.Command {
-	var opts runOpts
+// Command manages contexts
+func Command(opts *cliopts.GlobalOpts) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run a container",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd.Context(), args[0], opts)
-		},
+		Use:   "context",
+		Short: "Manage contexts",
 	}
 
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
-	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
+	cmd.AddCommand(
+		createCommand(),
+		listCommand(),
+		removeCommand(),
+		useCommand(opts),
+	)
 
 	return cmd
-}
-
-func runRun(ctx context.Context, image string, opts runOpts) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.toContainerConfig(image)
-	if err != nil {
-		return err
-	}
-
-	if err = c.ContainerService().Run(ctx, project); err != nil {
-		return err
-	}
-	fmt.Println(opts.name)
-	return nil
-
-}
-
-func getRandomName() string {
-	// Azure supports hyphen but not underscore in names
-	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
 }

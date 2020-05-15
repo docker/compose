@@ -25,57 +25,46 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package run
+package context
 
 import (
 	"context"
 	"fmt"
-	"strings"
+	"os"
+	"text/tabwriter"
 
-	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	"github.com/docker/api/context/store"
 )
 
-// Command runs a container
-func Command() *cobra.Command {
-	var opts runOpts
+func listCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run a container",
-		Args:  cobra.ExactArgs(1),
+		Use:     "list",
+		Short:   "List available contexts",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd.Context(), args[0], opts)
+			return runList(cmd.Context())
 		},
 	}
-
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
-	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
-
 	return cmd
 }
 
-func runRun(ctx context.Context, image string, opts runOpts) error {
-	c, err := client.New(ctx)
+func runList(ctx context.Context) error {
+	s := store.ContextStore(ctx)
+	contexts, err := s.List()
 	if err != nil {
 		return err
 	}
 
-	project, err := opts.toContainerConfig(image)
-	if err != nil {
-		return err
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, "NAME\tDESCRIPTION\tTYPE")
+	format := "%s\t%s\t%s\n"
+
+	for _, c := range contexts {
+		fmt.Fprintf(w, format, c.Name, c.Metadata.Description, c.Metadata.Type)
 	}
 
-	if err = c.ContainerService().Run(ctx, project); err != nil {
-		return err
-	}
-	fmt.Println(opts.name)
-	return nil
-
-}
-
-func getRandomName() string {
-	// Azure supports hyphen but not underscore in names
-	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
+	return w.Flush()
 }

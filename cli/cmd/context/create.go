@@ -25,57 +25,51 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package run
+package context
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
-	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	"github.com/docker/api/context/store"
 )
 
-// Command runs a container
-func Command() *cobra.Command {
-	var opts runOpts
+type createOpts struct {
+	description       string
+	aciLocation       string
+	aciSubscriptionID string
+	aciResourceGroup  string
+}
+
+func createCommand() *cobra.Command {
+	var opts createOpts
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run a container",
-		Args:  cobra.ExactArgs(1),
+		Use:   "create CONTEXT BACKEND [OPTIONS]",
+		Short: "Create a context",
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRun(cmd.Context(), args[0], opts)
+			return runCreate(cmd.Context(), opts, args[0], args[1])
 		},
 	}
 
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
-	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
+	cmd.Flags().StringVar(&opts.description, "description", "", "Description of the context")
+	cmd.Flags().StringVar(&opts.aciLocation, "aci-location", "eastus", "Location")
+	cmd.Flags().StringVar(&opts.aciSubscriptionID, "aci-subscription-id", "", "Location")
+	cmd.Flags().StringVar(&opts.aciResourceGroup, "aci-resource-group", "", "Resource group")
 
 	return cmd
 }
 
-func runRun(ctx context.Context, image string, opts runOpts) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
+func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
+	switch contextType {
+	case "aci":
+		return createACIContext(ctx, name, opts)
+	default:
+		s := store.ContextStore(ctx)
+		return s.Create(name, store.TypedContext{
+			Type:        contextType,
+			Description: opts.description,
+		})
 	}
-
-	project, err := opts.toContainerConfig(image)
-	if err != nil {
-		return err
-	}
-
-	if err = c.ContainerService().Run(ctx, project); err != nil {
-		return err
-	}
-	fmt.Println(opts.name)
-	return nil
-
-}
-
-func getRandomName() string {
-	// Azure supports hyphen but not underscore in names
-	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
 }

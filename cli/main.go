@@ -47,6 +47,7 @@ import (
 
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
+	contextcmd "github.com/docker/api/cli/cmd/context"
 	"github.com/docker/api/cli/cmd/run"
 	cliconfig "github.com/docker/api/cli/config"
 	cliopts "github.com/docker/api/cli/options"
@@ -100,7 +101,7 @@ func main() {
 	}
 
 	root.AddCommand(
-		cmd.ContextCommand(&opts),
+		contextcmd.Command(&opts),
 		cmd.PsCommand(),
 		cmd.ServeCommand(),
 		run.Command(),
