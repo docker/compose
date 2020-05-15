@@ -35,12 +35,13 @@ import (
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/cli/options/run"
 	"github.com/docker/api/client"
 )
 
 // Command runs a container
 func Command() *cobra.Command {
-	var opts runOpts
+	var opts run.Opts
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a container",
@@ -50,19 +51,19 @@ func Command() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
-	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
+	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
+	cmd.Flags().StringVar(&opts.Name, "name", getRandomName(), "Assign a name to the container")
 
 	return cmd
 }
 
-func runRun(ctx context.Context, image string, opts runOpts) error {
+func runRun(ctx context.Context, image string, opts run.Opts) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}
 
-	project, err := opts.toContainerConfig(image)
+	project, err := opts.ToContainerConfig(image)
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,8 @@ func runRun(ctx context.Context, image string, opts runOpts) error {
 	if err = c.ContainerService().Run(ctx, project); err != nil {
 		return err
 	}
-	fmt.Println(opts.name)
+	fmt.Println(opts.Name)
+
 	return nil
 
 }

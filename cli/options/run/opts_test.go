@@ -88,7 +88,10 @@ func (s *RunOptsSuite) TestPortParse() {
 	}
 
 	for _, testCase := range testCases {
-		result, err := toPorts([]string{testCase.in})
+		opts := Opts{
+			Publish: []string{testCase.in},
+		}
+		result, err := opts.toPorts()
 		require.Nil(s.T(), err)
 		assert.ElementsMatch(s.T(), testCase.expected, result)
 	}

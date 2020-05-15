@@ -137,6 +137,7 @@ func (cs *aciContainerService) List(ctx context.Context) ([]containers.Container
 				ID:     containerID,
 				Image:  *container.Image,
 				Status: status,
+				Ports:  convert.ToPorts(*container.Ports),
 			})
 		}
 	}
