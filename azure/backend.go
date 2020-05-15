@@ -148,8 +148,8 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	var ports []types.ServicePortConfig
 	for _, p := range r.Ports {
 		ports = append(ports, types.ServicePortConfig{
-			Target:    p.Destination,
-			Published: p.Source,
+			Target:    p.ContainerPort,
+			Published: p.HostPort,
 		})
 	}
 	project := compose.Project{

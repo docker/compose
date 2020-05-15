@@ -50,7 +50,7 @@ func Command() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s)")
+	cmd.Flags().StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	cmd.Flags().StringVar(&opts.name, "name", getRandomName(), "Assign a name to the container")
 
 	return cmd

@@ -9,6 +9,7 @@ ENV GO111MODULE=on
 
 WORKDIR ${PWD}
 ADD go.* ${PWD}
+RUN go mod download
 ADD . ${PWD}
 
 FROM golang:${GO_VERSION} AS protos-base
