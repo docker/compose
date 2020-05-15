@@ -4,17 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/rand"
-	"net"
-	"net/http"
 	"net/url"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/docker/api/errdefs"
@@ -70,11 +66,6 @@ type AzureLoginService struct {
 
 const tokenStoreFilename = "dockerAccessToken.json"
 
-func getTokenStorePath() string {
-	cliPath, _ := cli.AccessTokensPath()
-	return filepath.Join(filepath.Dir(cliPath), tokenStoreFilename)
-}
-
 // NewAzureLoginService creates a NewAzureLoginService
 func NewAzureLoginService() (AzureLoginService, error) {
 	return newAzureLoginServiceFromPath(getTokenStorePath(), azureAPIHelper{})
@@ -90,14 +81,6 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 		apiHelper:  helper,
 	}, nil
 }
-
-type apiHelper interface {
-	queryToken(data url.Values, tenantID string) (azureToken, error)
-	openAzureLoginPage(redirectURL string)
-	queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error)
-}
-
-type azureAPIHelper struct{}
 
 //Login perform azure login through browser
 func (login AzureLoginService) Login(ctx context.Context) error {
@@ -165,92 +148,9 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 	}
 }
 
-func startLoginServer(queryCh chan url.Values) (int, error) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", queryHandler(queryCh))
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, err
-	}
-
-	availablePort := listener.Addr().(*net.TCPAddr).Port
-	server := &http.Server{Handler: mux}
-	go func() {
-		if err := server.Serve(listener); err != nil {
-			queryCh <- url.Values{
-				"error": []string{fmt.Sprintf("error starting http server with: %v", err)},
-			}
-		}
-	}()
-	return availablePort, nil
-}
-
-func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) {
-	state := randomString("", 10)
-	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
-	openbrowser(authURL)
-}
-
-func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
-	req, err := http.NewRequest(http.MethodGet, authorizationURL, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Add("Authorization", authorizationHeader)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	bits, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, 0, err
-	}
-	return bits, res.StatusCode, nil
-}
-
-func queryHandler(queryCh chan url.Values) func(w http.ResponseWriter, r *http.Request) {
-	queryHandler := func(w http.ResponseWriter, r *http.Request) {
-		_, hasCode := r.URL.Query()["code"]
-		if hasCode {
-			_, err := w.Write([]byte(successfullLoginHTML))
-			if err != nil {
-				queryCh <- url.Values{
-					"error": []string{err.Error()},
-				}
-			} else {
-				queryCh <- r.URL.Query()
-			}
-		} else {
-			_, err := w.Write([]byte(loginFailedHTML))
-			if err != nil {
-				queryCh <- url.Values{
-					"error": []string{err.Error()},
-				}
-			} else {
-				queryCh <- r.URL.Query()
-			}
-		}
-	}
-	return queryHandler
-}
-
-func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azureToken, error) {
-	res, err := http.Post(fmt.Sprintf(tokenEndpoint, tenantID), "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
-	if err != nil {
-		return azureToken{}, err
-	}
-	if res.StatusCode != 200 {
-		return azureToken{}, errors.Errorf("error while renewing access token, status : %s", res.Status)
-	}
-	bits, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return azureToken{}, err
-	}
-	token := azureToken{}
-	if err := json.Unmarshal(bits, &token); err != nil {
-		return azureToken{}, err
-	}
-	return token, nil
+func getTokenStorePath() string {
+	cliPath, _ := cli.AccessTokensPath()
+	return filepath.Join(filepath.Dir(cliPath), tokenStoreFilename)
 }
 
 func toOAuthToken(token azureToken) oauth2.Token {
@@ -341,44 +241,3 @@ func openbrowser(url string) {
 		log.Fatal(err)
 	}
 }
-
-var (
-	letterRunes = []rune("abcdefghijklmnopqrstuvwxyz123456789")
-)
-
-func randomString(prefix string, length int) string {
-	b := make([]rune, length)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return prefix + string(b)
-}
-
-const loginFailedHTML = `
-	<!DOCTYPE html>
-	<html>
-	<head>
-	    <meta charset="utf-8" />
-	    <title>Login failed</title>
-	</head>
-	<body>
-	    <h4>Some failures occurred during the authentication</h4>
-	    <p>You can log an issue at <a href="https://github.com/azure/azure-cli/issues">Azure CLI GitHub Repository</a> and we will assist you in resolving it.</p>
-	</body>
-	</html>
-	`
-
-const successfullLoginHTML = `
-	<!DOCTYPE html>
-	<html>
-	<head>
-	    <meta charset="utf-8" />
-	    <meta http-equiv="refresh" content="10;url=https://docs.microsoft.com/cli/azure/">
-	    <title>Login successfully</title>
-	</head>
-	<body>
-	    <h4>You have logged into Microsoft Azure!</h4>
-	    <p>You can close this window, or we will redirect you to the <a href="https://docs.microsoft.com/cli/azure/">Azure CLI documents</a> in 10 seconds.</p>
-	</body>
-	</html>
-	`

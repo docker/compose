@@ -1,0 +1,75 @@
+package login
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/pkg/errors"
+)
+
+type apiHelper interface {
+	queryToken(data url.Values, tenantID string) (azureToken, error)
+	openAzureLoginPage(redirectURL string)
+	queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error)
+}
+
+type azureAPIHelper struct{}
+
+func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) {
+	state := randomString("", 10)
+	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
+	openbrowser(authURL)
+}
+
+func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
+	req, err := http.NewRequest(http.MethodGet, authorizationURL, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Add("Authorization", authorizationHeader)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	bits, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return bits, res.StatusCode, nil
+}
+
+func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azureToken, error) {
+	res, err := http.Post(fmt.Sprintf(tokenEndpoint, tenantID), "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	if err != nil {
+		return azureToken{}, err
+	}
+	if res.StatusCode != 200 {
+		return azureToken{}, errors.Errorf("error while renewing access token, status : %s", res.Status)
+	}
+	bits, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return azureToken{}, err
+	}
+	token := azureToken{}
+	if err := json.Unmarshal(bits, &token); err != nil {
+		return azureToken{}, err
+	}
+	return token, nil
+}
+
+var (
+	letterRunes = []rune("abcdefghijklmnopqrstuvwxyz123456789")
+)
+
+func randomString(prefix string, length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return prefix + string(b)
+}
