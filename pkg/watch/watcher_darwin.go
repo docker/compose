@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/windmilleng/tilt/pkg/logger"
+	"github.com/tilt-dev/tilt/pkg/logger"
 
-	"github.com/windmilleng/fsevents"
+	"github.com/tilt-dev/fsevents"
 )
 
 // A file watcher optimized for Darwin.
