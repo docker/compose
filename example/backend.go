@@ -2,6 +2,7 @@ package example
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -37,7 +38,7 @@ func init() {
 
 type containerService struct{}
 
-func (cs *containerService) List(ctx context.Context) ([]containers.Container, error) {
+func (cs *containerService) List(ctx context.Context, _ bool) ([]containers.Container, error) {
 	return []containers.Container{
 		{
 			ID:    "id",
@@ -53,6 +54,10 @@ func (cs *containerService) List(ctx context.Context) ([]containers.Container, e
 func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
 	fmt.Printf("Running container %q with name %q\n", r.Image, r.ID)
 	return nil
+}
+
+func (cs *containerService) Stop(ctx context.Context, containerName string) error {
+	return errors.New("not implemented")
 }
 
 func (cs *containerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {

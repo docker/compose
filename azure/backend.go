@@ -101,7 +101,7 @@ type aciContainerService struct {
 	ctx                   store.AciContext
 }
 
-func (cs *aciContainerService) List(ctx context.Context) ([]containers.Container, error) {
+func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.Container, error) {
 	var containerGroups []containerinstance.ContainerGroup
 	result, err := cs.containerGroupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
 	if err != nil {
@@ -175,6 +175,10 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	}
 
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
+}
+
+func (cs *aciContainerService) Stop(ctx context.Context, containerName string) error {
+	return errors.New("not implemented")
 }
 
 func getGroupAndContainerName(containerID string) (groupName string, containerName string) {

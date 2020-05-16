@@ -54,7 +54,9 @@ type LogsRequest struct {
 // Service interacts with the underlying container backend
 type Service interface {
 	// List returns all the containers
-	List(ctx context.Context) ([]Container, error)
+	List(ctx context.Context, all bool) ([]Container, error)
+	// Stop stops the running container
+	Stop(ctx context.Context, containerName string) error
 	// Run creates and starts a container
 	Run(ctx context.Context, config ContainerConfig) error
 	// Exec executes a command inside a running container

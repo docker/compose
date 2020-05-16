@@ -15,6 +15,7 @@ import (
 )
 
 type psOpts struct {
+	all   bool
 	quiet bool
 }
 
@@ -30,6 +31,7 @@ func PsCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
+	cmd.Flags().BoolVarP(&opts.quiet, "all", "a", false, "Show all containers (default shows just running)")
 
 	return cmd
 }
@@ -40,7 +42,7 @@ func runPs(ctx context.Context, opts psOpts) error {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	containers, err := c.ContainerService().List(ctx)
+	containers, err := c.ContainerService().List(ctx, opts.all)
 	if err != nil {
 		return errors.Wrap(err, "fetch containers")
 	}
