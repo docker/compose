@@ -133,11 +133,12 @@ func (cs *aciContainerService) List(ctx context.Context) ([]containers.Container
 			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
 				status = *container.InstanceView.CurrentState.State
 			}
+
 			res = append(res, containers.Container{
 				ID:     containerID,
 				Image:  *container.Image,
 				Status: status,
-				Ports:  convert.ToPorts(*container.Ports),
+				Ports:  convert.ToPorts(group.IPAddress, *container.Ports),
 			})
 		}
 	}
