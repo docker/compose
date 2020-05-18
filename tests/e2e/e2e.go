@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"os/exec"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -84,4 +86,28 @@ func main() {
 		output := NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
 		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
 	})
+
+	It("can run 'serve' command", func() {
+		server, err := startCliServer()
+		Expect(err).To(BeNil())
+		defer killCliServer(server)
+
+		NewCommand("yarn", "install").WithinDirectory("tests/node-client").ExecOrDie()
+		output := NewCommand("yarn", "run", "start", "test-example").WithinDirectory("tests/node-client").ExecOrDie()
+		Expect(output).To(ContainSubstring("nginx"))
+	})
+}
+
+func killCliServer(process *os.Process) {
+	err := process.Kill()
+	Expect(err).To(BeNil())
+}
+
+func startCliServer() (*os.Process, error) {
+	cmd := exec.Command("./bin/docker", "serve", "--address", "unix:///tmp/backend.sock")
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Process, nil
 }
