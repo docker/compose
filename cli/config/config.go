@@ -34,6 +34,8 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
+	"github.com/docker/api/context/store"
 )
 
 // LoadFile loads the docker configuration
@@ -56,7 +58,7 @@ func WriteCurrentContext(dir string, name string) error {
 		return err
 	}
 	// Match existing CLI behavior
-	if name == "default" {
+	if name == store.DefaultContextName {
 		delete(m, currentContextKey)
 	} else {
 		m[currentContextKey] = name
