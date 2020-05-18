@@ -1,0 +1,18 @@
+{
+  "name": "ts-test-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "prestart": "./build.sh"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.0.3",
+    "grpc": "^1.24.2",
+    "grpc-tools": "^1.8.1",
+    "grpc_tools_node_protoc_ts": "^3.0.0",
+    "ts-node": "^8.9.1",
+    "typescript": "^3.8.3"
+  }
+}
