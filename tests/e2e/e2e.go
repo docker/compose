@@ -61,7 +61,7 @@ func main() {
 	It("uses the test context", func() {
 		currentContext := NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
-		output := NewCommand("docker", "context", "ls").ExecOrDie()
+		output := NewDockerCommand("context", "ls").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example *"))
 		output = NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example"))
