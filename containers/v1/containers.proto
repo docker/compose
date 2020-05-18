@@ -40,6 +40,7 @@ service Containers {
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
 	rpc Update(UpdateRequest) returns (UpdateResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
+	rpc Logs(LogsRequest) returns (stream LogsResponse);
 }
 
 message Port {
@@ -153,4 +154,13 @@ message ListRequest {
 
 message ListResponse {
 	repeated Container containers = 1;
+}
+
+message LogsRequest {
+	string container_id = 1;
+	bool follow = 2;
+}
+
+message LogsResponse {
+	bytes logs = 1;
 }
