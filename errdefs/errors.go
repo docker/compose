@@ -42,6 +42,9 @@ var (
 	ErrUnknown = errors.New("unknown")
 	// ErrLoginFailed is returned when login failed
 	ErrLoginFailed = errors.New("login failed")
+	// ErrNotImplemented is returned when a backend doesn't implement
+	// an action
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
@@ -62,4 +65,9 @@ func IsForbiddenError(err error) bool {
 // IsUnknownError returns true if the unwrapped error is ErrUnknown
 func IsUnknownError(err error) bool {
 	return errors.Is(err, ErrUnknown)
+}
+
+// IsErrNotImplemented returns true if the unwrapped error is ErrNotImplemented
+func IsErrNotImplemented(err error) bool {
+	return errors.Is(err, ErrNotImplemented)
 }

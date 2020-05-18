@@ -29,7 +29,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net"
 	"strings"
 
@@ -78,29 +77,33 @@ func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, 
 func unaryMeta(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, errors.New("missing metadata")
+		return handler(ctx, req)
 	}
 
-	key := md[apicontext.Key]
+	key, ok := md[apicontext.Key]
+	if !ok {
+		return handler(ctx, req)
+	}
 
 	if len(key) == 1 {
 		s, err := store.New()
 		if err != nil {
 			return nil, err
 		}
-		ctx = store.WithContextStore(ctx, s)
 
+		ctx = store.WithContextStore(ctx, s)
 		ctx = apicontext.WithCurrentContext(ctx, key[0])
 
 		c, err := client.New(ctx)
 		if err != nil {
 			return nil, err
 		}
+
 		ctx, err = proxy.WithClient(ctx, c)
 		if err != nil {
 			return nil, err
 		}
 	}
-	m, err := handler(ctx, req)
-	return m, err
+
+	return handler(ctx, req)
 }

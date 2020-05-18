@@ -42,16 +42,25 @@ service Containers {
 	rpc Exec(ExecRequest) returns (ExecResponse);
 }
 
+message Port {
+	uint32 host_port = 1;
+	uint32 container_port = 2;
+	string protocol = 3;
+	string host_ip = 4;
+}
+
 message Container {
 	string id = 1;
 	string image = 2;
 	string status = 3;
-	uint64 cpu_time = 4;
-	uint64 memory_usage = 5;
-	uint64 memory_limit = 6;
-	uint64 pids_current = 7;
-	uint64 pids_limit = 8;
-	map<string, string> labels = 9;
+	string command = 4;
+	uint64 cpu_time = 5;
+	uint64 memory_usage = 6;
+	uint64 memory_limit = 7;
+	uint64 pids_current = 8;
+	uint64 pids_limit = 9;
+	repeated string labels = 10;
+	repeated Port ports = 11;
 }
 
 message CreateRequest {
@@ -110,7 +119,7 @@ message StartResponse {
 
 message StopRequest {
 	string id = 1;
-	int64 signal = 2;
+	uint32 timeout = 2;
 }
 
 message StopResponse {
@@ -139,7 +148,7 @@ message KillResponse {
 }
 
 message ListRequest {
-	repeated string filters = 1;
+	bool all = 1;
 }
 
 message ListResponse {

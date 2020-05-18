@@ -80,6 +80,15 @@ func main() {
 		Expect(lines[1]).To(Equal("1234"))
 	})
 
+	It("can run ps command with all ", func() {
+		output := NewDockerCommand("ps", "-q", "--all").ExecOrDie()
+		lines := Lines(output)
+		Expect(len(lines)).To(Equal(3))
+		Expect(lines[0]).To(Equal("id"))
+		Expect(lines[1]).To(Equal("1234"))
+		Expect(lines[2]).To(Equal("stopped"))
+	})
+
 	It("can run 'run' command", func() {
 		output := NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
 		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
