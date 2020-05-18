@@ -58,6 +58,26 @@
       },
       "Type": "AWS::Logs::LogGroup"
     },
+    "TestSimpleWithOverridesDefaultNetwork": {
+      "Properties": {
+        "GroupDescription": "TestSimpleWithOverrides default Security Group",
+        "GroupName": "TestSimpleWithOverridesDefaultNetwork",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleWithOverrides"
+          },
+          {
+            "Key": "com.docker.compose.network",
+            "Value": "default"
+          }
+        ],
+        "VpcId": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
     "simpleService": {
       "Properties": {
         "Cluster": {
@@ -76,6 +96,11 @@
         "NetworkConfiguration": {
           "AwsvpcConfiguration": {
             "AssignPublicIp": "ENABLED",
+            "SecurityGroups": [
+              {
+                "Ref": "TestSimpleWithOverridesDefaultNetwork"
+              }
+            ],
             "Subnets": [
               {
                 "Ref": "ParameterSubnet1Id"
