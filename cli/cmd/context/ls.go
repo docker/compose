@@ -35,6 +35,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
 
@@ -52,6 +53,7 @@ func listCommand() *cobra.Command {
 }
 
 func runList(ctx context.Context) error {
+	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 	contexts, err := s.List()
 	if err != nil {
@@ -63,7 +65,11 @@ func runList(ctx context.Context) error {
 	format := "%s\t%s\t%s\n"
 
 	for _, c := range contexts {
-		fmt.Fprintf(w, format, c.Name, c.Metadata.Description, c.Metadata.Type)
+		contextName := c.Name
+		if c.Name == currentContext {
+			contextName += " *"
+		}
+		fmt.Fprintf(w, format, contextName, c.Metadata.Description, c.Metadata.Type)
 	}
 
 	return w.Flush()
