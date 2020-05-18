@@ -48,9 +48,11 @@ const (
 )
 
 const (
-	contextsDir = "contexts"
-	metadataDir = "meta"
-	metaFile    = "meta.json"
+	dockerEndpointKey = "docker"
+	configDir         = ".docker"
+	contextsDir       = "contexts"
+	metadataDir       = "meta"
+	metaFile          = "meta.json"
 )
 
 type contextStoreKey struct{}
@@ -103,7 +105,7 @@ func New(opts ...Opt) (Store, error) {
 		return nil, err
 	}
 	s := &store{
-		root: filepath.Join(home, ".docker"),
+		root: filepath.Join(home, configDir),
 	}
 	if _, err := os.Stat(s.root); os.IsNotExist(err) {
 		if err = os.Mkdir(s.root, 0755); err != nil {
@@ -190,11 +192,12 @@ func parse(payload []byte, getter func() interface{}) (interface{}, error) {
 
 func (s *store) GetType(meta *Metadata) string {
 	for k := range meta.Endpoints {
-		if k != "docker" {
+		if k != dockerEndpointKey {
 			return k
 		}
 	}
-	return "docker"
+
+	return dockerEndpointKey
 }
 
 func (s *store) Create(name string, data TypedContext) error {
@@ -220,8 +223,8 @@ func (s *store) Create(name string, data TypedContext) error {
 		Name:     name,
 		Metadata: data,
 		Endpoints: map[string]interface{}{
-			"docker":    dummyContext{},
-			(data.Type): dummyContext{},
+			(dockerEndpointKey): dummyContext{},
+			(data.Type):         dummyContext{},
 		},
 	}
 
