@@ -1,12 +1,14 @@
 package amazon
 
 import (
+	"fmt"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
 // Validate check the compose model do not use unsupported features and inject sane defaults for ECS deployment
-func (c *client) Validate(project *compose.Project) error {
+func Validate(project *compose.Project) error {
 	if len(project.Networks) == 0 {
 		// Compose application model implies a default network if none is explicitly set.
 		// FIXME move this to compose-go
@@ -21,6 +23,10 @@ func (c *client) Validate(project *compose.Project) error {
 			// FIXME move this to compose-go
 			service.Networks = map[string]*types.ServiceNetworkConfig{"default": nil}
 			project.Services[i] = service
+		}
+
+		if service.NetworkMode != "" && service.NetworkMode != "awsvpc" {
+			return fmt.Errorf("ECS do not support NetworkMode %q", service.NetworkMode)
 		}
 	}
 

@@ -26,6 +26,11 @@ const (
 
 // Convert a compose project into a CloudFormation template
 func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
+	err := Validate(project)
+	if err != nil {
+		return nil, err
+	}
+
 	template := cloudformation.NewTemplate()
 
 	template.Parameters[ParameterClusterName] = cloudformation.Parameter{
