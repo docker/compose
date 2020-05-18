@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -66,8 +67,7 @@ func main() {
 		Expect(len(Lines(output))).To(Equal(1))
 	})
 
-	var nginxID string
-	It("runs nginx on port 80 (PORT NOT CHECKED YET!!! REMOVE THAT WHEN IMPLEMENTED)", func() {
+	It("runs nginx on port 80", func() {
 		output := NewDockerCommand("run", "nginx", "-p", "80:80", "--name", testContainerName).ExecOrDie()
 		Expect(output).To(Equal(testContainerName + "\n"))
 		output = NewDockerCommand("ps").ExecOrDie()
@@ -75,20 +75,19 @@ func main() {
 		Expect(len(lines)).To(Equal(2))
 
 		containerFields := Columns(lines[1])
-		nginxID = containerFields[0]
 		Expect(containerFields[1]).To(Equal("nginx"))
 		Expect(containerFields[2]).To(Equal("Running"))
-		// exposedIP := containerFields[3]
-		// Expect(exposedIP).To(ContainSubstring(":80->80/TCP"))
+		exposedIP := containerFields[3]
+		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
 
-		// url := strings.ReplaceAll(exposedIP, "->80/TCP", "")
-		// output = NewCommand("curl", url).ExecOrDie()
-		// Expect(output).To(ContainSubstring("Welcome to nginx!"))
+		url := strings.ReplaceAll(exposedIP, "->80/tcp", "")
+		output = NewCommand("curl", url).ExecOrDie()
+		Expect(output).To(ContainSubstring("Welcome to nginx!"))
 	})
 
 	It("removes container nginx", func() {
-		output := NewDockerCommand("rm", nginxID).ExecOrDie()
-		Expect(Lines(output)[0]).To(Equal(nginxID))
+		output := NewDockerCommand("rm", testContainerName).ExecOrDie()
+		Expect(Lines(output)[0]).To(Equal(testContainerName))
 	})
 
 	It("deploys a compose app", func() {
@@ -97,25 +96,25 @@ func main() {
 		output := NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
 		Expect(len(Lines)).To(Equal(4))
+		webChecked := false
+
 		for _, line := range Lines[1:] {
 			Expect(line).To(ContainSubstring("Running"))
-		}
-		/*
-				if strings.Contains(line, "acicompose_web") {
-					webChecked = true
-					containerFields := Columns(line)
-					exposedIP := containerFields[3]
-					Expect(exposedIP).To(ContainSubstring(":80->80/TCP"))
+			if strings.Contains(line, "acidemo_web") {
+				webChecked = true
+				containerFields := Columns(line)
+				exposedIP := containerFields[3]
+				Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
 
-					url := strings.ReplaceAll(exposedIP, "->80/TCP", "")
-					output = NewCommand("curl", url).ExecOrDie()
-					Expect(output).To(ContainSubstring("Docker Compose demo"))
-					output = NewCommand("curl", url+"/words/noun").ExecOrDie()
-					Expect(output).To(ContainSubstring("\"word\":"))
-				}
+				url := strings.ReplaceAll(exposedIP, "->80/tcp", "")
+				output = NewCommand("curl", url).ExecOrDie()
+				Expect(output).To(ContainSubstring("Docker Compose demo"))
+				output = NewCommand("curl", url+"/words/noun").ExecOrDie()
+				Expect(output).To(ContainSubstring("\"word\":"))
 			}
-			Expect(webChecked).To(BeTrue())
-		*/
+		}
+
+		Expect(webChecked).To(BeTrue())
 	})
 
 	It("get logs from web service", func() {

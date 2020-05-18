@@ -65,7 +65,7 @@ func main() {
 		output := NewDockerCommand("ps").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(3))
-		Expect(lines[2]).To(ContainSubstring("1234  alpine"))
+		Expect(lines[2]).To(ContainSubstring("1234                alpine"))
 	})
 
 	It("can run quiet ps command", func() {

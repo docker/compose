@@ -25,6 +25,7 @@
 
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+PWD = $(shell pwd)
 
 export DOCKER_BUILDKIT=1
 
@@ -61,8 +62,7 @@ cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	@docker build . \
-	--target lint
+	docker run --rm -t -v $(PWD):/app -w /app golangci/golangci-lint:v1.27-alpine golangci-lint run ./...
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

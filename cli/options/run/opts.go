@@ -8,13 +8,28 @@ import (
 	"github.com/docker/api/containers"
 )
 
-type runOpts struct {
-	name    string
-	publish []string
+// Opts contain run command options
+type Opts struct {
+	Name    string
+	Publish []string
 }
 
-func toPorts(ports []string) ([]containers.Port, error) {
-	_, bindings, err := nat.ParsePortSpecs(ports)
+// ToContainerConfig convert run options to a container configuration
+func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, error) {
+	publish, err := r.toPorts()
+	if err != nil {
+		return containers.ContainerConfig{}, err
+	}
+
+	return containers.ContainerConfig{
+		ID:    r.Name,
+		Image: image,
+		Ports: publish,
+	}, nil
+}
+
+func (r *Opts) toPorts() ([]containers.Port, error) {
+	_, bindings, err := nat.ParsePortSpecs(r.Publish)
 	if err != nil {
 		return nil, err
 	}
@@ -43,17 +58,4 @@ func toPorts(ports []string) ([]containers.Port, error) {
 	}
 
 	return result, nil
-}
-
-func (r *runOpts) toContainerConfig(image string) (containers.ContainerConfig, error) {
-	publish, err := toPorts(r.publish)
-	if err != nil {
-		return containers.ContainerConfig{}, err
-	}
-
-	return containers.ContainerConfig{
-		ID:    r.name,
-		Image: image,
-		Ports: publish,
-	}, nil
 }

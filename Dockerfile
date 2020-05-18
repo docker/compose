@@ -29,9 +29,6 @@ WORKDIR ${PWD}
 ADD go.* ${PWD}
 ADD . ${PWD}
 
-FROM golang:${GO_VERSION} AS lint-base
-RUN go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.26.0
-
 FROM protos-base AS make-protos
 RUN make -f builder.Makefile protos
 
@@ -56,6 +53,3 @@ COPY --from=make-cross /api/bin/* .
 
 FROM base as test
 RUN make -f builder.Makefile test
-
-FROM lint-base AS lint
-RUN make -f builder.Makefile lint
