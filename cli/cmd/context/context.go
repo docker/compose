@@ -46,7 +46,7 @@ func Command(opts *cliopts.GlobalOpts) *cobra.Command {
 		createCommand(),
 		listCommand(),
 		removeCommand(),
-		showCommand(opts),
+		showCommand(),
 		useCommand(opts),
 		login.Command(),
 	)
