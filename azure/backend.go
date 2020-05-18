@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/errdefs"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/compose-spec/compose-go/types"
@@ -177,8 +178,8 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func (cs *aciContainerService) Stop(ctx context.Context, containerName string) error {
-	return errors.New("not implemented")
+func (cs *aciContainerService) Stop(ctx context.Context, containerName string, timeout *uint32) error {
+	return errdefs.ErrNotImplemented
 }
 
 func getGroupAndContainerName(containerID string) (groupName string, containerName string) {

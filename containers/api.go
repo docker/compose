@@ -56,7 +56,7 @@ type Service interface {
 	// List returns all the containers
 	List(ctx context.Context, all bool) ([]Container, error)
 	// Stop stops the running container
-	Stop(ctx context.Context, containerName string) error
+	Stop(ctx context.Context, containerID string, timeout *uint32) error
 	// Run creates and starts a container
 	Run(ctx context.Context, config ContainerConfig) error
 	// Exec executes a command inside a running container

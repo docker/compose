@@ -119,7 +119,7 @@ message StartResponse {
 
 message StopRequest {
 	string id = 1;
-	int64 signal = 2;
+	uint32 timeout = 2;
 }
 
 message StopResponse {

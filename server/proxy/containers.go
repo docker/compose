@@ -76,7 +76,8 @@ func (p *proxyContainerAPI) Start(_ context.Context, request *v1.StartRequest) (
 
 func (p *proxyContainerAPI) Stop(ctx context.Context, request *v1.StopRequest) (*v1.StopResponse, error) {
 	c := Client(ctx)
-	return &v1.StopResponse{}, c.ContainerService().Stop(ctx, request.Id)
+	timeoutValue := request.GetTimeout()
+	return &v1.StopResponse{}, c.ContainerService().Stop(ctx, request.Id, &timeoutValue)
 }
 
 func (p *proxyContainerAPI) Kill(ctx context.Context, request *v1.KillRequest) (*v1.KillResponse, error) {

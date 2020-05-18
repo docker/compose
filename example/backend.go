@@ -56,7 +56,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	return nil
 }
 
-func (cs *containerService) Stop(ctx context.Context, containerName string) error {
+func (cs *containerService) Stop(ctx context.Context, containerName string, timeout *uint32) error {
 	return errors.New("not implemented")
 }
 

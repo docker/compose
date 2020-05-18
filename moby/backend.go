@@ -91,9 +91,13 @@ func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) er
 	return ms.apiClient.ContainerStart(ctx, create.ID, types.ContainerStartOptions{})
 }
 
-func (ms *mobyService) Stop(ctx context.Context, containerName string) error {
-	timeout := 1 * time.Second
-	return ms.apiClient.ContainerStop(ctx, containerName, &timeout)
+func (ms *mobyService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
+	var t *time.Duration
+	if timeout != nil {
+		timeoutValue := time.Duration(*timeout) * time.Second
+		t = &timeoutValue
+	}
+	return ms.apiClient.ContainerStop(ctx, containerID, t)
 }
 
 func (ms *mobyService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
