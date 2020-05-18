@@ -44,6 +44,7 @@ var contextSetConfig = []byte(`{
 
 func TestDetermineCurrentContext(t *testing.T) {
 	d, err := ioutil.TempDir("", "")
+	// nolint errcheck
 	defer os.RemoveAll(d)
 	require.NoError(t, err)
 	err = ioutil.WriteFile(filepath.Join(d, config.ConfigFileName), contextSetConfig, 0644)
