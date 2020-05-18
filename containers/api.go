@@ -40,6 +40,8 @@ type ContainerConfig struct {
 	Image string
 	// Ports provide a list of published ports
 	Ports []Port
+	// Labels set labels to the container
+	Labels map[string]string
 }
 
 // LogsRequest contains configuration about a log request

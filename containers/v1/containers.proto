@@ -51,7 +51,7 @@ message Container {
 	uint64 memory_limit = 6;
 	uint64 pids_current = 7;
 	uint64 pids_limit = 8;
-	repeated string labels = 9;
+	map<string, string> labels = 9;
 }
 
 message CreateRequest {
@@ -68,7 +68,7 @@ message CreateRequest {
 	string restart_status = 11;
 	repeated Mount mounts = 12;
 	string working_dir = 13;
-	repeated string labels = 14;
+	map<string, string> labels = 14;
 }
 
 message Mount {
