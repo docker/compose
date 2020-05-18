@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"net"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -39,10 +38,12 @@ func ServeCommand() *cobra.Command {
 func runServe(ctx context.Context, opts serveOpts) error {
 	s := server.New()
 
-	listener, err := net.Listen("unix", opts.address)
+	listener, err := server.CreateListener(opts.address)
+
 	if err != nil {
-		return errors.Wrap(err, "listen unix socket")
+		return errors.Wrap(err, "listen address "+opts.address)
 	}
+
 	// nolint errcheck
 	defer listener.Close()
 

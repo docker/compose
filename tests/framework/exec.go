@@ -46,7 +46,7 @@ func NewCommand(command string, args ...string) *CmdContext {
 
 func dockerExecutable() string {
 	if runtime.GOOS == "windows" {
-		return "./bin/windows/docker.exe"
+		return "./bin/docker.exe"
 	}
 	return "./bin/docker"
 }

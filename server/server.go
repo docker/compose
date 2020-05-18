@@ -30,6 +30,8 @@ package server
 import (
 	"context"
 	"errors"
+	"net"
+	"strings"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
@@ -55,6 +57,15 @@ func New() *grpc.Server {
 	hs := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, hs)
 	return s
+}
+
+
+//CreateListener creates a listener either on tcp://, or local listener, supporting unix:// for unix socket or npipe:// for named pipes on windows
+func CreateListener(address string) (net.Listener, error) {
+	if strings.HasPrefix(address, "tcp://") {
+		return net.Listen("tcp", strings.TrimPrefix(address, "tcp://"))
+	}
+	return createLocalListener(address)
 }
 
 func unary(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
