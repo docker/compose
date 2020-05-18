@@ -136,16 +136,10 @@ func main() {
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))
 	}
-	config, err := cliconfig.LoadFile(opts.Config)
+
+	currentContext, err := determineCurrentContext(opts.Context, opts.Config)
 	if err != nil {
-		fatal(errors.Wrap(err, "unable to find configuration file"))
-	}
-	currentContext := opts.Context
-	if currentContext == "" {
-		currentContext = config.CurrentContext
-	}
-	if currentContext == "" {
-		currentContext = "default"
+		fatal(errors.New("unable to determine current context"))
 	}
 
 	s, err := store.New(store.WithRoot(opts.Config))
@@ -198,6 +192,21 @@ func execMoby(ctx context.Context) {
 		}
 		os.Exit(0)
 	}
+}
+
+func determineCurrentContext(flag string, configDir string) (string, error) {
+	res := flag
+	if res == "" {
+		config, err := cliconfig.LoadFile(configDir)
+		if err != nil {
+			return "", err
+		}
+		res = config.CurrentContext
+	}
+	if res == "" {
+		res = "default"
+	}
+	return res, nil
 }
 
 func fatal(err error) {
