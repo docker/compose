@@ -28,28 +28,36 @@
 package context
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/cmd/context/login"
-
 	cliopts "github.com/docker/api/cli/options"
+	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
 )
 
-// Command manages contexts
-func Command(opts *cliopts.GlobalOpts) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "context",
-		Short: "Manage contexts",
+func showCommand(opts *cliopts.GlobalOpts) *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Print the current context",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runShow(cmd.Context(), opts)
+		},
 	}
+}
 
-	cmd.AddCommand(
-		createCommand(),
-		listCommand(),
-		removeCommand(),
-		showCommand(opts),
-		useCommand(opts),
-		login.Command(),
-	)
-
-	return cmd
+func runShow(ctx context.Context, opts *cliopts.GlobalOpts) error {
+	s := store.ContextStore(ctx)
+	name := apicontext.CurrentContext(ctx)
+	// Match behavior of existing CLI
+	if name != store.DefaultContextName {
+		if _, err := s.Get(name, nil); err != nil {
+			return err
+		}
+	}
+	fmt.Println(name)
+	return nil
 }
