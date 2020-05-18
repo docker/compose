@@ -177,7 +177,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func getGrouNameContainername(containerID string) (groupName string, containerName string) {
+func getGroupAndContainerName(containerID string) (groupName string, containerName string) {
 	tokens := strings.Split(containerID, "_")
 	groupName = tokens[0]
 	if len(tokens) > 1 {
@@ -190,7 +190,7 @@ func getGrouNameContainername(containerID string) (groupName string, containerNa
 }
 
 func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
-	groupName, containerAciName := getGrouNameContainername(name)
+	groupName, containerAciName := getGroupAndContainerName(name)
 	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, groupName, containerAciName)
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 }
 
 func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
-	groupName, containerAciName := getGrouNameContainername(containerName)
+	groupName, containerAciName := getGroupAndContainerName(containerName)
 	logs, err := getACIContainerLogs(ctx, cs.ctx, groupName, containerAciName)
 	if err != nil {
 		return err
