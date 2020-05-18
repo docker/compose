@@ -22,8 +22,9 @@ body {
 	background-color: #001f5b;
 }
 
-.logo {
-	margin-top: 30px;
+.logo img{
+	margin: -50px 0;
+	width: 435px;
 }
 
 .footer {
@@ -78,7 +79,7 @@ body {
 
 .result .word {
 	display: inline-block;
-	font-family: 'Raleway', sans-serif;
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 	font-size: 45px;
 	color: white;
 	line-height: 155px;
