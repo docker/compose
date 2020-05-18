@@ -17,9 +17,11 @@ type portGroup struct {
 // PortsString returns a human readable published ports
 func PortsString(ports []containers.Port) string {
 	groupMap := make(map[string]*portGroup)
-	var result []string
-	var hostMappings []string
-	var groupMapKeys []string
+	var (
+		result       []string
+		hostMappings []string
+		groupMapKeys []string
+	)
 
 	sort.Slice(ports, func(i int, j int) bool {
 		return comparePorts(ports[i], ports[j])

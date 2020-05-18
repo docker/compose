@@ -62,7 +62,7 @@ cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	docker run -t -v $(PWD):/app -w /app golangci/golangci-lint:v1.27-alpine golangci-lint run ./...
+	docker run --rm -t -v $(PWD):/app -w /app golangci/golangci-lint:v1.27-alpine golangci-lint run ./...
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

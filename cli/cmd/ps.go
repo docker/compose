@@ -6,10 +6,9 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/docker/docker/pkg/stringid"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
-	"github.com/docker/docker/pkg/stringid"
 
 	"github.com/docker/api/cli/formatter"
 	"github.com/docker/api/client"
