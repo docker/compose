@@ -31,7 +31,7 @@ func PsCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
-	cmd.Flags().BoolVarP(&opts.quiet, "all", "a", false, "Show all containers (default shows just running)")
+	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Show all containers (default shows just running)")
 
 	return cmd
 }

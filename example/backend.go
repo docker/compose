@@ -38,8 +38,8 @@ func init() {
 
 type containerService struct{}
 
-func (cs *containerService) List(ctx context.Context, _ bool) ([]containers.Container, error) {
-	return []containers.Container{
+func (cs *containerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
+	result := []containers.Container{
 		{
 			ID:    "id",
 			Image: "nginx",
@@ -48,7 +48,16 @@ func (cs *containerService) List(ctx context.Context, _ bool) ([]containers.Cont
 			ID:    "1234",
 			Image: "alpine",
 		},
-	}, nil
+	}
+
+	if all {
+		result = append(result, containers.Container{
+			ID:    "stopped",
+			Image: "nginx",
+		})
+	}
+
+	return result, nil
 }
 
 func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
