@@ -25,31 +25,47 @@
 	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-package context
+package main
 
 import (
-	"github.com/spf13/cobra"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
 
-	"github.com/docker/api/cli/cmd/context/login"
+	"github.com/stretchr/testify/require"
 
-	cliopts "github.com/docker/api/cli/options"
+	"github.com/docker/api/cli/config"
 )
 
-// Command manages contexts
-func Command(opts *cliopts.GlobalOpts) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "context",
-		Short: "Manage contexts",
-	}
+var contextSetConfig = []byte(`{
+	"currentContext": "some-context"
+}`)
 
-	cmd.AddCommand(
-		createCommand(),
-		listCommand(),
-		removeCommand(),
-		showCommand(opts),
-		useCommand(opts),
-		login.Command(),
-	)
+func TestDetermineCurrentContext(t *testing.T) {
+	d, err := ioutil.TempDir("", "")
+	defer os.RemoveAll(d)
+	require.NoError(t, err)
+	err = ioutil.WriteFile(filepath.Join(d, config.ConfigFileName), contextSetConfig, 0644)
+	require.NoError(t, err)
 
-	return cmd
+	// If nothing set, fallback to default
+	c, err := determineCurrentContext("", "")
+	require.NoError(t, err)
+	require.Equal(t, "default", c)
+
+	// If context flag set, use that
+	c, err = determineCurrentContext("other-context", "")
+	require.NoError(t, err)
+	require.Equal(t, "other-context", c)
+
+	// If no context flag, use config
+	c, err = determineCurrentContext("", d)
+	require.NoError(t, err)
+	require.Equal(t, "some-context", c)
+
+	// Ensure context flag overrides config
+	c, err = determineCurrentContext("other-context", d)
+	require.NoError(t, err)
+	require.Equal(t, "other-context", c)
 }

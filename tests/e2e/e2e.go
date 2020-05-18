@@ -21,7 +21,9 @@ func main() {
 
 	It("should be initialized with default context", func() {
 		NewDockerCommand("context", "use", "default").ExecOrDie()
-		output := NewCommand("docker", "context", "ls").ExecOrDie()
+		output := NewDockerCommand("context", "show").ExecOrDie()
+		Expect(output).To(ContainSubstring("default"))
+		output = NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(Not(ContainSubstring("test-example")))
 		Expect(output).To(ContainSubstring("default *"))
 	})
@@ -59,6 +61,8 @@ func main() {
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example *"))
+		output = NewDockerCommand("context", "show").ExecOrDie()
+		Expect(output).To(ContainSubstring("test-example"))
 	})
 
 	It("can run ps command", func() {
