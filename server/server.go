@@ -59,7 +59,6 @@ func New() *grpc.Server {
 	return s
 }
 
-
 //CreateListener creates a listener either on tcp://, or local listener, supporting unix:// for unix socket or npipe:// for named pipes on windows
 func CreateListener(address string) (net.Listener, error) {
 	if strings.HasPrefix(address, "tcp://") {
