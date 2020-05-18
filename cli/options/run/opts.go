@@ -1,7 +1,9 @@
 package run
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/docker/go-connections/nat"
 
@@ -12,6 +14,7 @@ import (
 type Opts struct {
 	Name    string
 	Publish []string
+	Labels  []string
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -21,10 +24,16 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		return containers.ContainerConfig{}, err
 	}
 
+	labels, err := toLabels(r.Labels)
+	if err != nil {
+		return containers.ContainerConfig{}, err
+	}
+
 	return containers.ContainerConfig{
-		ID:    r.Name,
-		Image: image,
-		Ports: publish,
+		ID:     r.Name,
+		Image:  image,
+		Ports:  publish,
+		Labels: labels,
 	}, nil
 }
 
@@ -55,6 +64,19 @@ func (r *Opts) toPorts() ([]containers.Port, error) {
 				HostIP:        portbind.HostIP,
 			})
 		}
+	}
+
+	return result, nil
+}
+
+func toLabels(labels []string) (map[string]string, error) {
+	result := map[string]string{}
+	for _, label := range labels {
+		parts := strings.Split(label, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("wrong label format %q", label)
+		}
+		result[parts[0]] = parts[1]
 	}
 
 	return result, nil

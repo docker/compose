@@ -159,9 +159,10 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		Config: types.Config{
 			Services: []types.ServiceConfig{
 				{
-					Name:  singleContainerName,
-					Image: r.Image,
-					Ports: ports,
+					Name:   singleContainerName,
+					Image:  r.Image,
+					Ports:  ports,
+					Labels: r.Labels,
 				},
 			},
 		},

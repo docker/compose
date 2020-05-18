@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,6 +95,48 @@ func (s *RunOptsSuite) TestPortParse() {
 		result, err := opts.toPorts()
 		require.Nil(s.T(), err)
 		assert.ElementsMatch(s.T(), testCase.expected, result)
+	}
+}
+
+func (s *RunOptsSuite) TestLabels() {
+	testCases := []struct {
+		in            []string
+		expected      map[string]string
+		expectedError error
+	}{
+		{
+			in: []string{"label=value"},
+			expected: map[string]string{
+				"label": "value",
+			},
+			expectedError: nil,
+		},
+		{
+			in: []string{"label=value", "label=value2"},
+			expected: map[string]string{
+				"label": "value2",
+			},
+			expectedError: nil,
+		},
+		{
+			in: []string{"label=value", "label2=value2"},
+			expected: map[string]string{
+				"label":  "value",
+				"label2": "value2",
+			},
+			expectedError: nil,
+		},
+		{
+			in:            []string{"label"},
+			expected:      nil,
+			expectedError: errors.New(`wrong label format "label"`),
+		},
+	}
+
+	for _, testCase := range testCases {
+		result, err := toLabels(testCase.in)
+		assert.Equal(s.T(), testCase.expectedError, err)
+		assert.Equal(s.T(), testCase.expected, result)
 	}
 }
 

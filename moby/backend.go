@@ -75,7 +75,8 @@ func (ms *mobyService) List(ctx context.Context) ([]containers.Container, error)
 
 func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) error {
 	create, err := ms.apiClient.ContainerCreate(ctx, &container.Config{
-		Image: r.Image,
+		Image:  r.Image,
+		Labels: r.Labels,
 	}, nil, nil, r.ID)
 	if err != nil {
 		return err
