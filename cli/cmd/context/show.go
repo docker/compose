@@ -33,27 +33,26 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cliopts "github.com/docker/api/cli/options"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
 
-func showCommand(opts *cliopts.GlobalOpts) *cobra.Command {
+func showCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
 		Short: "Print the current context",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runShow(cmd.Context(), opts)
+			return runShow(cmd.Context())
 		},
 	}
 }
 
-func runShow(ctx context.Context, opts *cliopts.GlobalOpts) error {
-	s := store.ContextStore(ctx)
+func runShow(ctx context.Context) error {
 	name := apicontext.CurrentContext(ctx)
 	// Match behavior of existing CLI
 	if name != store.DefaultContextName {
+		s := store.ContextStore(ctx)
 		if _, err := s.Get(name, nil); err != nil {
 			return err
 		}
