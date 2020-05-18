@@ -338,3 +338,55 @@ func (s sdk) GetLogs(ctx context.Context, name string) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 }
+
+func (s sdk) GetTasks(ctx context.Context, cluster string, name string) ([]string, error) {
+	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
+		Cluster:     aws.String(cluster),
+		ServiceName: aws.String(name),
+	})
+	if err != nil {
+		return nil, err
+	}
+	arns := []string{}
+	for _, arn := range tasks.TaskArns {
+		arns = append(arns, *arn)
+	}
+	return arns, nil
+}
+
+func (s sdk) GetNetworkInterfaces(ctx context.Context, cluster string, arns ...string) ([]string, error) {
+	tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
+		Cluster: aws.String(cluster),
+		Tasks:   aws.StringSlice(arns),
+	})
+	if err != nil {
+		return nil, err
+	}
+	interfaces := []string{}
+	for _, task := range tasks.Tasks {
+		for _, attachement := range task.Attachments {
+			if *attachement.Type == "ElasticNetworkInterface" {
+				for _, pair := range attachement.Details {
+					if *pair.Name == "networkInterfaceId" {
+						interfaces = append(interfaces, *pair.Value)
+					}
+				}
+			}
+		}
+	}
+	return interfaces, nil
+}
+
+func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) ([]string, error) {
+	desc, err := s.EC2.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
+		NetworkInterfaceIds: aws.StringSlice(interfaces),
+	})
+	if err != nil {
+		return nil, err
+	}
+	publicIPs := []string{}
+	for _, interf := range desc.NetworkInterfaces {
+		publicIPs = append(publicIPs, *interf.Association.PublicIp)
+	}
+	return publicIPs, nil
+}
