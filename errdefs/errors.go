@@ -45,6 +45,8 @@ var (
 	// ErrNotImplemented is returned when a backend doesn't implement
 	// an action
 	ErrNotImplemented = errors.New("not implemented")
+	// ErrParsingFailed
+	ErrParsingFailed = errors.New("parsing failed")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound

@@ -1,13 +1,16 @@
 package convert
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/compose-spec/compose-go/types"
+
+	"github.com/docker/api/errdefs"
 )
 
 // GetRunVolumes return volume configurations for a project and a single service
@@ -74,7 +77,7 @@ func volumeURL(pathURL string) (*url.URL, error) {
 
 	count := strings.Count(pathURL, ":")
 	if count > 2 {
-		return nil, fmt.Errorf("unable to parse volume mount %q", pathURL)
+		return nil, errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("unable to parse volume mount %q", pathURL))
 	}
 	if count == 2 {
 		tokens := strings.Split(pathURL, ":")
@@ -86,20 +89,20 @@ func volumeURL(pathURL string) (*url.URL, error) {
 func (v *volumeInput) parse(name string, s string) error {
 	volumeURL, err := volumeURL(s)
 	if err != nil {
-		return fmt.Errorf("volume specification %q could not be parsed %q", s, err)
+		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q could not be parsed %q", s, err))
 	}
 	v.username = volumeURL.User.Username()
 	if v.username == "" {
-		return fmt.Errorf("volume specification %q does not include a storage username", v)
+		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage username", v))
 	}
 	key, ok := volumeURL.User.Password()
 	if !ok || key == "" {
-		return fmt.Errorf("volume specification %q does not include a storage key", v)
+		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage key", v))
 	}
 	v.key = unescapeKey(key)
 	v.share = volumeURL.Host
 	if v.share == "" {
-		return fmt.Errorf("volume specification %q does not include a storage file share", v)
+		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage file share", v))
 	}
 	v.name = name
 	v.target = volumeURL.Path
