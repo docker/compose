@@ -29,7 +29,7 @@ type dockerCliCommand struct {
 
 type ConfigFileOperator func(configFile *dockerConfigFile.ConfigFile)
 
-func (d dockerCliCommand) createTestCmd(ops ...ConfigFileOperator) (icmd.Cmd, func()) {
+func (d dockerCliCommand) createTestCmd(ops ...ConfigFileOperator) (icmd.Cmd, func(), docker.AwsContext) {
 	configDir, err := ioutil.TempDir("", "config")
 	if err != nil {
 		panic(err)
@@ -55,9 +55,8 @@ func (d dockerCliCommand) createTestCmd(ops ...ConfigFileOperator) (icmd.Cmd, fu
 	}
 
 	awsContext := docker.AwsContext{
-		Profile: "TestProfile",
-		Cluster: "TestCluster",
-		Region:  "TestRegion",
+		Profile: "sandbox.devtools.developer",
+		Region:  "eu-west-3",
 	}
 	testStore, err := docker.NewContextWithStore(testContextName, &awsContext, filepath.Join(configDir, "contexts"))
 	if err != nil {
@@ -71,7 +70,7 @@ func (d dockerCliCommand) createTestCmd(ops ...ConfigFileOperator) (icmd.Cmd, fu
 	env := append(os.Environ(),
 		"DOCKER_CONFIG="+configDir,
 		"DOCKER_CLI_EXPERIMENTAL=enabled") // TODO: Remove this once docker ecs plugin is no more experimental
-	return icmd.Cmd{Env: env}, cleanup
+	return icmd.Cmd{Env: env}, cleanup, awsContext
 }
 
 func (d dockerCliCommand) Command(args ...string) []string {

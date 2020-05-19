@@ -10,7 +10,7 @@ import (
 )
 
 func TestInvokePluginFromCLI(t *testing.T) {
-	cmd, cleanup := dockerCli.createTestCmd()
+	cmd, cleanup, _ := dockerCli.createTestCmd()
 	defer cleanup()
 	// docker --help should list app as a top command
 	cmd.Command = dockerCli.Command("--help")

@@ -7,7 +7,7 @@ import (
 )
 
 func TestExitErrorCode(t *testing.T) {
-	cmd, cleanup := dockerCli.createTestCmd()
+	cmd, cleanup, _ := dockerCli.createTestCmd()
 	defer cleanup()
 
 	cmd.Command = dockerCli.Command("ecs", "unknown_command")

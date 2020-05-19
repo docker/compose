@@ -10,7 +10,7 @@ import (
 )
 
 func TestDefaultAwsContextName(t *testing.T) {
-	cmd, cleanup := dockerCli.createTestCmd()
+	cmd, cleanup, _ := dockerCli.createTestCmd()
 	defer cleanup()
 
 	cmd.Command = dockerCli.Command("ecs", "setup", "--cluster", "clusterName", "--profile", "profileName",
