@@ -78,7 +78,38 @@ func main() {
 	})
 
 	It("runs nginx on port 80", func() {
-		runTest(subscriptionID)
+		aciContext := store.AciContext{
+			SubscriptionID: subscriptionID,
+			Location:       location,
+			ResourceGroup:  resourceGroupName,
+		}
+		createStorageAccount(aciContext, testStorageAccountName)
+		defer deleteStorageAccount(aciContext)
+		keys := getStorageKeys(aciContext, testStorageAccountName)
+		firstKey := *keys[0].Value
+		credential, u := createFileShare(firstKey, testShareName)
+		uploadFile(credential, u.String(), testFileName, testFileContent)
+
+		mountTarget := "/usr/share/nginx/html"
+		output := NewDockerCommand("run", "nginx",
+			"-v", fmt.Sprintf("%s:%s@%s:%s",
+				testStorageAccountName, firstKey, testShareName, mountTarget),
+			"-p", "80:80",
+			"--name", testContainerName).ExecOrDie()
+		Expect(output).To(Equal(testContainerName + "\n"))
+		output = NewDockerCommand("ps").ExecOrDie()
+		lines := Lines(output)
+		Expect(len(lines)).To(Equal(2))
+
+		containerFields := Columns(lines[1])
+		Expect(containerFields[1]).To(Equal("nginx"))
+		Expect(containerFields[2]).To(Equal("Running"))
+		exposedIP := containerFields[3]
+		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
+
+		publishedURL := strings.ReplaceAll(exposedIP, "->80/tcp", "")
+		output = NewCommand("curl", publishedURL).ExecOrDie()
+		Expect(output).To(ContainSubstring(testFileContent))
 	})
 
 	It("removes container nginx", func() {
@@ -179,41 +210,6 @@ func uploadFile(credential azfile.SharedKeyCredential, baseURL, fileName, fileCo
 	fileURL := azfile.NewFileURL(*fURL, azfile.NewPipeline(&credential, azfile.PipelineOptions{}))
 	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(testFileContent), fileURL, azfile.UploadToAzureFileOptions{})
 	Expect(err).To(BeNil())
-}
-
-func runTest(subscriptionID string) {
-	aciContext := store.AciContext{
-		SubscriptionID: subscriptionID,
-		Location:       location,
-		ResourceGroup:  resourceGroupName,
-	}
-	createStorageAccount(aciContext, testStorageAccountName)
-	defer deleteStorageAccount(aciContext)
-	keys := getStorageKeys(aciContext, testStorageAccountName)
-	firstKey := *keys[0].Value
-	credential, u := createFileShare(firstKey, testShareName)
-	uploadFile(credential, u.String(), testFileName, testFileContent)
-
-	mountTarget := "/usr/share/nginx/html"
-	output := NewDockerCommand("run", "nginx",
-		"-v", fmt.Sprintf("%s:%s@%s:%s",
-			testStorageAccountName, firstKey, testShareName, mountTarget),
-		"-p", "80:80",
-		"--name", testContainerName).ExecOrDie()
-	Expect(output).To(Equal(testContainerName + "\n"))
-	output = NewDockerCommand("ps").ExecOrDie()
-	lines := Lines(output)
-	Expect(len(lines)).To(Equal(2))
-
-	containerFields := Columns(lines[1])
-	Expect(containerFields[1]).To(Equal("nginx"))
-	Expect(containerFields[2]).To(Equal("Running"))
-	exposedIP := containerFields[3]
-	Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
-
-	publishedURL := strings.ReplaceAll(exposedIP, "->80/tcp", "")
-	output = NewCommand("curl", publishedURL).ExecOrDie()
-	Expect(output).To(ContainSubstring(testFileContent))
 }
 
 func setupTestResourceGroup(groupName string) {
