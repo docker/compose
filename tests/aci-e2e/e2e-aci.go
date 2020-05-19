@@ -208,7 +208,7 @@ func uploadFile(credential azfile.SharedKeyCredential, baseURL, fileName, fileCo
 	fURL, err := url.Parse(baseURL + "/" + fileName)
 	Expect(err).To(BeNil())
 	fileURL := azfile.NewFileURL(*fURL, azfile.NewPipeline(&credential, azfile.PipelineOptions{}))
-	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(testFileContent), fileURL, azfile.UploadToAzureFileOptions{})
+	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(fileContent), fileURL, azfile.UploadToAzureFileOptions{})
 	Expect(err).To(BeNil())
 }
 
