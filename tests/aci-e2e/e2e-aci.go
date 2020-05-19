@@ -16,8 +16,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/docker/api/azure"
-	"github.com/docker/api/azure/storage"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/tests/aci-e2e/storage"
 	. "github.com/docker/api/tests/framework"
 )
 

@@ -49,7 +49,7 @@ type volumeInput struct {
 	target   string
 }
 
-func scapeKeySlashes(rawURL string) (string, error) {
+func escapeKeySlashes(rawURL string) (string, error) {
 	urlSplit := strings.Split(rawURL, "@")
 	if len(urlSplit) < 1 {
 		return "", errors.New("invalid url format " + rawURL)
@@ -60,13 +60,13 @@ func scapeKeySlashes(rawURL string) (string, error) {
 	return scaped, nil
 }
 
-func unscapeKey(passwd string) string {
-	return strings.ReplaceAll(passwd, "_", "/")
+func unescapeKey(key string) string {
+	return strings.ReplaceAll(key, "_", "/")
 }
 
 // Removes the second ':' that separates the source from target
 func volumeURL(pathURL string) (*url.URL, error) {
-	scapedURL, err := scapeKeySlashes(pathURL)
+	scapedURL, err := escapeKeySlashes(pathURL)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +92,11 @@ func (v *volumeInput) parse(name string, s string) error {
 	if v.username == "" {
 		return fmt.Errorf("volume specification %q does not include a storage username", v)
 	}
-	passwd, ok := volumeURL.User.Password()
-	if !ok || passwd == "" {
+	key, ok := volumeURL.User.Password()
+	if !ok || key == "" {
 		return fmt.Errorf("volume specification %q does not include a storage key", v)
 	}
-	v.key = unscapeKey(passwd)
+	v.key = unescapeKey(key)
 	v.share = volumeURL.Host
 	if v.share == "" {
 		return fmt.Errorf("volume specification %q does not include a storage file share", v)
