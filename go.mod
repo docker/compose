@@ -3,10 +3,13 @@ module github.com/docker/api
 go 1.14
 
 require (
+	github.com/Azure/azure-pipeline-go v0.2.1
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
+	github.com/Azure/azure-storage-file-go v0.7.0
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Azure/go-autorest/autorest v0.10.0
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
+	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
 	github.com/Azure/go-autorest/autorest/azure/cli v0.3.1
 	github.com/Azure/go-autorest/autorest/date v0.2.0
 	github.com/Azure/go-autorest/autorest/to v0.3.0

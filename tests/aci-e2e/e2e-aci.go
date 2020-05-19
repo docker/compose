@@ -2,14 +2,22 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/go-autorest/autorest/to"
+
+	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
+	"github.com/Azure/azure-storage-file-go/azfile"
+
 	. "github.com/onsi/gomega"
 
 	"github.com/docker/api/azure"
+	"github.com/docker/api/azure/storage"
+	"github.com/docker/api/context/store"
 	. "github.com/docker/api/tests/framework"
 )
 
@@ -44,9 +52,11 @@ func main() {
 		Expect(output).To(ContainSubstring("default *"))
 	})
 
+	var subscriptionID string
 	It("creates a new aci context for tests", func() {
 		setupTestResourceGroup(resourceGroupName)
-		subscriptionID, err := azure.GetSubscriptionID(context.TODO())
+		var err error
+		subscriptionID, err = azure.GetSubscriptionID(context.TODO())
 		Expect(err).To(BeNil())
 
 		NewDockerCommand("context", "create", contextName, "aci", "--aci-subscription-id", subscriptionID, "--aci-resource-group", resourceGroupName, "--aci-location", location).ExecOrDie()
@@ -68,21 +78,7 @@ func main() {
 	})
 
 	It("runs nginx on port 80", func() {
-		output := NewDockerCommand("run", "nginx", "-p", "80:80", "--name", testContainerName).ExecOrDie()
-		Expect(output).To(Equal(testContainerName + "\n"))
-		output = NewDockerCommand("ps").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(2))
-
-		containerFields := Columns(lines[1])
-		Expect(containerFields[1]).To(Equal("nginx"))
-		Expect(containerFields[2]).To(Equal("Running"))
-		exposedIP := containerFields[3]
-		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
-
-		url := strings.ReplaceAll(exposedIP, "->80/tcp", "")
-		output = NewCommand("curl", url).ExecOrDie()
-		Expect(output).To(ContainSubstring("Welcome to nginx!"))
+		runTest(subscriptionID)
 	})
 
 	It("removes container nginx", func() {
@@ -134,6 +130,90 @@ func main() {
 		output := NewCommand("docker", "context", "rm", contextName).ExecOrDie()
 		Expect(output).To(ContainSubstring(contextName))
 	})
+}
+
+const (
+	testStorageAccountName = "dockertestaccountname"
+	testShareName          = "dockertestsharename"
+	testFileContent        = "Volume mounted with success!"
+	testFileName           = "index.html"
+)
+
+func createStorageAccount(aciContext store.AciContext, accountName string) azure_storage.Account {
+	storageAccount, err := storage.CreateStorageAccount(context.TODO(), aciContext, accountName)
+	Expect(err).To(BeNil())
+	Expect(*storageAccount.Name).To(Equal(accountName))
+	return storageAccount
+}
+
+func getStorageKeys(aciContext store.AciContext, storageAccountName string) []azure_storage.AccountKey {
+	list, err := storage.ListKeys(context.TODO(), aciContext, storageAccountName)
+	Expect(err).To(BeNil())
+	Expect(list.Keys).ToNot(BeNil())
+	Expect(len(*list.Keys)).To(BeNumerically(">", 0))
+
+	return *list.Keys
+}
+
+func deleteStorageAccount(aciContext store.AciContext) {
+	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, testStorageAccountName)
+	Expect(err).To(BeNil())
+}
+
+func createFileShare(key, shareName string) (azfile.SharedKeyCredential, url.URL) {
+	// Create a ShareURL object that wraps a soon-to-be-created share's URL and a default pipeline.
+	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", testStorageAccountName, shareName))
+	credential, err := azfile.NewSharedKeyCredential(testStorageAccountName, key)
+	Expect(err).To(BeNil())
+
+	shareURL := azfile.NewShareURL(*u, azfile.NewPipeline(credential, azfile.PipelineOptions{}))
+	_, err = shareURL.Create(context.TODO(), azfile.Metadata{}, 0)
+	Expect(err).To(BeNil())
+
+	return *credential, *u
+}
+
+func uploadFile(credential azfile.SharedKeyCredential, baseURL, fileName, fileContent string) {
+	fURL, err := url.Parse(baseURL + "/" + fileName)
+	Expect(err).To(BeNil())
+	fileURL := azfile.NewFileURL(*fURL, azfile.NewPipeline(&credential, azfile.PipelineOptions{}))
+	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(testFileContent), fileURL, azfile.UploadToAzureFileOptions{})
+	Expect(err).To(BeNil())
+}
+
+func runTest(subscriptionID string) {
+	aciContext := store.AciContext{
+		SubscriptionID: subscriptionID,
+		Location:       location,
+		ResourceGroup:  resourceGroupName,
+	}
+	createStorageAccount(aciContext, testStorageAccountName)
+	defer deleteStorageAccount(aciContext)
+	keys := getStorageKeys(aciContext, testStorageAccountName)
+	firstKey := *keys[0].Value
+	credential, u := createFileShare(firstKey, testShareName)
+	uploadFile(credential, u.String(), testFileName, testFileContent)
+
+	mountTarget := "/usr/share/nginx/html"
+	output := NewDockerCommand("run", "nginx",
+		"-v", fmt.Sprintf("%s:%s@%s:%s",
+			testStorageAccountName, firstKey, testShareName, mountTarget),
+		"-p", "80:80",
+		"--name", testContainerName).ExecOrDie()
+	Expect(output).To(Equal(testContainerName + "\n"))
+	output = NewDockerCommand("ps").ExecOrDie()
+	lines := Lines(output)
+	Expect(len(lines)).To(Equal(2))
+
+	containerFields := Columns(lines[1])
+	Expect(containerFields[1]).To(Equal("nginx"))
+	Expect(containerFields[2]).To(Equal("Running"))
+	exposedIP := containerFields[3]
+	Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
+
+	publishedURL := strings.ReplaceAll(exposedIP, "->80/tcp", "")
+	output = NewCommand("curl", publishedURL).ExecOrDie()
+	Expect(output).To(ContainSubstring(testFileContent))
 }
 
 func setupTestResourceGroup(groupName string) {

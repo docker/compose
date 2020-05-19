@@ -257,11 +257,14 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 	return containerClient, nil
 }
 
-func getSubscriptionsClient() subscription.SubscriptionsClient {
+func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
-	authorizer, _ := login.NewAuthorizerFromLogin()
+	authorizer, err := login.NewAuthorizerFromLogin()
+	if err != nil {
+		return subscription.SubscriptionsClient{}, err
+	}
 	subc.Authorizer = authorizer
-	return subc
+	return subc, nil
 }
 
 // GetGroupsClient ...
@@ -274,7 +277,10 @@ func GetGroupsClient(subscriptionID string) resources.GroupsClient {
 
 // GetSubscriptionID ...
 func GetSubscriptionID(ctx context.Context) (string, error) {
-	c := getSubscriptionsClient()
+	c, err := getSubscriptionsClient()
+	if err != nil {
+		return "", err
+	}
 	res, err := c.List(ctx)
 	if err != nil {
 		return "", err
