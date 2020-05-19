@@ -16,6 +16,9 @@ If you don't have or want to use Docker for building you need to make sure you h
 
 And then you can call the same make targets but you need to pass it the `builder.Makefile` (`make -f builder.Makefile`).
 
+The new CLI delegates to the classic docker for default contexts ; delegation is done to `docker-classic`. 
+* `make classic-link` will create a `docker-classic` link in `/usr/local/bin` if you don't already have it from Docker Desktop
+
 ## Building the project
 
 ```bash
