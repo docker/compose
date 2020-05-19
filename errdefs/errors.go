@@ -73,3 +73,8 @@ func IsUnknownError(err error) bool {
 func IsErrNotImplemented(err error) bool {
 	return errors.Is(err, ErrNotImplemented)
 }
+
+// IsErrParseFail returns true if the unwrapped error is ErrParsingFailed
+func IsErrParsingFailed(err error) bool {
+	return errors.Is(err, ErrParsingFailed)
+}

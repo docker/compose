@@ -55,10 +55,16 @@ type volumeInput struct {
 func escapeKeySlashes(rawURL string) (string, error) {
 	urlSplit := strings.Split(rawURL, "@")
 	if len(urlSplit) < 1 {
-		return "", errors.New("invalid url format " + rawURL)
+		return "", errors.Wrap(errdefs.ErrParsingFailed, "invalid url format "+rawURL)
 	}
 	userPasswd := strings.ReplaceAll(urlSplit[0], "/", "_")
-	scaped := userPasswd + rawURL[strings.Index(rawURL, "@"):]
+
+	atIndex := strings.Index(rawURL, "@")
+	if atIndex < 0 {
+		return "", errors.Wrap(errdefs.ErrParsingFailed, "no share specified in "+rawURL)
+	}
+
+	scaped := userPasswd + rawURL[atIndex:]
 
 	return scaped, nil
 }
