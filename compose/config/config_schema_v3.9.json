@@ -391,7 +391,7 @@
         "start_period": {"type": "string", "format": "duration"}
       },
       "additionalProperties": false,
-      "patternProperties": {"^x-": {}}      
+      "patternProperties": {"^x-": {}}
     },
     "deployment": {
       "id": "#/definitions/deployment",
@@ -414,7 +414,7 @@
             ]}
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "update_config": {
           "type": "object",
@@ -429,7 +429,7 @@
             ]}
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "resources": {
           "type": "object",
@@ -441,7 +441,7 @@
                 "memory": {"type": "string"}
               },
               "additionalProperties": false,
-              "patternProperties": {"^x-": {}}     
+              "patternProperties": {"^x-": {}}
             },
             "reservations": {
               "type": "object",
@@ -451,11 +451,11 @@
                 "generic_resources": {"$ref": "#/definitions/generic_resources"}
               },
               "additionalProperties": false,
-              "patternProperties": {"^x-": {}}     
+              "patternProperties": {"^x-": {}}
             }
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "restart_policy": {
           "type": "object",
@@ -466,7 +466,7 @@
             "window": {"type": "string", "format": "duration"}
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "placement": {
           "type": "object",
@@ -480,17 +480,17 @@
                   "spread": {"type": "string"}
                 },
                 "additionalProperties": false,
-                "patternProperties": {"^x-": {}}     
+                "patternProperties": {"^x-": {}}
               }
             },
             "max_replicas_per_node": {"type": "integer"}
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         }
       },
       "additionalProperties": false,
-      "patternProperties": {"^x-": {}}     
+      "patternProperties": {"^x-": {}}
     },
 
     "generic_resources": {
@@ -506,11 +506,11 @@
               "value": {"type": "number"}
             },
             "additionalProperties": false,
-            "patternProperties": {"^x-": {}}     
+            "patternProperties": {"^x-": {}}
           }
         },
         "additionalProperties": false,
-        "patternProperties": {"^x-": {}}     
+        "patternProperties": {"^x-": {}}
       }
     },
 
@@ -538,12 +538,12 @@
                   "subnet": {"type": "string"}
                 },
                 "additionalProperties": false,
-                "patternProperties": {"^x-": {}}     
+                "patternProperties": {"^x-": {}}
               }
             }
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "external": {
           "type": ["boolean", "object"],
@@ -554,14 +554,14 @@
             }
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "internal": {"type": "boolean"},
         "attachable": {"type": "boolean"},
         "labels": {"$ref": "#/definitions/list_or_dict"}
       },
       "additionalProperties": false,
-      "patternProperties": {"^x-": {}}     
+      "patternProperties": {"^x-": {}}
     },
 
     "volume": {
@@ -585,7 +585,7 @@
             }
           },
           "additionalProperties": false,
-          "patternProperties": {"^x-": {}}     
+          "patternProperties": {"^x-": {}}
         },
         "labels": {"$ref": "#/definitions/list_or_dict"}
       },
@@ -616,7 +616,7 @@
         "template_driver": {"type": "string"}
       },
       "additionalProperties": false,
-      "patternProperties": {"^x-": {}}     
+      "patternProperties": {"^x-": {}}
     },
 
     "config": {
@@ -638,7 +638,7 @@
         "template_driver": {"type": "string"}
       },
       "additionalProperties": false,
-      "patternProperties": {"^x-": {}}     
+      "patternProperties": {"^x-": {}}
     },
 
     "string_or_list": {
