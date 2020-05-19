@@ -1,0 +1,3 @@
+NAME                TYPE                DESCRIPTION                               DOCKER ENPOINT                KUBERNETES ENDPOINT               ORCHESTRATOR
+default             docker              Current DOCKER_HOST based configuration   unix:///var/run/docker.sock   https://35.205.93.167 (default)   swarm
+example *           example                                                                                                                       

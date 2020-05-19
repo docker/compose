@@ -54,7 +54,7 @@ func runPs(ctx context.Context, opts psOpts) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 8, ' ', 0)
+	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprintf(w, "CONTAINER ID\tIMAGE\tCOMMAND\tSTATUS\tPORTS\n")
 	format := "%s\t%s\t%s\t%s\t%s\n"
 	for _, c := range containers {

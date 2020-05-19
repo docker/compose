@@ -1,4 +1,4 @@
-package cmd
+package context
 
 import (
 	"context"
@@ -6,17 +6,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gotest.tools/v3/golden"
 
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
-	_ "github.com/docker/api/example"
 )
 
-type PsSuite struct {
+type ContextSuite struct {
 	suite.Suite
 	ctx            context.Context
 	writer         *os.File
@@ -25,7 +23,7 @@ type PsSuite struct {
 	storeRoot      string
 }
 
-func (sut *PsSuite) BeforeTest(suiteName, testName string) {
+func (sut *ContextSuite) BeforeTest(suiteName, testName string) {
 	ctx := context.Background()
 	ctx = apicontext.WithCurrentContext(ctx, "example")
 	dir, err := ioutil.TempDir("", "store")
@@ -54,7 +52,7 @@ func (sut *PsSuite) BeforeTest(suiteName, testName string) {
 	sut.reader = r
 }
 
-func (sut *PsSuite) getStdOut() string {
+func (sut *ContextSuite) getStdOut() string {
 	err := sut.writer.Close()
 	require.Nil(sut.T(), err)
 
@@ -63,34 +61,18 @@ func (sut *PsSuite) getStdOut() string {
 	return string(out)
 }
 
-func (sut *PsSuite) AfterTest(suiteName, testName string) {
+func (sut *ContextSuite) AfterTest(suiteName, testName string) {
 	os.Stdout = sut.originalStdout
 	err := os.RemoveAll(sut.storeRoot)
 	require.Nil(sut.T(), err)
 }
 
-func (sut *PsSuite) TestPs() {
-	opts := psOpts{
-		quiet: false,
-	}
-
-	err := runPs(sut.ctx, opts)
-	assert.NilError(sut.T(), err)
-
-	golden.Assert(sut.T(), sut.getStdOut(), "ps-out.golden")
-}
-
-func (sut *PsSuite) TestPsQuiet() {
-	opts := psOpts{
-		quiet: true,
-	}
-
-	err := runPs(sut.ctx, opts)
-	assert.NilError(sut.T(), err)
-
-	golden.Assert(sut.T(), sut.getStdOut(), "ps-out-quiet.golden")
+func (sut *ContextSuite) TestLs() {
+	err := runList(sut.ctx)
+	require.Nil(sut.T(), err)
+	golden.Assert(sut.T(), sut.getStdOut(), "ls-out.golden")
 }
 
 func TestPs(t *testing.T) {
-	suite.Run(t, new(PsSuite))
+	suite.Run(t, new(ContextSuite))
 }
