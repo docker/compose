@@ -51,10 +51,14 @@ type ConfigFlags struct {
 
 // AddConfigFlags adds persistent (global) flags
 func (c *ConfigFlags) AddConfigFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&c.Config, ConfigFlagName, filepath.Join(home(), ConfigFileDir), "Location of the client config files `DIRECTORY`")
+	flags.StringVar(&c.Config, ConfigFlagName, confDir(), "Location of the client config files `DIRECTORY`")
 }
 
-func home() string {
+func confDir() string {
+	env := os.Getenv("DOCKER_CONFIG")
+	if env != "" {
+		return env
+	}
 	home, _ := os.UserHomeDir()
-	return home
+	return filepath.Join(home, ConfigFileDir)
 }
