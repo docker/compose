@@ -25,6 +25,11 @@ func NewProject(config types.ConfigDetails, name string) (*Project, error) {
 		return nil, err
 	}
 
+	err = Normalize(model)
+	if err != nil {
+		return nil, err
+	}
+
 	p := Project{
 		Config:     *model,
 		projectDir: config.WorkingDir,

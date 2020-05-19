@@ -8,6 +8,6 @@ import (
 
 func TestInvalidNetworkMode(t *testing.T) {
 	project := load(t, "testdata/invalid_network_mode.yaml")
-	err := Validate(project)
-	assert.Error(t, err, "ECS do not support NetworkMode \"bridge\"")
+	err := Check(project)
+	assert.Error(t, err[0], "'network_mode' \"bridge\" is not supported")
 }

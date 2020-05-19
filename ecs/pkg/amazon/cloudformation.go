@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -26,9 +28,9 @@ const (
 
 // Convert a compose project into a CloudFormation template
 func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
-	err := Validate(project)
-	if err != nil {
-		return nil, err
+	warnings := Check(project)
+	for _, w := range warnings {
+		logrus.Warn(w)
 	}
 
 	template := cloudformation.NewTemplate()

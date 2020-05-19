@@ -10,6 +10,7 @@ import (
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
 	"github.com/docker/ecs-plugin/pkg/compose"
@@ -68,7 +69,7 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 				ResourceRequirements:   nil,
 				StartTimeout:           0,
 				StopTimeout:            durationToInt(service.StopGracePeriod),
-				SystemControls:         nil,
+				SystemControls:         toSystemControls(service.Sysctls),
 				Ulimits:                toUlimits(service.Ulimits),
 				User:                   service.User,
 				VolumesFrom:            nil,
@@ -84,8 +85,30 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 		PlacementConstraints:    toPlacementConstraints(service.Deploy),
 		ProxyConfiguration:      nil,
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
-		Tags:                    nil,
+		Tags:                    toTags(service.Labels),
 	}, nil
+}
+
+func toTags(labels types.Labels) []tags.Tag {
+	t := []tags.Tag{}
+	for n, v := range labels {
+		t = append(t, tags.Tag{
+			Key:   n,
+			Value: v,
+		})
+	}
+	return t
+}
+
+func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl {
+	sys := []ecs.TaskDefinition_SystemControl{}
+	for k, v := range sysctls {
+		sys = append(sys, ecs.TaskDefinition_SystemControl{
+			Namespace: k,
+			Value:     v,
+		})
+	}
+	return sys
 }
 
 func toLimits(service types.ServiceConfig) (string, string, error) {
