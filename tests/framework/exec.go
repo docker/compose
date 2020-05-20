@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func (b CmdContext) makeCmd() *exec.Cmd {
@@ -35,25 +40,79 @@ type RetriesContext struct {
 	interval time.Duration
 }
 
+// Suite is used to store context information for e2e tests
+type Suite struct {
+	suite.Suite
+	ConfigDir string
+	BinDir    string
+}
+
+// SetupSuite is run before running any tests
+func (s *Suite) SetupSuite() {
+	d, _ := ioutil.TempDir("", "")
+	s.BinDir = d
+	gomega.RegisterFailHandler(func(message string, callerSkip ...int) {
+		log.Error(message)
+		cp := filepath.Join(s.ConfigDir, "config.json")
+		d, _ := ioutil.ReadFile(cp)
+		fmt.Printf("Contents of %s:\n%s\n\nContents of config dir:\n", cp, string(d))
+		out, _ := s.NewCommand("find", s.ConfigDir).Exec()
+		fmt.Println(out)
+		s.T().Fail()
+	})
+	s.linkClassicDocker()
+}
+
+// TearDownSuite is run after all tests
+func (s *Suite) TearDownSuite() {
+	_ = os.RemoveAll(s.BinDir)
+}
+
+func (s *Suite) linkClassicDocker() {
+	p, err := exec.LookPath("docker")
+	gomega.Expect(err).To(gomega.BeNil())
+	err = os.Symlink(p, filepath.Join(s.BinDir, "docker-classic"))
+	gomega.Expect(err).To(gomega.BeNil())
+	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
+	gomega.Expect(err).To(gomega.BeNil())
+}
+
+// BeforeTest is run before each test
+func (s *Suite) BeforeTest(suite, test string) {
+	d, _ := ioutil.TempDir("", "")
+	s.ConfigDir = d
+}
+
+// AfterTest is run after each test
+func (s *Suite) AfterTest(suite, test string) {
+	err := os.RemoveAll(s.ConfigDir)
+	require.NoError(s.T(), err)
+}
+
 // NewCommand creates a command context.
-func NewCommand(command string, args ...string) *CmdContext {
+func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
+	var envs []string
+	if s.ConfigDir != "" {
+		envs = append(os.Environ(), fmt.Sprintf("DOCKER_CONFIG=%s", s.ConfigDir))
+	}
 	return &CmdContext{
 		command: command,
 		args:    args,
+		envs:    envs,
 		retries: RetriesContext{interval: time.Second},
 	}
 }
 
 func dockerExecutable() string {
 	if runtime.GOOS == "windows" {
-		return "./bin/docker.exe"
+		return "../../bin/docker.exe"
 	}
-	return "./bin/docker"
+	return "../../bin/docker"
 }
 
 // NewDockerCommand creates a docker builder.
-func NewDockerCommand(args ...string) *CmdContext {
-	return NewCommand(dockerExecutable(), args...)
+func (s *Suite) NewDockerCommand(args ...string) *CmdContext {
+	return s.NewCommand(dockerExecutable(), args...)
 }
 
 // WithinDirectory tells Docker the cwd.
