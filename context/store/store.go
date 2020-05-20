@@ -264,6 +264,8 @@ func (s *store) List() ([]*Metadata, error) {
 		}
 	}
 
+	// The default context is not stored in the store, it is in-memory only
+	// so we need a special case for it.
 	dockerDefault, err := dockerGefaultContext()
 	if err != nil {
 		return nil, err

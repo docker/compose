@@ -75,7 +75,7 @@ func (sut *PsSuite) TestPs() {
 	}
 
 	err := runPs(sut.ctx, opts)
-	assert.NilError(sut.T(), err)
+	assert.Nil(sut.T(), err)
 
 	golden.Assert(sut.T(), sut.getStdOut(), "ps-out.golden")
 }
@@ -86,7 +86,7 @@ func (sut *PsSuite) TestPsQuiet() {
 	}
 
 	err := runPs(sut.ctx, opts)
-	assert.NilError(sut.T(), err)
+	assert.Nil(sut.T(), err)
 
 	golden.Assert(sut.T(), sut.getStdOut(), "ps-out-quiet.golden")
 }
