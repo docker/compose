@@ -45,10 +45,10 @@ import (
 )
 
 // New returns a new GRPC server.
-func New() *grpc.Server {
+func New(ctx context.Context) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			unaryMeta,
+			unaryMeta(ctx),
 			unary,
 		),
 		grpc.StreamInterceptor(stream),
@@ -74,36 +74,34 @@ func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, 
 	return grpc_prometheus.StreamServerInterceptor(srv, ss, info, handler)
 }
 
-func unaryMeta(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
+func unaryMeta(clictx context.Context) func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return handler(ctx, req)
+		}
+
+		key, ok := md[apicontext.Key]
+		if !ok {
+			return handler(ctx, req)
+		}
+
+		if len(key) == 1 {
+			s := store.ContextStore(clictx)
+			ctx = store.WithContextStore(ctx, s)
+			ctx = apicontext.WithCurrentContext(ctx, key[0])
+
+			c, err := client.New(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx, err = proxy.WithClient(ctx, c)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		return handler(ctx, req)
 	}
-
-	key, ok := md[apicontext.Key]
-	if !ok {
-		return handler(ctx, req)
-	}
-
-	if len(key) == 1 {
-		s, err := store.New()
-		if err != nil {
-			return nil, err
-		}
-
-		ctx = store.WithContextStore(ctx, s)
-		ctx = apicontext.WithCurrentContext(ctx, key[0])
-
-		c, err := client.New(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		ctx, err = proxy.WithClient(ctx, c)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return handler(ctx, req)
 }

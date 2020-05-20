@@ -21,6 +21,7 @@ type serveOpts struct {
 
 // ServeCommand returns the command to serve the API
 func ServeCommand() *cobra.Command {
+	// FIXME(chris-crone): Should warn that specified context is ignored
 	var opts serveOpts
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -36,14 +37,12 @@ func ServeCommand() *cobra.Command {
 }
 
 func runServe(ctx context.Context, opts serveOpts) error {
-	s := server.New()
+	s := server.New(ctx)
 
 	listener, err := server.CreateListener(opts.address)
-
 	if err != nil {
 		return errors.Wrap(err, "listen address "+opts.address)
 	}
-
 	// nolint errcheck
 	defer listener.Close()
 
@@ -71,11 +70,7 @@ type cliServer struct {
 }
 
 func (cs *cliServer) Contexts(ctx context.Context, request *cliv1.ContextsRequest) (*cliv1.ContextsResponse, error) {
-	s, err := store.New()
-	if err != nil {
-		logrus.Error(err)
-		return &cliv1.ContextsResponse{}, err
-	}
+	s := store.ContextStore(ctx)
 	contexts, err := s.List()
 	if err != nil {
 		logrus.Error(err)
