@@ -31,12 +31,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/cli/cmd/context/login"
-
-	cliopts "github.com/docker/api/cli/options"
 )
 
 // Command manages contexts
-func Command(opts *cliopts.GlobalOpts) *cobra.Command {
+func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "context",
 		Short: "Manage contexts",
@@ -47,7 +45,7 @@ func Command(opts *cliopts.GlobalOpts) *cobra.Command {
 		listCommand(),
 		removeCommand(),
 		showCommand(),
-		useCommand(opts),
+		useCommand(),
 		login.Command(),
 	)
 
