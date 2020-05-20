@@ -4,6 +4,6 @@ ddt==1.4.1
 flake8==3.8.1
 gitpython==2.1.15
 mock==3.0.5
-pytest==5.3.4; python_version >= '3.5'
+pytest==5.4.2; python_version >= '3.5'
 pytest==4.6.5; python_version < '3.5'
 pytest-cov==2.8.1
