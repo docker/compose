@@ -45,7 +45,7 @@ func main() {
 	})
 
 	It("creates a new aci context for tests", func() {
-		setupTestResourecGroup(resourceGroupName)
+		setupTestResourceGroup(resourceGroupName)
 		subscriptionID, err := azure.GetSubscriptionID(context.TODO())
 		Expect(err).To(BeNil())
 
@@ -136,7 +136,7 @@ func main() {
 	})
 }
 
-func setupTestResourecGroup(groupName string) {
+func setupTestResourceGroup(groupName string) {
 	log.Println("Creating resource group " + resourceGroupName)
 	ctx := context.TODO()
 	subscriptionID, err := azure.GetSubscriptionID(ctx)
