@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:experimental
-ARG GO_VERSION=1.14.3-alpine3.11
+ARG GO_VERSION=1.14.3-alpine
 
 FROM golang:${GO_VERSION} AS base
 ARG TARGET_OS=unknown
@@ -7,7 +7,7 @@ ARG TARGET_ARCH=unknown
 ARG PWD=/api
 ENV GO111MODULE=on
 
-RUN apk update && apk add docker make
+RUN apk update && apk add -U docker make
 
 WORKDIR ${PWD}
 ADD go.* ${PWD}

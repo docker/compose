@@ -146,12 +146,12 @@ func read(meta string, getter func() interface{}) (*Metadata, error) {
 	}
 
 	var um untypedMetadata
-	if err := marshalTyped(bytes, &um); err != nil {
+	if err := json.Unmarshal(bytes, &um); err != nil {
 		return nil, err
 	}
 
 	var uc untypedContext
-	if err := marshalTyped(um.Metadata, &uc); err != nil {
+	if err := json.Unmarshal(um.Metadata, &uc); err != nil {
 		return nil, err
 	}
 	if uc.Type == "" {
@@ -176,10 +176,6 @@ func read(meta string, getter func() interface{}) (*Metadata, error) {
 			Data:              data,
 		},
 	}, nil
-}
-
-func marshalTyped(in []byte, val interface{}) error {
-	return json.Unmarshal(in, val)
 }
 
 func parse(payload []byte, getter func() interface{}) (interface{}, error) {
@@ -266,7 +262,7 @@ func (s *store) List() ([]*Metadata, error) {
 
 	// The default context is not stored in the store, it is in-memory only
 	// so we need a special case for it.
-	dockerDefault, err := dockerGefaultContext()
+	dockerDefault, err := dockerDefaultContext()
 	if err != nil {
 		return nil, err
 	}

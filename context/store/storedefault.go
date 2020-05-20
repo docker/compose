@@ -31,7 +31,7 @@ type endpoint struct {
 	DefaultNamespace string
 }
 
-func dockerGefaultContext() (*Metadata, error) {
+func dockerDefaultContext() (*Metadata, error) {
 	cmd := exec.Command("docker", "context", "inspect", "default")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout

@@ -7,7 +7,7 @@ import (
 )
 
 func TestDefaultContext(t *testing.T) {
-	s, err := dockerGefaultContext()
+	s, err := dockerDefaultContext()
 	assert.Nil(t, err)
 	assert.Equal(t, "default", s.Name)
 }
