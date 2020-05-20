@@ -45,6 +45,8 @@ var (
 	// ErrNotImplemented is returned when a backend doesn't implement
 	// an action
 	ErrNotImplemented = errors.New("not implemented")
+	// ErrParsingFailed is returned when a string cannot be parsed
+	ErrParsingFailed = errors.New("parsing failed")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
@@ -70,4 +72,9 @@ func IsUnknownError(err error) bool {
 // IsErrNotImplemented returns true if the unwrapped error is ErrNotImplemented
 func IsErrNotImplemented(err error) bool {
 	return errors.Is(err, ErrNotImplemented)
+}
+
+// IsErrParsingFailed returns true if the unwrapped error is ErrParsingFailed
+func IsErrParsingFailed(err error) bool {
+	return errors.Is(err, ErrParsingFailed)
 }

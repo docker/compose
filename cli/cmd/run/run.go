@@ -54,6 +54,7 @@ func Command() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	cmd.Flags().StringVar(&opts.Name, "name", getRandomName(), "Assign a name to the container")
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
+	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: user:key@my_share:/absolute/path/to/target")
 
 	return cmd
 }
@@ -64,18 +65,17 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 		return err
 	}
 
-	project, err := opts.ToContainerConfig(image)
+	containerConfig, err := opts.ToContainerConfig(image)
 	if err != nil {
 		return err
 	}
 
-	if err = c.ContainerService().Run(ctx, project); err != nil {
+	if err = c.ContainerService().Run(ctx, containerConfig); err != nil {
 		return err
 	}
 	fmt.Println(opts.Name)
 
 	return nil
-
 }
 
 func getRandomName() string {

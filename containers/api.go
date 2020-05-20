@@ -26,7 +26,7 @@ type Port struct {
 	HostPort uint32
 	// ContainerPort is the port number inside the container
 	ContainerPort uint32
-	/// Protocol is the protocol of the port mapping
+	// Protocol is the protocol of the port mapping
 	Protocol string
 	// HostIP is the host ip to use
 	HostIP string
@@ -42,6 +42,8 @@ type ContainerConfig struct {
 	Ports []Port
 	// Labels set labels to the container
 	Labels map[string]string
+	// Volumes to be mounted
+	Volumes []string
 }
 
 // LogsRequest contains configuration about a log request

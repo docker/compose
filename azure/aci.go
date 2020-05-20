@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/api/azure/login"
-
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -20,6 +18,9 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/pkg/errors"
+
+	"github.com/docker/api/azure/login"
+	"github.com/docker/api/errdefs"
 
 	"github.com/docker/api/context/store"
 )
@@ -257,11 +258,14 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 	return containerClient, nil
 }
 
-func getSubscriptionsClient() subscription.SubscriptionsClient {
+func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
-	authorizer, _ := login.NewAuthorizerFromLogin()
+	authorizer, err := login.NewAuthorizerFromLogin()
+	if err != nil {
+		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginFailed, err.Error())
+	}
 	subc.Authorizer = authorizer
-	return subc
+	return subc, nil
 }
 
 // GetGroupsClient ...
@@ -274,7 +278,10 @@ func GetGroupsClient(subscriptionID string) resources.GroupsClient {
 
 // GetSubscriptionID ...
 func GetSubscriptionID(ctx context.Context) (string, error) {
-	c := getSubscriptionsClient()
+	c, err := getSubscriptionsClient()
+	if err != nil {
+		return "", err
+	}
 	res, err := c.List(ctx)
 	if err != nil {
 		return "", err

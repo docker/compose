@@ -15,6 +15,7 @@ type Opts struct {
 	Name    string
 	Publish []string
 	Labels  []string
+	Volumes []string
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -30,10 +31,11 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 	}
 
 	return containers.ContainerConfig{
-		ID:     r.Name,
-		Image:  image,
-		Ports:  publish,
-		Labels: labels,
+		ID:      r.Name,
+		Image:   image,
+		Ports:   publish,
+		Labels:  labels,
+		Volumes: r.Volumes,
 	}, nil
 }
 
