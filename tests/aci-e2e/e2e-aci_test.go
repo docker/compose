@@ -3,18 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
-	"github.com/Azure/go-autorest/autorest/to"
-
 	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/azure-storage-file-go/azfile"
-
+	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/docker/api/azure"
