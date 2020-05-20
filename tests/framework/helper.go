@@ -1,7 +1,9 @@
 package framework
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/robpike/filter"
@@ -36,4 +38,20 @@ func gomegaFailHandler(message string, callerSkip ...int) {
 //SetupTest Init gomega fail handler
 func SetupTest() {
 	gomega.RegisterFailHandler(gomegaFailHandler)
+
+	linkClassicDocker()
+}
+
+func linkClassicDocker() {
+	dockerOriginal := strings.TrimSuffix(NewCommand("which", "docker").ExecOrDie(), "\n")
+	_, err := NewCommand("rm", "-r", "./bin/tests").Exec()
+	if err == nil {
+		fmt.Println("Removing existing /bin/tests folder before running tests")
+	}
+	_, err = NewCommand("mkdir", "-p", "./bin/tests").Exec()
+	gomega.Expect(err).To(gomega.BeNil())
+	NewCommand("ln", "-s", dockerOriginal, "./bin/tests/docker-classic").ExecOrDie()
+	newPath := "./bin/tests:" + os.Getenv("PATH")
+	err = os.Setenv("PATH", newPath)
+	gomega.Expect(err).To(gomega.BeNil())
 }

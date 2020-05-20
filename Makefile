@@ -64,10 +64,13 @@ cache-clear: ## Clear the builder cache
 lint: ## run linter(s)
 	docker run --rm -t -v $(PWD):/app -w /app golangci/golangci-lint:v1.27-alpine golangci-lint run --timeout 10m0s ./...
 
+classic-link: ## create docker-classic symlink if does not already exist
+	ln -s /usr/local/bin/docker-classic /Applications/Docker.app/Contents/Resources/bin/docker
+
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 FORCE:
 
-.PHONY: all protos cli e2e-local cross test cache-clear lint help
+.PHONY: all protos cli e2e-local cross test cache-clear lint help classic-link
