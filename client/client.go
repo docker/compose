@@ -33,12 +33,8 @@ import (
 	"github.com/docker/api/context/cloud"
 
 	"github.com/docker/api/backend"
-	backendv1 "github.com/docker/api/backend/v1"
-	cliv1 "github.com/docker/api/cli/v1"
 	"github.com/docker/api/compose"
-	composev1 "github.com/docker/api/compose/v1"
 	"github.com/docker/api/containers"
-	containersv1 "github.com/docker/api/containers/v1"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -68,11 +64,6 @@ func New(ctx context.Context) (*Client, error) {
 
 // Client is a multi-backend client
 type Client struct {
-	backendv1.BackendClient
-	cliv1.CliClient
-	containersv1.ContainersClient
-	composev1.ComposeClient
-
 	backendType string
 	bs          backend.Service
 }
