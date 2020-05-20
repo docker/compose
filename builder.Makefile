@@ -55,7 +55,7 @@ cross:
 	@GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-windows-amd64.exe ./cli
 
 test:
-	@go test ./...
+	@go test -cover $(shell go list ./... | grep -vE 'e2e')
 
 lint:
 	golangci-lint run --timeout 10m0s ./...

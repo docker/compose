@@ -3,8 +3,10 @@ import * as continersPb from "./grpc/containers_grpc_pb";
 import { IContainersClient } from './grpc/containers_grpc_pb';
 import { ListRequest, ListResponse } from "./grpc/containers_pb";
 
+let address = process.argv[3] || "unix:///tmp/backend.sock";
+
 const ContainersServiceClient = grpc.makeClientConstructor(continersPb["com.docker.api.containers.v1.Containers"], "ContainersClient");
-const client = new ContainersServiceClient("unix:///tmp/backend.sock", grpc.credentials.createInsecure()) as unknown as IContainersClient;
+const client = new ContainersServiceClient(address, grpc.credentials.createInsecure()) as unknown as IContainersClient;
 
 let backend = process.argv[2] || "moby";
 const meta = new grpc.Metadata();

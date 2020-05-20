@@ -43,10 +43,7 @@ func getter() interface{} {
 // New creates a backend that can manage containers
 func New(ctx context.Context) (backend.Service, error) {
 	currentContext := apicontext.CurrentContext(ctx)
-	contextStore, err := store.New()
-	if err != nil {
-		return nil, err
-	}
+	contextStore := store.ContextStore(ctx)
 	metadata, err := contextStore.Get(currentContext, getter)
 	if err != nil {
 		return nil, errors.Wrap(err, "wrong context type")

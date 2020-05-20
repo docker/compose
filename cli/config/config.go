@@ -28,6 +28,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -37,6 +38,19 @@ import (
 
 	"github.com/docker/api/context/store"
 )
+
+type dirKey struct{}
+
+// WithDir sets the config directory path in the context
+func WithDir(ctx context.Context, path string) context.Context {
+	return context.WithValue(ctx, dirKey{}, path)
+}
+
+// Dir returns the config directory path
+func Dir(ctx context.Context) string {
+	cd, _ := ctx.Value(dirKey{}).(string)
+	return cd
+}
 
 // LoadFile loads the docker configuration
 func LoadFile(dir string) (*File, error) {

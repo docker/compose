@@ -101,7 +101,7 @@ func main() {
 	}
 
 	root.AddCommand(
-		contextcmd.Command(&opts),
+		contextcmd.Command(),
 		cmd.PsCommand(),
 		cmd.ServeCommand(),
 		run.Command(),
@@ -136,13 +136,15 @@ func main() {
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))
 	}
+	configDir := opts.Config
+	ctx = cliconfig.WithDir(ctx, configDir)
 
-	currentContext, err := determineCurrentContext(opts.Context, opts.Config)
+	currentContext, err := determineCurrentContext(opts.Context, configDir)
 	if err != nil {
 		fatal(errors.New("unable to determine current context"))
 	}
 
-	s, err := store.New(store.WithRoot(opts.Config))
+	s, err := store.New(store.WithRoot(configDir))
 	if err != nil {
 		fatal(errors.Wrap(err, "unable to create context store"))
 	}
