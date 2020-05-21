@@ -38,7 +38,6 @@ import (
 
 	"github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -58,8 +57,9 @@ func (s *Suite) SetupSuite() {
 		cp := filepath.Join(s.ConfigDir, "config.json")
 		d, _ := ioutil.ReadFile(cp)
 		fmt.Printf("Contents of %s:\n%s\n\nContents of config dir:\n", cp, string(d))
-		out, _ := s.NewCommand("find", s.ConfigDir).Exec()
-		fmt.Println(out)
+		for _, p := range dirContents(s.ConfigDir) {
+			fmt.Println(p)
+		}
 		s.T().Fail()
 	})
 	s.linkClassicDocker()
@@ -68,6 +68,15 @@ func (s *Suite) SetupSuite() {
 // TearDownSuite is run after all tests
 func (s *Suite) TearDownSuite() {
 	_ = os.RemoveAll(s.BinDir)
+}
+
+func dirContents(dir string) []string {
+	res := []string{}
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		res = append(res, filepath.Join(dir, path))
+		return nil
+	})
+	return res
 }
 
 func (s *Suite) linkClassicDocker() {
@@ -83,24 +92,19 @@ func (s *Suite) linkClassicDocker() {
 func (s *Suite) BeforeTest(suite, test string) {
 	d, _ := ioutil.TempDir("", "")
 	s.ConfigDir = d
+	_ = os.Setenv("DOCKER_CONFIG", s.ConfigDir)
 }
 
 // AfterTest is run after each test
 func (s *Suite) AfterTest(suite, test string) {
-	err := os.RemoveAll(s.ConfigDir)
-	require.NoError(s.T(), err)
+	_ = os.RemoveAll(s.ConfigDir)
 }
 
 // NewCommand creates a command context.
 func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
-	var envs []string
-	if s.ConfigDir != "" {
-		envs = append(os.Environ(), fmt.Sprintf("DOCKER_CONFIG=%s", s.ConfigDir))
-	}
 	return &CmdContext{
 		command: command,
 		args:    args,
-		envs:    envs,
 		retries: RetriesContext{interval: time.Second},
 	}
 }
