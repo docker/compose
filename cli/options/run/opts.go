@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/api/containers"
@@ -20,6 +21,10 @@ type Opts struct {
 
 // ToContainerConfig convert run options to a container configuration
 func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, error) {
+	if r.Name == "" {
+		r.Name = getRandomName()
+	}
+
 	publish, err := r.toPorts()
 	if err != nil {
 		return containers.ContainerConfig{}, err
@@ -82,4 +87,9 @@ func toLabels(labels []string) (map[string]string, error) {
 	}
 
 	return result, nil
+}
+
+func getRandomName() string {
+	// Azure supports hyphen but not underscore in names
+	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
 }

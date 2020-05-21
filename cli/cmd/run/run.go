@@ -30,9 +30,7 @@ package run
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/cli/options/run"
@@ -52,7 +50,7 @@ func Command() *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
-	cmd.Flags().StringVar(&opts.Name, "name", getRandomName(), "Assign a name to the container")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
 	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: user:key@my_share:/absolute/path/to/target")
 
@@ -76,9 +74,4 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 	fmt.Println(opts.Name)
 
 	return nil
-}
-
-func getRandomName() string {
-	// Azure supports hyphen but not underscore in names
-	return strings.Replace(namesgenerator.GetRandomName(0), "_", "-", -1)
 }
