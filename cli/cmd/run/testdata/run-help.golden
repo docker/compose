@@ -1,0 +1,10 @@
+Run a container
+
+Usage:
+  run [flags]
+
+Flags:
+  -l, --label stringArray     Set meta data on a container
+      --name string           Assign a name to the container
+  -p, --publish stringArray   Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT
+  -v, --volume stringArray    Volume. Ex: user:key@my_share:/absolute/path/to/target

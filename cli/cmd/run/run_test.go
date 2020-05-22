@@ -1,23 +1,42 @@
+/*
+	Copyright (c) 2020 Docker Inc.
+
+	Permission is hereby granted, free of charge, to any person
+	obtaining a copy of this software and associated documentation
+	files (the "Software"), to deal in the Software without
+	restriction, including without limitation the rights to use, copy,
+	modify, merge, publish, distribute, sublicense, and/or sell copies
+	of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be
+	included in all copies or substantial portions of the Software.
+
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+	EXPRESS OR IMPLIED,
+	INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+	HOLDERS BE LIABLE FOR ANY CLAIM,
+	DAMAGES OR OTHER LIABILITY,
+	WHETHER IN AN ACTION OF CONTRACT,
+	TORT OR OTHERWISE,
+	ARISING FROM, OUT OF OR IN CONNECTION WITH
+	THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
 package run
 
 import (
-	"regexp"
+	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/golden"
 )
 
-var (
-	// AzureNameRegex is used to validate container names
-	// Regex was taken from server side error:
-	// The container name must contain no more than 63 characters and must match the regex '[a-z0-9]([-a-z0-9]*[a-z0-9])?' (e.g. 'my-name').
-	AzureNameRegex = regexp.MustCompile("[a-z0-9]([-a-z0-9]*[a-z0-9])")
-)
-
-// TestAzureRandomName ensures compliance with Azure naming requirements
-func TestAzureRandomName(t *testing.T) {
-	n := getRandomName()
-	require.Less(t, len(n), 64)
-	require.Greater(t, len(n), 1)
-	require.Regexp(t, AzureNameRegex, n)
+func TestHelp(t *testing.T) {
+	var b bytes.Buffer
+	c := Command()
+	c.SetOutput(&b)
+	_ = c.Help()
+	golden.Assert(t, b.String(), "run-help.golden")
 }
