@@ -44,7 +44,7 @@ cli: ## Compile the cli
 	--target cli
 
 e2e-local: ## Run End to end local tests
-	go test -v ./tests/e2e
+	go test -v ./tests/e2e ./moby/e2e
 
 e2e-aci: ## Run End to end ACI tests (requires azure login)
 	go test -v ./tests/aci-e2e

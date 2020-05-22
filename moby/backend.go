@@ -3,7 +3,6 @@ package moby
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -108,8 +107,9 @@ func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) er
 				return err
 			}
 			scanner := bufio.NewScanner(io)
+
+			// Read the whole body, otherwise the pulling stops
 			for scanner.Scan() {
-				fmt.Println(string(scanner.Bytes()))
 			}
 
 			if err = scanner.Err(); err != nil {
