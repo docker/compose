@@ -62,7 +62,8 @@ cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	docker run --rm -t -v $(PWD):/app -w /app golangci/golangci-lint:v1.27-alpine golangci-lint run --timeout 10m0s ./...
+	@docker build . \
+	--target lint
 
 classic-link: ## create docker-classic symlink if does not already exist
 	ln -s /usr/local/bin/docker-classic /Applications/Docker.app/Contents/Resources/bin/docker
@@ -73,4 +74,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all protos cli e2e-local cross test cache-clear lint help classic-link
+.PHONY: all protos cli e2e-local cross test cache-clear lint classic-link help
