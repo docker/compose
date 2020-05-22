@@ -1,6 +1,7 @@
 package login
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		case "azure":
 			return cloudLogin(cmd, "aci")
 		default:
-			return errors.New("Unknown backend type for cloud login : " + backend)
+			return errors.New("unknown backend type for cloud login: " + backend)
 		}
 	}
 	return dockerclassic.ExecCmd(cmd)
@@ -47,6 +48,13 @@ func cloudLogin(cmd *cobra.Command, backendType string) error {
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
-	return cs.Login(ctx, nil)
-
+	err = cs.Login(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if cmd.Context().Err() != nil {
+		return errors.New("login canceled")
+	}
+	fmt.Println("login successful")
+	return nil
 }

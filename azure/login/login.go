@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
-
-	"github.com/docker/api/errdefs"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -77,28 +76,32 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 	}, nil
 }
 
-//Login perform azure login through browser
+// Login performs an Azure login through a web browser
 func (login AzureLoginService) Login(ctx context.Context) error {
-	queryCh := make(chan url.Values, 1)
-	serverPort, err := startLoginServer(queryCh)
+	queryCh := make(chan localResponse, 1)
+	s, err := NewLocalServer(queryCh)
 	if err != nil {
 		return err
 	}
+	s.Serve()
+	defer s.Close()
 
-	redirectURL := "http://localhost:" + strconv.Itoa(serverPort)
+	redirectURL := s.Addr()
+	if redirectURL == "" {
+		return errors.New("empty redirect URL")
+	}
 	login.apiHelper.openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
 		return nil
-	case qsValues := <-queryCh:
-		errorMsg, hasError := qsValues["error"]
-		if hasError {
-			return fmt.Errorf("login failed : %s", errorMsg)
+	case q := <-queryCh:
+		if q.err != nil {
+			return errors.Wrap(err, "unhandled local login server error")
 		}
-		code, hasCode := qsValues["code"]
+		code, hasCode := q.values["code"]
 		if !hasCode {
-			return errdefs.ErrLoginFailed
+			return errors.New("no login code")
 		}
 		data := url.Values{
 			"grant_type":   []string{"authorization_code"},
@@ -109,38 +112,35 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 		}
 		token, err := login.apiHelper.queryToken(data, "organizations")
 		if err != nil {
-			return errors.Wrap(err, "Access token request failed")
+			return errors.Wrap(err, "access token request failed")
 		}
 
 		bits, statusCode, err := login.apiHelper.queryAuthorizationAPI(authorizationURL, fmt.Sprintf("Bearer %s", token.AccessToken))
 		if err != nil {
-			return errors.Wrap(err, "login failed")
+			return errors.Wrap(err, "check auth failed")
 		}
 
-		if statusCode == 200 {
-			var tenantResult tenantResult
-			if err := json.Unmarshal(bits, &tenantResult); err != nil {
-				return errors.Wrap(err, "login failed")
+		switch statusCode {
+		case http.StatusOK:
+			var t tenantResult
+			if err := json.Unmarshal(bits, &t); err != nil {
+				return errors.Wrap(err, "unable to unmarshal tenant")
 			}
-			tenantID := tenantResult.Value[0].TenantID
-			tenantToken, err := login.refreshToken(token.RefreshToken, tenantID)
+			tID := t.Value[0].TenantID
+			tToken, err := login.refreshToken(token.RefreshToken, tID)
 			if err != nil {
-				return errors.Wrap(err, "login failed")
+				return errors.Wrap(err, "unable to refresh token")
 			}
-			loginInfo := TokenInfo{TenantID: tenantID, Token: tenantToken}
+			loginInfo := TokenInfo{TenantID: tID, Token: tToken}
 
-			err = login.tokenStore.writeLoginInfo(loginInfo)
-
-			if err != nil {
-				return errors.Wrap(err, "login failed")
+			if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
+				return errors.Wrap(err, "could not store login info")
 			}
-			fmt.Println("Login Succeeded")
-
-			return nil
+		default:
+			return fmt.Errorf("unable to login status code %d: %s", statusCode, bits)
 		}
-
-		return fmt.Errorf("login failed : " + string(bits))
 	}
+	return nil
 }
 
 func getTokenStorePath() string {

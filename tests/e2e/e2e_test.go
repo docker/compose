@@ -90,7 +90,7 @@ func (s *E2eSuite) TestClassicLogin() {
 
 func (s *E2eSuite) TestCloudLogin() {
 	output, err := s.NewDockerCommand("login", "mycloudbackend").Exec()
-	Expect(output).To(ContainSubstring("Unknown backend type for cloud login : mycloudbackend"))
+	Expect(output).To(ContainSubstring("unknown backend type for cloud login: mycloudbackend"))
 	Expect(err).NotTo(BeNil())
 }
 
