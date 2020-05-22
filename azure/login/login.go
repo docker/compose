@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/url"
 	"os/exec"
 	"path/filepath"
@@ -23,10 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 )
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
 const (

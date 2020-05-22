@@ -30,11 +30,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -69,6 +71,8 @@ func init() {
 	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), path)); err != nil {
 		panic(err)
 	}
+	// Seed random
+	rand.Seed(time.Now().UnixNano())
 }
 
 func isOwnCommand(cmd *cobra.Command) bool {
