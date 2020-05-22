@@ -49,9 +49,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	p := proxy.NewContainerAPI()
 
 	containersv1.RegisterContainersServer(s, p)
-	cliv1.RegisterCliServer(s, &cliServer{
-		ctx,
-	})
+	cliv1.RegisterCliServer(s, &cliServer{})
 
 	go func() {
 		<-ctx.Done()
@@ -66,7 +64,6 @@ func runServe(ctx context.Context, opts serveOpts) error {
 }
 
 type cliServer struct {
-	ctx context.Context
 }
 
 func (cs *cliServer) Contexts(ctx context.Context, request *cliv1.ContextsRequest) (*cliv1.ContextsResponse, error) {

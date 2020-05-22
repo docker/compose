@@ -143,6 +143,7 @@ func (ms *mobyService) Logs(ctx context.Context, containerName string, request c
 	r, err := ms.apiClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
+		Follow:     request.Follow,
 	})
 	if err != nil {
 		return err

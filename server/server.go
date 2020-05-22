@@ -48,10 +48,13 @@ import (
 func New(ctx context.Context) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			unaryMeta(ctx),
+			unaryServerInterceptor(ctx),
 			unary,
 		),
-		grpc.StreamInterceptor(stream),
+		grpc.ChainStreamInterceptor(
+			grpc.StreamServerInterceptor(stream),
+			grpc.StreamServerInterceptor(streamServerInterceptor(ctx)),
+		),
 	)
 	hs := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, hs)
@@ -74,34 +77,111 @@ func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, 
 	return grpc_prometheus.StreamServerInterceptor(srv, ss, info, handler)
 }
 
-func unaryMeta(clictx context.Context) func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// unaryServerInterceptor configures the context and sends it to the next handler
+func unaryServerInterceptor(clictx context.Context) func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return handler(ctx, req)
+		currentContext := getContext(ctx)
+		configuredCtx, err := configureContext(clictx, currentContext)
+		if err != nil {
+			return nil, err
 		}
 
-		key, ok := md[apicontext.Key]
-		if !ok {
-			return handler(ctx, req)
-		}
-
-		if len(key) == 1 {
-			s := store.ContextStore(clictx)
-			ctx = store.WithContextStore(ctx, s)
-			ctx = apicontext.WithCurrentContext(ctx, key[0])
-
-			c, err := client.New(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx, err = proxy.WithClient(ctx, c)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return handler(ctx, req)
+		return handler(configuredCtx, req)
 	}
+}
+
+// streamServerInterceptor configures the context and sends it to the next handler
+func streamServerInterceptor(clictx context.Context) func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		currentContext := getContext(ss.Context())
+		ctx, err := configureContext(clictx, currentContext)
+		if err != nil {
+			return err
+		}
+
+		return handler(srv, newServerStream(ctx, ss))
+	}
+}
+
+// getContext returns the current context name sent in the request metadata, it
+// returns an empty string if there is no metadata
+// not present
+func getContext(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+
+	key, ok := md[apicontext.Key]
+	if !ok {
+		return ""
+	}
+
+	if len(key) == 1 {
+		return key[0]
+	}
+
+	return ""
+}
+
+// configureContext populates the request context with objects the client
+// needs: the context store and the api client
+func configureContext(ctx context.Context, currentContext string) (context.Context, error) {
+	s := store.ContextStore(ctx)
+	ctx = store.WithContextStore(ctx, s)
+	if currentContext != "" {
+		ctx = apicontext.WithCurrentContext(ctx, currentContext)
+	}
+
+	c, err := client.New(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, err = proxy.WithClient(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctx, nil
+}
+
+// A gRPC server stream will only let you get its context but
+// there is no way to set a new (augmented context) to the next
+// handler (like we do for a unary request). We need to wrap the grpc.ServerSteam
+// to be able to set a new context that will be sent to the next stream interceptor.
+type contextServerStream struct {
+	s   grpc.ServerStream
+	ctx context.Context
+}
+
+func newServerStream(ctx context.Context, s grpc.ServerStream) grpc.ServerStream {
+	return &contextServerStream{
+		s:   s,
+		ctx: ctx,
+	}
+}
+
+func (css *contextServerStream) SetHeader(md metadata.MD) error {
+	return css.s.SetHeader(md)
+}
+
+func (css *contextServerStream) SendHeader(md metadata.MD) error {
+	return css.s.SendHeader(md)
+}
+
+func (css *contextServerStream) SetTrailer(md metadata.MD) {
+	css.s.SetTrailer(md)
+}
+
+func (css *contextServerStream) Context() context.Context {
+	return css.ctx
+}
+
+func (css *contextServerStream) SendMsg(m interface{}) error {
+	return css.s.SendMsg(m)
+}
+
+func (css *contextServerStream) RecvMsg(m interface{}) error {
+	return css.s.RecvMsg(m)
 }

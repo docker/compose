@@ -101,3 +101,13 @@ func (p *proxyContainerAPI) Update(_ context.Context, _ *v1.UpdateRequest) (*v1.
 func (p *proxyContainerAPI) Exec(_ context.Context, _ *v1.ExecRequest) (*v1.ExecResponse, error) {
 	panic("not implemented") // TODO: Implement
 }
+
+func (p *proxyContainerAPI) Logs(request *v1.LogsRequest, stream v1.Containers_LogsServer) error {
+	ctx := stream.Context()
+	c := Client(ctx)
+
+	return c.ContainerService().Logs(ctx, request.GetContainerId(), containers.LogsRequest{
+		Follow: request.Follow,
+		Writer: &streamWriter{stream},
+	})
+}
