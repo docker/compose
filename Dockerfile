@@ -63,4 +63,5 @@ COPY --from=make-cross /api/bin/* .
 
 FROM base as test
 ENV CGO_ENABLED=0
-RUN make -f builder.Makefile test
+RUN --mount=id=build,type=cache,target=/root/.cache/go-build \
+    make -f builder.Makefile test
