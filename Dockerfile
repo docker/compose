@@ -1,11 +1,13 @@
 # syntax = docker/dockerfile:experimental
-ARG GO_VERSION=1.14.2
+ARG GO_VERSION=1.14.3-alpine
 
 FROM golang:${GO_VERSION} AS base
 ARG TARGET_OS=unknown
 ARG TARGET_ARCH=unknown
 ARG PWD=/api
 ENV GO111MODULE=on
+
+RUN apk update && apk add -U docker make
 
 WORKDIR ${PWD}
 ADD go.* ${PWD}
@@ -18,9 +20,7 @@ ARG TARGET_ARCH=unknown
 ARG PWD=/api
 ENV GO111MODULE=on
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    protobuf-compiler \
-    libprotobuf-dev
+RUN apk update && apk add protoc make
 
 RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1 && \
     go get golang.org/x/tools/cmd/goimports
@@ -52,4 +52,5 @@ FROM scratch AS cross
 COPY --from=make-cross /api/bin/* .
 
 FROM base as test
+ENV CGO_ENABLED=0
 RUN make -f builder.Makefile test

@@ -31,6 +31,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -60,17 +62,43 @@ func runList(ctx context.Context) error {
 		return err
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "NAME\tDESCRIPTION\tTYPE")
-	format := "%s\t%s\t%s\n"
+	sort.Slice(contexts, func(i, j int) bool {
+		return strings.Compare(contexts[i].Name, contexts[j].Name) == -1
+	})
+
+	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
+	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION\tDOCKER ENPOINT\tKUBERNETES ENDPOINT\tORCHESTRATOR")
+	format := "%s\t%s\t%s\t%s\t%s\t%s\n"
 
 	for _, c := range contexts {
 		contextName := c.Name
 		if c.Name == currentContext {
 			contextName += " *"
 		}
-		fmt.Fprintf(w, format, contextName, c.Metadata.Description, c.Metadata.Type)
+
+		fmt.Fprintf(w,
+			format,
+			contextName,
+			c.Metadata.Type,
+			c.Metadata.Description,
+			getEndpoint("docker", c.Endpoints),
+			getEndpoint("kubernetes", c.Endpoints),
+			c.Metadata.StackOrchestrator)
 	}
 
 	return w.Flush()
+}
+
+func getEndpoint(name string, meta map[string]store.Endpoint) string {
+	d, ok := meta[name]
+	if !ok {
+		return ""
+	}
+
+	result := d.Host
+	if d.DefaultNamespace != "" {
+		result += fmt.Sprintf(" (%s)", d.DefaultNamespace)
+	}
+
+	return result
 }

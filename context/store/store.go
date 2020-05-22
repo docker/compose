@@ -104,35 +104,31 @@ func New(opts ...Opt) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	root := filepath.Join(home, configDir)
+	if err := createDirIfNotExist(root); err != nil {
+		return nil, err
+	}
+
 	s := &store{
-		root: filepath.Join(home, configDir),
+		root: root,
 	}
-	if _, err := os.Stat(s.root); os.IsNotExist(err) {
-		if err = os.Mkdir(s.root, 0755); err != nil {
-			return nil, err
-		}
-	}
+
 	for _, opt := range opts {
 		opt(s)
 	}
-	cd := filepath.Join(s.root, contextsDir)
-	if _, err := os.Stat(cd); os.IsNotExist(err) {
-		if err = os.Mkdir(cd, 0755); err != nil {
-			return nil, err
-		}
+
+	m := filepath.Join(s.root, contextsDir, metadataDir)
+	if err := createDirIfNotExist(m); err != nil {
+		return nil, err
 	}
-	m := filepath.Join(cd, metadataDir)
-	if _, err := os.Stat(m); os.IsNotExist(err) {
-		if err = os.Mkdir(m, 0755); err != nil {
-			return nil, err
-		}
-	}
+
 	return s, nil
 }
 
 // Get returns the context with the given name
 func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
-	meta := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name), metaFile)
+	meta := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name), metaFile)
 	m, err := read(meta, getter)
 	if os.IsNotExist(err) {
 		return nil, errors.Wrap(errdefs.ErrNotFound, objectName(name))
@@ -158,19 +154,26 @@ func read(meta string, getter func() interface{}) (*Metadata, error) {
 	if err := json.Unmarshal(um.Metadata, &uc); err != nil {
 		return nil, err
 	}
+	if uc.Type == "" {
+		uc.Type = "docker"
+	}
 
-	data, err := parse(uc.Data, getter)
-	if err != nil {
-		return nil, err
+	var data interface{}
+	if uc.Data != nil {
+		data, err = parse(uc.Data, getter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Metadata{
 		Name:      um.Name,
 		Endpoints: um.Endpoints,
 		Metadata: TypedContext{
-			Description: uc.Description,
-			Type:        uc.Type,
-			Data:        data,
+			StackOrchestrator: uc.StackOrchestrator,
+			Description:       uc.Description,
+			Type:              uc.Type,
+			Data:              data,
 		},
 	}, nil
 }
@@ -183,10 +186,12 @@ func parse(payload []byte, getter func() interface{}) (interface{}, error) {
 		}
 		return res, nil
 	}
+
 	typed := getter()
 	if err := json.Unmarshal(payload, &typed); err != nil {
 		return nil, err
 	}
+
 	return reflect.ValueOf(typed).Elem().Interface(), nil
 }
 
@@ -204,7 +209,7 @@ func (s *store) Create(name string, data TypedContext) error {
 	if name == DefaultContextName {
 		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
 	}
-	dir := contextdirOf(name)
+	dir := contextDirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
 		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
@@ -222,9 +227,9 @@ func (s *store) Create(name string, data TypedContext) error {
 	meta := Metadata{
 		Name:     name,
 		Metadata: data,
-		Endpoints: map[string]interface{}{
-			(dockerEndpointKey): dummyContext{},
-			(data.Type):         dummyContext{},
+		Endpoints: map[string]Endpoint{
+			(dockerEndpointKey): {},
+			(data.Type):         {},
 		},
 	}
 
@@ -255,6 +260,14 @@ func (s *store) List() ([]*Metadata, error) {
 		}
 	}
 
+	// The default context is not stored in the store, it is in-memory only
+	// so we need a special case for it.
+	dockerDefault, err := dockerDefaultContext()
+	if err != nil {
+		return nil, err
+	}
+
+	result = append(result, dockerDefault)
 	return result, nil
 }
 
@@ -262,7 +275,7 @@ func (s *store) Remove(name string) error {
 	if name == DefaultContextName {
 		return errors.Wrap(errdefs.ErrForbidden, objectName(name))
 	}
-	dir := filepath.Join(s.root, contextsDir, metadataDir, contextdirOf(name))
+	dir := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name))
 	// Check if directory exists because os.RemoveAll returns nil if it doesn't
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return errors.Wrap(errdefs.ErrNotFound, objectName(name))
@@ -273,7 +286,7 @@ func (s *store) Remove(name string) error {
 	return nil
 }
 
-func contextdirOf(name string) string {
+func contextDirOf(name string) string {
 	return digest.FromString(name).Encoded()
 }
 
@@ -281,32 +294,49 @@ func objectName(name string) string {
 	return fmt.Sprintf("context %q", name)
 }
 
+func createDirIfNotExist(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type dummyContext struct{}
+
+// Endpoint holds the Docker or the Kubernetes endpoint
+type Endpoint struct {
+	Host             string `json:",omitempty"`
+	DefaultNamespace string `json:",omitempty"`
+}
 
 // Metadata represents the docker context metadata
 type Metadata struct {
-	Name      string                 `json:",omitempty"`
-	Metadata  TypedContext           `json:",omitempty"`
-	Endpoints map[string]interface{} `json:",omitempty"`
+	Name      string              `json:",omitempty"`
+	Metadata  TypedContext        `json:",omitempty"`
+	Endpoints map[string]Endpoint `json:",omitempty"`
 }
 
 type untypedMetadata struct {
-	Name      string                 `json:",omitempty"`
-	Metadata  json.RawMessage        `json:",omitempty"`
-	Endpoints map[string]interface{} `json:",omitempty"`
+	Name      string              `json:",omitempty"`
+	Metadata  json.RawMessage     `json:",omitempty"`
+	Endpoints map[string]Endpoint `json:",omitempty"`
 }
 
 type untypedContext struct {
-	Data        json.RawMessage `json:",omitempty"`
-	Description string          `json:",omitempty"`
-	Type        string          `json:",omitempty"`
+	StackOrchestrator string          `json:",omitempty"`
+	Type              string          `json:",omitempty"`
+	Description       string          `json:",omitempty"`
+	Data              json.RawMessage `json:",omitempty"`
 }
 
 // TypedContext is a context with a type (moby, aci, etc...)
 type TypedContext struct {
-	Type        string      `json:",omitempty"`
-	Description string      `json:",omitempty"`
-	Data        interface{} `json:",omitempty"`
+	StackOrchestrator string      `json:",omitempty"`
+	Type              string      `json:",omitempty"`
+	Description       string      `json:",omitempty"`
+	Data              interface{} `json:",omitempty"`
 }
 
 // AciContext is the context for ACI

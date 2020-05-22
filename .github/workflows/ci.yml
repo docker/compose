@@ -54,11 +54,11 @@ jobs:
       - name: Install Protoc
         uses: arduino/setup-protoc@master
         with:
-          version: '3.9.1'
+          version: "3.9.1"
 
       - uses: actions/setup-node@v1
         with:
-          node-version: '10.x'
+          node-version: "10.x"
 
       - name: E2E Test
         run: make e2e-local

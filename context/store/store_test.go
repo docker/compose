@@ -103,9 +103,10 @@ func (suite *StoreTestSuite) TestList() {
 	contexts, err := suite.store.List()
 	require.Nil(suite.T(), err)
 
-	require.Equal(suite.T(), len(contexts), 2)
-	require.Equal(suite.T(), contexts[0].Name, "test1")
-	require.Equal(suite.T(), contexts[1].Name, "test2")
+	require.Equal(suite.T(), len(contexts), 3)
+	require.Equal(suite.T(), "test1", contexts[0].Name)
+	require.Equal(suite.T(), "test2", contexts[1].Name)
+	require.Equal(suite.T(), "default", contexts[2].Name)
 }
 
 func (suite *StoreTestSuite) TestRemoveNotFound() {
@@ -119,13 +120,15 @@ func (suite *StoreTestSuite) TestRemove() {
 	require.Nil(suite.T(), err)
 	contexts, err := suite.store.List()
 	require.Nil(suite.T(), err)
-	require.Equal(suite.T(), len(contexts), 1)
+	require.Equal(suite.T(), len(contexts), 2)
 
 	err = suite.store.Remove("testremove")
 	require.Nil(suite.T(), err)
 	contexts, err = suite.store.List()
 	require.Nil(suite.T(), err)
-	require.Equal(suite.T(), len(contexts), 0)
+	// The default context is always here, that's why we
+	// have len(contexts) == 1
+	require.Equal(suite.T(), len(contexts), 1)
 }
 
 func TestExampleTestSuite(t *testing.T) {

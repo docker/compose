@@ -26,14 +26,14 @@
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
-PROTOS=$(shell find . -name \*.proto)
+PROTOS=$(shell find . -not \( -path ./tests -prune \) -name \*.proto)
 
 EXTENSION :=
 ifeq ($(GOOS),windows)
   EXTENSION := .exe
 endif
 
-STATIC_FLAGS= CGO_ENABLED=0
+STATIC_FLAGS=CGO_ENABLED=0
 LDFLAGS := "-s -w"
 GO_BUILD = $(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
