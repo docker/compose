@@ -29,19 +29,27 @@ package context
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/api/context/store"
 )
 
 func createACIContext(ctx context.Context, name string, opts createOpts) error {
 	s := store.ContextStore(ctx)
-	return s.Create(name, store.TypedContext{
-		Type:        "aci",
-		Description: opts.description,
-		Data: store.AciContext{
+
+	description := fmt.Sprintf("%s@%s", opts.aciResourceGroup, opts.aciLocation)
+	if opts.description != "" {
+		description = fmt.Sprintf("%s (%s)", opts.description, description)
+	}
+
+	return s.Create(
+		name,
+		store.AciContextType,
+		description,
+		store.AciContext{
 			SubscriptionID: opts.aciSubscriptionID,
 			Location:       opts.aciLocation,
 			ResourceGroup:  opts.aciResourceGroup,
 		},
-	})
+	)
 }

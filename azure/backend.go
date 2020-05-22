@@ -36,19 +36,15 @@ func init() {
 	})
 }
 
-func getter() interface{} {
-	return &store.AciContext{}
-}
-
 // New creates a backend that can manage containers
 func New(ctx context.Context) (backend.Service, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	contextStore := store.ContextStore(ctx)
-	metadata, err := contextStore.Get(currentContext, getter)
-	if err != nil {
-		return nil, errors.Wrap(err, "wrong context type")
+
+	var aciContext store.AciContext
+	if err := contextStore.GetEndpoint(currentContext, &aciContext); err != nil {
+		return nil, err
 	}
-	aciContext, _ := metadata.Metadata.Data.(store.AciContext)
 
 	auth, _ := login.NewAuthorizerFromLogin()
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)

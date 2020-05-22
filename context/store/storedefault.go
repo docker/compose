@@ -10,7 +10,7 @@ import (
 
 // Represents a context as created by the docker cli
 type defaultContext struct {
-	Metadata  TypedContext
+	Metadata  ContextMetadata
 	Endpoints endpoints
 }
 
@@ -54,20 +54,19 @@ func dockerDefaultContext() (*Metadata, error) {
 
 	meta := Metadata{
 		Name: "default",
-		Endpoints: map[string]Endpoint{
-			"docker": {
+		Type: "docker",
+		Endpoints: map[string]interface{}{
+			"docker": Endpoint{
 				Host: defaultCtx.Endpoints.Docker.Host,
 			},
-			"kubernetes": {
+			"kubernetes": Endpoint{
 				Host:             defaultCtx.Endpoints.Kubernetes.Host,
 				DefaultNamespace: defaultCtx.Endpoints.Kubernetes.DefaultNamespace,
 			},
 		},
-		Metadata: TypedContext{
+		Metadata: ContextMetadata{
 			Description:       "Current DOCKER_HOST based configuration",
-			Type:              "docker",
 			StackOrchestrator: defaultCtx.Metadata.StackOrchestrator,
-			Data:              defaultCtx.Metadata,
 		},
 	}
 

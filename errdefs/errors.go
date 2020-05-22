@@ -47,6 +47,9 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrParsingFailed is returned when a string cannot be parsed
 	ErrParsingFailed = errors.New("parsing failed")
+	// ErrWrongContextType is returned when the caller tries to get a context
+	// with the wrong type
+	ErrWrongContextType = errors.New("wrong context type")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound

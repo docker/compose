@@ -53,7 +53,7 @@ func runShow(ctx context.Context) error {
 	// Match behavior of existing CLI
 	if name != store.DefaultContextName {
 		s := store.ContextStore(ctx)
-		if _, err := s.Get(name, nil); err != nil {
+		if _, err := s.Get(name); err != nil {
 			return err
 		}
 	}

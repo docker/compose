@@ -72,17 +72,65 @@ func ContextStore(ctx context.Context) Store {
 type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
-	Get(name string, getter func() interface{}) (*Metadata, error)
-	// GetType returns the type of the context (docker, aci etc)
-	GetType(meta *Metadata) string
+	Get(name string) (*Metadata, error)
+	// GetEndpoint sets the `v` parameter to the value of the endpoint for a
+	// particular context type
+	GetEndpoint(name string, v interface{}) error
 	// Create creates a new context, it returns an error if a context with the
 	// same name exists already.
-	Create(name string, data TypedContext) error
+	Create(name string, contextType string, description string, data interface{}) error
 	// List returns the list of created contexts
 	List() ([]*Metadata, error)
 	// Remove removes a context by name from the context store
 	Remove(name string) error
 }
+
+// Endpoint holds the Docker or the Kubernetes endpoint, they both have the
+// `Host` property, only kubernetes will have the `DefaultNamespace`
+type Endpoint struct {
+	Host             string `json:",omitempty"`
+	DefaultNamespace string `json:",omitempty"`
+}
+
+const (
+	// AciContextType is the endpoint key in the context endpoints for an ACI
+	// backend
+	AciContextType = "aci"
+	// MobyContextType is the endpoint key in the context endpoints for a moby
+	// backend
+	MobyContextType = "moby"
+	// ExampleContextType is the endpoint key in the context endpoints for an
+	// example backend
+	ExampleContextType = "example"
+)
+
+// Metadata represents the docker context metadata
+type Metadata struct {
+	Name      string                 `json:",omitempty"`
+	Type      string                 `json:",omitempty"`
+	Metadata  ContextMetadata        `json:",omitempty"`
+	Endpoints map[string]interface{} `json:",omitempty"`
+}
+
+// ContextMetadata is represtentation of the data we put in a context
+// metadata
+type ContextMetadata struct {
+	Description       string `json:",omitempty"`
+	StackOrchestrator string `json:",omitempty"`
+}
+
+// AciContext is the context for the ACI backend
+type AciContext struct {
+	SubscriptionID string `json:",omitempty"`
+	Location       string `json:",omitempty"`
+	ResourceGroup  string `json:",omitempty"`
+}
+
+// MobyContext is the context for the moby backend
+type MobyContext struct{}
+
+// ExampleContext is the context for the example backend
+type ExampleContext struct{}
 
 type store struct {
 	root string
@@ -127,9 +175,9 @@ func New(opts ...Opt) (Store, error) {
 }
 
 // Get returns the context with the given name
-func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
+func (s *store) Get(name string) (*Metadata, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name), metaFile)
-	m, err := read(meta, getter)
+	m, err := read(meta)
 	if os.IsNotExist(err) {
 		return nil, errors.Wrap(errdefs.ErrNotFound, objectName(name))
 	} else if err != nil {
@@ -139,73 +187,75 @@ func (s *store) Get(name string, getter func() interface{}) (*Metadata, error) {
 	return m, nil
 }
 
-func read(meta string, getter func() interface{}) (*Metadata, error) {
+func (s *store) GetEndpoint(name string, data interface{}) error {
+	meta, err := s.Get(name)
+	if err != nil {
+		return err
+	}
+	if _, ok := meta.Endpoints[meta.Type]; !ok {
+		return errors.Wrapf(errdefs.ErrNotFound, "endpoint of type %q", meta.Type)
+	}
+
+	dstPtrValue := reflect.ValueOf(data)
+	dstValue := reflect.Indirect(dstPtrValue)
+
+	val := reflect.ValueOf(meta.Endpoints[meta.Type])
+	valIndirect := reflect.Indirect(val)
+
+	if dstValue.Type() != valIndirect.Type() {
+		return errdefs.ErrWrongContextType
+	}
+
+	dstValue.Set(valIndirect)
+
+	return nil
+}
+
+func read(meta string) (*Metadata, error) {
 	bytes, err := ioutil.ReadFile(meta)
 	if err != nil {
 		return nil, err
 	}
 
-	var um untypedMetadata
-	if err := json.Unmarshal(bytes, &um); err != nil {
+	var metadata Metadata
+	if err := json.Unmarshal(bytes, &metadata); err != nil {
 		return nil, err
 	}
 
-	var uc untypedContext
-	if err := json.Unmarshal(um.Metadata, &uc); err != nil {
+	metadata.Endpoints, err = toTypedEndpoints(metadata.Endpoints)
+	if err != nil {
 		return nil, err
 	}
-	if uc.Type == "" {
-		uc.Type = "docker"
-	}
 
-	var data interface{}
-	if uc.Data != nil {
-		data, err = parse(uc.Data, getter)
+	return &metadata, nil
+}
+
+func toTypedEndpoints(endpoints map[string]interface{}) (map[string]interface{}, error) {
+	result := map[string]interface{}{}
+	for k, v := range endpoints {
+		bytes, err := json.Marshal(v)
 		if err != nil {
 			return nil, err
 		}
-	}
+		typeGetters := getters()
+		if _, ok := typeGetters[k]; !ok {
+			result[k] = v
+			continue
+		}
 
-	return &Metadata{
-		Name:      um.Name,
-		Endpoints: um.Endpoints,
-		Metadata: TypedContext{
-			StackOrchestrator: uc.StackOrchestrator,
-			Description:       uc.Description,
-			Type:              uc.Type,
-			Data:              data,
-		},
-	}, nil
-}
-
-func parse(payload []byte, getter func() interface{}) (interface{}, error) {
-	if getter == nil {
-		var res map[string]interface{}
-		if err := json.Unmarshal(payload, &res); err != nil {
+		val := typeGetters[k]()
+		err = json.Unmarshal(bytes, &val)
+		if err != nil {
 			return nil, err
 		}
-		return res, nil
+
+		result[k] = val
 	}
 
-	typed := getter()
-	if err := json.Unmarshal(payload, &typed); err != nil {
-		return nil, err
-	}
-
-	return reflect.ValueOf(typed).Elem().Interface(), nil
+	return result, nil
 }
 
-func (s *store) GetType(meta *Metadata) string {
-	for k := range meta.Endpoints {
-		if k != dockerEndpointKey {
-			return k
-		}
-	}
-
-	return dockerEndpointKey
-}
-
-func (s *store) Create(name string, data TypedContext) error {
+func (s *store) Create(name string, contextType string, description string, data interface{}) error {
 	if name == DefaultContextName {
 		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
 	}
@@ -220,16 +270,15 @@ func (s *store) Create(name string, data TypedContext) error {
 		return err
 	}
 
-	if data.Data == nil {
-		data.Data = dummyContext{}
-	}
-
 	meta := Metadata{
-		Name:     name,
-		Metadata: data,
-		Endpoints: map[string]Endpoint{
-			(dockerEndpointKey): {},
-			(data.Type):         {},
+		Name: name,
+		Type: contextType,
+		Metadata: ContextMetadata{
+			Description: description,
+		},
+		Endpoints: map[string]interface{}{
+			(dockerEndpointKey): data,
+			(contextType):       data,
 		},
 	}
 
@@ -252,7 +301,7 @@ func (s *store) List() ([]*Metadata, error) {
 	for _, fi := range c {
 		if fi.IsDir() {
 			meta := filepath.Join(root, fi.Name(), metaFile)
-			r, err := read(meta, nil)
+			r, err := read(meta)
 			if err != nil {
 				return nil, err
 			}
@@ -303,45 +352,19 @@ func createDirIfNotExist(dir string) error {
 	return nil
 }
 
-type dummyContext struct{}
-
-// Endpoint holds the Docker or the Kubernetes endpoint
-type Endpoint struct {
-	Host             string `json:",omitempty"`
-	DefaultNamespace string `json:",omitempty"`
-}
-
-// Metadata represents the docker context metadata
-type Metadata struct {
-	Name      string              `json:",omitempty"`
-	Metadata  TypedContext        `json:",omitempty"`
-	Endpoints map[string]Endpoint `json:",omitempty"`
-}
-
-type untypedMetadata struct {
-	Name      string              `json:",omitempty"`
-	Metadata  json.RawMessage     `json:",omitempty"`
-	Endpoints map[string]Endpoint `json:",omitempty"`
-}
-
-type untypedContext struct {
-	StackOrchestrator string          `json:",omitempty"`
-	Type              string          `json:",omitempty"`
-	Description       string          `json:",omitempty"`
-	Data              json.RawMessage `json:",omitempty"`
-}
-
-// TypedContext is a context with a type (moby, aci, etc...)
-type TypedContext struct {
-	StackOrchestrator string      `json:",omitempty"`
-	Type              string      `json:",omitempty"`
-	Description       string      `json:",omitempty"`
-	Data              interface{} `json:",omitempty"`
-}
-
-// AciContext is the context for ACI
-type AciContext struct {
-	SubscriptionID string `json:",omitempty"`
-	Location       string `json:",omitempty"`
-	ResourceGroup  string `json:",omitempty"`
+// Different context types managed by the store.
+// TODO(rumpl): we should make this extensible in the future if we want to
+// be able to manage other contexts.
+func getters() map[string]func() interface{} {
+	return map[string]func() interface{}{
+		"aci": func() interface{} {
+			return &AciContext{}
+		},
+		"moby": func() interface{} {
+			return &MobyContext{}
+		},
+		"example": func() interface{} {
+			return &ExampleContext{}
+		},
+	}
 }
