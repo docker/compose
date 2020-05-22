@@ -42,7 +42,8 @@ COMPOSEFILE_V3_5 = ComposeVersion('3.5')
 COMPOSEFILE_V3_6 = ComposeVersion('3.6')
 COMPOSEFILE_V3_7 = ComposeVersion('3.7')
 COMPOSEFILE_V3_8 = ComposeVersion('3.8')
-COMPOSEFILE_V3_9 = ComposeVersion('3.9')
+
+COMPOSEFILE_NO_VERSION = ComposeVersion('3.9')
 
 # minimum DOCKER ENGINE API version needed to support
 # features for each compose schema version
@@ -62,7 +63,7 @@ API_VERSIONS = {
     COMPOSEFILE_V3_6: '1.36',
     COMPOSEFILE_V3_7: '1.38',
     COMPOSEFILE_V3_8: '1.38',
-    COMPOSEFILE_V3_9: '1.38',
+    COMPOSEFILE_NO_VERSION: '1.38',
 }
 
 API_VERSION_TO_ENGINE_VERSION = {
@@ -81,5 +82,5 @@ API_VERSION_TO_ENGINE_VERSION = {
     API_VERSIONS[COMPOSEFILE_V3_6]: '18.02.0',
     API_VERSIONS[COMPOSEFILE_V3_7]: '18.06.0',
     API_VERSIONS[COMPOSEFILE_V3_8]: '18.06.0',
-    API_VERSIONS[COMPOSEFILE_V3_9]: '18.06.0',
+    API_VERSIONS[COMPOSEFILE_NO_VERSION]: '18.06.0',
 }

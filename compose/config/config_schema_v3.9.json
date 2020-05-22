@@ -4,7 +4,6 @@
   "type": "object",
   "title": "Compose Specification",
   "description": "The Compose file is a YAML file defining a multi-containers based application.",
-  "required": ["version"],
 
   "properties": {
     "version": {
