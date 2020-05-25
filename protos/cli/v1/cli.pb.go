@@ -28,21 +28,20 @@
 // versions:
 // 	protoc-gen-go v1.22.0
 // 	protoc        v3.11.2
-// source: cli/v1/cli.proto
+// source: protos/cli/v1/cli.proto
 
 package v1
 
 import (
 	context "context"
-	reflect "reflect"
-	sync "sync"
-
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -68,7 +67,7 @@ type Context struct {
 func (x *Context) Reset() {
 	*x = Context{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cli_v1_cli_proto_msgTypes[0]
+		mi := &file_protos_cli_v1_cli_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -81,7 +80,7 @@ func (x *Context) String() string {
 func (*Context) ProtoMessage() {}
 
 func (x *Context) ProtoReflect() protoreflect.Message {
-	mi := &file_cli_v1_cli_proto_msgTypes[0]
+	mi := &file_protos_cli_v1_cli_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -94,7 +93,7 @@ func (x *Context) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Context.ProtoReflect.Descriptor instead.
 func (*Context) Descriptor() ([]byte, []int) {
-	return file_cli_v1_cli_proto_rawDescGZIP(), []int{0}
+	return file_protos_cli_v1_cli_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Context) GetName() string {
@@ -120,7 +119,7 @@ type ContextsRequest struct {
 func (x *ContextsRequest) Reset() {
 	*x = ContextsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cli_v1_cli_proto_msgTypes[1]
+		mi := &file_protos_cli_v1_cli_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -133,7 +132,7 @@ func (x *ContextsRequest) String() string {
 func (*ContextsRequest) ProtoMessage() {}
 
 func (x *ContextsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cli_v1_cli_proto_msgTypes[1]
+	mi := &file_protos_cli_v1_cli_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -146,7 +145,7 @@ func (x *ContextsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextsRequest.ProtoReflect.Descriptor instead.
 func (*ContextsRequest) Descriptor() ([]byte, []int) {
-	return file_cli_v1_cli_proto_rawDescGZIP(), []int{1}
+	return file_protos_cli_v1_cli_proto_rawDescGZIP(), []int{1}
 }
 
 type ContextsResponse struct {
@@ -160,7 +159,7 @@ type ContextsResponse struct {
 func (x *ContextsResponse) Reset() {
 	*x = ContextsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cli_v1_cli_proto_msgTypes[2]
+		mi := &file_protos_cli_v1_cli_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -173,7 +172,7 @@ func (x *ContextsResponse) String() string {
 func (*ContextsResponse) ProtoMessage() {}
 
 func (x *ContextsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cli_v1_cli_proto_msgTypes[2]
+	mi := &file_protos_cli_v1_cli_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +185,7 @@ func (x *ContextsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContextsResponse.ProtoReflect.Descriptor instead.
 func (*ContextsResponse) Descriptor() ([]byte, []int) {
-	return file_cli_v1_cli_proto_rawDescGZIP(), []int{2}
+	return file_protos_cli_v1_cli_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ContextsResponse) GetContexts() []*Context {
@@ -196,55 +195,58 @@ func (x *ContextsResponse) GetContexts() []*Context {
 	return nil
 }
 
-var File_cli_v1_cli_proto protoreflect.FileDescriptor
+var File_protos_cli_v1_cli_proto protoreflect.FileDescriptor
 
-var file_cli_v1_cli_proto_rawDesc = []byte{
-	0x0a, 0x10, 0x63, 0x6c, 0x69, 0x2f, 0x76, 0x31, 0x2f, 0x63, 0x6c, 0x69, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x12, 0x15, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61,
-	0x70, 0x69, 0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31, 0x22, 0x3f, 0x0a, 0x07, 0x43, 0x6f, 0x6e,
-	0x74, 0x65, 0x78, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x63, 0x6f, 0x6e, 0x74,
-	0x65, 0x78, 0x74, 0x54, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x63,
-	0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x54, 0x79, 0x70, 0x65, 0x22, 0x11, 0x0a, 0x0f, 0x43, 0x6f,
-	0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x4e, 0x0a,
-	0x10, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x12, 0x3a, 0x0a, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x18, 0x01, 0x20,
-	0x03, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72,
-	0x2e, 0x61, 0x70, 0x69, 0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74,
-	0x65, 0x78, 0x74, 0x52, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x32, 0x62, 0x0a,
-	0x03, 0x43, 0x6c, 0x69, 0x12, 0x5b, 0x0a, 0x08, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73,
-	0x12, 0x26, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70,
-	0x69, 0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74,
-	0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x27, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64,
-	0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31,
-	0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
-	0x65, 0x42, 0x21, 0x5a, 0x1f, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x63, 0x6c, 0x69, 0x2f, 0x76,
-	0x31, 0x3b, 0x76, 0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+var file_protos_cli_v1_cli_proto_rawDesc = []byte{
+	0x0a, 0x17, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x63, 0x6c, 0x69, 0x2f, 0x76, 0x31, 0x2f,
+	0x63, 0x6c, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x1c, 0x63, 0x6f, 0x6d, 0x2e, 0x64,
+	0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73,
+	0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31, 0x22, 0x3f, 0x0a, 0x07, 0x43, 0x6f, 0x6e, 0x74, 0x65,
+	0x78, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78,
+	0x74, 0x54, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x63, 0x6f, 0x6e,
+	0x74, 0x65, 0x78, 0x74, 0x54, 0x79, 0x70, 0x65, 0x22, 0x11, 0x0a, 0x0f, 0x43, 0x6f, 0x6e, 0x74,
+	0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x55, 0x0a, 0x10, 0x43,
+	0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x41, 0x0a, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28,
+	0x0b, 0x32, 0x25, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61,
+	0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6c, 0x69, 0x2e, 0x76, 0x31,
+	0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x52, 0x08, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x78,
+	0x74, 0x73, 0x32, 0x70, 0x0a, 0x03, 0x43, 0x6c, 0x69, 0x12, 0x69, 0x0a, 0x08, 0x43, 0x6f, 0x6e,
+	0x74, 0x65, 0x78, 0x74, 0x73, 0x12, 0x2d, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b,
+	0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6c,
+	0x69, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x2e, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65,
+	0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6c, 0x69,
+	0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x78, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x42, 0x28, 0x5a, 0x26, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
+	0x6f, 0x6d, 0x2f, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x73, 0x2f, 0x63, 0x6c, 0x69, 0x2f, 0x76, 0x31, 0x3b, 0x76, 0x31, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_cli_v1_cli_proto_rawDescOnce sync.Once
-	file_cli_v1_cli_proto_rawDescData = file_cli_v1_cli_proto_rawDesc
+	file_protos_cli_v1_cli_proto_rawDescOnce sync.Once
+	file_protos_cli_v1_cli_proto_rawDescData = file_protos_cli_v1_cli_proto_rawDesc
 )
 
-func file_cli_v1_cli_proto_rawDescGZIP() []byte {
-	file_cli_v1_cli_proto_rawDescOnce.Do(func() {
-		file_cli_v1_cli_proto_rawDescData = protoimpl.X.CompressGZIP(file_cli_v1_cli_proto_rawDescData)
+func file_protos_cli_v1_cli_proto_rawDescGZIP() []byte {
+	file_protos_cli_v1_cli_proto_rawDescOnce.Do(func() {
+		file_protos_cli_v1_cli_proto_rawDescData = protoimpl.X.CompressGZIP(file_protos_cli_v1_cli_proto_rawDescData)
 	})
-	return file_cli_v1_cli_proto_rawDescData
+	return file_protos_cli_v1_cli_proto_rawDescData
 }
 
-var file_cli_v1_cli_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_cli_v1_cli_proto_goTypes = []interface{}{
-	(*Context)(nil),          // 0: com.docker.api.cli.v1.Context
-	(*ContextsRequest)(nil),  // 1: com.docker.api.cli.v1.ContextsRequest
-	(*ContextsResponse)(nil), // 2: com.docker.api.cli.v1.ContextsResponse
+var file_protos_cli_v1_cli_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_protos_cli_v1_cli_proto_goTypes = []interface{}{
+	(*Context)(nil),          // 0: com.docker.api.protos.cli.v1.Context
+	(*ContextsRequest)(nil),  // 1: com.docker.api.protos.cli.v1.ContextsRequest
+	(*ContextsResponse)(nil), // 2: com.docker.api.protos.cli.v1.ContextsResponse
 }
-var file_cli_v1_cli_proto_depIdxs = []int32{
-	0, // 0: com.docker.api.cli.v1.ContextsResponse.contexts:type_name -> com.docker.api.cli.v1.Context
-	1, // 1: com.docker.api.cli.v1.Cli.Contexts:input_type -> com.docker.api.cli.v1.ContextsRequest
-	2, // 2: com.docker.api.cli.v1.Cli.Contexts:output_type -> com.docker.api.cli.v1.ContextsResponse
+var file_protos_cli_v1_cli_proto_depIdxs = []int32{
+	0, // 0: com.docker.api.protos.cli.v1.ContextsResponse.contexts:type_name -> com.docker.api.protos.cli.v1.Context
+	1, // 1: com.docker.api.protos.cli.v1.Cli.Contexts:input_type -> com.docker.api.protos.cli.v1.ContextsRequest
+	2, // 2: com.docker.api.protos.cli.v1.Cli.Contexts:output_type -> com.docker.api.protos.cli.v1.ContextsResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -252,13 +254,13 @@ var file_cli_v1_cli_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_cli_v1_cli_proto_init() }
-func file_cli_v1_cli_proto_init() {
-	if File_cli_v1_cli_proto != nil {
+func init() { file_protos_cli_v1_cli_proto_init() }
+func file_protos_cli_v1_cli_proto_init() {
+	if File_protos_cli_v1_cli_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_cli_v1_cli_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_protos_cli_v1_cli_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Context); i {
 			case 0:
 				return &v.state
@@ -270,7 +272,7 @@ func file_cli_v1_cli_proto_init() {
 				return nil
 			}
 		}
-		file_cli_v1_cli_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_protos_cli_v1_cli_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ContextsRequest); i {
 			case 0:
 				return &v.state
@@ -282,7 +284,7 @@ func file_cli_v1_cli_proto_init() {
 				return nil
 			}
 		}
-		file_cli_v1_cli_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_protos_cli_v1_cli_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ContextsResponse); i {
 			case 0:
 				return &v.state
@@ -299,20 +301,20 @@ func file_cli_v1_cli_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_cli_v1_cli_proto_rawDesc,
+			RawDescriptor: file_protos_cli_v1_cli_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_cli_v1_cli_proto_goTypes,
-		DependencyIndexes: file_cli_v1_cli_proto_depIdxs,
-		MessageInfos:      file_cli_v1_cli_proto_msgTypes,
+		GoTypes:           file_protos_cli_v1_cli_proto_goTypes,
+		DependencyIndexes: file_protos_cli_v1_cli_proto_depIdxs,
+		MessageInfos:      file_protos_cli_v1_cli_proto_msgTypes,
 	}.Build()
-	File_cli_v1_cli_proto = out.File
-	file_cli_v1_cli_proto_rawDesc = nil
-	file_cli_v1_cli_proto_goTypes = nil
-	file_cli_v1_cli_proto_depIdxs = nil
+	File_protos_cli_v1_cli_proto = out.File
+	file_protos_cli_v1_cli_proto_rawDesc = nil
+	file_protos_cli_v1_cli_proto_goTypes = nil
+	file_protos_cli_v1_cli_proto_depIdxs = nil
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -341,7 +343,7 @@ func NewCliClient(cc grpc.ClientConnInterface) CliClient {
 
 func (c *cliClient) Contexts(ctx context.Context, in *ContextsRequest, opts ...grpc.CallOption) (*ContextsResponse, error) {
 	out := new(ContextsResponse)
-	err := c.cc.Invoke(ctx, "/com.docker.api.cli.v1.Cli/Contexts", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/com.docker.api.protos.cli.v1.Cli/Contexts", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +378,7 @@ func _Cli_Contexts_Handler(srv interface{}, ctx context.Context, dec func(interf
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/com.docker.api.cli.v1.Cli/Contexts",
+		FullMethod: "/com.docker.api.protos.cli.v1.Cli/Contexts",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CliServer).Contexts(ctx, req.(*ContextsRequest))
@@ -385,7 +387,7 @@ func _Cli_Contexts_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 var _Cli_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "com.docker.api.cli.v1.Cli",
+	ServiceName: "com.docker.api.protos.cli.v1.Cli",
 	HandlerType: (*CliServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -394,5 +396,5 @@ var _Cli_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "cli/v1/cli.proto",
+	Metadata: "protos/cli/v1/cli.proto",
 }

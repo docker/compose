@@ -27,9 +27,9 @@
 
 syntax = "proto3";
 
-package com.docker.api.cli.v1;
+package com.docker.api.protos.cli.v1;
 
-option go_package = "github.com/docker/api/cli/v1;v1";
+option go_package = "github.com/docker/api/protos/cli/v1;v1";
 
 service Cli {
     // Returns the list of existing contexts

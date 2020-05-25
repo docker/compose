@@ -27,9 +27,9 @@
 
 syntax = "proto3";
 
-package com.docker.api.containers.v1;
+package com.docker.api.protos.containers.v1;
 
-option go_package = "github.com/docker/api/containers/v1;v1";
+option go_package = "github.com/docker/api/protos/containers/v1;v1";
 
 service Containers {
 	rpc List(ListRequest) returns (ListResponse);

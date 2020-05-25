@@ -6,9 +6,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	cliv1 "github.com/docker/api/cli/v1"
-	containersv1 "github.com/docker/api/containers/v1"
 	"github.com/docker/api/context/store"
+	cliv1 "github.com/docker/api/protos/cli/v1"
+	containersv1 "github.com/docker/api/protos/containers/v1"
 	"github.com/docker/api/server"
 	"github.com/docker/api/server/proxy"
 

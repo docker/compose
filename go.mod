@@ -17,7 +17,7 @@ require (
 	github.com/compose-spec/compose-go v0.0.0-20200423124427-63dcf8c22cae
 	github.com/containerd/console v1.0.0
 	github.com/containerd/containerd v1.3.4 // indirect
-	github.com/docker/distribution v2.7.1+incompatible
+	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200309214505-aa6a9891b09c+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
