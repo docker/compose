@@ -44,19 +44,18 @@ func New(ctx context.Context) (*Client, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 
-	cc, err := s.Get(currentContext, nil)
+	cc, err := s.Get(currentContext)
 	if err != nil {
 		return nil, err
 	}
-	contextType := s.GetType(cc)
 
-	service, err := backend.Get(ctx, contextType)
+	service, err := backend.Get(ctx, cc.Type)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		backendType: contextType,
+		backendType: cc.Type,
 		bs:          service,
 	}, nil
 

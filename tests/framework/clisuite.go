@@ -35,9 +35,7 @@ func (sut *CliSuite) BeforeTest(suiteName, testName string) {
 	)
 	require.Nil(sut.T(), err)
 
-	err = s.Create("example", store.TypedContext{
-		Type: "example",
-	})
+	err = s.Create("example", "example", "", store.ContextMetadata{})
 	require.Nil(sut.T(), err)
 
 	sut.storeRoot = dir

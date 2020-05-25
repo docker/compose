@@ -33,6 +33,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -62,42 +63,55 @@ func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
 }
 
 func (suite *StoreTestSuite) TestCreate() {
-	err := suite.store.Create("test", TypedContext{})
+	err := suite.store.Create("test", "test", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
 
-	err = suite.store.Create("test", TypedContext{})
+	err = suite.store.Create("test", "test", "descrsiption", ContextMetadata{})
 	require.EqualError(suite.T(), err, `context "test": already exists`)
 	require.True(suite.T(), errdefs.IsAlreadyExistsError(err))
 }
 
+func (suite *StoreTestSuite) TestGetEndpoint() {
+	err := suite.store.Create("aci", "aci", "description", AciContext{
+		Location: "eu",
+	})
+	require.Nil(suite.T(), err)
+
+	var ctx AciContext
+	err = suite.store.GetEndpoint("aci", &ctx)
+	assert.Equal(suite.T(), nil, err)
+	assert.Equal(suite.T(), "eu", ctx.Location)
+
+	var exampleCtx ExampleContext
+	err = suite.store.GetEndpoint("aci", &exampleCtx)
+	assert.EqualError(suite.T(), err, "wrong context type")
+}
+
 func (suite *StoreTestSuite) TestGetUnknown() {
-	meta, err := suite.store.Get("unknown", nil)
+	meta, err := suite.store.Get("unknown")
 	require.Nil(suite.T(), meta)
 	require.EqualError(suite.T(), err, `context "unknown": not found`)
 	require.True(suite.T(), errdefs.IsNotFoundError(err))
 }
 
 func (suite *StoreTestSuite) TestGet() {
-	err := suite.store.Create("test", TypedContext{
-		Type:        "type",
-		Description: "description",
-	})
+	err := suite.store.Create("test", "type", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
 
-	meta, err := suite.store.Get("test", nil)
+	meta, err := suite.store.Get("test")
 	require.Nil(suite.T(), err)
 	require.NotNil(suite.T(), meta)
 	require.Equal(suite.T(), "test", meta.Name)
 
 	require.Equal(suite.T(), "description", meta.Metadata.Description)
-	require.Equal(suite.T(), "type", meta.Metadata.Type)
+	require.Equal(suite.T(), "type", meta.Type)
 }
 
 func (suite *StoreTestSuite) TestList() {
-	err := suite.store.Create("test1", TypedContext{})
+	err := suite.store.Create("test1", "type", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
 
-	err = suite.store.Create("test2", TypedContext{})
+	err = suite.store.Create("test2", "type", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
 
 	contexts, err := suite.store.List()
@@ -116,7 +130,7 @@ func (suite *StoreTestSuite) TestRemoveNotFound() {
 }
 
 func (suite *StoreTestSuite) TestRemove() {
-	err := suite.store.Create("testremove", TypedContext{})
+	err := suite.store.Create("testremove", "type", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
 	contexts, err := suite.store.List()
 	require.Nil(suite.T(), err)

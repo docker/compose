@@ -79,7 +79,7 @@ func runList(ctx context.Context) error {
 		fmt.Fprintf(w,
 			format,
 			contextName,
-			c.Metadata.Type,
+			c.Type,
 			c.Metadata.Description,
 			getEndpoint("docker", c.Endpoints),
 			getEndpoint("kubernetes", c.Endpoints),
@@ -89,15 +89,19 @@ func runList(ctx context.Context) error {
 	return w.Flush()
 }
 
-func getEndpoint(name string, meta map[string]store.Endpoint) string {
-	d, ok := meta[name]
+func getEndpoint(name string, meta map[string]interface{}) string {
+	endpoints, ok := meta[name]
+	if !ok {
+		return ""
+	}
+	data, ok := endpoints.(store.Endpoint)
 	if !ok {
 		return ""
 	}
 
-	result := d.Host
-	if d.DefaultNamespace != "" {
-		result += fmt.Sprintf(" (%s)", d.DefaultNamespace)
+	result := data.Host
+	if data.DefaultNamespace != "" {
+		result += fmt.Sprintf(" (%s)", data.DefaultNamespace)
 	}
 
 	return result

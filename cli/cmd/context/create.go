@@ -67,9 +67,7 @@ func runCreate(ctx context.Context, opts createOpts, name string, contextType st
 		return createACIContext(ctx, name, opts)
 	default:
 		s := store.ContextStore(ctx)
-		return s.Create(name, store.TypedContext{
-			Type:        contextType,
-			Description: opts.description,
-		})
+		// TODO: we need to implement different contexts for known backends
+		return s.Create(name, contextType, opts.description, store.ExampleContext{})
 	}
 }

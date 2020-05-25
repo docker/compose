@@ -77,7 +77,7 @@ func (cs *cliServer) Contexts(ctx context.Context, request *cliv1.ContextsReques
 	for _, c := range contexts {
 		result.Contexts = append(result.Contexts, &cliv1.Context{
 			Name:        c.Name,
-			ContextType: c.Metadata.Type,
+			ContextType: c.Type,
 		})
 	}
 	return result, nil

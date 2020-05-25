@@ -52,7 +52,7 @@ func runUse(ctx context.Context, name string) error {
 	s := store.ContextStore(ctx)
 	// Match behavior of existing CLI
 	if name != store.DefaultContextName {
-		if _, err := s.Get(name, nil); err != nil {
+		if _, err := s.Get(name); err != nil {
 			return err
 		}
 	}
