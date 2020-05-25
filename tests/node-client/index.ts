@@ -5,7 +5,7 @@ import { ListRequest, ListResponse } from "./grpc/containers_pb";
 
 let address = process.argv[3] || "unix:///tmp/backend.sock";
 const ContainersServiceClient = grpc.makeClientConstructor(
-  continersPb["com.docker.api.containers.v1.Containers"],
+  continersPb["com.docker.api.protos.containers.v1.Containers"],
   "ContainersClient"
 );
 const client = (new ContainersServiceClient(

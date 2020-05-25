@@ -26,7 +26,7 @@
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 
-PROTOS=$(shell find . -not \( -path ./tests -prune \) -name \*.proto)
+PROTOS=$(shell find protos -name \*.proto)
 
 EXTENSION :=
 ifeq ($(GOOS),windows)
@@ -44,7 +44,6 @@ all: cli
 
 protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
-	@goimports -w -local github.com/docker/api .
 
 cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) -o $(BINARY_WITH_EXTENSION) ./cli

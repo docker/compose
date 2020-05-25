@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/metadata"
 
-	v1 "github.com/docker/api/containers/v1"
+	v1 "github.com/docker/api/protos/containers/v1"
 )
 
 type logServer struct {

@@ -23,8 +23,7 @@ ENV GO111MODULE=on
 
 RUN apk update && apk add protoc make
 
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1 && \
-    go get golang.org/x/tools/cmd/goimports
+RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1
 
 WORKDIR ${PWD}
 ADD go.* ${PWD}
@@ -53,7 +52,7 @@ RUN --mount=id=build,type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile cross
 
 FROM scratch AS protos
-COPY --from=make-protos /api .
+COPY --from=make-protos /api/protos .
 
 FROM scratch AS cli
 COPY --from=make-cli /api/bin/* .
