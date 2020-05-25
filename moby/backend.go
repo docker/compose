@@ -1,9 +1,13 @@
 package moby
 
 import (
+	"bufio"
 	"context"
 	"io"
+	"strconv"
 	"time"
+
+	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/api/context/cloud"
 
@@ -72,7 +76,7 @@ func (ms *mobyService) List(ctx context.Context, all bool) ([]containers.Contain
 			// statuses. We also need to add a `Created` property on the gRPC side.
 			Status:  container.Status,
 			Command: container.Command,
-			Ports:   getPorts(container.Ports),
+			Ports:   toPorts(container.Ports),
 		})
 	}
 
@@ -80,15 +84,50 @@ func (ms *mobyService) List(ctx context.Context, all bool) ([]containers.Contain
 }
 
 func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) error {
-	create, err := ms.apiClient.ContainerCreate(ctx, &container.Config{
-		Image:  r.Image,
-		Labels: r.Labels,
-	}, nil, nil, r.ID)
+	exposedPorts, hostBindings, err := fromPorts(r.Ports)
 	if err != nil {
 		return err
 	}
 
-	return ms.apiClient.ContainerStart(ctx, create.ID, types.ContainerStartOptions{})
+	containerConfig := &container.Config{
+		Image:        r.Image,
+		Labels:       r.Labels,
+		ExposedPorts: exposedPorts,
+	}
+	hostConfig := &container.HostConfig{
+		PortBindings: hostBindings,
+	}
+
+	created, err := ms.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)
+
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			io, err := ms.apiClient.ImagePull(ctx, r.Image, types.ImagePullOptions{})
+			if err != nil {
+				return err
+			}
+			scanner := bufio.NewScanner(io)
+
+			// Read the whole body, otherwise the pulling stops
+			for scanner.Scan() {
+			}
+
+			if err = scanner.Err(); err != nil {
+				return err
+			}
+			if err = io.Close(); err != nil {
+				return err
+			}
+			created, err = ms.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	return ms.apiClient.ContainerStart(ctx, created.ID, types.ContainerStartOptions{})
 }
 
 func (ms *mobyService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
@@ -162,7 +201,7 @@ func (ms *mobyService) Delete(ctx context.Context, containerID string, force boo
 	return err
 }
 
-func getPorts(ports []types.Port) []containers.Port {
+func toPorts(ports []types.Port) []containers.Port {
 	result := []containers.Port{}
 	for _, port := range ports {
 		result = append(result, containers.Port{
@@ -174,4 +213,34 @@ func getPorts(ports []types.Port) []containers.Port {
 	}
 
 	return result
+}
+
+func fromPorts(ports []containers.Port) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, error) {
+	var (
+		exposedPorts = make(map[nat.Port]struct{}, len(ports))
+		bindings     = make(map[nat.Port][]nat.PortBinding)
+	)
+
+	for _, port := range ports {
+		p, err := nat.NewPort(port.Protocol, strconv.Itoa(int(port.ContainerPort)))
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if _, exists := exposedPorts[p]; !exists {
+			exposedPorts[p] = struct{}{}
+		}
+
+		portBinding := nat.PortBinding{
+			HostIP:   port.HostIP,
+			HostPort: strconv.Itoa(int(port.HostPort)),
+		}
+		bslice, exists := bindings[p]
+		if !exists {
+			bslice = []nat.PortBinding{}
+		}
+		bindings[p] = append(bslice, portBinding)
+	}
+
+	return exposedPorts, bindings, nil
 }
