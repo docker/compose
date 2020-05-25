@@ -2,6 +2,7 @@ package amazon
 
 const (
 	ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+	ECRReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 
 	ActionGetSecretValue = "secretsmanager:GetSecretValue"
 	ActionGetParameters  = "ssm:GetParameters"

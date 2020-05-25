@@ -120,6 +120,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			Policies:                 rolePolicies,
 			ManagedPolicyArns: []string{
 				ECSTaskExecutionPolicy,
+				ECRReadOnlyPolicy,
 			},
 		}
 		template.Resources[taskDefinition] = definition
