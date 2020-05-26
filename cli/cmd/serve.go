@@ -5,14 +5,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
-	"github.com/docker/api/context/store"
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	contextsv1 "github.com/docker/api/protos/contexts/v1"
 	"github.com/docker/api/server"
 	"github.com/docker/api/server/proxy"
-
-	"github.com/spf13/cobra"
 )
 
 type serveOpts struct {
@@ -47,9 +45,10 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	defer listener.Close()
 
 	p := proxy.NewContainerAPI()
+	contextsService := server.NewContexts()
 
 	containersv1.RegisterContainersServer(s, p)
-	contextsv1.RegisterContextsServer(s, &cliServer{})
+	contextsv1.RegisterContextsServer(s, contextsService)
 
 	go func() {
 		<-ctx.Done()
@@ -61,24 +60,4 @@ func runServe(ctx context.Context, opts serveOpts) error {
 
 	// start the GRPC server to serve on the listener
 	return s.Serve(listener)
-}
-
-type cliServer struct {
-}
-
-func (cs *cliServer) List(ctx context.Context, request *contextsv1.ListRequest) (*contextsv1.ListResponse, error) {
-	s := store.ContextStore(ctx)
-	contexts, err := s.List()
-	if err != nil {
-		logrus.Error(err)
-		return &contextsv1.ListResponse{}, err
-	}
-	result := &contextsv1.ListResponse{}
-	for _, c := range contexts {
-		result.Contexts = append(result.Contexts, &contextsv1.Context{
-			Name:        c.Name,
-			ContextType: c.Type,
-		})
-	}
-	return result, nil
 }
