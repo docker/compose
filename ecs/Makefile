@@ -11,6 +11,7 @@ e2e: build ## Run tests
 	go test ./... -v -tags=e2e
 
 dev: build
+	@mkdir -p ~/.docker/cli-plugins/
 	ln -f -s "${PWD}/dist/docker-ecs" "${HOME}/.docker/cli-plugins/docker-ecs"
 
 lint: ## Verify Go files
