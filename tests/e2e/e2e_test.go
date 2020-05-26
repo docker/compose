@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -62,6 +63,19 @@ func (s *E2eSuite) TestContextDefault() {
 		output = s.NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(Not(ContainSubstring("test-example")))
 		Expect(output).To(ContainSubstring("default *"))
+	})
+}
+
+func (s *E2eSuite) TestSetupError() {
+	It("should display an error if cannot shell out to docker-classic", func() {
+		err := os.Setenv("PATH", s.BinDir)
+		Expect(err).To(BeNil())
+		err = os.Remove(filepath.Join(s.BinDir, "docker-classic"))
+		Expect(err).To(BeNil())
+		output, err := s.NewDockerCommand("ps").Exec()
+		Expect(output).To(ContainSubstring("docker-classic"))
+		Expect(output).To(ContainSubstring("not found"))
+		Expect(err).NotTo(BeNil())
 	})
 }
 
