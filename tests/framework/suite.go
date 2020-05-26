@@ -80,9 +80,16 @@ func dirContents(dir string) []string {
 }
 
 func (s *Suite) linkClassicDocker() {
-	p, err := exec.LookPath("docker")
+	p, err := exec.LookPath("docker-classic")
+	if err != nil {
+		p, err = exec.LookPath("docker")
+	}
 	gomega.Expect(err).To(gomega.BeNil())
 	err = os.Symlink(p, filepath.Join(s.BinDir, "docker-classic"))
+	gomega.Expect(err).To(gomega.BeNil())
+	dockerPath, err := filepath.Abs("../../bin/docker")
+	gomega.Expect(err).To(gomega.BeNil())
+	err = os.Symlink(dockerPath, filepath.Join(s.BinDir, "docker"))
 	gomega.Expect(err).To(gomega.BeNil())
 	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
 	gomega.Expect(err).To(gomega.BeNil())
@@ -111,9 +118,9 @@ func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 
 func dockerExecutable() string {
 	if runtime.GOOS == "windows" {
-		return "../../bin/docker.exe"
+		return "docker.exe"
 	}
-	return "../../bin/docker"
+	return "docker"
 }
 
 // NewDockerCommand creates a docker builder.
