@@ -27,13 +27,13 @@
 
 syntax = "proto3";
 
-package com.docker.api.protos.cli.v1;
+package com.docker.api.protos.context.v1;
 
-option go_package = "github.com/docker/api/protos/cli/v1;v1";
+option go_package = "github.com/docker/api/protos/context/v1;v1";
 
-service Cli {
+service Contexts {
     // Returns the list of existing contexts
-    rpc Contexts(ContextsRequest) returns (ContextsResponse);
+    rpc List(ListRequest) returns (ListResponse);
 }
 
 message Context {
@@ -41,10 +41,10 @@ message Context {
     string contextType = 2;
 }
 
-message ContextsRequest {
+message ListRequest {
 
 }
 
-message ContextsResponse {
+message ListResponse {
     repeated Context contexts = 1;
 }
