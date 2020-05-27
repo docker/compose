@@ -33,6 +33,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -129,6 +130,29 @@ func (b CmdContext) Exec() (string, error) {
 	}
 }
 
+//WaitFor waits for a condition to be true
+func WaitFor(interval, duration time.Duration, abort <-chan error, condition func() bool) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	timeout := make(chan int)
+	go func() {
+		time.Sleep(duration)
+		close(timeout)
+	}()
+	for {
+		select {
+		case err := <-abort:
+			return err
+		case <-timeout:
+			return fmt.Errorf("timeout after %v", duration)
+		case <-ticker.C:
+			if condition() {
+				return nil
+			}
+		}
+	}
+}
+
 // Execute executes a command.
 // The command cannot be re-used afterwards.
 func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
@@ -152,7 +176,7 @@ func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
 		}
 	case <-timeout:
 		log.Debugf("%s %s timed-out", cmd.Path, strings.Join(cmd.Args[1:], " "))
-		if err := cmd.Process.Kill(); err != nil {
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 			return "", err
 		}
 		return "", fmt.Errorf(
