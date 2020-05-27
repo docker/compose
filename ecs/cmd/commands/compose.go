@@ -23,6 +23,7 @@ func ComposeCommand(dockerCli command.Cli) *cobra.Command {
 		UpCommand(dockerCli, opts),
 		DownCommand(dockerCli, opts),
 		LogsCommand(dockerCli, opts),
+		PsCommand(dockerCli, opts),
 	)
 	return cmd
 }
@@ -81,6 +82,26 @@ func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 				return err
 			}
 			return client.ComposeUp(context.Background(), project)
+		}),
+	}
+	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
+	return cmd
+}
+
+func PsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+	opts := upOptions{}
+	cmd := &cobra.Command{
+		Use: "ps",
+		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+			clusteropts, err := docker.GetAwsContext(dockerCli)
+			if err != nil {
+				return err
+			}
+			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			if err != nil {
+				return err
+			}
+			return client.ComposePs(context.Background(), project)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")

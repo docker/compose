@@ -388,7 +388,9 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) ([]string, 
 	}
 	publicIPs := []string{}
 	for _, interf := range desc.NetworkInterfaces {
-		publicIPs = append(publicIPs, *interf.Association.PublicIp)
+		if interf.Association != nil {
+			publicIPs = append(publicIPs, *interf.Association.PublicIp)
+		}
 	}
 	return publicIPs, nil
 }

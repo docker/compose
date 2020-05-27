@@ -17,4 +17,5 @@ type API interface {
 	InspectSecret(ctx context.Context, id string) (docker.Secret, error)
 	ListSecrets(ctx context.Context) ([]docker.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
+	ComposePs(background context.Context, project *Project) error
 }
