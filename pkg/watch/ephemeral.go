@@ -25,11 +25,16 @@ func initEphemeralPathMatcher() model.PathMatcher {
 	// ignoring .sw? seems dangerous, since things like .swf or .swi exist, but ignoring the first few
 	// seems safe and should catch most cases
 	vimPatterns := []string{"**/4913", "**/*~", "**/.*.swp", "**/.*.swx", "**/.*.swo", "**/.*.swn"}
+	// kate (the default text editor for KDE) uses a file similar to Vim's .swp
+	// files, but it doesn't have the "incrememnting" character problem mentioned
+	// above
+	katePatterns := []string{"**/.*.kate-swp"}
 
 	allPatterns := []string{}
 	allPatterns = append(allPatterns, golandPatterns...)
 	allPatterns = append(allPatterns, emacsPatterns...)
 	allPatterns = append(allPatterns, vimPatterns...)
+	allPatterns = append(allPatterns, katePatterns...)
 
 	matcher, err := dockerignore.NewDockerPatternMatcher("/", allPatterns)
 	if err != nil {
