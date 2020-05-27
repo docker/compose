@@ -123,6 +123,16 @@
             }
           }
         ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleWithOverrides"
+          },
+          {
+            "Key": "com.docker.compose.service",
+            "Value": "simple"
+          }
+        ],
         "TaskDefinition": {
           "Ref": "simpleTaskDefinition"
         }

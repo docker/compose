@@ -183,7 +183,17 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceName:        service.Name,
 			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
-			TaskDefinition:     cloudformation.Ref(taskDefinition),
+			Tags: []tags.Tag{
+				{
+					Key:   ProjectTag,
+					Value: project.Name,
+				},
+				{
+					Key:   ServiceTag,
+					Value: service.Name,
+				},
+			},
+			TaskDefinition: cloudformation.Ref(taskDefinition),
 		}
 	}
 	return template, nil
