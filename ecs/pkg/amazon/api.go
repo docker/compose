@@ -2,7 +2,7 @@ package amazon
 
 import "context"
 
-//go:generate mockgen -destination=./mock/api.go -package=mock . API
+//go:generate mockgen -destination=./api_mock.go -self_package "github.com/docker/ecs-plugin/pkg/amazon" -package=amazon . API
 
 type API interface {
 	downAPI

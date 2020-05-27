@@ -4,14 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/ecs-plugin/pkg/amazon/mock"
 	"github.com/golang/mock/gomock"
 )
 
 func TestDownDontDeleteCluster(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	m := mock.NewMockAPI(ctrl)
+	m := NewMockAPI(ctrl)
 	c := &client{
 		Cluster: "test_cluster",
 		Region:  "region",
@@ -30,7 +29,7 @@ func TestDownDontDeleteCluster(t *testing.T) {
 func TestDownDeleteCluster(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	m := mock.NewMockAPI(ctrl)
+	m := NewMockAPI(ctrl)
 	c := &client{
 		Cluster: "test_cluster",
 		Region:  "region",
