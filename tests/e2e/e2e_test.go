@@ -35,6 +35,8 @@ import (
 	"testing"
 	"time"
 
+	"gotest.tools/golden"
+
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 
@@ -57,12 +59,10 @@ func (s *E2eSuite) TestContextHelp() {
 
 func (s *E2eSuite) TestContextDefault() {
 	It("should be initialized with default context", func() {
-		s.NewDockerCommand("context", "use", "default").ExecOrDie()
 		output := s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
 		output = s.NewCommand("docker", "context", "ls").ExecOrDie()
-		Expect(output).To(Not(ContainSubstring("test-example")))
-		Expect(output).To(ContainSubstring("default *"))
+		golden.Assert(s.T(), output, "ls-out-default.golden")
 	})
 }
 
@@ -107,7 +107,7 @@ func (s *E2eSuite) TestMockBackend() {
 		currentContext := s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := s.NewDockerCommand("context", "ls").ExecOrDie()
-		Expect(output).To(ContainSubstring("test-example *"))
+		golden.Assert(s.T(), output, "ls-out-test-example.golden")
 		output = s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example"))
 	})

@@ -107,22 +107,6 @@ func (suite *StoreTestSuite) TestGet() {
 	require.Equal(suite.T(), "type", meta.Type)
 }
 
-func (suite *StoreTestSuite) TestList() {
-	err := suite.store.Create("test1", "type", "description", ContextMetadata{})
-	require.Nil(suite.T(), err)
-
-	err = suite.store.Create("test2", "type", "description", ContextMetadata{})
-	require.Nil(suite.T(), err)
-
-	contexts, err := suite.store.List()
-	require.Nil(suite.T(), err)
-
-	require.Equal(suite.T(), len(contexts), 3)
-	require.Equal(suite.T(), "test1", contexts[0].Name)
-	require.Equal(suite.T(), "test2", contexts[1].Name)
-	require.Equal(suite.T(), "default", contexts[2].Name)
-}
-
 func (suite *StoreTestSuite) TestRemoveNotFound() {
 	err := suite.store.Remove("notfound")
 	require.EqualError(suite.T(), err, `context "notfound": not found`)
@@ -132,17 +116,18 @@ func (suite *StoreTestSuite) TestRemoveNotFound() {
 func (suite *StoreTestSuite) TestRemove() {
 	err := suite.store.Create("testremove", "type", "description", ContextMetadata{})
 	require.Nil(suite.T(), err)
-	contexts, err := suite.store.List()
+
+	meta, err := suite.store.Get("testremove")
 	require.Nil(suite.T(), err)
-	require.Equal(suite.T(), len(contexts), 2)
+	require.NotNil(suite.T(), meta)
 
 	err = suite.store.Remove("testremove")
 	require.Nil(suite.T(), err)
-	contexts, err = suite.store.List()
-	require.Nil(suite.T(), err)
-	// The default context is always here, that's why we
-	// have len(contexts) == 1
-	require.Equal(suite.T(), len(contexts), 1)
+
+	meta, err = suite.store.Get("testremove")
+	require.EqualError(suite.T(), err, `context "testremove": not found`)
+	require.Nil(suite.T(), meta)
+
 }
 
 func TestExampleTestSuite(t *testing.T) {

@@ -32,7 +32,7 @@ type endpoint struct {
 }
 
 func dockerDefaultContext() (*Metadata, error) {
-	cmd := exec.Command("docker", "context", "inspect", "default")
+	cmd := exec.Command("docker-classic", "context", "inspect", "default")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	err := cmd.Run()
