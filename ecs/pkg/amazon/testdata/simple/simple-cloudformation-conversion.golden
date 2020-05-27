@@ -58,27 +58,7 @@
       },
       "Type": "AWS::Logs::LogGroup"
     },
-    "TestSimpleConvertDefaultNetwork": {
-      "Properties": {
-        "GroupDescription": "TestSimpleConvert default Security Group",
-        "GroupName": "TestSimpleConvertDefaultNetwork",
-        "Tags": [
-          {
-            "Key": "com.docker.compose.project",
-            "Value": "TestSimpleConvert"
-          },
-          {
-            "Key": "com.docker.compose.network",
-            "Value": "default"
-          }
-        ],
-        "VpcId": {
-          "Ref": "ParameterVPCId"
-        }
-      },
-      "Type": "AWS::EC2::SecurityGroup"
-    },
-    "simpleService": {
+    "SimpleService": {
       "Properties": {
         "Cluster": {
           "Fn::If": [
@@ -117,7 +97,7 @@
           {
             "RegistryArn": {
               "Fn::GetAtt": [
-                "simpleServiceDiscoveryEntry",
+                "SimpleServiceDiscoveryEntry",
                 "Arn"
               ]
             }
@@ -134,12 +114,12 @@
           }
         ],
         "TaskDefinition": {
-          "Ref": "simpleTaskDefinition"
+          "Ref": "SimpleTaskDefinition"
         }
       },
       "Type": "AWS::ECS::Service"
     },
-    "simpleServiceDiscoveryEntry": {
+    "SimpleServiceDiscoveryEntry": {
       "Properties": {
         "Description": "\"simple\" service discovery entry in Cloud Map",
         "DnsConfig": {
@@ -158,7 +138,7 @@
       },
       "Type": "AWS::ServiceDiscovery::Service"
     },
-    "simpleTaskDefinition": {
+    "SimpleTaskDefinition": {
       "Properties": {
         "ContainerDefinitions": [
           {
@@ -191,7 +171,7 @@
                 "awslogs-region": {
                   "Ref": "AWS::Region"
                 },
-                "awslogs-stream-prefix": "simple"
+                "awslogs-stream-prefix": "TestSimpleConvert"
               }
             },
             "Name": "simple"
@@ -199,7 +179,7 @@
         ],
         "Cpu": "256",
         "ExecutionRoleArn": {
-          "Ref": "simpleTaskExecutionRole"
+          "Ref": "SimpleTaskExecutionRole"
         },
         "Family": "TestSimpleConvert-simple",
         "Memory": "512",
@@ -210,7 +190,7 @@
       },
       "Type": "AWS::ECS::TaskDefinition"
     },
-    "simpleTaskExecutionRole": {
+    "SimpleTaskExecutionRole": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -232,6 +212,26 @@
         ]
       },
       "Type": "AWS::IAM::Role"
+    },
+    "TestSimpleConvertDefaultNetwork": {
+      "Properties": {
+        "GroupDescription": "TestSimpleConvert default Security Group",
+        "GroupName": "TestSimpleConvertDefaultNetwork",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          },
+          {
+            "Key": "com.docker.compose.network",
+            "Value": "default"
+          }
+        ],
+        "VpcId": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroup"
     }
   }
 }

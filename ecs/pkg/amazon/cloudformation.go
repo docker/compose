@@ -2,6 +2,7 @@ package amazon
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -99,7 +100,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			return nil, err
 		}
 
-		taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", service.Name)
+		taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
 		policy, err := c.getPolicy(definition)
 		if err != nil {
 			return nil, err
@@ -114,7 +115,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		}
 		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
 
-		taskDefinition := fmt.Sprintf("%sTaskDefinition", service.Name)
+		taskDefinition := fmt.Sprintf("%sTaskDefinition", normalizeResourceName(service.Name))
 		template.Resources[taskExecutionRole] = &iam.Role{
 			AssumeRolePolicyDocument: assumeRolePolicyDocument,
 			Policies:                 rolePolicies,
@@ -130,7 +131,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
 		}
 
-		serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", service.Name)
+		serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", normalizeResourceName(service.Name))
 		records := []cloudmap.Service_DnsRecord{
 			{
 				TTL:  60,
@@ -166,7 +167,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			serviceSecurityGroups = append(serviceSecurityGroups, cloudformation.Ref(logicalName))
 		}
 
-		template.Resources[fmt.Sprintf("%sService", service.Name)] = &ecs.Service{
+		template.Resources[fmt.Sprintf("%sService", normalizeResourceName(service.Name))] = &ecs.Service{
 			Cluster:      cluster,
 			DesiredCount: 1,
 			LaunchType:   ecsapi.LaunchTypeFargate,
@@ -193,7 +194,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					Value: service.Name,
 				},
 			},
-			TaskDefinition: cloudformation.Ref(taskDefinition),
+			TaskDefinition: cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
 	}
 	return template, nil
@@ -236,7 +237,11 @@ func convertNetwork(project *compose.Project, net string, vpc string) (string, c
 }
 
 func networkResourceName(project *compose.Project, network string) string {
-	return fmt.Sprintf("%s%sNetwork", project.Name, strings.Title(network))
+	return fmt.Sprintf("%s%sNetwork", normalizeResourceName(project.Name), normalizeResourceName(network))
+}
+
+func normalizeResourceName(s string) string {
+	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }
 
 func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {

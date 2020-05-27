@@ -57,7 +57,7 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 					Options: map[string]string{
 						"awslogs-region":        cloudformation.Ref("AWS::Region"),
 						"awslogs-group":         cloudformation.Ref("LogGroup"),
-						"awslogs-stream-prefix": service.Name,
+						"awslogs-stream-prefix": project.Name,
 					},
 				},
 				Name:                   service.Name,
