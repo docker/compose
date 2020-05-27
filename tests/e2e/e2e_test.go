@@ -29,8 +29,6 @@ package main
 
 import (
 	"fmt"
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"log"
 	"os"
@@ -39,6 +37,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/suite"
 
 	"gotest.tools/golden"
 
@@ -91,7 +92,7 @@ func (s *E2eSuite) TestKillChildOnCancel() {
 RUN sleep 100`), 0644)).To(Succeed())
 		shutdown := make(chan time.Time)
 		errs := make(chan error)
-			ctx := s.NewDockerCommand("build", "--no-cache", "-t", "test-sleep-image", ".").WithinDirectory(dir).WithTimeout(shutdown)
+		ctx := s.NewDockerCommand("build", "--no-cache", "-t", "test-sleep-image", ".").WithinDirectory(dir).WithTimeout(shutdown)
 		go func() {
 			_, err := ctx.Exec()
 			errs <- err
