@@ -131,18 +131,31 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		}
 
 		serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", service.Name)
+		records := []cloudmap.Service_DnsRecord{
+			{
+				TTL:  60,
+				Type: cloudmapapi.RecordTypeA,
+			},
+		}
+		serviceRegistry := ecs.Service_ServiceRegistry{
+			RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
+		}
+
+		if len(service.Ports) > 0 {
+			records = append(records, cloudmap.Service_DnsRecord{
+				TTL:  60,
+				Type: cloudmapapi.RecordTypeSrv,
+			})
+			serviceRegistry.Port = int(service.Ports[0].Target)
+		}
+
 		template.Resources[serviceRegistration] = &cloudmap.Service{
 			Description:       fmt.Sprintf("%q service discovery entry in Cloud Map", service.Name),
 			HealthCheckConfig: healthCheck,
 			Name:              service.Name,
 			NamespaceId:       cloudformation.Ref("CloudMap"),
 			DnsConfig: &cloudmap.Service_DnsConfig{
-				DnsRecords: []cloudmap.Service_DnsRecord{
-					{
-						TTL:  300,
-						Type: cloudmapapi.RecordTypeA,
-					},
-				},
+				DnsRecords:    records,
 				RoutingPolicy: cloudmapapi.RoutingPolicyMultivalue,
 			},
 		}
@@ -169,12 +182,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			},
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceName:        service.Name,
-			ServiceRegistries: []ecs.Service_ServiceRegistry{
-				{
-					RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
-				},
-			},
-			TaskDefinition: cloudformation.Ref(taskDefinition),
+			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
+			TaskDefinition:     cloudformation.Ref(taskDefinition),
 		}
 	}
 	return template, nil

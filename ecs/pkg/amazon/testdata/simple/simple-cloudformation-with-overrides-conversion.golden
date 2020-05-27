@@ -135,7 +135,7 @@
         "DnsConfig": {
           "DnsRecords": [
             {
-              "TTL": 300,
+              "TTL": 60,
               "Type": "A"
             }
           ],
