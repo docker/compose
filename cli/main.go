@@ -186,7 +186,7 @@ func execMoby(ctx context.Context) {
 	// Only run original docker command if the current context is not
 	// ours.
 	if err != nil {
-		cmd := exec.Command("docker-classic", os.Args[1:]...)
+		cmd := exec.CommandContext(ctx, "docker-classic", os.Args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

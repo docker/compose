@@ -66,7 +66,7 @@ lint: ## run linter(s)
 	--target lint
 
 classic-link: ## create docker-classic symlink if does not already exist
-	ln -s /usr/local/bin/docker-classic /Applications/Docker.app/Contents/Resources/bin/docker
+	ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker-classic
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

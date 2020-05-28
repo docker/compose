@@ -29,16 +29,19 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"gotest.tools/golden"
-
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
+
+	"gotest.tools/golden"
 
 	. "github.com/docker/api/tests/framework"
 )
@@ -76,6 +79,37 @@ func (s *E2eSuite) TestSetupError() {
 		Expect(output).To(ContainSubstring("docker-classic"))
 		Expect(output).To(ContainSubstring("not found"))
 		Expect(err).NotTo(BeNil())
+	})
+}
+
+func (s *E2eSuite) TestKillChildOnCancel() {
+	It("should kill docker-classic if parent command is cancelled", func() {
+		out := s.NewCommand("ps", "-x").ExecOrDie()
+		Expect(out).NotTo(ContainSubstring("docker-classic"))
+
+		dir := s.ConfigDir
+		Expect(ioutil.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(`FROM alpine:3.10
+RUN sleep 100`), 0644)).To(Succeed())
+		shutdown := make(chan time.Time)
+		errs := make(chan error)
+		ctx := s.NewDockerCommand("build", "--no-cache", "-t", "test-sleep-image", ".").WithinDirectory(dir).WithTimeout(shutdown)
+		go func() {
+			_, err := ctx.Exec()
+			errs <- err
+		}()
+		err := WaitFor(time.Second, 3*time.Second, errs, func() bool {
+			out := s.NewCommand("ps", "-x").ExecOrDie()
+			return strings.Contains(out, "docker-classic")
+		})
+		Expect(err).NotTo(HaveOccurred())
+		log.Println("Killing docker process")
+
+		close(shutdown)
+		err = WaitFor(time.Second, 4*time.Second, nil, func() bool {
+			out := s.NewCommand("ps", "-x").ExecOrDie()
+			return !strings.Contains(out, "docker-classic")
+		})
+		Expect(err).NotTo(HaveOccurred())
 	})
 }
 
