@@ -167,9 +167,13 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			serviceSecurityGroups = append(serviceSecurityGroups, cloudformation.Ref(logicalName))
 		}
 
+		desiredCount := 1
+		if service.Deploy != nil && service.Deploy.Replicas != nil {
+			desiredCount = int(*service.Deploy.Replicas)
+		}
 		template.Resources[fmt.Sprintf("%sService", normalizeResourceName(service.Name))] = &ecs.Service{
 			Cluster:      cluster,
-			DesiredCount: 1,
+			DesiredCount: desiredCount,
 			LaunchType:   ecsapi.LaunchTypeFargate,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
