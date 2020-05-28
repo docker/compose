@@ -137,6 +137,26 @@ func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0, arg1)
 }
 
+// DescribeTasks mocks base method
+func (m *MockAPI) DescribeTasks(arg0 context.Context, arg1 string, arg2 ...string) ([]TaskStatus, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DescribeTasks", varargs...)
+	ret0, _ := ret[0].([]TaskStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeTasks indicates an expected call of DescribeTasks
+func (mr *MockAPIMockRecorder) DescribeTasks(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeTasks", reflect.TypeOf((*MockAPI)(nil).DescribeTasks), varargs...)
+}
+
 // GetDefaultVPC mocks base method
 func (m *MockAPI) GetDefaultVPC(arg0 context.Context) (string, error) {
 	m.ctrl.T.Helper()
@@ -166,35 +186,15 @@ func (mr *MockAPIMockRecorder) GetLogs(arg0, arg1, arg2 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockAPI)(nil).GetLogs), arg0, arg1, arg2)
 }
 
-// GetNetworkInterfaces mocks base method
-func (m *MockAPI) GetNetworkInterfaces(arg0 context.Context, arg1 string, arg2 ...string) ([]string, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0, arg1}
-	for _, a := range arg2 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "GetNetworkInterfaces", varargs...)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetNetworkInterfaces indicates an expected call of GetNetworkInterfaces
-func (mr *MockAPIMockRecorder) GetNetworkInterfaces(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkInterfaces", reflect.TypeOf((*MockAPI)(nil).GetNetworkInterfaces), varargs...)
-}
-
 // GetPublicIPs mocks base method
-func (m *MockAPI) GetPublicIPs(arg0 context.Context, arg1 ...string) ([]string, error) {
+func (m *MockAPI) GetPublicIPs(arg0 context.Context, arg1 ...string) (map[string]string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0}
 	for _, a := range arg1 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetPublicIPs", varargs...)
-	ret0, _ := ret[0].([]string)
+	ret0, _ := ret[0].(map[string]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -236,21 +236,6 @@ func (mr *MockAPIMockRecorder) GetSubNets(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubNets", reflect.TypeOf((*MockAPI)(nil).GetSubNets), arg0, arg1)
 }
 
-// GetTasks mocks base method
-func (m *MockAPI) GetTasks(arg0 context.Context, arg1, arg2 string) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTasks", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetTasks indicates an expected call of GetTasks
-func (mr *MockAPIMockRecorder) GetTasks(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTasks", reflect.TypeOf((*MockAPI)(nil).GetTasks), arg0, arg1, arg2)
-}
-
 // InspectSecret mocks base method
 func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (docker.Secret, error) {
 	m.ctrl.T.Helper()
@@ -279,6 +264,21 @@ func (m *MockAPI) ListSecrets(arg0 context.Context) ([]docker.Secret, error) {
 func (mr *MockAPIMockRecorder) ListSecrets(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSecrets", reflect.TypeOf((*MockAPI)(nil).ListSecrets), arg0)
+}
+
+// ListTasks mocks base method
+func (m *MockAPI) ListTasks(arg0 context.Context, arg1, arg2 string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTasks", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTasks indicates an expected call of ListTasks
+func (mr *MockAPIMockRecorder) ListTasks(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTasks", reflect.TypeOf((*MockAPI)(nil).ListTasks), arg0, arg1, arg2)
 }
 
 // StackExists mocks base method

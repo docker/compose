@@ -17,39 +17,51 @@ func (c *client) ComposePs(ctx context.Context, project *compose.Project) error 
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 2, 3, ' ', 0)
 	fmt.Fprintf(w, "Name\tState\tPorts\n")
-	for _, s := range project.Services {
-		tasks, err := c.api.GetTasks(ctx, cluster, s.Name)
-		if err != nil {
-			return err
+	arns, err := c.api.ListTasks(ctx, cluster, project.Name)
+	if err != nil {
+		return err
+	}
+
+	tasks, err := c.api.DescribeTasks(ctx, cluster, arns...)
+	if err != nil {
+		return err
+	}
+
+	networkInterfaces := []string{}
+	for _, t := range tasks {
+		if t.NetworkInterface != "" {
+			networkInterfaces = append(networkInterfaces, t.NetworkInterface)
 		}
-		if len(tasks) == 0 {
-			continue
-		}
-		// TODO get more data from DescribeTask, including tasks status
-		networkInterfaces, err := c.api.GetNetworkInterfaces(ctx, cluster, tasks...)
-		if err != nil {
-			return err
-		}
-		if len(networkInterfaces) == 0 {
-			fmt.Fprintf(w, "%s\t%s\t\n", s.Name, "Provisioning")
-			continue
-		}
-		publicIps, err := c.api.GetPublicIPs(ctx, networkInterfaces...)
-		if err != nil {
-			return err
-		}
+	}
+	publicIps, err := c.api.GetPublicIPs(ctx, networkInterfaces...)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tasks {
 		ports := []string{}
-		for _, p := range s.Ports {
-			ports = append(ports, fmt.Sprintf("%s:%d->%d/%s", strings.Join(publicIps, ","), p.Published, p.Target, p.Protocol))
+		s, err := project.GetService(t.Service)
+		if err != nil {
+			return err
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\n", s.Name, "Up", strings.Join(ports, ", "))
+		for _, p := range s.Ports {
+			ports = append(ports, fmt.Sprintf("%s:%d->%d/%s", publicIps[t.NetworkInterface], p.Published, p.Target, p.Protocol))
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\n", s.Name, t.State, strings.Join(ports, ", "))
 	}
 	w.Flush()
 	return nil
 }
 
-type psAPI interface {
-	GetTasks(ctx context.Context, cluster string, name string) ([]string, error)
-	GetNetworkInterfaces(ctx context.Context, cluster string, arns ...string) ([]string, error)
-	GetPublicIPs(ctx context.Context, interfaces ...string) ([]string, error)
+type TaskStatus struct {
+	State            string
+	Service          string
+	NetworkInterface string
+	PublicIP         string
+}
+
+type listAPI interface {
+	ListTasks(ctx context.Context, cluster string, name string) ([]string, error)
+	DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]TaskStatus, error)
+	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
 }

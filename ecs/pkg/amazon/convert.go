@@ -77,7 +77,7 @@ func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDe
 			},
 		},
 		Cpu:                     cpu,
-		Family:                  fmt.Sprintf("%s-%s", project.Name, service.Name),
+		Family:                  project.Name,
 		IpcMode:                 service.Ipc,
 		Memory:                  mem,
 		NetworkMode:             ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.

@@ -341,10 +341,10 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer LogConsumer) err
 	}
 }
 
-func (s sdk) GetTasks(ctx context.Context, cluster string, name string) ([]string, error) {
+func (s sdk) ListTasks(ctx context.Context, cluster string, name string) ([]string, error) {
 	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
-		Cluster:     aws.String(cluster),
-		ServiceName: aws.String(name),
+		Cluster: aws.String(cluster),
+		Family:  aws.String(name),
 	})
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func (s sdk) GetTasks(ctx context.Context, cluster string, name string) ([]strin
 	return arns, nil
 }
 
-func (s sdk) GetNetworkInterfaces(ctx context.Context, cluster string, arns ...string) ([]string, error) {
+func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]TaskStatus, error) {
 	tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
 		Cluster: aws.String(cluster),
 		Tasks:   aws.StringSlice(arns),
@@ -364,32 +364,38 @@ func (s sdk) GetNetworkInterfaces(ctx context.Context, cluster string, arns ...s
 	if err != nil {
 		return nil, err
 	}
-	interfaces := []string{}
+	result := []TaskStatus{}
 	for _, task := range tasks.Tasks {
+		var networkInterface string
 		for _, attachement := range task.Attachments {
 			if *attachement.Type == "ElasticNetworkInterface" {
 				for _, pair := range attachement.Details {
 					if *pair.Name == "networkInterfaceId" {
-						interfaces = append(interfaces, *pair.Value)
+						networkInterface = *pair.Value
 					}
 				}
 			}
 		}
+		result = append(result, TaskStatus{
+			State:            *task.LastStatus,
+			Service:          strings.Replace(*task.Group, "service:", "", 1),
+			NetworkInterface: networkInterface,
+		})
 	}
-	return interfaces, nil
+	return result, nil
 }
 
-func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) ([]string, error) {
+func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error) {
 	desc, err := s.EC2.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
 		NetworkInterfaceIds: aws.StringSlice(interfaces),
 	})
 	if err != nil {
 		return nil, err
 	}
-	publicIPs := []string{}
+	publicIPs := map[string]string{}
 	for _, interf := range desc.NetworkInterfaces {
 		if interf.Association != nil {
-			publicIPs = append(publicIPs, *interf.Association.PublicIp)
+			publicIPs[*interf.NetworkInterfaceId] = *interf.Association.PublicIp
 		}
 	}
 	return publicIPs, nil

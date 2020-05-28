@@ -48,10 +48,10 @@ func composeUpSimpleService(t *testing.T, cmd icmd.Cmd, awsContext docker.AwsCon
 	})
 	assert.NilError(t, err)
 	sdk := amazon.NewAPI(session)
-	arns, err := sdk.GetTasks(bgContext, t.Name(), "simple")
+	arns, err := sdk.ListTasks(bgContext, t.Name(), t.Name())
 	assert.NilError(t, err)
-	networkInterfaces, err := sdk.GetNetworkInterfaces(bgContext, t.Name(), arns...)
-	publicIps, err := sdk.GetPublicIPs(context.Background(), networkInterfaces...)
+	tasks, err := sdk.DescribeTasks(bgContext, t.Name(), arns...)
+	publicIps, err := sdk.GetPublicIPs(context.Background(), tasks[0].NetworkInterface)
 	assert.NilError(t, err)
 	for _, ip := range publicIps {
 		icmd.RunCommand("curl", "-I", "http://"+ip).Assert(t, icmd.Success)
