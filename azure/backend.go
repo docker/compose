@@ -31,58 +31,53 @@ const singleContainerName = "single--container--aci"
 var ErrNoSuchContainer = errors.New("no such container")
 
 func init() {
-	backend.Register("aci", "aci", func(ctx context.Context) (backend.Service, error) {
-		return New(ctx)
-	})
+	backend.Register("aci", "aci", service, getCloudService)
 }
 
-// New creates a backend that can manage containers
-func New(ctx context.Context) (backend.Service, error) {
-	currentContext := apicontext.CurrentContext(ctx)
+func service(ctx context.Context) (backend.Service, error) {
 	contextStore := store.ContextStore(ctx)
-
+	currentContext := apicontext.CurrentContext(ctx)
 	var aciContext store.AciContext
+
 	if err := contextStore.GetEndpoint(currentContext, &aciContext); err != nil {
 		return nil, err
 	}
 
-	return getAciAPIService(aciContext)
+	return getAciAPIService(aciContext), nil
 }
 
-func getAciAPIService(aciCtx store.AciContext) (*aciAPIService, error) {
+func getCloudService() (cloud.Service, error) {
 	service, err := login.NewAzureLoginService()
 	if err != nil {
 		return nil, err
 	}
-	return &aciAPIService{
-		aciContainerService: aciContainerService{
-			ctx: aciCtx,
-		},
-		aciComposeService: aciComposeService{
-			ctx: aciCtx,
-		},
-		aciCloudService: aciCloudService{
-			loginService: service,
-		},
+	return &aciCloudService{
+		loginService: service,
 	}, nil
 }
 
+func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
+	return &aciAPIService{
+		aciContainerService: &aciContainerService{
+			ctx: aciCtx,
+		},
+		aciComposeService: &aciComposeService{
+			ctx: aciCtx,
+		},
+	}
+}
+
 type aciAPIService struct {
-	aciContainerService
-	aciComposeService
-	aciCloudService
+	*aciContainerService
+	*aciComposeService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
-	return &a.aciContainerService
+	return a.aciContainerService
 }
 
 func (a *aciAPIService) ComposeService() compose.Service {
-	return &a.aciComposeService
-}
-
-func (a *aciAPIService) CloudService() cloud.Service {
-	return &a.aciCloudService
+	return a.aciComposeService
 }
 
 type aciContainerService struct {
