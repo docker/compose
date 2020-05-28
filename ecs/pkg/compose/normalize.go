@@ -49,5 +49,34 @@ func Normalize(model *types.Config) error {
 		}
 		model.Services[i] = s
 	}
+
+	for i, n := range model.Networks {
+		if n.Name == "" {
+			n.Name = i
+			model.Networks[i] = n
+		}
+	}
+
+	for i, v := range model.Volumes {
+		if v.Name == "" {
+			v.Name = i
+			model.Volumes[i] = v
+		}
+	}
+
+	for i, c := range model.Configs {
+		if c.Name == "" {
+			c.Name = i
+			model.Configs[i] = c
+		}
+	}
+
+	for i, s := range model.Secrets {
+		if s.Name == "" {
+			s.Name = i
+			model.Secrets[i] = s
+		}
+	}
+
 	return nil
 }

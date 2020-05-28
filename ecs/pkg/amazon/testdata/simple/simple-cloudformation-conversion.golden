@@ -232,6 +232,19 @@
         }
       },
       "Type": "AWS::EC2::SecurityGroup"
+    },
+    "TestSimpleConvertDefaultNetworkIngress": {
+      "Properties": {
+        "Description": "Allow communication within network default",
+        "GroupId": {
+          "Ref": "TestSimpleConvertDefaultNetwork"
+        },
+        "IpProtocol": "-1",
+        "SourceSecurityGroupId": {
+          "Ref": "TestSimpleConvertDefaultNetwork"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
     }
   }
 }

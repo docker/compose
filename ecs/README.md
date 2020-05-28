@@ -55,11 +55,9 @@ according to the networks declared in Compose model. Doing so, services attached
 communicate together, while services from distinct SecurityGroups can't. We just can't set service aliasses per network.
 
 A CloudMap private namespace is created for application as `{project}.local`. Services get registered so that we 
-get service discovery and DNS round-robin (equivalent for Compose's `endpoint_mode: dnsrr`). Hostname-only service
-discovery is enabled by running application containers with `LOCALDOMAIN={project}.local` 
-(see [resolv.conf(5)](http://man7.org/linux/man-pages/man5/resolv.conf.5.html)). This works out-of-the-box for 
-debian-based Docker images. Alpine images have to include a tiny entrypoint script to replicate this feature:
+get service discovery and DNS round-robin (equivalent for Compose's `endpoint_mode: dnsrr`). Docker images SHOULD 
+include a tiny entrypoint script to replicate this feature:
 ```shell script
-if [ $LOCALDOMAIN ]; then echo "search ${LOCALDOMAIN}" >> /etc/resolv.conf; fi 
+if [ ! -z LOCALDOMAIN ]; then echo "search ${LOCALDOMAIN}" >> /etc/resolv.conf; fi 
 ```  
 

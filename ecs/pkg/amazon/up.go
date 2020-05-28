@@ -54,6 +54,7 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
+	fmt.Println()
 	return c.WaitStackCompletion(ctx, project.Name, StackCreate)
 }
 

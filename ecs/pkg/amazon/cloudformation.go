@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
+
 	"github.com/sirupsen/logrus"
 
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
@@ -77,9 +79,10 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	}
 	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(ParameterClusterName))
 
-	for net := range project.Networks {
-		name, resource := convertNetwork(project, net, cloudformation.Ref(ParameterVPCId))
-		template.Resources[name] = resource
+	for _, net := range project.Networks {
+		for k, v := range convertNetwork(project, net, cloudformation.Ref(ParameterVPCId)) {
+			template.Resources[k] = v
+		}
 	}
 
 	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
@@ -204,25 +207,28 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	return template, nil
 }
 
-func convertNetwork(project *compose.Project, net string, vpc string) (string, cloudformation.Resource) {
+func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc string) map[string]cloudformation.Resource {
+	resources := map[string]cloudformation.Resource{}
 	var ingresses []ec2.SecurityGroup_Ingress
-	for _, service := range project.Services {
-		if _, ok := service.Networks[net]; ok {
-			for _, port := range service.Ports {
-				ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
-					CidrIp:      "0.0.0.0/0",
-					Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
-					FromPort:    int(port.Target),
-					IpProtocol:  strings.ToUpper(port.Protocol),
-					ToPort:      int(port.Target),
-				})
+	if !net.Internal {
+		for _, service := range project.Services {
+			if _, ok := service.Networks[net.Name]; ok {
+				for _, port := range service.Ports {
+					ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
+						CidrIp:      "0.0.0.0/0",
+						Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
+						FromPort:    int(port.Target),
+						IpProtocol:  strings.ToUpper(port.Protocol),
+						ToPort:      int(port.Target),
+					})
+				}
 			}
 		}
 	}
 
-	securityGroup := networkResourceName(project, net)
-	resource := &ec2.SecurityGroup{
-		GroupDescription:     fmt.Sprintf("%s %s Security Group", project.Name, net),
+	securityGroup := networkResourceName(project, net.Name)
+	resources[securityGroup] = &ec2.SecurityGroup{
+		GroupDescription:     fmt.Sprintf("%s %s Security Group", project.Name, net.Name),
 		GroupName:            securityGroup,
 		SecurityGroupIngress: ingresses,
 		VpcId:                vpc,
@@ -233,11 +239,20 @@ func convertNetwork(project *compose.Project, net string, vpc string) (string, c
 			},
 			{
 				Key:   NetworkTag,
-				Value: net,
+				Value: net.Name,
 			},
 		},
 	}
-	return securityGroup, resource
+
+	ingress := securityGroup + "Ingress"
+	resources[ingress] = &ec2.SecurityGroupIngress{
+		Description:           fmt.Sprintf("Allow communication within network %s", net.Name),
+		IpProtocol:            "-1", // all protocols
+		GroupId:               cloudformation.Ref(securityGroup),
+		SourceSecurityGroupId: cloudformation.Ref(securityGroup),
+	}
+
+	return resources
 }
 
 func networkResourceName(project *compose.Project, network string) string {
