@@ -46,22 +46,17 @@ func New(ctx context.Context) (backend.Service, error) {
 		return nil, err
 	}
 
-	auth, _ := login.NewAuthorizerFromLogin()
-	containerGroupsClient := containerinstance.NewContainerGroupsClient(aciContext.SubscriptionID)
-	containerGroupsClient.Authorizer = auth
-
-	return getAciAPIService(containerGroupsClient, aciContext)
+	return getAciAPIService(aciContext)
 }
 
-func getAciAPIService(cgc containerinstance.ContainerGroupsClient, aciCtx store.AciContext) (*aciAPIService, error) {
+func getAciAPIService(aciCtx store.AciContext) (*aciAPIService, error) {
 	service, err := login.NewAzureLoginService()
 	if err != nil {
 		return nil, err
 	}
 	return &aciAPIService{
 		aciContainerService: aciContainerService{
-			containerGroupsClient: cgc,
-			ctx:                   aciCtx,
+			ctx: aciCtx,
 		},
 		aciComposeService: aciComposeService{
 			ctx: aciCtx,
@@ -91,13 +86,16 @@ func (a *aciAPIService) CloudService() cloud.Service {
 }
 
 type aciContainerService struct {
-	containerGroupsClient containerinstance.ContainerGroupsClient
-	ctx                   store.AciContext
+	ctx store.AciContext
 }
 
 func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.Container, error) {
+	groupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	if err != nil {
+		return nil, err
+	}
 	var containerGroups []containerinstance.ContainerGroup
-	result, err := cs.containerGroupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
+	result, err := groupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
 	if err != nil {
 		return []containers.Container{}, err
 	}
@@ -111,7 +109,7 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 
 	var res []containers.Container
 	for _, containerGroup := range containerGroups {
-		group, err := cs.containerGroupsClient.Get(ctx, cs.ctx.ResourceGroup, *containerGroup.Name)
+		group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, *containerGroup.Name)
 		if err != nil {
 			return []containers.Container{}, err
 		}
