@@ -39,7 +39,7 @@ import (
 	"github.com/docker/api/context/store"
 )
 
-// New returns a backend client
+// New returns a backend client associated with current context
 func New(ctx context.Context) (*Client, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
@@ -58,7 +58,11 @@ func New(ctx context.Context) (*Client, error) {
 		backendType: cc.Type,
 		bs:          service,
 	}, nil
+}
 
+// GetCloudService returns a backend CloudService (typically login, create context)
+func GetCloudService(ctx context.Context, backendType string) (cloud.Service, error) {
+	return backend.GetCloudService(ctx, backendType)
 }
 
 // Client is a multi-backend client
@@ -75,9 +79,4 @@ func (c *Client) ContainerService() containers.Service {
 // ComposeService returns the backend service for the current context
 func (c *Client) ComposeService() compose.Service {
 	return c.bs.ComposeService()
-}
-
-// CloudService returns the backend service for the current context
-func (c *Client) CloudService() cloud.Service {
-	return c.bs.CloudService()
 }

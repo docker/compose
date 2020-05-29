@@ -26,14 +26,12 @@ func (a *apiService) ComposeService() compose.Service {
 	return &a.composeService
 }
 
-func (a *apiService) CloudService() cloud.Service {
-	return nil
+func init() {
+	backend.Register("example", "example", service, cloud.NotImplementedCloudService)
 }
 
-func init() {
-	backend.Register("example", "example", func(ctx context.Context) (backend.Service, error) {
-		return &apiService{}, nil
-	})
+func service(ctx context.Context) (backend.Service, error) {
+	return &apiService{}, nil
 }
 
 type containerService struct{}

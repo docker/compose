@@ -19,11 +19,13 @@ var (
 )
 
 type initFunc func(context.Context) (Service, error)
+type getCloudServiceFunc func() (cloud.Service, error)
 
 type registeredBackend struct {
-	name        string
-	backendType string
-	init        initFunc
+	name            string
+	backendType     string
+	init            initFunc
+	getCloudService getCloudServiceFunc
 }
 
 var backends = struct {
@@ -34,11 +36,10 @@ var backends = struct {
 type Service interface {
 	ContainerService() containers.Service
 	ComposeService() compose.Service
-	CloudService() cloud.Service
 }
 
 // Register adds a typed backend to the registry
-func Register(name string, backendType string, init initFunc) {
+func Register(name string, backendType string, init initFunc, getCoudService getCloudServiceFunc) {
 	if name == "" {
 		logrus.Fatal(errNoName)
 	}
@@ -55,6 +56,7 @@ func Register(name string, backendType string, init initFunc) {
 		name,
 		backendType,
 		init,
+		getCoudService,
 	})
 }
 
@@ -68,4 +70,16 @@ func Get(ctx context.Context, backendType string) (Service, error) {
 	}
 
 	return nil, fmt.Errorf("backend not found for context %q", backendType)
+}
+
+// GetCloudService returns the backend registered for a particular type, it returns
+// an error if there is no registered backends for the given type.
+func GetCloudService(ctx context.Context, backendType string) (cloud.Service, error) {
+	for _, b := range backends.r {
+		if b.backendType == backendType {
+			return b.getCloudService()
+		}
+	}
+
+	return nil, fmt.Errorf("backend not found for backend type %s", backendType)
 }

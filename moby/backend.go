@@ -27,13 +27,10 @@ type mobyService struct {
 }
 
 func init() {
-	backend.Register("moby", "moby", func(ctx context.Context) (backend.Service, error) {
-		return New()
-	})
+	backend.Register("moby", "moby", service, cloud.NotImplementedCloudService)
 }
 
-// New returns a moby backend implementation
-func New() (backend.Service, error) {
+func service(ctx context.Context) (backend.Service, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
@@ -49,10 +46,6 @@ func (ms *mobyService) ContainerService() containers.Service {
 }
 
 func (ms *mobyService) ComposeService() compose.Service {
-	return nil
-}
-
-func (ms *mobyService) CloudService() cloud.Service {
 	return nil
 }
 
