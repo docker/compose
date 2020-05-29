@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -42,6 +43,10 @@ func (c *client) ComposePs(ctx context.Context, project *compose.Project) error 
 	if err != nil {
 		return err
 	}
+
+	sort.Slice(tasks, func(i, j int) bool {
+		return strings.Compare(tasks[i].Service, tasks[j].Service) < 0
+	})
 
 	for _, t := range tasks {
 		ports := []string{}
