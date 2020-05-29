@@ -23,10 +23,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-GOOS ?= $(shell go env GOOS)
-GOARCH ?= $(shell go env GOARCH)
-PWD = $(shell pwd)
-
 export DOCKER_BUILDKIT=1
 
 all: cli
