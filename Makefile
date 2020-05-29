@@ -32,16 +32,13 @@ export DOCKER_BUILDKIT=1
 all: cli
 
 protos: ## Generate go code from .proto files
-	@docker build . \
-	--output type=local,dest=./protos \
-	--target protos
+	@docker build . --target protos \
+	--output type=local,dest=./protos
 
 cli: ## Compile the cli
-	@docker build . \
-	--output type=local,dest=./bin \
-	--build-arg TARGET_OS=${GOOS} \
-	--build-arg TARGET_ARCH=${GOARCH} \
-	--target cli
+	@docker build . --target cli \
+	--platform local \
+	--output type=local,dest=./bin
 
 e2e-local: ## Run End to end local tests
 	go test -v ./tests/e2e ./moby/e2e
