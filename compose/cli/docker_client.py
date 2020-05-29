@@ -31,7 +31,7 @@ def default_cert_path():
 
 def make_context(host, options, environment):
     tls = tls_config_from_options(options, environment)
-    ctx = Context("compose", host=host)
+    ctx = Context("compose", host=host, tls=tls.verify if tls else False)
     if tls:
         ctx.set_endpoint("docker", host, tls, skip_tls_verify=not tls.verify)
     return ctx
@@ -138,7 +138,7 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         tls = kwargs.get("tls", None)
         verify = False if not tls else tls.verify
         if host:
-            context = Context("compose", host=host)
+            context = Context("compose", host=host, tls=verify)
         else:
             context = ContextAPI.get_current_context()
         if tls:
