@@ -39,8 +39,7 @@ func inspectCommand() *cobra.Command {
 		Short: "Display detailed information on one or more contexts",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			dockerclassic.Exec(cmd.Context())
-			return nil
+			return dockerclassic.ExecCmd(cmd)
 		},
 	}
 	return cmd

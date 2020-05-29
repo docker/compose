@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/spf13/cobra"
+
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
 
-// Exec will delegate the cli command to docker-classic
+// Exec delegates to docker-classic
 func Exec(ctx context.Context) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
@@ -33,4 +35,10 @@ func Exec(ctx context.Context) {
 		}
 		os.Exit(0)
 	}
+}
+
+// ExecCmd delegates the cli command to docker-classic. The error is never returned (process will exit with docker classic exit code), the return type is to make it easier to use with cobra commands
+func ExecCmd(command *cobra.Command) error {
+	Exec(command.Context())
+	return nil
 }

@@ -29,8 +29,6 @@ package context
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/docker/api/cli/cmd/context/login"
 )
 
 // Command manages contexts
@@ -46,7 +44,6 @@ func Command() *cobra.Command {
 		removeCommand(),
 		showCommand(),
 		useCommand(),
-		login.Command(),
 		inspectCommand(),
 	)
 

@@ -76,6 +76,24 @@ func (s *E2eSuite) TestContextLegacy() {
 	})
 }
 
+func (s *E2eSuite) TestClassicLoginWithparameters() {
+	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
+	Expect(err).NotTo(BeNil())
+}
+
+func (s *E2eSuite) TestClassicLogin() {
+	output, err := s.NewDockerCommand("login", "someregistry.docker.io").Exec()
+	Expect(output).To(ContainSubstring("Cannot perform an interactive login from a non TTY device"))
+	Expect(err).NotTo(BeNil())
+}
+
+func (s *E2eSuite) TestCloudLogin() {
+	output, err := s.NewDockerCommand("login", "mycloudbackend").Exec()
+	Expect(output).To(ContainSubstring("Unknown backend type for cloud login : mycloudbackend"))
+	Expect(err).NotTo(BeNil())
+}
+
 func (s *E2eSuite) TestSetupError() {
 	It("should display an error if cannot shell out to docker-classic", func() {
 		err := os.Setenv("PATH", s.BinDir)
