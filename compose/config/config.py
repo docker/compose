@@ -194,6 +194,8 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
     @cached_property
     def version(self):
         if 'version' not in self.config:
+            if 'services' not in self.config:
+                return V1
             return const.COMPOSEFILE_NO_VERSION
 
         version = self.config['version']
