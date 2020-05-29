@@ -17,9 +17,14 @@ func (c *client) ComposePs(ctx context.Context, project *compose.Project) error 
 	}
 	w := tabwriter.NewWriter(os.Stdout, 20, 2, 3, ' ', 0)
 	fmt.Fprintf(w, "Name\tState\tPorts\n")
+	defer w.Flush()
+
 	arns, err := c.api.ListTasks(ctx, cluster, project.Name)
 	if err != nil {
 		return err
+	}
+	if len(arns) == 0 {
+		return nil
 	}
 
 	tasks, err := c.api.DescribeTasks(ctx, cluster, arns...)
@@ -49,7 +54,6 @@ func (c *client) ComposePs(ctx context.Context, project *compose.Project) error 
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\n", s.Name, t.State, strings.Join(ports, ", "))
 	}
-	w.Flush()
 	return nil
 }
 
