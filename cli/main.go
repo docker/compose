@@ -32,11 +32,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/docker/api/cli/dockerclassic"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -95,7 +96,7 @@ func main() {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			runningOwnCommand = isOwnCommand(cmd)
 			if !runningOwnCommand {
-				execMoby(cmd.Context())
+				dockerclassic.Exec(cmd.Context())
 			}
 			return nil
 		},
@@ -119,7 +120,7 @@ func main() {
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		runningOwnCommand = isOwnCommand(cmd)
 		if !runningOwnCommand {
-			execMoby(cmd.Context())
+			dockerclassic.Exec(cmd.Context())
 		}
 		helpFunc(cmd, args)
 	})
@@ -161,7 +162,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		execMoby(ctx)
+		dockerclassic.Exec(ctx)
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -176,30 +177,6 @@ func newSigContext() (context.Context, func()) {
 		cancel()
 	}()
 	return ctx, cancel
-}
-
-func execMoby(ctx context.Context) {
-	currentContext := apicontext.CurrentContext(ctx)
-	s := store.ContextStore(ctx)
-
-	_, err := s.Get(currentContext)
-	// Only run original docker command if the current context is not
-	// ours.
-	if err != nil {
-		cmd := exec.CommandContext(ctx, "docker-classic", os.Args[1:]...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			if exiterr, ok := err.(*exec.ExitError); ok {
-				fmt.Fprintln(os.Stderr, exiterr.Error())
-				os.Exit(exiterr.ExitCode())
-			}
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
 }
 
 func determineCurrentContext(flag string, configDir string) (string, error) {

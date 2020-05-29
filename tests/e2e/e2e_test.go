@@ -69,6 +69,13 @@ func (s *E2eSuite) TestContextDefault() {
 	})
 }
 
+func (s *E2eSuite) TestContextLegacy() {
+	It("should inspect default", func() {
+		output := s.NewDockerCommand("context", "inspect", "default").ExecOrDie()
+		Expect(output).To(ContainSubstring(`"Name": "default"`))
+	})
+}
+
 func (s *E2eSuite) TestSetupError() {
 	It("should display an error if cannot shell out to docker-classic", func() {
 		err := os.Setenv("PATH", s.BinDir)

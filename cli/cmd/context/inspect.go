@@ -28,27 +28,20 @@
 package context
 
 import (
-	"github.com/spf13/cobra"
+	"github.com/docker/api/cli/dockerclassic"
 
-	"github.com/docker/api/cli/cmd/context/login"
+	"github.com/spf13/cobra"
 )
 
-// Command manages contexts
-func Command() *cobra.Command {
+func inspectCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "context",
-		Short: "Manage contexts",
+		Use:   "inspect",
+		Short: "Display detailed information on one or more contexts",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dockerclassic.Exec(cmd.Context())
+			return nil
+		},
 	}
-
-	cmd.AddCommand(
-		createCommand(),
-		listCommand(),
-		removeCommand(),
-		showCommand(),
-		useCommand(),
-		login.Command(),
-		inspectCommand(),
-	)
-
 	return cmd
 }
