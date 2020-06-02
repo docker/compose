@@ -268,28 +268,33 @@ func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	return subc, nil
 }
 
-// GetGroupsClient ...
-func GetGroupsClient(subscriptionID string) resources.GroupsClient {
+func getGroupsClient(subscriptionID string) resources.GroupsClient {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
 	authorizer, _ := login.NewAuthorizerFromLogin()
 	groupsClient.Authorizer = authorizer
 	return groupsClient
 }
 
-// GetSubscriptionID ...
-func GetSubscriptionID(ctx context.Context) (string, error) {
+func getSubscriptionIDs(ctx context.Context) ([]subscription.Model, error) {
 	c, err := getSubscriptionsClient()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	res, err := c.List(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	subs := res.Values()
+
 	if len(subs) == 0 {
-		return "", errors.New("no subscriptions found")
+		return nil, errors.New("no subscriptions found")
 	}
-	sub := subs[0]
-	return *sub.SubscriptionID, nil
+	for res.NotDone() {
+		err = res.NextWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		subs = append(subs, res.Values()...)
+	}
+	return subs, nil
 }

@@ -30,12 +30,17 @@ package context
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
+	"github.com/docker/api/client"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/context/store"
 )
 
-type createOpts struct {
+// AciCreateOpts Options for ACI context create
+type AciCreateOpts struct {
 	description       string
 	aciLocation       string
 	aciSubscriptionID string
@@ -43,7 +48,7 @@ type createOpts struct {
 }
 
 func createCommand() *cobra.Command {
-	var opts createOpts
+	var opts AciCreateOpts
 	cmd := &cobra.Command{
 		Use:   "create CONTEXT BACKEND [OPTIONS]",
 		Short: "Create a context",
@@ -61,13 +66,36 @@ func createCommand() *cobra.Command {
 	return cmd
 }
 
-func runCreate(ctx context.Context, opts createOpts, name string, contextType string) error {
+func runCreate(ctx context.Context, opts AciCreateOpts, name string, contextType string) error {
+	var description string
+	var contextData interface{}
+
 	switch contextType {
 	case "aci":
-		return createACIContext(ctx, name, opts)
-	default:
-		s := store.ContextStore(ctx)
-		// TODO: we need to implement different contexts for known backends
-		return s.Create(name, contextType, opts.description, store.ExampleContext{})
+		cs, err := client.GetCloudService(ctx, "aci")
+		if err != nil {
+			return errors.Wrap(err, "cannot connect to backend")
+		}
+		params := map[string]string{
+			"aciSubscriptionId": opts.aciSubscriptionID,
+			"aciResourceGroup":  opts.aciResourceGroup,
+			"aciLocation":       opts.aciLocation,
+			"description":       opts.description,
+		}
+		contextData, description, err = cs.CreateContextData(ctx, params)
+		if err != nil {
+			return errors.Wrap(err, "cannot create context")
+		}
+	default: // TODO: we need to implement different contexts for known backends
+		description = opts.description
+		contextData = store.ExampleContext{}
 	}
+
+	s := store.ContextStore(ctx)
+	return s.Create(
+		name,
+		contextType,
+		description,
+		contextData,
+	)
 }

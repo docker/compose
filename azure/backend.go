@@ -282,3 +282,7 @@ type aciCloudService struct {
 func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
 	return cs.loginService.Login(ctx)
 }
+
+func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {
+	return createContextData(ctx, params, cliUserSelector{})
+}
