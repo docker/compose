@@ -11,7 +11,6 @@ type Warnings []string
 type CompatibilityChecker interface {
 	CheckService(service *types.ServiceConfig)
 	CheckCapAdd(service *types.ServiceConfig)
-	CheckDependsOn(service *types.ServiceConfig)
 	CheckDNS(service *types.ServiceConfig)
 	CheckDNSOpts(service *types.ServiceConfig)
 	CheckDNSSearch(service *types.ServiceConfig)

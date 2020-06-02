@@ -174,10 +174,16 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		if service.Deploy != nil && service.Deploy.Replicas != nil {
 			desiredCount = int(*service.Deploy.Replicas)
 		}
-		template.Resources[fmt.Sprintf("%sService", normalizeResourceName(service.Name))] = &ecs.Service{
-			Cluster:      cluster,
-			DesiredCount: desiredCount,
-			LaunchType:   ecsapi.LaunchTypeFargate,
+
+		dependsOn := []string{}
+		for _, dependency := range service.DependsOn {
+			dependsOn = append(dependsOn, serviceResourceName(dependency))
+		}
+		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
+			AWSCloudFormationDependsOn: dependsOn,
+			Cluster:                    cluster,
+			DesiredCount:               desiredCount,
+			LaunchType:                 ecsapi.LaunchTypeFargate,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
@@ -257,6 +263,10 @@ func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc strin
 
 func networkResourceName(project *compose.Project, network string) string {
 	return fmt.Sprintf("%s%sNetwork", normalizeResourceName(project.Name), normalizeResourceName(network))
+}
+
+func serviceResourceName(dependency string) string {
+	return fmt.Sprintf("%sService", normalizeResourceName(dependency))
 }
 
 func normalizeResourceName(s string) string {

@@ -21,7 +21,6 @@ func (c *FargateCompatibilityChecker) Errors() []error {
 
 func (c *FargateCompatibilityChecker) CheckService(service *types.ServiceConfig) {
 	c.CheckCapAdd(service)
-	c.CheckDependsOn(service)
 	c.CheckDNS(service)
 	c.CheckDNSOpts(service)
 	c.CheckDNSSearch(service)
@@ -45,13 +44,6 @@ func (c *FargateCompatibilityChecker) CheckNetworkMode(service *types.ServiceCon
 		c.error("'network_mode' %q is not supported", service.NetworkMode)
 	}
 	service.NetworkMode = ecs.NetworkModeAwsvpc
-}
-
-func (c *FargateCompatibilityChecker) CheckDependsOn(service *types.ServiceConfig) {
-	if len(service.DependsOn) != 0 {
-		c.error("'depends_on' is not supported")
-		service.DependsOn = nil
-	}
 }
 
 func (c *FargateCompatibilityChecker) CheckLinks(service *types.ServiceConfig) {
