@@ -20,9 +20,13 @@ func (c *client) ComposePs(ctx context.Context, project *compose.Project) error 
 	fmt.Fprintf(w, "Name\tState\tPorts\n")
 	defer w.Flush()
 
-	arns, err := c.api.ListTasks(ctx, cluster, project.Name)
-	if err != nil {
-		return err
+	arns := []string{}
+	for _, service := range project.Services {
+		tasks, err := c.api.ListTasks(ctx, cluster, service.Name)
+		if err != nil {
+			return err
+		}
+		arns = append(arns, tasks...)
 	}
 	if len(arns) == 0 {
 		return nil

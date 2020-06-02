@@ -181,7 +181,7 @@
         "ExecutionRoleArn": {
           "Ref": "SimpleTaskExecutionRole"
         },
-        "Family": "TestSimpleWithOverrides",
+        "Family": "TestSimpleWithOverrides-simple",
         "Memory": "512",
         "NetworkMode": "awsvpc",
         "RequiresCompatibilities": [

@@ -181,7 +181,7 @@
         "ExecutionRoleArn": {
           "Ref": "SimpleTaskExecutionRole"
         },
-        "Family": "TestSimpleConvert",
+        "Family": "TestSimpleConvert-simple",
         "Memory": "512",
         "NetworkMode": "awsvpc",
         "RequiresCompatibilities": [

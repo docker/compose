@@ -341,10 +341,10 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer LogConsumer) err
 	}
 }
 
-func (s sdk) ListTasks(ctx context.Context, cluster string, name string) ([]string, error) {
+func (s sdk) ListTasks(ctx context.Context, cluster string, service string) ([]string, error) {
 	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
-		Cluster: aws.String(cluster),
-		Family:  aws.String(name),
+		Cluster:     aws.String(cluster),
+		ServiceName: aws.String(service),
 	})
 	if err != nil {
 		return nil, err
