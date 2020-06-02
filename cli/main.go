@@ -37,6 +37,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/api/cli/cmd/login"
+
 	"github.com/docker/api/cli/dockerclassic"
 
 	"github.com/pkg/errors"
@@ -60,6 +62,11 @@ import (
 
 var (
 	runningOwnCommand bool
+	ownCommands       = map[string]struct{}{
+		"context": {},
+		"login":   {},
+		"serve":   {},
+	}
 )
 
 func init() {
@@ -80,7 +87,7 @@ func isOwnCommand(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	if cmd.Name() == "context" || cmd.Name() == "serve" {
+	if _, ok := ownCommands[cmd.Name()]; ok {
 		return true
 	}
 	return isOwnCommand(cmd.Parent())
@@ -114,6 +121,7 @@ func main() {
 		cmd.LogsCommand(),
 		cmd.RmCommand(),
 		compose.Command(),
+		login.Command(),
 	)
 
 	helpFunc := root.HelpFunc()

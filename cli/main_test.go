@@ -33,6 +33,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/docker/api/cli/cmd"
+	"github.com/docker/api/cli/cmd/context"
+	"github.com/docker/api/cli/cmd/login"
+	"github.com/docker/api/cli/cmd/run"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/api/cli/config"
@@ -69,4 +74,14 @@ func TestDetermineCurrentContext(t *testing.T) {
 	c, err = determineCurrentContext("other-context", d)
 	require.NoError(t, err)
 	require.Equal(t, "other-context", c)
+}
+
+func TestCheckOwnCommand(t *testing.T) {
+	require.True(t, isOwnCommand(login.Command()))
+	require.True(t, isOwnCommand(context.Command()))
+	require.True(t, isOwnCommand(cmd.ServeCommand()))
+	require.False(t, isOwnCommand(run.Command()))
+	require.False(t, isOwnCommand(cmd.ExecCommand()))
+	require.False(t, isOwnCommand(cmd.LogsCommand()))
+	require.False(t, isOwnCommand(cmd.PsCommand()))
 }
