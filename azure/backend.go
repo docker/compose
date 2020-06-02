@@ -284,5 +284,6 @@ func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) 
 }
 
 func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {
-	return createContextData(ctx, params, cliUserSelector{})
+	contextHelper := newContextCreateHelper()
+	return contextHelper.createContextData(ctx, params)
 }

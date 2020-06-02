@@ -30,53 +30,59 @@ package azure
 import (
 	"context"
 	"fmt"
-
-	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
-
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
-
-	"github.com/docker/api/context/store"
-
+	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/tj/survey/terminal"
+
+	"github.com/docker/api/context/store"
 )
 
-func createContextData(ctx context.Context, opts map[string]string, selector userSelector) (interface{}, string, error) {
+type contextCreateACIHelper struct {
+	selector            userSelector
+	resourceGroupHelper ACIResourceGroupHelper
+}
+
+func newContextCreateHelper() contextCreateACIHelper {
+	return contextCreateACIHelper{
+		selector:            cliUserSelector{},
+		resourceGroupHelper: aciResourceGroupHelperImpl{},
+	}
+}
+
+func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts map[string]string) (interface{}, string, error) {
 	var subscriptionID string
 	if opts["aciSubscriptionID"] != "" {
 		subscriptionID = opts["aciSubscriptionID"]
 	} else {
-		subs, err := getSubscriptionIDs(ctx)
+		subs, err := helper.resourceGroupHelper.GetSubscriptionIDs(ctx)
 		if err != nil {
 			return nil, "", err
 		}
-		subscriptionID, err = chooseSub(subs, selector)
+		subscriptionID, err = helper.chooseSub(subs)
 		if err != nil {
 			return nil, "", err
 		}
 	}
 
-	gc := getGroupsClient(subscriptionID)
 	var group resources.Group
 	var err error
 
 	if opts["aciResourceGroup"] != "" {
-		group, err = gc.Get(ctx, opts["aciResourceGroup"])
+		group, err = helper.resourceGroupHelper.GetGroup(ctx, subscriptionID, opts["aciResourceGroup"])
 		if err != nil {
 			return nil, "", errors.Wrapf(err, "Could not find resource group %q", opts["aciResourceGroup"])
 		}
 	} else {
-		groupResponse, err := gc.List(ctx, "", nil)
+		groups, err := helper.resourceGroupHelper.ListGroups(ctx, subscriptionID)
 		if err != nil {
 			return nil, "", err
 		}
-
-		groups := groupResponse.Values()
-		group, err = chooseGroup(ctx, gc, opts, groups, selector)
+		group, err = helper.chooseGroup(ctx, subscriptionID, opts, groups)
 		if err != nil {
 			return nil, "", err
 		}
@@ -99,12 +105,12 @@ func createContextData(ctx context.Context, opts map[string]string, selector use
 	}, description, nil
 }
 
-func createGroup(ctx context.Context, gc resources.GroupsClient, location string) (resources.Group, error) {
+func (helper contextCreateACIHelper) createGroup(ctx context.Context, subscriptionID, location string) (resources.Group, error) {
 	if location == "" {
 		location = "eastus"
 	}
 	gid := uuid.New().String()
-	g, err := gc.CreateOrUpdate(ctx, gid, resources.Group{
+	g, err := helper.resourceGroupHelper.CreateOrUpdate(ctx, subscriptionID, gid, resources.Group{
 		Location: &location,
 	})
 	if err != nil {
@@ -116,13 +122,13 @@ func createGroup(ctx context.Context, gc resources.GroupsClient, location string
 	return g, nil
 }
 
-func chooseGroup(ctx context.Context, gc resources.GroupsClient, opts map[string]string, groups []resources.Group, selector userSelector) (resources.Group, error) {
+func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscriptionID string, opts map[string]string, groups []resources.Group) (resources.Group, error) {
 	groupNames := []string{"create a new resource group"}
 	for _, g := range groups {
 		groupNames = append(groupNames, fmt.Sprintf("%s (%s)", *g.Name, *g.Location))
 	}
 
-	group, err := selector.userSelect("Choose a resource group", groupNames)
+	group, err := helper.selector.userSelect("Select a resource group", groupNames)
 	if err != nil {
 		if err == terminal.InterruptErr {
 			os.Exit(0)
@@ -132,13 +138,13 @@ func chooseGroup(ctx context.Context, gc resources.GroupsClient, opts map[string
 	}
 
 	if group == 0 {
-		return createGroup(ctx, gc, opts["aciLocation"])
+		return helper.createGroup(ctx, subscriptionID, opts["aciLocation"])
 	}
 
 	return groups[group-1], nil
 }
 
-func chooseSub(subs []subscription.Model, selector userSelector) (string, error) {
+func (helper contextCreateACIHelper) chooseSub(subs []subscription.Model) (string, error) {
 	if len(subs) == 1 {
 		sub := subs[0]
 		fmt.Println("Using only available subscription : " + *sub.DisplayName + "(" + *sub.SubscriptionID + ")")
@@ -148,7 +154,7 @@ func chooseSub(subs []subscription.Model, selector userSelector) (string, error)
 	for _, sub := range subs {
 		options = append(options, *sub.DisplayName+"("+*sub.SubscriptionID+")")
 	}
-	selected, err := selector.userSelect("Select a subscription ID", options)
+	selected, err := helper.selector.userSelect("Select a subscription ID", options)
 	if err != nil {
 		if err == terminal.InterruptErr {
 			os.Exit(0)

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -25,7 +26,7 @@ func CreateStorageAccount(ctx context.Context, aciContext store.AciContext, acco
 		return storage.Account{}, err
 	}
 	if !*result.NameAvailable {
-		return storage.Account{}, err
+		return storage.Account{}, errors.New("storage account name already exists" + accountName)
 	}
 
 	future, err := storageAccountsClient.Create(

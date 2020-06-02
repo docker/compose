@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/api/azure"
+
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/azure-storage-file-go/azfile"
@@ -63,7 +65,8 @@ func (s *E2eACISuite) TestContextDefault() {
 func (s *E2eACISuite) TestACIBackend() {
 	It("creates a new aci context for tests", func() {
 		setupTestResourceGroup(resourceGroupName)
-		models, err := azure.getSubscriptionIDs(context.TODO())
+		helper := azure.NewACIResourceGroupHelper()
+		models, err := helper.GetSubscriptionIDs(context.TODO())
 		Expect(err).To(BeNil())
 		subscriptionID = *models[0].SubscriptionID
 
@@ -172,13 +175,14 @@ func (s *E2eACISuite) TestACIBackend() {
 }
 
 const (
-	testStorageAccountName = "dockertestaccountname"
-	testShareName          = "dockertestsharename"
+	testStorageAccountName = "dockertestaccount"
+	testShareName          = "dockertestshare"
 	testFileContent        = "Volume mounted with success!"
 	testFileName           = "index.html"
 )
 
 func createStorageAccount(aciContext store.AciContext, accountName string) azure_storage.Account {
+	log.Println("Creating storage account " + accountName)
 	storageAccount, err := storage.CreateStorageAccount(context.TODO(), aciContext, accountName)
 	Expect(err).To(BeNil())
 	Expect(*storageAccount.Name).To(Equal(accountName))
@@ -195,6 +199,7 @@ func getStorageKeys(aciContext store.AciContext, storageAccountName string) []az
 }
 
 func deleteStorageAccount(aciContext store.AciContext) {
+	log.Println("Deleting storage account " + testStorageAccountName)
 	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, testStorageAccountName)
 	Expect(err).To(BeNil())
 }
@@ -227,10 +232,10 @@ func TestE2eACI(t *testing.T) {
 func setupTestResourceGroup(groupName string) {
 	log.Println("Creating resource group " + resourceGroupName)
 	ctx := context.TODO()
-	models, err := azure.getSubscriptionIDs(ctx)
+	helper := azure.NewACIResourceGroupHelper()
+	models, err := helper.GetSubscriptionIDs(ctx)
 	Expect(err).To(BeNil())
-	gc := azure.getGroupsClient(*models[0].SubscriptionID)
-	_, err = gc.CreateOrUpdate(ctx, groupName, resources.Group{
+	_, err = helper.CreateOrUpdate(ctx, *models[0].SubscriptionID, groupName, resources.Group{
 		Location: to.StringPtr(location),
 	})
 	Expect(err).To(BeNil())
@@ -239,9 +244,9 @@ func setupTestResourceGroup(groupName string) {
 func deleteResourceGroup(groupName string) {
 	log.Println("Deleting resource group " + resourceGroupName)
 	ctx := context.TODO()
-	models, err := azure.getSubscriptionIDs(ctx)
+	helper := azure.NewACIResourceGroupHelper()
+	models, err := helper.GetSubscriptionIDs(ctx)
 	Expect(err).To(BeNil())
-	gc := azure.getGroupsClient(*models[0].SubscriptionID)
-	_, err = gc.Delete(ctx, groupName)
+	err = helper.Delete(ctx, *models[0].SubscriptionID, groupName)
 	Expect(err).To(BeNil())
 }
