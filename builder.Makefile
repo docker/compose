@@ -23,21 +23,21 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH
 # THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-GOOS ?= $(shell go env GOOS)
-GOARCH ?= $(shell go env GOARCH)
+GOOS?=$(shell go env GOOS)
+GOARCH?=$(shell go env GOARCH)
 
 PROTOS=$(shell find protos -name \*.proto)
 
-EXTENSION :=
+EXTENSION:=
 ifeq ($(GOOS),windows)
-  EXTENSION := .exe
+  EXTENSION:=.exe
 endif
 
 STATIC_FLAGS=CGO_ENABLED=0
-LDFLAGS := "-s -w"
-GO_BUILD = $(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
+LDFLAGS:="-s -w"
+GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
-BINARY=bin/docker
+BINARY?=bin/docker
 BINARY_WITH_EXTENSION=$(BINARY)$(EXTENSION)
 
 all: cli
