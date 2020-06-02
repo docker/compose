@@ -29,12 +29,12 @@ all: cli
 
 protos: ## Generate go code from .proto files
 	@docker build . --target protos \
-	--output type=local,dest=./protos
+	--output ./protos
 
 cli: ## Compile the cli
 	@docker build . --target cli \
 	--platform local \
-	--output type=local,dest=./bin
+	--output ./bin
 
 e2e-local: ## Run End to end local tests
 	go test -v ./tests/e2e ./moby/e2e
@@ -43,20 +43,17 @@ e2e-aci: ## Run End to end ACI tests (requires azure login)
 	go test -v ./tests/aci-e2e
 
 cross: ## Compile the CLI for linux, darwin and windows
-	@docker build . \
-	--output type=local,dest=./bin \
-	--target cross
+	@docker build . --target cross \
+	--output ./bin \
 
 test: ## Run unit tests
-	@docker build . \
-	--target test
+	@docker build . --target test
 
 cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	@docker build . \
-	--target lint
+	@docker build . --target lint
 
 classic-link: ## create docker-classic symlink if does not already exist
 	ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker-classic
