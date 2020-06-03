@@ -97,6 +97,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		Name:        fmt.Sprintf("%s.local", project.Name),
 		Vpc:         cloudformation.Ref(ParameterVPCId),
 	}
+	//map LB type to security groups list
+	loadBalancers := map[string][]string{}
 
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
@@ -168,7 +170,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		}
 
 		dependsOn := []string{}
-		loadBalancers := []ecs.Service_LoadBalancer{}
+		serviceLB := []ecs.Service_LoadBalancer{}
 		if len(service.Ports) > 0 {
 			for _, port := range service.Ports {
 				loadBalancerType := "network"
@@ -191,26 +193,12 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					strings.Title(project.Name),
 					strings.ToUpper(loadBalancerType[0:1]),
 				)
-				// create load baalncer if it doesn't exist
-				if _, ok := template.Resources[loadBalancerName]; !ok {
-
-					template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
-						Name:           loadBalancerName,
-						Scheme:         "internet-facing",
-						SecurityGroups: loadBalancerSecGroups,
-						Subnets: []string{
-							cloudformation.Ref(ParameterSubnet1Id),
-							cloudformation.Ref(ParameterSubnet2Id),
-						},
-						Tags: []tags.Tag{
-							{
-								Key:   ProjectTag,
-								Value: project.Name,
-							},
-						},
-						Type: loadBalancerType,
-					}
+				// create load balancer if it doesn't exist
+				if _, ok := loadBalancers[loadBalancerType]; !ok {
+					loadBalancers[loadBalancerType] = []string{}
 				}
+				loadBalancers[loadBalancerType] = append(loadBalancers[loadBalancerType], loadBalancerSecGroups...)
+
 				targetGroupName := fmt.Sprintf(
 					"%s%s%sTargetGroup",
 					normalizeResourceName(service.Name),
@@ -257,7 +245,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					Port:            int(port.Published),
 				}
 
-				loadBalancers = append(loadBalancers, ecs.Service_LoadBalancer{
+				serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
 					ContainerName:  service.Name,
 					ContainerPort:  int(port.Published),
 					TargetGroupArn: cloudformation.Ref(targetGroupName),
@@ -278,7 +266,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			Cluster:                    cluster,
 			DesiredCount:               desiredCount,
 			LaunchType:                 ecsapi.LaunchTypeFargate,
-			LoadBalancers:              loadBalancers,
+			LoadBalancers:              serviceLB,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
@@ -303,6 +291,32 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 				},
 			},
 			TaskDefinition: cloudformation.Ref(normalizeResourceName(taskDefinition)),
+		}
+	}
+
+	// create LBs
+	for lbType, lbSecGroups := range loadBalancers {
+		loadBalancerName := fmt.Sprintf(
+			"%s%sLB",
+			strings.Title(project.Name),
+			strings.ToUpper(lbType[0:1]),
+		)
+
+		template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
+			Name:           loadBalancerName,
+			Scheme:         "internet-facing",
+			SecurityGroups: lbSecGroups,
+			Subnets: []string{
+				cloudformation.Ref(ParameterSubnet1Id),
+				cloudformation.Ref(ParameterSubnet2Id),
+			},
+			Tags: []tags.Tag{
+				{
+					Key:   ProjectTag,
+					Value: project.Name,
+				},
+			},
+			Type: lbType,
 		}
 	}
 	return template, nil
