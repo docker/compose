@@ -2,8 +2,6 @@ Docker Compose
 ==============
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
-## :exclamation: The docker-compose project announces that as Python 2 has reached its EOL, versions 1.26.x will be the last to support it. For more information, please refer to this [issue](https://github.com/docker/compose/issues/6890).
-
 Compose is a tool for defining and running multi-container Docker applications.
 With Compose, you use a Compose file to configure your application's services.
 Then, using a single command, you create and start all the services
