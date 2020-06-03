@@ -9,12 +9,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
@@ -144,13 +146,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
 		}
 
-		if len(service.Ports) > 0 {
-			records = append(records, cloudmap.Service_DnsRecord{
-				TTL:  60,
-				Type: cloudmapapi.RecordTypeSrv,
-			})
-			serviceRegistry.Port = int(service.Ports[0].Target)
-		}
+		loadBalancers := []ecs.Service_LoadBalancer{}
 
 		template.Resources[serviceRegistration] = &cloudmap.Service{
 			Description:       fmt.Sprintf("%q service discovery entry in Cloud Map", service.Name),
@@ -168,12 +164,118 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			serviceSecurityGroups = append(serviceSecurityGroups, networks[net])
 		}
 
+		dependsOn := []string{}
+		if len(service.Ports) > 0 {
+			records = append(records, cloudmap.Service_DnsRecord{
+				TTL:  60,
+				Type: cloudmapapi.RecordTypeSrv,
+			})
+			//serviceRegistry.Port = int(service.Ports[0].Target)
+			// add targetgroup for each published port
+			for _, port := range service.Ports {
+				targetGroupName := fmt.Sprintf(
+					"%s%s%sTargetGroup",
+					normalizeResourceName(service.Name),
+					strings.ToUpper(port.Protocol),
+					string(port.Published),
+				)
+				listenerName := fmt.Sprintf(
+					"%s%s%sListener",
+					normalizeResourceName(service.Name),
+					strings.ToUpper(port.Protocol),
+					string(port.Published),
+				)
+				loadBalancerName := fmt.Sprintf(
+					"%s%s%sLoadBalancer",
+					normalizeResourceName(service.Name),
+					strings.ToUpper(port.Protocol),
+					string(port.Published),
+				)
+				dependsOn = append(dependsOn, listenerName)
+				lbType := "network"
+				lbSecGroups := []string{}
+				protocolType := strings.ToUpper(port.Protocol)
+				targetType := elbv2.TargetTypeEnumInstance
+				if port.Published == 80 || port.Published == 443 {
+					lbType = "application"
+					lbSecGroups = serviceSecurityGroups
+					protocolType = "HTTPS"
+					targetType = elbv2.TargetTypeEnumIp
+					if port.Published == 80 {
+						protocolType = "HTTP"
+					}
+				}
+
+				template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
+					Name:     targetGroupName,
+					Port:     int(port.Target),
+					Protocol: protocolType,
+					Tags: []tags.Tag{
+						{
+							Key:   ProjectTag,
+							Value: project.Name,
+						},
+						{
+							Key:   ServiceTag,
+							Value: service.Name,
+						},
+					},
+					VpcId:      cloudformation.Ref(ParameterVPCId),
+					TargetType: targetType,
+				}
+
+				template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
+					Name:           loadBalancerName,
+					Scheme:         "internet-facing",
+					SecurityGroups: lbSecGroups,
+					Subnets: []string{
+						cloudformation.Ref(ParameterSubnet1Id),
+						cloudformation.Ref(ParameterSubnet2Id),
+					},
+					Tags: []tags.Tag{
+						{
+							Key:   ProjectTag,
+							Value: project.Name,
+						},
+						{
+							Key:   ServiceTag,
+							Value: service.Name,
+						},
+					},
+					Type: lbType,
+				}
+
+				template.Resources[listenerName] = &elasticloadbalancingv2.Listener{
+					DefaultActions: []elasticloadbalancingv2.Listener_Action{
+						{
+							ForwardConfig: &elasticloadbalancingv2.Listener_ForwardConfig{
+								TargetGroups: []elasticloadbalancingv2.Listener_TargetGroupTuple{
+									{
+										TargetGroupArn: cloudformation.Ref(targetGroupName),
+									},
+								},
+							},
+							Type: elbv2.ActionTypeEnumForward,
+						},
+					},
+					LoadBalancerArn: cloudformation.Ref(loadBalancerName),
+					Protocol:        protocolType,
+					Port:            int(port.Published),
+				}
+
+				loadBalancers = append(loadBalancers, ecs.Service_LoadBalancer{
+					ContainerName:  service.Name,
+					ContainerPort:  int(port.Published),
+					TargetGroupArn: cloudformation.Ref(targetGroupName),
+				})
+			}
+		}
+
 		desiredCount := 1
 		if service.Deploy != nil && service.Deploy.Replicas != nil {
 			desiredCount = int(*service.Deploy.Replicas)
 		}
 
-		dependsOn := []string{}
 		for _, dependency := range service.DependsOn {
 			dependsOn = append(dependsOn, serviceResourceName(dependency))
 		}
@@ -182,6 +284,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			Cluster:                    cluster,
 			DesiredCount:               desiredCount,
 			LaunchType:                 ecsapi.LaunchTypeFargate,
+			LoadBalancers:              loadBalancers,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
