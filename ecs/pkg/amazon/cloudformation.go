@@ -236,6 +236,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					strings.ToUpper(port.Protocol),
 					string(port.Published),
 				)
+				//add listener to dependsOn
+				//https://stackoverflow.com/questions/53971873/the-target-group-does-not-have-an-associated-load-balancer
 				dependsOn = append(dependsOn, listenerName)
 				template.Resources[listenerName] = &elasticloadbalancingv2.Listener{
 					DefaultActions: []elasticloadbalancingv2.Listener_Action{
