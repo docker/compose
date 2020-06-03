@@ -1080,7 +1080,7 @@ class TopLevelCommand(object):
                 log.error(
                     "The image for the service you're trying to recreate has been removed. "
                     "If you continue, volume data could be lost. Consider backing up your data "
-                    "before continuing.\n".format(e.explanation)
+                    "before continuing.\n"
                 )
                 res = yesno("Continue with the new image? [yN]", False)
                 if res is None or not res:
