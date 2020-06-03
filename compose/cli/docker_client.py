@@ -2,7 +2,6 @@ import logging
 import os.path
 import ssl
 
-import six
 from docker import APIClient
 from docker import Context
 from docker import ContextAPI
@@ -44,7 +43,7 @@ def get_client(environment, verbose=False, version=None, context=None):
         environment=environment, tls_version=get_tls_version(environment)
     )
     if verbose:
-        version_info = six.iteritems(client.version())
+        version_info = client.version().items()
         log.info(get_version_info('full'))
         log.info("Docker base_url: %s", client.base_url)
         log.info("Docker version: %s",
