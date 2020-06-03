@@ -1,3 +1,4 @@
+import contextlib
 import os
 
 from compose.config.config import ConfigDetails
