@@ -3,6 +3,7 @@ module github.com/docker/api
 go 1.14
 
 require (
+	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
 	github.com/Azure/azure-storage-file-go v0.7.0
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
@@ -24,6 +25,7 @@ require (
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.3
 	github.com/golang/protobuf v1.4.1
+	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.0
@@ -38,6 +40,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
+	github.com/tj/survey v2.0.6+incompatible
 	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 // indirect

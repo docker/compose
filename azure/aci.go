@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
-	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -20,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/docker/api/azure/login"
-	"github.com/docker/api/errdefs"
-
 	"github.com/docker/api/context/store"
 )
 
@@ -256,40 +252,4 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 	containerClient := containerinstance.NewContainerClient(subscriptionID)
 	containerClient.Authorizer = auth
 	return containerClient, nil
-}
-
-func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
-	subc := subscription.NewSubscriptionsClient()
-	authorizer, err := login.NewAuthorizerFromLogin()
-	if err != nil {
-		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginFailed, err.Error())
-	}
-	subc.Authorizer = authorizer
-	return subc, nil
-}
-
-// GetGroupsClient ...
-func GetGroupsClient(subscriptionID string) resources.GroupsClient {
-	groupsClient := resources.NewGroupsClient(subscriptionID)
-	authorizer, _ := login.NewAuthorizerFromLogin()
-	groupsClient.Authorizer = authorizer
-	return groupsClient
-}
-
-// GetSubscriptionID ...
-func GetSubscriptionID(ctx context.Context) (string, error) {
-	c, err := getSubscriptionsClient()
-	if err != nil {
-		return "", err
-	}
-	res, err := c.List(ctx)
-	if err != nil {
-		return "", err
-	}
-	subs := res.Values()
-	if len(subs) == 0 {
-		return "", errors.New("no subscriptions found")
-	}
-	sub := subs[0]
-	return *sub.SubscriptionID, nil
 }
