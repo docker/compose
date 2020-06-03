@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.26.0 (2020-04-29)
+1.26.0 (2020-06-03)
 -------------------
 
 ### Features
@@ -18,6 +18,8 @@ Change log
 
 - Bump `OpenSSL` from 1.1.1f to 1.1.1g
 
+- Bump `docker-py` from 4.2.0 to 4.2.1
+
 ### Bugs
 
 - Properly escape values coming from env_files
@@ -31,6 +33,8 @@ Change log
 - Don't adjust output on terminal width when piped into another command
 
 - Show an error message when `version` attribute is malformed
+
+- Fix HTTPS connection when DOCKER_HOST is remote
 
 1.25.5 (2020-02-04)
 -------------------
