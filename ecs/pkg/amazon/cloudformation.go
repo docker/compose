@@ -57,11 +57,11 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	*/
 	template.Parameters[ParameterSubnet1Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
-		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
+		Description: "SubnetId, for Availability Zone 1 in the region in your VPC",
 	}
 	template.Parameters[ParameterSubnet2Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
-		Description: "SubnetId,for Availability Zone 1 in the region in your VPC",
+		Description: "SubnetId, for Availability Zone 2 in the region in your VPC",
 	}
 
 	// Create Cluster is `ParameterClusterName` parameter is not set
@@ -79,10 +79,9 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	}
 	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(ParameterClusterName))
 
+	networks := map[string]string{}
 	for _, net := range project.Networks {
-		for k, v := range convertNetwork(project, net, cloudformation.Ref(ParameterVPCId)) {
-			template.Resources[k] = v
-		}
+		networks[net.Name] = convertNetwork(project, net, cloudformation.Ref(ParameterVPCId), template)
 	}
 
 	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
@@ -166,8 +165,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 
 		serviceSecurityGroups := []string{}
 		for net := range service.Networks {
-			logicalName := networkResourceName(project, net)
-			serviceSecurityGroups = append(serviceSecurityGroups, cloudformation.Ref(logicalName))
+			serviceSecurityGroups = append(serviceSecurityGroups, networks[net])
 		}
 
 		desiredCount := 1
@@ -213,8 +211,12 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	return template, nil
 }
 
-func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc string) map[string]cloudformation.Resource {
-	resources := map[string]cloudformation.Resource{}
+func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
+	if sg, ok := net.Extras[ExtensionSecurityGroup]; ok {
+		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
+		return sg.(string)
+	}
+
 	var ingresses []ec2.SecurityGroup_Ingress
 	if !net.Internal {
 		for _, service := range project.Services {
@@ -233,7 +235,7 @@ func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc strin
 	}
 
 	securityGroup := networkResourceName(project, net.Name)
-	resources[securityGroup] = &ec2.SecurityGroup{
+	template.Resources[securityGroup] = &ec2.SecurityGroup{
 		GroupDescription:     fmt.Sprintf("%s %s Security Group", project.Name, net.Name),
 		GroupName:            securityGroup,
 		SecurityGroupIngress: ingresses,
@@ -251,14 +253,14 @@ func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc strin
 	}
 
 	ingress := securityGroup + "Ingress"
-	resources[ingress] = &ec2.SecurityGroupIngress{
+	template.Resources[ingress] = &ec2.SecurityGroupIngress{
 		Description:           fmt.Sprintf("Allow communication within network %s", net.Name),
 		IpProtocol:            "-1", // all protocols
 		GroupId:               cloudformation.Ref(securityGroup),
 		SourceSecurityGroupId: cloudformation.Ref(securityGroup),
 	}
 
-	return resources
+	return cloudformation.Ref(securityGroup)
 }
 
 func networkResourceName(project *compose.Project, network string) string {

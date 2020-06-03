@@ -16,11 +16,11 @@
       "Type": "String"
     },
     "ParameterSubnet1Id": {
-      "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
+      "Description": "SubnetId, for Availability Zone 1 in the region in your VPC",
       "Type": "AWS::EC2::Subnet::Id"
     },
     "ParameterSubnet2Id": {
-      "Description": "SubnetId,for Availability Zone 1 in the region in your VPC",
+      "Description": "SubnetId, for Availability Zone 2 in the region in your VPC",
       "Type": "AWS::EC2::Subnet::Id"
     },
     "ParameterVPCId": {

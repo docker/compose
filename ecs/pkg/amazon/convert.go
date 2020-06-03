@@ -318,7 +318,7 @@ func getImage(image string) string {
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
 	// extract registry and namespace string from image name
 	for key, value := range service.Extras {
-		if key == "x-aws-pull_credentials" {
+		if key == ExtensionPullCredentials {
 			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 		}
 	}

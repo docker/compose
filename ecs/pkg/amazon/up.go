@@ -59,18 +59,15 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 }
 
 func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
-	//check compose file for the default external network
-	if net, ok := project.Networks["default"]; ok {
-		if net.External.External {
-			vpc := net.Name
-			ok, err := c.api.VpcExists(ctx, vpc)
-			if err != nil {
-				return "", err
-			}
-			if !ok {
-				return "", fmt.Errorf("VPC does not exist: %s", vpc)
-			}
-			return vpc, nil
+	//check compose file for custom VPC selected
+	if vpc, ok := project.Extras[ExtensionVPC]; ok {
+		vpcID := vpc.(string)
+		ok, err := c.api.VpcExists(ctx, vpcID)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", fmt.Errorf("VPC does not exist: %s", vpc)
 		}
 	}
 	defaultVPC, err := c.api.GetDefaultVPC(ctx)
