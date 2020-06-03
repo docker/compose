@@ -15,7 +15,7 @@
 
 set -e
 
-VERSION="1.25.5"
+VERSION="1.26.0"
 IMAGE="docker/compose:$VERSION"
 
 
