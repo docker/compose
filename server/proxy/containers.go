@@ -34,7 +34,7 @@ func (p *proxyContainerAPI) List(ctx context.Context, request *v1.ListRequest) (
 
 	c, err := client.ContainerService().List(ctx, request.GetAll())
 	if err != nil {
-		return &v1.ListResponse{}, nil
+		return &v1.ListResponse{}, err
 	}
 
 	response := &v1.ListResponse{
