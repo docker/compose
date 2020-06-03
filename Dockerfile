@@ -52,6 +52,7 @@ WORKDIR /code/
 RUN pip install virtualenv==16.2.0
 RUN pip install tox==2.9.1
 
+COPY requirements-indirect.txt .
 COPY requirements.txt .
 COPY requirements-dev.txt .
 COPY .pre-commit-config.yaml .

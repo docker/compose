@@ -45,6 +45,7 @@ virtualenv -p C:\Python37\python.exe .\venv
 $ErrorActionPreference = "Continue"
 
 .\venv\Scripts\pip install pypiwin32==223
+.\venv\Scripts\pip install -r requirements-indirect.txt
 .\venv\Scripts\pip install -r requirements.txt
 .\venv\Scripts\pip install --no-deps .
 .\venv\Scripts\pip install -r requirements-build.txt

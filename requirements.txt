@@ -25,5 +25,4 @@ six==1.12.0
 subprocess32==3.5.4; python_version < '3.2'
 texttable==1.6.2
 urllib3==1.25.9; python_version == '3.3'
-wcwidth==0.1.9
 websocket-client==0.57.0
