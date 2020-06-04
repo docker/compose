@@ -98,7 +98,28 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		Vpc:         cloudformation.Ref(ParameterVPCId),
 	}
 
-	var loadBalancer *elasticloadbalancingv2.LoadBalancer
+	loadBalancerType := "network"
+	loadBalancerName := fmt.Sprintf(
+		"%s%sLB",
+		strings.Title(project.Name),
+		strings.ToUpper(loadBalancerType[0:1]),
+	)
+	loadBalancer := &elasticloadbalancingv2.LoadBalancer{
+		Name:   loadBalancerName,
+		Scheme: "internet-facing",
+		Subnets: []string{
+			cloudformation.Ref(ParameterSubnet1Id),
+			cloudformation.Ref(ParameterSubnet2Id),
+		},
+		Tags: []tags.Tag{
+			{
+				Key:   ProjectTag,
+				Value: project.Name,
+			},
+		},
+		Type: loadBalancerType,
+	}
+	template.Resources[loadBalancerName] = loadBalancer
 
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
@@ -142,12 +163,6 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
 		}
 
-		serviceSecurityGroups := []string{}
-		for net := range service.Networks {
-			logicalName := networkResourceName(project, net)
-			serviceSecurityGroups = append(serviceSecurityGroups, cloudformation.Ref(logicalName))
-		}
-
 		template.Resources[serviceRegistration] = &cloudmap.Service{
 			Description:       fmt.Sprintf("%q service discovery entry in Cloud Map", service.Name),
 			HealthCheckConfig: healthCheck,
@@ -173,54 +188,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		serviceLB := []ecs.Service_LoadBalancer{}
 		if len(service.Ports) > 0 {
 			for _, port := range service.Ports {
-				loadBalancerType := "network"
 
 				protocolType := strings.ToUpper(port.Protocol)
-				targetType := elbv2.TargetTypeEnumInstance
-				loadBalancerSecGroups := []string{}
-
-				if port.Published == 80 || port.Published == 443 {
-					loadBalancerType = "application"
-					loadBalancerSecGroups = serviceSecurityGroups
-					protocolType = "HTTPS"
-					targetType = elbv2.TargetTypeEnumIp
-					if port.Published == 80 {
-						protocolType = "HTTP"
-					}
-				}
-				loadBalancerName := fmt.Sprintf(
-					"%s%sLB",
-					strings.Title(project.Name),
-					strings.ToUpper(loadBalancerType[0:1]),
-				)
-				// create load balancer if it doesn't exist -- global load balancer
-				if loadBalancer == nil {
-
-					loadBalancer = &elasticloadbalancingv2.LoadBalancer{
-						Name:           loadBalancerName,
-						Scheme:         "internet-facing",
-						SecurityGroups: loadBalancerSecGroups,
-						Subnets: []string{
-							cloudformation.Ref(ParameterSubnet1Id),
-							cloudformation.Ref(ParameterSubnet2Id),
-						},
-						Tags: []tags.Tag{
-							{
-								Key:   ProjectTag,
-								Value: project.Name,
-							},
-						},
-						Type: loadBalancerType,
-					}
-					template.Resources[loadBalancerName] = loadBalancer
-				}
-				if loadBalancer.Type != loadBalancerType {
-					return nil, fmt.Errorf(
-						"exposed ports require different types of load balancers, only one type is permitted")
-				}
-				loadBalancer.SecurityGroups = append(loadBalancer.SecurityGroups, loadBalancerSecGroups...)
-				loadBalancer.SecurityGroups = uniqueLBSecurityGroups(loadBalancer.SecurityGroups)
-
 				targetGroupName := fmt.Sprintf(
 					"%s%s%sTargetGroup",
 					normalizeResourceName(service.Name),
@@ -238,7 +207,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 						},
 					},
 					VpcId:      cloudformation.Ref(ParameterVPCId),
-					TargetType: targetType,
+					TargetType: elbv2.TargetTypeEnumIp,
 				}
 				listenerName := fmt.Sprintf(
 					"%s%s%sListener",
@@ -407,16 +376,4 @@ func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) 
 		}, nil
 	}
 	return nil, nil
-}
-
-func uniqueLBSecurityGroups(groups []string) []string {
-	keys := make(map[string]bool)
-	unique := []string{}
-	for _, k := range groups {
-		if _, val := keys[k]; !val {
-			keys[k] = true
-			unique = append(unique, k)
-		}
-	}
-	return unique
 }
