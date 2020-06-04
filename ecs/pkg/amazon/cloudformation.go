@@ -97,8 +97,8 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		Name:        fmt.Sprintf("%s.local", project.Name),
 		Vpc:         cloudformation.Ref(ParameterVPCId),
 	}
-	//map LB type to security groups list
-	loadBalancers := map[string][]string{}
+
+	var loadBalancer *elasticloadbalancingv2.LoadBalancer
 
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
@@ -193,11 +193,33 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 					strings.Title(project.Name),
 					strings.ToUpper(loadBalancerType[0:1]),
 				)
-				// create load balancer if it doesn't exist
-				if _, ok := loadBalancers[loadBalancerType]; !ok {
-					loadBalancers[loadBalancerType] = []string{}
+				// create load balancer if it doesn't exist -- global load balancer
+				if loadBalancer == nil {
+
+					loadBalancer = &elasticloadbalancingv2.LoadBalancer{
+						Name:           loadBalancerName,
+						Scheme:         "internet-facing",
+						SecurityGroups: loadBalancerSecGroups,
+						Subnets: []string{
+							cloudformation.Ref(ParameterSubnet1Id),
+							cloudformation.Ref(ParameterSubnet2Id),
+						},
+						Tags: []tags.Tag{
+							{
+								Key:   ProjectTag,
+								Value: project.Name,
+							},
+						},
+						Type: loadBalancerType,
+					}
+					template.Resources[loadBalancerName] = loadBalancer
 				}
-				loadBalancers[loadBalancerType] = append(loadBalancers[loadBalancerType], loadBalancerSecGroups...)
+				if loadBalancer.Type != loadBalancerType {
+					return nil, fmt.Errorf(
+						"exposed ports require different types of load balancers, only one type is permitted")
+				}
+				loadBalancer.SecurityGroups = append(loadBalancer.SecurityGroups, loadBalancerSecGroups...)
+				loadBalancer.SecurityGroups = uniqueLBSecurityGroups(loadBalancer.SecurityGroups)
 
 				targetGroupName := fmt.Sprintf(
 					"%s%s%sTargetGroup",
@@ -293,32 +315,6 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			TaskDefinition: cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
 	}
-
-	// create LBs
-	for lbType, lbSecGroups := range loadBalancers {
-		loadBalancerName := fmt.Sprintf(
-			"%s%sLB",
-			strings.Title(project.Name),
-			strings.ToUpper(lbType[0:1]),
-		)
-
-		template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
-			Name:           loadBalancerName,
-			Scheme:         "internet-facing",
-			SecurityGroups: lbSecGroups,
-			Subnets: []string{
-				cloudformation.Ref(ParameterSubnet1Id),
-				cloudformation.Ref(ParameterSubnet2Id),
-			},
-			Tags: []tags.Tag{
-				{
-					Key:   ProjectTag,
-					Value: project.Name,
-				},
-			},
-			Type: lbType,
-		}
-	}
 	return template, nil
 }
 
@@ -411,4 +407,16 @@ func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) 
 		}, nil
 	}
 	return nil, nil
+}
+
+func uniqueLBSecurityGroups(groups []string) []string {
+	keys := make(map[string]bool)
+	unique := []string{}
+	for _, k := range groups {
+		if _, val := keys[k]; !val {
+			keys[k] = true
+			unique = append(unique, k)
+		}
+	}
+	return unique
 }
