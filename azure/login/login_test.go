@@ -98,7 +98,7 @@ func (suite *LoginSuite) TestDoesNotRefreshValidToken() {
 func (suite *LoginSuite) TestInvalidLogin() {
 	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
 		redirectURL := args.Get(0).(string)
-		err := queryKeyValue(redirectURL, "error", "access denied")
+		err := queryKeyValue(redirectURL, "error", "access denied: login failed")
 		Expect(err).To(BeNil())
 	})
 
@@ -107,7 +107,7 @@ func (suite *LoginSuite) TestInvalidLogin() {
 	Expect(err).To(BeNil())
 
 	err = azureLogin.Login(context.TODO())
-	Expect(err.Error()).To(BeEquivalentTo("no login code"))
+	Expect(err.Error()).To(BeEquivalentTo("no login code: login failed"))
 }
 
 func (suite *LoginSuite) TestValidLogin() {
@@ -192,7 +192,7 @@ func (suite *LoginSuite) TestLoginAuthorizationFailed() {
 	Expect(err).To(BeNil())
 
 	err = azureLogin.Login(context.TODO())
-	Expect(err.Error()).To(BeEquivalentTo("unable to login status code 400: [access denied]"))
+	Expect(err.Error()).To(BeEquivalentTo("unable to login status code 400: [access denied]: login failed"))
 }
 
 func refreshTokenData(refreshToken string) url.Values {

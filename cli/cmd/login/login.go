@@ -1,6 +1,7 @@
 package login
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/docker/api/cli/dockerclassic"
 	"github.com/docker/api/client"
+	"github.com/docker/api/errdefs"
 )
 
 // Command returns the login command
@@ -46,14 +48,14 @@ func cloudLogin(cmd *cobra.Command, backendType string) error {
 	ctx := cmd.Context()
 	cs, err := client.GetCloudService(ctx, backendType)
 	if err != nil {
-		return errors.Wrap(err, "cannot connect to backend")
+		return errors.Wrap(errdefs.ErrLoginFailed, "cannot connect to backend")
 	}
 	err = cs.Login(ctx, nil)
+	if errors.Is(err, context.Canceled) {
+		return errors.New("login canceled")
+	}
 	if err != nil {
 		return err
-	}
-	if cmd.Context().Err() != nil {
-		return errors.New("login canceled")
 	}
 	fmt.Println("login successful")
 	return nil

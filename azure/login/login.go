@@ -17,9 +17,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 
-	"github.com/pkg/errors"
+	"github.com/docker/api/errdefs"
 )
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
@@ -88,20 +89,20 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 
 	redirectURL := s.Addr()
 	if redirectURL == "" {
-		return errors.New("empty redirect URL")
+		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
 	}
 	login.apiHelper.openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
-		return nil
+		return ctx.Err()
 	case q := <-queryCh:
 		if q.err != nil {
-			return errors.Wrap(err, "unhandled local login server error")
+			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
 		}
 		code, hasCode := q.values["code"]
 		if !hasCode {
-			return errors.New("no login code")
+			return errors.Wrap(errdefs.ErrLoginFailed, "no login code")
 		}
 		data := url.Values{
 			"grant_type":   []string{"authorization_code"},
@@ -112,32 +113,32 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 		}
 		token, err := login.apiHelper.queryToken(data, "organizations")
 		if err != nil {
-			return errors.Wrap(err, "access token request failed")
+			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
 
 		bits, statusCode, err := login.apiHelper.queryAuthorizationAPI(authorizationURL, fmt.Sprintf("Bearer %s", token.AccessToken))
 		if err != nil {
-			return errors.Wrap(err, "check auth failed")
+			return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
 		}
 
 		switch statusCode {
 		case http.StatusOK:
 			var t tenantResult
 			if err := json.Unmarshal(bits, &t); err != nil {
-				return errors.Wrap(err, "unable to unmarshal tenant")
+				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
 			}
 			tID := t.Value[0].TenantID
 			tToken, err := login.refreshToken(token.RefreshToken, tID)
 			if err != nil {
-				return errors.Wrap(err, "unable to refresh token")
+				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
 			}
 			loginInfo := TokenInfo{TenantID: tID, Token: tToken}
 
 			if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
-				return errors.Wrap(err, "could not store login info")
+				return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
 			}
 		default:
-			return fmt.Errorf("unable to login status code %d: %s", statusCode, bits)
+			return errors.Wrapf(errdefs.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
 		}
 	}
 	return nil
