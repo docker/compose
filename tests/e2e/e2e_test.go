@@ -109,7 +109,7 @@ func (s *E2eSuite) TestSetupError() {
 
 func (s *E2eSuite) TestKillChildOnCancel() {
 	It("should kill docker-classic if parent command is cancelled", func() {
-		out := s.NewCommand("ps", "-x").ExecOrDie()
+		out := s.ListProcessesCommand().ExecOrDie()
 		Expect(out).NotTo(ContainSubstring("docker-classic"))
 
 		dir := s.ConfigDir
@@ -122,16 +122,16 @@ RUN sleep 100`), 0644)).To(Succeed())
 			_, err := ctx.Exec()
 			errs <- err
 		}()
-		err := WaitFor(time.Second, 3*time.Second, errs, func() bool {
-			out := s.NewCommand("ps", "-x").ExecOrDie()
+		err := WaitFor(time.Second, 10*time.Second, errs, func() bool {
+			out := s.ListProcessesCommand().ExecOrDie()
 			return strings.Contains(out, "docker-classic")
 		})
 		Expect(err).NotTo(HaveOccurred())
 		log.Println("Killing docker process")
 
 		close(shutdown)
-		err = WaitFor(time.Second, 4*time.Second, nil, func() bool {
-			out := s.NewCommand("ps", "-x").ExecOrDie()
+		err = WaitFor(time.Second, 12*time.Second, nil, func() bool {
+			out := s.ListProcessesCommand().ExecOrDie()
 			return !strings.Contains(out, "docker-classic")
 		})
 		Expect(err).NotTo(HaveOccurred())
