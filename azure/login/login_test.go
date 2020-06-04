@@ -2,7 +2,6 @@ package login
 
 import (
 	"context"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -20,14 +19,14 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type LoginSuiteTest struct {
+type LoginSuite struct {
 	suite.Suite
 	dir        string
 	mockHelper *MockAzureHelper
 	azureLogin AzureLoginService
 }
 
-func (suite *LoginSuiteTest) BeforeTest(suiteName, testName string) {
+func (suite *LoginSuite) BeforeTest(suiteName, testName string) {
 	dir, err := ioutil.TempDir("", "test_store")
 	Expect(err).To(BeNil())
 
@@ -37,12 +36,12 @@ func (suite *LoginSuiteTest) BeforeTest(suiteName, testName string) {
 	Expect(err).To(BeNil())
 }
 
-func (suite *LoginSuiteTest) AfterTest(suiteName, testName string) {
+func (suite *LoginSuite) AfterTest(suiteName, testName string) {
 	err := os.RemoveAll(suite.dir)
 	Expect(err).To(BeNil())
 }
 
-func (suite *LoginSuiteTest) TestRefreshInValidToken() {
+func (suite *LoginSuite) TestRefreshInValidToken() {
 	data := refreshTokenData("refreshToken")
 	suite.mockHelper.On("queryToken", data, "123456").Return(azureToken{
 		RefreshToken: "newRefreshToken",
@@ -77,7 +76,7 @@ func (suite *LoginSuiteTest) TestRefreshInValidToken() {
 	Expect(storedToken.Token.Expiry).To(BeTemporally(">", time.Now().Add(3500*time.Second)))
 }
 
-func (suite *LoginSuiteTest) TestDoesNotRefreshValidToken() {
+func (suite *LoginSuite) TestDoesNotRefreshValidToken() {
 	expiryDate := time.Now().Add(1 * time.Hour)
 	err := suite.azureLogin.tokenStore.writeLoginInfo(TokenInfo{
 		TenantID: "123456",
@@ -96,10 +95,10 @@ func (suite *LoginSuiteTest) TestDoesNotRefreshValidToken() {
 	Expect(token.AccessToken).To(Equal("accessToken"))
 }
 
-func (suite *LoginSuiteTest) TestInvalidLogin() {
+func (suite *LoginSuite) TestInvalidLogin() {
 	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
 		redirectURL := args.Get(0).(string)
-		err := queryKeyValue(redirectURL, "error", "access denied")
+		err := queryKeyValue(redirectURL, "error", "access denied: login failed")
 		Expect(err).To(BeNil())
 	})
 
@@ -108,10 +107,10 @@ func (suite *LoginSuiteTest) TestInvalidLogin() {
 	Expect(err).To(BeNil())
 
 	err = azureLogin.Login(context.TODO())
-	Expect(err).To(MatchError(errors.New("login failed : [access denied]")))
+	Expect(err.Error()).To(BeEquivalentTo("no login code: login failed"))
 }
 
-func (suite *LoginSuiteTest) TestValidLogin() {
+func (suite *LoginSuite) TestValidLogin() {
 	var redirectURL string
 	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
 		redirectURL = args.Get(0).(string)
@@ -161,7 +160,7 @@ func (suite *LoginSuiteTest) TestValidLogin() {
 	Expect(loginToken.Token.Type()).To(Equal("Bearer"))
 }
 
-func (suite *LoginSuiteTest) TestLoginAuthorizationFailed() {
+func (suite *LoginSuite) TestLoginAuthorizationFailed() {
 	var redirectURL string
 	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
 		redirectURL = args.Get(0).(string)
@@ -193,7 +192,7 @@ func (suite *LoginSuiteTest) TestLoginAuthorizationFailed() {
 	Expect(err).To(BeNil())
 
 	err = azureLogin.Login(context.TODO())
-	Expect(err).To(MatchError(errors.New("login failed : [access denied]")))
+	Expect(err.Error()).To(BeEquivalentTo("unable to login status code 400: [access denied]: login failed"))
 }
 
 func refreshTokenData(refreshToken string) url.Values {
@@ -218,7 +217,7 @@ func queryKeyValue(redirectURL string, key string, value string) error {
 
 func TestLoginSuite(t *testing.T) {
 	RegisterTestingT(t)
-	suite.Run(t, new(LoginSuiteTest))
+	suite.Run(t, new(LoginSuite))
 }
 
 type MockAzureHelper struct {

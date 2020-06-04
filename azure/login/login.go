@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os/exec"
 	"path/filepath"
@@ -12,15 +13,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/docker/api/errdefs"
-
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 
-	"github.com/pkg/errors"
+	"github.com/docker/api/errdefs"
 )
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
@@ -77,28 +77,32 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 	}, nil
 }
 
-//Login perform azure login through browser
+// Login performs an Azure login through a web browser
 func (login AzureLoginService) Login(ctx context.Context) error {
-	queryCh := make(chan url.Values, 1)
-	serverPort, err := startLoginServer(queryCh)
+	queryCh := make(chan localResponse, 1)
+	s, err := NewLocalServer(queryCh)
 	if err != nil {
 		return err
 	}
+	s.Serve()
+	defer s.Close()
 
-	redirectURL := "http://localhost:" + strconv.Itoa(serverPort)
+	redirectURL := s.Addr()
+	if redirectURL == "" {
+		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
+	}
 	login.apiHelper.openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
-		return nil
-	case qsValues := <-queryCh:
-		errorMsg, hasError := qsValues["error"]
-		if hasError {
-			return fmt.Errorf("login failed : %s", errorMsg)
+		return ctx.Err()
+	case q := <-queryCh:
+		if q.err != nil {
+			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
 		}
-		code, hasCode := qsValues["code"]
+		code, hasCode := q.values["code"]
 		if !hasCode {
-			return errdefs.ErrLoginFailed
+			return errors.Wrap(errdefs.ErrLoginFailed, "no login code")
 		}
 		data := url.Values{
 			"grant_type":   []string{"authorization_code"},
@@ -109,38 +113,35 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 		}
 		token, err := login.apiHelper.queryToken(data, "organizations")
 		if err != nil {
-			return errors.Wrap(err, "Access token request failed")
+			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
 
 		bits, statusCode, err := login.apiHelper.queryAuthorizationAPI(authorizationURL, fmt.Sprintf("Bearer %s", token.AccessToken))
 		if err != nil {
-			return errors.Wrap(err, "login failed")
+			return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
 		}
 
-		if statusCode == 200 {
-			var tenantResult tenantResult
-			if err := json.Unmarshal(bits, &tenantResult); err != nil {
-				return errors.Wrap(err, "login failed")
+		switch statusCode {
+		case http.StatusOK:
+			var t tenantResult
+			if err := json.Unmarshal(bits, &t); err != nil {
+				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
 			}
-			tenantID := tenantResult.Value[0].TenantID
-			tenantToken, err := login.refreshToken(token.RefreshToken, tenantID)
+			tID := t.Value[0].TenantID
+			tToken, err := login.refreshToken(token.RefreshToken, tID)
 			if err != nil {
-				return errors.Wrap(err, "login failed")
+				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
 			}
-			loginInfo := TokenInfo{TenantID: tenantID, Token: tenantToken}
+			loginInfo := TokenInfo{TenantID: tID, Token: tToken}
 
-			err = login.tokenStore.writeLoginInfo(loginInfo)
-
-			if err != nil {
-				return errors.Wrap(err, "login failed")
+			if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
+				return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
 			}
-			fmt.Println("Login Succeeded")
-
-			return nil
+		default:
+			return errors.Wrapf(errdefs.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
 		}
-
-		return fmt.Errorf("login failed : " + string(bits))
 	}
+	return nil
 }
 
 func getTokenStorePath() string {
