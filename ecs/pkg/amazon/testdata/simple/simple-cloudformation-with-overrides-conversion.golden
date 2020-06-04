@@ -8,11 +8,23 @@
           "Ref": "ParameterClusterName"
         }
       ]
+    },
+    "CreateLoadBalancer": {
+      "Fn::Equals": [
+        "",
+        {
+          "Ref": "ParameterLoadBalancerARN"
+        }
+      ]
     }
   },
   "Parameters": {
     "ParameterClusterName": {
       "Description": "Name of the ECS cluster to deploy to (optional)",
+      "Type": "String"
+    },
+    "ParameterLoadBalancerARN": {
+      "Description": "Name of the LoadBalancer to connect to (optional)",
       "Type": "String"
     },
     "ParameterSubnet1Id": {
@@ -247,6 +259,7 @@
       "Type": "AWS::EC2::SecurityGroupIngress"
     },
     "TestSimpleWithOverridesNLB": {
+      "Condition": "CreateLoadBalancer",
       "Properties": {
         "Name": "TestSimpleWithOverridesNLB",
         "Scheme": "internet-facing",
