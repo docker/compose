@@ -258,10 +258,10 @@
       },
       "Type": "AWS::EC2::SecurityGroupIngress"
     },
-    "TestSimpleConvertNLB": {
+    "TestSimpleConvertLoadBalancer": {
       "Condition": "CreateLoadBalancer",
       "Properties": {
-        "Name": "TestSimpleConvertNLB",
+        "Name": "TestSimpleConvertLoadBalancer",
         "Scheme": "internet-facing",
         "Subnets": [
           {

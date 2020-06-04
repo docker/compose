@@ -89,7 +89,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
 	c.createCloudMap(project, template)
-	loadBalancer := c.createLoadBalancer(project, template)
+	loadBalancer := c.createLoadBalancer(project, template, "network")
 
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
@@ -177,20 +177,14 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	return template, nil
 }
 
-func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
-
-	loadBalancerType := "network"
-	loadBalancerName := fmt.Sprintf(
-		"%s%sLB",
-		strings.Title(project.Name),
-		strings.ToUpper(loadBalancerType[0:1]),
-	)
+func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template, loadBalancerType string) string {
+	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
 	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
 	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
 
-	loadBalancer := &elasticloadbalancingv2.LoadBalancer{
+	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
 		Name:   loadBalancerName,
-		Scheme: "internet-facing",
+		Scheme: elbv2.LoadBalancerSchemeEnumInternetFacing,
 		Subnets: []string{
 			cloudformation.Ref(ParameterSubnet1Id),
 			cloudformation.Ref(ParameterSubnet2Id),
@@ -204,7 +198,6 @@ func (c client) createLoadBalancer(project *compose.Project, template *cloudform
 		Type:                       loadBalancerType,
 		AWSCloudFormationCondition: "CreateLoadBalancer",
 	}
-	template.Resources[loadBalancerName] = loadBalancer
 	loadBalancerRef := cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
 
 	return loadBalancerRef
