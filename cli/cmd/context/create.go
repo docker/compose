@@ -29,13 +29,12 @@ package context
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
-
-	"github.com/docker/api/client"
-
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/client"
 	"github.com/docker/api/context/store"
 )
 
@@ -67,30 +66,10 @@ func createCommand() *cobra.Command {
 }
 
 func runCreate(ctx context.Context, opts AciCreateOpts, name string, contextType string) error {
-	var description string
-	var contextData interface{}
-
-	switch contextType {
-	case "aci":
-		cs, err := client.GetCloudService(ctx, "aci")
-		if err != nil {
-			return errors.Wrap(err, "cannot connect to backend")
-		}
-		params := map[string]string{
-			"aciSubscriptionId": opts.aciSubscriptionID,
-			"aciResourceGroup":  opts.aciResourceGroup,
-			"aciLocation":       opts.aciLocation,
-			"description":       opts.description,
-		}
-		contextData, description, err = cs.CreateContextData(ctx, params)
-		if err != nil {
-			return errors.Wrap(err, "cannot create context")
-		}
-	default: // TODO: we need to implement different contexts for known backends
-		description = opts.description
-		contextData = store.ExampleContext{}
+	contextData, description, err := getContextData(ctx, contextType, opts)
+	if err != nil {
+		return nil
 	}
-
 	s := store.ContextStore(ctx)
 	return s.Create(
 		name,
@@ -98,4 +77,27 @@ func runCreate(ctx context.Context, opts AciCreateOpts, name string, contextType
 		description,
 		contextData,
 	)
+}
+
+func getContextData(ctx context.Context, contextType string, opts AciCreateOpts) (interface{}, string, error) {
+	switch contextType {
+	case "aci":
+		cs, err := client.GetCloudService(ctx, "aci")
+		if err != nil {
+			return nil, "", errors.Wrap(err, "cannot connect to ACI backend")
+		}
+		params := map[string]string{
+			"aciSubscriptionId": opts.aciSubscriptionID,
+			"aciResourceGroup":  opts.aciResourceGroup,
+			"aciLocation":       opts.aciLocation,
+			"description":       opts.description,
+		}
+		return cs.CreateContextData(ctx, params)
+	case "moby":
+		return store.MobyContext{}, opts.description, nil
+	case "example":
+		return store.ExampleContext{}, opts.description, nil
+	default:
+		return nil, "", errors.New(fmt.Sprintf("incorrect context type %s, must be one of (aci | moby | docker)", contextType))
+	}
 }
