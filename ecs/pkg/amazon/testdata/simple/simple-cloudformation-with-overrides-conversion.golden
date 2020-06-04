@@ -245,6 +245,28 @@
         }
       },
       "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "TestSimpleWithOverridesNLB": {
+      "Properties": {
+        "Name": "TestSimpleWithOverridesNLB",
+        "Scheme": "internet-facing",
+        "Subnets": [
+          {
+            "Ref": "ParameterSubnet1Id"
+          },
+          {
+            "Ref": "ParameterSubnet2Id"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleWithOverrides"
+          }
+        ],
+        "Type": "network"
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
     }
   }
 }
