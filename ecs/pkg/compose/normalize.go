@@ -23,6 +23,13 @@ func Normalize(model *types.Config) error {
 			s.Networks = map[string]*types.ServiceNetworkConfig{"default": nil}
 		}
 
+		for i, p := range s.Ports {
+			if p.Published == 0 {
+				p.Published = p.Target
+				s.Ports[i] = p
+			}
+		}
+
 		if s.LogDriver != "" {
 			logrus.Warn("`log_driver` is deprecated. Use the `logging` attribute")
 			if s.Logging == nil {

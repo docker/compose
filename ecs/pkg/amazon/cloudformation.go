@@ -172,15 +172,10 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 }
 
 func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
-	loadBalancerType := "network"
-	loadBalancerName := fmt.Sprintf(
-		"%s%sLB",
-		strings.Title(project.Name),
-		strings.ToUpper(loadBalancerType[0:1]),
-	)
-	loadBalancer := &elasticloadbalancingv2.LoadBalancer{
+	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
+	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
 		Name:   loadBalancerName,
-		Scheme: "internet-facing",
+		Scheme: elbv2.LoadBalancerSchemeEnumInternetFacing,
 		Subnets: []string{
 			cloudformation.Ref(ParameterSubnet1Id),
 			cloudformation.Ref(ParameterSubnet2Id),
@@ -191,18 +186,17 @@ func (c client) createLoadBalancer(project *compose.Project, template *cloudform
 				Value: project.Name,
 			},
 		},
-		Type: loadBalancerType,
+		Type: elbv2.LoadBalancerTypeEnumNetwork,
 	}
-	template.Resources[loadBalancerName] = loadBalancer
 	return loadBalancerName
 }
 
 func (c client) createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerName string, protocol string) string {
 	listenerName := fmt.Sprintf(
-		"%s%s%sListener",
+		"%s%s%dListener",
 		normalizeResourceName(service.Name),
 		strings.ToUpper(port.Protocol),
-		string(port.Published),
+		port.Published,
 	)
 	//add listener to dependsOn
 	//https://stackoverflow.com/questions/53971873/the-target-group-does-not-have-an-associated-load-balancer
@@ -228,10 +222,10 @@ func (c client) createListener(service types.ServiceConfig, port types.ServicePo
 
 func (c client) createTargetGroup(project *compose.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
 	targetGroupName := fmt.Sprintf(
-		"%s%s%sTargetGroup",
+		"%s%s%dTargetGroup",
 		normalizeResourceName(service.Name),
 		strings.ToUpper(port.Protocol),
-		string(port.Published),
+		port.Published,
 	)
 	template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
 		Name:     targetGroupName,
