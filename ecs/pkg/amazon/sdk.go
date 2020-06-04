@@ -400,3 +400,25 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	}
 	return publicIPs, nil
 }
+
+func (s sdk) LoadBalancerExists(ctx context.Context, name string) (bool, error) {
+	logrus.Debug("Check if cluster was already created: ", name)
+	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
+		Names: []*string{aws.String(name)},
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(lbs.LoadBalancers) > 0, nil
+}
+
+func (s sdk) GetLoadBalancerARN(ctx context.Context, name string) (string, error) {
+	logrus.Debug("Check if cluster was already created: ", name)
+	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
+		Names: []*string{aws.String(name)},
+	})
+	if err != nil {
+		return "", err
+	}
+	return *lbs.LoadBalancers[0].LoadBalancerArn, nil
+}

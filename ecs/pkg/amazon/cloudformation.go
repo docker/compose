@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	ParameterClusterName = "ParameterClusterName"
-	ParameterVPCId       = "ParameterVPCId"
-	ParameterSubnet1Id   = "ParameterSubnet1Id"
-	ParameterSubnet2Id   = "ParameterSubnet2Id"
+	ParameterClusterName     = "ParameterClusterName"
+	ParameterVPCId           = "ParameterVPCId"
+	ParameterSubnet1Id       = "ParameterSubnet1Id"
+	ParameterSubnet2Id       = "ParameterSubnet2Id"
+	ParameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
 // Convert a compose project into a CloudFormation template
@@ -64,6 +65,11 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	template.Parameters[ParameterSubnet2Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
 		Description: "SubnetId, for Availability Zone 2 in the region in your VPC",
+	}
+
+	template.Parameters[ParameterLoadBalancerARN] = cloudformation.Parameter{
+		Type:        "String",
+		Description: "Name of the LoadBalancer to connect to (optional)",
 	}
 
 	// Create Cluster is `ParameterClusterName` parameter is not set
@@ -172,10 +178,19 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 }
 
 func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
-	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
-	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
+
+	loadBalancerType := "network"
+	loadBalancerName := fmt.Sprintf(
+		"%s%sLB",
+		strings.Title(project.Name),
+		strings.ToUpper(loadBalancerType[0:1]),
+	)
+	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
+	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
+
+	loadBalancer := &elasticloadbalancingv2.LoadBalancer{
 		Name:   loadBalancerName,
-		Scheme: elbv2.LoadBalancerSchemeEnumInternetFacing,
+		Scheme: "internet-facing",
 		Subnets: []string{
 			cloudformation.Ref(ParameterSubnet1Id),
 			cloudformation.Ref(ParameterSubnet2Id),
@@ -186,12 +201,16 @@ func (c client) createLoadBalancer(project *compose.Project, template *cloudform
 				Value: project.Name,
 			},
 		},
-		Type: elbv2.LoadBalancerTypeEnumNetwork,
+		Type:                       loadBalancerType,
+		AWSCloudFormationCondition: "CreateLoadBalancer",
 	}
-	return loadBalancerName
+	template.Resources[loadBalancerName] = loadBalancer
+	loadBalancerRef := cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
+
+	return loadBalancerRef
 }
 
-func (c client) createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerName string, protocol string) string {
+func (c client) createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
 	listenerName := fmt.Sprintf(
 		"%s%s%dListener",
 		normalizeResourceName(service.Name),
@@ -213,7 +232,7 @@ func (c client) createListener(service types.ServiceConfig, port types.ServicePo
 				Type: elbv2.ActionTypeEnumForward,
 			},
 		},
-		LoadBalancerArn: cloudformation.Ref(loadBalancerName),
+		LoadBalancerArn: loadBalancerARN,
 		Protocol:        protocol,
 		Port:            int(port.Published),
 	}

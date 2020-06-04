@@ -42,11 +42,17 @@ func (c *client) ComposeUp(ctx context.Context, project *compose.Project) error 
 		return err
 	}
 
+	lb, err := c.GetLoadBalancer(ctx, project)
+	if err != nil {
+		return err
+	}
+
 	parameters := map[string]string{
-		ParameterClusterName: c.Cluster,
-		ParameterVPCId:       vpc,
-		ParameterSubnet1Id:   subNets[0],
-		ParameterSubnet2Id:   subNets[1],
+		ParameterClusterName:     c.Cluster,
+		ParameterVPCId:           vpc,
+		ParameterSubnet1Id:       subNets[0],
+		ParameterSubnet2Id:       subNets[1],
+		ParameterLoadBalancerARN: lb,
 	}
 
 	err = c.api.CreateStack(ctx, project.Name, template, parameters)
@@ -77,6 +83,22 @@ func (c client) GetVPC(ctx context.Context, project *compose.Project) (string, e
 	return defaultVPC, nil
 }
 
+func (c client) GetLoadBalancer(ctx context.Context, project *compose.Project) (string, error) {
+	//check compose file for custom VPC selected
+	if lb, ok := project.Extras[ExtensionLB]; ok {
+		lbName := lb.(string)
+		ok, err := c.api.LoadBalancerExists(ctx, lbName)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", fmt.Errorf("Load Balancer does not exist: %s", lb)
+		}
+		return c.api.GetLoadBalancerARN(ctx, lbName)
+	}
+	return "", nil
+}
+
 type upAPI interface {
 	waitAPI
 	GetDefaultVPC(ctx context.Context) (string, error)
@@ -86,4 +108,7 @@ type upAPI interface {
 	ClusterExists(ctx context.Context, name string) (bool, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template *cloudformation.Template, parameters map[string]string) error
+
+	LoadBalancerExists(ctx context.Context, name string) (bool, error)
+	GetLoadBalancerARN(ctx context.Context, name string) (string, error)
 }
