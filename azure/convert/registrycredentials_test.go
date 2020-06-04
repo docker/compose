@@ -1,0 +1,192 @@
+package convert
+
+import (
+	"strconv"
+
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/compose-spec/compose-go/types"
+	cliconfigtypes "github.com/docker/cli/cli/config/types"
+
+	"github.com/docker/api/compose"
+
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
+
+	"testing"
+
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+)
+
+const getAllCredentials = "getAllRegistryCredentials"
+
+type RegistryConvertTestSuite struct {
+	suite.Suite
+	loader *MockRegistryLoader
+}
+
+func (suite *RegistryConvertTestSuite) BeforeTest(suiteName, testName string) {
+	suite.loader = &MockRegistryLoader{}
+}
+
+func (suite *RegistryConvertTestSuite) TestHubPrivateImage() {
+	suite.loader.On(getAllCredentials).Return(registry("https://index.docker.io", userPwdCreds("toto", "pwd")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr(dockerHub),
+			Username: to.StringPtr("toto"),
+			Password: to.StringPtr("pwd"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestRegistryNameWithoutProtocol() {
+	suite.loader.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr(dockerHub),
+			Username: to.StringPtr("toto"),
+			Password: to.StringPtr("pwd"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestImageWithDotInName() {
+	suite.loader.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("my.image"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr(dockerHub),
+			Username: to.StringPtr("toto"),
+			Password: to.StringPtr("pwd"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestAcrPrivateImage() {
+	suite.loader.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", tokenCreds("123456")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr("mycontainerregistrygta.azurecr.io"),
+			Username: to.StringPtr(tokenUsername),
+			Password: to.StringPtr("123456"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestNoMoreRegistriesThanImages() {
+	configs := map[string]cliconfigtypes.AuthConfig{
+		"https://mycontainerregistrygta.azurecr.io": tokenCreds("123456"),
+		"https://index.docker.io":                   userPwdCreds("toto", "pwd"),
+	}
+	suite.loader.On(getAllCredentials).Return(configs, nil)
+
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr("mycontainerregistrygta.azurecr.io"),
+			Username: to.StringPtr(tokenUsername),
+			Password: to.StringPtr("123456"),
+		},
+	}))
+
+	creds, err = getRegistryCredentials(composeServices("someuser/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr(dockerHub),
+			Username: to.StringPtr("toto"),
+			Password: to.StringPtr("pwd"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestHubAndSeveralACRRegistries() {
+	configs := map[string]cliconfigtypes.AuthConfig{
+		"https://mycontainerregistry1.azurecr.io": tokenCreds("123456"),
+		"https://mycontainerregistry2.azurecr.io": tokenCreds("456789"),
+		"https://mycontainerregistry3.azurecr.io": tokenCreds("123456789"),
+		"https://index.docker.io":                 userPwdCreds("toto", "pwd"),
+		"https://other.registry.io":               userPwdCreds("user", "password"),
+	}
+	suite.loader.On(getAllCredentials).Return(configs, nil)
+
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistry1.azurecr.io/privateimg", "someuser/privateImg2", "mycontainerregistry2.azurecr.io/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(ContainElement(containerinstance.ImageRegistryCredential{
+		Server:   to.StringPtr("mycontainerregistry1.azurecr.io"),
+		Username: to.StringPtr(tokenUsername),
+		Password: to.StringPtr("123456"),
+	}))
+	Expect(creds).To(ContainElement(containerinstance.ImageRegistryCredential{
+		Server:   to.StringPtr("mycontainerregistry2.azurecr.io"),
+		Username: to.StringPtr(tokenUsername),
+		Password: to.StringPtr("456789"),
+	}))
+	Expect(creds).To(ContainElement(containerinstance.ImageRegistryCredential{
+		Server:   to.StringPtr(dockerHub),
+		Username: to.StringPtr("toto"),
+		Password: to.StringPtr("pwd"),
+	}))
+}
+
+func composeServices(images ...string) compose.Project {
+	var services []types.ServiceConfig
+	for index, name := range images {
+		service := types.ServiceConfig{
+			Name:  "service" + strconv.Itoa(index),
+			Image: name,
+		}
+		services = append(services, service)
+	}
+	return compose.Project{
+		Config: types.Config{
+			Services: services,
+		},
+	}
+}
+
+func registry(host string, configregistryData cliconfigtypes.AuthConfig) map[string]cliconfigtypes.AuthConfig {
+	return map[string]cliconfigtypes.AuthConfig{
+		host: configregistryData,
+	}
+}
+
+func userPwdCreds(user string, password string) cliconfigtypes.AuthConfig {
+	return cliconfigtypes.AuthConfig{
+		Username: user,
+		Password: password,
+	}
+}
+
+func tokenCreds(token string) cliconfigtypes.AuthConfig {
+	return cliconfigtypes.AuthConfig{
+		IdentityToken: token,
+	}
+}
+
+func TestRegistryConvertTestSuite(t *testing.T) {
+	RegisterTestingT(t)
+	suite.Run(t, new(RegistryConvertTestSuite))
+}
+
+type MockRegistryLoader struct {
+	mock.Mock
+}
+
+func (s *MockRegistryLoader) getAllRegistryCredentials() (map[string]cliconfigtypes.AuthConfig, error) {
+	args := s.Called()
+	return args.Get(0).(map[string]cliconfigtypes.AuthConfig), args.Error(1)
+}

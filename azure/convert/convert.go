@@ -42,14 +42,21 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 	} else {
 		volumes = &allVolumes
 	}
+
+	registryCreds, err := getRegistryCredentials(p, newCliRegistryConfLoader())
+	if err != nil {
+		return containerinstance.ContainerGroup{}, err
+	}
+
 	var containers []containerinstance.Container
 	groupDefinition := containerinstance.ContainerGroup{
 		Name:     &containerGroupName,
 		Location: &aciContext.Location,
 		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{
-			OsType:     containerinstance.Linux,
-			Containers: &containers,
-			Volumes:    volumes,
+			OsType:                   containerinstance.Linux,
+			Containers:               &containers,
+			Volumes:                  volumes,
+			ImageRegistryCredentials: &registryCreds,
 		},
 	}
 
