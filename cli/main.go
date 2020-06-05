@@ -34,6 +34,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -171,8 +172,23 @@ func main() {
 			os.Exit(1)
 		}
 		dockerclassic.Exec(ctx)
-		fmt.Println(err)
+
+		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string) {
+	re := regexp.MustCompile(`unknown command "([^"]*)"`)
+	submatch := re.FindSubmatch([]byte(err.Error()))
+	if len(submatch) == 2 {
+		dockerCommand := string(submatch[1])
+
+		if dockerclassic.IsDefaultContextCommand(dockerCommand) {
+			fmt.Fprintf(os.Stderr, "Command \"%s\" not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
+			os.Exit(1)
+		}
 	}
 }
 

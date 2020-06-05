@@ -162,6 +162,13 @@ func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
 	Expect(err).NotTo(BeNil())
 }
 
+func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
+	s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
+	output, err := s.NewDockerCommand("--context", "test-example", "images").Exec()
+	Expect(output).To(Equal("Command \"images\" not available in current context (test-example), you can use the \"default\" context to run this command\n"))
+	Expect(err).NotTo(BeNil())
+}
+
 func (s *E2eSuite) TestMockBackend() {
 	It("creates a new test context to hardcoded example backend", func() {
 		s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
