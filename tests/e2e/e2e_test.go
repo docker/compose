@@ -156,6 +156,12 @@ func (s *E2eSuite) TestLegacy() {
 	})
 }
 
+func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
+	output, err := s.NewDockerCommand("foo").Exec()
+	golden.Assert(s.T(), output, "unknown-foo-command.golden")
+	Expect(err).NotTo(BeNil())
+}
+
 func (s *E2eSuite) TestMockBackend() {
 	It("creates a new test context to hardcoded example backend", func() {
 		s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()

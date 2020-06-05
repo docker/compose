@@ -27,7 +27,6 @@ func Exec(ctx context.Context) {
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			if exiterr, ok := err.(*exec.ExitError); ok {
-				fmt.Fprintln(os.Stderr, exiterr.Error())
 				os.Exit(exiterr.ExitCode())
 			}
 			fmt.Fprintln(os.Stderr, err)
