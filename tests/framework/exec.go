@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -176,7 +177,7 @@ func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
 		}
 	case <-timeout:
 		log.Debugf("%s %s timed-out", cmd.Path, strings.Join(cmd.Args[1:], " "))
-		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		if err := terminateProcess(cmd); err != nil {
 			return "", err
 		}
 		return "", fmt.Errorf(
@@ -187,6 +188,13 @@ func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
 		log.Debugf("stderr: %s", stderr.String())
 	}
 	return stdout.String(), nil
+}
+
+func terminateProcess(cmd *exec.Cmd) error {
+	if runtime.GOOS == "windows" {
+		return cmd.Process.Kill()
+	}
+	return cmd.Process.Signal(syscall.SIGTERM)
 }
 
 func mergeWriter(other io.Writer, buf io.Writer) io.Writer {

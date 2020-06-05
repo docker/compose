@@ -107,6 +107,14 @@ func (s *Suite) AfterTest(suite, test string) {
 	_ = os.RemoveAll(s.ConfigDir)
 }
 
+// ListProcessesCommand creates a command to list processes, "tasklist" on windows, "ps" otherwise.
+func (s *Suite) ListProcessesCommand() *CmdContext {
+	if runtime.GOOS == "windows" {
+		return s.NewCommand("tasklist")
+	}
+	return s.NewCommand("ps")
+}
+
 // NewCommand creates a command context.
 func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 	return &CmdContext{
