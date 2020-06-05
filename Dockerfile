@@ -8,7 +8,8 @@ ENV GO111MODULE=on
 RUN apk add --no-cache \
     docker \
     make \
-    protoc
+    protoc \
+    protobuf-dev
 COPY go.* .
 RUN go mod download
 

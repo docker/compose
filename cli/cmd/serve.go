@@ -9,6 +9,7 @@ import (
 
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	contextsv1 "github.com/docker/api/protos/contexts/v1"
+	streamsv1 "github.com/docker/api/protos/streams/v1"
 	"github.com/docker/api/server"
 	"github.com/docker/api/server/proxy"
 )
@@ -44,10 +45,11 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	// nolint errcheck
 	defer listener.Close()
 
-	p := proxy.NewContainerAPI()
+	p := proxy.New()
 	contextsService := server.NewContexts()
 
 	containersv1.RegisterContainersServer(s, p)
+	streamsv1.RegisterStreamingServer(s, p)
 	contextsv1.RegisterContextsServer(s, contextsService)
 
 	go func() {

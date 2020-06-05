@@ -11,7 +11,7 @@ import (
 )
 
 type logServer struct {
-	logs []byte
+	logs interface{}
 }
 
 func (ls *logServer) Send(response *v1.LogsResponse) error {
@@ -34,8 +34,7 @@ func (ls *logServer) Context() context.Context {
 }
 
 func (ls *logServer) SendMsg(m interface{}) error {
-	s, _ := m.(*v1.LogsResponse)
-	ls.logs = s.Logs
+	ls.logs = m
 	return nil
 }
 
@@ -43,14 +42,17 @@ func (ls *logServer) RecvMsg(m interface{}) error {
 	return nil
 }
 
-func TestStreamWriter(t *testing.T) {
+func TestLogStreamWriter(t *testing.T) {
 	ls := &logServer{}
 	sw := newStreamWriter(ls)
 	in := []byte{104, 101, 108, 108, 111}
+	expected := &v1.LogsResponse{
+		Value: in,
+	}
 
 	l, err := sw.Write(in)
 
 	assert.Nil(t, err)
 	assert.Equal(t, len(in), l)
-	assert.Equal(t, in, ls.logs)
+	assert.Equal(t, expected, ls.logs)
 }
