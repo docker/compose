@@ -263,6 +263,11 @@
       "Properties": {
         "Name": "TestSimpleConvertLoadBalancer",
         "Scheme": "internet-facing",
+        "SecurityGroups": [
+          {
+            "Ref": "TestSimpleConvertDefaultNetwork"
+          }
+        ],
         "Subnets": [
           {
             "Ref": "ParameterSubnet1Id"
