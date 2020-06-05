@@ -186,28 +186,22 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 }
 
 func (c client) getLoadBalancerType(project *compose.Project, networks map[string]string) (string, []string) {
-	// check what type of load balancer to create, we asssume by default application type
-	loadBalancerType := elbv2.LoadBalancerTypeEnumApplication
-	albSecurityGroups := []string{}
-
 	for _, service := range project.Services {
-		if len(service.Ports) == 0 {
-			continue
-		}
 		for _, port := range service.Ports {
 			if port.Published != 80 && port.Published != 443 {
 				return elbv2.LoadBalancerTypeEnumNetwork, []string{}
 			}
 		}
-
-		serviceSecurityGroups := []string{}
-		for net := range service.Networks {
-			serviceSecurityGroups = append(serviceSecurityGroups, networks[net])
-		}
-		albSecurityGroups = append(albSecurityGroups, serviceSecurityGroups...)
-		albSecurityGroups = uniqueStrings(albSecurityGroups)
 	}
-	return loadBalancerType, albSecurityGroups
+
+	albSecurityGroups := []string{}
+	for _, network := range project.Networks {
+		if !network.Internal {
+			albSecurityGroups = append(albSecurityGroups, networks[network.Name])
+		}
+	}
+	albSecurityGroups = uniqueStrings(albSecurityGroups)
+	return elbv2.LoadBalancerTypeEnumApplication, albSecurityGroups
 }
 
 func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template, loadBalancerType string, securityGroups []string) string {
