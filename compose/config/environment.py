@@ -3,6 +3,7 @@ import os
 import re
 
 import dotenv
+from envbash import load_envbash
 
 from ..const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
@@ -26,7 +27,7 @@ def split_env(env):
     return key, value
 
 
-def env_vars_from_file(filename, interpolate=True):
+def env_vars_from_file(filename, interpolate=True, interpreter=None):
     """
     Read in a line delimited file of environment variables.
     """
@@ -34,8 +35,13 @@ def env_vars_from_file(filename, interpolate=True):
         raise EnvFileNotFound("Couldn't find env file: {}".format(filename))
     elif not os.path.isfile(filename):
         raise EnvFileNotFound("{} is not a file.".format(filename))
-
-    env = dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig', interpolate=interpolate)
+    env = {}
+    if interpreter in ('bash', 'sh', 'ksh'):
+        if IS_WINDOWS_PLATFORM:
+            raise ConfigurationError("{} is not valid interpreter on Windows".format(interpreter))
+        load_envbash(filename, env={}, into=env, bash=interpreter)
+    else:
+        env = dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig', interpolate=interpolate)
     for k, v in env.items():
         env[k] = v if interpolate else v.replace('$', '$$')
     return env

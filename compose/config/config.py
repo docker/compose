@@ -680,10 +680,21 @@ def resolve_environment(service_dict, environment=None, interpolate=True):
     """
     env = {}
     for env_file in service_dict.get('env_file', []):
-        env.update(env_vars_from_file(env_file, interpolate))
+        (path, interpreter) = split_path_and_interpreter(env_file)
+        env.update(env_vars_from_file(path, interpolate, interpreter=interpreter))
 
     env.update(parse_environment(service_dict.get('environment')))
     return dict(resolve_env_var(k, v, environment) for k, v in env.items())
+
+
+def split_path_and_interpreter(env_file_path):
+    drive, envfile_config = splitdrive(env_file_path)
+
+    if ':' in envfile_config:
+        (path, interpreter) = envfile_config.split(':', 1)
+        return (drive + path, interpreter)
+    else:
+        return (env_file_path, 'dotenv')
 
 
 def resolve_build_args(buildargs, environment):

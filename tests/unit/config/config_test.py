@@ -4303,21 +4303,35 @@ class EnvTest(unittest.TestCase):
             'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'bar'
         }
 
+    def test_resolve_environment_from_bash_env_file(self):
+        assert resolve_environment({'env_file': ['tests/fixtures/env/bash.env:bash']}) == {
+            'VAR': '1', 'CMD_RESULT': 'result', 'EMPTY': ''
+        }
+
     def test_environment_overrides_env_file(self):
         assert resolve_environment({
             'environment': {'FOO': 'baz'},
             'env_file': ['tests/fixtures/env/one.env'],
         }) == {'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz'}
 
+    def test_environment_overrides_bash_env_file(self):
+        assert resolve_environment({
+            'environment': {'CMD_RESULT': 'baz'},
+            'env_file': ['tests/fixtures/env/bash.env:bash'],
+        }) == {'VAR': '1', 'CMD_RESULT': 'baz', 'EMPTY': ''}
+
     def test_resolve_environment_with_multiple_env_files(self):
         service_dict = {
             'env_file': [
                 'tests/fixtures/env/one.env',
-                'tests/fixtures/env/two.env'
+                'tests/fixtures/env/two.env',
+                'tests/fixtures/env/bash.env:bash',
             ]
         }
         assert resolve_environment(service_dict) == {
-            'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz', 'DOO': 'dah'
+            'ONE': '2', 'TWO': '1', 'THREE': '3', 'FOO': 'baz',
+            'DOO': 'dah',
+            'VAR': '1', 'CMD_RESULT': 'result', 'EMPTY': ''
         }
 
     def test_resolve_environment_nonexistent_file(self):
@@ -4342,6 +4356,31 @@ class EnvTest(unittest.TestCase):
             'FILE_DEF_EMPTY': '',
             'ENV_DEF': 'E3',
             'NO_DEF': None
+        }
+
+    @mock.patch.dict(os.environ)
+    def test_resolve_environment_from_bash_env_file_with_empty_values(self):
+        os.environ['FILE_DEF'] = 'E1'
+        os.environ['FILE_DEF_EMPTY'] = 'E2'
+        assert resolve_environment(
+            {'env_file': ['tests/fixtures/env/resolve_bash.env:bash']},
+            Environment.from_env_file(None)
+        ) == {
+            'FILE_DEF': u'bär',
+            'FILE_DEF_EMPTY': '',
+            'NO_DEF': ''
+        }
+
+    @mock.patch.dict(os.environ)
+    def test_resolve_environment_from_env_file_with_id_command(self):
+        os.environ['CUSTOM_UUID'] = '1420'
+        os.environ['CUSTOM_GUID'] = '111'
+        assert resolve_environment(
+            {'env_file': ['tests/fixtures/env/get_uuid.env:bash']},
+            Environment.from_env_file(None)
+        ) == {
+            'CUSTOM_UUID': '0',
+            'CUSTOM_GUID': '0'
         }
 
     @mock.patch.dict(os.environ)
@@ -4388,6 +4427,39 @@ def load_from_filename(filename, override_dir=None):
     return config.load(
         config.find('.', [filename], Environment.from_env_file('.'), override_dir=override_dir)
     ).services
+
+
+class EnvFileSplitTest(unittest.TestCase):
+
+    def test_split_empty_path(self):
+        host_path = ''
+        expected_split = ('', 'dotenv')
+
+        split = config.split_path_and_interpreter(host_path)
+        assert split == expected_split
+
+    def test_split_path_with_empty_interpreter(self):
+        host_path = '/root/test'
+        expected_split = (host_path, 'dotenv')
+
+        split = config.split_path_and_interpreter(host_path)
+        assert split == expected_split
+
+    def test_split_windows_path(self):
+        host_path = 'c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config'
+        windows_env_path = host_path + ':test'
+        expected_split = ('c:\\Users\\msamblanet\\Documents\\anvil\\connect\\config', 'test')
+
+        split = config.split_path_and_interpreter(windows_env_path)
+        assert split == expected_split
+
+    def test_split_root_path(self):
+        host_path = '/root/test'
+        env_path = host_path + ':test'
+        expected_split = (host_path, 'test')
+
+        split = config.split_path_and_interpreter(env_path)
+        assert split == expected_split
 
 
 class ExtendsTest(unittest.TestCase):

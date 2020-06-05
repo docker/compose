@@ -1150,7 +1150,7 @@ class Service(object):
         container_name = build_container_name(
             self.project, service_name, number, slug,
         )
-        ext_links_origins = [link.split(':')[0] for link in self.options.get('external_links', [])]
+        ext_links_origins = [links.split(':')[0] for links in self.options.get('external_links', [])]
         if container_name in ext_links_origins:
             raise DependencyError(
                 'Service {0} has a self-referential external link: {1}'.format(
