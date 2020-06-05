@@ -72,8 +72,7 @@ func getReader(t *testing.T, in []byte, errResult error) reader {
 	}
 }
 
-func getAny(t *testing.T, data []byte) *any.Any {
-	in := []byte{104, 101, 108, 108, 111}
+func getAny(t *testing.T, in []byte) *any.Any {
 	value, err := ptypes.MarshalAny(&streamsv1.BytesMessage{
 		Type:  streamsv1.IOStream_STDOUT,
 		Value: in,

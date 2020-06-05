@@ -3,8 +3,10 @@ node_modules/.bin/grpc_tools_node_protoc \
     --grpc_out=generate_package_definition:./grpc \
     -I ../../protos/contexts/v1 \
     -I ../../protos/containers/v1 \
+    -I ../../protos/streams/v1 \
     ../../protos/contexts/v1/*.proto \
-    ../../protos/containers/v1/*.proto
+    ../../protos/containers/v1/*.proto \
+    ../../protos/streams/v1/*.proto
 
 # generate d.ts codes
 protoc \
@@ -12,5 +14,7 @@ protoc \
     --ts_out=generate_package_definition:./grpc \
     -I ../../protos/contexts/v1 \
     -I ../../protos/containers/v1 \
+    -I ../../protos/streams/v1 \
     ../../protos/contexts/v1/*.proto \
-    ../../protos/containers/v1/*.proto
+    ../../protos/containers/v1/*.proto \
+    ../../protos/streams/v1/*.proto
