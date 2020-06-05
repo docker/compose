@@ -277,7 +277,7 @@
             "Value": "TestSimpleConvert"
           }
         ],
-        "Type": "network"
+        "Type": "application"
       },
       "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
     }
