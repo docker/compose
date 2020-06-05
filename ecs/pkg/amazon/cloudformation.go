@@ -90,8 +90,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
 	c.createCloudMap(project, template)
 
-	loadBalancerType, albSecurityGroups := c.getLoadBalancerType(project, networks)
-	loadBalancer := c.createLoadBalancer(project, template, loadBalancerType, albSecurityGroups)
+	loadBalancerARN := c.createLoadBalancer(project, template)
 
 	for _, service := range project.Services {
 		definition, err := Convert(project, service)
@@ -125,14 +124,14 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		if len(service.Ports) > 0 {
 			for _, port := range service.Ports {
 				protocol := strings.ToUpper(port.Protocol)
-				if loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
+				if c.getLoadBalancerType(project) == elbv2.LoadBalancerTypeEnumApplication {
 					protocol = elbv2.ProtocolEnumHttps
 					if port.Published == 80 {
 						protocol = elbv2.ProtocolEnumHttp
 					}
 				}
 				targetGroupName := c.createTargetGroup(project, service, port, template, protocol)
-				listenerName := c.createListener(service, port, template, targetGroupName, loadBalancer, protocol)
+				listenerName := c.createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
 				dependsOn = append(dependsOn, listenerName)
 				serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
 					ContainerName:  service.Name,
@@ -185,29 +184,38 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	return template, nil
 }
 
-func (c client) getLoadBalancerType(project *compose.Project, networks map[string]string) (string, []string) {
+func (c client) getLoadBalancerType(project *compose.Project) string {
 	for _, service := range project.Services {
 		for _, port := range service.Ports {
 			if port.Published != 80 && port.Published != 443 {
-				return elbv2.LoadBalancerTypeEnumNetwork, []string{}
+				return elbv2.LoadBalancerTypeEnumNetwork
 			}
 		}
 	}
-
-	albSecurityGroups := []string{}
-	for _, network := range project.Networks {
-		if !network.Internal {
-			albSecurityGroups = append(albSecurityGroups, networks[network.Name])
-		}
-	}
-	albSecurityGroups = uniqueStrings(albSecurityGroups)
-	return elbv2.LoadBalancerTypeEnumApplication, albSecurityGroups
+	return elbv2.LoadBalancerTypeEnumApplication
 }
 
-func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template, loadBalancerType string, securityGroups []string) string {
+func (c client) getLoadBalancerSecurityGroups(project *compose.Project, template *cloudformation.Template) []string {
+	securityGroups := []string{}
+	for _, network := range project.Networks {
+		if !network.Internal {
+			net := convertNetwork(project, network, cloudformation.Ref(ParameterVPCId), template)
+			securityGroups = append(securityGroups, net)
+		}
+	}
+	return uniqueStrings(securityGroups)
+}
+
+func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
 	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
 	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
 	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
+
+	loadBalancerType := c.getLoadBalancerType(project)
+	securityGroups := []string{}
+	if loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
+		securityGroups = c.getLoadBalancerSecurityGroups(project, template)
+	}
 
 	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
 		Name:           loadBalancerName,
@@ -226,9 +234,7 @@ func (c client) createLoadBalancer(project *compose.Project, template *cloudform
 		Type:                       loadBalancerType,
 		AWSCloudFormationCondition: "CreateLoadBalancer",
 	}
-	loadBalancerRef := cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
-
-	return loadBalancerRef
+	return cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
 }
 
 func (c client) createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
