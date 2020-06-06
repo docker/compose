@@ -38,10 +38,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/api/cli/cmd/login"
-
-	"github.com/docker/api/cli/dockerclassic"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -54,9 +50,11 @@ import (
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
 	contextcmd "github.com/docker/api/cli/cmd/context"
+	"github.com/docker/api/cli/cmd/login"
 	"github.com/docker/api/cli/cmd/run"
-	cliconfig "github.com/docker/api/cli/config"
+	"github.com/docker/api/cli/dockerclassic"
 	cliopts "github.com/docker/api/cli/options"
+	"github.com/docker/api/config"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -151,7 +149,7 @@ func main() {
 		fatal(errors.New("config path cannot be empty"))
 	}
 	configDir := opts.Config
-	ctx = cliconfig.WithDir(ctx, configDir)
+	ctx = config.WithDir(ctx, configDir)
 
 	currentContext, err := determineCurrentContext(opts.Context, configDir)
 	if err != nil {
@@ -206,7 +204,7 @@ func newSigContext() (context.Context, func()) {
 func determineCurrentContext(flag string, configDir string) (string, error) {
 	res := flag
 	if res == "" {
-		config, err := cliconfig.LoadFile(configDir)
+		config, err := config.LoadFile(configDir)
 		if err != nil {
 			return "", err
 		}

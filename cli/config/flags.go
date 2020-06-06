@@ -32,15 +32,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/pflag"
-)
 
-const (
-	// ConfigFileName is the name of config file
-	ConfigFileName = "config.json"
-	// ConfigFileDir is the default folder where the config file is stored
-	ConfigFileDir = ".docker"
-	// ConfigFlagName is the name of the config flag
-	ConfigFlagName = "config"
+	"github.com/docker/api/config"
 )
 
 // ConfigFlags are the global CLI flags
@@ -51,7 +44,7 @@ type ConfigFlags struct {
 
 // AddConfigFlags adds persistent (global) flags
 func (c *ConfigFlags) AddConfigFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&c.Config, ConfigFlagName, confDir(), "Location of the client config files `DIRECTORY`")
+	flags.StringVar(&c.Config, config.ConfigFlagName, confDir(), "Location of the client config files `DIRECTORY`")
 }
 
 func confDir() string {
@@ -60,5 +53,5 @@ func confDir() string {
 		return env
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ConfigFileDir)
+	return filepath.Join(home, config.ConfigFileDir)
 }
