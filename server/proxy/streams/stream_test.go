@@ -1,4 +1,4 @@
-package proxy
+package streams
 
 import (
 	"context"
@@ -54,7 +54,7 @@ func (bs *byteStream) RecvMsg(m interface{}) error {
 	return nil
 }
 
-func getReader(t *testing.T, in []byte, errResult error) reader {
+func getReader(t *testing.T, in []byte, errResult error) IO {
 	message := streamsv1.BytesMessage{
 		Type:  streamsv1.IOStream_STDOUT,
 		Value: in,
@@ -62,8 +62,8 @@ func getReader(t *testing.T, in []byte, errResult error) reader {
 	m, err := ptypes.MarshalAny(&message)
 	require.Nil(t, err)
 
-	return reader{
-		stream: &Stream{
+	return IO{
+		Stream: &Stream{
 			Streaming_NewStreamServer: &byteStream{
 				recvResult: m,
 				recvErr:    errResult,
@@ -109,7 +109,11 @@ func TestStreamWriter(t *testing.T) {
 	expected := getAny(t, in)
 
 	bs := byteStream{}
-	w := writer{stream: &bs}
+	w := IO{
+		Stream: &Stream{
+			Streaming_NewStreamServer: &bs,
+		},
+	}
 
 	n, err := w.Write(in)
 	assert.Nil(t, err)

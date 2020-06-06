@@ -1,4 +1,4 @@
-package proxy
+package streams
 
 import (
 	"context"

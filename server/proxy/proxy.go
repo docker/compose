@@ -8,6 +8,7 @@ import (
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	contextsv1 "github.com/docker/api/protos/contexts/v1"
 	streamsv1 "github.com/docker/api/protos/streams/v1"
+	"github.com/docker/api/server/proxy/streams"
 )
 
 type clientKey struct{}
@@ -34,7 +35,7 @@ type Proxy interface {
 type proxy struct {
 	currentContext string
 	mu             sync.Mutex
-	streams        map[string]*Stream
+	streams        map[string]*streams.Stream
 	contextsProxy  *contextsProxy
 }
 
@@ -42,7 +43,7 @@ type proxy struct {
 func New(currentContext string) Proxy {
 	return &proxy{
 		currentContext: currentContext,
-		streams:        map[string]*Stream{},
+		streams:        map[string]*streams.Stream{},
 		contextsProxy:  &contextsProxy{},
 	}
 }
