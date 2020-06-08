@@ -426,7 +426,6 @@ func normalizeResourceName(s string) string {
 }
 
 func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
-
 	arns := []string{}
 	for _, container := range taskDef.ContainerDefinitions {
 		if container.RepositoryCredentials != nil {
