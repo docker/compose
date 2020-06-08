@@ -33,7 +33,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cliconfig "github.com/docker/api/cli/config"
+	"github.com/docker/api/config"
 	"github.com/docker/api/context/store"
 )
 
@@ -56,7 +56,7 @@ func runUse(ctx context.Context, name string) error {
 			return err
 		}
 	}
-	if err := cliconfig.WriteCurrentContext(cliconfig.Dir(ctx), name); err != nil {
+	if err := config.WriteCurrentContext(config.Dir(ctx), name); err != nil {
 		return err
 	}
 	fmt.Println(name)

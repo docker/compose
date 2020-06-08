@@ -40,7 +40,6 @@ import (
 
 	"github.com/docker/api/client"
 	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
 	"github.com/docker/api/server/proxy"
 )
 
@@ -127,8 +126,6 @@ func getContext(ctx context.Context) string {
 // configureContext populates the request context with objects the client
 // needs: the context store and the api client
 func configureContext(ctx context.Context, currentContext string) (context.Context, error) {
-	s := store.ContextStore(ctx)
-	ctx = store.WithContextStore(ctx, s)
 	if currentContext != "" {
 		ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	}

@@ -28,6 +28,15 @@
 package config
 
 const (
+	// ConfigFileName is the name of config file
+	ConfigFileName = "config.json"
+	// ConfigFileDir is the default folder where the config file is stored
+	ConfigFileDir = ".docker"
+	// ConfigFlagName is the name of the config flag
+	ConfigFlagName = "config"
+)
+
+const (
 	// currentContextKey is the key used in the Docker config file to set the
 	// default context
 	currentContextKey = "currentContext"

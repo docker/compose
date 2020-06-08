@@ -40,7 +40,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/docker/api/cli/config"
+	"github.com/docker/api/config"
 )
 
 var contextSetConfig = []byte(`{

@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/api/containers"
 	containersv1 "github.com/docker/api/protos/containers/v1"
+	"github.com/docker/api/server/proxy/streams"
 )
 
 func portsToGrpc(ports []containers.Port) []*containersv1.Port {
@@ -97,7 +98,10 @@ func (p *proxy) Exec(ctx context.Context, request *containersv1.ExecRequest) (*c
 		return &containersv1.ExecResponse{}, errors.New("unknown stream id")
 	}
 
-	err := Client(ctx).ContainerService().Exec(ctx, request.GetId(), request.GetCommand(), &reader{stream}, &writer{stream})
+	io := &streams.IO{
+		Stream: stream,
+	}
+	err := Client(ctx).ContainerService().Exec(ctx, request.GetId(), request.GetCommand(), io, io)
 
 	return &containersv1.ExecResponse{}, err
 }
@@ -108,6 +112,8 @@ func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Cont
 
 	return c.ContainerService().Logs(ctx, request.GetContainerId(), containers.LogsRequest{
 		Follow: request.Follow,
-		Writer: &logStream{stream},
+		Writer: &streams.Log{
+			Stream: stream,
+		},
 	})
 }
