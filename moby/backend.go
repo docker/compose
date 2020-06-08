@@ -138,18 +138,21 @@ func (ms *mobyService) Exec(ctx context.Context, name string, command string, re
 	cec, err := ms.apiClient.ContainerExecCreate(ctx, name, types.ExecConfig{
 		Cmd:          []string{command},
 		Tty:          true,
-		AttachStderr: true,
 		AttachStdin:  true,
 		AttachStdout: true,
+		AttachStderr: true,
 	})
 	if err != nil {
 		return err
 	}
-	resp, err := ms.apiClient.ContainerExecAttach(ctx, cec.ID, types.ExecStartCheck{})
+	resp, err := ms.apiClient.ContainerExecAttach(ctx, cec.ID, types.ExecStartCheck{
+		Tty: true,
+	})
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
+
 	readChannel := make(chan error, 10)
 	writeChannel := make(chan error, 10)
 

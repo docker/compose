@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package com.docker.api.protos.streams.v1;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/docker/api/protos/streams/v1;v1";
+
+service Streaming {
+	rpc NewStream(stream google.protobuf.Any) returns (stream google.protobuf.Any);
+}
+
+enum IOStream {
+	STDIN = 0;
+	STDOUT = 1;
+	STDERR = 2;
+}
+
+message BytesMessage {
+	IOStream type = 1;
+	bytes value = 2;
+}
+
+message ResizeMessage {
+	uint32 width = 1;
+	uint32 height = 2;
+}
+
+message ExitMessage {
+	uint32 status = 1;
+}

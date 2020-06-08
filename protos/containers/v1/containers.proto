@@ -33,14 +33,11 @@ option go_package = "github.com/docker/api/protos/containers/v1;v1";
 
 service Containers {
 	rpc List(ListRequest) returns (ListResponse);
-	rpc Create(CreateRequest) returns (CreateResponse);
-	rpc Start(StartRequest) returns (StartResponse);
 	rpc Stop(StopRequest) returns (StopResponse);
-	rpc Kill(KillRequest) returns (KillResponse);
-	rpc Delete(DeleteRequest) returns (DeleteResponse);
-	rpc Update(UpdateRequest) returns (UpdateResponse);
+	rpc Run(RunRequest) returns (RunResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Logs(LogsRequest) returns (stream LogsResponse);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
 }
 
 message Port {
@@ -64,58 +61,12 @@ message Container {
 	repeated Port ports = 11;
 }
 
-message CreateRequest {
-	string id = 1;
-	repeated string args = 2;
-	repeated string env = 3;
-	bool tty = 4;
-	string image = 5;
-	string hostname = 6;
-	repeated string networks = 7;
-	string snapshotter = 8;
-	string logger = 9;
-	string profile = 10;
-	string restart_status = 11;
-	repeated Mount mounts = 12;
-	string working_dir = 13;
-	map<string, string> labels = 14;
-}
-
-message Mount {
-	string type = 1;
-	string source = 2;
-	string destination = 3;
-	repeated string options = 4;
-}
-
-message CreateResponse {
-
-}
-
-message UpdateRequest {
-	string id = 1;
-	string image = 2;
-}
-
-message UpdateResponse {
-
-}
-
 message DeleteRequest {
 	string id = 1;
 	bool force = 2;
 }
 
 message DeleteResponse {
-}
-
-message StartRequest {
-	string id = 1;
-	string stream_id = 2;
-}
-
-message StartResponse {
-
 }
 
 message StopRequest {
@@ -126,26 +77,28 @@ message StopRequest {
 message StopResponse {
 }
 
+message RunRequest {
+	string id = 1;
+	string image = 2;
+	repeated Port ports = 3;
+	map<string, string> labels = 4;
+	repeated string volumes = 5;
+}
+
+message RunResponse {
+}
 
 message ExecRequest {
 	string id = 1;
-	string stream_id = 2;
-	repeated string args = 3;
-	repeated string env = 4;
-	bool tty = 5;
-	string working_dir = 6;
+	string command = 2;
+	string stream_id = 3;
+	repeated string args = 4;
+	repeated string env = 5;
+	bool tty = 6;
 }
 
 message ExecResponse {
-
-}
-
-message KillRequest {
-	string id = 1;
-	int64 signal = 2;
-}
-
-message KillResponse {
+	bytes output = 1;
 }
 
 message ListRequest {
@@ -158,9 +111,9 @@ message ListResponse {
 
 message LogsRequest {
 	string container_id = 1;
-	bool follow = 2;
+	bool follow = 3;
 }
 
 message LogsResponse {
-	bytes logs = 1;
+	bytes value = 1;
 }
