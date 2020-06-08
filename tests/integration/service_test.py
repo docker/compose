@@ -223,6 +223,9 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
+    @pytest.mark.xfail(True, reason='Getting "Your kernel does not support '
+                                    'cgroup blkio weight and weight_device" on daemon start '
+                                    'on Linux kernel 5.3.x')
     def test_create_container_with_blkio_config(self):
         blkio_config = {
             'weight': 300,
