@@ -316,6 +316,7 @@ class TopLevelCommand(object):
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
             --services               Print the service names, one per line.
+            --images                 Print the service image names with tag, one per line.
             --volumes                Print the volume names, one per line.
             --hash="*"               Print the service config hash, one per line.
                                      Set "service1,service2" for a list of specified services
@@ -336,6 +337,10 @@ class TopLevelCommand(object):
 
         if options['--services']:
             print('\n'.join(service['name'] for service in compose_config.services))
+            return
+
+        if options['--images']:
+            print('\n'.join(service['image'] for service in compose_config.services))
             return
 
         if options['--volumes']:
