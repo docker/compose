@@ -65,7 +65,7 @@ func (s *E2eSuite) TestContextDefault() {
 		output := s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
 		output = s.NewCommand("docker", "context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, "ls-out-default.golden")
+		golden.Assert(s.T(), output, GoldenFile("ls-out-default"))
 	})
 }
 
@@ -187,7 +187,7 @@ func (s *E2eSuite) TestMockBackend() {
 		currentContext := s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := s.NewDockerCommand("context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, "ls-out-test-example.golden")
+		golden.Assert(s.T(), output, GoldenFile("ls-out-test-example"))
 		output = s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example"))
 	})

@@ -28,6 +28,7 @@
 package framework
 
 import (
+	"runtime"
 	"strings"
 
 	"github.com/robpike/filter"
@@ -46,6 +47,13 @@ func Lines(output string) []string {
 // Columns get columns from a line
 func Columns(line string) []string {
 	return filter.Choose(strings.Split(line, " "), nonEmptyString).([]string)
+}
+
+func GoldenFile(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + "-windows.golden"
+	}
+	return name + ".golden"
 }
 
 // It runs func
