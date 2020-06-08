@@ -91,8 +91,15 @@ func (s *Suite) copyExecutablesInBinDir() {
 	gomega.Expect(err).To(gomega.BeNil())
 	err = copyFile(dockerPath, filepath.Join(s.BinDir, dockerExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
+	err = os.Setenv("PATH", concatenatePath(s.BinDir))
 	gomega.Expect(err).To(gomega.BeNil())
+}
+
+func concatenatePath(path string) string {
+	if IsWindows() {
+		return fmt.Sprintf("%s;%s", path, os.Getenv("PATH"))
+	}
+	return fmt.Sprintf("%s:%s", path, os.Getenv("PATH"))
 }
 
 func copyFile(sourceFile string, destinationFile string) error {
