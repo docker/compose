@@ -1,0 +1,2 @@
+core.autocrlf false
+*.golden text eol=lf

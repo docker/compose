@@ -62,3 +62,44 @@ jobs:
 
       - name: E2E Test
         run: make e2e-local
+
+
+  windows-build:
+    name: Windows Build
+    runs-on: windows-latest
+    env:
+      GO111MODULE: "on"
+    steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v1
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Test
+        run: make -f builder.Makefile test
+
+      - name: Build
+        run: make -f builder.Makefile cli
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@master
+        with:
+          version: "3.9.1"
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "10.x"
+
+      - name: E2E Test
+        run: make e2e-local
