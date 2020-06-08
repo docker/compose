@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
+
+// ClassicCliName name of the classic cli binary
+const ClassicCliName = "docker-classic"
 
 // Exec delegates to docker-classic
 func Exec(ctx context.Context) {
@@ -21,13 +25,12 @@ func Exec(ctx context.Context) {
 	// Only run original docker command if the current context is not
 	// ours.
 	if err != nil {
-		cmd := exec.CommandContext(ctx, "docker-classic", os.Args[1:]...)
+		cmd := exec.CommandContext(ctx, ClassicCliName, os.Args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			if exiterr, ok := err.(*exec.ExitError); ok {
-				fmt.Fprintln(os.Stderr, exiterr.Error())
 				os.Exit(exiterr.ExitCode())
 			}
 			fmt.Fprintln(os.Stderr, err)
@@ -41,4 +44,16 @@ func Exec(ctx context.Context) {
 func ExecCmd(command *cobra.Command) error {
 	Exec(command.Context())
 	return nil
+}
+
+// IsDefaultContextCommand checks if the command exists in the classic cli (issues a shellout --help)
+func IsDefaultContextCommand(dockerCommand string) bool {
+	cmd := exec.Command(ClassicCliName, dockerCommand, "--help")
+	b, e := cmd.CombinedOutput()
+	if e != nil {
+		fmt.Println(e)
+	}
+	output := string(b)
+	contains := strings.Contains(output, "Usage:\tdocker "+dockerCommand)
+	return contains
 }
