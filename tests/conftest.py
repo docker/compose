@@ -34,6 +34,7 @@ non_conformity_tests = [
     "test_config_external_volume_v3_4",
     "test_config_external_volume_v3_x",
     "test_config_list_services",
+    "test_config_list_images",
     "test_config_list_volumes",
     "test_config_quiet",
     "test_config_quiet_with_error",

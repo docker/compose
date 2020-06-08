@@ -245,6 +245,11 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['config', '--services'])
         assert set(result.stdout.rstrip().split('\n')) == {'web', 'other'}
 
+    def test_config_list_images(self):
+        self.base_dir = 'tests/fixtures/v2-full'
+        result = self.dispatch(['config', '--images'])
+        assert set(result.stdout.rstrip().split('\n')) == {'busybox:1.31.0-uclibc', 'busybox:1.31.0-uclibc'}
+
     def test_config_list_volumes(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--volumes'])
