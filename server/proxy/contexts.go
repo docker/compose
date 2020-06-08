@@ -9,10 +9,11 @@ import (
 )
 
 type contextsProxy struct {
+	configDir string
 }
 
 func (cp *contextsProxy) SetCurrent(ctx context.Context, request *contextsv1.SetCurrentRequest) (*contextsv1.SetCurrentResponse, error) {
-	if err := config.WriteCurrentContext(config.Dir(ctx), request.GetName()); err != nil {
+	if err := config.WriteCurrentContext(cp.configDir, request.GetName()); err != nil {
 		return &contextsv1.SetCurrentResponse{}, err
 	}
 
@@ -21,6 +22,10 @@ func (cp *contextsProxy) SetCurrent(ctx context.Context, request *contextsv1.Set
 
 func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListRequest) (*contextsv1.ListResponse, error) {
 	s := store.ContextStore(ctx)
+	configFile, err := config.LoadFile(cp.configDir)
+	if err != nil {
+		return nil, err
+	}
 	contexts, err := s.List()
 	if err != nil {
 		return &contextsv1.ListResponse{}, err
@@ -32,6 +37,7 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 		result.Contexts = append(result.Contexts, &contextsv1.Context{
 			Name:        c.Name,
 			ContextType: c.Type,
+			Current:     c.Name == configFile.CurrentContext,
 		})
 	}
 
