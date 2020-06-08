@@ -116,11 +116,15 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(containerFields[1]).To(Equal("nginx"))
 		Expect(containerFields[2]).To(Equal("Running"))
 		exposedIP := containerFields[3]
+		containerID := containerFields[0]
 		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
 
 		publishedURL := strings.ReplaceAll(exposedIP, "->80/tcp", "")
 		output = s.NewCommand("curl", publishedURL).ExecOrDie()
 		Expect(output).To(ContainSubstring(testFileContent))
+
+		output = s.NewDockerCommand("logs", containerID).ExecOrDie()
+		Expect(output).To(ContainSubstring("GET"))
 	})
 
 	It("removes container nginx", func() {

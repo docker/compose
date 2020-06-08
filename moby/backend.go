@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/docker/docker/pkg/stringid"
+
 	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/docker/api/types"
@@ -61,7 +63,7 @@ func (ms *mobyService) List(ctx context.Context, all bool) ([]containers.Contain
 	var result []containers.Container
 	for _, container := range css {
 		result = append(result, containers.Container{
-			ID:    container.ID,
+			ID:    stringid.TruncateID(container.ID),
 			Image: container.Image,
 			// TODO: `Status` is a human readable string ("Up 24 minutes"),
 			// we need to return the `State` instead but first we need to
