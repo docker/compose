@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
+
+	"github.com/awslabs/goformation/v4/cloudformation"
+	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
@@ -67,6 +71,36 @@ networks:
 	assert.Check(t, ingress != nil)
 	assert.Check(t, ingress.SourceSecurityGroupId == cloudformation.Ref("TestPublicNetwork"))
 
+}
+
+func TestLoadBalancerTypeApplication(t *testing.T) {
+	template := convertYaml(t, `
+version: "3"
+services:
+  test:
+    image: nginx
+    ports:
+      - 80:80
+`)
+	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
+	assert.Check(t, lb != nil)
+	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumApplication)
+	assert.Check(t, len(lb.SecurityGroups) > 0)
+}
+
+func TestLoadBalancerTypeNetwork(t *testing.T) {
+	template := convertYaml(t, `
+version: "3"
+services:
+  test:
+    image: nginx
+    ports:
+      - 80:80
+      - 88:88
+`)
+	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
+	assert.Check(t, lb != nil)
+	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumNetwork)
 }
 
 func convertResultAsString(t *testing.T, project *compose.Project, clusterName string) string {
