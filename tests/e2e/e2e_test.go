@@ -106,7 +106,7 @@ func (s *E2eSuite) TestSetupError() {
 	It("should display an error if cannot shell out to docker-classic", func() {
 		err := os.Setenv("PATH", s.BinDir)
 		Expect(err).To(BeNil())
-		err = os.Remove(filepath.Join(s.BinDir, "docker-classic"))
+		err = os.Remove(filepath.Join(s.BinDir, DockerClassicExecutable()))
 		Expect(err).To(BeNil())
 		output, err := s.NewDockerCommand("ps").Exec()
 		Expect(output).To(ContainSubstring("docker-classic"))

@@ -62,7 +62,7 @@ func (s *Suite) SetupSuite() {
 		}
 		s.T().Fail()
 	})
-	s.linkClassicDocker()
+	s.copyExecutablesInBinDir()
 }
 
 // TearDownSuite is run after all tests
@@ -79,20 +79,33 @@ func dirContents(dir string) []string {
 	return res
 }
 
-func (s *Suite) linkClassicDocker() {
-	p, err := exec.LookPath("docker-classic")
+func (s *Suite) copyExecutablesInBinDir() {
+	p, err := exec.LookPath(DockerClassicExecutable())
 	if err != nil {
-		p, err = exec.LookPath("docker")
+		p, err = exec.LookPath(dockerExecutable())
 	}
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Symlink(p, filepath.Join(s.BinDir, "docker-classic"))
+	err = copyFiles(p, filepath.Join(s.BinDir, DockerClassicExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
-	dockerPath, err := filepath.Abs("../../bin/docker")
+	dockerPath, err := filepath.Abs("../../bin/" + dockerExecutable())
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Symlink(dockerPath, filepath.Join(s.BinDir, "docker"))
+	err = copyFiles(dockerPath, filepath.Join(s.BinDir, dockerExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
 	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
 	gomega.Expect(err).To(gomega.BeNil())
+}
+
+func copyFiles(sourceFile string, destinationFile string) error {
+	input, err := ioutil.ReadFile(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(destinationFile, input, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // BeforeTest is run before each test
@@ -109,10 +122,14 @@ func (s *Suite) AfterTest(suite, test string) {
 
 // ListProcessesCommand creates a command to list processes, "tasklist" on windows, "ps" otherwise.
 func (s *Suite) ListProcessesCommand() *CmdContext {
-	if runtime.GOOS == "windows" {
+	if isWindows() {
 		return s.NewCommand("tasklist")
 	}
 	return s.NewCommand("ps")
+}
+
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }
 
 // NewCommand creates a command context.
@@ -125,10 +142,17 @@ func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 }
 
 func dockerExecutable() string {
-	if runtime.GOOS == "windows" {
+	if isWindows() {
 		return "docker.exe"
 	}
 	return "docker"
+}
+
+func DockerClassicExecutable() string {
+	if isWindows() {
+		return "docker-classic.exe"
+	}
+	return "docker-classic"
 }
 
 // NewDockerCommand creates a docker builder.
