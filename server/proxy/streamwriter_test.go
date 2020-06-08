@@ -15,7 +15,6 @@ type logServer struct {
 }
 
 func (ls *logServer) Send(response *v1.LogsResponse) error {
-	ls.logs = response.Logs
 	return nil
 }
 
@@ -35,6 +34,8 @@ func (ls *logServer) Context() context.Context {
 }
 
 func (ls *logServer) SendMsg(m interface{}) error {
+	s, _ := m.(*v1.LogsResponse)
+	ls.logs = s.Logs
 	return nil
 }
 

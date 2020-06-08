@@ -17,7 +17,7 @@ func newStreamWriter(stream v1.Containers_LogsServer) io.Writer {
 }
 
 func (w *streamWriter) Write(p []byte) (n int, err error) {
-	return len(p), w.stream.Send(&v1.LogsResponse{
+	return len(p), w.stream.SendMsg(&v1.LogsResponse{
 		Logs: p,
 	})
 }

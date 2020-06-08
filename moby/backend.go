@@ -9,16 +9,16 @@ import (
 
 	"github.com/docker/go-connections/nat"
 
-	"github.com/docker/api/context/cloud"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
+	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
 )
 
@@ -172,15 +172,30 @@ func (ms *mobyService) Exec(ctx context.Context, name string, command string, re
 }
 
 func (ms *mobyService) Logs(ctx context.Context, containerName string, request containers.LogsRequest) error {
+	c, err := ms.apiClient.ContainerInspect(ctx, containerName)
+	if err != nil {
+		return err
+	}
+
 	r, err := ms.apiClient.ContainerLogs(ctx, containerName, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     request.Follow,
 	})
+
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(request.Writer, r)
+
+	// nolint errcheck
+	defer r.Close()
+
+	if c.Config.Tty {
+		_, err = io.Copy(request.Writer, r)
+	} else {
+		_, err = stdcopy.StdCopy(request.Writer, request.Writer, r)
+	}
+
 	return err
 }
 
