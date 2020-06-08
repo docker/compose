@@ -231,15 +231,24 @@ func (s *E2eSuite) TestAPIServer() {
 		cName := "test-example"
 		s.NewDockerCommand("context", "create", cName, "example").ExecOrDie()
 
-		sPath := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
+		//sPath := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
+		sPath, cliAddress := s.getGrpcServerAndCLientAddress()
 		server, err := serveAPI(s.ConfigDir, sPath)
 		Expect(err).To(BeNil())
 		defer killProcess(server)
 
 		s.NewCommand("yarn", "install").WithinDirectory("../node-client").ExecOrDie()
-		output := s.NewCommand("yarn", "run", "start", cName, sPath).WithinDirectory("../node-client").ExecOrDie()
+		output := s.NewCommand("yarn", "run", "start", cName, cliAddress).WithinDirectory("../node-client").ExecOrDie()
 		Expect(output).To(ContainSubstring("nginx"))
 	})
+}
+
+func (s *E2eSuite) getGrpcServerAndCLientAddress() (string, string) {
+	if IsWindows() {
+		return "npipe:////./pipe/clibackend", "unix:////./pipe/clibackend"
+	}
+	socketName := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
+	return socketName, socketName
 }
 
 func TestE2e(t *testing.T) {

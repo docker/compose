@@ -122,13 +122,13 @@ func (s *Suite) AfterTest(suite, test string) {
 
 // ListProcessesCommand creates a command to list processes, "tasklist" on windows, "ps" otherwise.
 func (s *Suite) ListProcessesCommand() *CmdContext {
-	if isWindows() {
+	if IsWindows() {
 		return s.NewCommand("tasklist")
 	}
 	return s.NewCommand("ps")
 }
 
-func isWindows() bool {
+func IsWindows() bool {
 	return runtime.GOOS == "windows"
 }
 
@@ -142,14 +142,14 @@ func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 }
 
 func dockerExecutable() string {
-	if isWindows() {
+	if IsWindows() {
 		return "docker.exe"
 	}
 	return "docker"
 }
 
 func DockerClassicExecutable() string {
-	if isWindows() {
+	if IsWindows() {
 		return "docker-classic.exe"
 	}
 	return "docker-classic"
