@@ -6,7 +6,6 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -58,7 +57,7 @@ func runPs(ctx context.Context, opts psOpts) error {
 	fmt.Fprintf(w, "CONTAINER ID\tIMAGE\tCOMMAND\tSTATUS\tPORTS\n")
 	format := "%s\t%s\t%s\t%s\t%s\n"
 	for _, c := range containers {
-		fmt.Fprintf(w, format, stringid.TruncateID(c.ID), c.Image, c.Command, c.Status, formatter.PortsString(c.Ports))
+		fmt.Fprintf(w, format, c.ID, c.Image, c.Command, c.Status, formatter.PortsString(c.Ports))
 	}
 
 	return w.Flush()
