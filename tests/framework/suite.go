@@ -33,7 +33,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -56,6 +55,7 @@ func (s *Suite) SetupSuite() {
 		log.Error(message)
 		cp := filepath.Join(s.ConfigDir, "config.json")
 		d, _ := ioutil.ReadFile(cp)
+		fmt.Printf("Bin dir:%s\n", s.BinDir)
 		fmt.Printf("Contents of %s:\n%s\n\nContents of config dir:\n", cp, string(d))
 		for _, p := range dirContents(s.ConfigDir) {
 			fmt.Println(p)
@@ -85,23 +85,23 @@ func (s *Suite) copyExecutablesInBinDir() {
 		p, err = exec.LookPath(dockerExecutable())
 	}
 	gomega.Expect(err).To(gomega.BeNil())
-	err = copyFiles(p, filepath.Join(s.BinDir, DockerClassicExecutable()))
+	err = copyFile(p, filepath.Join(s.BinDir, DockerClassicExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
 	dockerPath, err := filepath.Abs("../../bin/" + dockerExecutable())
 	gomega.Expect(err).To(gomega.BeNil())
-	err = copyFiles(dockerPath, filepath.Join(s.BinDir, dockerExecutable()))
+	err = copyFile(dockerPath, filepath.Join(s.BinDir, dockerExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
 	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
 	gomega.Expect(err).To(gomega.BeNil())
 }
 
-func copyFiles(sourceFile string, destinationFile string) error {
+func copyFile(sourceFile string, destinationFile string) error {
 	input, err := ioutil.ReadFile(sourceFile)
 	if err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(destinationFile, input, 0644)
+	err = ioutil.WriteFile(destinationFile, input, 0777)
 	if err != nil {
 		return err
 	}
@@ -128,10 +128,6 @@ func (s *Suite) ListProcessesCommand() *CmdContext {
 	return s.NewCommand("ps")
 }
 
-func IsWindows() bool {
-	return runtime.GOOS == "windows"
-}
-
 // NewCommand creates a command context.
 func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 	return &CmdContext{
@@ -148,6 +144,7 @@ func dockerExecutable() string {
 	return "docker"
 }
 
+// DockerClassicExecutable binary name based on platform
 func DockerClassicExecutable() string {
 	if IsWindows() {
 		return "docker-classic.exe"
