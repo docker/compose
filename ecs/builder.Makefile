@@ -12,7 +12,7 @@ STATIC_FLAGS= CGO_ENABLED=0
 LDFLAGS := "-s -w"
 GO_BUILD = $(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
-BINARY=dist/docker
+BINARY=dist/docker-ecs
 BINARY_WITH_EXTENSION=$(BINARY)$(EXTENSION)
 
 export DOCKER_BUILDKIT=1
