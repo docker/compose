@@ -44,7 +44,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	github.com/tj/survey v2.0.6+incompatible
 	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
