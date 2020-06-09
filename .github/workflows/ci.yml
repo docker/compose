@@ -21,7 +21,7 @@ jobs:
       - name: Run golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.27.0
-          ./golangci-lint run
+          ./golangci-lint run --timeout 10m0s
 
   build:
     name: Build
@@ -63,7 +63,6 @@ jobs:
       - name: E2E Test
         run: make e2e-local
 
-
   windows-build:
     name: Windows Build
     runs-on: windows-latest
@@ -92,14 +91,5 @@ jobs:
       - name: Build
         run: make -f builder.Makefile cli
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@master
-        with:
-          version: "3.9.1"
-
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "10.x"
-
       - name: E2E Test
-        run: make e2e-local
+        run: make e2e-win-ci
