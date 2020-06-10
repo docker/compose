@@ -1785,6 +1785,7 @@ class _CLIBuilder(object):
         """
         if dockerfile:
             dockerfile = os.path.join(path, dockerfile)
+            
         iidfile = tempfile.NamedTemporaryFile(delete=False)
 
         command_builder = _CommandBuilder()
