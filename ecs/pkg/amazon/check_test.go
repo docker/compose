@@ -3,7 +3,7 @@ package amazon
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestInvalidNetworkMode(t *testing.T) {

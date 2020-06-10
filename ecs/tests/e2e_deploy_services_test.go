@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/docker"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/fs"
 	"gotest.tools/v3/golden"
 	"gotest.tools/v3/icmd"

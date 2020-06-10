@@ -13,7 +13,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
 

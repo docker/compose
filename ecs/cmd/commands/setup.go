@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
-	"github.com/docker/cli/cli-plugins/plugin"
 	contextStore "github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -42,11 +41,6 @@ func SetupCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			//Override the root command PersistentPreRun
-			//We just need to initialize the top parent command
-			return plugin.PersistentPreRunE(cmd, args)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if requiredFlag := opts.unsetRequiredArgs(); len(requiredFlag) > 0 {
 				if err := interactiveCli(&opts); err != nil {
