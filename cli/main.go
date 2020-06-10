@@ -60,8 +60,7 @@ import (
 )
 
 var (
-	runningOwnCommand bool
-	ownCommands       = map[string]struct{}{
+	ownCommands = map[string]struct{}{
 		"context": {},
 		"login":   {},
 		"serve":   {},
@@ -100,8 +99,7 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			runningOwnCommand = isOwnCommand(cmd)
-			if !runningOwnCommand {
+			if !isOwnCommand(cmd) {
 				dockerclassic.Exec(cmd.Context())
 			}
 			return nil
@@ -125,8 +123,7 @@ func main() {
 
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		runningOwnCommand = isOwnCommand(cmd)
-		if !runningOwnCommand {
+		if !isOwnCommand(cmd) {
 			dockerclassic.Exec(cmd.Context())
 		}
 		helpFunc(cmd, args)
@@ -163,9 +160,11 @@ func main() {
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
-	if err = root.ExecuteContext(ctx); err != nil {
+	err = root.ExecuteContext(ctx)
+	if err != nil {
 		// Context should always be handled by new CLI
-		if runningOwnCommand {
+		requiredCmd, _, _ := root.Find(os.Args[1:])
+		if requiredCmd != nil && isOwnCommand(requiredCmd) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

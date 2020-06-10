@@ -76,6 +76,14 @@ func (s *E2eSuite) TestContextLegacy() {
 	})
 }
 
+func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
+	It("should dispay new cli error when parsing context create flags", func() {
+		_, err := s.NewDockerCommand("context", "create", "--aci-subscription-id", "titi").Exec()
+		Expect(err.Error()).NotTo(ContainSubstring("unknown flag"))
+		Expect(err.Error()).To(ContainSubstring("accepts 2 arg(s), received 0"))
+	})
+}
+
 func (s *E2eSuite) TestClassicLoginWithparameters() {
 	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
 	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
