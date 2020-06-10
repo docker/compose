@@ -127,6 +127,9 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 			if err := json.Unmarshal(bits, &t); err != nil {
 				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
 			}
+			if len(t.Value) < 1 {
+				return errors.Wrap(errdefs.ErrLoginFailed, "could not find azure tenant")
+			}
 			tID := t.Value[0].TenantID
 			tToken, err := login.refreshToken(token.RefreshToken, tID)
 			if err != nil {
