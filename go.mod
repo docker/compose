@@ -33,7 +33,7 @@ require (
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/onsi/gomega v1.9.0
+	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.1.1 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	github.com/tj/survey v2.0.6+incompatible
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
+	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 // indirect
 	google.golang.org/grpc v1.29.1
