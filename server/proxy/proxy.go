@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/config"
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	contextsv1 "github.com/docker/api/protos/contexts/v1"
 	streamsv1 "github.com/docker/api/protos/streams/v1"
@@ -33,18 +34,21 @@ type Proxy interface {
 }
 
 type proxy struct {
-	currentContext string
-	mu             sync.Mutex
-	streams        map[string]*streams.Stream
-	contextsProxy  *contextsProxy
+	configDir     string
+	mu            sync.Mutex
+	streams       map[string]*streams.Stream
+	contextsProxy *contextsProxy
 }
 
 // New creates a new proxy server
-func New(currentContext string) Proxy {
+func New(ctx context.Context) Proxy {
+	configDir := config.Dir(ctx)
 	return &proxy{
-		currentContext: currentContext,
-		streams:        map[string]*streams.Stream{},
-		contextsProxy:  &contextsProxy{},
+		configDir: configDir,
+		streams:   map[string]*streams.Stream{},
+		contextsProxy: &contextsProxy{
+			configDir: configDir,
+		},
 	}
 }
 

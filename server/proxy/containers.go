@@ -24,9 +24,7 @@ func portsToGrpc(ports []containers.Port) []*containersv1.Port {
 }
 
 func (p *proxy) List(ctx context.Context, request *containersv1.ListRequest) (*containersv1.ListResponse, error) {
-	client := Client(ctx)
-
-	c, err := client.ContainerService().List(ctx, request.GetAll())
+	containerList, err := Client(ctx).ContainerService().List(ctx, request.GetAll())
 	if err != nil {
 		return &containersv1.ListResponse{}, err
 	}
@@ -34,7 +32,7 @@ func (p *proxy) List(ctx context.Context, request *containersv1.ListRequest) (*c
 	response := &containersv1.ListResponse{
 		Containers: []*containersv1.Container{},
 	}
-	for _, container := range c {
+	for _, container := range containerList {
 		response.Containers = append(response.Containers, &containersv1.Container{
 			Id:          container.ID,
 			Image:       container.Image,
@@ -54,9 +52,8 @@ func (p *proxy) List(ctx context.Context, request *containersv1.ListRequest) (*c
 }
 
 func (p *proxy) Stop(ctx context.Context, request *containersv1.StopRequest) (*containersv1.StopResponse, error) {
-	c := Client(ctx)
 	timeoutValue := request.GetTimeout()
-	return &containersv1.StopResponse{}, c.ContainerService().Stop(ctx, request.Id, &timeoutValue)
+	return &containersv1.StopResponse{}, Client(ctx).ContainerService().Stop(ctx, request.Id, &timeoutValue)
 }
 
 func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*containersv1.RunResponse, error) {
@@ -70,24 +67,17 @@ func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*con
 		})
 	}
 
-	err := Client(ctx).ContainerService().Run(ctx, containers.ContainerConfig{
+	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, containers.ContainerConfig{
 		ID:      request.GetId(),
 		Image:   request.GetImage(),
 		Labels:  request.GetLabels(),
 		Ports:   ports,
 		Volumes: request.GetVolumes(),
 	})
-
-	return &containersv1.RunResponse{}, err
 }
 
 func (p *proxy) Delete(ctx context.Context, request *containersv1.DeleteRequest) (*containersv1.DeleteResponse, error) {
-	err := Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
-	if err != nil {
-		return &containersv1.DeleteResponse{}, err
-	}
-
-	return &containersv1.DeleteResponse{}, nil
+	return &containersv1.DeleteResponse{}, Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
 }
 
 func (p *proxy) Exec(ctx context.Context, request *containersv1.ExecRequest) (*containersv1.ExecResponse, error) {
@@ -101,16 +91,12 @@ func (p *proxy) Exec(ctx context.Context, request *containersv1.ExecRequest) (*c
 	io := &streams.IO{
 		Stream: stream,
 	}
-	err := Client(ctx).ContainerService().Exec(ctx, request.GetId(), request.GetCommand(), io, io)
 
-	return &containersv1.ExecResponse{}, err
+	return &containersv1.ExecResponse{}, Client(ctx).ContainerService().Exec(ctx, request.GetId(), request.GetCommand(), io, io)
 }
 
 func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Containers_LogsServer) error {
-	ctx := stream.Context()
-	c := Client(ctx)
-
-	return c.ContainerService().Logs(ctx, request.GetContainerId(), containers.LogsRequest{
+	return Client(stream.Context()).ContainerService().Logs(stream.Context(), request.GetContainerId(), containers.LogsRequest{
 		Follow: request.Follow,
 		Writer: &streams.Log{
 			Stream: stream,

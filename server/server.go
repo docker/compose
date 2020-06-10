@@ -32,28 +32,23 @@ import (
 	"net"
 	"strings"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/config"
 	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
 	"github.com/docker/api/server/proxy"
 )
 
 // New returns a new GRPC server.
 func New(ctx context.Context) *grpc.Server {
 	s := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			unaryServerInterceptor(ctx),
-			unary,
-		),
-		grpc.ChainStreamInterceptor(
-			grpc.StreamServerInterceptor(stream),
-			grpc.StreamServerInterceptor(streamServerInterceptor(ctx)),
-		),
+		grpc.UnaryInterceptor(unaryServerInterceptor(ctx)),
+		grpc.StreamInterceptor(streamServerInterceptor(ctx)),
 	)
 	hs := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(s, hs)
@@ -68,19 +63,10 @@ func CreateListener(address string) (net.Listener, error) {
 	return createLocalListener(address)
 }
 
-func unary(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	return grpc_prometheus.UnaryServerInterceptor(ctx, req, info, handler)
-}
-
-func stream(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	return grpc_prometheus.StreamServerInterceptor(srv, ss, info, handler)
-}
-
 // unaryServerInterceptor configures the context and sends it to the next handler
 func unaryServerInterceptor(clictx context.Context) func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		currentContext := getContext(ctx)
-		configuredCtx, err := configureContext(clictx, currentContext)
+		configuredCtx, err := configureContext(clictx, info.FullMethod)
 		if err != nil {
 			return nil, err
 		}
@@ -92,8 +78,7 @@ func unaryServerInterceptor(clictx context.Context) func(ctx context.Context, re
 // streamServerInterceptor configures the context and sends it to the next handler
 func streamServerInterceptor(clictx context.Context) func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		currentContext := getContext(ss.Context())
-		ctx, err := configureContext(clictx, currentContext)
+		ctx, err := configureContext(clictx, info.FullMethod)
 		if err != nil {
 			return err
 		}
@@ -102,43 +87,37 @@ func streamServerInterceptor(clictx context.Context) func(srv interface{}, ss gr
 	}
 }
 
-// getContext returns the current context name sent in the request metadata, it
-// returns an empty string if there is no metadata
-// not present
-func getContext(ctx context.Context) string {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return ""
-	}
-
-	key, ok := md[apicontext.Key]
-	if !ok {
-		return ""
-	}
-
-	if len(key) == 1 {
-		return key[0]
-	}
-
-	return ""
-}
-
 // configureContext populates the request context with objects the client
 // needs: the context store and the api client
-func configureContext(ctx context.Context, currentContext string) (context.Context, error) {
-	if currentContext != "" {
-		ctx = apicontext.WithCurrentContext(ctx, currentContext)
-	}
-
-	c, err := client.New(ctx)
+func configureContext(ctx context.Context, method string) (context.Context, error) {
+	configDir := config.Dir(ctx)
+	configFile, err := config.LoadFile(configDir)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, err = proxy.WithClient(ctx, c)
+	if configFile.CurrentContext != "" {
+		ctx = apicontext.WithCurrentContext(ctx, configFile.CurrentContext)
+	}
+
+	// The contexts service doesn't need the client
+	if !strings.Contains(method, "/com.docker.api.protos.context.v1.Contexts") {
+		c, err := client.New(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		ctx, err = proxy.WithClient(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	s, err := store.New(store.WithRoot(configDir))
 	if err != nil {
 		return nil, err
 	}
+	ctx = store.WithContextStore(ctx, s)
 
 	return ctx, nil
 }

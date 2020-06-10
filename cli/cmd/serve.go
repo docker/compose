@@ -7,7 +7,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	apicontext "github.com/docker/api/context"
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	contextsv1 "github.com/docker/api/protos/contexts/v1"
 	streamsv1 "github.com/docker/api/protos/streams/v1"
@@ -46,7 +45,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	// nolint errcheck
 	defer listener.Close()
 
-	p := proxy.New(apicontext.CurrentContext(ctx))
+	p := proxy.New(ctx)
 
 	containersv1.RegisterContainersServer(s, p)
 	streamsv1.RegisterStreamingServer(s, p)
