@@ -36,7 +36,7 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 	for _, c := range contexts {
 		result.Contexts = append(result.Contexts, &contextsv1.Context{
 			Name:        c.Name,
-			ContextType: c.Type,
+			ContextType: c.Type(),
 			Current:     c.Name == configFile.CurrentContext,
 		})
 	}

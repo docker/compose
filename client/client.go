@@ -49,13 +49,13 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	service, err := backend.Get(ctx, cc.Type)
+	service, err := backend.Get(ctx, cc.Type())
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
-		backendType: cc.Type,
+		backendType: cc.Type(),
 		bs:          service,
 	}, nil
 }

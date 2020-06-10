@@ -104,7 +104,7 @@ func (suite *StoreTestSuite) TestGet() {
 	require.Equal(suite.T(), "test", meta.Name)
 
 	require.Equal(suite.T(), "description", meta.Metadata.Description)
-	require.Equal(suite.T(), "type", meta.Type)
+	require.Equal(suite.T(), "type", meta.Type())
 }
 
 func (suite *StoreTestSuite) TestRemoveNotFound() {
