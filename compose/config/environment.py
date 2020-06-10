@@ -1,12 +1,8 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import os
 import re
 
 import dotenv
-import six
 
 from ..const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
@@ -16,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 def split_env(env):
-    if isinstance(env, six.binary_type):
+    if isinstance(env, bytes):
         env = env.decode('utf-8', 'replace')
     key = value = None
     if '=' in env:

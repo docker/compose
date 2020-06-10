@@ -2,9 +2,6 @@
 Integration tests which cover state convergence (aka smart recreate) performed
 by `docker-compose up`.
 """
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import copy
 import os
 import shutil

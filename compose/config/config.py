@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import functools
 import io
 import logging
@@ -11,7 +8,6 @@ import sys
 from collections import namedtuple
 from operator import attrgetter
 
-import six
 import yaml
 from cached_property import cached_property
 
@@ -204,7 +200,7 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                         'Compose file version 1.'.format(self.filename))
             return V1
 
-        if not isinstance(version, six.string_types):
+        if not isinstance(version, str):
             raise ConfigurationError(
                 'Version in "{}" is invalid - it should be a string.'
                 .format(self.filename))
@@ -687,12 +683,12 @@ def resolve_environment(service_dict, environment=None, interpolate=True):
         env.update(env_vars_from_file(env_file, interpolate))
 
     env.update(parse_environment(service_dict.get('environment')))
-    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(env))
+    return dict(resolve_env_var(k, v, environment) for k, v in env.items())
 
 
 def resolve_build_args(buildargs, environment):
     args = parse_build_arguments(buildargs)
-    return dict(resolve_env_var(k, v, environment) for k, v in six.iteritems(args))
+    return dict(resolve_env_var(k, v, environment) for k, v in args.items())
 
 
 def validate_extended_service_dict(service_dict, filename, service):
@@ -779,7 +775,7 @@ def process_service(service_config):
 
 
 def process_build_section(service_dict, working_dir):
-    if isinstance(service_dict['build'], six.string_types):
+    if isinstance(service_dict['build'], str):
         service_dict['build'] = resolve_build_path(working_dir, service_dict['build'])
     elif isinstance(service_dict['build'], dict):
         if 'context' in service_dict['build']:
@@ -847,7 +843,7 @@ def process_healthcheck(service_dict):
         hc['test'] = ['NONE']
 
     for field in ['interval', 'timeout', 'start_period']:
-        if field not in hc or isinstance(hc[field], six.integer_types):
+        if field not in hc or isinstance(hc[field], int):
             continue
         hc[field] = parse_nanoseconds_int(hc[field])
 
@@ -1179,7 +1175,7 @@ def merge_ports(md, base, override):
 def merge_build(output, base, override):
     def to_dict(service):
         build_config = service.get('build', {})
-        if isinstance(build_config, six.string_types):
+        if isinstance(build_config, str):
             return {'context': build_config}
         return build_config
 
@@ -1389,7 +1385,7 @@ def normalize_build(service_dict, working_dir, environment):
     if 'build' in service_dict:
         build = {}
         # Shortcut where specifying a string is treated as the build context
-        if isinstance(service_dict['build'], six.string_types):
+        if isinstance(service_dict['build'], str):
             build['context'] = service_dict.pop('build')
         else:
             build.update(service_dict['build'])
@@ -1415,7 +1411,7 @@ def validate_paths(service_dict):
     if 'build' in service_dict:
         build = service_dict.get('build', {})
 
-        if isinstance(build, six.string_types):
+        if isinstance(build, str):
             build_path = build
         elif isinstance(build, dict) and 'context' in build:
             build_path = build['context']
@@ -1506,7 +1502,7 @@ def merge_list_or_string(base, override):
 def to_list(value):
     if value is None:
         return []
-    elif isinstance(value, six.string_types):
+    elif isinstance(value, str):
         return [value]
     else:
         return value

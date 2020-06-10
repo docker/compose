@@ -1,5 +1,4 @@
 backports.shutil_get_terminal_size==1.0.0
-backports.ssl-match-hostname==3.5.0.1; python_version < '3'
 cached-property==1.5.1
 certifi==2020.4.5.1
 chardet==3.0.4
@@ -21,8 +20,6 @@ PySocks==1.7.1
 python-dotenv==0.13.0
 PyYAML==5.3
 requests==2.22.0
-six==1.12.0
-subprocess32==3.5.4; python_version < '3.2'
 texttable==1.6.2
 urllib3==1.25.9; python_version == '3.3'
 websocket-client==0.57.0
