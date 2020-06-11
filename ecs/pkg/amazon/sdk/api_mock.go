@@ -2,7 +2,7 @@
 // Source: github.com/docker/ecs-plugin/pkg/amazon (interfaces: API)
 
 // Package amazon is a generated GoMock package.
-package amazon
+package sdk
 
 import (
 	context "context"
@@ -10,7 +10,7 @@ import (
 
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
-	docker "github.com/docker/ecs-plugin/pkg/docker"
+	btypes "github.com/docker/ecs-plugin/pkg/amazon/types"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -53,7 +53,7 @@ func (mr *MockAPIMockRecorder) ClusterExists(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // CreateSecret mocks base method
-func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 docker.Secret) (string, error) {
+func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 btypes.Secret) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSecret", arg0, arg1)
 	ret0, _ := ret[0].(string)
@@ -139,14 +139,14 @@ func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomo
 }
 
 // DescribeTasks mocks base method
-func (m *MockAPI) DescribeTasks(arg0 context.Context, arg1 string, arg2 ...string) ([]TaskStatus, error) {
+func (m *MockAPI) DescribeTasks(arg0 context.Context, arg1 string, arg2 ...string) ([]btypes.TaskStatus, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "DescribeTasks", varargs...)
-	ret0, _ := ret[0].([]TaskStatus)
+	ret0, _ := ret[0].([]btypes.TaskStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -174,7 +174,7 @@ func (mr *MockAPIMockRecorder) GetDefaultVPC(arg0 interface{}) *gomock.Call {
 }
 
 // GetLogs mocks base method
-func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 LogConsumer) error {
+func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 btypes.LogConsumer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -238,10 +238,10 @@ func (mr *MockAPIMockRecorder) GetSubNets(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // InspectSecret mocks base method
-func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (docker.Secret, error) {
+func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (btypes.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InspectSecret", arg0, arg1)
-	ret0, _ := ret[0].(docker.Secret)
+	ret0, _ := ret[0].(btypes.Secret)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -253,10 +253,10 @@ func (mr *MockAPIMockRecorder) InspectSecret(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // ListSecrets mocks base method
-func (m *MockAPI) ListSecrets(arg0 context.Context) ([]docker.Secret, error) {
+func (m *MockAPI) ListSecrets(arg0 context.Context) ([]btypes.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListSecrets", arg0)
-	ret0, _ := ret[0].([]docker.Secret)
+	ret0, _ := ret[0].([]btypes.Secret)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

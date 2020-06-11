@@ -1,4 +1,4 @@
-package amazon
+package backend
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
+
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
@@ -103,7 +104,7 @@ services:
 }
 
 func convertResultAsString(t *testing.T, project *compose.Project, clusterName string) string {
-	client, err := NewClient("", clusterName, "")
+	client, err := NewBackend("", clusterName, "")
 	assert.NilError(t, err)
 	result, err := client.Convert(project)
 	assert.NilError(t, err)
@@ -133,7 +134,7 @@ func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 	assert.NilError(t, err)
 	err = compose.Normalize(model)
 	assert.NilError(t, err)
-	template, err := client{}.Convert(&compose.Project{
+	template, err := Backend{}.Convert(&compose.Project{
 		Config: *model,
 		Name:   "test",
 	})

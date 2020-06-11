@@ -3,9 +3,12 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/ecs-plugin/pkg/amazon"
+	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
@@ -47,11 +50,11 @@ func ConvertCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) 
 			if err != nil {
 				return err
 			}
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
-			template, err := client.Convert(project)
+			template, err := backend.Convert(project)
 			if err != nil {
 				return err
 			}
@@ -77,11 +80,11 @@ func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 			if err != nil {
 				return err
 			}
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
-			return client.ComposeUp(context.Background(), project)
+			return backend.ComposeUp(context.Background(), project)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
@@ -97,11 +100,20 @@ func PsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 			if err != nil {
 				return err
 			}
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
-			return client.ComposePs(context.Background(), project)
+			tasks, err := backend.ComposePs(context.Background(), project)
+			if err != nil {
+				return err
+			}
+			printSection(os.Stdout, len(tasks), func(w io.Writer) {
+				for _, task := range tasks {
+					fmt.Fprintf(w, "%s\t%s\t%s\n", task.Name, task.State, strings.Join(task.Ports, " "))
+				}
+			}, "NAME", "STATE", "PORTS")
+			return nil
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
@@ -117,7 +129,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 	cmd := &cobra.Command{
 		Use: "down",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
@@ -126,11 +138,11 @@ func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 				if err != nil {
 					return err
 				}
-				return client.ComposeDown(context.Background(), project.Name, opts.DeleteCluster)
+				return backend.ComposeDown(context.Background(), project.Name, opts.DeleteCluster)
 			}
 			// project names passed as parameters
 			for _, name := range args {
-				err := client.ComposeDown(context.Background(), name, opts.DeleteCluster)
+				err := backend.ComposeDown(context.Background(), name, opts.DeleteCluster)
 				if err != nil {
 					return err
 				}
@@ -146,7 +158,7 @@ func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 	cmd := &cobra.Command{
 		Use: "logs [PROJECT NAME]",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
@@ -161,7 +173,7 @@ func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 			} else {
 				name = args[0]
 			}
-			return client.ComposeLogs(context.Background(), name)
+			return backend.ComposeLogs(context.Background(), name)
 		}),
 	}
 	return cmd

@@ -1,4 +1,4 @@
-package amazon
+package sdk
 
 import (
 	"context"
@@ -25,7 +25,8 @@ import (
 	cf "github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/ecs-plugin/pkg/docker"
+	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	t "github.com/docker/ecs-plugin/pkg/amazon/types"
 )
 
 type sdk struct {
@@ -188,9 +189,9 @@ func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) 
 		StackName: aws.String(name),
 	}
 	switch operation {
-	case StackCreate:
+	case t.StackCreate:
 		return s.CF.WaitUntilStackCreateCompleteWithContext(ctx, input)
-	case StackDelete:
+	case t.StackDelete:
 		return s.CF.WaitUntilStackDeleteCompleteWithContext(ctx, input)
 	default:
 		return fmt.Errorf("internal error: unexpected stack operation %d", operation)
@@ -235,7 +236,7 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	return err
 }
 
-func (s sdk) CreateSecret(ctx context.Context, secret docker.Secret) (string, error) {
+func (s sdk) CreateSecret(ctx context.Context, secret t.Secret) (string, error) {
 	logrus.Debug("Create secret " + secret.Name)
 	secretStr, err := secret.GetCredString()
 	if err != nil {
@@ -253,17 +254,17 @@ func (s sdk) CreateSecret(ctx context.Context, secret docker.Secret) (string, er
 	return *response.ARN, nil
 }
 
-func (s sdk) InspectSecret(ctx context.Context, id string) (docker.Secret, error) {
+func (s sdk) InspectSecret(ctx context.Context, id string) (t.Secret, error) {
 	logrus.Debug("Inspect secret " + id)
 	response, err := s.SM.DescribeSecret(&secretsmanager.DescribeSecretInput{SecretId: &id})
 	if err != nil {
-		return docker.Secret{}, err
+		return t.Secret{}, err
 	}
 	labels := map[string]string{}
 	for _, tag := range response.Tags {
 		labels[*tag.Key] = *tag.Value
 	}
-	secret := docker.Secret{
+	secret := t.Secret{
 		ID:     *response.ARN,
 		Name:   *response.Name,
 		Labels: labels,
@@ -274,14 +275,14 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (docker.Secret, error
 	return secret, nil
 }
 
-func (s sdk) ListSecrets(ctx context.Context) ([]docker.Secret, error) {
+func (s sdk) ListSecrets(ctx context.Context) ([]t.Secret, error) {
 
 	logrus.Debug("List secrets ...")
 	response, err := s.SM.ListSecrets(&secretsmanager.ListSecretsInput{})
 	if err != nil {
-		return []docker.Secret{}, err
+		return []t.Secret{}, err
 	}
-	var secrets []docker.Secret
+	var secrets []t.Secret
 
 	for _, sec := range response.SecretList {
 
@@ -293,7 +294,7 @@ func (s sdk) ListSecrets(ctx context.Context) ([]docker.Secret, error) {
 		if sec.Description != nil {
 			description = *sec.Description
 		}
-		secrets = append(secrets, docker.Secret{
+		secrets = append(secrets, t.Secret{
 			ID:          *sec.ARN,
 			Name:        *sec.Name,
 			Labels:      labels,
@@ -310,7 +311,7 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	return err
 }
 
-func (s sdk) GetLogs(ctx context.Context, name string, consumer LogConsumer) error {
+func (s sdk) GetLogs(ctx context.Context, name string, consumer types.LogConsumer) error {
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
@@ -356,7 +357,7 @@ func (s sdk) ListTasks(ctx context.Context, cluster string, service string) ([]s
 	return arns, nil
 }
 
-func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]TaskStatus, error) {
+func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]t.TaskStatus, error) {
 	tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
 		Cluster: aws.String(cluster),
 		Tasks:   aws.StringSlice(arns),
@@ -364,7 +365,7 @@ func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) 
 	if err != nil {
 		return nil, err
 	}
-	result := []TaskStatus{}
+	result := []t.TaskStatus{}
 	for _, task := range tasks.Tasks {
 		var networkInterface string
 		for _, attachement := range task.Attachments {
@@ -376,7 +377,7 @@ func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) 
 				}
 			}
 		}
-		result = append(result, TaskStatus{
+		result = append(result, t.TaskStatus{
 			State:            *task.LastStatus,
 			Service:          strings.Replace(*task.Group, "service:", "", 1),
 			NetworkInterface: networkInterface,

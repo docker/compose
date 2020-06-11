@@ -1,4 +1,4 @@
-package amazon
+package backend
 
 const (
 	ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"

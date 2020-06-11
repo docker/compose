@@ -1,4 +1,4 @@
-package amazon
+package backend
 
 import (
 	"fmt"
@@ -21,6 +21,9 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
+	"github.com/docker/ecs-plugin/pkg/amazon/compatibility"
+	sdk "github.com/docker/ecs-plugin/pkg/amazon/sdk"
+	btypes "github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
@@ -33,8 +36,8 @@ const (
 )
 
 // Convert a compose project into a CloudFormation template
-func (c client) Convert(project *compose.Project) (*cloudformation.Template, error) {
-	warnings := Check(project)
+func (b Backend) Convert(project *compose.Project) (*cloudformation.Template, error) {
+	warnings := compatibility.Check(project)
 	for _, w := range warnings {
 		logrus.Warn(w)
 	}
@@ -75,7 +78,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	// Create Cluster is `ParameterClusterName` parameter is not set
 	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(ParameterClusterName))
 
-	cluster := c.createCluster(project, template)
+	cluster := createCluster(project, template)
 
 	networks := map[string]string{}
 	for _, net := range project.Networks {
@@ -88,17 +91,18 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	}
 
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
-	c.createCloudMap(project, template)
+	createCloudMap(project, template)
 
-	loadBalancerARN := c.createLoadBalancer(project, template)
+	loadBalancerARN := createLoadBalancer(project, template)
 
 	for _, service := range project.Services {
-		definition, err := Convert(project, service)
+
+		definition, err := sdk.Convert(project, service)
 		if err != nil {
 			return nil, err
 		}
 
-		taskExecutionRole, err := c.createTaskExecutionRole(service, err, definition, template)
+		taskExecutionRole, err := createTaskExecutionRole(service, err, definition, template)
 		if err != nil {
 			return template, err
 		}
@@ -112,7 +116,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
 		}
 
-		serviceRegistry := c.createServiceRegistry(service, template, healthCheck)
+		serviceRegistry := createServiceRegistry(service, template, healthCheck)
 
 		serviceSecurityGroups := []string{}
 		for net := range service.Networks {
@@ -124,14 +128,14 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 		if len(service.Ports) > 0 {
 			for _, port := range service.Ports {
 				protocol := strings.ToUpper(port.Protocol)
-				if c.getLoadBalancerType(project) == elbv2.LoadBalancerTypeEnumApplication {
+				if getLoadBalancerType(project) == elbv2.LoadBalancerTypeEnumApplication {
 					protocol = elbv2.ProtocolEnumHttps
 					if port.Published == 80 {
 						protocol = elbv2.ProtocolEnumHttp
 					}
 				}
-				targetGroupName := c.createTargetGroup(project, service, port, template, protocol)
-				listenerName := c.createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
+				targetGroupName := createTargetGroup(project, service, port, template, protocol)
+				listenerName := createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
 				dependsOn = append(dependsOn, listenerName)
 				serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
 					ContainerName:  service.Name,
@@ -184,7 +188,7 @@ func (c client) Convert(project *compose.Project) (*cloudformation.Template, err
 	return template, nil
 }
 
-func (c client) getLoadBalancerType(project *compose.Project) string {
+func getLoadBalancerType(project *compose.Project) string {
 	for _, service := range project.Services {
 		for _, port := range service.Ports {
 			if port.Published != 80 && port.Published != 443 {
@@ -195,7 +199,7 @@ func (c client) getLoadBalancerType(project *compose.Project) string {
 	return elbv2.LoadBalancerTypeEnumApplication
 }
 
-func (c client) getLoadBalancerSecurityGroups(project *compose.Project, template *cloudformation.Template) []string {
+func getLoadBalancerSecurityGroups(project *compose.Project, template *cloudformation.Template) []string {
 	securityGroups := []string{}
 	for _, network := range project.Networks {
 		if !network.Internal {
@@ -206,15 +210,15 @@ func (c client) getLoadBalancerSecurityGroups(project *compose.Project, template
 	return uniqueStrings(securityGroups)
 }
 
-func (c client) createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
+func createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
 	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
 	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
 	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
 
-	loadBalancerType := c.getLoadBalancerType(project)
+	loadBalancerType := getLoadBalancerType(project)
 	securityGroups := []string{}
 	if loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
-		securityGroups = c.getLoadBalancerSecurityGroups(project, template)
+		securityGroups = getLoadBalancerSecurityGroups(project, template)
 	}
 
 	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
@@ -237,7 +241,7 @@ func (c client) createLoadBalancer(project *compose.Project, template *cloudform
 	return cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
 }
 
-func (c client) createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
+func createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
 	listenerName := fmt.Sprintf(
 		"%s%s%dListener",
 		normalizeResourceName(service.Name),
@@ -266,7 +270,7 @@ func (c client) createListener(service types.ServiceConfig, port types.ServicePo
 	return listenerName
 }
 
-func (c client) createTargetGroup(project *compose.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
+func createTargetGroup(project *compose.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
 	targetGroupName := fmt.Sprintf(
 		"%s%s%dTargetGroup",
 		normalizeResourceName(service.Name),
@@ -289,7 +293,7 @@ func (c client) createTargetGroup(project *compose.Project, service types.Servic
 	return targetGroupName
 }
 
-func (c client) createServiceRegistry(service types.ServiceConfig, template *cloudformation.Template, healthCheck *cloudmap.Service_HealthCheckConfig) ecs.Service_ServiceRegistry {
+func createServiceRegistry(service types.ServiceConfig, template *cloudformation.Template, healthCheck *cloudmap.Service_HealthCheckConfig) ecs.Service_ServiceRegistry {
 	serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", normalizeResourceName(service.Name))
 	serviceRegistry := ecs.Service_ServiceRegistry{
 		RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
@@ -316,9 +320,9 @@ func (c client) createServiceRegistry(service types.ServiceConfig, template *clo
 	return serviceRegistry
 }
 
-func (c client) createTaskExecutionRole(service types.ServiceConfig, err error, definition *ecs.TaskDefinition, template *cloudformation.Template) (string, error) {
+func createTaskExecutionRole(service types.ServiceConfig, err error, definition *ecs.TaskDefinition, template *cloudformation.Template) (string, error) {
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
-	policy, err := c.getPolicy(definition)
+	policy, err := getPolicy(definition)
 	if err != nil {
 		return taskExecutionRole, err
 	}
@@ -341,7 +345,7 @@ func (c client) createTaskExecutionRole(service types.ServiceConfig, err error, 
 	return taskExecutionRole, nil
 }
 
-func (c client) createCluster(project *compose.Project, template *cloudformation.Template) string {
+func createCluster(project *compose.Project, template *cloudformation.Template) string {
 	template.Resources["Cluster"] = &ecs.Cluster{
 		ClusterName: project.Name,
 		Tags: []tags.Tag{
@@ -356,7 +360,7 @@ func (c client) createCluster(project *compose.Project, template *cloudformation
 	return cluster
 }
 
-func (c client) createCloudMap(project *compose.Project, template *cloudformation.Template) {
+func createCloudMap(project *compose.Project, template *cloudformation.Template) {
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
@@ -365,7 +369,7 @@ func (c client) createCloudMap(project *compose.Project, template *cloudformatio
 }
 
 func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
-	if sg, ok := net.Extras[ExtensionSecurityGroup]; ok {
+	if sg, ok := net.Extras[btypes.ExtensionSecurityGroup]; ok {
 		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
 		return sg.(string)
 	}
@@ -428,7 +432,7 @@ func normalizeResourceName(s string) string {
 	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }
 
-func (c client) getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
+func getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
 	arns := []string{}
 	for _, container := range taskDef.ContainerDefinitions {
 		if container.RepositoryCredentials != nil {

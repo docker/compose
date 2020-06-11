@@ -1,9 +1,9 @@
-package amazon
+package backend
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
 )
 
 const (
@@ -12,7 +12,7 @@ const (
 	ServiceTag = "com.docker.compose.service"
 )
 
-func NewClient(profile string, cluster string, region string) (compose.API, error) {
+func NewBackend(profile string, cluster string, region string) (*Backend, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Profile: profile,
 		Config: aws.Config{
@@ -22,17 +22,15 @@ func NewClient(profile string, cluster string, region string) (compose.API, erro
 	if err != nil {
 		return nil, err
 	}
-	return &client{
+	return &Backend{
 		Cluster: cluster,
 		Region:  region,
-		api:     NewAPI(sess),
+		api:     sdk.NewAPI(sess),
 	}, nil
 }
 
-type client struct {
+type Backend struct {
 	Cluster string
 	Region  string
-	api     API
+	api     sdk.API
 }
-
-var _ compose.API = &client{}

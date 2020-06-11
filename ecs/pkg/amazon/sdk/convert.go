@@ -1,4 +1,4 @@
-package amazon
+package sdk
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
+	t "github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
@@ -318,7 +319,7 @@ func getImage(image string) string {
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
 	// extract registry and namespace string from image name
 	for key, value := range service.Extras {
-		if key == ExtensionPullCredentials {
+		if key == t.ExtensionPullCredentials {
 			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 		}
 	}

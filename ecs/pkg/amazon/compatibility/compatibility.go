@@ -1,4 +1,4 @@
-package amazon
+package compatibility
 
 import (
 	"fmt"

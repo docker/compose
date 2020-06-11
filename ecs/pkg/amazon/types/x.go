@@ -1,4 +1,4 @@
-package amazon
+package types
 
 const (
 	ExtensionSecurityGroup   = "x-aws-securitygroup"

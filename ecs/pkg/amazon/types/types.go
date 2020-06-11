@@ -1,8 +1,24 @@
-package docker
+package types
 
-import (
-	"encoding/json"
+import "encoding/json"
+
+type TaskStatus struct {
+	Name             string
+	State            string
+	Service          string
+	NetworkInterface string
+	PublicIP         string
+	Ports            []string
+}
+
+const (
+	StackCreate = iota
+	StackDelete
 )
+
+type LogConsumer interface {
+	Log(service, container, message string)
+}
 
 type Secret struct {
 	ID          string            `json:"ID"`

@@ -1,4 +1,4 @@
-package amazon
+package backend
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (c *client) ComposeLogs(ctx context.Context, projectName string) error {
-	err := c.api.GetLogs(ctx, projectName, &logConsumer{
+func (b *Backend) ComposeLogs(ctx context.Context, projectName string) error {
+	err := b.api.GetLogs(ctx, projectName, &logConsumer{
 		colors: map[string]console.ColorFunc{},
 		width:  0,
 	})
@@ -24,11 +24,6 @@ func (c *client) ComposeLogs(ctx context.Context, projectName string) error {
 	signal.Notify(signalChan, os.Interrupt)
 	<-signalChan
 	return nil
-}
-
-type logConsumer struct {
-	colors map[string]console.ColorFunc
-	width  int
 }
 
 func (l *logConsumer) Log(service, container, message string) {
@@ -54,10 +49,7 @@ func (l *logConsumer) computeWidth() {
 	l.width = width + 3
 }
 
-type LogConsumer interface {
-	Log(service, container, message string)
-}
-
-type logsAPI interface {
-	GetLogs(ctx context.Context, name string, consumer LogConsumer) error
+type logConsumer struct {
+	colors map[string]console.ColorFunc
+	width  int
 }

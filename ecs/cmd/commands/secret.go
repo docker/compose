@@ -10,7 +10,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/ecs-plugin/pkg/amazon"
+	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
+	"github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +48,7 @@ func CreateSecret(dockerCli command.Cli) *cobra.Command {
 		Use:   "create NAME",
 		Short: "Creates a secret.",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
@@ -56,8 +57,8 @@ func CreateSecret(dockerCli command.Cli) *cobra.Command {
 			}
 			name := args[0]
 
-			secret := docker.NewSecret(name, opts.Username, opts.Password, opts.Description)
-			id, err := client.CreateSecret(context.Background(), secret)
+			secret := types.NewSecret(name, opts.Username, opts.Password, opts.Description)
+			id, err := backend.CreateSecret(context.Background(), secret)
 			fmt.Println(id)
 			return err
 		}),
@@ -73,7 +74,7 @@ func InspectSecret(dockerCli command.Cli) *cobra.Command {
 		Use:   "inspect ID",
 		Short: "Displays secret details",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
@@ -81,7 +82,7 @@ func InspectSecret(dockerCli command.Cli) *cobra.Command {
 				return errors.New("Missing mandatory parameter: ID")
 			}
 			id := args[0]
-			secret, err := client.InspectSecret(context.Background(), id)
+			secret, err := backend.InspectSecret(context.Background(), id)
 			if err != nil {
 				return err
 			}
@@ -102,11 +103,11 @@ func ListSecrets(dockerCli command.Cli) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List secrets stored for the existing account.",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
-			secrets, err := client.ListSecrets(context.Background())
+			secrets, err := backend.ListSecrets(context.Background())
 			if err != nil {
 				return err
 			}
@@ -125,21 +126,21 @@ func DeleteSecret(dockerCli command.Cli) *cobra.Command {
 		Aliases: []string{"rm", "remove"},
 		Short:   "Removes a secret.",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			client, err := amazon.NewClient(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
 			if len(args) == 0 {
 				return errors.New("Missing mandatory parameter: [NAME]")
 			}
-			return client.DeleteSecret(context.Background(), args[0], opts.recover)
+			return backend.DeleteSecret(context.Background(), args[0], opts.recover)
 		}),
 	}
 	cmd.Flags().BoolVar(&opts.recover, "recover", false, "Enable recovery.")
 	return cmd
 }
 
-func printList(out io.Writer, secrets []docker.Secret) {
+func printList(out io.Writer, secrets []types.Secret) {
 	printSection(out, len(secrets), func(w io.Writer) {
 		for _, secret := range secrets {
 			fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)
