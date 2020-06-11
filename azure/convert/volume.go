@@ -3,7 +3,6 @@ package convert
 import (
 	"fmt"
 	"net/url"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -113,7 +112,8 @@ func (v *volumeInput) parse(name string, s string) error {
 	v.name = name
 	v.target = volumeURL.Path
 	if v.target == "" {
-		v.target = filepath.Join("/run/volumes/", v.share)
+		// Do not use filepath.Join, on Windows it will replace / by \
+		v.target = "/run/volumes/" + v.share
 	}
 	return nil
 }

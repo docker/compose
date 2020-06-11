@@ -28,13 +28,8 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -65,7 +60,7 @@ func (s *E2eSuite) TestContextDefault() {
 		output := s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
 		output = s.NewCommand("docker", "context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, "ls-out-default.golden")
+		golden.Assert(s.T(), output, GoldenFile("ls-out-default"))
 	})
 }
 
@@ -106,43 +101,12 @@ func (s *E2eSuite) TestSetupError() {
 	It("should display an error if cannot shell out to docker-classic", func() {
 		err := os.Setenv("PATH", s.BinDir)
 		Expect(err).To(BeNil())
-		err = os.Remove(filepath.Join(s.BinDir, "docker-classic"))
+		err = os.Remove(filepath.Join(s.BinDir, DockerClassicExecutable()))
 		Expect(err).To(BeNil())
 		output, err := s.NewDockerCommand("ps").Exec()
 		Expect(output).To(ContainSubstring("docker-classic"))
 		Expect(output).To(ContainSubstring("not found"))
 		Expect(err).NotTo(BeNil())
-	})
-}
-
-func (s *E2eSuite) TestKillChildOnCancel() {
-	It("should kill docker-classic if parent command is cancelled", func() {
-		out := s.ListProcessesCommand().ExecOrDie()
-		Expect(out).NotTo(ContainSubstring("docker-classic"))
-
-		dir := s.ConfigDir
-		Expect(ioutil.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(`FROM alpine:3.10
-RUN sleep 100`), 0644)).To(Succeed())
-		shutdown := make(chan time.Time)
-		errs := make(chan error)
-		ctx := s.NewDockerCommand("build", "--no-cache", "-t", "test-sleep-image", ".").WithinDirectory(dir).WithTimeout(shutdown)
-		go func() {
-			_, err := ctx.Exec()
-			errs <- err
-		}()
-		err := WaitFor(time.Second, 10*time.Second, errs, func() bool {
-			out := s.ListProcessesCommand().ExecOrDie()
-			return strings.Contains(out, "docker-classic")
-		})
-		Expect(err).NotTo(HaveOccurred())
-		log.Println("Killing docker process")
-
-		close(shutdown)
-		err = WaitFor(time.Second, 12*time.Second, nil, func() bool {
-			out := s.ListProcessesCommand().ExecOrDie()
-			return !strings.Contains(out, "docker-classic")
-		})
-		Expect(err).NotTo(HaveOccurred())
 	})
 }
 
@@ -159,7 +123,7 @@ func (s *E2eSuite) TestLegacy() {
 
 	It("should run local container in less than 10 secs", func() {
 		s.NewDockerCommand("pull", "hello-world").ExecOrDie()
-		output := s.NewDockerCommand("run", "--rm", "hello-world").WithTimeout(time.NewTimer(10 * time.Second).C).ExecOrDie()
+		output := s.NewDockerCommand("run", "--rm", "hello-world").WithTimeout(time.NewTimer(20 * time.Second).C).ExecOrDie()
 		Expect(output).To(ContainSubstring("Hello from Docker!"))
 	})
 }
@@ -187,7 +151,7 @@ func (s *E2eSuite) TestMockBackend() {
 		currentContext := s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := s.NewDockerCommand("context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, "ls-out-test-example.golden")
+		golden.Assert(s.T(), output, GoldenFile("ls-out-test-example"))
 		output = s.NewDockerCommand("context", "show").ExecOrDie()
 		Expect(output).To(ContainSubstring("test-example"))
 	})
@@ -222,40 +186,6 @@ func (s *E2eSuite) TestMockBackend() {
 	})
 }
 
-func (s *E2eSuite) TestAPIServer() {
-	_, err := exec.LookPath("yarn")
-	if err != nil || os.Getenv("SKIP_NODE") != "" {
-		s.T().Skip("skipping, yarn not installed")
-	}
-	It("can run 'serve' command", func() {
-		cName := "test-example"
-		s.NewDockerCommand("context", "create", cName, "example").ExecOrDie()
-
-		sPath := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
-		server, err := serveAPI(s.ConfigDir, sPath)
-		Expect(err).To(BeNil())
-		defer killProcess(server)
-
-		s.NewCommand("yarn", "install").WithinDirectory("../node-client").ExecOrDie()
-		output := s.NewCommand("yarn", "run", "start", cName, sPath).WithinDirectory("../node-client").ExecOrDie()
-		Expect(output).To(ContainSubstring("nginx"))
-	})
-}
-
 func TestE2e(t *testing.T) {
 	suite.Run(t, new(E2eSuite))
-}
-
-func killProcess(process *os.Process) {
-	err := process.Kill()
-	Expect(err).To(BeNil())
-}
-
-func serveAPI(configDir string, address string) (*os.Process, error) {
-	cmd := exec.Command("../../bin/docker", "--config", configDir, "serve", "--address", address)
-	err := cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-	return cmd.Process, nil
 }

@@ -37,7 +37,10 @@ cli: ## Compile the cli
 	--output ./bin
 
 e2e-local: ## Run End to end local tests
-	go test -v ./tests/e2e ./moby/e2e
+	go test -v ./tests/e2e ./tests/skip-win-ci-e2e ./moby/e2e
+
+e2e-win-ci: ## Run End to end local tests on windows CI, no docker for linux containers available ATM
+	go test -v ./tests/e2e
 
 e2e-aci: ## Run End to end ACI tests (requires azure login)
 	go test -v ./tests/aci-e2e

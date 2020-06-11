@@ -33,7 +33,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -56,13 +55,14 @@ func (s *Suite) SetupSuite() {
 		log.Error(message)
 		cp := filepath.Join(s.ConfigDir, "config.json")
 		d, _ := ioutil.ReadFile(cp)
+		fmt.Printf("Bin dir:%s\n", s.BinDir)
 		fmt.Printf("Contents of %s:\n%s\n\nContents of config dir:\n", cp, string(d))
 		for _, p := range dirContents(s.ConfigDir) {
 			fmt.Println(p)
 		}
 		s.T().Fail()
 	})
-	s.linkClassicDocker()
+	s.copyExecutablesInBinDir()
 }
 
 // TearDownSuite is run after all tests
@@ -79,20 +79,40 @@ func dirContents(dir string) []string {
 	return res
 }
 
-func (s *Suite) linkClassicDocker() {
-	p, err := exec.LookPath("docker-classic")
+func (s *Suite) copyExecutablesInBinDir() {
+	p, err := exec.LookPath(DockerClassicExecutable())
 	if err != nil {
-		p, err = exec.LookPath("docker")
+		p, err = exec.LookPath(dockerExecutable())
 	}
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Symlink(p, filepath.Join(s.BinDir, "docker-classic"))
+	err = copyFile(p, filepath.Join(s.BinDir, DockerClassicExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
-	dockerPath, err := filepath.Abs("../../bin/docker")
+	dockerPath, err := filepath.Abs("../../bin/" + dockerExecutable())
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Symlink(dockerPath, filepath.Join(s.BinDir, "docker"))
+	err = copyFile(dockerPath, filepath.Join(s.BinDir, dockerExecutable()))
 	gomega.Expect(err).To(gomega.BeNil())
-	err = os.Setenv("PATH", fmt.Sprintf("%s:%s", s.BinDir, os.Getenv("PATH")))
+	err = os.Setenv("PATH", concatenatePath(s.BinDir))
 	gomega.Expect(err).To(gomega.BeNil())
+}
+
+func concatenatePath(path string) string {
+	if IsWindows() {
+		return fmt.Sprintf("%s;%s", path, os.Getenv("PATH"))
+	}
+	return fmt.Sprintf("%s:%s", path, os.Getenv("PATH"))
+}
+
+func copyFile(sourceFile string, destinationFile string) error {
+	input, err := ioutil.ReadFile(sourceFile)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(destinationFile, input, 0777)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // BeforeTest is run before each test
@@ -109,7 +129,7 @@ func (s *Suite) AfterTest(suite, test string) {
 
 // ListProcessesCommand creates a command to list processes, "tasklist" on windows, "ps" otherwise.
 func (s *Suite) ListProcessesCommand() *CmdContext {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		return s.NewCommand("tasklist")
 	}
 	return s.NewCommand("ps")
@@ -125,10 +145,18 @@ func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 }
 
 func dockerExecutable() string {
-	if runtime.GOOS == "windows" {
+	if IsWindows() {
 		return "docker.exe"
 	}
 	return "docker"
+}
+
+// DockerClassicExecutable binary name based on platform
+func DockerClassicExecutable() string {
+	if IsWindows() {
+		return "docker-classic.exe"
+	}
+	return "docker-classic"
 }
 
 // NewDockerCommand creates a docker builder.
