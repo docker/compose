@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const defaultContextType = "docker"
+
 // Represents a context as created by the docker cli
 type defaultContext struct {
 	Metadata  ContextMetadata
@@ -31,7 +33,7 @@ type endpoint struct {
 	DefaultNamespace string
 }
 
-func dockerDefaultContext() (*Metadata, error) {
+func dockerDefaultContext() (*DockerContext, error) {
 	cmd := exec.Command("docker-classic", "context", "inspect", "default")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -52,9 +54,8 @@ func dockerDefaultContext() (*Metadata, error) {
 
 	defaultCtx := ctx[0]
 
-	meta := Metadata{
+	meta := DockerContext{
 		Name: "default",
-		Type: "docker",
 		Endpoints: map[string]interface{}{
 			"docker": Endpoint{
 				Host: defaultCtx.Endpoints.Docker.Host,
@@ -65,6 +66,7 @@ func dockerDefaultContext() (*Metadata, error) {
 			},
 		},
 		Metadata: ContextMetadata{
+			Type:              defaultContextType,
 			Description:       "Current DOCKER_HOST based configuration",
 			StackOrchestrator: defaultCtx.Metadata.StackOrchestrator,
 		},

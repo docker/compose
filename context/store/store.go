@@ -72,7 +72,7 @@ func ContextStore(ctx context.Context) Store {
 type Store interface {
 	// Get returns the context with name, it returns an error if the  context
 	// doesn't exist
-	Get(name string) (*Metadata, error)
+	Get(name string) (*DockerContext, error)
 	// GetEndpoint sets the `v` parameter to the value of the endpoint for a
 	// particular context type
 	GetEndpoint(name string, v interface{}) error
@@ -80,7 +80,7 @@ type Store interface {
 	// same name exists already.
 	Create(name string, contextType string, description string, data interface{}) error
 	// List returns the list of created contexts
-	List() ([]*Metadata, error)
+	List() ([]*DockerContext, error)
 	// Remove removes a context by name from the context store
 	Remove(name string) error
 }
@@ -103,34 +103,6 @@ const (
 	// example backend
 	ExampleContextType = "example"
 )
-
-// Metadata represents the docker context metadata
-type Metadata struct {
-	Name      string                 `json:",omitempty"`
-	Type      string                 `json:",omitempty"`
-	Metadata  ContextMetadata        `json:",omitempty"`
-	Endpoints map[string]interface{} `json:",omitempty"`
-}
-
-// ContextMetadata is represtentation of the data we put in a context
-// metadata
-type ContextMetadata struct {
-	Description       string `json:",omitempty"`
-	StackOrchestrator string `json:",omitempty"`
-}
-
-// AciContext is the context for the ACI backend
-type AciContext struct {
-	SubscriptionID string `json:",omitempty"`
-	Location       string `json:",omitempty"`
-	ResourceGroup  string `json:",omitempty"`
-}
-
-// MobyContext is the context for the moby backend
-type MobyContext struct{}
-
-// ExampleContext is the context for the example backend
-type ExampleContext struct{}
 
 type store struct {
 	root string
@@ -175,7 +147,7 @@ func New(opts ...Opt) (Store, error) {
 }
 
 // Get returns the context with the given name
-func (s *store) Get(name string) (*Metadata, error) {
+func (s *store) Get(name string) (*DockerContext, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name), metaFile)
 	m, err := read(meta)
 	if os.IsNotExist(err) {
@@ -192,14 +164,15 @@ func (s *store) GetEndpoint(name string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := meta.Endpoints[meta.Type]; !ok {
-		return errors.Wrapf(errdefs.ErrNotFound, "endpoint of type %q", meta.Type)
+	contextType := meta.Type()
+	if _, ok := meta.Endpoints[contextType]; !ok {
+		return errors.Wrapf(errdefs.ErrNotFound, "endpoint of type %q", contextType)
 	}
 
 	dstPtrValue := reflect.ValueOf(data)
 	dstValue := reflect.Indirect(dstPtrValue)
 
-	val := reflect.ValueOf(meta.Endpoints[meta.Type])
+	val := reflect.ValueOf(meta.Endpoints[contextType])
 	valIndirect := reflect.Indirect(val)
 
 	if dstValue.Type() != valIndirect.Type() {
@@ -211,13 +184,13 @@ func (s *store) GetEndpoint(name string, data interface{}) error {
 	return nil
 }
 
-func read(meta string) (*Metadata, error) {
+func read(meta string) (*DockerContext, error) {
 	bytes, err := ioutil.ReadFile(meta)
 	if err != nil {
 		return nil, err
 	}
 
-	var metadata Metadata
+	var metadata DockerContext
 	if err := json.Unmarshal(bytes, &metadata); err != nil {
 		return nil, err
 	}
@@ -270,10 +243,10 @@ func (s *store) Create(name string, contextType string, description string, data
 		return err
 	}
 
-	meta := Metadata{
+	meta := DockerContext{
 		Name: name,
-		Type: contextType,
 		Metadata: ContextMetadata{
+			Type:        contextType,
 			Description: description,
 		},
 		Endpoints: map[string]interface{}{
@@ -290,14 +263,14 @@ func (s *store) Create(name string, contextType string, description string, data
 	return ioutil.WriteFile(filepath.Join(metaDir, metaFile), bytes, 0644)
 }
 
-func (s *store) List() ([]*Metadata, error) {
+func (s *store) List() ([]*DockerContext, error) {
 	root := filepath.Join(s.root, contextsDir, metadataDir)
 	c, err := ioutil.ReadDir(root)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []*Metadata
+	var result []*DockerContext
 	for _, fi := range c {
 		if fi.IsDir() {
 			meta := filepath.Join(root, fi.Name(), metaFile)

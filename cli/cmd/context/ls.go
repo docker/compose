@@ -79,7 +79,7 @@ func runList(ctx context.Context) error {
 		fmt.Fprintf(w,
 			format,
 			contextName,
-			c.Type,
+			c.Type(),
 			c.Metadata.Description,
 			getEndpoint("docker", c.Endpoints),
 			getEndpoint("kubernetes", c.Endpoints),
