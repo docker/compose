@@ -132,7 +132,7 @@ func (s *Suite) ListProcessesCommand() *CmdContext {
 	if IsWindows() {
 		return s.NewCommand("tasklist")
 	}
-	return s.NewCommand("ps")
+	return s.NewCommand("ps", "-x")
 }
 
 // NewCommand creates a command context.

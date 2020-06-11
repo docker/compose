@@ -50,22 +50,23 @@ type NonWinCIE2eSuite struct {
 
 func (s *NonWinCIE2eSuite) TestKillChildOnCancel() {
 	It("should kill docker-classic if parent command is cancelled", func() {
+		imageName := "test-sleep-image"
 		out := s.ListProcessesCommand().ExecOrDie()
-		Expect(out).NotTo(ContainSubstring("docker-classic"))
+		Expect(out).NotTo(ContainSubstring(imageName))
 
 		dir := s.ConfigDir
 		Expect(ioutil.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(`FROM alpine:3.10
 RUN sleep 100`), 0644)).To(Succeed())
 		shutdown := make(chan time.Time)
 		errs := make(chan error)
-		ctx := s.NewDockerCommand("build", "--no-cache", "-t", "test-sleep-image", ".").WithinDirectory(dir).WithTimeout(shutdown)
+		ctx := s.NewDockerCommand("build", "--no-cache", "-t", imageName, ".").WithinDirectory(dir).WithTimeout(shutdown)
 		go func() {
 			_, err := ctx.Exec()
 			errs <- err
 		}()
 		err := WaitFor(time.Second, 10*time.Second, errs, func() bool {
 			out := s.ListProcessesCommand().ExecOrDie()
-			return strings.Contains(out, "docker-classic")
+			return strings.Contains(out, imageName)
 		})
 		Expect(err).NotTo(HaveOccurred())
 		log.Println("Killing docker process")
@@ -73,7 +74,7 @@ RUN sleep 100`), 0644)).To(Succeed())
 		close(shutdown)
 		err = WaitFor(time.Second, 12*time.Second, nil, func() bool {
 			out := s.ListProcessesCommand().ExecOrDie()
-			return !strings.Contains(out, "docker-classic")
+			return !strings.Contains(out, imageName)
 		})
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -108,7 +109,7 @@ func (s *NonWinCIE2eSuite) getGrpcServerAndCLientAddress() (string, string) {
 	return socketName, socketName
 }
 
-func TestE2e(t *testing.T) {
+func TestNonWinCIE2(t *testing.T) {
 	suite.Run(t, new(NonWinCIE2eSuite))
 }
 
