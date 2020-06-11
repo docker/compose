@@ -46,36 +46,36 @@ type E2eSuite struct {
 }
 
 func (s *E2eSuite) TestContextHelp() {
-	It("ensures context command includes azure-login and aci-create", func() {
-		output := s.NewDockerCommand("context", "create", "--help").ExecOrDie()
-		Expect(output).To(ContainSubstring("docker context create CONTEXT BACKEND [OPTIONS] [flags]"))
-		Expect(output).To(ContainSubstring("--aci-location"))
-		Expect(output).To(ContainSubstring("--aci-subscription-id"))
-		Expect(output).To(ContainSubstring("--aci-resource-group"))
-	})
+	output := s.NewDockerCommand("context", "create", "aci", "--help").ExecOrDie()
+	Expect(output).To(ContainSubstring("docker context create aci CONTEXT [flags]"))
+	Expect(output).To(ContainSubstring("--location"))
+	Expect(output).To(ContainSubstring("--subscription-id"))
+	Expect(output).To(ContainSubstring("--resource-group"))
 }
 
-func (s *E2eSuite) TestContextDefault() {
-	It("should be initialized with default context", func() {
-		output := s.NewDockerCommand("context", "show").ExecOrDie()
-		Expect(output).To(ContainSubstring("default"))
-		output = s.NewCommand("docker", "context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, GoldenFile("ls-out-default"))
-	})
+func (s *E2eSuite) TestListAndShowDefaultContext() {
+	output := s.NewDockerCommand("context", "show").ExecOrDie()
+	Expect(output).To(ContainSubstring("default"))
+	output = s.NewCommand("docker", "context", "ls").ExecOrDie()
+	golden.Assert(s.T(), output, GoldenFile("ls-out-default"))
 }
 
-func (s *E2eSuite) TestContextLegacy() {
-	It("should inspect default", func() {
-		output := s.NewDockerCommand("context", "inspect", "default").ExecOrDie()
-		Expect(output).To(ContainSubstring(`"Name": "default"`))
-	})
+func (s *E2eSuite) TestCreateDockerContextAndListIt() {
+	s.NewDockerCommand("context", "create", "test-docker", "--from", "default").ExecOrDie()
+	output := s.NewCommand("docker", "context", "ls").ExecOrDie()
+	golden.Assert(s.T(), output, GoldenFile("ls-out-test-docker"))
+}
+
+func (s *E2eSuite) TestInspectDefaultContext() {
+	output := s.NewDockerCommand("context", "inspect", "default").ExecOrDie()
+	Expect(output).To(ContainSubstring(`"Name": "default"`))
 }
 
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	It("should dispay new cli error when parsing context create flags", func() {
-		_, err := s.NewDockerCommand("context", "create", "--aci-subscription-id", "titi").Exec()
+		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
 		Expect(err.Error()).NotTo(ContainSubstring("unknown flag"))
-		Expect(err.Error()).To(ContainSubstring("accepts 2 arg(s), received 0"))
+		Expect(err.Error()).To(ContainSubstring("accepts 1 arg(s), received 0"))
 	})
 }
 
@@ -135,7 +135,7 @@ func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
 }
 
 func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
-	s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
+	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
 	output, err := s.NewDockerCommand("--context", "test-example", "images").Exec()
 	Expect(output).To(Equal("Command \"images\" not available in current context (test-example), you can use the \"default\" context to run this command\n"))
 	Expect(err).NotTo(BeNil())
@@ -149,7 +149,7 @@ func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
 
 func (s *E2eSuite) TestMockBackend() {
 	It("creates a new test context to hardcoded example backend", func() {
-		s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()
+		s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
 		// Expect(output).To(ContainSubstring("test-example context acitest created"))
 	})
 

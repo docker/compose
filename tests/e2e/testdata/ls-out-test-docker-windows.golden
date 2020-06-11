@@ -1,0 +1,3 @@
+NAME                TYPE                DESCRIPTION                               DOCKER ENDPOINT                  KUBERNETES ENDPOINT   ORCHESTRATOR
+default *           docker              Current DOCKER_HOST based configuration   npipe:////./pipe/docker_engine                         swarm
+test-docker         docker                                                        npipe:////./pipe/docker_engine                         swarm

@@ -211,8 +211,8 @@ func toTypedEndpoints(endpoints map[string]interface{}) (map[string]interface{},
 			return nil, err
 		}
 		typeGetters := getters()
-		typeGetter, ok := typeGetters[k];
-		if  !ok {
+		typeGetter, ok := typeGetters[k]
+		if !ok {
 			typeGetter = func() interface{} {
 				return &Endpoint{}
 			}

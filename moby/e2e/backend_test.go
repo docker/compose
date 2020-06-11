@@ -16,7 +16,7 @@ type MobyBackendTestSuite struct {
 }
 
 func (m *MobyBackendTestSuite) BeforeTest(suiteName string, testName string) {
-	m.NewDockerCommand("context", "create", "test-context", "moby").ExecOrDie()
+	m.NewDockerCommand("context", "create", "moby", "test-context").ExecOrDie()
 	m.NewDockerCommand("context", "use", "test-context").ExecOrDie()
 }
 
