@@ -211,12 +211,14 @@ func toTypedEndpoints(endpoints map[string]interface{}) (map[string]interface{},
 			return nil, err
 		}
 		typeGetters := getters()
-		if _, ok := typeGetters[k]; !ok {
-			result[k] = v
-			continue
+		typeGetter, ok := typeGetters[k];
+		if  !ok {
+			typeGetter = func() interface{} {
+				return &Endpoint{}
+			}
 		}
 
-		val := typeGetters[k]()
+		val := typeGetter()
 		err = json.Unmarshal(bytes, &val)
 		if err != nil {
 			return nil, err

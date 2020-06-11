@@ -58,10 +58,10 @@ func dockerDefaultContext() (*DockerContext, error) {
 	meta := DockerContext{
 		Name: "default",
 		Endpoints: map[string]interface{}{
-			"docker": Endpoint{
+			"docker": &Endpoint{
 				Host: defaultCtx.Endpoints.Docker.Host,
 			},
-			"kubernetes": Endpoint{
+			"kubernetes": &Endpoint{
 				Host:             defaultCtx.Endpoints.Kubernetes.Host,
 				DefaultNamespace: defaultCtx.Endpoints.Kubernetes.DefaultNamespace,
 			},

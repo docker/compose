@@ -94,7 +94,7 @@ func getEndpoint(name string, meta map[string]interface{}) string {
 	if !ok {
 		return ""
 	}
-	data, ok := endpoints.(store.Endpoint)
+	data, ok := endpoints.(*store.Endpoint)
 	if !ok {
 		return ""
 	}
