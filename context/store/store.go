@@ -96,9 +96,8 @@ const (
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"
-	// MobyContextType is the endpoint key in the context endpoints for a moby
-	// backend
-	MobyContextType = "moby"
+	// LocalContextType is the endpoint key in the context endpoints for a new local backend
+	LocalContextType = "local"
 	// ExampleContextType is the endpoint key in the context endpoints for an
 	// example backend
 	ExampleContextType = "example"
@@ -335,8 +334,8 @@ func getters() map[string]func() interface{} {
 		"aci": func() interface{} {
 			return &AciContext{}
 		},
-		"moby": func() interface{} {
-			return &MobyContext{}
+		"local": func() interface{} {
+			return &LocalContext{}
 		},
 		"example": func() interface{} {
 			return &ExampleContext{}

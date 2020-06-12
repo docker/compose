@@ -26,7 +26,7 @@ Insert a really small tutorial or links here.
 We have made some changes to the syntax of a few commands to make them easier to understand. Where we still support the old
 forms, the command line will tell you the new form, but will still work correctly. In cases where we remove the old
 form you will get help text. If we remove a verb, for example "docker stack" we will display a message saying that the command
-is only available with the Moby backend. For example
+is only available with the Local backend. For example
 
 ```
 > docker context create my-context --description "some description" --docker "host=tcp://myserver:2376"

@@ -83,7 +83,7 @@ $ docker context create my-context --description "some description" --docker "ho
 
 	cmd.AddCommand(
 		createAciCommand(),
-		createMobyCommand(),
+		createLocalCommand(),
 		createExampleCommand(),
 	)
 
@@ -99,15 +99,15 @@ $ docker context create my-context --description "some description" --docker "ho
 	return cmd
 }
 
-func createMobyCommand() *cobra.Command {
+func createLocalCommand() *cobra.Command {
 	var opts descriptionCreateOpts
 	cmd := &cobra.Command{
-		Use:    "moby CONTEXT",
-		Short:  "Create a context for accessing docker engine with new CLI commands",
+		Use:    "local CONTEXT",
+		Short:  "Create a context for accessing local engine",
 		Args:   cobra.ExactArgs(1),
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDockerContext(cmd.Context(), args[0], store.MobyContextType, opts.description, store.MobyContext{})
+			return createDockerContext(cmd.Context(), args[0], store.LocalContextType, opts.description, store.LocalContext{})
 		},
 	}
 	addDescriptionFlag(cmd, &opts.description)

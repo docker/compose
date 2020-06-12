@@ -39,7 +39,7 @@ import (
 
 var sampleConfig = []byte(`{
 	"otherField": "value",
-	"currentContext": "moby"
+	"currentContext": "local"
 }`)
 
 type ConfigTestSuite struct {
@@ -66,14 +66,14 @@ func (s *ConfigTestSuite) TestLoadFile() {
 	writeSampleConfig(s.T(), s.configDir)
 	f, err := LoadFile(s.configDir)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), "moby", f.CurrentContext)
+	require.Equal(s.T(), "local", f.CurrentContext)
 }
 
 func (s *ConfigTestSuite) TestOverWriteCurrentContext() {
 	writeSampleConfig(s.T(), s.configDir)
 	f, err := LoadFile(s.configDir)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), "moby", f.CurrentContext)
+	require.Equal(s.T(), "local", f.CurrentContext)
 
 	err = WriteCurrentContext(s.configDir, "overwrite")
 	require.NoError(s.T(), err)
