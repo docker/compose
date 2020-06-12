@@ -67,7 +67,7 @@ func runList(ctx context.Context) error {
 	})
 
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION\tDOCKER ENPOINT\tKUBERNETES ENDPOINT\tORCHESTRATOR")
+	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION\tDOCKER ENDPOINT\tKUBERNETES ENDPOINT\tORCHESTRATOR")
 	format := "%s\t%s\t%s\t%s\t%s\t%s\n"
 
 	for _, c := range contexts {
