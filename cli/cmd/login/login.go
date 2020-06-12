@@ -57,6 +57,6 @@ func cloudLogin(cmd *cobra.Command, backendType string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("login successful")
+	fmt.Println("login succeeded")
 	return nil
 }
