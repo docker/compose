@@ -58,8 +58,10 @@ cache-clear: ## Clear the builder cache
 lint: ## run linter(s)
 	@docker build . --target lint
 
+serve: cli ## start server
+	@./bin/docker serve --address unix:///tmp/backend.sock
 classic-link: ## create docker-classic symlink if does not already exist
-	ln -s /Applications/Docker.app/Contents/Resources/bin/docker /usr/local/bin/docker-classic
+	ln -s $(CLASSIC_DOCKER) /usr/local/bin/docker-classic
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
@@ -67,4 +69,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all protos cli e2e-local cross test cache-clear lint classic-link help
+.PHONY: all protos cli e2e-local cross test cache-clear lint serve classic-link help
