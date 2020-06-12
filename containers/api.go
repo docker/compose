@@ -67,4 +67,6 @@ type Service interface {
 	Logs(ctx context.Context, containerName string, request LogsRequest) error
 	// Delete removes containers
 	Delete(ctx context.Context, id string, force bool) error
+	// Inspect get a specific container
+	Inspect(ctx context.Context, id string) (Container, error)
 }

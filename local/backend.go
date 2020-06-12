@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/docker/pkg/stringid"
@@ -49,6 +50,31 @@ func (ms *local) ContainerService() containers.Service {
 
 func (ms *local) ComposeService() compose.Service {
 	return nil
+}
+
+func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, error) {
+	c, err := ms.apiClient.ContainerInspect(ctx, id)
+	if err != nil {
+		return containers.Container{}, err
+	}
+
+	status := ""
+	if c.State != nil {
+		status = c.State.Status
+	}
+
+	command := ""
+	if c.Config != nil &&
+		c.Config.Cmd != nil {
+		command = strings.Join(c.Config.Cmd, " ")
+	}
+
+	return containers.Container{
+		ID:      stringid.TruncateID(c.ID),
+		Status:  status,
+		Image:   c.Path + "@" + c.Image,
+		Command: command,
+	}, nil
 }
 
 func (ms *local) List(ctx context.Context, all bool) ([]containers.Container, error) {

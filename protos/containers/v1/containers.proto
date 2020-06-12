@@ -32,88 +32,97 @@ package com.docker.api.protos.containers.v1;
 option go_package = "github.com/docker/api/protos/containers/v1;v1";
 
 service Containers {
-	rpc List(ListRequest) returns (ListResponse);
-	rpc Stop(StopRequest) returns (StopResponse);
-	rpc Run(RunRequest) returns (RunResponse);
-	rpc Exec(ExecRequest) returns (ExecResponse);
-	rpc Logs(LogsRequest) returns (stream LogsResponse);
-	rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  rpc Run(RunRequest) returns (RunResponse);
+  rpc Exec(ExecRequest) returns (ExecResponse);
+  rpc Logs(LogsRequest) returns (stream LogsResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc Inspect(InspectRequest) returns (InspectResponse);
 }
 
 message Port {
-	uint32 host_port = 1;
-	uint32 container_port = 2;
-	string protocol = 3;
-	string host_ip = 4;
+  uint32 host_port = 1;
+  uint32 container_port = 2;
+  string protocol = 3;
+  string host_ip = 4;
 }
 
 message Container {
-	string id = 1;
-	string image = 2;
-	string status = 3;
-	string command = 4;
-	uint64 cpu_time = 5;
-	uint64 memory_usage = 6;
-	uint64 memory_limit = 7;
-	uint64 pids_current = 8;
-	uint64 pids_limit = 9;
-	repeated string labels = 10;
-	repeated Port ports = 11;
+  string id = 1;
+  string image = 2;
+  string status = 3;
+  string command = 4;
+  uint64 cpu_time = 5;
+  uint64 memory_usage = 6;
+  uint64 memory_limit = 7;
+  uint64 pids_current = 8;
+  uint64 pids_limit = 9;
+  repeated string labels = 10;
+  repeated Port ports = 11;
+}
+
+message InspectRequest {
+  string id = 1;
+}
+
+message InspectResponse {
+  Container container = 1;
 }
 
 message DeleteRequest {
-	string id = 1;
-	bool force = 2;
+  string id = 1;
+  bool force = 2;
 }
 
 message DeleteResponse {
 }
 
 message StopRequest {
-	string id = 1;
-	uint32 timeout = 2;
+  string id = 1;
+  uint32 timeout = 2;
 }
 
 message StopResponse {
 }
 
 message RunRequest {
-	string id = 1;
-	string image = 2;
-	repeated Port ports = 3;
-	map<string, string> labels = 4;
-	repeated string volumes = 5;
+  string id = 1;
+  string image = 2;
+  repeated Port ports = 3;
+  map<string, string> labels = 4;
+  repeated string volumes = 5;
 }
 
 message RunResponse {
 }
 
 message ExecRequest {
-	string id = 1;
-	string command = 2;
-	string stream_id = 3;
-	repeated string args = 4;
-	repeated string env = 5;
-	bool tty = 6;
+  string id = 1;
+  string command = 2;
+  string stream_id = 3;
+  repeated string args = 4;
+  repeated string env = 5;
+  bool tty = 6;
 }
 
 message ExecResponse {
-	bytes output = 1;
+  bytes output = 1;
 }
 
 message ListRequest {
-	bool all = 1;
+  bool all = 1;
 }
 
 message ListResponse {
-	repeated Container containers = 1;
+  repeated Container containers = 1;
 }
 
 message LogsRequest {
-	string container_id = 1;
-	bool follow = 3;
+  string container_id = 1;
+  bool follow = 3;
 }
 
 message LogsResponse {
-	bytes value = 1;
+  bytes value = 1;
 }

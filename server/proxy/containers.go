@@ -76,6 +76,29 @@ func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*con
 	})
 }
 
+func (p *proxy) Inspect(ctx context.Context, request *containersv1.InspectRequest) (*containersv1.InspectResponse, error) {
+	c, err := Client(ctx).ContainerService().Inspect(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	response := &containersv1.InspectResponse{
+		Container: &containersv1.Container{
+			Id:          c.ID,
+			Image:       c.Image,
+			Status:      c.Status,
+			Command:     c.Command,
+			CpuTime:     c.CPUTime,
+			MemoryUsage: c.MemoryUsage,
+			MemoryLimit: c.MemoryLimit,
+			PidsCurrent: c.PidsCurrent,
+			PidsLimit:   c.PidsLimit,
+			Labels:      c.Labels,
+			Ports:       portsToGrpc(c.Ports),
+		},
+	}
+	return response, err
+}
+
 func (p *proxy) Delete(ctx context.Context, request *containersv1.DeleteRequest) (*containersv1.DeleteResponse, error) {
 	return &containersv1.DeleteResponse{}, Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
 }

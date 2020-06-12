@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/go-autorest/autorest/to"
+
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
 
@@ -29,6 +31,9 @@ const singleContainerName = "single--container--aci"
 
 // ErrNoSuchContainer is returned when the mentioned container does not exist
 var ErrNoSuchContainer = errors.New("no such container")
+
+// ErrTooManyContainers is returned when trying to inspect on multiple containers at once
+var ErrTooManyContainers = errors.New("more than one container in group ID")
 
 func init() {
 	backend.Register("aci", "aci", service, getCloudService)
@@ -237,6 +242,59 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _
 	}
 
 	return err
+}
+
+func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) (containers.Container, error) {
+	cg, err := getACIContainerGroup(ctx, cs.ctx, containerID)
+	if err != nil {
+		return containers.Container{}, err
+	}
+	if cg.StatusCode == http.StatusNoContent {
+		return containers.Container{}, ErrNoSuchContainer
+	}
+
+	if cg.Containers != nil && len(*cg.Containers) > 1 {
+		return containers.Container{}, ErrTooManyContainers
+	}
+
+	return containerGroupToContainer(cg)
+}
+
+func containerGroupToContainer(cg containerinstance.ContainerGroup) (containers.Container, error) {
+	status := "unavailable"
+	cc := (*cg.Containers)[0]
+	if cc.InstanceView != nil &&
+		cc.InstanceView.CurrentState != nil &&
+		cc.InstanceView.CurrentState.State != nil {
+		status = to.String(cc.InstanceView.CurrentState.State)
+	}
+
+	memLimits := -1.
+	if cc.Resources != nil &&
+		cc.Resources.Limits != nil &&
+		cc.Resources.Limits.MemoryInGB != nil {
+		memLimits = *cc.Resources.Limits.MemoryInGB
+	}
+
+	command := ""
+	if cc.Command != nil {
+		command = strings.Join(*cc.Command, "")
+	}
+	c := containers.Container{
+		ID:          to.String(cg.Name),
+		Status:      status,
+		Image:       to.String(cc.Image),
+		Command:     command,
+		CPUTime:     0,
+		MemoryUsage: 0,
+		MemoryLimit: uint64(memLimits),
+		PidsCurrent: 0,
+		PidsLimit:   0,
+		Labels:      nil,
+		Ports:       convert.ToPorts(cg.IPAddress, *cc.Ports),
+	}
+
+	return c, nil
 }
 
 type aciComposeService struct {

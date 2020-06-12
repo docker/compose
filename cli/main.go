@@ -118,6 +118,7 @@ func main() {
 		cmd.ExecCommand(),
 		cmd.LogsCommand(),
 		cmd.RmCommand(),
+		cmd.InspectCommand(),
 		compose.Command(),
 		login.Command(),
 		cmd.VersionCommand(),

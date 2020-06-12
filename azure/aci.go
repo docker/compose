@@ -87,6 +87,15 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	return err
 }
 
+func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
+	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	if err != nil {
+		return containerinstance.ContainerGroup{}, fmt.Errorf("cannot get container group client: %v", err)
+	}
+
+	return containerGroupsClient.Get(ctx, aciContext.ResourceGroup, containerGroupName)
+}
+
 func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
