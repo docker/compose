@@ -168,4 +168,4 @@ func (c *FargateCompatibilityChecker) CheckLabels(service *types.ServiceConfig) 
 	}
 }
 
-var _ CompatibilityChecker = &FargateCompatibilityChecker{}
+var _ Checker = &FargateCompatibilityChecker{}

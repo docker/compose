@@ -8,7 +8,7 @@ import (
 type Warning string
 type Warnings []string
 
-type CompatibilityChecker interface {
+type Checker interface {
 	CheckService(service *types.ServiceConfig)
 	CheckCapAdd(service *types.ServiceConfig)
 	CheckDNS(service *types.ServiceConfig)
