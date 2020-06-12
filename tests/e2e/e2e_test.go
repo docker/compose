@@ -141,6 +141,12 @@ func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
 	Expect(err).NotTo(BeNil())
 }
 
+func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
+	output := s.NewDockerCommand("version").ExecOrDie()
+	Expect(output).To(ContainSubstring(`Azure integration  0.1-beta
+ Version:          `))
+}
+
 func (s *E2eSuite) TestMockBackend() {
 	It("creates a new test context to hardcoded example backend", func() {
 		s.NewDockerCommand("context", "create", "test-example", "example").ExecOrDie()

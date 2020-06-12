@@ -64,6 +64,7 @@ var (
 		"context": {},
 		"login":   {},
 		"serve":   {},
+		"version": {},
 	}
 )
 
@@ -119,6 +120,7 @@ func main() {
 		cmd.RmCommand(),
 		compose.Command(),
 		login.Command(),
+		cmd.VersionCommand(),
 	)
 
 	helpFunc := root.HelpFunc()
