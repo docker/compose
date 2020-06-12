@@ -96,7 +96,8 @@ const (
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"
-	// LocalContextType is the endpoint key in the context endpoints for a new local backend
+	// LocalContextType is the endpoint key in the context endpoints for a new
+	// local backend
 	LocalContextType = "local"
 	// ExampleContextType is the endpoint key in the context endpoints for an
 	// example backend

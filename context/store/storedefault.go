@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultContextType = "docker"
+const defaultContextType = "moby"
 
 // Represents a context as created by the docker cli
 type defaultContext struct {

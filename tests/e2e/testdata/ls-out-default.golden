@@ -1,2 +1,2 @@
 NAME                TYPE                DESCRIPTION                               DOCKER ENDPOINT               KUBERNETES ENDPOINT   ORCHESTRATOR
-default *           docker              Current DOCKER_HOST based configuration   unix:///var/run/docker.sock                         swarm
+default *           moby                Current DOCKER_HOST based configuration   unix:///var/run/docker.sock                         swarm
