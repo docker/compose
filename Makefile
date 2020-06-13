@@ -25,6 +25,14 @@
 
 export DOCKER_BUILDKIT=1
 
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	CLASSIC_DOCKER=/usr/bin/docker
+endif
+ifeq ($(UNAME_S),Darwin)
+	CLASSIC_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
+endif
+
 all: cli
 
 protos: ## Generate go code from .proto files
