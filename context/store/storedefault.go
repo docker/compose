@@ -34,7 +34,8 @@ type endpoint struct {
 }
 
 func dockerDefaultContext() (*DockerContext, error) {
-	cmd := exec.Command("docker-classic", "context", "inspect", "default")
+	// ensure we run this using default context, in current context has been damaged / removed in store
+	cmd := exec.Command("docker-classic", "--context", "default", "context", "inspect", "default")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	err := cmd.Run()
