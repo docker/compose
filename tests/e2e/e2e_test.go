@@ -79,6 +79,13 @@ func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	})
 }
 
+func (s *E2eSuite) TestCannotRemoveCurrentContext() {
+	s.NewDockerCommand("context", "create", "test-context", "--from", "default").ExecOrDie()
+	s.NewDockerCommand("context", "use", "test-context").ExecOrDie()
+	_, err := s.NewDockerCommand("context", "rm", "test-context").Exec()
+	Expect(err.Error()).To(ContainSubstring("cannot delete current context"))
+}
+
 func (s *E2eSuite) TestClassicLoginWithparameters() {
 	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
 	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))

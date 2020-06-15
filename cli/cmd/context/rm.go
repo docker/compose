@@ -29,10 +29,11 @@ package context
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
-
+	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/multierror"
 )
@@ -50,10 +51,14 @@ func removeCommand() *cobra.Command {
 }
 
 func runRemove(ctx context.Context, args []string) error {
+	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
+
 	var errs *multierror.Error
 	for _, n := range args {
-		if err := s.Remove(n); err != nil {
+		if currentContext == n {
+			errs = multierror.Append(errs, errors.New("cannot delete current context"))
+		} else if err := s.Remove(n); err != nil {
 			errs = multierror.Append(errs, err)
 		} else {
 			fmt.Println(n)
