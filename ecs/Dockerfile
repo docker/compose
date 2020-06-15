@@ -18,6 +18,8 @@ COPY . .
 FROM base AS make-plugin
 ARG TARGETOS
 ARG TARGETARCH
+RUN apk add build-base
+RUN GO111MODULE=on go get github.com/golang/mock/mockgen@latest
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     GOOS=${TARGETOS} \

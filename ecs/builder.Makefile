@@ -20,7 +20,10 @@ all: build
 clean:
 	rm -rf dist/
 
-build:
+generate: pkg/amazon/sdk/api_mock.go
+	go generate ./...
+
+build: generate
 	$(GO_BUILD) -v -o $(BINARY_WITH_EXTENSION) cmd/main/main.go
 
 cross:
