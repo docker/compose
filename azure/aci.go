@@ -21,6 +21,9 @@ import (
 	"github.com/docker/api/context/store"
 )
 
+
+const aciDockerUserAgent = "docker-cli"
+
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
@@ -238,6 +241,7 @@ func getContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 	}
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
 	containerGroupsClient.Authorizer = auth
+	containerGroupsClient.UserAgent= aciDockerUserAgent
 	containerGroupsClient.PollingDelay = 5 * time.Second
 	containerGroupsClient.RetryAttempts = 30
 	containerGroupsClient.RetryDuration = 1 * time.Second
@@ -250,6 +254,7 @@ func getContainerClient(subscriptionID string) (containerinstance.ContainerClien
 		return containerinstance.ContainerClient{}, err
 	}
 	containerClient := containerinstance.NewContainerClient(subscriptionID)
+	containerClient.UserAgent=aciDockerUserAgent
 	containerClient.Authorizer = auth
 	return containerClient, nil
 }

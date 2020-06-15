@@ -94,6 +94,7 @@ func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginFailed, err.Error())
 	}
 	subc.Authorizer = authorizer
+	subc.UserAgent=aciDockerUserAgent
 	return subc, nil
 }
 
@@ -101,5 +102,6 @@ func getGroupsClient(subscriptionID string) resources.GroupsClient {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
 	authorizer, _ := login.NewAuthorizerFromLogin()
 	groupsClient.Authorizer = authorizer
+	groupsClient.UserAgent=aciDockerUserAgent
 	return groupsClient
 }
