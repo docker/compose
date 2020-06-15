@@ -11,26 +11,26 @@ import (
 	"github.com/docker/api/tests/framework"
 )
 
-type MobyBackendTestSuite struct {
+type LocalBackendTestSuite struct {
 	framework.Suite
 }
 
-func (m *MobyBackendTestSuite) BeforeTest(suiteName string, testName string) {
-	m.NewDockerCommand("context", "create", "test-context", "moby").ExecOrDie()
+func (m *LocalBackendTestSuite) BeforeTest(suiteName string, testName string) {
+	m.NewDockerCommand("context", "create", "local", "test-context").ExecOrDie()
 	m.NewDockerCommand("context", "use", "test-context").ExecOrDie()
 }
 
-func (m *MobyBackendTestSuite) AfterTest(suiteName string, testName string) {
+func (m *LocalBackendTestSuite) AfterTest(suiteName string, testName string) {
 	m.NewDockerCommand("context", "rm", "test-context").ExecOrDie()
 	m.NewDockerCommand("context", "use", "default").ExecOrDie()
 }
 
-func (m *MobyBackendTestSuite) TestPs() {
+func (m *LocalBackendTestSuite) TestPs() {
 	out := m.NewDockerCommand("ps").ExecOrDie()
 	require.Equal(m.T(), "CONTAINER ID        IMAGE               COMMAND             STATUS              PORTS\n", out)
 }
 
-func (m *MobyBackendTestSuite) TestRun() {
+func (m *LocalBackendTestSuite) TestRun() {
 	_, err := m.NewDockerCommand("run", "--name", "nginx", "nginx").Exec()
 	require.Nil(m.T(), err)
 	out := m.NewDockerCommand("ps").ExecOrDie()
@@ -41,7 +41,7 @@ func (m *MobyBackendTestSuite) TestRun() {
 	assert.Equal(m.T(), 3, len(lines))
 }
 
-func (m *MobyBackendTestSuite) TestRunWithPorts() {
+func (m *LocalBackendTestSuite) TestRunWithPorts() {
 	_, err := m.NewDockerCommand("run", "--name", "nginx", "-p", "8080:80", "nginx").Exec()
 	require.Nil(m.T(), err)
 	out := m.NewDockerCommand("ps").ExecOrDie()
@@ -51,6 +51,6 @@ func (m *MobyBackendTestSuite) TestRunWithPorts() {
 	assert.Contains(m.T(), out, "8080")
 }
 
-func TestMobyBackendTestSuite(t *testing.T) {
-	suite.Run(t, new(MobyBackendTestSuite))
+func TestLocalBackendTestSuite(t *testing.T) {
+	suite.Run(t, new(LocalBackendTestSuite))
 }

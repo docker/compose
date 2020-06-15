@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultContextType = "docker"
+const defaultContextType = "moby"
 
 // Represents a context as created by the docker cli
 type defaultContext struct {
@@ -58,10 +58,10 @@ func dockerDefaultContext() (*DockerContext, error) {
 	meta := DockerContext{
 		Name: "default",
 		Endpoints: map[string]interface{}{
-			"docker": Endpoint{
+			"docker": &Endpoint{
 				Host: defaultCtx.Endpoints.Docker.Host,
 			},
-			"kubernetes": Endpoint{
+			"kubernetes": &Endpoint{
 				Host:             defaultCtx.Endpoints.Kubernetes.Host,
 				DefaultNamespace: defaultCtx.Endpoints.Kubernetes.DefaultNamespace,
 			},

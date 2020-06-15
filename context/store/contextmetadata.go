@@ -33,8 +33,8 @@ type AciContext struct {
 	ResourceGroup  string `json:",omitempty"`
 }
 
-// MobyContext is the context for the moby backend
-type MobyContext struct{}
+// LocalContext is the context for the local backend
+type LocalContext struct{}
 
 // ExampleContext is the context for the example backend
 type ExampleContext struct{}

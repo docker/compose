@@ -96,9 +96,9 @@ const (
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"
-	// MobyContextType is the endpoint key in the context endpoints for a moby
-	// backend
-	MobyContextType = "moby"
+	// LocalContextType is the endpoint key in the context endpoints for a new
+	// local backend
+	LocalContextType = "local"
 	// ExampleContextType is the endpoint key in the context endpoints for an
 	// example backend
 	ExampleContextType = "example"
@@ -211,12 +211,14 @@ func toTypedEndpoints(endpoints map[string]interface{}) (map[string]interface{},
 			return nil, err
 		}
 		typeGetters := getters()
-		if _, ok := typeGetters[k]; !ok {
-			result[k] = v
-			continue
+		typeGetter, ok := typeGetters[k]
+		if !ok {
+			typeGetter = func() interface{} {
+				return &Endpoint{}
+			}
 		}
 
-		val := typeGetters[k]()
+		val := typeGetter()
 		err = json.Unmarshal(bytes, &val)
 		if err != nil {
 			return nil, err
@@ -333,8 +335,8 @@ func getters() map[string]func() interface{} {
 		"aci": func() interface{} {
 			return &AciContext{}
 		},
-		"moby": func() interface{} {
-			return &MobyContext{}
+		"local": func() interface{} {
+			return &LocalContext{}
 		},
 		"example": func() interface{} {
 			return &ExampleContext{}

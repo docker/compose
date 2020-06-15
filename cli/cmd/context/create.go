@@ -29,75 +29,118 @@ package context
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	"github.com/docker/api/cli/dockerclassic"
 	"github.com/docker/api/context/store"
 )
 
-// AciCreateOpts Options for ACI context create
-type AciCreateOpts struct {
-	description       string
-	aciLocation       string
-	aciSubscriptionID string
-	aciResourceGroup  string
+type descriptionCreateOpts struct {
+	description string
 }
 
 func createCommand() *cobra.Command {
-	var opts AciCreateOpts
+	const longHelp = `Create a new context
+
+Create docker engine context: 
+$ docker context create CONTEXT [flags]
+
+Create Azure Container Instances context:
+$ docker context create aci CONTEXT [flags]
+(see docker context create aci --help)
+
+Docker endpoint config:
+
+NAME                DESCRIPTION
+from                Copy named context's Docker endpoint configuration
+host                Docker endpoint on which to connect
+ca                  Trust certs signed only by this CA
+cert                Path to TLS certificate file
+key                 Path to TLS key file
+skip-tls-verify     Skip TLS certificate validation
+
+Kubernetes endpoint config:
+
+NAME                 DESCRIPTION
+from                 Copy named context's Kubernetes endpoint configuration
+config-file          Path to a Kubernetes config file
+context-override     Overrides the context set in the kubernetes config file
+namespace-override   Overrides the namespace set in the kubernetes config file
+
+Example:
+
+$ docker context create my-context --description "some description" --docker "host=tcp://myserver:2376,ca=~/ca-file,cert=~/cert-file,key=~/key-file"`
+
 	cmd := &cobra.Command{
-		Use:   "create CONTEXT BACKEND [OPTIONS]",
-		Short: "Create a context",
-		Args:  cobra.ExactArgs(2),
+		Use:   "create CONTEXT",
+		Short: "Create new context",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreate(cmd.Context(), opts, args[0], args[1])
+			return dockerclassic.ExecCmd(cmd)
 		},
+		Long: longHelp,
 	}
 
-	cmd.Flags().StringVar(&opts.description, "description", "", "Description of the context")
-	cmd.Flags().StringVar(&opts.aciLocation, "aci-location", "eastus", "Location")
-	cmd.Flags().StringVar(&opts.aciSubscriptionID, "aci-subscription-id", "", "Location")
-	cmd.Flags().StringVar(&opts.aciResourceGroup, "aci-resource-group", "", "Resource group")
+	cmd.AddCommand(
+		createAciCommand(),
+		createLocalCommand(),
+		createExampleCommand(),
+	)
+
+	flags := cmd.Flags()
+	flags.String("description", "", "Description of the context")
+	flags.String(
+		"default-stack-orchestrator", "",
+		"Default orchestrator for stack operations to use with this context (swarm|kubernetes|all)")
+	flags.StringToString("docker", nil, "set the docker endpoint")
+	flags.StringToString("kubernetes", nil, "set the kubernetes endpoint")
+	flags.String("from", "", "create context from a named context")
 
 	return cmd
 }
 
-func runCreate(ctx context.Context, opts AciCreateOpts, name string, contextType string) error {
-	contextData, description, err := getContextData(ctx, contextType, opts)
-	if err != nil {
-		return nil
+func createLocalCommand() *cobra.Command {
+	var opts descriptionCreateOpts
+	cmd := &cobra.Command{
+		Use:    "local CONTEXT",
+		Short:  "Create a context for accessing local engine",
+		Args:   cobra.ExactArgs(1),
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createDockerContext(cmd.Context(), args[0], store.LocalContextType, opts.description, store.LocalContext{})
+		},
 	}
+	addDescriptionFlag(cmd, &opts.description)
+	return cmd
+}
+
+func createExampleCommand() *cobra.Command {
+	var opts descriptionCreateOpts
+	cmd := &cobra.Command{
+		Use:    "example CONTEXT",
+		Short:  "Create a test context returning fixed output",
+		Args:   cobra.ExactArgs(1),
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return createDockerContext(cmd.Context(), args[0], store.ExampleContextType, opts.description, store.ExampleContext{})
+		},
+	}
+
+	addDescriptionFlag(cmd, &opts.description)
+	return cmd
+}
+
+func createDockerContext(ctx context.Context, name string, contextType string, description string, data interface{}) error {
 	s := store.ContextStore(ctx)
-	return s.Create(
+	result := s.Create(
 		name,
 		contextType,
 		description,
-		contextData,
+		data,
 	)
+	return result
 }
 
-func getContextData(ctx context.Context, contextType string, opts AciCreateOpts) (interface{}, string, error) {
-	switch contextType {
-	case "aci":
-		cs, err := client.GetCloudService(ctx, "aci")
-		if err != nil {
-			return nil, "", errors.Wrap(err, "cannot connect to ACI backend")
-		}
-		params := map[string]string{
-			"aciSubscriptionId": opts.aciSubscriptionID,
-			"aciResourceGroup":  opts.aciResourceGroup,
-			"aciLocation":       opts.aciLocation,
-			"description":       opts.description,
-		}
-		return cs.CreateContextData(ctx, params)
-	case "moby":
-		return store.MobyContext{}, opts.description, nil
-	case "example":
-		return store.ExampleContext{}, opts.description, nil
-	default:
-		return nil, "", errors.New(fmt.Sprintf("incorrect context type %s, must be one of (aci | moby | docker)", contextType))
-	}
+func addDescriptionFlag(cmd *cobra.Command, descriptionOpt *string) {
+	cmd.Flags().StringVar(descriptionOpt, "description", "", "Description of the context")
 }

@@ -45,7 +45,7 @@ import (
 	// Backend registrations
 	_ "github.com/docker/api/azure"
 	_ "github.com/docker/api/example"
-	_ "github.com/docker/api/moby"
+	_ "github.com/docker/api/local"
 
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"

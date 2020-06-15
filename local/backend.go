@@ -1,4 +1,4 @@
-package moby
+package local
 
 import (
 	"bufio"
@@ -24,12 +24,12 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-type mobyService struct {
+type local struct {
 	apiClient *client.Client
 }
 
 func init() {
-	backend.Register("moby", "moby", service, cloud.NotImplementedCloudService)
+	backend.Register("local", "local", service, cloud.NotImplementedCloudService)
 }
 
 func service(ctx context.Context) (backend.Service, error) {
@@ -38,20 +38,20 @@ func service(ctx context.Context) (backend.Service, error) {
 		return nil, err
 	}
 
-	return &mobyService{
+	return &local{
 		apiClient,
 	}, nil
 }
 
-func (ms *mobyService) ContainerService() containers.Service {
+func (ms *local) ContainerService() containers.Service {
 	return ms
 }
 
-func (ms *mobyService) ComposeService() compose.Service {
+func (ms *local) ComposeService() compose.Service {
 	return nil
 }
 
-func (ms *mobyService) List(ctx context.Context, all bool) ([]containers.Container, error) {
+func (ms *local) List(ctx context.Context, all bool) ([]containers.Container, error) {
 	css, err := ms.apiClient.ContainerList(ctx, types.ContainerListOptions{
 		All: all,
 	})
@@ -78,7 +78,7 @@ func (ms *mobyService) List(ctx context.Context, all bool) ([]containers.Contain
 	return result, nil
 }
 
-func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) error {
+func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 	exposedPorts, hostBindings, err := fromPorts(r.Ports)
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func (ms *mobyService) Run(ctx context.Context, r containers.ContainerConfig) er
 	return ms.apiClient.ContainerStart(ctx, created.ID, types.ContainerStartOptions{})
 }
 
-func (ms *mobyService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
+func (ms *local) Stop(ctx context.Context, containerID string, timeout *uint32) error {
 	var t *time.Duration
 	if timeout != nil {
 		timeoutValue := time.Duration(*timeout) * time.Second
@@ -134,7 +134,7 @@ func (ms *mobyService) Stop(ctx context.Context, containerID string, timeout *ui
 	return ms.apiClient.ContainerStop(ctx, containerID, t)
 }
 
-func (ms *mobyService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
+func (ms *local) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
 	cec, err := ms.apiClient.ContainerExecCreate(ctx, name, types.ExecConfig{
 		Cmd:          []string{command},
 		Tty:          true,
@@ -176,7 +176,7 @@ func (ms *mobyService) Exec(ctx context.Context, name string, command string, re
 	}
 }
 
-func (ms *mobyService) Logs(ctx context.Context, containerName string, request containers.LogsRequest) error {
+func (ms *local) Logs(ctx context.Context, containerName string, request containers.LogsRequest) error {
 	c, err := ms.apiClient.ContainerInspect(ctx, containerName)
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func (ms *mobyService) Logs(ctx context.Context, containerName string, request c
 	return err
 }
 
-func (ms *mobyService) Delete(ctx context.Context, containerID string, force bool) error {
+func (ms *local) Delete(ctx context.Context, containerID string, force bool) error {
 	err := ms.apiClient.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
 		Force: force,
 	})

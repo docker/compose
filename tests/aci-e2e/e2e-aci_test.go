@@ -38,16 +38,6 @@ type E2eACISuite struct {
 	Suite
 }
 
-func (s *E2eACISuite) TestContextHelp() {
-	It("ensures context command includes azure-login and aci-create", func() {
-		output := s.NewDockerCommand("context", "create", "--help").ExecOrDie()
-		Expect(output).To(ContainSubstring("docker context create CONTEXT BACKEND [OPTIONS] [flags]"))
-		Expect(output).To(ContainSubstring("--aci-location"))
-		Expect(output).To(ContainSubstring("--aci-subscription-id"))
-		Expect(output).To(ContainSubstring("--aci-resource-group"))
-	})
-}
-
 func (s *E2eACISuite) TestContextDefault() {
 	It("should be initialized with default context", func() {
 		_, err := s.NewCommand("docker", "context", "rm", "-f", contextName).Exec()
@@ -70,7 +60,7 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(err).To(BeNil())
 		subscriptionID = *models[0].SubscriptionID
 
-		s.NewDockerCommand("context", "create", contextName, "aci", "--aci-subscription-id", subscriptionID, "--aci-resource-group", resourceGroupName, "--aci-location", location).ExecOrDie()
+		s.NewDockerCommand("context", "create", "aci", contextName, "--subscription-id", subscriptionID, "--resource-group", resourceGroupName, "--location", location).ExecOrDie()
 		// Expect(output).To(ContainSubstring("ACI context acitest created"))
 	})
 
