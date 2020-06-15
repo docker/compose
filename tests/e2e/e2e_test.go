@@ -143,7 +143,7 @@ func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
 
 func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
 	output := s.NewDockerCommand("version").ExecOrDie()
-	Expect(output).To(ContainSubstring(`Azure integration  0.1-beta
+	Expect(output).To(ContainSubstring(`Azure integration  1.0.0-beta
  Version:          `))
 }
 
