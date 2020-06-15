@@ -99,7 +99,7 @@ func loadFile(path string, dest interface{}) error {
 		return errors.Wrap(err, "unable to read config file")
 	}
 	err = json.Unmarshal(data, dest)
-	return errors.Wrap(err, "unable to unmarshal config")
+	return errors.Wrap(err, "unable to unmarshal config file "+path)
 }
 
 func configFilePath(dir string) string {

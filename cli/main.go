@@ -150,7 +150,7 @@ func main() {
 
 	currentContext, err := determineCurrentContext(opts.Context, configDir)
 	if err != nil {
-		fatal(errors.New("unable to determine current context"))
+		fatal(errors.Wrap(err, "unable to determine current context"))
 	}
 
 	s, err := store.New(store.WithRoot(configDir))
