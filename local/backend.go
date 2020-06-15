@@ -1,3 +1,5 @@
+// +build local
+
 package local
 
 import (

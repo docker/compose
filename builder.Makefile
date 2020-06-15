@@ -40,21 +40,26 @@ GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 BINARY?=bin/docker
 BINARY_WITH_EXTENSION=$(BINARY)$(EXTENSION)
 
+TAGS:=
+ifdef BUILD_TAGS
+  TAGS=-tags $(BUILD_TAGS)
+endif
+
 all: cli
 
 protos:
 	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 cli:
-	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) -o $(BINARY_WITH_EXTENSION) ./cli
+	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(BINARY_WITH_EXTENSION) ./cli
 
 cross:
-	@GOOS=linux   GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-linux-amd64 ./cli
-	@GOOS=darwin  GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-darwin-amd64 ./cli
-	@GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BINARY)-windows-amd64.exe ./cli
+	@GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
+	@GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
+	@GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
 
 test:
-	@go test -cover $(shell go list ./... | grep -vE 'e2e')
+	@go test $(TAGS) -cover $(shell go list ./... | grep -vE 'e2e')
 
 lint:
 	golangci-lint run --timeout 10m0s ./...
