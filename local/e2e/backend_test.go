@@ -21,8 +21,7 @@ func (m *LocalBackendTestSuite) BeforeTest(suiteName string, testName string) {
 }
 
 func (m *LocalBackendTestSuite) AfterTest(suiteName string, testName string) {
-	m.NewDockerCommand("context", "rm", "test-context").ExecOrDie()
-	m.NewDockerCommand("context", "use", "default").ExecOrDie()
+	m.NewDockerCommand("context", "rm", "-f", "test-context").ExecOrDie()
 }
 
 func (m *LocalBackendTestSuite) TestPs() {
