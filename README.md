@@ -25,8 +25,11 @@ The new CLI delegates to the classic docker for default contexts ; delegation is
 $ make
 ```
 
-If you make changes to the `.proto` files, make sure to `make protos` to generate go code.
+This will make the cli with all backends enabled. `make cross` on the other hand will cross-compile the cli without the
+example and local backend. We use `make cross` to build for our release, hence the exclusion of those backends. You can
+still cross-compile with all backends enabled: `BUILD_TAGS=example,local make cross`.
 
+If you make changes to the `.proto` files, make sure to `make protos` to generate go code.
 
 ## Tests
 

@@ -32,15 +32,19 @@ FROM base AS make-cli
 ENV CGO_ENABLED=0
 ARG TARGETOS
 ARG TARGETARCH
+ARG BUILD_TAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
+    BUILD_TAGS=${BUILD_TAGS} \
     make BINARY=/out/docker -f builder.Makefile cli
 
 FROM base AS make-cross
+ARG BUILD_TAGS
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
+    BUILD_TAGS=${BUILD_TAGS} \
     make BINARY=/out/docker  -f builder.Makefile cross
 
 FROM scratch AS protos
@@ -53,7 +57,9 @@ FROM scratch AS cross
 COPY --from=make-cross /out/* .
 
 FROM base as test
+ARG BUILD_TAGS
 ENV CGO_ENABLED=0
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
+    BUILD_TAGS=${BUILD_TAGS} \
     make -f builder.Makefile test

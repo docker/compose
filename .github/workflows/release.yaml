@@ -3,7 +3,7 @@ name: releaser
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 jobs:
   upload-release:
     runs-on: ubuntu-latest
@@ -32,4 +32,3 @@ jobs:
           artifacts: "bin/*"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
-

@@ -42,6 +42,7 @@ protos: ## Generate go code from .proto files
 cli: ## Compile the cli
 	@docker build . --target cli \
 	--platform local \
+	--build-arg BUILD_TAGS=example,local \
 	--output ./bin
 
 e2e-local: ## Run End to end local tests
@@ -55,10 +56,13 @@ e2e-aci: ## Run End to end ACI tests (requires azure login)
 
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \
+	--build-arg BUILD_TAGS \
 	--output ./bin \
 
 test: ## Run unit tests
-	@docker build . --target test
+	@docker build . \
+	--build-arg BUILD_TAGS=example,local \
+	--target test
 
 cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
@@ -68,6 +72,7 @@ lint: ## run linter(s)
 
 serve: cli ## start server
 	@./bin/docker serve --address unix:///tmp/backend.sock
+
 classic-link: ## create docker-classic symlink if does not already exist
 	ln -s $(CLASSIC_DOCKER) /usr/local/bin/docker-classic
 
