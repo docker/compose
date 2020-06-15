@@ -80,10 +80,18 @@ func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 }
 
 func (s *E2eSuite) TestCannotRemoveCurrentContext() {
-	s.NewDockerCommand("context", "create", "test-context", "--from", "default").ExecOrDie()
-	s.NewDockerCommand("context", "use", "test-context").ExecOrDie()
-	_, err := s.NewDockerCommand("context", "rm", "test-context").Exec()
+	s.NewDockerCommand("context", "create", "test-context-rm", "--from", "default").ExecOrDie()
+	s.NewDockerCommand("context", "use", "test-context-rm").ExecOrDie()
+	_, err := s.NewDockerCommand("context", "rm", "test-context-rm").Exec()
 	Expect(err.Error()).To(ContainSubstring("cannot delete current context"))
+}
+
+func (s *E2eSuite) TestCanForceRemoveCurrentContext() {
+	s.NewDockerCommand("context", "create", "test-context-rmf", "--from", "default").ExecOrDie()
+	s.NewDockerCommand("context", "use", "test-context-rmf").ExecOrDie()
+	s.NewDockerCommand("context", "rm", "-f", "test-context-rmf").ExecOrDie()
+	out := s.NewDockerCommand("context", "ls").ExecOrDie()
+	Expect(out).To(ContainSubstring("default *"))
 }
 
 func (s *E2eSuite) TestClassicLoginWithparameters() {
