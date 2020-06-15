@@ -6,10 +6,11 @@ import (
 
 	"github.com/docker/api/context/store"
 
-	_ "github.com/docker/api/example"
-	"github.com/docker/api/tests/framework"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
+
+	_ "github.com/docker/api/example"
+	"github.com/docker/api/tests/framework"
 )
 
 type PsSuite struct {

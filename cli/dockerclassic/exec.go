@@ -57,3 +57,9 @@ func IsDefaultContextCommand(dockerCommand string) bool {
 	contains := strings.Contains(output, "Usage:\tdocker "+dockerCommand)
 	return contains
 }
+
+// ExecSilent executes a command and do redirect output to stdOut, return output
+func ExecSilent(ctx context.Context) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, ClassicCliName, os.Args[1:]...)
+	return cmd.CombinedOutput()
+}
