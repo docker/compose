@@ -182,6 +182,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 	})
 	return err
 }
+
 func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) error {
 	input := &cloudformation.DescribeStacksInput{
 		StackName: aws.String(name),
