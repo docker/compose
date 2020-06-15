@@ -298,8 +298,11 @@ func (c client) createServiceRegistry(service types.ServiceConfig, template *clo
 	template.Resources[serviceRegistration] = &cloudmap.Service{
 		Description:       fmt.Sprintf("%q service discovery entry in Cloud Map", service.Name),
 		HealthCheckConfig: healthCheck,
-		Name:              service.Name,
-		NamespaceId:       cloudformation.Ref("CloudMap"),
+		HealthCheckCustomConfig: &cloudmap.Service_HealthCheckCustomConfig{
+			FailureThreshold: 1,
+		},
+		Name:        service.Name,
+		NamespaceId: cloudformation.Ref("CloudMap"),
 		DnsConfig: &cloudmap.Service_DnsConfig{
 			DnsRecords: []cloudmap.Service_DnsRecord{
 				{
