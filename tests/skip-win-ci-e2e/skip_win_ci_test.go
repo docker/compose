@@ -28,11 +28,8 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -80,49 +77,6 @@ RUN sleep 100`), 0644)).To(Succeed())
 	})
 }
 
-func (s *NonWinCIE2eSuite) TestAPIServer() {
-	_, err := exec.LookPath("yarn")
-	if err != nil || os.Getenv("SKIP_NODE") != "" {
-		s.T().Skip("skipping, yarn not installed")
-	}
-	It("can run 'serve' command", func() {
-		cName := "test-example"
-		s.NewDockerCommand("context", "create", cName, "example").ExecOrDie()
-
-		//sPath := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
-		sPath, cliAddress := s.getGrpcServerAndCLientAddress()
-		server, err := serveAPI(s.ConfigDir, sPath)
-		Expect(err).To(BeNil())
-		defer killProcess(server)
-
-		s.NewCommand("yarn", "install").WithinDirectory("../node-client").ExecOrDie()
-		output := s.NewCommand("yarn", "run", "start", cName, cliAddress).WithinDirectory("../node-client").ExecOrDie()
-		Expect(output).To(ContainSubstring("nginx"))
-	})
-}
-
-func (s *NonWinCIE2eSuite) getGrpcServerAndCLientAddress() (string, string) {
-	if IsWindows() {
-		return "npipe:////./pipe/clibackend", "unix:////./pipe/clibackend"
-	}
-	socketName := fmt.Sprintf("unix:///%s/docker.sock", s.ConfigDir)
-	return socketName, socketName
-}
-
 func TestNonWinCIE2(t *testing.T) {
 	suite.Run(t, new(NonWinCIE2eSuite))
-}
-
-func killProcess(process *os.Process) {
-	err := process.Kill()
-	Expect(err).To(BeNil())
-}
-
-func serveAPI(configDir string, address string) (*os.Process, error) {
-	cmd := exec.Command("../../bin/docker", "--config", configDir, "serve", "--address", address)
-	err := cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-	return cmd.Process, nil
 }
