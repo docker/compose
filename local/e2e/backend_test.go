@@ -49,6 +49,14 @@ func (m *LocalBackendTestSuite) TestRunWithPorts() {
 		m.NewDockerCommand("rm", "-f", "nginx").ExecOrDie()
 	}()
 	assert.Contains(m.T(), out, "8080")
+
+	out = m.NewDockerCommand("inspect", "nginx").ExecOrDie()
+	assert.Contains(m.T(), out, "\"Status\": \"running\"")
+}
+
+func (m *LocalBackendTestSuite) TestInspectNotFound() {
+	out, _ := m.NewDockerCommand("inspect", "nonexistentcontainer").Exec()
+	assert.Contains(m.T(), out, "Error: No such container: nonexistentcontainer")
 }
 
 func TestLocalBackendTestSuite(t *testing.T) {

@@ -72,7 +72,7 @@ func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, 
 	return containers.Container{
 		ID:      stringid.TruncateID(c.ID),
 		Status:  status,
-		Image:   c.Path + "@" + c.Image,
+		Image:   c.Image,
 		Command: command,
 	}, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/api/compose"
+	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 )
 
@@ -225,4 +226,39 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 		},
 	}, nil
 
+}
+
+func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) (containers.Container, error) {
+	memLimits := -1.
+	if cc.Resources != nil &&
+		cc.Resources.Limits != nil &&
+		cc.Resources.Limits.MemoryInGB != nil {
+		memLimits = *cc.Resources.Limits.MemoryInGB
+	}
+
+	command := ""
+	if cc.Command != nil {
+		command = strings.Join(*cc.Command, " ")
+	}
+
+	status := "Unknown"
+	if cc.InstanceView != nil && cc.InstanceView.CurrentState != nil {
+		status = *cc.InstanceView.CurrentState.State
+	}
+
+	c := containers.Container{
+		ID:          containerID,
+		Status:      status,
+		Image:       to.String(cc.Image),
+		Command:     command,
+		CPUTime:     0,
+		MemoryUsage: 0,
+		MemoryLimit: uint64(memLimits),
+		PidsCurrent: 0,
+		PidsLimit:   0,
+		Labels:      nil,
+		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
+	}
+
+	return c, nil
 }

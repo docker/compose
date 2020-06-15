@@ -11,7 +11,7 @@ import (
 	"github.com/docker/api/client"
 )
 
-// RmCommand deletes containers
+// InspectCommand inspects into containers
 func InspectCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect",

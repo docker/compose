@@ -186,6 +186,11 @@ func (s *E2eSuite) TestMockBackend() {
 		Expect(lines[2]).To(Equal("stopped"))
 	})
 
+	It("can run inspect command on container", func() {
+		golden.Assert(s.T(), s.NewDockerCommand("inspect", "id").ExecOrDie(),
+			GoldenFile("inspect-id"))
+	})
+
 	It("can run 'run' command", func() {
 		output := s.NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
 		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
