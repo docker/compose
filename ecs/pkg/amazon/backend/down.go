@@ -2,30 +2,25 @@ package backend
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) ComposeDown(ctx context.Context, projectName string, deleteCluster bool) error {
-	err := b.api.DeleteStack(ctx, projectName)
+func (b *Backend) Down(ctx context.Context, options compose.ProjectOptions) error {
+	project, err := compose.ProjectFromOptions(&options)
 	if err != nil {
 		return err
 	}
 
-	err = b.WaitStackCompletion(ctx, projectName, types.StackDelete)
+	err = b.api.DeleteStack(ctx, project.Name)
 	if err != nil {
 		return err
 	}
 
-	if !deleteCluster {
-		return nil
-	}
-
-	fmt.Printf("Delete cluster %s", b.Cluster)
-	if err = b.api.DeleteCluster(ctx, b.Cluster); err != nil {
+	err = b.WaitStackCompletion(ctx, project.Name, types.StackDelete)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("... done. \n")
 	return nil
 }

@@ -8,14 +8,15 @@ import (
 )
 
 type API interface {
+	Up(ctx context.Context, options ProjectOptions) error
+	Down(ctx context.Context, options ProjectOptions) error
+
 	Convert(project *Project) (*cloudformation.Template, error)
-	ComposeUp(ctx context.Context, project *Project) error
-	ComposeDown(ctx context.Context, projectName string, deleteCluster bool) error
-	ComposeLogs(ctx context.Context, projectName string) error
+	Logs(ctx context.Context, projectName string) error
+	Ps(background context.Context, project *Project) ([]types.TaskStatus, error)
 
 	CreateSecret(ctx context.Context, secret types.Secret) (string, error)
 	InspectSecret(ctx context.Context, id string) (types.Secret, error)
 	ListSecrets(ctx context.Context) ([]types.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
-	ComposePs(background context.Context, project *Project) ([]types.TaskStatus, error)
 }

@@ -8,7 +8,12 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) ComposeUp(ctx context.Context, project *compose.Project) error {
+func (b *Backend) Up(ctx context.Context, options compose.ProjectOptions) error {
+	project, err := compose.ProjectFromOptions(&options)
+	if err != nil {
+		return err
+	}
+
 	if b.Cluster != "" {
 		ok, err := b.api.ClusterExists(ctx, b.Cluster)
 		if err != nil {

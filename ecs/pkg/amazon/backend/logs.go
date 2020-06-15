@@ -11,7 +11,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) ComposeLogs(ctx context.Context, projectName string) error {
+func (b *Backend) Logs(ctx context.Context, projectName string) error {
 	err := b.api.GetLogs(ctx, projectName, &logConsumer{
 		colors: map[string]console.ColorFunc{},
 		width:  0,

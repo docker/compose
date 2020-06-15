@@ -10,7 +10,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) ComposePs(ctx context.Context, project *compose.Project) ([]types.TaskStatus, error) {
+func (b *Backend) Ps(ctx context.Context, project *compose.Project) ([]types.TaskStatus, error) {
 	cluster := b.Cluster
 	if cluster == "" {
 		cluster = project.Name

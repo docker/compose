@@ -75,16 +75,12 @@ func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
-		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
-			clusteropts, err := docker.GetAwsContext(dockerCli)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
 			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
 			if err != nil {
 				return err
 			}
-			return backend.ComposeUp(context.Background(), project)
+			return backend.Up(context.Background(), *projectOpts)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
@@ -104,7 +100,7 @@ func PsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 			if err != nil {
 				return err
 			}
-			tasks, err := backend.ComposePs(context.Background(), project)
+			tasks, err := backend.Ps(context.Background(), project)
 			if err != nil {
 				return err
 			}
@@ -133,21 +129,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 			if err != nil {
 				return err
 			}
-			if len(args) == 0 {
-				project, err := compose.ProjectFromOptions(projectOpts)
-				if err != nil {
-					return err
-				}
-				return backend.ComposeDown(context.Background(), project.Name, opts.DeleteCluster)
-			}
-			// project names passed as parameters
-			for _, name := range args {
-				err := backend.ComposeDown(context.Background(), name, opts.DeleteCluster)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
+			return backend.Down(context.Background(), *projectOpts)
 		}),
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
@@ -173,7 +155,7 @@ func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 			} else {
 				name = args[0]
 			}
-			return backend.ComposeLogs(context.Background(), name)
+			return backend.Logs(context.Background(), name)
 		}),
 	}
 	return cmd
