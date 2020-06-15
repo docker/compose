@@ -148,10 +148,7 @@ func main() {
 	configDir := opts.Config
 	ctx = config.WithDir(ctx, configDir)
 
-	currentContext, err := determineCurrentContext(opts.Context, configDir)
-	if err != nil {
-		fatal(errors.Wrap(err, "unable to determine current context"))
-	}
+	currentContext := determineCurrentContext(opts.Context, configDir)
 
 	s, err := store.New(store.WithRoot(configDir))
 	if err != nil {
@@ -200,19 +197,20 @@ func newSigContext() (context.Context, func()) {
 	return ctx, cancel
 }
 
-func determineCurrentContext(flag string, configDir string) (string, error) {
+func determineCurrentContext(flag string, configDir string) string {
 	res := flag
 	if res == "" {
 		config, err := config.LoadFile(configDir)
 		if err != nil {
-			return "", err
+			fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
+			return "default"
 		}
 		res = config.CurrentContext
 	}
 	if res == "" {
 		res = "default"
 	}
-	return res, nil
+	return res
 }
 
 func fatal(err error) {

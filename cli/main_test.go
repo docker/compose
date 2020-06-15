@@ -56,23 +56,19 @@ func TestDetermineCurrentContext(t *testing.T) {
 	require.NoError(t, err)
 
 	// If nothing set, fallback to default
-	c, err := determineCurrentContext("", "")
-	require.NoError(t, err)
+	c := determineCurrentContext("", "")
 	require.Equal(t, "default", c)
 
 	// If context flag set, use that
-	c, err = determineCurrentContext("other-context", "")
-	require.NoError(t, err)
+	c = determineCurrentContext("other-context", "")
 	require.Equal(t, "other-context", c)
 
 	// If no context flag, use config
-	c, err = determineCurrentContext("", d)
-	require.NoError(t, err)
+	c = determineCurrentContext("", d)
 	require.Equal(t, "some-context", c)
 
 	// Ensure context flag overrides config
-	c, err = determineCurrentContext("other-context", d)
-	require.NoError(t, err)
+	c = determineCurrentContext("other-context", d)
 	require.Equal(t, "other-context", c)
 }
 
