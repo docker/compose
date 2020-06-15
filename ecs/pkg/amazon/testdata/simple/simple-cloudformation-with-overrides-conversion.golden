@@ -143,6 +143,9 @@
           ],
           "RoutingPolicy": "MULTIVALUE"
         },
+        "HealthCheckCustomConfig": {
+          "FailureThreshold": 1
+        },
         "Name": "simple",
         "NamespaceId": {
           "Ref": "CloudMap"
