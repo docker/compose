@@ -202,8 +202,7 @@ func (s *E2eSuite) TestMockBackend() {
 	})
 
 	It("can run inspect command on container", func() {
-		golden.Assert(s.T(), s.NewDockerCommand("inspect", "id").ExecOrDie(),
-			GoldenFile("inspect-id"))
+		golden.Assert(s.T(), s.NewDockerCommand("inspect", "id").ExecOrDie(), "inspect-id")
 	})
 
 	It("can run 'run' command", func() {

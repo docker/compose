@@ -37,6 +37,9 @@ func runInspect(ctx context.Context, id string) error {
 	}
 
 	b, err := json.MarshalIndent(container, "", "  ")
+	if err != nil {
+		return err
+	}
 	containerString := string(b)
 	fmt.Println(containerString)
 
