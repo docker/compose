@@ -1,18 +1,14 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import re
 import shutil
 import tempfile
 from distutils.spawn import find_executable
+from io import StringIO
 from os import path
 
 import pytest
 from docker.errors import APIError
 from docker.errors import ImageNotFound
-from six import StringIO
-from six import text_type
 
 from .. import mock
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
@@ -224,6 +220,9 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
+    @pytest.mark.xfail(True, reason='Getting "Your kernel does not support '
+                                    'cgroup blkio weight and weight_device" on daemon start '
+                                    'on Linux kernel 5.3.x')
     def test_create_container_with_blkio_config(self):
         blkio_config = {
             'weight': 300,
@@ -988,6 +987,23 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
 
+    def test_build_cli_with_build_labels(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write("FROM busybox\n")
+
+        service = self.create_service('web',
+                                      build={
+                                          'context': base_dir,
+                                          'labels': {'com.docker.compose.test': 'true'}},
+                                      )
+        service.build(cli=True)
+        self.addCleanup(self.client.remove_image, service.image_name)
+        image = self.client.inspect_image('composetest_web')
+        assert image['Config']['Labels']['com.docker.compose.test']
+
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -1044,7 +1060,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        service = self.create_service('web', build={'context': text_type(base_dir)})
+        service = self.create_service('web', build={'context': str(base_dir)})
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
@@ -1078,7 +1094,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
-                                      build={'context': text_type(base_dir),
+                                      build={'context': str(base_dir),
                                              'args': {"build_version": "1"}})
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
@@ -1095,7 +1111,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
-                                      build={'context': text_type(base_dir),
+                                      build={'context': str(base_dir),
                                              'args': {"build_version": "1"}})
         service.build(build_args_override={'build_version': '2'})
         self.addCleanup(self.client.remove_image, service.image_name)
@@ -1111,7 +1127,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('FROM busybox\n')
 
         service = self.create_service('buildlabels', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'labels': {'com.docker.compose.test': 'true'}
         })
         service.build()
@@ -1138,7 +1154,7 @@ class ServiceTest(DockerClientTestCase):
         self.client.start(net_container)
 
         service = self.create_service('buildwithnet', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'network': 'container:{}'.format(net_container['Id'])
         })
 
@@ -1162,7 +1178,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('LABEL com.docker.compose.test.target=two\n')
 
         service = self.create_service('buildtarget', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'target': 'one'
         })
 
@@ -1184,7 +1200,7 @@ class ServiceTest(DockerClientTestCase):
             ]))
 
         service = self.create_service('build_extra_hosts', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'extra_hosts': {
                 'foobar': '127.0.0.1',
                 'baz': '127.0.0.1'
@@ -1206,7 +1222,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('hello world\n')
 
         service = self.create_service('build_gzip', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
         })
         service.build(gzip=True)
         assert service.image()
@@ -1219,7 +1235,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('FROM busybox\n')
 
         service = self.create_service('build_isolation', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'isolation': 'default',
         })
         service.build()
@@ -1233,7 +1249,7 @@ class ServiceTest(DockerClientTestCase):
         service = Service(
             'build_leading_slug', client=self.client,
             project='___-composetest', build={
-                'context': text_type(base_dir)
+                'context': str(base_dir)
             }
         )
         assert service.image_name == 'composetest_build_leading_slug'

@@ -1,17 +1,12 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import functools
 import logging
 import pprint
 from itertools import chain
 
-import six
-
 
 def format_call(args, kwargs):
     args = (repr(a) for a in args)
-    kwargs = ("{0!s}={1!r}".format(*item) for item in six.iteritems(kwargs))
+    kwargs = ("{0!s}={1!r}".format(*item) for item in kwargs.items())
     return "({0})".format(", ".join(chain(args, kwargs)))
 
 
@@ -41,7 +36,7 @@ class VerboseProxy(object):
     def __getattr__(self, name):
         attr = getattr(self.obj, name)
 
-        if not six.callable(attr):
+        if not callable(attr):
             return attr
 
         return functools.partial(self.proxy_callable, name)

@@ -603,6 +603,7 @@ _docker_compose() {
 		--tlsverify
 	"
 	local daemon_options_with_args="
+		--context -c
 		--env-file
 		--file -f
 		--host -H

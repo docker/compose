@@ -1,7 +1,4 @@
 # flake8: noqa
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from . import environment
 from .config import ConfigurationError
 from .config import DOCKER_CONFIG_KEYS

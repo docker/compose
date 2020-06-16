@@ -1,9 +1,9 @@
-ARG DOCKER_VERSION=19.03.5
-ARG PYTHON_VERSION=3.7.6
+ARG DOCKER_VERSION=19.03.8
+ARG PYTHON_VERSION=3.7.7
 ARG BUILD_ALPINE_VERSION=3.11
 ARG BUILD_DEBIAN_VERSION=slim-stretch
-ARG RUNTIME_ALPINE_VERSION=3.11.3
-ARG RUNTIME_DEBIAN_VERSION=stretch-20191224-slim
+ARG RUNTIME_ALPINE_VERSION=3.11.5
+ARG RUNTIME_DEBIAN_VERSION=stretch-20200414-slim
 
 ARG BUILD_PLATFORM=alpine
 
@@ -24,8 +24,6 @@ RUN apk add --no-cache \
     musl-dev \
     openssl \
     openssl-dev \
-    python2 \
-    python2-dev \
     zlib-dev
 ENV BUILD_BOOTLOADER=1
 
@@ -40,7 +38,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl-dev \
     make \
     openssl \
-    python2.7-dev \
     zlib1g-dev
 
 FROM build-${BUILD_PLATFORM} AS build
@@ -52,6 +49,7 @@ WORKDIR /code/
 RUN pip install virtualenv==16.2.0
 RUN pip install tox==2.9.1
 
+COPY requirements-indirect.txt .
 COPY requirements.txt .
 COPY requirements-dev.txt .
 COPY .pre-commit-config.yaml .

@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import unittest
 from threading import Lock
 
-import six
 from docker.errors import APIError
 
 from compose.parallel import GlobalLimit
@@ -39,7 +35,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=[1, 2, 3, 4, 5],
             func=lambda x: x * 2,
-            get_name=six.text_type,
+            get_name=str,
             msg="Doubling",
         )
 
@@ -61,7 +57,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=list(range(tasks)),
             func=f,
-            get_name=six.text_type,
+            get_name=str,
             msg="Testing",
             limit=limit,
         )
@@ -85,7 +81,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=list(range(tasks)),
             func=f,
-            get_name=six.text_type,
+            get_name=str,
             msg="Testing",
         )
 
@@ -147,7 +143,7 @@ def test_parallel_execute_alignment(capsys):
     results, errors = parallel_execute(
         objects=["short", "a very long name"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Aligning",
     )
 
@@ -164,7 +160,7 @@ def test_parallel_execute_ansi(capsys):
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Control characters",
     )
 
@@ -180,7 +176,7 @@ def test_parallel_execute_noansi(capsys):
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Control characters",
     )
 

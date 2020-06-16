@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from compose import utils
 
 
@@ -18,7 +15,7 @@ def write_to_stream(s, stream):
 
 def stream_output(output, stream):
     is_terminal = hasattr(stream, 'isatty') and stream.isatty()
-    stream = utils.get_output_stream(stream)
+    stream = stream
     lines = {}
     diff = 0
 
