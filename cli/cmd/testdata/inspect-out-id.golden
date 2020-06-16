@@ -1,0 +1,13 @@
+{
+  "ID": "id",
+  "Status": "",
+  "Image": "nginx",
+  "Command": "",
+  "CPUTime": 0,
+  "MemoryUsage": 0,
+  "MemoryLimit": 0,
+  "PidsCurrent": 0,
+  "PidsLimit": 0,
+  "Labels": null,
+  "Ports": null
+}

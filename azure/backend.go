@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/go-autorest/autorest/to"
+
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
 
@@ -237,6 +239,33 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _
 	}
 
 	return err
+}
+
+func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) (containers.Container, error) {
+	groupName, containerName := getGroupAndContainerName(containerID)
+
+	cg, err := getACIContainerGroup(ctx, cs.ctx, groupName)
+	if err != nil {
+		return containers.Container{}, err
+	}
+	if cg.StatusCode == http.StatusNoContent {
+		return containers.Container{}, ErrNoSuchContainer
+	}
+
+	var cc containerinstance.Container
+	var found = false
+	for _, c := range *cg.Containers {
+		if to.String(c.Name) == containerName {
+			cc = c
+			found = true
+			break
+		}
+	}
+	if !found {
+		return containers.Container{}, ErrNoSuchContainer
+	}
+
+	return convert.ContainerGroupToContainer(containerID, cg, cc)
 }
 
 type aciComposeService struct {

@@ -33,19 +33,7 @@ func (p *proxy) List(ctx context.Context, request *containersv1.ListRequest) (*c
 		Containers: []*containersv1.Container{},
 	}
 	for _, container := range containerList {
-		response.Containers = append(response.Containers, &containersv1.Container{
-			Id:          container.ID,
-			Image:       container.Image,
-			Command:     container.Command,
-			Status:      container.Status,
-			CpuTime:     container.CPUTime,
-			Labels:      container.Labels,
-			MemoryLimit: container.MemoryLimit,
-			MemoryUsage: container.MemoryUsage,
-			PidsCurrent: container.PidsCurrent,
-			PidsLimit:   container.PidsLimit,
-			Ports:       portsToGrpc(container.Ports),
-		})
+		response.Containers = append(response.Containers, toGrpcContainer(container))
 	}
 
 	return response, nil
@@ -76,6 +64,17 @@ func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*con
 	})
 }
 
+func (p *proxy) Inspect(ctx context.Context, request *containersv1.InspectRequest) (*containersv1.InspectResponse, error) {
+	c, err := Client(ctx).ContainerService().Inspect(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	response := &containersv1.InspectResponse{
+		Container: toGrpcContainer(c),
+	}
+	return response, err
+}
+
 func (p *proxy) Delete(ctx context.Context, request *containersv1.DeleteRequest) (*containersv1.DeleteResponse, error) {
 	return &containersv1.DeleteResponse{}, Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
 }
@@ -102,4 +101,20 @@ func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Cont
 			Stream: stream,
 		},
 	})
+}
+
+func toGrpcContainer(c containers.Container) *containersv1.Container {
+	return &containersv1.Container{
+		Id:          c.ID,
+		Image:       c.Image,
+		Status:      c.Status,
+		Command:     c.Command,
+		CpuTime:     c.CPUTime,
+		MemoryUsage: c.MemoryUsage,
+		MemoryLimit: c.MemoryLimit,
+		PidsCurrent: c.PidsCurrent,
+		PidsLimit:   c.PidsLimit,
+		Labels:      c.Labels,
+		Ports:       portsToGrpc(c.Ports),
+	}
 }

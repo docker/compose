@@ -38,6 +38,13 @@ func service(ctx context.Context) (backend.Service, error) {
 
 type containerService struct{}
 
+func (cs *containerService) Inspect(ctx context.Context, id string) (containers.Container, error) {
+	return containers.Container{
+		ID:    "id",
+		Image: "nginx",
+	}, nil
+}
+
 func (cs *containerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
 	result := []containers.Container{
 		{

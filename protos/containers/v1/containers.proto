@@ -38,6 +38,7 @@ service Containers {
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Logs(LogsRequest) returns (stream LogsResponse);
 	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Inspect(InspectRequest) returns (InspectResponse);
 }
 
 message Port {
@@ -59,6 +60,14 @@ message Container {
 	uint64 pids_limit = 9;
 	repeated string labels = 10;
 	repeated Port ports = 11;
+}
+
+message InspectRequest {
+	string id = 1;
+}
+
+message InspectResponse {
+	Container container = 1;
 }
 
 message DeleteRequest {
