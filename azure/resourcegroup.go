@@ -7,7 +7,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/pkg/errors"
 
-	"github.com/docker/api/azure/login"
 	"github.com/docker/api/errdefs"
 )
 
@@ -30,13 +29,20 @@ func NewACIResourceGroupHelper() ACIResourceGroupHelper {
 
 // GetGroup get a resource group from its name
 func (mgt aciResourceGroupHelperImpl) GetGroup(ctx context.Context, subscriptionID string, groupName string) (resources.Group, error) {
-	gc := getGroupsClient(subscriptionID)
+	gc, err := getGroupsClient(subscriptionID)
+	if err != nil {
+		return resources.Group{}, err
+	}
 	return gc.Get(ctx, groupName)
 }
 
 // ListGroups list resource groups
 func (mgt aciResourceGroupHelperImpl) ListGroups(ctx context.Context, subscriptionID string) ([]resources.Group, error) {
-	gc := getGroupsClient(subscriptionID)
+	gc, err := getGroupsClient(subscriptionID)
+	if err != nil {
+		return nil, err
+	}
+
 	groupResponse, err := gc.List(ctx, "", nil)
 	if err != nil {
 		return nil, err
@@ -48,13 +54,20 @@ func (mgt aciResourceGroupHelperImpl) ListGroups(ctx context.Context, subscripti
 
 // CreateOrUpdate create or update a resource group
 func (mgt aciResourceGroupHelperImpl) CreateOrUpdate(ctx context.Context, subscriptionID string, resourceGroupName string, parameters resources.Group) (result resources.Group, err error) {
-	gc := getGroupsClient(subscriptionID)
+	gc, err := getGroupsClient(subscriptionID)
+	if err != nil {
+		return resources.Group{}, err
+	}
 	return gc.CreateOrUpdate(ctx, resourceGroupName, parameters)
 }
 
 // Delete deletes a resource group
 func (mgt aciResourceGroupHelperImpl) Delete(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
-	gc := getGroupsClient(subscriptionID)
+	gc, err := getGroupsClient(subscriptionID)
+	if err != nil {
+		return err
+	}
+
 	future, err := gc.Delete(ctx, resourceGroupName)
 	if err != nil {
 		return err
@@ -89,17 +102,18 @@ func (mgt aciResourceGroupHelperImpl) GetSubscriptionIDs(ctx context.Context) ([
 
 func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
-	authorizer, err := login.NewAuthorizerFromLogin()
+	err := setupClient(&subc.Client)
 	if err != nil {
 		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginFailed, err.Error())
 	}
-	subc.Authorizer = authorizer
 	return subc, nil
 }
 
-func getGroupsClient(subscriptionID string) resources.GroupsClient {
+func getGroupsClient(subscriptionID string) (resources.GroupsClient, error) {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
-	authorizer, _ := login.NewAuthorizerFromLogin()
-	groupsClient.Authorizer = authorizer
-	return groupsClient
+	err := setupClient(&groupsClient.Client)
+	if err != nil {
+		return resources.GroupsClient{}, err
+	}
+	return groupsClient, nil
 }
