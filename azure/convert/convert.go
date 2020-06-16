@@ -228,6 +228,7 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 
 }
 
+// ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) (containers.Container, error) {
 	memLimits := -1.
 	if cc.Resources != nil &&
