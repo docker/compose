@@ -19,6 +19,7 @@ import (
 
 	"github.com/docker/api/azure/login"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/progress"
 )
 
 const aciDockerUserAgent = "docker-cli"
@@ -47,10 +48,17 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 }
 
 func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
+	w := progress.ContextWriter(ctx)
 	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
+	w.Event(progress.Event{
+		ID:         *groupDefinition.Name,
+		Status:     progress.Working,
+		StatusText: "Waiting",
+	})
+
 	future, err := containerGroupsClient.CreateOrUpdate(
 		ctx,
 		aciContext.ResourceGroup,
@@ -61,13 +69,34 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		return err
 	}
 
+	w.Event(progress.Event{
+		ID:         *groupDefinition.Name,
+		Status:     progress.Done,
+		StatusText: "Created",
+	})
+	for _, c := range *groupDefinition.Containers {
+		w.Event(progress.Event{
+			ID:         *c.Name,
+			Status:     progress.Working,
+			StatusText: "Waiting",
+		})
+	}
+
 	err = future.WaitForCompletionRef(ctx, containerGroupsClient.Client)
 	if err != nil {
 		return err
 	}
+
 	containerGroup, err := future.Result(containerGroupsClient)
 	if err != nil {
 		return err
+	}
+	for _, c := range *groupDefinition.Containers {
+		w.Event(progress.Event{
+			ID:         *c.Name,
+			Status:     progress.Done,
+			StatusText: "Done",
+		})
 	}
 
 	if len(*containerGroup.Containers) > 1 {

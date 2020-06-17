@@ -30,11 +30,14 @@ package run
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/api/cli/options/run"
 	"github.com/docker/api/client"
+	"github.com/docker/api/progress"
 )
 
 // Command runs a container
@@ -68,10 +71,23 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 		return err
 	}
 
-	if err = c.ContainerService().Run(ctx, containerConfig); err != nil {
+	eg, _ := errgroup.WithContext(ctx)
+	w, err := progress.NewWriter(os.Stderr)
+	if err != nil {
 		return err
 	}
-	fmt.Println(opts.Name)
+	eg.Go(func() error {
+		return w.Start(context.Background())
+	})
 
-	return nil
+	ctx = progress.WithContextWriter(ctx, w)
+
+	eg.Go(func() error {
+		defer w.Stop()
+		return c.ContainerService().Run(ctx, containerConfig)
+	})
+
+	err = eg.Wait()
+	fmt.Println(opts.Name)
+	return err
 }
