@@ -1,4 +1,4 @@
-package dockerclassic
+package mobycli
 
 import (
 	"fmt"

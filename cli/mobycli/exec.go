@@ -1,4 +1,4 @@
-package dockerclassic
+package mobycli
 
 import (
 	"context"
@@ -13,10 +13,10 @@ import (
 	"github.com/docker/api/context/store"
 )
 
-// ClassicCliName name of the classic cli binary
-const ClassicCliName = "docker-classic"
+// ComDockerCli name of the classic cli binary
+const ComDockerCli = "com.docker.cli"
 
-// Exec delegates to docker-classic
+// Exec delegates to com.docker.cli
 func Exec(ctx context.Context) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
@@ -25,7 +25,7 @@ func Exec(ctx context.Context) {
 	// Only run original docker command if the current context is not
 	// ours.
 	if err != nil {
-		cmd := exec.CommandContext(ctx, ClassicCliName, os.Args[1:]...)
+		cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -40,7 +40,7 @@ func Exec(ctx context.Context) {
 	}
 }
 
-// ExecCmd delegates the cli command to docker-classic. The error is never returned (process will exit with docker classic exit code), the return type is to make it easier to use with cobra commands
+// ExecCmd delegates the cli command to com.docker.cli. The error is never returned (process will exit with docker classic exit code), the return type is to make it easier to use with cobra commands
 func ExecCmd(command *cobra.Command) error {
 	Exec(command.Context())
 	return nil
@@ -48,7 +48,7 @@ func ExecCmd(command *cobra.Command) error {
 
 // IsDefaultContextCommand checks if the command exists in the classic cli (issues a shellout --help)
 func IsDefaultContextCommand(dockerCommand string) bool {
-	cmd := exec.Command(ClassicCliName, dockerCommand, "--help")
+	cmd := exec.Command(ComDockerCli, dockerCommand, "--help")
 	b, e := cmd.CombinedOutput()
 	if e != nil {
 		fmt.Println(e)
@@ -60,6 +60,6 @@ func IsDefaultContextCommand(dockerCommand string) bool {
 
 // ExecSilent executes a command and do redirect output to stdOut, return output
 func ExecSilent(ctx context.Context) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, ClassicCliName, os.Args[1:]...)
+	cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
 	return cmd.CombinedOutput()
 }

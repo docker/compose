@@ -27,10 +27,10 @@ export DOCKER_BUILDKIT=1
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-	CLASSIC_DOCKER=/usr/bin/docker
+	MOBY_DOCKER=/usr/bin/docker
 endif
 ifeq ($(UNAME_S),Darwin)
-	CLASSIC_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
+	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
 endif
 
 all: cli
@@ -73,8 +73,8 @@ lint: ## run linter(s)
 serve: cli ## start server
 	@./bin/docker serve --address unix:///tmp/backend.sock
 
-classic-link: ## create docker-classic symlink if does not already exist
-	ln -s $(CLASSIC_DOCKER) /usr/local/bin/docker-classic
+moby-cli-link: ## create com.docker.cli symlink if does not already exist
+	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
