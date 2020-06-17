@@ -19,12 +19,13 @@ const ComDockerCli = "com.docker.cli"
 // Exec delegates to com.docker.cli if on moby context
 func Exec(ctx context.Context) {
 	currentContext := apicontext.CurrentContext(ctx)
+
 	s := store.ContextStore(ctx)
 
-	_, err := s.Get(currentContext)
+	currentCtx, err := s.Get(currentContext)
 	// Only run original docker command if the current context is not
 	// ours.
-	if err != nil {
+	if err != nil || currentCtx.Type() == store.DefaultContextType {
 		shellOut(ctx)
 	}
 }

@@ -12,7 +12,7 @@ type DockerContext struct {
 // Type the context type
 func (m *DockerContext) Type() string {
 	if m.Metadata.Type == "" {
-		return defaultContextType
+		return DefaultContextType
 	}
 	return m.Metadata.Type
 }

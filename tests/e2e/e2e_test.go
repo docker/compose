@@ -169,6 +169,13 @@ func (s *E2eSuite) TestLegacy() {
 		output := s.NewDockerCommand("run", "--rm", "hello-world").WithTimeout(time.NewTimer(20 * time.Second).C).ExecOrDie()
 		Expect(output).To(ContainSubstring("Hello from Docker!"))
 	})
+
+	It("should execute legacy commands in other moby contexts", func() {
+		s.NewDockerCommand("context", "create", "mobyCtx", "--from=default").ExecOrDie()
+		s.NewDockerCommand("context", "use", "mobyCtx").ExecOrDie()
+		output, _ := s.NewDockerCommand("swarm", "join").Exec()
+		Expect(output).To(ContainSubstring("\"docker swarm join\" requires exactly 1 argument."))
+	})
 }
 
 func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {

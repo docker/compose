@@ -8,8 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultContextType = "moby"
-
 // Represents a context as created by the docker cli
 type defaultContext struct {
 	Metadata  ContextMetadata
@@ -67,7 +65,7 @@ func dockerDefaultContext() (*DockerContext, error) {
 			},
 		},
 		Metadata: ContextMetadata{
-			Type:              defaultContextType,
+			Type:              DefaultContextType,
 			Description:       "Current DOCKER_HOST based configuration",
 			StackOrchestrator: defaultCtx.Metadata.StackOrchestrator,
 		},
