@@ -66,6 +66,14 @@ func (s *E2eSuite) TestCreateDockerContextAndListIt() {
 	golden.Assert(s.T(), output, GoldenFile("ls-out-test-docker"))
 }
 
+func (s *E2eSuite) TestContextListQuiet() {
+	s.NewDockerCommand("context", "create", "test-docker", "--from", "default").ExecOrDie()
+	output := s.NewCommand("docker", "context", "ls", "-q").ExecOrDie()
+	Expect(output).To(Equal(`default
+test-docker
+`))
+}
+
 func (s *E2eSuite) TestInspectDefaultContext() {
 	output := s.NewDockerCommand("context", "inspect", "default").ExecOrDie()
 	Expect(output).To(ContainSubstring(`"Name": "default"`))
