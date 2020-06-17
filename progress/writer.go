@@ -59,6 +59,19 @@ type writer struct {
 	mtx      *sync.RWMutex
 }
 
+type writerKey struct{}
+
+// WithContextWriter adds the writer to the context
+func WithContextWriter(ctx context.Context, writer Writer) context.Context {
+	return context.WithValue(ctx, writerKey{}, writer)
+}
+
+// ContextWriter returns the writer from the context
+func ContextWriter(ctx context.Context) Writer {
+	s, _ := ctx.Value(writerKey{}).(Writer)
+	return s
+}
+
 // NewWriter returns a new multi-progress writer
 func NewWriter(out io.Writer) Writer {
 	return &writer{
