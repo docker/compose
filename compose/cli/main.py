@@ -180,7 +180,7 @@ class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f <arg>...] [options] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [options] [--] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
@@ -257,7 +257,7 @@ class TopLevelCommand(object):
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `docker-compose build` to rebuild it.
 
-        Usage: build [options] [--build-arg key=val...] [SERVICE...]
+        Usage: build [options] [--build-arg key=val...] [--] [SERVICE...]
 
         Options:
             --build-arg key=val     Set build-time variables for services.
@@ -423,7 +423,7 @@ class TopLevelCommand(object):
         """
         Receive real time events from containers.
 
-        Usage: events [options] [SERVICE...]
+        Usage: events [options] [--] [SERVICE...]
 
         Options:
             --json      Output events as a stream of json objects
@@ -448,7 +448,7 @@ class TopLevelCommand(object):
         """
         Execute a command in a running container
 
-        Usage: exec [options] [-e KEY=VAL...] SERVICE COMMAND [ARGS...]
+        Usage: exec [options] [-e KEY=VAL...] [--] SERVICE COMMAND [ARGS...]
 
         Options:
             -d, --detach      Detached mode: Run command in the background.
@@ -536,7 +536,7 @@ class TopLevelCommand(object):
     def images(self, options):
         """
         List images used by the created containers.
-        Usage: images [options] [SERVICE...]
+        Usage: images [options] [--] [SERVICE...]
 
         Options:
             -q, --quiet  Only display IDs
@@ -591,7 +591,7 @@ class TopLevelCommand(object):
         """
         Force stop service containers.
 
-        Usage: kill [options] [SERVICE...]
+        Usage: kill [options] [--] [SERVICE...]
 
         Options:
             -s SIGNAL         SIGNAL to send to the container.
@@ -605,7 +605,7 @@ class TopLevelCommand(object):
         """
         View output from containers.
 
-        Usage: logs [options] [SERVICE...]
+        Usage: logs [options] [--] [SERVICE...]
 
         Options:
             --no-color          Produce monochrome output.
@@ -648,7 +648,7 @@ class TopLevelCommand(object):
         """
         Print the public port for a port binding.
 
-        Usage: port [options] SERVICE PRIVATE_PORT
+        Usage: port [options] [--] SERVICE PRIVATE_PORT
 
         Options:
             --protocol=proto  tcp or udp [default: tcp]
@@ -669,7 +669,7 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [SERVICE...]
+        Usage: ps [options] [--] [SERVICE...]
 
         Options:
             -q, --quiet          Only display IDs
@@ -725,7 +725,7 @@ class TopLevelCommand(object):
         """
         Pulls images for services defined in a Compose file, but does not start the containers.
 
-        Usage: pull [options] [SERVICE...]
+        Usage: pull [options] [--] [SERVICE...]
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
@@ -748,7 +748,7 @@ class TopLevelCommand(object):
         """
         Pushes images for services.
 
-        Usage: push [options] [SERVICE...]
+        Usage: push [options] [--] [SERVICE...]
 
         Options:
             --ignore-push-failures  Push what it can and ignores images with push failures.
@@ -767,7 +767,7 @@ class TopLevelCommand(object):
 
         Any data which is not in a volume will be lost.
 
-        Usage: rm [options] [SERVICE...]
+        Usage: rm [options] [--] [SERVICE...]
 
         Options:
             -f, --force   Don't ask to confirm removal
@@ -815,7 +815,7 @@ class TopLevelCommand(object):
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage:
-            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...]
+            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] [--]
                 SERVICE [COMMAND] [ARGS...]
 
         Options:
@@ -911,7 +911,7 @@ class TopLevelCommand(object):
 
         They can be started again with `docker-compose start`.
 
-        Usage: stop [options] [SERVICE...]
+        Usage: stop [options] [--] [SERVICE...]
 
         Options:
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
@@ -924,7 +924,7 @@ class TopLevelCommand(object):
         """
         Restart running containers.
 
-        Usage: restart [options] [SERVICE...]
+        Usage: restart [options] [--] [SERVICE...]
 
         Options:
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
@@ -989,7 +989,7 @@ class TopLevelCommand(object):
         If you want to force Compose to stop and recreate all containers, use the
         `--force-recreate` flag.
 
-        Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
+        Usage: up [options] [--scale SERVICE=NUM...] [--] [SERVICE...]
 
         Options:
             -d, --detach               Detached mode: Run containers in the background,
