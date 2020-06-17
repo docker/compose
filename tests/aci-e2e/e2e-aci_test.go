@@ -123,7 +123,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	It("deploys a compose app", func() {
-		s.NewDockerCommand("compose", "up", "-f", "../composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "up", "-f", "../composefiles/aci-demo/aci_demo_port.yaml", "--project-name", "acidemo").ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
@@ -155,7 +155,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	It("shutdown compose app", func() {
-		s.NewDockerCommand("compose", "down", "-f", "../composefiles/aci-demo/aci_demo_port.yaml", "--name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "down", "-f", "../composefiles/aci-demo/aci_demo_port.yaml", "--project-name", "acidemo").ExecOrDie()
 	})
 	It("switches back to default context", func() {
 		output := s.NewCommand("docker", "context", "use", "default").ExecOrDie()
