@@ -1,7 +1,6 @@
 package compose
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -130,12 +129,10 @@ func parseConfigs(configPaths []string) ([]types.ConfigFile, error) {
 		var b []byte
 		var err error
 		if f == "-" {
-			return []types.ConfigFile{}, errors.New("reading compose file from stdin is not supported")
+			b, err = ioutil.ReadAll(os.Stdin)
+		} else {
+			b, err = ioutil.ReadFile(f)
 		}
-		if _, err := os.Stat(f); err != nil {
-			return nil, err
-		}
-		b, err = ioutil.ReadFile(f)
 		if err != nil {
 			return nil, err
 		}
