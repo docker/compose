@@ -11,11 +11,20 @@ import (
 
 	"github.com/docker/api/cli/formatter"
 	"github.com/docker/api/client"
+	formatter2 "github.com/docker/api/formatter"
 )
 
 type psOpts struct {
 	all   bool
 	quiet bool
+	json  bool
+}
+
+func (o psOpts) validate() error {
+	if o.quiet && o.json {
+		return errors.New(`cannot combine "quiet" and "json" options`)
+	}
+	return nil
 }
 
 // PsCommand lists containers
@@ -31,11 +40,17 @@ func PsCommand() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
 	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Show all containers (default shows just running)")
+	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
 
 	return cmd
 }
 
 func runPs(ctx context.Context, opts psOpts) error {
+	err := opts.validate()
+	if err != nil {
+		return err
+	}
+
 	c, err := client.New(ctx)
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
@@ -50,6 +65,15 @@ func runPs(ctx context.Context, opts psOpts) error {
 		for _, c := range containers {
 			fmt.Println(c.ID)
 		}
+		return nil
+	}
+
+	if opts.json {
+		j, err := formatter2.ToStandardJSON(containers)
+		if err != nil {
+			return err
+		}
+		fmt.Println(j)
 		return nil
 	}
 
