@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,8 +35,7 @@ func (m *LocalBackendTestSuite) TestRun() {
 	defer func() {
 		m.NewDockerCommand("rm", "-f", "nginx").ExecOrDie()
 	}()
-	lines := strings.Split(out, "\n")
-	assert.Equal(m.T(), 3, len(lines))
+	assert.Contains(m.T(), out, "nginx")
 }
 
 func (m *LocalBackendTestSuite) TestRunWithPorts() {

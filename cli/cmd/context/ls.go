@@ -41,20 +41,26 @@ import (
 	"github.com/docker/api/context/store"
 )
 
+type lsOpts struct {
+	quiet bool
+}
+
 func listCommand() *cobra.Command {
+	var opts lsOpts
 	cmd := &cobra.Command{
 		Use:     "list",
 		Short:   "List available contexts",
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd.Context())
+			return runList(cmd.Context(), opts)
 		},
 	}
+	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
 	return cmd
 }
 
-func runList(ctx context.Context) error {
+func runList(ctx context.Context, opts lsOpts) error {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 	contexts, err := s.List()
@@ -65,6 +71,13 @@ func runList(ctx context.Context) error {
 	sort.Slice(contexts, func(i, j int) bool {
 		return strings.Compare(contexts[i].Name, contexts[j].Name) == -1
 	})
+
+	if opts.quiet {
+		for _, c := range contexts {
+			fmt.Println(c.Name)
+		}
+		return nil
+	}
 
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION\tDOCKER ENDPOINT\tKUBERNETES ENDPOINT\tORCHESTRATOR")
