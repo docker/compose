@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/formatter"
 )
 
 // InspectCommand inspects into containers
@@ -36,12 +36,11 @@ func runInspect(ctx context.Context, id string) error {
 		return err
 	}
 
-	b, err := json.MarshalIndent(container, "", "  ")
+	j, err := formatter.ToStandardJSON(container)
 	if err != nil {
 		return err
 	}
-	containerString := string(b)
-	fmt.Println(containerString)
+	fmt.Println(j)
 
 	return nil
 }

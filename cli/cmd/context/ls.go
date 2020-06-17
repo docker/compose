@@ -29,6 +29,7 @@ package context
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -39,10 +40,19 @@ import (
 
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/formatter"
 )
 
 type lsOpts struct {
 	quiet bool
+	json  bool
+}
+
+func (o lsOpts) validate() error {
+	if o.quiet && o.json {
+		return errors.New(`cannot combine "quiet" and "json" options`)
+	}
+	return nil
 }
 
 func listCommand() *cobra.Command {
@@ -57,10 +67,17 @@ func listCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
+	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
+
 	return cmd
 }
 
 func runList(ctx context.Context, opts lsOpts) error {
+	err := opts.validate()
+	if err != nil {
+		return err
+	}
+
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 	contexts, err := s.List()
@@ -76,6 +93,15 @@ func runList(ctx context.Context, opts lsOpts) error {
 		for _, c := range contexts {
 			fmt.Println(c.Name)
 		}
+		return nil
+	}
+
+	if opts.json {
+		j, err := formatter.ToStandardJSON(contexts)
+		if err != nil {
+			return err
+		}
+		fmt.Println(j)
 		return nil
 	}
 
