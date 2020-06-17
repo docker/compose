@@ -9,7 +9,7 @@ import (
 	"github.com/docker/api/cli/dockerclassic"
 )
 
-const cliVersion = "1.0.0-beta"
+const cliVersion = "0.1.0"
 
 // VersionCommand command to display version
 func VersionCommand() *cobra.Command {
