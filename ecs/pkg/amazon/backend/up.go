@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) Up(ctx context.Context, options compose.ProjectOptions) error {
-	project, err := compose.ProjectFromOptions(&options)
+func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
+	project, err := cli.ProjectFromOptions(&options)
 	if err != nil {
 		return err
 	}
@@ -66,12 +67,12 @@ func (b *Backend) Up(ctx context.Context, options compose.ProjectOptions) error 
 	}
 
 	fmt.Println()
-	return b.WaitStackCompletion(ctx, project.Name, types.StackCreate)
+	return b.WaitStackCompletion(ctx, project.Name, compose.StackCreate)
 }
 
-func (b Backend) GetVPC(ctx context.Context, project *compose.Project) (string, error) {
+func (b Backend) GetVPC(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if vpc, ok := project.Extras[types.ExtensionVPC]; ok {
+	if vpc, ok := project.Extensions[compose.ExtensionVPC]; ok {
 		vpcID := vpc.(string)
 		ok, err := b.api.VpcExists(ctx, vpcID)
 		if err != nil {
@@ -88,9 +89,9 @@ func (b Backend) GetVPC(ctx context.Context, project *compose.Project) (string, 
 	return defaultVPC, nil
 }
 
-func (b Backend) GetLoadBalancer(ctx context.Context, project *compose.Project) (string, error) {
+func (b Backend) GetLoadBalancer(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if lb, ok := project.Extras[types.ExtensionLB]; ok {
+	if lb, ok := project.Extensions[compose.ExtensionLB]; ok {
 		lbName := lb.(string)
 		ok, err := b.api.LoadBalancerExists(ctx, lbName)
 		if err != nil {

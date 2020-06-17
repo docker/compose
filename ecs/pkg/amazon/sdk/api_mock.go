@@ -8,9 +8,10 @@ import (
 	context "context"
 	reflect "reflect"
 
+	"github.com/docker/ecs-plugin/pkg/compose"
+
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	cloudformation0 "github.com/awslabs/goformation/v4/cloudformation"
-	btypes "github.com/docker/ecs-plugin/pkg/amazon/types"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -53,7 +54,7 @@ func (mr *MockAPIMockRecorder) ClusterExists(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // CreateSecret mocks base method
-func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 btypes.Secret) (string, error) {
+func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 compose.Secret) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSecret", arg0, arg1)
 	ret0, _ := ret[0].(string)
@@ -139,14 +140,14 @@ func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomo
 }
 
 // DescribeTasks mocks base method
-func (m *MockAPI) DescribeTasks(arg0 context.Context, arg1 string, arg2 ...string) ([]btypes.TaskStatus, error) {
+func (m *MockAPI) DescribeTasks(arg0 context.Context, arg1 string, arg2 ...string) ([]compose.TaskStatus, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "DescribeTasks", varargs...)
-	ret0, _ := ret[0].([]btypes.TaskStatus)
+	ret0, _ := ret[0].([]compose.TaskStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -174,7 +175,7 @@ func (mr *MockAPIMockRecorder) GetDefaultVPC(arg0 interface{}) *gomock.Call {
 }
 
 // GetLogs mocks base method
-func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 btypes.LogConsumer) error {
+func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 compose.LogConsumer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -238,10 +239,10 @@ func (mr *MockAPIMockRecorder) GetSubNets(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // InspectSecret mocks base method
-func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (btypes.Secret, error) {
+func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (compose.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InspectSecret", arg0, arg1)
-	ret0, _ := ret[0].(btypes.Secret)
+	ret0, _ := ret[0].(compose.Secret)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -253,10 +254,10 @@ func (mr *MockAPIMockRecorder) InspectSecret(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // ListSecrets mocks base method
-func (m *MockAPI) ListSecrets(arg0 context.Context) ([]btypes.Secret, error) {
+func (m *MockAPI) ListSecrets(arg0 context.Context) ([]compose.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListSecrets", arg0)
-	ret0, _ := ret[0].([]btypes.Secret)
+	ret0, _ := ret[0].([]compose.Secret)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -23,10 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	cf "github.com/awslabs/goformation/v4/cloudformation"
+	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
-
-	"github.com/docker/ecs-plugin/pkg/amazon/types"
-	t "github.com/docker/ecs-plugin/pkg/amazon/types"
 )
 
 type sdk struct {
@@ -189,9 +187,9 @@ func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) 
 		StackName: aws.String(name),
 	}
 	switch operation {
-	case t.StackCreate:
+	case compose.StackCreate:
 		return s.CF.WaitUntilStackCreateCompleteWithContext(ctx, input)
-	case t.StackDelete:
+	case compose.StackDelete:
 		return s.CF.WaitUntilStackDeleteCompleteWithContext(ctx, input)
 	default:
 		return fmt.Errorf("internal error: unexpected stack operation %d", operation)
@@ -236,7 +234,7 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	return err
 }
 
-func (s sdk) CreateSecret(ctx context.Context, secret t.Secret) (string, error) {
+func (s sdk) CreateSecret(ctx context.Context, secret compose.Secret) (string, error) {
 	logrus.Debug("Create secret " + secret.Name)
 	secretStr, err := secret.GetCredString()
 	if err != nil {
@@ -254,17 +252,17 @@ func (s sdk) CreateSecret(ctx context.Context, secret t.Secret) (string, error) 
 	return *response.ARN, nil
 }
 
-func (s sdk) InspectSecret(ctx context.Context, id string) (t.Secret, error) {
+func (s sdk) InspectSecret(ctx context.Context, id string) (compose.Secret, error) {
 	logrus.Debug("Inspect secret " + id)
 	response, err := s.SM.DescribeSecret(&secretsmanager.DescribeSecretInput{SecretId: &id})
 	if err != nil {
-		return t.Secret{}, err
+		return compose.Secret{}, err
 	}
 	labels := map[string]string{}
 	for _, tag := range response.Tags {
 		labels[*tag.Key] = *tag.Value
 	}
-	secret := t.Secret{
+	secret := compose.Secret{
 		ID:     *response.ARN,
 		Name:   *response.Name,
 		Labels: labels,
@@ -275,14 +273,14 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (t.Secret, error) {
 	return secret, nil
 }
 
-func (s sdk) ListSecrets(ctx context.Context) ([]t.Secret, error) {
+func (s sdk) ListSecrets(ctx context.Context) ([]compose.Secret, error) {
 
 	logrus.Debug("List secrets ...")
 	response, err := s.SM.ListSecrets(&secretsmanager.ListSecretsInput{})
 	if err != nil {
-		return []t.Secret{}, err
+		return []compose.Secret{}, err
 	}
-	var secrets []t.Secret
+	var secrets []compose.Secret
 
 	for _, sec := range response.SecretList {
 
@@ -294,7 +292,7 @@ func (s sdk) ListSecrets(ctx context.Context) ([]t.Secret, error) {
 		if sec.Description != nil {
 			description = *sec.Description
 		}
-		secrets = append(secrets, t.Secret{
+		secrets = append(secrets, compose.Secret{
 			ID:          *sec.ARN,
 			Name:        *sec.Name,
 			Labels:      labels,
@@ -311,7 +309,7 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	return err
 }
 
-func (s sdk) GetLogs(ctx context.Context, name string, consumer types.LogConsumer) error {
+func (s sdk) GetLogs(ctx context.Context, name string, consumer compose.LogConsumer) error {
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
@@ -357,7 +355,7 @@ func (s sdk) ListTasks(ctx context.Context, cluster string, service string) ([]s
 	return arns, nil
 }
 
-func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]t.TaskStatus, error) {
+func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]compose.TaskStatus, error) {
 	tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
 		Cluster: aws.String(cluster),
 		Tasks:   aws.StringSlice(arns),
@@ -365,7 +363,7 @@ func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) 
 	if err != nil {
 		return nil, err
 	}
-	result := []t.TaskStatus{}
+	result := []compose.TaskStatus{}
 	for _, task := range tasks.Tasks {
 		var networkInterface string
 		for _, attachement := range task.Attachments {
@@ -377,7 +375,7 @@ func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) 
 				}
 			}
 		}
-		result = append(result, t.TaskStatus{
+		result = append(result, compose.TaskStatus{
 			State:            *task.LastStatus,
 			Service:          strings.Replace(*task.Group, "service:", "", 1),
 			NetworkInterface: networkInterface,

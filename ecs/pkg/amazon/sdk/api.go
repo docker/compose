@@ -5,7 +5,7 @@ import (
 
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation"
-	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
 //go:generate mockgen -destination=./api_mock.go -self_package "github.com/docker/ecs-plugin/pkg/amazon" -package=amazon . API
@@ -38,19 +38,19 @@ type downAPI interface {
 }
 
 type logsAPI interface {
-	GetLogs(ctx context.Context, name string, consumer types.LogConsumer) error
+	GetLogs(ctx context.Context, name string, consumer compose.LogConsumer) error
 }
 
 type secretsAPI interface {
-	CreateSecret(ctx context.Context, secret types.Secret) (string, error)
-	InspectSecret(ctx context.Context, id string) (types.Secret, error)
-	ListSecrets(ctx context.Context) ([]types.Secret, error)
+	CreateSecret(ctx context.Context, secret compose.Secret) (string, error)
+	InspectSecret(ctx context.Context, id string) (compose.Secret, error)
+	ListSecrets(ctx context.Context) ([]compose.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
 }
 
 type listAPI interface {
 	ListTasks(ctx context.Context, cluster string, name string) ([]string, error)
-	DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]types.TaskStatus, error)
+	DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]compose.TaskStatus, error)
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
 }
 

@@ -7,13 +7,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
-	"github.com/awslabs/goformation/v4/cloudformation/iam"
-
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
+	"github.com/awslabs/goformation/v4/cloudformation/iam"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/ecs-plugin/pkg/compose"
-
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
@@ -58,6 +56,10 @@ version: "3"
 services:
   test:
     image: hello_world
+    networks:
+      - front-tier 
+      - back-tier 
+
 networks:
   front-tier:
     name: public
@@ -103,7 +105,7 @@ services:
 	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumNetwork)
 }
 
-func convertResultAsString(t *testing.T, project *compose.Project, clusterName string) string {
+func convertResultAsString(t *testing.T, project *types.Project, clusterName string) string {
 	client, err := NewBackend("", clusterName, "")
 	assert.NilError(t, err)
 	result, err := client.Convert(project)
@@ -113,12 +115,12 @@ func convertResultAsString(t *testing.T, project *compose.Project, clusterName s
 	return fmt.Sprintf("%s\n", string(resultAsJSON))
 }
 
-func load(t *testing.T, paths ...string) *compose.Project {
-	options := compose.ProjectOptions{
+func load(t *testing.T, paths ...string) *types.Project {
+	options := cli.ProjectOptions{
 		Name:        t.Name(),
 		ConfigPaths: paths,
 	}
-	project, err := compose.ProjectFromOptions(&options)
+	project, err := cli.ProjectFromOptions(&options)
 	assert.NilError(t, err)
 	return project
 }
@@ -130,14 +132,11 @@ func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 		ConfigFiles: []types.ConfigFile{
 			{Config: dict},
 		},
+	}, func(options *loader.Options) {
+		options.Name = "Test"
 	})
 	assert.NilError(t, err)
-	err = compose.Normalize(model)
-	assert.NilError(t, err)
-	template, err := Backend{}.Convert(&compose.Project{
-		Config: *model,
-		Name:   "test",
-	})
+	template, err := Backend{}.Convert(model)
 	assert.NilError(t, err)
 	return template
 }

@@ -5,14 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
-
-	"github.com/sirupsen/logrus"
-
+	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
-
-	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
@@ -21,10 +16,11 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
-	"github.com/docker/ecs-plugin/pkg/amazon/compatibility"
+	"github.com/compose-spec/compose-go/compatibility"
+	"github.com/compose-spec/compose-go/types"
 	sdk "github.com/docker/ecs-plugin/pkg/amazon/sdk"
-	btypes "github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -35,11 +31,38 @@ const (
 	ParameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
+type FargateCompatibilityChecker struct {
+	*compatibility.AllowList
+}
+
 // Convert a compose project into a CloudFormation template
-func (b Backend) Convert(project *compose.Project) (*cloudformation.Template, error) {
-	warnings := compatibility.Check(project)
-	for _, w := range warnings {
-		logrus.Warn(w)
+func (b Backend) Convert(project *types.Project) (*cloudformation.Template, error) {
+	var checker compatibility.Checker = FargateCompatibilityChecker{
+		&compatibility.AllowList{
+			Supported: []string{
+				"services.command",
+				"services.container_name",
+				"services.depends_on",
+				"services.entrypoint",
+				"services.environment",
+				"services.healthcheck",
+				"services.healthcheck.interval",
+				"services.healthcheck.start_period",
+				"services.healthcheck.test",
+				"services.healthcheck.timeout",
+				"services.networks",
+				"services.ports",
+				"services.ports.mode",
+				"services.ports.target",
+				"services.ports.protocol",
+				"services.user",
+				"services.working_dir",
+			},
+		},
+	}
+	compatibility.Check(project, checker)
+	for _, err := range checker.Errors() {
+		logrus.Warn(err.Error())
 	}
 
 	template := cloudformation.NewTemplate()
@@ -188,7 +211,7 @@ func (b Backend) Convert(project *compose.Project) (*cloudformation.Template, er
 	return template, nil
 }
 
-func getLoadBalancerType(project *compose.Project) string {
+func getLoadBalancerType(project *types.Project) string {
 	for _, service := range project.Services {
 		for _, port := range service.Ports {
 			if port.Published != 80 && port.Published != 443 {
@@ -199,7 +222,7 @@ func getLoadBalancerType(project *compose.Project) string {
 	return elbv2.LoadBalancerTypeEnumApplication
 }
 
-func getLoadBalancerSecurityGroups(project *compose.Project, template *cloudformation.Template) []string {
+func getLoadBalancerSecurityGroups(project *types.Project, template *cloudformation.Template) []string {
 	securityGroups := []string{}
 	for _, network := range project.Networks {
 		if !network.Internal {
@@ -210,7 +233,7 @@ func getLoadBalancerSecurityGroups(project *compose.Project, template *cloudform
 	return uniqueStrings(securityGroups)
 }
 
-func createLoadBalancer(project *compose.Project, template *cloudformation.Template) string {
+func createLoadBalancer(project *types.Project, template *cloudformation.Template) string {
 	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
 	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
 	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
@@ -270,7 +293,7 @@ func createListener(service types.ServiceConfig, port types.ServicePortConfig, t
 	return listenerName
 }
 
-func createTargetGroup(project *compose.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
+func createTargetGroup(project *types.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
 	targetGroupName := fmt.Sprintf(
 		"%s%s%dTargetGroup",
 		normalizeResourceName(service.Name),
@@ -345,7 +368,7 @@ func createTaskExecutionRole(service types.ServiceConfig, err error, definition 
 	return taskExecutionRole, nil
 }
 
-func createCluster(project *compose.Project, template *cloudformation.Template) string {
+func createCluster(project *types.Project, template *cloudformation.Template) string {
 	template.Resources["Cluster"] = &ecs.Cluster{
 		ClusterName: project.Name,
 		Tags: []tags.Tag{
@@ -360,7 +383,7 @@ func createCluster(project *compose.Project, template *cloudformation.Template) 
 	return cluster
 }
 
-func createCloudMap(project *compose.Project, template *cloudformation.Template) {
+func createCloudMap(project *types.Project, template *cloudformation.Template) {
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
@@ -368,8 +391,8 @@ func createCloudMap(project *compose.Project, template *cloudformation.Template)
 	}
 }
 
-func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
-	if sg, ok := net.Extras[btypes.ExtensionSecurityGroup]; ok {
+func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
+	if sg, ok := net.Extensions[compose.ExtensionSecurityGroup]; ok {
 		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
 		return sg.(string)
 	}
@@ -420,7 +443,7 @@ func convertNetwork(project *compose.Project, net types.NetworkConfig, vpc strin
 	return cloudformation.Ref(securityGroup)
 }
 
-func networkResourceName(project *compose.Project, network string) string {
+func networkResourceName(project *types.Project, network string) string {
 	return fmt.Sprintf("%s%sNetwork", normalizeResourceName(project.Name), normalizeResourceName(network))
 }
 

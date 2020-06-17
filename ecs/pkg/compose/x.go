@@ -1,4 +1,4 @@
-package types
+package compose
 
 const (
 	ExtensionSecurityGroup   = "x-aws-securitygroup"

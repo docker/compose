@@ -11,7 +11,7 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
-	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +57,7 @@ func CreateSecret(dockerCli command.Cli) *cobra.Command {
 			}
 			name := args[0]
 
-			secret := types.NewSecret(name, opts.Username, opts.Password, opts.Description)
+			secret := compose.NewSecret(name, opts.Username, opts.Password, opts.Description)
 			id, err := backend.CreateSecret(context.Background(), secret)
 			fmt.Println(id)
 			return err
@@ -140,7 +140,7 @@ func DeleteSecret(dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func printList(out io.Writer, secrets []types.Secret) {
+func printList(out io.Writer, secrets []compose.Secret) {
 	printSection(out, len(secrets), func(w io.Writer) {
 		for _, secret := range secrets {
 			fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)

@@ -1,4 +1,4 @@
-package types
+package compose
 
 import "encoding/json"
 

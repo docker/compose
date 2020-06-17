@@ -13,11 +13,10 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
-	t "github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func Convert(project *compose.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
+func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err
@@ -318,8 +317,8 @@ func getImage(image string) string {
 
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
 	// extract registry and namespace string from image name
-	for key, value := range service.Extras {
-		if key == t.ExtensionPullCredentials {
+	for key, value := range service.Extensions {
+		if key == compose.ExtensionPullCredentials {
 			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 		}
 	}

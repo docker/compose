@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
-	btypes "github.com/docker/ecs-plugin/pkg/amazon/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/golang/mock/gomock"
 )
@@ -23,10 +23,10 @@ func TestDown(t *testing.T) {
 	recorder := m.EXPECT()
 	recorder.DeleteStack(ctx, "test_project").Return(nil)
 	recorder.GetStackID(ctx, "test_project").Return("stack-123", nil)
-	recorder.WaitStackComplete(ctx, "stack-123", btypes.StackDelete).Return(nil)
+	recorder.WaitStackComplete(ctx, "stack-123", compose.StackDelete).Return(nil)
 	recorder.DescribeStackEvents(ctx, "stack-123").Return(nil, nil)
 
-	c.Down(ctx, compose.ProjectOptions{
+	c.Down(ctx, cli.ProjectOptions{
 		ConfigPaths: []string{},
 		Name:        "test_project",
 	})

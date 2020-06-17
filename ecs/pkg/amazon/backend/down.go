@@ -3,14 +3,14 @@ package backend
 import (
 	"context"
 
-	"github.com/docker/ecs-plugin/pkg/amazon/types"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) Down(ctx context.Context, options compose.ProjectOptions) error {
+func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
 	name := options.Name
 	if name == "" {
-		project, err := compose.ProjectFromOptions(&options)
+		project, err := cli.ProjectFromOptions(&options)
 		if err != nil {
 			return err
 		}
@@ -22,7 +22,7 @@ func (b *Backend) Down(ctx context.Context, options compose.ProjectOptions) erro
 		return err
 	}
 
-	err = b.WaitStackCompletion(ctx, name, types.StackDelete)
+	err = b.WaitStackCompletion(ctx, name, compose.StackDelete)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ require (
 	github.com/bugsnag/panicwrap v1.2.0 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cloudflare/cfssl v1.4.1 // indirect
-	github.com/compose-spec/compose-go v0.0.0-20200409090215-53c0040c9127
+	github.com/compose-spec/compose-go v0.0.0-20200622094647-0bb9a6c7d89a
 	github.com/containerd/containerd v1.3.2 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
 	github.com/docker/cli v0.0.0-20200130152716-5d0cf8839492
@@ -35,11 +35,11 @@ require (
 	github.com/manifoldco/promptui v0.7.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/miekg/pkcs11 v1.0.3 // indirect
-	github.com/mitchellh/mapstructure v1.2.2
+	github.com/mitchellh/mapstructure v1.3.2
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
-	github.com/sirupsen/logrus v1.5.0
+	github.com/sirupsen/logrus v1.6.0
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
@@ -52,7 +52,6 @@ require (
 	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
 	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
 	gopkg.in/ini.v1 v1.55.0
-	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2
 	vbom.ml/util v0.0.0-20180919145318-efcd4e0f9787 // indirect
 )

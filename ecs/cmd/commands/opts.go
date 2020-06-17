@@ -1,26 +1,23 @@
-package compose
+package commands
 
 import (
+	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-type ProjectOptions struct {
-	ConfigPaths []string
-	Name        string
-}
-
-func (o *ProjectOptions) AddFlags(flags *pflag.FlagSet) {
+func AddFlags(o *cli.ProjectOptions, flags *pflag.FlagSet) {
 	flags.StringArrayVarP(&o.ConfigPaths, "file", "f", nil, "Specify an alternate compose file")
 	flags.StringVarP(&o.Name, "project-name", "n", "", "Specify an alternate project name (default: directory name)")
 }
 
-type ProjectFunc func(project *Project, args []string) error
+type ProjectFunc func(project *types.Project, args []string) error
 
 // WithProject wrap a ProjectFunc into a cobra command
-func WithProject(options *ProjectOptions, f ProjectFunc) func(cmd *cobra.Command, args []string) error {
+func WithProject(options *cli.ProjectOptions, f ProjectFunc) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		project, err := ProjectFromOptions(options)
+		project, err := cli.ProjectFromOptions(options)
 		if err != nil {
 			return err
 		}

@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
-	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
@@ -18,8 +19,8 @@ func ComposeCommand(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "compose",
 	}
-	opts := &compose.ProjectOptions{}
-	opts.AddFlags(cmd.Flags())
+	opts := &cli.ProjectOptions{}
+	AddFlags(opts, cmd.Flags())
 
 	cmd.AddCommand(
 		ConvertCommand(dockerCli, opts),
@@ -42,10 +43,10 @@ func (o upOptions) LoadBalancerArn() *string {
 	return &o.loadBalancerArn
 }
 
-func ConvertCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+func ConvertCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
-		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+		RunE: WithProject(projectOpts, func(project *types.Project, args []string) error {
 			clusteropts, err := docker.GetAwsContext(dockerCli)
 			if err != nil {
 				return err
@@ -71,7 +72,7 @@ func ConvertCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) 
 	return cmd
 }
 
-func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+func UpCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
@@ -87,11 +88,11 @@ func UpCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobr
 	return cmd
 }
 
-func PsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+func PsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "ps",
-		RunE: compose.WithProject(projectOpts, func(project *compose.Project, args []string) error {
+		RunE: WithProject(projectOpts, func(project *types.Project, args []string) error {
 			clusteropts, err := docker.GetAwsContext(dockerCli)
 			if err != nil {
 				return err
@@ -120,7 +121,7 @@ type downOptions struct {
 	DeleteCluster bool
 }
 
-func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
@@ -136,7 +137,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 	return cmd
 }
 
-func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *cobra.Command {
+func LogsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "logs [PROJECT NAME]",
 		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
@@ -147,7 +148,7 @@ func LogsCommand(dockerCli command.Cli, projectOpts *compose.ProjectOptions) *co
 			var name string
 
 			if len(args) == 0 {
-				project, err := compose.ProjectFromOptions(projectOpts)
+				project, err := cli.ProjectFromOptions(projectOpts)
 				if err != nil {
 					return err
 				}
