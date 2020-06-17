@@ -79,6 +79,11 @@ func (s *E2eSuite) TestInspectDefaultContext() {
 	Expect(output).To(ContainSubstring(`"Name": "default"`))
 }
 
+func (s *E2eSuite) TestInspectContextNoArgs() {
+	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
+	Expect(output).To(ContainSubstring(`"Name": "default"`))
+}
+
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	It("should dispay new cli error when parsing context create flags", func() {
 		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
