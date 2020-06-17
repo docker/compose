@@ -131,9 +131,6 @@ func parseConfigs(configPaths []string) ([]types.ConfigFile, error) {
 		if f == "-" {
 			b, err = ioutil.ReadAll(os.Stdin)
 		} else {
-			if _, err := os.Stat(f); err != nil {
-				return nil, err
-			}
 			b, err = ioutil.ReadFile(f)
 		}
 		if err != nil {
