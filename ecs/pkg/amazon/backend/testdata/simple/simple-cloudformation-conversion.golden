@@ -104,7 +104,6 @@
           }
         },
         "SchedulingStrategy": "REPLICA",
-        "ServiceName": "simple",
         "ServiceRegistries": [
           {
             "RegistryArn": {

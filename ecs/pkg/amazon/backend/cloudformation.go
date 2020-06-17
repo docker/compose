@@ -18,7 +18,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/compatibility"
 	"github.com/compose-spec/compose-go/types"
-	sdk "github.com/docker/ecs-plugin/pkg/amazon/sdk"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
 )
@@ -120,7 +119,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 
 	for _, service := range project.Services {
 
-		definition, err := sdk.Convert(project, service)
+		definition, err := Convert(project, service)
 		if err != nil {
 			return nil, err
 		}

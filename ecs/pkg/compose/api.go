@@ -14,7 +14,7 @@ type API interface {
 
 	Convert(project *types.Project) (*cloudformation.Template, error)
 	Logs(ctx context.Context, projectName string) error
-	Ps(background context.Context, project *types.Project) ([]TaskStatus, error)
+	Ps(background context.Context, project *types.Project) ([]ServiceStatus, error)
 
 	CreateSecret(ctx context.Context, secret Secret) (string, error)
 	InspectSecret(ctx context.Context, id string) (Secret, error)

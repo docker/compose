@@ -101,15 +101,15 @@ func PsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Co
 			if err != nil {
 				return err
 			}
-			tasks, err := backend.Ps(context.Background(), project)
+			status, err := backend.Ps(context.Background(), project)
 			if err != nil {
 				return err
 			}
-			printSection(os.Stdout, len(tasks), func(w io.Writer) {
-				for _, task := range tasks {
-					fmt.Fprintf(w, "%s\t%s\t%s\n", task.Name, task.State, strings.Join(task.Ports, " "))
+			printSection(os.Stdout, len(status), func(w io.Writer) {
+				for _, service := range status {
+					fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, " "))
 				}
-			}, "NAME", "STATE", "PORTS")
+			}, "ID", "NAME", "REPLICAS", "PORTS")
 			return nil
 		}),
 	}

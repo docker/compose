@@ -2,13 +2,12 @@ package compose
 
 import "encoding/json"
 
-type TaskStatus struct {
-	Name             string
-	State            string
-	Service          string
-	NetworkInterface string
-	PublicIP         string
-	Ports            []string
+type ServiceStatus struct {
+	ID       string
+	Name     string
+	Replicas int
+	Desired  int
+	Ports    []string
 }
 
 const (

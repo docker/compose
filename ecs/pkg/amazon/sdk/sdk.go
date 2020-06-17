@@ -341,10 +341,26 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer compose.LogConsu
 	}
 }
 
-func (s sdk) ListTasks(ctx context.Context, cluster string, service string) ([]string, error) {
+func (s sdk) DescribeService(ctx context.Context, cluster string, name string) (compose.ServiceStatus, error) {
+	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
+		Cluster:  aws.String(cluster),
+		Services: aws.StringSlice([]string{name}),
+	})
+	if err != nil {
+		return compose.ServiceStatus{}, err
+	}
+	return compose.ServiceStatus{
+		ID:       *services.Services[0].ServiceName,
+		Name:     name,
+		Replicas: int(*services.Services[0].RunningCount),
+		Desired:  int(*services.Services[0].DesiredCount),
+	}, nil
+}
+
+func (s sdk) ListTasks(ctx context.Context, cluster string, family string) ([]string, error) {
 	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
-		Cluster:     aws.String(cluster),
-		ServiceName: aws.String(service),
+		Cluster: aws.String(cluster),
+		Family:  aws.String(family),
 	})
 	if err != nil {
 		return nil, err
@@ -354,35 +370,6 @@ func (s sdk) ListTasks(ctx context.Context, cluster string, service string) ([]s
 		arns = append(arns, *arn)
 	}
 	return arns, nil
-}
-
-func (s sdk) DescribeTasks(ctx context.Context, cluster string, arns ...string) ([]compose.TaskStatus, error) {
-	tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
-		Cluster: aws.String(cluster),
-		Tasks:   aws.StringSlice(arns),
-	})
-	if err != nil {
-		return nil, err
-	}
-	result := []compose.TaskStatus{}
-	for _, task := range tasks.Tasks {
-		var networkInterface string
-		for _, attachement := range task.Attachments {
-			if *attachement.Type == "ElasticNetworkInterface" {
-				for _, pair := range attachement.Details {
-					if *pair.Name == "networkInterfaceId" {
-						networkInterface = *pair.Value
-					}
-				}
-			}
-		}
-		result = append(result, compose.TaskStatus{
-			State:            *task.LastStatus,
-			Service:          strings.Replace(*task.Group, "service:", "", 1),
-			NetworkInterface: networkInterface,
-		})
-	}
-	return result, nil
 }
 
 func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error) {

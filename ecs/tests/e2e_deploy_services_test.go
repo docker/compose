@@ -6,9 +6,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/docker/ecs-plugin/pkg/amazon"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/fs"
@@ -47,11 +48,11 @@ func composeUpSimpleService(t *testing.T, cmd icmd.Cmd, awsContext docker.AwsCon
 		},
 	})
 	assert.NilError(t, err)
-	sdk := amazon.NewAPI(session)
-	arns, err := sdk.ListTasks(bgContext, t.Name(), t.Name())
+	api := sdk.NewAPI(session)
+	arns, err := api.ListTasks(bgContext, t.Name(), t.Name())
 	assert.NilError(t, err)
-	tasks, err := sdk.DescribeTasks(bgContext, t.Name(), arns...)
-	publicIps, err := sdk.GetPublicIPs(context.Background(), tasks[0].NetworkInterface)
+	tasks, err := api.DescribeTasks(bgContext, t.Name(), arns...)
+	publicIps, err := api.GetPublicIPs(context.Background(), tasks[0].NetworkInterface)
 	assert.NilError(t, err)
 	for _, ip := range publicIps {
 		icmd.RunCommand("curl", "-I", "http://"+ip).Assert(t, icmd.Success)
