@@ -84,6 +84,13 @@ func (s *E2eSuite) TestInspectContextNoArgs() {
 	Expect(output).To(ContainSubstring(`"Name": "default"`))
 }
 
+func (s *E2eSuite) TestInspectContextRegardlessCurrentContext() {
+	s.NewDockerCommand("context", "create", "local", "localCtx").ExecOrDie()
+	s.NewDockerCommand("context", "use", "localCtx").ExecOrDie()
+	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
+	Expect(output).To(ContainSubstring(`"Name": "localCtx"`))
+}
+
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	It("should dispay new cli error when parsing context create flags", func() {
 		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
@@ -108,6 +115,14 @@ func (s *E2eSuite) TestCanForceRemoveCurrentContext() {
 }
 
 func (s *E2eSuite) TestClassicLoginWithparameters() {
+	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
+	Expect(err).NotTo(BeNil())
+}
+
+func (s *E2eSuite) TestClassicLoginRegardlessCurrentContext() {
+	s.NewDockerCommand("context", "create", "local", "localCtx").ExecOrDie()
+	s.NewDockerCommand("context", "use", "localCtx").ExecOrDie()
 	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
 	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
 	Expect(err).NotTo(BeNil())
