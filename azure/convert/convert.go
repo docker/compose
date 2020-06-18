@@ -19,7 +19,7 @@ import (
 const (
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
-	dnsSidecarImage       = "alpine:3.12.0"
+	dnsSidecarImage       = "busybox:1.31.1"
 
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
