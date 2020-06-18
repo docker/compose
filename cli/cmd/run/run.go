@@ -35,6 +35,7 @@ import (
 
 	"github.com/docker/api/cli/options/run"
 	"github.com/docker/api/client"
+	"github.com/docker/api/progress"
 )
 
 // Command runs a container
@@ -68,10 +69,11 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 		return err
 	}
 
-	if err = c.ContainerService().Run(ctx, containerConfig); err != nil {
-		return err
+	err = progress.Run(ctx, func(ctx context.Context) error {
+		return c.ContainerService().Run(ctx, containerConfig)
+	})
+	if err == nil {
+		fmt.Println(opts.Name)
 	}
-	fmt.Println(opts.Name)
-
-	return nil
+	return err
 }

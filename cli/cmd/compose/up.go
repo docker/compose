@@ -35,6 +35,7 @@ import (
 
 	"github.com/docker/api/client"
 	"github.com/docker/api/compose"
+	"github.com/docker/api/progress"
 )
 
 func upCommand() *cobra.Command {
@@ -64,5 +65,7 @@ func runUp(ctx context.Context, opts compose.ProjectOptions) error {
 		return errors.New("compose not implemented in current context")
 	}
 
-	return composeService.Up(ctx, opts)
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return composeService.Up(ctx, opts)
+	})
 }

@@ -6,7 +6,6 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/Azure/azure-sdk-for-go v43.2.0+incompatible
 	github.com/Azure/azure-storage-file-go v0.7.0
-	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Azure/go-autorest/autorest v0.10.2
 	github.com/Azure/go-autorest/autorest/adal v0.8.3
 	github.com/Azure/go-autorest/autorest/azure/cli v0.3.1
@@ -32,7 +31,8 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
-	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/moby/term v0.0.0-20200611042045-63b9a826fb74
+	github.com/morikuni/aec v1.0.0
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1 // indirect
@@ -46,6 +46,7 @@ require (
 	github.com/tj/survey v2.0.6+incompatible
 	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 // indirect
 	google.golang.org/grpc v1.29.1
 	google.golang.org/protobuf v1.24.0
