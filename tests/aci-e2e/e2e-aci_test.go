@@ -99,7 +99,7 @@ func (s *E2eACISuite) TestACIBackend() {
 				testStorageAccountName, firstKey, testShareName, mountTarget),
 			"-p", "80:80",
 			"--name", testContainerName).ExecOrDie()
-		Expect(output).To(Equal(testContainerName + "\n"))
+		Expect(output).To(ContainSubstring(testContainerName))
 		output = s.NewDockerCommand("ps").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(2))
