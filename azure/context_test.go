@@ -121,7 +121,7 @@ func (suite *ContextSuiteTest) TestSelectSubscriptionIdAndExistingResourceGroup(
 
 	suite.mockResourceGroupHeper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{sub1, sub2}, nil)
 
-	selectOptions := []string{"Subscription1(1234)", "Subscription2(5678)"}
+	selectOptions := []string{"Subscription1 (1234)", "Subscription2 (5678)"}
 	suite.mockUserSelector.On("userSelect", "Select a subscription ID", selectOptions).Return(1, nil)
 	selectOptions = []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
 	suite.mockUserSelector.On("userSelect", "Select a resource group", selectOptions).Return(2, nil)

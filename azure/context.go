@@ -147,12 +147,12 @@ func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscripti
 func (helper contextCreateACIHelper) chooseSub(subs []subscription.Model) (string, error) {
 	if len(subs) == 1 {
 		sub := subs[0]
-		fmt.Println("Using only available subscription : " + *sub.DisplayName + "(" + *sub.SubscriptionID + ")")
+		fmt.Println("Using only available subscription : " + display(sub))
 		return *sub.SubscriptionID, nil
 	}
 	var options []string
 	for _, sub := range subs {
-		options = append(options, *sub.DisplayName+"("+*sub.SubscriptionID+")")
+		options = append(options, display(sub))
 	}
 	selected, err := helper.selector.userSelect("Select a subscription ID", options)
 	if err != nil {
@@ -162,6 +162,10 @@ func (helper contextCreateACIHelper) chooseSub(subs []subscription.Model) (strin
 		return "", err
 	}
 	return *subs[selected].SubscriptionID, nil
+}
+
+func display(sub subscription.Model) string {
+	return fmt.Sprintf("%s (%s)", *sub.DisplayName, *sub.SubscriptionID)
 }
 
 type userSelector interface {
