@@ -283,7 +283,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions
 	if err != nil {
 		return err
 	}
-	return createACIContainers(ctx, cs.ctx, groupDefinition)
+	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptions) error {

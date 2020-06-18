@@ -43,6 +43,14 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 		return fmt.Errorf("container group %q already exists", *groupDefinition.Name)
 	}
 
+	return createOrUpdateACIContainers(ctx, aciContext, groupDefinition)
+}
+
+func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
+	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	if err != nil {
+		return errors.Wrapf(err, "cannot get container group client")
+	}
 	future, err := containerGroupsClient.CreateOrUpdate(
 		ctx,
 		aciContext.ResourceGroup,
