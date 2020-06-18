@@ -1,0 +1,12 @@
+version: "2"
+services:
+  --test-service:
+    image: busybox:1.27.0.2
+    build: .
+    command: top
+    ports:
+      - "8080:80"
+
+  --log-service:
+    image: busybox:1.31.0-uclibc
+    command: sh -c "echo hello && tail -f /dev/null"
