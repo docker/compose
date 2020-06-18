@@ -31,7 +31,9 @@ integration!
 
 This release includes:
 * Initial support for deploying containers to Azure Container Instances (ACI)
-* A gRPC API for managing contexts and containers
+* A gRPC API for managing contexts and Azure containers
 
 ### Known issues
-*
+* Mapping a container port to a different host port is not current supported (i.e.: `docker run -p 80:8080`)
+* Exec currently only allows interactive sessions with a terminal (`exec -t`), not specify commands in the command line
+* `docker run` detaches from the container by default, even if `-d` is not specified
