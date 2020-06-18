@@ -17,6 +17,10 @@ import (
 )
 
 const (
+	// ComposeDnsSidecarName name of the dns sidecar container
+	ComposeDnsSidecarName = "aci--dns--sidecar"
+
+
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
@@ -94,8 +98,42 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 
 		containers = append(containers, containerDefinition)
 	}
+	if len(containers) > 1 {
+		dnsSideCar := getDnsSidecar(containers)
+		containers = append(containers, dnsSideCar)
+	}
 	groupDefinition.ContainerGroupProperties.Containers = &containers
+
 	return groupDefinition, nil
+}
+
+func getDnsSidecar(containers []containerinstance.Container) containerinstance.Container {
+	var commands []string
+	for _, container := range containers {
+		commands = append(commands, fmt.Sprintf("echo 127.0.0.1 %s >> /etc/hosts", *container.Name))
+	}
+	// ACI restart policy is currently at container group level, cannot let the sidecar terminate quietly once /etc/hosts has been edited
+	// Pricing is done at the container group level so letting the sidecar container "sleep" does not impact the proce for the whole group
+	commands = append(commands, "sleep infinity")
+	alpineCmd := []string{"sh", "-c", strings.Join(commands, ";")}
+	dnsSideCar := containerinstance.Container{
+		Name: to.StringPtr(ComposeDnsSidecarName),
+		ContainerProperties: &containerinstance.ContainerProperties{
+			Image:   to.StringPtr("alpine:3.12.0"),
+			Command: &alpineCmd,
+			Resources: &containerinstance.ResourceRequirements{
+				Limits: &containerinstance.ResourceLimits{
+					MemoryInGB: to.Float64Ptr(1),
+					CPU:        to.Float64Ptr(1),
+				},
+				Requests: &containerinstance.ResourceRequests{
+					MemoryInGB: to.Float64Ptr(1),
+					CPU:        to.Float64Ptr(1),
+				},
+			},
+		},
+	}
+	return dnsSideCar
 }
 
 type projectAciHelper compose.Project

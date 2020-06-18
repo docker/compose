@@ -87,40 +87,12 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		return err
 	}
 
-	containerGroup, err := future.Result(containerGroupsClient)
-	if err != nil {
-		return err
-	}
 	for _, c := range *groupDefinition.Containers {
 		w.Event(progress.Event{
 			ID:         *c.Name,
 			Status:     progress.Done,
 			StatusText: "Done",
 		})
-	}
-
-	if len(*containerGroup.Containers) > 1 {
-		var commands []string
-		for _, container := range *containerGroup.Containers {
-			commands = append(commands, fmt.Sprintf("echo 127.0.0.1 %s >> /etc/hosts", *container.Name))
-		}
-		commands = append(commands, "exit")
-
-		containers := *containerGroup.Containers
-		container := containers[0]
-		response, err := execACIContainer(ctx, aciContext, "/bin/sh", *containerGroup.Name, *container.Name)
-		if err != nil {
-			return err
-		}
-
-		if err = execCommands(
-			ctx,
-			*response.WebSocketURI,
-			*response.Password,
-			commands,
-		); err != nil {
-			return err
-		}
 	}
 
 	return err
