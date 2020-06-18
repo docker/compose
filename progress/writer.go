@@ -2,11 +2,13 @@ package progress
 
 import (
 	"context"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/containerd/console"
 	"github.com/moby/term"
+	"golang.org/x/sync/errgroup"
 )
 
 // EventStatus indicates the status of an action
@@ -57,6 +59,30 @@ func WithContextWriter(ctx context.Context, writer Writer) context.Context {
 func ContextWriter(ctx context.Context) Writer {
 	s, _ := ctx.Value(writerKey{}).(Writer)
 	return s
+}
+
+type progressFunc func(context.Context) error
+
+// Run will run a writer and the progress function
+// in parallel
+func Run(ctx context.Context, pf progressFunc) error {
+	eg, _ := errgroup.WithContext(ctx)
+	w, err := NewWriter(os.Stderr)
+	if err != nil {
+		return err
+	}
+	eg.Go(func() error {
+		return w.Start(context.Background())
+	})
+
+	ctx = WithContextWriter(ctx, w)
+
+	eg.Go(func() error {
+		defer w.Stop()
+		return pf(ctx)
+	})
+
+	return eg.Wait()
 }
 
 // NewWriter returns a new multi-progress writer
