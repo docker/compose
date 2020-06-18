@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -142,37 +140,6 @@ func getTermSize() (*int32, *int32) {
 	rows := tm.Height()
 	cols := tm.Width()
 	return to.Int32Ptr(int32(rows)), to.Int32Ptr(int32(cols))
-}
-
-type commandSender struct {
-	commands string
-}
-
-func (cs *commandSender) Read(p []byte) (int, error) {
-	if len(cs.commands) == 0 {
-		return 0, io.EOF
-	}
-
-	var command string
-	if len(p) >= len(cs.commands) {
-		command = cs.commands
-		cs.commands = ""
-	} else {
-		command = cs.commands[:len(p)]
-		cs.commands = cs.commands[len(p):]
-	}
-
-	copy(p, command)
-
-	return len(command), nil
-}
-
-func execCommands(ctx context.Context, address string, password string, commands []string) error {
-	writer := ioutil.Discard
-	reader := &commandSender{
-		commands: strings.Join(commands, "\n"),
-	}
-	return exec(ctx, address, password, reader, writer)
 }
 
 func exec(ctx context.Context, address string, password string, reader io.Reader, writer io.Writer) error {
