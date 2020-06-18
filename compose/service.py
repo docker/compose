@@ -1773,7 +1773,7 @@ class _CLIBuilder(object):
         """
         if dockerfile:
             dockerfile = os.path.join(path, dockerfile)
-        iidfile = tempfile.NamedTemporaryFile(delete=False)
+        iidfile = tempfile.NamedTemporaryFile()
 
         command_builder = _CommandBuilder()
         command_builder.add_params("--build-arg", buildargs)
