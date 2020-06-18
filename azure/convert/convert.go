@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	// ComposeDnsSidecarName name of the dns sidecar container
-	ComposeDnsSidecarName = "aci--dns--sidecar"
-
+	// ComposeDNSSidecarName name of the dns sidecar container
+	ComposeDNSSidecarName = "aci--dns--sidecar"
 
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
@@ -99,7 +98,7 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 		containers = append(containers, containerDefinition)
 	}
 	if len(containers) > 1 {
-		dnsSideCar := getDnsSidecar(containers)
+		dnsSideCar := getDNSSidecar(containers)
 		containers = append(containers, dnsSideCar)
 	}
 	groupDefinition.ContainerGroupProperties.Containers = &containers
@@ -107,7 +106,7 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 	return groupDefinition, nil
 }
 
-func getDnsSidecar(containers []containerinstance.Container) containerinstance.Container {
+func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
 	var commands []string
 	for _, container := range containers {
 		commands = append(commands, fmt.Sprintf("echo 127.0.0.1 %s >> /etc/hosts", *container.Name))
@@ -117,7 +116,7 @@ func getDnsSidecar(containers []containerinstance.Container) containerinstance.C
 	commands = append(commands, "sleep infinity")
 	alpineCmd := []string{"sh", "-c", strings.Join(commands, ";")}
 	dnsSideCar := containerinstance.Container{
-		Name: to.StringPtr(ComposeDnsSidecarName),
+		Name: to.StringPtr(ComposeDNSSidecarName),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image:   to.StringPtr("alpine:3.12.0"),
 			Command: &alpineCmd,

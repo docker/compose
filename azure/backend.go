@@ -113,6 +113,10 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 
 		for _, container := range *group.Containers {
 			var containerID string
+			// don't list sidecar container
+			if *container.Name == convert.ComposeDNSSidecarName {
+				continue
+			}
 			if *container.Name == singleContainerName {
 				containerID = *containerGroup.Name
 			} else {
