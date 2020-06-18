@@ -37,10 +37,12 @@ func inspectCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect",
 		Short: "Display detailed information on one or more contexts",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return mobycli.ExecCmd(cmd)
 		},
 	}
+	// flags matching delegated command in moby cli
+	flags := cmd.Flags()
+	flags.StringP("format", "f", "", "Format the output using the given Go template")
 	return cmd
 }

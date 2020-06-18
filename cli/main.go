@@ -101,7 +101,7 @@ func main() {
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isOwnCommand(cmd) {
-				mobycli.Exec(cmd.Context())
+				mobycli.ExecIfDefaultCtxType(cmd.Context())
 			}
 			return nil
 		},
@@ -127,7 +127,7 @@ func main() {
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !isOwnCommand(cmd) {
-			mobycli.Exec(cmd.Context())
+			mobycli.ExecIfDefaultCtxType(cmd.Context())
 		}
 		helpFunc(cmd, args)
 	})
@@ -168,7 +168,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		mobycli.Exec(ctx)
+		mobycli.ExecIfDefaultCtxType(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
 		fmt.Fprintln(os.Stderr, err)

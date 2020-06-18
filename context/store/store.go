@@ -45,6 +45,17 @@ import (
 const (
 	// DefaultContextName is an automatically generated local context
 	DefaultContextName = "default"
+	// DefaultContextType is the type for all moby contexts (not associated with cli backend)
+	DefaultContextType = "moby"
+	// AciContextType is the endpoint key in the context endpoints for an ACI
+	// backend
+	AciContextType = "aci"
+	// LocalContextType is the endpoint key in the context endpoints for a new
+	// local backend
+	LocalContextType = "local"
+	// ExampleContextType is the endpoint key in the context endpoints for an
+	// example backend
+	ExampleContextType = "example"
 )
 
 const (
@@ -91,18 +102,6 @@ type Endpoint struct {
 	Host             string `json:",omitempty"`
 	DefaultNamespace string `json:",omitempty"`
 }
-
-const (
-	// AciContextType is the endpoint key in the context endpoints for an ACI
-	// backend
-	AciContextType = "aci"
-	// LocalContextType is the endpoint key in the context endpoints for a new
-	// local backend
-	LocalContextType = "local"
-	// ExampleContextType is the endpoint key in the context endpoints for an
-	// example backend
-	ExampleContextType = "example"
-)
 
 type store struct {
 	root string
