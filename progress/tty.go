@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -102,7 +103,7 @@ func (w *ttyWriter) print() {
 
 	numLines := 0
 	for _, v := range w.eventIDs {
-		line := lineText(w.events[v], terminalWidth, statusPadding)
+		line := lineText(w.events[v], terminalWidth, statusPadding, runtime.GOOS != "windows")
 		// nolint: errcheck
 		fmt.Fprint(w.out, line)
 		numLines++
@@ -111,7 +112,7 @@ func (w *ttyWriter) print() {
 	w.numLines = numLines
 }
 
-func lineText(event Event, terminalWidth, statusPadding int) string {
+func lineText(event Event, terminalWidth, statusPadding int, color bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.endTime
@@ -134,15 +135,18 @@ func lineText(event Event, terminalWidth, statusPadding int) string {
 	timer := fmt.Sprintf("%.1fs\n", elapsed)
 	o := align(text, timer, terminalWidth)
 
-	color := aec.WhiteF
-	if event.Status == Done {
-		color = aec.BlueF
-	}
-	if event.Status == Error {
-		color = aec.RedF
+	if color {
+		color := aec.WhiteF
+		if event.Status == Done {
+			color = aec.BlueF
+		}
+		if event.Status == Error {
+			color = aec.RedF
+		}
+		return aec.Apply(o, color)
 	}
 
-	return aec.Apply(o, color)
+	return o
 }
 
 func numDone(events map[string]Event) int {

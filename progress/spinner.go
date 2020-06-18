@@ -1,6 +1,9 @@
 package progress
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 type spinner struct {
 	time  time.Time
@@ -11,13 +14,21 @@ type spinner struct {
 }
 
 func newSpinner() *spinner {
+	chars := []string{
+		"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
+	}
+	done := "⠿"
+
+	if runtime.GOOS == "windows" {
+		chars = []string{"-"}
+		done = "-"
+	}
+
 	return &spinner{
 		index: 0,
 		time:  time.Now(),
-		chars: []string{
-			"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
-		},
-		done: "⠿",
+		chars: chars,
+		done:  done,
 	}
 }
 
