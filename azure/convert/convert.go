@@ -19,6 +19,7 @@ import (
 const (
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
+	dnsSidecarImage       = "alpine:3.12.0"
 
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
@@ -118,7 +119,7 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 	dnsSideCar := containerinstance.Container{
 		Name: to.StringPtr(ComposeDNSSidecarName),
 		ContainerProperties: &containerinstance.ContainerProperties{
-			Image:   to.StringPtr("alpine:3.12.0"),
+			Image:   to.StringPtr(dnsSidecarImage),
 			Command: &alpineCmd,
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{
