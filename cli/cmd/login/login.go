@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/dockerclassic"
+	"github.com/docker/api/cli/mobycli"
 	"github.com/docker/api/client"
 	"github.com/docker/api/errdefs"
 )
@@ -22,7 +22,7 @@ func Command() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runLogin,
 	}
-	// define flags for backward compatibility with docker-classic
+	// define flags for backward compatibility with com.docker.cli
 	flags := cmd.Flags()
 	flags.StringP("username", "u", "", "Username")
 	flags.StringP("password", "p", "", "Password")
@@ -41,7 +41,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 			return errors.New("unknown backend type for cloud login: " + backend)
 		}
 	}
-	return dockerclassic.ExecCmd(cmd)
+	return mobycli.ExecCmd(cmd)
 }
 
 func cloudLogin(cmd *cobra.Command, backendType string) error {

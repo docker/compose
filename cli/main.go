@@ -52,7 +52,7 @@ import (
 	contextcmd "github.com/docker/api/cli/cmd/context"
 	"github.com/docker/api/cli/cmd/login"
 	"github.com/docker/api/cli/cmd/run"
-	"github.com/docker/api/cli/dockerclassic"
+	"github.com/docker/api/cli/mobycli"
 	cliopts "github.com/docker/api/cli/options"
 	"github.com/docker/api/config"
 	apicontext "github.com/docker/api/context"
@@ -101,7 +101,7 @@ func main() {
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isOwnCommand(cmd) {
-				dockerclassic.Exec(cmd.Context())
+				mobycli.Exec(cmd.Context())
 			}
 			return nil
 		},
@@ -127,7 +127,7 @@ func main() {
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !isOwnCommand(cmd) {
-			dockerclassic.Exec(cmd.Context())
+			mobycli.Exec(cmd.Context())
 		}
 		helpFunc(cmd, args)
 	})
@@ -168,7 +168,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		dockerclassic.Exec(ctx)
+		mobycli.Exec(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
 		fmt.Fprintln(os.Stderr, err)
@@ -182,7 +182,7 @@ func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string
 	if len(submatch) == 2 {
 		dockerCommand := string(submatch[1])
 
-		if dockerclassic.IsDefaultContextCommand(dockerCommand) {
+		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command \"%s\" not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
 			os.Exit(1)
 		}

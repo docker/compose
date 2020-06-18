@@ -32,7 +32,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/dockerclassic"
+	"github.com/docker/api/cli/mobycli"
 	"github.com/docker/api/context/store"
 )
 
@@ -76,7 +76,7 @@ $ docker context create my-context --description "some description" --docker "ho
 		Use:   "create CONTEXT",
 		Short: "Create new context",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return dockerclassic.ExecCmd(cmd)
+			return mobycli.ExecCmd(cmd)
 		},
 		Long: longHelp,
 	}

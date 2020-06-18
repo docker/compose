@@ -28,7 +28,7 @@
 package context
 
 import (
-	"github.com/docker/api/cli/dockerclassic"
+	"github.com/docker/api/cli/mobycli"
 
 	"github.com/spf13/cobra"
 )
@@ -39,7 +39,7 @@ func inspectCommand() *cobra.Command {
 		Short: "Display detailed information on one or more contexts",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return dockerclassic.ExecCmd(cmd)
+			return mobycli.ExecCmd(cmd)
 		},
 	}
 	return cmd

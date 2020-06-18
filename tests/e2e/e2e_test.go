@@ -121,13 +121,13 @@ func (s *E2eSuite) TestCloudLogin() {
 }
 
 func (s *E2eSuite) TestSetupError() {
-	It("should display an error if cannot shell out to docker-classic", func() {
+	It("should display an error if cannot shell out to com.docker.cli", func() {
 		err := os.Setenv("PATH", s.BinDir)
 		Expect(err).To(BeNil())
 		err = os.Remove(filepath.Join(s.BinDir, DockerClassicExecutable()))
 		Expect(err).To(BeNil())
 		output, err := s.NewDockerCommand("ps").Exec()
-		Expect(output).To(ContainSubstring("docker-classic"))
+		Expect(output).To(ContainSubstring("com.docker.cli"))
 		Expect(output).To(ContainSubstring("not found"))
 		Expect(err).NotTo(BeNil())
 	})

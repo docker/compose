@@ -46,7 +46,7 @@ type NonWinCIE2eSuite struct {
 }
 
 func (s *NonWinCIE2eSuite) TestKillChildOnCancel() {
-	It("should kill docker-classic if parent command is cancelled", func() {
+	It("should kill com.docker.cli if parent command is cancelled", func() {
 		imageName := "test-sleep-image"
 		out := s.ListProcessesCommand().ExecOrDie()
 		Expect(out).NotTo(ContainSubstring(imageName))
