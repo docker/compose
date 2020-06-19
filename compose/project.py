@@ -168,11 +168,14 @@ class Project(object):
             if name not in valid_names:
                 raise NoSuchService(name)
 
-    def get_services(self, service_names=None, include_deps=False):
+    def get_services(self, service_names=None, include_deps=False, auto_up_only=False):
         """
         Returns a list of this project's services filtered
         by the provided list of names, or all services if service_names is None
         or [].
+        If auto_up_only is True and service_names is None or [], services which
+        have auto_up explicitly set to False and are not pulled in as a
+        dependency are excluded.
 
         If include_deps is specified, returns a list including the dependencies for
         service_names, in order of dependency.
@@ -183,7 +186,12 @@ class Project(object):
         Raises NoSuchService if any of the named services do not exist.
         """
         if service_names is None or len(service_names) == 0:
-            service_names = self.service_names
+            service_names = [
+                service.name
+                for service in self.services
+                # if auto_up_only is True exclude services with auto_up set to False
+                if not auto_up_only or service.options.get('auto_up', True)
+            ]
 
         unsorted = [self.get_service(name) for name in service_names]
         services = [s for s in self.services if s in unsorted]
@@ -196,8 +204,8 @@ class Project(object):
 
         return uniques
 
-    def get_services_without_duplicate(self, service_names=None, include_deps=False):
-        services = self.get_services(service_names, include_deps)
+    def get_services_without_duplicate(self, service_names=None, include_deps=False, auto_up_only=False):
+        services = self.get_services(service_names, include_deps, auto_up_only)
         for service in services:
             service.remove_duplicate_containers()
         return services
@@ -404,7 +412,11 @@ class Project(object):
         strategy=ConvergenceStrategy.changed,
         do_build=BuildAction.none,
     ):
-        services = self.get_services_without_duplicate(service_names, include_deps=True)
+        services = self.get_services_without_duplicate(
+            service_names,
+            include_deps=True,
+            auto_up_only=True
+        )
 
         for svc in services:
             svc.ensure_image_exists(do_build=do_build)
@@ -538,7 +550,8 @@ class Project(object):
 
         services = self.get_services_without_duplicate(
             service_names,
-            include_deps=start_deps)
+            include_deps=start_deps,
+            auto_up_only=True)
 
         for svc in services:
             svc.ensure_image_exists(do_build=do_build, silent=silent, cli=cli)

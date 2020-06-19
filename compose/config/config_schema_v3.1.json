@@ -62,6 +62,7 @@
       "type": "object",
 
       "properties": {
+        "auto_up": {"type": "boolean"},
         "deploy": {"$ref": "#/definitions/deployment"},
         "build": {
           "oneOf": [

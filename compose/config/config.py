@@ -124,6 +124,7 @@ DOCKER_CONFIG_KEYS = [
 ]
 
 ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
+    'auto_up',
     'blkio_config',
     'build',
     'container_name',

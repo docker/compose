@@ -167,6 +167,107 @@ class ProjectTest(unittest.TestCase):
         project = Project('test', [web, db], None)
         assert project.get_services(['web', 'db'], include_deps=True) == [db, web]
 
+    def test_get_services_includes_non_auto_up_services_without_args(self):
+        db = Service(
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        mock_api = Service(
+            auto_up=False,
+            name='mock_api',
+            image='foo',
+        )
+        project = Project('test', [web, db, mock_api], None)
+        assert project.get_services() == [web, db, mock_api]
+
+    def test_get_services_excludes_non_auto_up_services_without_service_names(self):
+        db = Service(
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        mock_api = Service(
+            auto_up=False,
+            name='mock_api',
+            image='foo',
+        )
+        project = Project('test', [web, db, mock_api], None)
+        assert project.get_services(auto_up_only=True) == [web, db]
+
+    def test_get_services_exludes_auto_up_services_as_dependencies_with_no_deps(self):
+        db = Service(
+            auto_up=False,
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        project = Project('test', [web, db], None)
+        assert project.get_services(include_deps=False, auto_up_only=True) == [web]
+
+    def test_get_services_includes_auto_up_services_as_dependencies_with_include_deps(self):
+        db = Service(
+            auto_up=False,
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        project = Project('test', [web, db], None)
+        assert project.get_services(include_deps=True, auto_up_only=True) == [db, web]
+
+    def test_get_services_returns_listed_non_auto_up_services_with_service_names(self):
+        db = Service(
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        mock_api = Service(
+            auto_up=False,
+            name='mock_api',
+            image='foo',
+        )
+        project = Project('test', [web, db, mock_api], None)
+        assert project.get_services(['mock_api'], auto_up_only=True) == [mock_api]
+
+    def test_get_services_returns_listed_non_auto_up_services_and_dependencies_with_service_names(self):
+        db = Service(
+            name='db',
+            image='foo',
+        )
+        web = Service(
+            name='web',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        mock_api = Service(
+            auto_up=False,
+            name='mock_api',
+            image='foo',
+            links=[(db, 'database')]
+        )
+        project = Project('test', [web, db, mock_api], None)
+        assert project.get_services(['mock_api'], include_deps=True, auto_up_only=True) == [db, mock_api]
+
     def test_use_volumes_from_container(self):
         container_id = 'aabbccddee'
         container_dict = dict(Name='aaa', Id=container_id)

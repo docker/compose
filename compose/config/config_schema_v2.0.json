@@ -51,6 +51,7 @@
       "type": "object",
 
       "properties": {
+        "auto_up": {"type": "boolean"},
         "blkio_config": {
           "type": "object",
           "properties": {
