@@ -91,6 +91,11 @@ func (suite *LoginSuite) TestRefreshInValidToken() {
 	Expect(storedToken.Token.Expiry).To(BeTemporally(">", time.Now().Add(3500*time.Second)))
 }
 
+func (suite *LoginSuite) TestClearErrorMessageIfNotAlreadyLoggedIn() {
+	_, err := newAuthorizerFromLoginStorePath(filepath.Join(suite.dir, tokenStoreFilename))
+	Expect(err.Error()).To(ContainSubstring("not logged in to azure, you need to run \"docker login azure\" first"))
+}
+
 func (suite *LoginSuite) TestDoesNotRefreshValidToken() {
 	expiryDate := time.Now().Add(1 * time.Hour)
 	err := suite.azureLogin.tokenStore.writeLoginInfo(TokenInfo{
