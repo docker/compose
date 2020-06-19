@@ -85,7 +85,6 @@ func main() {
 	var opts cliopts.GlobalOpts
 	root := &cobra.Command{
 		Use:           "docker",
-		Long:          "docker for the 2020s",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
