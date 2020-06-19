@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/api/cli/cmd/mobyflags"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -43,6 +45,7 @@ func Command() *cobra.Command {
 	flags.StringP("username", "u", "", "Username")
 	flags.StringP("password", "p", "", "Password")
 	flags.BoolP("password-stdin", "", false, "Take the password from stdin")
+	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 
 	return cmd
 }

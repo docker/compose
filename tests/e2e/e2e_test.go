@@ -173,6 +173,23 @@ func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
 	Expect(err).NotTo(BeNil())
 }
 
+func (s *E2eSuite) TestPassThroughRootLegacyFlags() {
+	output, err := s.NewDockerCommand("-H", "tcp://localhost:123", "version").Exec()
+	Expect(err).To(BeNil())
+	Expect(output).To(ContainSubstring("Client:"))
+	Expect(output).To(ContainSubstring("localhost:123"))
+
+	output, _ = s.NewDockerCommand("-H", "tcp://localhost:123", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
+
+	output, _ = s.NewDockerCommand("--log-level", "debug", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
+
+	output, _ = s.NewDockerCommand("login", "--help").Exec()
+	Expect(output).NotTo(ContainSubstring("--host"))
+	Expect(output).NotTo(ContainSubstring("--log-level"))
+}
+
 func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
 	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
 	output, err := s.NewDockerCommand("--context", "test-example", "images").Exec()
