@@ -20,9 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -103,40 +101,12 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		return err
 	}
 
-	containerGroup, err := future.Result(containerGroupsClient)
-	if err != nil {
-		return err
-	}
 	for _, c := range *groupDefinition.Containers {
 		w.Event(progress.Event{
 			ID:         *c.Name,
 			Status:     progress.Done,
 			StatusText: "Done",
 		})
-	}
-
-	if len(*containerGroup.Containers) > 1 {
-		var commands []string
-		for _, container := range *containerGroup.Containers {
-			commands = append(commands, fmt.Sprintf("echo 127.0.0.1 %s >> /etc/hosts", *container.Name))
-		}
-		commands = append(commands, "exit")
-
-		containers := *containerGroup.Containers
-		container := containers[0]
-		response, err := execACIContainer(ctx, aciContext, "/bin/sh", *containerGroup.Name, *container.Name)
-		if err != nil {
-			return err
-		}
-
-		if err = execCommands(
-			ctx,
-			*response.WebSocketURI,
-			*response.Password,
-			commands,
-		); err != nil {
-			return err
-		}
 	}
 
 	return err
@@ -186,37 +156,6 @@ func getTermSize() (*int32, *int32) {
 	rows := tm.Height()
 	cols := tm.Width()
 	return to.Int32Ptr(int32(rows)), to.Int32Ptr(int32(cols))
-}
-
-type commandSender struct {
-	commands string
-}
-
-func (cs *commandSender) Read(p []byte) (int, error) {
-	if len(cs.commands) == 0 {
-		return 0, io.EOF
-	}
-
-	var command string
-	if len(p) >= len(cs.commands) {
-		command = cs.commands
-		cs.commands = ""
-	} else {
-		command = cs.commands[:len(p)]
-		cs.commands = cs.commands[len(p):]
-	}
-
-	copy(p, command)
-
-	return len(command), nil
-}
-
-func execCommands(ctx context.Context, address string, password string, commands []string) error {
-	writer := ioutil.Discard
-	reader := &commandSender{
-		commands: strings.Join(commands, "\n"),
-	}
-	return exec(ctx, address, password, reader, writer)
 }
 
 func exec(ctx context.Context, address string, password string, reader io.Reader, writer io.Writer) error {
