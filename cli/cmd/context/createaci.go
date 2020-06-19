@@ -42,7 +42,7 @@ func createAciCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			contextData, description, err := getAciContextData(cmd.Context(), opts)
 			if err != nil {
-				return nil
+				return err
 			}
 			return createDockerContext(cmd.Context(), args[0], store.AciContextType, description, contextData)
 		},
