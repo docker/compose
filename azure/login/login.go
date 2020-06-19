@@ -181,13 +181,17 @@ func toOAuthToken(token azureToken) oauth2.Token {
 
 // NewAuthorizerFromLogin creates an authorizer based on login access token
 func NewAuthorizerFromLogin() (autorest.Authorizer, error) {
-	login, err := NewAzureLoginService()
+	return newAuthorizerFromLoginStorePath(getTokenStorePath())
+}
+
+func newAuthorizerFromLoginStorePath(storeTokenPath string) (autorest.Authorizer, error) {
+	login, err := newAzureLoginServiceFromPath(storeTokenPath, azureAPIHelper{})
 	if err != nil {
 		return nil, err
 	}
 	oauthToken, err := login.GetValidToken()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "not logged in to azure, you need to run \"docker login azure\" first")
 	}
 
 	token := adal.Token{
