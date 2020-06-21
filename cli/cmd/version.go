@@ -25,7 +25,7 @@ import (
 	"github.com/docker/api/cli/mobycli"
 )
 
-const cliVersion = "0.1.1"
+const cliVersion = "0.1.2"
 
 // VersionCommand command to display version
 func VersionCommand() *cobra.Command {
