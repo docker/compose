@@ -103,6 +103,12 @@ func (s *E2eSuite) TestCanForceRemoveCurrentContext() {
 	Expect(out).To(ContainSubstring("default *"))
 }
 
+func (s *E2eSuite) TestContextCreateAciChecksContextNameBeforeInteractivePart() {
+	s.NewDockerCommand("context", "create", "mycontext", "--from", "default").ExecOrDie()
+	_, err := s.NewDockerCommand("context", "create", "aci", "mycontext").Exec()
+	Expect(err.Error()).To(ContainSubstring("context mycontext: already exists"))
+}
+
 func (s *E2eSuite) TestClassicLoginWithparameters() {
 	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
 	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))

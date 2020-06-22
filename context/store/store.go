@@ -83,6 +83,8 @@ type Store interface {
 	List() ([]*DockerContext, error)
 	// Remove removes a context by name from the context store
 	Remove(name string) error
+	// ContextExists checks if a context already exists
+	ContextExists(name string) bool
 }
 
 // Endpoint holds the Docker or the Kubernetes endpoint, they both have the
@@ -218,15 +220,24 @@ func toTypedEndpoints(endpoints map[string]interface{}) (map[string]interface{},
 	return result, nil
 }
 
-func (s *store) Create(name string, contextType string, description string, data interface{}) error {
+func (s *store) ContextExists(name string) bool {
 	if name == DefaultContextName {
-		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
+		return true
 	}
 	dir := contextDirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 	if _, err := os.Stat(metaDir); !os.IsNotExist(err) {
+		return true
+	}
+	return false
+}
+
+func (s *store) Create(name string, contextType string, description string, data interface{}) error {
+	if s.ContextExists(name) {
 		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
 	}
+	dir := contextDirOf(name)
+	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
 
 	err := os.Mkdir(metaDir, 0755)
 	if err != nil {
