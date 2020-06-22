@@ -179,6 +179,7 @@ func options(subscriptionID string, resourceGroupName string) map[string]string 
 	return map[string]string{
 		"aciSubscriptionID": subscriptionID,
 		"aciResourceGroup":  resourceGroupName,
+		"aciLocation":       "eastus",
 	}
 }
 
