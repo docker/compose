@@ -120,7 +120,7 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "d", false, "enable debug output in the logs")
+	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "enable debug output in the logs")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
 
