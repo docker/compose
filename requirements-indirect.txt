@@ -7,7 +7,7 @@ cryptography==2.9.2
 distlib==0.3.0
 entrypoints==0.3
 filelock==3.0.12
-gitdb2==2.0.6
+gitdb2==4.0.2
 mccabe==0.6.1
 more-itertools==8.3.0; python_version >= '3.5'
 more-itertools==5.0.0; python_version < '3.5'
