@@ -130,6 +130,11 @@ func createDockerContext(ctx context.Context, name string, contextType string, d
 	return result
 }
 
+func contextExists(ctx context.Context, name string) bool {
+	s := store.ContextStore(ctx)
+	return s.ContextExists(name)
+}
+
 func addDescriptionFlag(cmd *cobra.Command, descriptionOpt *string) {
 	cmd.Flags().StringVar(descriptionOpt, "description", "", "Description of the context")
 }

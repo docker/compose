@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/api/client"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/errdefs"
 )
 
 type aciCreateOpts struct {
@@ -40,11 +41,7 @@ func createAciCommand() *cobra.Command {
 		Short: "Create a context for Azure Container Instances",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			contextData, description, err := getAciContextData(cmd.Context(), opts)
-			if err != nil {
-				return err
-			}
-			return createDockerContext(cmd.Context(), args[0], store.AciContextType, description, contextData)
+			return runCreateAci(cmd.Context(), args[0], opts)
 		},
 	}
 
@@ -54,6 +51,18 @@ func createAciCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.resourceGroup, "resource-group", "", "Resource group")
 
 	return cmd
+}
+
+func runCreateAci(ctx context.Context, contextName string, opts aciCreateOpts) error {
+	if contextExists(ctx, contextName) {
+		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
+	}
+	contextData, description, err := getAciContextData(ctx, opts)
+	if err != nil {
+		return err
+	}
+	return createDockerContext(ctx, contextName, store.AciContextType, description, contextData)
+
 }
 
 func getAciContextData(ctx context.Context, opts aciCreateOpts) (interface{}, string, error) {
