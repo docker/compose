@@ -35,6 +35,7 @@ import (
 	_ "github.com/docker/api/azure"
 	_ "github.com/docker/api/example"
 	_ "github.com/docker/api/local"
+	"github.com/docker/api/metrics"
 
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/compose"
@@ -154,6 +155,15 @@ func main() {
 	if err != nil {
 		fatal(errors.Wrap(err, "unable to create context store"))
 	}
+
+	ctype := store.DefaultContextType
+	cc, _ := s.Get(currentContext)
+	if cc != nil {
+		ctype = cc.Type()
+	}
+
+	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
+
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
