@@ -65,6 +65,16 @@ func (mgt aciResourceGroupHelperImpl) ListGroups(ctx context.Context, subscripti
 	}
 
 	groups := groupResponse.Values()
+
+	for groupResponse.NotDone() {
+		err = groupResponse.NextWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		newValues := groupResponse.Values()
+		groups = append(groups, newValues...)
+	}
+
 	return groups, nil
 }
 
