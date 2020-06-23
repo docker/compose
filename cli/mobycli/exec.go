@@ -42,11 +42,12 @@ func ExecIfDefaultCtxType(ctx context.Context) {
 	// Only run original docker command if the current context is not
 	// ours.
 	if err != nil || currentCtx.Type() == store.DefaultContextType {
-		shellOut(ctx)
+		ExecRegardlessContext(ctx)
 	}
 }
 
-func shellOut(ctx context.Context) {
+// ExecRegardlessContext delegates to com.docker.cli if on moby context
+func ExecRegardlessContext(ctx context.Context) {
 	cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -63,7 +64,7 @@ func shellOut(ctx context.Context) {
 
 // ExecCmd delegates the cli command to com.docker.cli. The error is never returned (process will exit with docker classic exit code), the return type is to make it easier to use with cobra commands
 func ExecCmd(command *cobra.Command) error {
-	shellOut(command.Context())
+	ExecRegardlessContext(command.Context())
 	return nil
 }
 

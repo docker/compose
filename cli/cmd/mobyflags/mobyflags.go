@@ -8,9 +8,6 @@ import (
 
 // AddMobyFlagsForRetrocompatibility adds retrocompatibility flags to our commands
 func AddMobyFlagsForRetrocompatibility(flags *flag.FlagSet) {
-	const hostFlag = "host"
-	flags.StringP(hostFlag, "H", "", "Daemon socket(s) to connect to")
-	markHidden(flags, hostFlag)
 	const logLevelFlag = "log-level"
 	flags.StringP(logLevelFlag, "l", "info", `Set the logging level ("debug"|"info"|"warn"|"error"|"fatal")`)
 	markHidden(flags, logLevelFlag)
