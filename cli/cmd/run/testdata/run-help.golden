@@ -4,6 +4,7 @@ Usage:
   run [flags]
 
 Flags:
+  -d, --detach                Run container in background and print container ID (default true)
   -l, --label stringArray     Set meta data on a container
       --name string           Assign a name to the container
   -p, --publish stringArray   Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT
