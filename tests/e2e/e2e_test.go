@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -207,9 +208,16 @@ func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
 func (s *E2eSuite) TestExecMobyIfUsingHostFlag() {
 	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
 	s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
-	output, err := s.NewDockerCommand("-H", "unix:///var/run/docker.sock", "ps").Exec()
+	output, err := s.NewDockerCommand("-H", defaultEndpoint(), "ps").Exec()
 	Expect(err).To(BeNil())
 	Expect(output).To(ContainSubstring("CONTAINER ID"))
+}
+
+func defaultEndpoint() string {
+	if runtime.GOOS == "windows" {
+		return "npipe:////./pipe/docker_engine"
+	}
+	return "unix:///var/run/docker.sock"
 }
 
 func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
