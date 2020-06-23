@@ -1,0 +1,17 @@
+version: '3.3'
+
+services:
+  db:
+    build: db
+    image: gtardif/sentences-db
+
+  words:
+    build: words
+    image: gtardif/sentences-api
+    ports:
+      - "8080:8080"
+  web:
+    build: web
+    image: gtardif/sentences-web
+    ports:
+      - "80:80"

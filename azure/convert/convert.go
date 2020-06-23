@@ -81,6 +81,7 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 		},
 	}
 
+	var groupPorts []containerinstance.Port
 	for _, s := range project.Services {
 		service := serviceConfigAciHelper(s)
 		containerDefinition, err := service.getAciContainer(volumesCache)
@@ -89,7 +90,6 @@ func ToContainerGroup(aciContext store.AciContext, p compose.Project) (container
 		}
 		if service.Ports != nil {
 			var containerPorts []containerinstance.ContainerPort
-			var groupPorts []containerinstance.Port
 			for _, portConfig := range service.Ports {
 				if portConfig.Published != 0 && portConfig.Published != portConfig.Target {
 					msg := fmt.Sprintf("Port mapping is not supported with ACI, cannot map port %d to %d for container %s",

@@ -160,6 +160,57 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSi
 	Expect(*(*group.Containers)[0].Image).To(Equal("image1"))
 }
 
+func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts() {
+	project := compose.Project{
+		Name: "",
+		Config: types.Config{
+			Services: []types.ServiceConfig{
+				{
+					Name:  "service1",
+					Image: "image1",
+					Ports: []types.ServicePortConfig{
+						{
+							Published: 80,
+							Target:    80,
+						},
+					},
+				},
+				{
+					Name:  "service2",
+					Image: "image2",
+					Ports: []types.ServicePortConfig{
+						{
+							Published: 8080,
+							Target:    8080,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+	Expect(len(*group.Containers)).To(Equal(3))
+
+	container1 := (*group.Containers)[0]
+	container2 := (*group.Containers)[1]
+	Expect(*container1.Name).To(Equal("service1"))
+	Expect(*container1.Image).To(Equal("image1"))
+	portsC1 := *container1.Ports
+	Expect(*portsC1[0].Port).To(Equal(int32(80)))
+
+	Expect(*container2.Name).To(Equal("service2"))
+	Expect(*container2.Image).To(Equal("image2"))
+	portsC2 := *container2.Ports
+	Expect(*portsC2[0].Port).To(Equal(int32(8080)))
+
+	groupPorts := *group.IPAddress.Ports
+	Expect(len(groupPorts)).To(Equal(2))
+	Expect(*groupPorts[0].Port).To(Equal(int32(80)))
+	Expect(*groupPorts[1].Port).To(Equal(int32(8080)))
+}
+
 func TestConvertTestSuite(t *testing.T) {
 	RegisterTestingT(t)
 	suite.Run(t, new(ConvertTestSuite))
