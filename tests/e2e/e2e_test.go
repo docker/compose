@@ -226,6 +226,14 @@ func defaultEndpoint() string {
 	return "unix:///var/run/docker.sock"
 }
 
+func (s *E2eSuite) TestExecMobyIfUsingversionFlag() {
+	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
+	s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
+	output, err := s.NewDockerCommand("-v").Exec()
+	Expect(err).To(BeNil())
+	Expect(output).To(ContainSubstring("Docker version"))
+}
+
 func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
 	output := s.NewDockerCommand("version").ExecOrDie()
 	Expect(output).To(ContainSubstring("Azure integration"))
