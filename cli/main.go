@@ -124,6 +124,7 @@ func main() {
 	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
+	root.Flags().BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
@@ -135,6 +136,9 @@ func main() {
 	defer cancel()
 
 	if opts.Host != "" {
+		mobycli.ExecRegardlessContext(ctx)
+	}
+	if opts.Version {
 		mobycli.ExecRegardlessContext(ctx)
 	}
 

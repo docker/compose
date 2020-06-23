@@ -25,6 +25,7 @@ import (
 type GlobalOpts struct {
 	apicontext.ContextFlags
 	cliconfig.ConfigFlags
-	Debug bool
-	Host  string
+	Debug   bool
+	Version bool
+	Host    string
 }
