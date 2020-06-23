@@ -37,7 +37,7 @@ func ToPorts(ipAddr *containerinstance.IPAddress, ports []containerinstance.Cont
 			protocol = string(port.Protocol)
 		}
 		ip := ""
-		if ipAddr != nil {
+		if ipAddr != nil && ipAddr.IP != nil {
 			ip = *ipAddr.IP
 		}
 
