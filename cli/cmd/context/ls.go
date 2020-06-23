@@ -17,7 +17,6 @@
 package context
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -27,14 +26,16 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/cli/mobycli"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/formatter"
 )
 
 type lsOpts struct {
-	quiet bool
-	json  bool
+	quiet  bool
+	json   bool
+	format string
 }
 
 func (o lsOpts) validate() error {
@@ -52,21 +53,26 @@ func listCommand() *cobra.Command {
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd.Context(), opts)
+			return runList(cmd, opts)
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format output as JSON")
 
 	return cmd
 }
 
-func runList(ctx context.Context, opts lsOpts) error {
+func runList(cmd *cobra.Command, opts lsOpts) error {
 	err := opts.validate()
 	if err != nil {
 		return err
 	}
+	if opts.format != "" {
+		return mobycli.ExecCmd(cmd)
+	}
 
+	ctx := cmd.Context()
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 	contexts, err := s.List()

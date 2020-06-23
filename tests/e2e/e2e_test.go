@@ -80,6 +80,12 @@ func (s *E2eSuite) TestInspectContextRegardlessCurrentContext() {
 	Expect(output).To(ContainSubstring(`"Name": "localCtx"`))
 }
 
+func (s *E2eSuite) TestContextLsFormat() {
+	output, err := s.NewDockerCommand("context", "ls", "--format", "{{ json . }}").Exec()
+	Expect(err).To(BeNil())
+	Expect(output).To(ContainSubstring(`"Name":"default"`))
+}
+
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	It("should dispay new cli error when parsing context create flags", func() {
 		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
