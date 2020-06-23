@@ -26,4 +26,5 @@ type GlobalOpts struct {
 	apicontext.ContextFlags
 	cliconfig.ConfigFlags
 	Debug bool
+	Host  string
 }

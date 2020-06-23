@@ -121,6 +121,7 @@ func main() {
 	})
 
 	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "enable debug output in the logs")
+	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
 
@@ -132,6 +133,10 @@ func main() {
 
 	ctx, cancel := newSigContext()
 	defer cancel()
+
+	if opts.Host != "" {
+		mobycli.ExecRegardlessContext(ctx)
+	}
 
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))

@@ -181,18 +181,19 @@ func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
 
 func (s *E2eSuite) TestPassThroughRootLegacyFlags() {
 	output, err := s.NewDockerCommand("-H", "tcp://localhost:123", "version").Exec()
-	Expect(err).To(BeNil())
-	Expect(output).To(ContainSubstring("Client:"))
+	Expect(err).NotTo(BeNil())
+	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
 	Expect(output).To(ContainSubstring("localhost:123"))
 
 	output, _ = s.NewDockerCommand("-H", "tcp://localhost:123", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
 	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
 
 	output, _ = s.NewDockerCommand("--log-level", "debug", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
+	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
 	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
 
 	output, _ = s.NewDockerCommand("login", "--help").Exec()
-	Expect(output).NotTo(ContainSubstring("--host"))
 	Expect(output).NotTo(ContainSubstring("--log-level"))
 }
 
@@ -201,6 +202,14 @@ func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
 	output, err := s.NewDockerCommand("--context", "test-example", "images").Exec()
 	Expect(output).To(Equal("Command \"images\" not available in current context (test-example), you can use the \"default\" context to run this command\n"))
 	Expect(err).NotTo(BeNil())
+}
+
+func (s *E2eSuite) TestExecMobyIfUsingHostFlag() {
+	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
+	s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
+	output, err := s.NewDockerCommand("-H", "unix:///var/run/docker.sock", "ps").Exec()
+	Expect(err).To(BeNil())
+	Expect(output).To(ContainSubstring("CONTAINER ID"))
 }
 
 func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
