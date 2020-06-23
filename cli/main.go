@@ -85,7 +85,6 @@ func main() {
 	var opts cliopts.GlobalOpts
 	root := &cobra.Command{
 		Use:           "docker",
-		Long:          "docker for the 2020s",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -121,7 +120,7 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "d", false, "enable debug output in the logs")
+	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "enable debug output in the logs")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
 

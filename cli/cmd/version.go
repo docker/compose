@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/cli/cmd/mobyflags"
 	"github.com/docker/api/cli/mobycli"
 )
 
@@ -39,6 +40,7 @@ func VersionCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.String("format", "", "Format the output using the given Go template")
 	flags.String("kubeconfig", "", "Kubernetes config file")
+	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 
 	return cmd
 }
