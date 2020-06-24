@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/cli/opts"
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
@@ -33,6 +34,8 @@ type Opts struct {
 	Publish []string
 	Labels  []string
 	Volumes []string
+	Cpus    float64
+	Memory  opts.MemBytes
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -52,11 +55,13 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 	}
 
 	return containers.ContainerConfig{
-		ID:      r.Name,
-		Image:   image,
-		Ports:   publish,
-		Labels:  labels,
-		Volumes: r.Volumes,
+		ID:       r.Name,
+		Image:    image,
+		Ports:    publish,
+		Labels:   labels,
+		Volumes:  r.Volumes,
+		MemLimit: r.Memory,
+		CpuLimit: r.Cpus,
 	}, nil
 }
 

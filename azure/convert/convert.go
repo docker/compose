@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
@@ -262,24 +263,40 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 	} else {
 		volumes = &allVolumes
 	}
+
+	memLimit := 1. // Default 1 Gb
+	var cpuLimit float64 = 1
+	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
+		memLimit = float64(bytesToGb(s.Deploy.Resources.Limits.MemoryBytes))
+		if s.Deploy.Resources.Limits.NanoCPUs != "" {
+			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
+			if err != nil {
+				return containerinstance.Container{}, err
+			}
+		}
+	}
 	return containerinstance.Container{
 		Name: to.StringPtr(s.Name),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image: to.StringPtr(s.Image),
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{
-					MemoryInGB: to.Float64Ptr(1),
-					CPU:        to.Float64Ptr(1),
+					MemoryInGB: to.Float64Ptr(memLimit),
+					CPU:        to.Float64Ptr(cpuLimit),
 				},
 				Requests: &containerinstance.ResourceRequests{
-					MemoryInGB: to.Float64Ptr(1),
-					CPU:        to.Float64Ptr(1),
+					MemoryInGB: to.Float64Ptr(memLimit), // FIXME To implement
+					CPU:        to.Float64Ptr(cpuLimit), // FIXME To implement
 				},
 			},
 			VolumeMounts: volumes,
 		},
 	}, nil
 
+}
+
+func bytesToGb(b types.UnitBytes) int64 {
+	return int64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
 }
 
 // ContainerGroupToContainer composes a Container from an ACI container definition

@@ -19,6 +19,8 @@ package containers
 import (
 	"context"
 	"io"
+
+	"github.com/docker/cli/opts"
 )
 
 // Container represents a created container
@@ -60,6 +62,10 @@ type ContainerConfig struct {
 	Labels map[string]string
 	// Volumes to be mounted
 	Volumes []string
+	// Memlimit
+	MemLimit opts.MemBytes
+	// CPUlimit
+	CpuLimit float64
 }
 
 // LogsRequest contains configuration about a log request
