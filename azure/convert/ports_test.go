@@ -73,6 +73,26 @@ func TestPortConvert(t *testing.T) {
 			},
 		},
 		{
+			name: "with nil ip value",
+			ip: &containerinstance.IPAddress{
+				IP: nil,
+			},
+			ports: []containerinstance.ContainerPort{
+				{
+					Protocol: "tcp",
+					Port:     to.Int32Ptr(80),
+				},
+			},
+			expected: []containers.Port{
+				{
+					HostPort:      80,
+					ContainerPort: 80,
+					HostIP:        "",
+					Protocol:      "tcp",
+				},
+			},
+		},
+		{
 			name: "skip nil ports",
 			ip:   nil,
 			ports: []containerinstance.ContainerPort{
