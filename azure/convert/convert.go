@@ -285,8 +285,8 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 					CPU:        to.Float64Ptr(cpuLimit),
 				},
 				Requests: &containerinstance.ResourceRequests{
-					MemoryInGB: to.Float64Ptr(memLimit), // FIXME To implement
-					CPU:        to.Float64Ptr(cpuLimit), // FIXME To implement
+					MemoryInGB: to.Float64Ptr(memLimit), // TODO: use the memory requests here and not limits
+					CPU:        to.Float64Ptr(cpuLimit), // TODO: use the cpu requests here and not limits
 				},
 			},
 			VolumeMounts: volumes,
@@ -301,11 +301,18 @@ func bytesToGb(b types.UnitBytes) int64 {
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) (containers.Container, error) {
-	memLimits := -1.
+	memLimits := 0.
 	if cc.Resources != nil &&
 		cc.Resources.Limits != nil &&
 		cc.Resources.Limits.MemoryInGB != nil {
 		memLimits = *cc.Resources.Limits.MemoryInGB
+	}
+
+	cpuLimit := 0.
+	if cc.Resources != nil &&
+		cc.Resources.Limits != nil &&
+		cc.Resources.Limits.CPU != nil {
+		cpuLimit = *cc.Resources.Limits.CPU
 	}
 
 	command := ""
@@ -324,6 +331,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		Image:       to.String(cc.Image),
 		Command:     command,
 		CPUTime:     0,
+		CPULimit:    cpuLimit,
 		MemoryUsage: 0,
 		MemoryLimit: uint64(memLimits),
 		PidsCurrent: 0,

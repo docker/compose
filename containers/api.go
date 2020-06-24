@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/cli/opts"
+	"github.com/docker/api/formatter"
 )
 
 // Container represents a created container
@@ -30,6 +30,7 @@ type Container struct {
 	Image       string
 	Command     string
 	CPUTime     uint64
+	CPULimit    float64
 	MemoryUsage uint64
 	MemoryLimit uint64
 	PidsCurrent uint64
@@ -63,9 +64,9 @@ type ContainerConfig struct {
 	// Volumes to be mounted
 	Volumes []string
 	// Memlimit
-	MemLimit opts.MemBytes
+	MemLimit formatter.MemBytes
 	// CPUlimit
-	CpuLimit float64
+	CPULimit float64
 }
 
 // LogsRequest contains configuration about a log request

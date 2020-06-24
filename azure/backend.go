@@ -182,7 +182,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 					Deploy: &types.DeployConfig{
 						Resources: types.Resources{
 							Limits: &types.Resource{
-								NanoCPUs:    fmt.Sprintf("%f", r.CpuLimit),
+								NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
 								MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
 							},
 						},

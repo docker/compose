@@ -48,6 +48,7 @@ message Container {
 	uint64 pids_limit = 9;
 	repeated string labels = 10;
 	repeated Port ports = 11;
+	uint64 cpu_limit = 12;
 }
 
 message InspectRequest {
@@ -80,6 +81,8 @@ message RunRequest {
 	repeated Port ports = 3;
 	map<string, string> labels = 4;
 	repeated string volumes = 5;
+	uint64 memory_limit = 6;
+	uint64 cpu_limit = 7;
 }
 
 message RunResponse {

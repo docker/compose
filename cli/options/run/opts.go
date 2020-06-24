@@ -21,11 +21,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/cli/opts"
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/api/containers"
+	"github.com/docker/api/formatter"
 )
 
 // Opts contain run command options
@@ -35,7 +35,7 @@ type Opts struct {
 	Labels  []string
 	Volumes []string
 	Cpus    float64
-	Memory  opts.MemBytes
+	Memory  formatter.MemBytes
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -61,7 +61,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		Labels:   labels,
 		Volumes:  r.Volumes,
 		MemLimit: r.Memory,
-		CpuLimit: r.Cpus,
+		CPULimit: r.Cpus,
 	}, nil
 }
 

@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	"github.com/docker/api/containers"
+	"github.com/docker/api/formatter"
 	containersv1 "github.com/docker/api/protos/containers/v1"
 	"github.com/docker/api/server/proxy/streams"
 )
@@ -61,23 +62,7 @@ func (p *proxy) Stop(ctx context.Context, request *containersv1.StopRequest) (*c
 }
 
 func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*containersv1.RunResponse, error) {
-	ports := []containers.Port{}
-	for _, p := range request.GetPorts() {
-		ports = append(ports, containers.Port{
-			ContainerPort: p.ContainerPort,
-			HostIP:        p.HostIp,
-			HostPort:      p.HostPort,
-			Protocol:      p.Protocol,
-		})
-	}
-
-	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, containers.ContainerConfig{
-		ID:      request.GetId(),
-		Image:   request.GetImage(),
-		Labels:  request.GetLabels(),
-		Ports:   ports,
-		Volumes: request.GetVolumes(),
-	})
+	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, grpcContainerToContainerConfig(request))
 }
 
 func (p *proxy) Inspect(ctx context.Context, request *containersv1.InspectRequest) (*containersv1.InspectResponse, error) {
@@ -132,5 +117,28 @@ func toGrpcContainer(c containers.Container) *containersv1.Container {
 		PidsLimit:   c.PidsLimit,
 		Labels:      c.Labels,
 		Ports:       portsToGrpc(c.Ports),
+		CpuLimit:    uint64(c.CPULimit),
+	}
+}
+
+func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers.ContainerConfig {
+	var ports []containers.Port
+	for _, p := range request.GetPorts() {
+		ports = append(ports, containers.Port{
+			ContainerPort: p.ContainerPort,
+			HostIP:        p.HostIp,
+			HostPort:      p.HostPort,
+			Protocol:      p.Protocol,
+		})
+	}
+
+	return containers.ContainerConfig{
+		ID:       request.GetId(),
+		Image:    request.GetImage(),
+		Ports:    ports,
+		Labels:   request.GetLabels(),
+		Volumes:  request.GetVolumes(),
+		MemLimit: formatter.MemBytes(request.GetMemoryLimit()),
+		CPULimit: float64(request.GetCpuLimit()),
 	}
 }
