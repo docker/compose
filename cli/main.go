@@ -50,6 +50,10 @@ import (
 )
 
 var (
+	version = "dev"
+)
+
+var (
 	ownCommands = map[string]struct{}{
 		"context": {},
 		"login":   {},
@@ -110,7 +114,7 @@ func main() {
 		cmd.InspectCommand(),
 		compose.Command(),
 		login.Command(),
-		cmd.VersionCommand(),
+		cmd.VersionCommand(version),
 	)
 
 	helpFunc := root.HelpFunc()

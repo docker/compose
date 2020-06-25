@@ -23,7 +23,9 @@ ifeq ($(GOOS),windows)
 endif
 
 STATIC_FLAGS=CGO_ENABLED=0
-LDFLAGS:="-s -w"
+GIT_TAG=$(shell git describe --tags --match "v[0-9]*")
+
+LDFLAGS="-s -w -X main.version=${GIT_TAG}"
 GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
 BINARY?=bin/docker
@@ -37,18 +39,18 @@ endif
 all: cli
 
 protos:
-	@protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
+	protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(BINARY_WITH_EXTENSION) ./cli
 
 cross:
-	@GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
-	@GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
-	@GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
+	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
+	GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
+	GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
 
 test:
-	@go test $(TAGS) -cover $(shell go list ./... | grep -vE 'e2e')
+	go test $(TAGS) -cover $(shell go list ./... | grep -vE 'e2e')
 
 lint:
 	golangci-lint run --timeout 10m0s ./...
