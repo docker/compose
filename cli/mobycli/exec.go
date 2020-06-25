@@ -32,18 +32,21 @@ import (
 // ComDockerCli name of the classic cli binary
 const ComDockerCli = "com.docker.cli"
 
-// ExecIfDefaultCtxType delegates to com.docker.cli if on moby context
+// ExecIfDefaultCtxType delegates to com.docker.cli if on moby or AWS context (until there is an AWS backend)
 func ExecIfDefaultCtxType(ctx context.Context) {
 	currentContext := apicontext.CurrentContext(ctx)
 
 	s := store.ContextStore(ctx)
 
 	currentCtx, err := s.Get(currentContext)
-	// Only run original docker command if the current context is not
-	// ours.
-	if err != nil || currentCtx.Type() == store.DefaultContextType {
+	// Only run original docker command if the current context is not ours.
+	if err != nil || mustDelegateToMoby(currentCtx.Type()) {
 		ExecRegardlessContext(ctx)
 	}
+}
+
+func mustDelegateToMoby(ctxType string) bool {
+	return ctxType == store.DefaultContextType || ctxType == store.AwsContextType
 }
 
 // ExecRegardlessContext delegates to com.docker.cli if on moby context
