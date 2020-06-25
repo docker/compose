@@ -6,12 +6,6 @@ import (
 	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
 )
 
-const (
-	ProjectTag = "com.docker.compose.project"
-	NetworkTag = "com.docker.compose.network"
-	ServiceTag = "com.docker.compose.service"
-)
-
 func NewBackend(profile string, cluster string, region string) (*Backend, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Profile: profile,

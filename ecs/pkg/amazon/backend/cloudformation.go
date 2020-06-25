@@ -31,13 +31,22 @@ const (
 )
 
 type FargateCompatibilityChecker struct {
-	*compatibility.AllowList
+	compatibility.AllowList
+}
+
+func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortConfig) {
+	if p.Published == 0 {
+		p.Published = p.Target
+	}
+	if p.Published != p.Target {
+		c.Error("published port can't be set to a distinct value than container port")
+	}
 }
 
 // Convert a compose project into a CloudFormation template
 func (b Backend) Convert(project *types.Project) (*cloudformation.Template, error) {
-	var checker compatibility.Checker = FargateCompatibilityChecker{
-		&compatibility.AllowList{
+	var checker compatibility.Checker = &FargateCompatibilityChecker{
+		compatibility.AllowList{
 			Supported: []string{
 				"services.command",
 				"services.container_name",
@@ -161,7 +170,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 				dependsOn = append(dependsOn, listenerName)
 				serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
 					ContainerName:  service.Name,
-					ContainerPort:  int(port.Published),
+					ContainerPort:  int(port.Target),
 					TargetGroupArn: cloudformation.Ref(targetGroupName),
 				})
 			}
@@ -195,11 +204,11 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
 			Tags: []tags.Tag{
 				{
-					Key:   ProjectTag,
+					Key:   compose.ProjectTag,
 					Value: project.Name,
 				},
 				{
-					Key:   ServiceTag,
+					Key:   compose.ServiceTag,
 					Value: service.Name,
 				},
 			},
@@ -252,7 +261,7 @@ func createLoadBalancer(project *types.Project, template *cloudformation.Templat
 		},
 		Tags: []tags.Tag{
 			{
-				Key:   ProjectTag,
+				Key:   compose.ProjectTag,
 				Value: project.Name,
 			},
 		},
@@ -267,7 +276,7 @@ func createListener(service types.ServiceConfig, port types.ServicePortConfig, t
 		"%s%s%dListener",
 		normalizeResourceName(service.Name),
 		strings.ToUpper(port.Protocol),
-		port.Published,
+		port.Target,
 	)
 	//add listener to dependsOn
 	//https://stackoverflow.com/questions/53971873/the-target-group-does-not-have-an-associated-load-balancer
@@ -286,7 +295,7 @@ func createListener(service types.ServiceConfig, port types.ServicePortConfig, t
 		},
 		LoadBalancerArn: loadBalancerARN,
 		Protocol:        protocol,
-		Port:            int(port.Published),
+		Port:            int(port.Target),
 	}
 	return listenerName
 }
@@ -304,7 +313,7 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 		Protocol: protocol,
 		Tags: []tags.Tag{
 			{
-				Key:   ProjectTag,
+				Key:   compose.ProjectTag,
 				Value: project.Name,
 			},
 		},
@@ -371,7 +380,7 @@ func createCluster(project *types.Project, template *cloudformation.Template) st
 		ClusterName: project.Name,
 		Tags: []tags.Tag{
 			{
-				Key:   ProjectTag,
+				Key:   compose.ProjectTag,
 				Value: project.Name,
 			},
 		},
@@ -420,11 +429,11 @@ func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string,
 		VpcId:                vpc,
 		Tags: []tags.Tag{
 			{
-				Key:   ProjectTag,
+				Key:   compose.ProjectTag,
 				Value: project.Name,
 			},
 			{
-				Key:   NetworkTag,
+				Key:   compose.NetworkTag,
 				Value: net.Name,
 			},
 		},

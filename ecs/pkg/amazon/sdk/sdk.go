@@ -175,7 +175,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		StackName:        aws.String(name),
 		TemplateBody:     aws.String(string(json)),
 		Parameters:       param,
-		TimeoutInMinutes: aws.Int64(10),
+		TimeoutInMinutes: aws.Int64(15),
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
 		},
@@ -341,20 +341,46 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer compose.LogConsu
 	}
 }
 
-func (s sdk) DescribeService(ctx context.Context, cluster string, name string) (compose.ServiceStatus, error) {
-	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
-		Cluster:  aws.String(cluster),
-		Services: aws.StringSlice([]string{name}),
+func (s sdk) DescribeServices(ctx context.Context, cluster string, project string) ([]compose.ServiceStatus, error) {
+	// TODO handle pagination
+	list, err := s.ECS.ListServicesWithContext(ctx, &ecs.ListServicesInput{
+		Cluster: aws.String(cluster),
 	})
 	if err != nil {
-		return compose.ServiceStatus{}, err
+		return nil, err
 	}
-	return compose.ServiceStatus{
-		ID:       *services.Services[0].ServiceName,
-		Name:     name,
-		Replicas: int(*services.Services[0].RunningCount),
-		Desired:  int(*services.Services[0].DesiredCount),
-	}, nil
+
+	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
+		Cluster:  aws.String(cluster),
+		Services: list.ServiceArns,
+	})
+	if err != nil {
+		return nil, err
+	}
+	status := []compose.ServiceStatus{}
+	for _, service := range services.Services {
+		var name string
+		var stack string
+		for _, t := range service.Tags {
+			switch *t.Key {
+			case compose.ProjectTag:
+				stack = *t.Value
+			case compose.ServiceTag:
+				name = *t.Value
+			}
+		}
+		if stack != project {
+			continue
+		}
+		status = append(status, compose.ServiceStatus{
+			ID:       *service.ServiceName,
+			Name:     name,
+			Replicas: int(*services.Services[0].RunningCount),
+			Desired:  int(*services.Services[0].DesiredCount),
+		})
+	}
+
+	return status, nil
 }
 
 func (s sdk) ListTasks(ctx context.Context, cluster string, family string) ([]string, error) {

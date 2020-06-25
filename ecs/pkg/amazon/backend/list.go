@@ -14,18 +14,22 @@ func (b *Backend) Ps(ctx context.Context, project *types.Project) ([]compose.Ser
 		cluster = project.Name
 	}
 
-	status := []compose.ServiceStatus{}
-	for _, service := range project.Services {
-		desc, err := b.api.DescribeService(ctx, cluster, service.Name)
+	status, err := b.api.DescribeServices(ctx, cluster, project.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, state := range status {
+		s, err := project.GetService(state.Name)
 		if err != nil {
 			return nil, err
 		}
 		ports := []string{}
-		for _, p := range service.Ports {
+		for _, p := range s.Ports {
 			ports = append(ports, fmt.Sprintf("*:%d->%d/%s", p.Published, p.Target, p.Protocol))
 		}
-		desc.Ports = ports
-		status = append(status, desc)
+		state.Ports = ports
+		status[i] = state
 	}
 	return status, nil
 }

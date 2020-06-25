@@ -5,6 +5,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/console"
 )
 
 func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
@@ -22,7 +23,8 @@ func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
 		return err
 	}
 
-	err = b.WaitStackCompletion(ctx, name, compose.StackDelete)
+	w := console.NewProgressWriter()
+	err = b.WaitStackCompletion(ctx, name, compose.StackDelete, w)
 	if err != nil {
 		return err
 	}

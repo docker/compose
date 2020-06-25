@@ -49,7 +49,7 @@ type secretsAPI interface {
 }
 
 type listAPI interface {
-	DescribeService(ctx context.Context, cluster string, name string) (compose.ServiceStatus, error)
+	DescribeServices(ctx context.Context, cluster string, project string) ([]compose.ServiceStatus, error)
 }
 
 type waitAPI interface {

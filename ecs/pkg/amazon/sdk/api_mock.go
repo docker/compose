@@ -122,19 +122,19 @@ func (mr *MockAPIMockRecorder) DeleteStack(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStack", reflect.TypeOf((*MockAPI)(nil).DeleteStack), arg0, arg1)
 }
 
-// DescribeService mocks base method
-func (m *MockAPI) DescribeService(arg0 context.Context, arg1, arg2 string) (compose.ServiceStatus, error) {
+// DescribeServices mocks base method
+func (m *MockAPI) DescribeServices(arg0 context.Context, arg1, arg2 string) ([]compose.ServiceStatus, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DescribeService", arg0, arg1, arg2)
-	ret0, _ := ret[0].(compose.ServiceStatus)
+	ret := m.ctrl.Call(m, "DescribeServices", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]compose.ServiceStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DescribeService indicates an expected call of DescribeService
-func (mr *MockAPIMockRecorder) DescribeService(arg0, arg1, arg2 interface{}) *gomock.Call {
+// DescribeServices indicates an expected call of DescribeServices
+func (mr *MockAPIMockRecorder) DescribeServices(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeService", reflect.TypeOf((*MockAPI)(nil).DescribeService), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeServices", reflect.TypeOf((*MockAPI)(nil).DescribeServices), arg0, arg1, arg2)
 }
 
 // DescribeStackEvents mocks base method

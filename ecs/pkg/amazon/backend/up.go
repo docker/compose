@@ -7,6 +7,7 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/console"
 )
 
 func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
@@ -67,7 +68,11 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 	}
 
 	fmt.Println()
-	return b.WaitStackCompletion(ctx, project.Name, compose.StackCreate)
+	w := console.NewProgressWriter()
+	for k := range template.Resources {
+		w.ResourceEvent(k, "PENDING", "")
+	}
+	return b.WaitStackCompletion(ctx, project.Name, compose.StackCreate, w)
 }
 
 func (b Backend) GetVPC(ctx context.Context, project *types.Project) (string, error) {

@@ -9,7 +9,8 @@ ENV GO111MODULE=on
 ARG ALPINE_PKG_DOCKER_VERSION
 RUN apk add --no-cache \
     docker=${ALPINE_PKG_DOCKER_VERSION} \
-    make
+    make \
+    build-base
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
@@ -18,7 +19,6 @@ COPY . .
 FROM base AS make-plugin
 ARG TARGETOS
 ARG TARGETARCH
-RUN apk add build-base
 RUN GO111MODULE=on go get github.com/golang/mock/mockgen@latest
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \

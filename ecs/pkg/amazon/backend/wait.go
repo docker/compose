@@ -11,8 +11,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operation int) error {
-	w := console.NewProgressWriter()
+func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operation int, w console.ProgressWriter) error {
 	knownEvents := map[string]struct{}{}
 
 	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
@@ -53,7 +52,7 @@ func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operatio
 			}
 			knownEvents[*event.EventId] = struct{}{}
 
-			resource := fmt.Sprintf("%s %q", aws.StringValue(event.ResourceType), aws.StringValue(event.LogicalResourceId))
+			resource := aws.StringValue(event.LogicalResourceId)
 			reason := aws.StringValue(event.ResourceStatusReason)
 			status := aws.StringValue(event.ResourceStatus)
 			w.ResourceEvent(resource, status, reason)
