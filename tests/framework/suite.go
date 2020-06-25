@@ -24,8 +24,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/api/cli/mobycli"
-
 	"github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
@@ -144,10 +142,11 @@ func dockerExecutable() string {
 
 // DockerClassicExecutable binary name based on platform
 func DockerClassicExecutable() string {
+	const comDockerCli = "com.docker.cli"
 	if IsWindows() {
-		return mobycli.ComDockerCli + ".exe"
+		return comDockerCli + ".exe"
 	}
-	return mobycli.ComDockerCli
+	return comDockerCli
 }
 
 // NewDockerCommand creates a docker builder.
