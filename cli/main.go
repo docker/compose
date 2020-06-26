@@ -60,6 +60,7 @@ var (
 		"serve":   {},
 		"version": {},
 	}
+	unknownCommandRegexp = regexp.MustCompile(`unknown command "([^"]*)"`)
 )
 
 func init() {
@@ -140,11 +141,9 @@ func main() {
 	ctx, cancel := newSigContext()
 	defer cancel()
 
-	if opts.Host != "" {
-		mobycli.ExecRegardlessContext(ctx)
-	}
-	if opts.Version {
-		mobycli.ExecRegardlessContext(ctx)
+	// --host and --version should immediately be forwarded to the original cli
+	if opts.Host != "" || opts.Version {
+		mobycli.Exec(ctx)
 	}
 
 	if opts.Config == "" {
@@ -171,30 +170,26 @@ func main() {
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
-	err = root.ExecuteContext(ctx)
-	if err != nil {
+	if err = root.ExecuteContext(ctx); err != nil {
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			fatal(err)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fatal(err)
 	}
 }
 
 func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string) {
-	re := regexp.MustCompile(`unknown command "([^"]*)"`)
-	submatch := re.FindSubmatch([]byte(err.Error()))
+	submatch := unknownCommandRegexp.FindSubmatch([]byte(err.Error()))
 	if len(submatch) == 2 {
 		dockerCommand := string(submatch[1])
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
-			fmt.Fprintf(os.Stderr, "Command \"%s\" not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
+			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
 			os.Exit(1)
 		}
 	}
