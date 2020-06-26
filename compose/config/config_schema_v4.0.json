@@ -1,10 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v3.7.json",
+  "id": "config_schema_v4.0.json",
   "type": "object",
-  "required": [
-    "version"
-  ],
   "properties": {
     "version": {
       "type": "string"
@@ -177,18 +174,48 @@
         "credential_spec": {
           "type": "object",
           "properties": {
+            "config": {
+              "type": "string"
+            },
             "file": {
               "type": "string"
             },
             "registry": {
               "type": "string"
             }
-          }
+          },
+          "additionalProperties": false
         },
         "depends_on": {
-          "$ref": "#/definitions/list_of_strings"
+          "oneOf": [
+            {"$ref": "#/definitions/list_of_strings"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-zA-Z0-9._-]+$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "condition": {
+                      "type": "string",
+                      "enum": ["service_started", "service_healthy"]
+                    }
+                  },
+                  "required": ["condition"]
+                }
+              }
+            }
+          ]
         },
         "devices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "dns_opt": {
           "type": "array",
           "items": {
             "type": "string"
@@ -233,6 +260,23 @@
             "format": "expose"
           },
           "uniqueItems": true
+        },
+        "extends": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+
+              "properties": {
+                "service": {"type": "string"},
+                "file": {"type": "string"}
+              },
+              "required": ["service"],
+              "additionalProperties": false
+            }
+          ]
         },
         "external_links": {
           "type": "array",
@@ -296,6 +340,10 @@
         "mac_address": {
           "type": "string"
         },
+        "mem_limit": {"type": ["number", "string"]},
+        "mem_reservation": {"type": ["string", "integer"]},
+        "mem_swappiness": {"type": "integer"},
+        "memswap_limit": {"type": ["number", "string"]},
         "network_mode": {
           "type": "string"
         },
@@ -320,7 +368,11 @@
                         },
                         "ipv6_address": {
                           "type": "string"
-                        }
+                        },
+                        "link_local_ips": {
+                          "$ref": "#/definitions/list_of_strings"
+                        },
+                        "priority": {"type": "number"}
                       },
                       "additionalProperties": false
                     },
@@ -333,6 +385,15 @@
               "additionalProperties": false
             }
           ]
+        },
+        "oom_kill_disable": {"type": "boolean"},
+        "oom_score_adj": {"type": "integer", "minimum": -1000, "maximum": 1000},
+        "group_add": {
+            "type": "array",
+            "items": {
+                "type": ["string", "number"]
+            },
+            "uniqueItems": true
         },
         "pid": {
           "type": [
@@ -382,6 +443,12 @@
         },
         "restart": {
           "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "scale": {
+          "type": "integer"
         },
         "security_opt": {
           "type": "array",
@@ -538,6 +605,13 @@
             ],
             "uniqueItems": true
           }
+        },
+        "volumes_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         },
         "working_dir": {
           "type": "string"
@@ -738,6 +812,9 @@
                 },
                 "additionalProperties": false
               }
+            },
+            "max_replicas_per_node": {
+              "type": "integer"
             }
           },
           "additionalProperties": false
@@ -803,11 +880,28 @@
                 "type": "object",
                 "properties": {
                   "subnet": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "subnet_ip_address"
+                  },
+                  "ip_range": {"type": "string"},
+                  "gateway": {"type": "string"},
+                  "aux_addresses": {
+                    "type": "object",
+                    "patternProperties": {
+                      "^.+$": {"type": "string"}
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
               }
+            },
+            "options": {
+              "type": "object",
+              "patternProperties": {
+                "^.+$": {"type": "string"}
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -907,6 +1001,23 @@
         },
         "labels": {
           "$ref": "#/definitions/list_or_dict"
+        },
+        "driver": {
+          "type": "string"
+        },
+        "driver_opts": {
+          "type": "object",
+          "patternProperties": {
+            "^.+$": {
+              "type": [
+                "string",
+                "number"
+              ]
+            }
+          }
+        },
+        "template_driver": {
+          "type": "string"
         }
       },
       "patternProperties": {
@@ -937,6 +1048,9 @@
         },
         "labels": {
           "$ref": "#/definitions/list_or_dict"
+        },
+        "template_driver": {
+          "type": "string"
         }
       },
       "patternProperties": {
