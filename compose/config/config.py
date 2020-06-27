@@ -729,9 +729,22 @@ def validate_extended_service_dict(service_dict, filename, service):
 
 
 def validate_service(service_config, service_names, config_file):
+    def build_image():
+        args = sys.argv[1:]
+        if 'pull' in args:
+            return False
+
+        if '--no-build' in args:
+            return False
+
+        return True
+
     service_dict, service_name = service_config.config, service_config.name
     validate_service_constraints(service_dict, service_name, config_file)
-    validate_paths(service_dict)
+
+    if build_image():
+        # We only care about valid paths when actually building images
+        validate_paths(service_dict)
 
     validate_cpu(service_config)
     validate_ulimits(service_config)

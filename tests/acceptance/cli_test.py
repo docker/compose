@@ -748,6 +748,20 @@ services:
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT not in result.stdout
 
+    def test_up_ignore_missing_build_directory(self):
+        self.base_dir = 'tests/fixtures/no-build'
+        result = self.dispatch(['up', '--no-build'])
+
+        assert 'alpine exited with code 0' in result.stdout
+        self.base_dir = None
+
+    def test_pull_ignore_missing_build_directory(self):
+        self.base_dir = 'tests/fixtures/no-build'
+        result = self.dispatch(['pull'])
+
+        assert 'Pulling my-alpine' in result.stderr
+        self.base_dir = None
+
     def test_build_pull(self):
         # Make sure we have the latest busybox already
         pull_busybox(self.client)
