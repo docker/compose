@@ -45,6 +45,7 @@ func ExecCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&opts.Tty, "tty", "t", false, "Allocate a pseudo-TTY")
+	cmd.Flags().BoolP("interactive", "i", false, "Keep STDIN open even if not attached")
 
 	return cmd
 }
