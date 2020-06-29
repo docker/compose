@@ -19,9 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -142,7 +140,9 @@ func (s *E2eACISuite) TestACIBackend() {
 
 	var exposedURL string
 	const composeFile = "../composefiles/aci-demo/aci_demo_port.yaml"
+	const composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
 	const serverContainer = "acidemo_web"
+	const wordsContainer = "acidemo_words"
 	It("deploys a compose app", func() {
 		s.NewDockerCommand("compose", "up", "-f", composeFile, "--project-name", "acidemo").ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
@@ -176,27 +176,17 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	It("updates a compose app", func() {
-		input, err := ioutil.ReadFile(composeFile)
-		Expect(err).To(BeNil())
-		modifiedInput := strings.Replace(string(input), "web:", "webserver:", 1)
-		modifiedComposeFile := strings.Replace(composeFile, ".yaml", "-modified.yaml", 1)
-		err = ioutil.WriteFile(modifiedComposeFile, []byte(modifiedInput), 0644)
-		Expect(err).To(BeNil())
-		defer func() {
-			err := os.Remove(modifiedComposeFile)
-			Expect(err).To(BeNil())
-		}()
-
-		s.NewDockerCommand("compose", "up", "-f", modifiedComposeFile, "--project-name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", "acidemo").ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
 		Expect(len(Lines)).To(Equal(4))
 		webChecked := false
+		wordsChecked := false
 
 		for _, line := range Lines[1:] {
 			Expect(line).To(ContainSubstring("Running"))
-			if strings.Contains(line, serverContainer+"server") {
+			if strings.Contains(line, serverContainer) {
 				webChecked = true
 				containerFields := Columns(line)
 				exposedIP := containerFields[3]
@@ -205,9 +195,20 @@ func (s *E2eACISuite) TestACIBackend() {
 				url := strings.ReplaceAll(exposedIP, "->80/tcp", "")
 				Expect(exposedURL).To(Equal(url))
 			}
+			if strings.Contains(line, wordsContainer) {
+				wordsChecked = true
+				containerFields := Columns(line)
+				exposedIP := containerFields[3]
+				Expect(exposedIP).To(ContainSubstring(":8080->8080/tcp"))
+
+				url := strings.ReplaceAll(exposedIP, "->8080/tcp", "")
+				output = s.NewCommand("curl", url+"/noun").ExecOrDie()
+				Expect(output).To(ContainSubstring("\"word\":"))
+			}
 		}
 
 		Expect(webChecked).To(BeTrue())
+		Expect(wordsChecked).To(BeTrue())
 	})
 
 	It("shutdown compose app", func() {
