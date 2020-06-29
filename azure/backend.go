@@ -179,6 +179,14 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 					Ports:   ports,
 					Labels:  r.Labels,
 					Volumes: serviceConfigVolumes,
+					Deploy: &types.DeployConfig{
+						Resources: types.Resources{
+							Limits: &types.Resource{
+								NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
+								MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
+							},
+						},
+					},
 				},
 			},
 			Volumes: projectVolumes,

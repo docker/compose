@@ -4,6 +4,7 @@
     "Image": "nginx",
     "Command": "",
     "CPUTime": 0,
+    "CPULimit": 0,
     "MemoryUsage": 0,
     "MemoryLimit": 0,
     "PidsCurrent": 0,

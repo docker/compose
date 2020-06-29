@@ -82,6 +82,7 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 			},
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{
+					CPU:        to.Float64Ptr(3),
 					MemoryInGB: to.Float64Ptr(9),
 				},
 			},
@@ -93,6 +94,7 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 		Status:      "Running",
 		Image:       "sha256:666",
 		Command:     "mycommand",
+		CPULimit:    3,
 		MemoryLimit: 9,
 		Ports: []containers.Port{{
 			HostPort:      uint32(80),

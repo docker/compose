@@ -44,6 +44,8 @@ func Command() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
 	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: user:key@my_share:/absolute/path/to/target")
 	cmd.Flags().BoolP("detach", "d", true, "Run container in background and print container ID")
+	cmd.Flags().Float64Var(&opts.Cpus, "cpus", 1., "Number of CPUs")
+	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
 
 	return cmd
 }

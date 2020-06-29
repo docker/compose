@@ -25,6 +25,7 @@ import (
 	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/api/containers"
+	"github.com/docker/api/formatter"
 )
 
 // Opts contain run command options
@@ -33,6 +34,8 @@ type Opts struct {
 	Publish []string
 	Labels  []string
 	Volumes []string
+	Cpus    float64
+	Memory  formatter.MemBytes
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -52,11 +55,13 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 	}
 
 	return containers.ContainerConfig{
-		ID:      r.Name,
-		Image:   image,
-		Ports:   publish,
-		Labels:  labels,
-		Volumes: r.Volumes,
+		ID:       r.Name,
+		Image:    image,
+		Ports:    publish,
+		Labels:   labels,
+		Volumes:  r.Volumes,
+		MemLimit: r.Memory,
+		CPULimit: r.Cpus,
 	}, nil
 }
 
