@@ -17,8 +17,8 @@
 package proxy
 
 import (
-	"github.com/containerd/containerd/log"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 
 	streamsv1 "github.com/docker/api/protos/streams/v1"
@@ -58,7 +58,7 @@ func (p *proxy) NewStream(stream streamsv1.Streaming_NewStreamServer) error {
 	case err := <-errc:
 		return err
 	case <-ctx.Done():
-		log.G(ctx).Debug("client context canceled")
+		logrus.Debug("client context canceled")
 		return ctx.Err()
 	}
 }
