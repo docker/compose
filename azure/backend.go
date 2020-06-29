@@ -236,21 +236,20 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 
 func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
 	groupName, containerAciName := getGroupAndContainerName(containerName)
-	logs, err := getACIContainerLogs(ctx, cs.ctx, groupName, containerAciName)
-	if err != nil {
-		return err
-	}
+	var tail *int32
+
 	if req.Tail != "all" {
-		tail, err := strconv.Atoi(req.Tail)
+		reqTail, err := strconv.Atoi(req.Tail)
 		if err != nil {
 			return err
 		}
-		lines := strings.Split(logs, "\n")
+		i32 := int32(reqTail)
+		tail = &i32
+	}
 
-		// If asked for less lines than exist, take only those lines
-		if tail <= len(lines) {
-			logs = strings.Join(lines[len(lines)-tail:], "\n")
-		}
+	logs, err := getACIContainerLogs(ctx, cs.ctx, groupName, containerAciName, tail)
+	if err != nil {
+		return err
 	}
 
 	_, err = fmt.Fprint(req.Writer, logs)
