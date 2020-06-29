@@ -17,7 +17,7 @@ require (
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/compose-spec/compose-go v0.0.0-20200423124427-63dcf8c22cae
 	github.com/containerd/console v1.0.0
-	github.com/containerd/containerd v1.3.5
+	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
 	github.com/docker/distribution v2.7.1+incompatible // indirect
