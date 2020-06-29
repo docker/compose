@@ -353,6 +353,7 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, project strin
 	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
 		Cluster:  aws.String(cluster),
 		Services: list.ServiceArns,
+		Include:  aws.StringSlice([]string{"TAGS"}),
 	})
 	if err != nil {
 		return nil, err
@@ -375,8 +376,8 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, project strin
 		status = append(status, compose.ServiceStatus{
 			ID:       *service.ServiceName,
 			Name:     name,
-			Replicas: int(*services.Services[0].RunningCount),
-			Desired:  int(*services.Services[0].DesiredCount),
+			Replicas: int(*service.RunningCount),
+			Desired:  int(*service.DesiredCount),
 		})
 	}
 
