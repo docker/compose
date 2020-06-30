@@ -5,16 +5,16 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/ecs-plugin/pkg/compose"
-
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
+	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/ecs-plugin/pkg/compose"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
@@ -106,6 +106,46 @@ services:
 	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
 	assert.Check(t, lb != nil)
 	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumNetwork)
+}
+
+func TestServiceMapping(t *testing.T) {
+	template := convertYaml(t, `
+version: "3"
+services:
+  test:
+    image: "image"
+    command: "command"
+    entrypoint: "entrypoint"
+    environment:
+      - "FOO=BAR"
+    cap_add:
+      - SYS_PTRACE
+    cap_drop:
+      - SYSLOG
+    init: true
+    user: "user"
+    working_dir: "working_dir"
+`)
+	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	container := def.ContainerDefinitions[0]
+	assert.Equal(t, container.Image, "docker.io/library/image")
+	assert.Equal(t, container.Command[0], "command")
+	assert.Equal(t, container.EntryPoint[0], "entrypoint")
+	assert.Equal(t, get(container.Environment, "FOO"), "BAR")
+	assert.Check(t, container.LinuxParameters.InitProcessEnabled)
+	assert.Equal(t, container.LinuxParameters.Capabilities.Add[0], "SYS_PTRACE")
+	assert.Equal(t, container.LinuxParameters.Capabilities.Drop[0], "SYSLOG")
+	assert.Equal(t, container.User, "user")
+	assert.Equal(t, container.WorkingDirectory, "working_dir")
+}
+
+func get(l []ecs.TaskDefinition_KeyValuePair, name string) string {
+	for _, e := range l {
+		if e.Name == name {
+			return e.Value
+		}
+	}
+	return ""
 }
 
 func TestResourcesHaveProjectTagSet(t *testing.T) {

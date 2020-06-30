@@ -43,6 +43,19 @@ func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortCo
 	}
 }
 
+func (c *FargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) {
+	add := []string{}
+	for _, cap := range service.CapAdd {
+		switch cap {
+		case "SYS_PTRACE":
+			add = append(add, cap)
+		default:
+			c.Error("service.cap_add = %s", cap)
+		}
+	}
+	service.CapAdd = add
+}
+
 // Convert a compose project into a CloudFormation template
 func (b Backend) Convert(project *types.Project) (*cloudformation.Template, error) {
 	var checker compatibility.Checker = &FargateCompatibilityChecker{
@@ -50,9 +63,11 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 			Supported: []string{
 				"services.command",
 				"services.container_name",
+				"services.cap_drop",
 				"services.depends_on",
 				"services.entrypoint",
 				"services.environment",
+				"services.init",
 				"services.healthcheck",
 				"services.healthcheck.interval",
 				"services.healthcheck.start_period",
