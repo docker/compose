@@ -55,10 +55,3 @@ jobs:
 
       - name: E2E Test
         run: make e2e-local
-
-      - name: ACI e2e Test
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: make e2e-aci
