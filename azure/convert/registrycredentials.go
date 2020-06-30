@@ -83,7 +83,7 @@ func getRegistryCredentials(project compose.Project, registryLoader registryConf
 			hostname = parsedURL.Path
 		}
 		if _, ok := usedRegistries[hostname]; ok {
-			if oneCred.Username != "" {
+			if oneCred.Password != "" {
 				aciCredential := containerinstance.ImageRegistryCredential{
 					Server:   to.StringPtr(hostname),
 					Password: to.StringPtr(oneCred.Password),
@@ -91,10 +91,14 @@ func getRegistryCredentials(project compose.Project, registryLoader registryConf
 				}
 				registryCreds = append(registryCreds, aciCredential)
 			} else if oneCred.IdentityToken != "" {
+				userName := tokenUsername
+				if oneCred.Username != "" {
+					userName = oneCred.Username
+				}
 				aciCredential := containerinstance.ImageRegistryCredential{
 					Server:   to.StringPtr(hostname),
 					Password: to.StringPtr(oneCred.IdentityToken),
-					Username: to.StringPtr(tokenUsername),
+					Username: to.StringPtr(userName),
 				}
 				registryCreds = append(registryCreds, aciCredential)
 			}
