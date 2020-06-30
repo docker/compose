@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/docker/api/azure"
+	"github.com/docker/api/azure/login"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
@@ -69,6 +71,17 @@ func (s *E2eACISuite) TestContextDefault() {
 }
 
 func (s *E2eACISuite) TestACIBackend() {
+	It("Logs in azure using service principal credentials", func() {
+		login, err := login.NewAzureLoginService()
+		Expect(err).To(BeNil())
+		// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
+		clientID := os.Getenv("AZURE_CLIENT_ID")
+		clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
+		tenantID := os.Getenv("AZURE_TENANT_ID")
+		err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
+		Expect(err).To(BeNil())
+	})
+
 	It("creates a new aci context for tests", func() {
 		setupTestResourceGroup(resourceGroupName)
 		helper := azure.NewACIResourceGroupHelper()

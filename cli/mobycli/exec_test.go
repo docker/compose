@@ -3,9 +3,10 @@ package mobycli
 import (
 	"testing"
 
-	"github.com/docker/api/tests/framework"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/docker/api/tests/framework"
 )
 
 type MobyExecSuite struct {

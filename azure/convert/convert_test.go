@@ -213,6 +213,67 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts
 	Expect(*groupPorts[1].Port).To(Equal(int32(8080)))
 }
 
+func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimits() {
+	_0_1Gb := 0.1 * 1024 * 1024 * 1024
+	project := compose.Project{
+		Name: "",
+		Config: types.Config{
+			Services: []types.ServiceConfig{
+				{
+					Name:  "service1",
+					Image: "image1",
+					Deploy: &types.DeployConfig{
+						Resources: types.Resources{
+							Limits: &types.Resource{
+								NanoCPUs:    "0.1",
+								MemoryBytes: types.UnitBytes(_0_1Gb),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+
+	container1 := (*group.Containers)[0]
+	limits := *container1.Resources.Limits
+	Expect(*limits.CPU).To(Equal(float64(0.1)))
+	Expect(*limits.MemoryInGB).To(Equal(float64(0.1)))
+}
+
+func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimitsDefaults() {
+	project := compose.Project{
+		Name: "",
+		Config: types.Config{
+			Services: []types.ServiceConfig{
+				{
+					Name:  "service1",
+					Image: "image1",
+					Deploy: &types.DeployConfig{
+						Resources: types.Resources{
+							Limits: &types.Resource{
+								NanoCPUs:    "",
+								MemoryBytes: 0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+
+	container1 := (*group.Containers)[0]
+	limits := *container1.Resources.Limits
+	Expect(*limits.CPU).To(Equal(float64(1)))
+	Expect(*limits.MemoryInGB).To(Equal(float64(1)))
+}
+
 func TestConvertTestSuite(t *testing.T) {
 	RegisterTestingT(t)
 	suite.Run(t, new(ConvertTestSuite))

@@ -31,6 +31,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
+	auth2 "github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
@@ -91,6 +92,32 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 		tokenStore: store,
 		apiHelper:  helper,
 	}, nil
+}
+
+// TestLoginFromServicePrincipal login with clientId / clientSecret from a previously created service principal.
+// The resulting token does not include a refresh token, used for tests only
+func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
+	creds := auth2.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
+
+	spToken, err := creds.ServicePrincipalToken()
+	if err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not  login with service principal: %s", err)
+	}
+	err = spToken.Refresh()
+	if err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not  login with service principal: %s", err)
+	}
+	token, err := spToOAuthToken(spToken.Token())
+	if err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not read service principal token expiry: %s", err)
+	}
+	loginInfo := TokenInfo{TenantID: tenantID, Token: token}
+
+	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
+	}
+	return nil
 }
 
 // Login performs an Azure login through a web browser
@@ -177,6 +204,21 @@ func toOAuthToken(token azureToken) oauth2.Token {
 		TokenType:    token.Type,
 	}
 	return oauthToken
+}
+
+func spToOAuthToken(token adal.Token) (oauth2.Token, error) {
+	expiresIn, err := token.ExpiresIn.Int64()
+	if err != nil {
+		return oauth2.Token{}, err
+	}
+	expireTime := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	oauthToken := oauth2.Token{
+		RefreshToken: token.RefreshToken,
+		AccessToken:  token.AccessToken,
+		Expiry:       expireTime,
+		TokenType:    token.Type,
+	}
+	return oauthToken, nil
 }
 
 // NewAuthorizerFromLogin creates an authorizer based on login access token
