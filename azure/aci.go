@@ -221,13 +221,13 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 	}
 }
 
-func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string) (string, error) {
+func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, tail *int32) (string, error) {
 	containerClient, err := getContainerClient(aciContext.SubscriptionID)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot get container client")
 	}
 
-	logs, err := containerClient.ListLogs(ctx, aciContext.ResourceGroup, containerGroupName, containerName, nil)
+	logs, err := containerClient.ListLogs(ctx, aciContext.ResourceGroup, containerGroupName, containerName, tail)
 	if err != nil {
 		return "", fmt.Errorf("cannot get container logs: %v", err)
 	}
