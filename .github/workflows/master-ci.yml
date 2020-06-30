@@ -6,28 +6,8 @@ on:
       - master
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
-    steps:
-      - name: Set up Go 1.14
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.14
-        id: go
-
-      - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
-
-      - name: Run golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.27.0
-          ./golangci-lint run --timeout 10m0s
-
   build:
-    name: Build
+    name: ACI e2e tests
     runs-on: ubuntu-latest
     env:
       GO111MODULE: "on"
@@ -46,18 +26,10 @@ jobs:
           path: ~/go/pkg/mod
           key: go-${{ hashFiles('**/go.sum') }}
 
-      - name: Test
-        env:
-          BUILD_TAGS: example,local
-        run: make -f builder.Makefile test
-
-      - name: Build
+      - name: Build fro ACI e2e tests
         env:
           BUILD_TAGS: example,local
         run: make -f builder.Makefile cli
-
-      - name: E2E Test
-        run: make e2e-local
 
       - name: ACI e2e Test
         env:
