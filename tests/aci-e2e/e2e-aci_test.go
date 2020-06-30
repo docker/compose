@@ -71,7 +71,6 @@ func (s *E2eACISuite) TestContextDefault() {
 }
 
 func (s *E2eACISuite) TestACIBackend() {
-
 	It("Logs in azure using service principal credentials", func() {
 		login, err := login.NewAzureLoginService()
 		Expect(err).To(BeNil())
@@ -79,7 +78,7 @@ func (s *E2eACISuite) TestACIBackend() {
 		clientID := os.Getenv("AZURE_CLIENT_ID")
 		clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 		tenantID := os.Getenv("AZURE_TENANT_ID")
-		err = login.LoginFromServicePrincipal(clientID, clientSecret, tenantID)
+		err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
 		Expect(err).To(BeNil())
 	})
 

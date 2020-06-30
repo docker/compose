@@ -94,8 +94,9 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 	}, nil
 }
 
-// LoginFromServicePrincipal login with clientId / clientSecret from a previously created service principal
-func (login AzureLoginService) LoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+// TestLoginFromServicePrincipal login with clientId / clientSecret from a previously created service principal.
+// The resulting token does not include a refresh token, used for tests only
+func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
 	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
 	creds := auth2.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 
