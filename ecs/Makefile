@@ -3,21 +3,31 @@ PWD=$(shell pwd)
 
 export DOCKER_BUILDKIT=1
 
+COMMIT := $(shell git rev-parse --short HEAD)
+TAG := $(shell git describe --tags --dirty --match "v*")
+
 .DEFAULT_GOAL := build
 
 build: ## Build for the current
 	@docker build . \
 		--output ./dist \
 		--platform ${PLATFORM} \
+		--build-arg COMMIT=${COMMIT} \
+		--build-arg TAG=${TAG} \
 		--target build
 
 cross: ## Cross build for linux, macos and windows
 	@docker build . \
 		--output ./dist \
+		--build-arg COMMIT=${COMMIT} \
+		--build-arg TAG=${TAG} \
 		--target cross
 
 test: build ## Run tests
-	@docker build . --target test
+	@docker build . \
+		--build-arg COMMIT=${COMMIT} \
+		--build-arg TAG=${TAG} \
+        --target test
 
 e2e: build ## Run tests
 	go test ./... -v -tags=e2e

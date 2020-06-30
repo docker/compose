@@ -6,10 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/fs"

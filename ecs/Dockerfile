@@ -14,12 +14,14 @@ RUN apk add --no-cache \
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
-COPY . .
 
 FROM base AS make-plugin
 ARG TARGETOS
 ARG TARGETARCH
 RUN GO111MODULE=on go get github.com/golang/mock/mockgen@latest
+ARG COMMIT
+ARG TAG
+COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     GOOS=${TARGETOS} \
@@ -27,6 +29,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile build
 
 FROM base AS make-cross
+ARG COMMIT
+ARG TAG
+COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     make -f builder.Makefile cross
