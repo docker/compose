@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func (b CmdContext) makeCmd() *exec.Cmd {
@@ -97,7 +97,7 @@ func (b CmdContext) WithStdinReader(reader io.Reader) *CmdContext {
 // ExecOrDie runs a docker command.
 func (b CmdContext) ExecOrDie() string {
 	str, err := b.Exec()
-	log.Debugf("stdout: %s", str)
+	logrus.Debugf("stdout: %s", str)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return str
 }
@@ -150,7 +150,7 @@ func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
 	cmd.Stdout = mergeWriter(cmd.Stdout, &stdout)
 	cmd.Stderr = mergeWriter(cmd.Stderr, &stderr)
 
-	log.Infof("Execute '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
+	logrus.Infof("Execute '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, stdout.String(), stderr.String(), err)
 	}
@@ -161,20 +161,20 @@ func Execute(cmd *exec.Cmd, timeout <-chan time.Time) (string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			log.Debugf("%s %s failed: %v", cmd.Path, strings.Join(cmd.Args[1:], " "), err)
+			logrus.Debugf("%s %s failed: %v", cmd.Path, strings.Join(cmd.Args[1:], " "), err)
 			return stderr.String(), fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, stdout.String(), stderr.String(), err)
 		}
 	case <-timeout:
-		log.Debugf("%s %s timed-out", cmd.Path, strings.Join(cmd.Args[1:], " "))
+		logrus.Debugf("%s %s timed-out", cmd.Path, strings.Join(cmd.Args[1:], " "))
 		if err := terminateProcess(cmd); err != nil {
 			return "", err
 		}
-		return "", fmt.Errorf(
+		return stdout.String(), fmt.Errorf(
 			"timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v",
 			cmd.Args, stdout.String(), stderr.String())
 	}
 	if stderr.String() != "" {
-		log.Debugf("stderr: %s", stderr.String())
+		logrus.Debugf("stderr: %s", stderr.String())
 	}
 	return stdout.String(), nil
 }

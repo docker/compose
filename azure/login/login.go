@@ -102,11 +102,11 @@ func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, cl
 
 	spToken, err := creds.ServicePrincipalToken()
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not  login with service principal: %s", err)
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not login with service principal: %s", err)
 	}
 	err = spToken.Refresh()
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not  login with service principal: %s", err)
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not login with service principal: %s", err)
 	}
 	token, err := spToOAuthToken(spToken.Token())
 	if err != nil {
