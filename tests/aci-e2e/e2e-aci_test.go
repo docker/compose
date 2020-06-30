@@ -151,7 +151,9 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	s.T().Run("follow logs from nginx", func(t *testing.T) {
-		ctx := s.NewDockerCommand("logs", "--follow", testContainerName).WithTimeout(time.NewTimer(5 * time.Second).C)
+		timeChan := make(chan time.Time)
+
+		ctx := s.NewDockerCommand("logs", "--follow", testContainerName).WithTimeout(timeChan)
 		outChan := make(chan string)
 
 		go func() {
@@ -159,10 +161,11 @@ func (s *E2eACISuite) TestACIBackend() {
 			outChan <- output
 		}()
 
-		// Give the `logs --follow` a little time to get the first burst of logs
-		time.Sleep(1 * time.Second)
-
 		s.NewCommand("curl", nginxExposedURL+"/test").ExecOrDie()
+		// Give the `logs --follow` a little time to get logs of the curl call
+		time.Sleep(10 * time.Second)
+		// Trigger a timeout to make ctx.Exec exit
+		timeChan <- time.Now()
 
 		output := <-outChan
 
