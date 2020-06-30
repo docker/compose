@@ -2,7 +2,10 @@ package backend
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
+
+	"github.com/docker/ecs-plugin/pkg/compose"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -103,6 +106,31 @@ services:
 	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
 	assert.Check(t, lb != nil)
 	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumNetwork)
+}
+
+func TestResourcesHaveProjectTagSet(t *testing.T) {
+	template := convertYaml(t, `
+version: "3"
+services:
+  test:
+    image: nginx
+    ports:
+      - 80:80
+      - 88:88
+`)
+	for _, r := range template.Resources {
+		tags := reflect.Indirect(reflect.ValueOf(r)).FieldByName("Tags")
+		if !tags.IsValid() {
+			continue
+		}
+		for i := 0; i < tags.Len(); i++ {
+			k := tags.Index(i).FieldByName("Key").String()
+			v := tags.Index(i).FieldByName("Value").String()
+			if k == compose.ProjectTag {
+				assert.Equal(t, v, "Test")
+			}
+		}
+	}
 }
 
 func convertResultAsString(t *testing.T, project *types.Project, clusterName string) string {
