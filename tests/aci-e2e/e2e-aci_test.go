@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"os"
 	"strings"
@@ -41,15 +42,18 @@ import (
 )
 
 const (
-	resourceGroupName = "resourceGroupTest"
 	location          = "westeurope"
 	contextName       = "acitest"
-
 	testContainerName = "testcontainername"
+	testShareName     = "dockertestshare"
+	testFileContent   = "Volume mounted with success!"
+	testFileName      = "index.html"
 )
 
 var (
-	subscriptionID string
+	subscriptionID         string
+	resourceGroupName      = "resourceGroupTestE2E-" + RandStringBytes(10)
+	testStorageAccountName = "storageteste2e" + RandStringBytes(6) // "between 3 and 24 characters in length and use numbers and lower-case letters only"
 )
 
 type E2eACISuite struct {
@@ -258,13 +262,6 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 }
 
-const (
-	testStorageAccountName = "dockertestaccount"
-	testShareName          = "dockertestshare"
-	testFileContent        = "Volume mounted with success!"
-	testFileName           = "index.html"
-)
-
 func createStorageAccount(aciContext store.AciContext, accountName string) azure_storage.Account {
 	log.Println("Creating storage account " + accountName)
 	storageAccount, err := storage.CreateStorageAccount(context.TODO(), aciContext, accountName)
@@ -333,4 +330,14 @@ func deleteResourceGroup(groupName string) {
 	Expect(err).To(BeNil())
 	err = helper.Delete(ctx, *models[0].SubscriptionID, groupName)
 	Expect(err).To(BeNil())
+}
+
+func RandStringBytes(n int) string {
+	rand.Seed(time.Now().UnixNano())
+	const digits = "0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = digits[rand.Intn(len(digits))]
+	}
+	return string(b)
 }
