@@ -33,10 +33,29 @@ If you make changes to the `.proto` files, make sure to `make protos` to generat
 
 ## Tests
 
-To run unit tests:
+### unit tests
 
 ```
 make test
 ```
 
 If you need to update a golden file simply do `go test ./... -test.update-golden`.
+
+### e2e tests
+
+```
+make e2e_local
+```
+This requires a local docker engine running
+
+```
+AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make e2e_aci
+```
+
+This requires azure service principal credentials to login to azure. 
+To get the values to be set in local environment variables, you can create a new service principal once you're logged in azure (with `docker login azure`)    
+```
+az ad sp create-for-rbac --name 'MyTestServicePrincipal' --sdk-auth
+```
+Running aci e2e tests will override your local login, the service principal credentials use a token that cannot be refreshed automatically. 
+You might need to run again `docker login azure` to properly use the command line after running ACI e2e tests. 
