@@ -1,6 +1,19 @@
 Change log
 ==========
 
+1.26.1 (2020-06-30)
+-------------------
+
+### Features
+
+- Bump `docker-py` from 4.2.1 to 4.2.2
+
+### Bugs
+
+- Enforce `docker-py` 4.2.1 as minimum version when installing with pip
+
+- Fix context load for non-docker endpoints
+
 1.26.0 (2020-06-03)
 -------------------
 
