@@ -309,7 +309,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 	if cc.Resources != nil &&
 		cc.Resources.Limits != nil &&
 		cc.Resources.Limits.MemoryInGB != nil {
-		memLimits = *cc.Resources.Limits.MemoryInGB
+		memLimits = *cc.Resources.Limits.MemoryInGB * 1024 * 1024 * 1024
 	}
 
 	cpuLimit := 0.
