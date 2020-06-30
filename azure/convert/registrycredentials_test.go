@@ -18,6 +18,7 @@ package convert
 
 import (
 	"strconv"
+	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
@@ -26,8 +27,6 @@ import (
 	"github.com/docker/api/compose"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
-
-	"testing"
 
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -89,6 +88,22 @@ func (suite *RegistryConvertTestSuite) TestImageWithDotInName() {
 
 func (suite *RegistryConvertTestSuite) TestAcrPrivateImage() {
 	suite.loader.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", tokenCreds("123456")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), suite.loader)
+	Expect(err).To(BeNil())
+	Expect(creds).To(Equal([]containerinstance.ImageRegistryCredential{
+		{
+			Server:   to.StringPtr("mycontainerregistrygta.azurecr.io"),
+			Username: to.StringPtr(tokenUsername),
+			Password: to.StringPtr("123456"),
+		},
+	}))
+}
+
+func (suite *RegistryConvertTestSuite) TestAcrPrivateImageLinux() {
+	token := tokenCreds("123456")
+	token.Username = tokenUsername
+	suite.loader.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", token), nil)
 
 	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), suite.loader)
 	Expect(err).To(BeNil())
