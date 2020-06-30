@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
 
@@ -267,7 +268,9 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 	memLimit := 1. // Default 1 Gb
 	var cpuLimit float64 = 1
 	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
-		memLimit = float64(bytesToGb(s.Deploy.Resources.Limits.MemoryBytes))
+		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
+			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
+		}
 		if s.Deploy.Resources.Limits.NanoCPUs != "" {
 			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
 			if err != nil {
@@ -295,8 +298,9 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 
 }
 
-func bytesToGb(b types.UnitBytes) int64 {
-	return int64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
+func bytesToGb(b types.UnitBytes) float64 {
+	f := float64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
+	return math.Round(f*100) / 100
 }
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
