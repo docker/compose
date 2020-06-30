@@ -24,12 +24,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest/to"
-
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/errdefs"
-
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -40,7 +36,9 @@ import (
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/errdefs"
 )
 
 const singleContainerName = "single--container--aci"
@@ -237,6 +235,10 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
 	groupName, containerAciName := getGroupAndContainerName(containerName)
 	var tail *int32
+
+	if req.Follow {
+		return streamLogs(ctx, cs.ctx, groupName, containerAciName, req.Writer)
+	}
 
 	if req.Tail != "all" {
 		reqTail, err := strconv.Atoi(req.Tail)

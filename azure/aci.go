@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -29,6 +30,7 @@ import (
 	tm "github.com/buger/goterm"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 
 	"github.com/docker/api/azure/login"
@@ -232,6 +234,42 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 		return "", fmt.Errorf("cannot get container logs: %v", err)
 	}
 	return *logs.Content, err
+}
+
+func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, out io.Writer) error {
+	lastOutput := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			logs, err := getACIContainerLogs(ctx, aciContext, containerGroupName, containerName, nil)
+			if err != nil {
+				return err
+			}
+			logLines := strings.Split(logs, "\n")
+			currentOutput := len(logLines)
+
+			b := aec.EmptyBuilder
+			for i := 0; i < lastOutput; i++ {
+				b = b.Up(1)
+			}
+
+			// Note: a backend should not do this normally, this breaks the log
+			// streaming over gRPC but this is the only thing we can do with
+			// the kind of logs ACI is giving us. Hopefully Azue will give us
+			// a real logs streaming api soon.
+			fmt.Fprint(out, b.Column(0).ANSI)
+
+			for i := 0; i < currentOutput-1; i++ {
+				fmt.Fprintln(out, logLines[i])
+			}
+
+			lastOutput = currentOutput - 1
+
+			time.Sleep(2 * time.Second)
+		}
+	}
 }
 
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
