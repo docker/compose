@@ -250,15 +250,12 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			logLines := strings.Split(logs, "\n")
 			currentOutput := len(logLines)
 
-			b := aec.EmptyBuilder
-			for i := 0; i < lastOutput; i++ {
-				b = b.Up(1)
-			}
-
 			// Note: a backend should not do this normally, this breaks the log
 			// streaming over gRPC but this is the only thing we can do with
 			// the kind of logs ACI is giving us. Hopefully Azue will give us
 			// a real logs streaming api soon.
+			b := aec.EmptyBuilder
+			b = b.Up(uint(lastOutput))
 			fmt.Fprint(out, b.Column(0).ANSI)
 
 			for i := 0; i < currentOutput-1; i++ {

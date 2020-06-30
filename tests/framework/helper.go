@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/robpike/filter"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func nonEmptyString(s string) bool {
@@ -54,5 +54,5 @@ func IsWindows() bool {
 // It runs func
 func It(description string, test func()) {
 	test()
-	log.Print("Passed: ", description)
+	logrus.Print("Passed: ", description)
 }
