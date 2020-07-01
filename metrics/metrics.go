@@ -27,6 +27,7 @@ var managementCommands = []string{
 	"assemble",
 	"builder",
 	"buildx",
+	"ecs",
 	"cluster",
 	"compose",
 	"config",
@@ -74,10 +75,16 @@ func getCommand(args []string, flags *flag.FlagSet) string {
 
 	if len(args) != 0 {
 		command = args[0]
-		if contains(managementCommands, command) {
-			if sub := getSubCommand(args[1:]); sub != "" {
-				return command + " " + sub
+		for {
+			currentCommand := args[0]
+			if contains(managementCommands, currentCommand) {
+				if sub := getSubCommand(args[1:]); sub != "" {
+					command += " " + sub
+					args = args[1:]
+					continue
+				}
 			}
+			break
 		}
 	}
 

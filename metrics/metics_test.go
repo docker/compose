@@ -30,64 +30,139 @@ func TestFlag(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		flags    []string
+		args     []string
 		expected string
 	}{
 		{
 			name:     "with long flags",
-			flags:    []string{"--debug", "run"},
+			args:     []string{"--debug", "run"},
 			expected: "run",
 		},
 		{
 			name:     "with short flags",
-			flags:    []string{"-d", "run"},
+			args:     []string{"-d", "run"},
 			expected: "run",
 		},
 		{
 			name:     "with flags with value",
-			flags:    []string{"--debug", "--str", "str-value", "run"},
+			args:     []string{"--debug", "--str", "str-value", "run"},
 			expected: "run",
 		},
 		{
 			name:     "with --",
-			flags:    []string{"--debug", "--str", "str-value", "--", "run"},
+			args:     []string{"--debug", "--str", "str-value", "--", "run"},
 			expected: "",
 		},
 		{
 			name:     "without a command",
-			flags:    []string{"--debug", "--str", "str-value"},
+			args:     []string{"--debug", "--str", "str-value"},
 			expected: "",
 		},
 		{
 			name:     "with unknown short flag",
-			flags:    []string{"-f", "run"},
+			args:     []string{"-f", "run"},
 			expected: "",
 		},
 		{
 			name:     "with unknown long flag",
-			flags:    []string{"--unknown-flag", "run"},
+			args:     []string{"--unknown-flag", "run"},
 			expected: "",
 		},
 		{
 			name:     "management command",
-			flags:    []string{"image", "ls"},
+			args:     []string{"image", "ls"},
 			expected: "image ls",
 		},
 		{
 			name:     "management command with flag",
-			flags:    []string{"image", "--test", "ls"},
+			args:     []string{"image", "--test", "ls"},
 			expected: "image",
 		},
 		{
 			name:     "management subcommand with flag",
-			flags:    []string{"image", "ls", "-q"},
+			args:     []string{"image", "ls", "-q"},
 			expected: "image ls",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.flags, root.PersistentFlags())
+			result := getCommand(testCase.args, root.PersistentFlags())
+			assert.Equal(t, testCase.expected, result)
+		})
+	}
+}
+
+func TestEcs(t *testing.T) {
+	root := &cobra.Command{}
+	root.PersistentFlags().BoolP("debug", "d", false, "debug")
+	root.PersistentFlags().String("str", "str", "str")
+
+	testCases := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "compose up",
+			args:     []string{"ecs", "compose", "-f", "test", "up"},
+			expected: "ecs compose up",
+		},
+		{
+			name:     "compose up",
+			args:     []string{"ecs", "compose", "--file", "test", "up"},
+			expected: "ecs compose up",
+		},
+		{
+			name:     "compose up",
+			args:     []string{"ecs", "compose", "--file", "test", "-n", "test", "up"},
+			expected: "ecs compose up",
+		},
+		{
+			name:     "compose up",
+			args:     []string{"ecs", "compose", "--file", "test", "--project-name", "test", "up"},
+			expected: "ecs compose up",
+		},
+		{
+			name:     "compose up",
+			args:     []string{"ecs", "compose", "up"},
+			expected: "ecs compose up",
+		},
+		{
+			name:     "compose down",
+			args:     []string{"ecs", "compose", "-f", "test", "down"},
+			expected: "ecs compose down",
+		},
+		{
+			name:     "compose down",
+			args:     []string{"ecs", "compose", "down"},
+			expected: "ecs compose down",
+		},
+		{
+			name:     "compose ps",
+			args:     []string{"ecs", "compose", "-f", "test", "ps"},
+			expected: "ecs compose ps",
+		},
+		{
+			name:     "compose ps",
+			args:     []string{"ecs", "compose", "ps"},
+			expected: "ecs compose ps",
+		},
+		{
+			name:     "compose logs",
+			args:     []string{"ecs", "compose", "-f", "test", "logs"},
+			expected: "ecs compose logs",
+		},
+		{
+			name:     "setup",
+			args:     []string{"ecs", "setup"},
+			expected: "ecs setup",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := getCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
