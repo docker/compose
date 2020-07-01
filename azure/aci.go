@@ -33,6 +33,7 @@ import (
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 
+	"github.com/docker/api/azure/convert"
 	"github.com/docker/api/azure/login"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/progress"
@@ -91,11 +92,13 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		StatusText: "Created",
 	})
 	for _, c := range *groupDefinition.Containers {
-		w.Event(progress.Event{
-			ID:         *c.Name,
-			Status:     progress.Working,
-			StatusText: "Waiting",
-		})
+		if c.Name != nil && *c.Name != convert.ComposeDNSSidecarName {
+			w.Event(progress.Event{
+				ID:         *c.Name,
+				Status:     progress.Working,
+				StatusText: "Waiting",
+			})
+		}
 	}
 
 	err = future.WaitForCompletionRef(ctx, containerGroupsClient.Client)
@@ -104,11 +107,13 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 	}
 
 	for _, c := range *groupDefinition.Containers {
-		w.Event(progress.Event{
-			ID:         *c.Name,
-			Status:     progress.Done,
-			StatusText: "Done",
-		})
+		if c.Name != nil && *c.Name != convert.ComposeDNSSidecarName {
+			w.Event(progress.Event{
+				ID:         *c.Name,
+				Status:     progress.Done,
+				StatusText: "Done",
+			})
+		}
 	}
 
 	return err
