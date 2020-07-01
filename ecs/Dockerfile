@@ -18,7 +18,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM base AS make-plugin
 ARG TARGETOS
 ARG TARGETARCH
-RUN GO111MODULE=on go get github.com/golang/mock/mockgen@latest
 ARG COMMIT
 ARG TAG
 COPY . .

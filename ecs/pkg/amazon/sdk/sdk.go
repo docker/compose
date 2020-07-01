@@ -70,18 +70,6 @@ func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
 	return *response.Cluster.Status, nil
 }
 
-func (s sdk) DeleteCluster(ctx context.Context, name string) error {
-	logrus.Debug("Delete cluster ", name)
-	response, err := s.ECS.DeleteClusterWithContext(ctx, &ecs.DeleteClusterInput{Cluster: aws.String(name)})
-	if err != nil {
-		return err
-	}
-	if *response.Cluster.Status == "INACTIVE" {
-		return nil
-	}
-	return fmt.Errorf("Failed to delete cluster, status: %s" + *response.Cluster.Status)
-}
-
 func (s sdk) VpcExists(ctx context.Context, vpcID string) (bool, error) {
 	logrus.Debug("Check if VPC exists: ", vpcID)
 	_, err := s.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
