@@ -125,7 +125,7 @@ func (suite *LoginSuite) TestInvalidLogin() {
 	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
 	Expect(err).To(BeNil())
 
-	err = azureLogin.Login(context.TODO())
+	err = azureLogin.Login(context.TODO(), "")
 	Expect(err.Error()).To(BeEquivalentTo("no login code: login failed"))
 }
 
@@ -166,7 +166,57 @@ func (suite *LoginSuite) TestValidLogin() {
 	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
 	Expect(err).To(BeNil())
 
-	err = azureLogin.Login(context.TODO())
+	err = azureLogin.Login(context.TODO(), "")
+	Expect(err).To(BeNil())
+
+	loginToken, err := suite.azureLogin.tokenStore.readToken()
+	Expect(err).To(BeNil())
+	Expect(loginToken.Token.AccessToken).To(Equal("newAccessToken"))
+	Expect(loginToken.Token.RefreshToken).To(Equal("newRefreshToken"))
+	Expect(loginToken.Token.Expiry).To(BeTemporally(">", time.Now().Add(3500*time.Second)))
+	Expect(loginToken.TenantID).To(Equal("12345a7c-c56d-43e8-9549-dd230ce8a038"))
+	Expect(loginToken.Token.Type()).To(Equal("Bearer"))
+}
+
+func (suite *LoginSuite) TestValidLoginRequestedTenant() {
+	var redirectURL string
+	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		redirectURL = args.Get(0).(string)
+		err := queryKeyValue(redirectURL, "code", "123456879")
+		Expect(err).To(BeNil())
+	})
+
+	suite.mockHelper.On("queryToken", mock.MatchedBy(func(data url.Values) bool {
+		//Need a matcher here because the value of redirectUrl is not known until executing openAzureLoginPage
+		return reflect.DeepEqual(data, url.Values{
+			"grant_type":   []string{"authorization_code"},
+			"client_id":    []string{clientID},
+			"code":         []string{"123456879"},
+			"scope":        []string{scopes},
+			"redirect_uri": []string{redirectURL},
+		})
+	}), "organizations").Return(azureToken{
+		RefreshToken: "firstRefreshToken",
+		AccessToken:  "firstAccessToken",
+		ExpiresIn:    3600,
+		Foci:         "1",
+	}, nil)
+
+	authBody := `{"value":[{"id":"/tenants/00000000-c56d-43e8-9549-dd230ce8a038","tenantId":"00000000-c56d-43e8-9549-dd230ce8a038"},
+						   {"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
+
+	suite.mockHelper.On("queryAuthorizationAPI", authorizationURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	data := refreshTokenData("firstRefreshToken")
+	suite.mockHelper.On("queryToken", data, "12345a7c-c56d-43e8-9549-dd230ce8a038").Return(azureToken{
+		RefreshToken: "newRefreshToken",
+		AccessToken:  "newAccessToken",
+		ExpiresIn:    3600,
+		Foci:         "1",
+	}, nil)
+	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
+	Expect(err).To(BeNil())
+
+	err = azureLogin.Login(context.TODO(), "12345a7c-c56d-43e8-9549-dd230ce8a038")
 	Expect(err).To(BeNil())
 
 	loginToken, err := suite.azureLogin.tokenStore.readToken()
@@ -202,13 +252,47 @@ func (suite *LoginSuite) TestLoginNoTenant() {
 		Foci:         "1",
 	}, nil)
 
+	authBody := `{"value":[{"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
+	suite.mockHelper.On("queryAuthorizationAPI", authorizationURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+
+	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
+	Expect(err).To(BeNil())
+
+	err = azureLogin.Login(context.TODO(), "00000000-c56d-43e8-9549-dd230ce8a038")
+	Expect(err.Error()).To(BeEquivalentTo("could not find requested azure tenant 00000000-c56d-43e8-9549-dd230ce8a038: login failed"))
+}
+
+func (suite *LoginSuite) TestLoginRequestedTenantNotFound() {
+	var redirectURL string
+	suite.mockHelper.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
+		redirectURL = args.Get(0).(string)
+		err := queryKeyValue(redirectURL, "code", "123456879")
+		Expect(err).To(BeNil())
+	})
+
+	suite.mockHelper.On("queryToken", mock.MatchedBy(func(data url.Values) bool {
+		//Need a matcher here because the value of redirectUrl is not known until executing openAzureLoginPage
+		return reflect.DeepEqual(data, url.Values{
+			"grant_type":   []string{"authorization_code"},
+			"client_id":    []string{clientID},
+			"code":         []string{"123456879"},
+			"scope":        []string{scopes},
+			"redirect_uri": []string{redirectURL},
+		})
+	}), "organizations").Return(azureToken{
+		RefreshToken: "firstRefreshToken",
+		AccessToken:  "firstAccessToken",
+		ExpiresIn:    3600,
+		Foci:         "1",
+	}, nil)
+
 	authBody := `{"value":[]}`
 	suite.mockHelper.On("queryAuthorizationAPI", authorizationURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 
 	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
 	Expect(err).To(BeNil())
 
-	err = azureLogin.Login(context.TODO())
+	err = azureLogin.Login(context.TODO(), "")
 	Expect(err.Error()).To(BeEquivalentTo("could not find azure tenant: login failed"))
 }
 
@@ -243,7 +327,7 @@ func (suite *LoginSuite) TestLoginAuthorizationFailed() {
 	azureLogin, err := newAzureLoginServiceFromPath(filepath.Join(suite.dir, tokenStoreFilename), suite.mockHelper)
 	Expect(err).To(BeNil())
 
-	err = azureLogin.Login(context.TODO())
+	err = azureLogin.Login(context.TODO(), "")
 	Expect(err.Error()).To(BeEquivalentTo("unable to login status code 400: [access denied]: login failed"))
 }
 

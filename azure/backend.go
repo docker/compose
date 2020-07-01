@@ -338,7 +338,7 @@ type aciCloudService struct {
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
-	return cs.loginService.Login(ctx)
+	return cs.loginService.Login(ctx, params[login.TenantIDLoginParam])
 }
 
 func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {

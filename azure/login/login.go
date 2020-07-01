@@ -49,6 +49,9 @@ const (
 	// v1 scope like "https://management.azure.com/.default" for ARM access
 	scopes   = "offline_access https://management.azure.com/.default"
 	clientID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" // Azure CLI client id
+
+	// TenantIDLoginParam
+	TenantIDLoginParam = "tenantId"
 )
 
 type (
@@ -121,7 +124,7 @@ func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, cl
 }
 
 // Login performs an Azure login through a web browser
-func (login AzureLoginService) Login(ctx context.Context) error {
+func (login AzureLoginService) Login(ctx context.Context, requestedTenantID string) error {
 	queryCh := make(chan localResponse, 1)
 	s, err := NewLocalServer(queryCh)
 	if err != nil {
@@ -170,15 +173,15 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 			if err := json.Unmarshal(bits, &t); err != nil {
 				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
 			}
-			if len(t.Value) < 1 {
-				return errors.Wrap(errdefs.ErrLoginFailed, "could not find azure tenant")
+			tenantID, err := getTenantID(t.Value, requestedTenantID)
+			if err != nil {
+				return errors.Wrap(errdefs.ErrLoginFailed, err.Error())
 			}
-			tID := t.Value[0].TenantID
-			tToken, err := login.refreshToken(token.RefreshToken, tID)
+			tToken, err := login.refreshToken(token.RefreshToken, tenantID)
 			if err != nil {
 				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
 			}
-			loginInfo := TokenInfo{TenantID: tID, Token: tToken}
+			loginInfo := TokenInfo{TenantID: tenantID, Token: tToken}
 
 			if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
 				return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
@@ -188,6 +191,21 @@ func (login AzureLoginService) Login(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func getTenantID(tenantValues []tenantValue, requestedTenantID string) (string, error) {
+	if requestedTenantID == "" {
+		if len(tenantValues) < 1 {
+			return "", errors.Errorf("could not find azure tenant")
+		}
+		return tenantValues[0].TenantID, nil
+	}
+	for _, tValue := range tenantValues {
+		if tValue.TenantID == requestedTenantID {
+			return tValue.TenantID, nil
+		}
+	}
+	return "", errors.Errorf("could not find requested azure tenant %s", requestedTenantID)
 }
 
 func getTokenStorePath() string {

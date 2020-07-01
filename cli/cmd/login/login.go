@@ -34,7 +34,7 @@ import (
 // Command returns the login command
 func Command() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "login [OPTIONS] [SERVER] | login azure",
+		Use:   "login [OPTIONS] [SERVER]",
 		Short: "Log in to a Docker registry",
 		Long:  "Log in to a Docker registry or cloud backend.\nIf no registry server is specified, the default is defined by the daemon.",
 		Args:  cobra.MaximumNArgs(1),
@@ -47,29 +47,25 @@ func Command() *cobra.Command {
 	flags.BoolP("password-stdin", "", false, "Take the password from stdin")
 	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 
+	cmd.AddCommand(AzureLoginCommand())
 	return cmd
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
 	if len(args) == 1 && !strings.Contains(args[0], ".") {
 		backend := args[0]
-		switch backend {
-		case "azure":
-			return cloudLogin(cmd, "aci")
-		default:
-			return errors.New("unknown backend type for cloud login: " + backend)
-		}
+		return errors.New("unknown backend type for cloud login: " + backend)
 	}
 	return mobycli.ExecCmd(cmd)
 }
 
-func cloudLogin(cmd *cobra.Command, backendType string) error {
+func cloudLogin(cmd *cobra.Command, backendType string, params map[string]string) error {
 	ctx := cmd.Context()
 	cs, err := client.GetCloudService(ctx, backendType)
 	if err != nil {
 		return errors.Wrap(errdefs.ErrLoginFailed, "cannot connect to backend")
 	}
-	err = cs.Login(ctx, nil)
+	err = cs.Login(ctx, params)
 	if errors.Is(err, context.Canceled) {
 		return errors.New("login canceled")
 	}
