@@ -16,8 +16,6 @@ ENV PATH $PATH:/usr/local/go/bin
 COPY dispatcher.go .
 RUN go build dispatcher.go
 
-RUN apt-get install curl && apt-get install dnsutils -y
-
 EXPOSE 80
 CMD ["/dispatcher"]
 
