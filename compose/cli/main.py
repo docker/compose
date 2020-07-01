@@ -233,7 +233,7 @@ class TopLevelCommand(object):
       top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
-      version            Show the Docker-Compose version information
+      version            Show version information and quit
     """
 
     def __init__(self, project, options=None):
@@ -1118,7 +1118,7 @@ class TopLevelCommand(object):
     @classmethod
     def version(cls, options):
         """
-        Show version information
+        Show version information and quit.
 
         Usage: version [--short]
 
