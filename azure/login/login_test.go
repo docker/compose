@@ -370,6 +370,7 @@ func (s *MockAzureHelper) queryAuthorizationAPI(authorizationURL string, authori
 	return args.Get(0).([]byte), args.Int(1), args.Error(2)
 }
 
-func (s *MockAzureHelper) openAzureLoginPage(redirectURL string) {
+func (s *MockAzureHelper) openAzureLoginPage(redirectURL string) error {
 	s.Called(redirectURL)
+	return nil
 }
