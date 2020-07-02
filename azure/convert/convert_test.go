@@ -23,7 +23,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 
-	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 
@@ -46,7 +45,7 @@ func (suite *ConvertTestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (suite *ConvertTestSuite) TestProjectName() {
-	project := compose.Project{
+	project := types.Project{
 		Name: "TEST",
 	}
 	containerGroup, err := ToContainerGroup(suite.ctx, project)
@@ -110,18 +109,15 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 }
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerWithDnsSideCarSide() {
-	project := compose.Project{
-		Name: "",
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:  "service1",
-					Image: "image1",
-				},
-				{
-					Name:  "service2",
-					Image: "image2",
-				},
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
 			},
 		},
 	}
@@ -142,14 +138,11 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerWithDnsSideCa
 }
 
 func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSideCarSide() {
-	project := compose.Project{
-		Name: "",
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:  "service1",
-					Image: "image1",
-				},
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
 			},
 		},
 	}
@@ -163,28 +156,25 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSi
 }
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts() {
-	project := compose.Project{
-		Name: "",
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:  "service1",
-					Image: "image1",
-					Ports: []types.ServicePortConfig{
-						{
-							Published: 80,
-							Target:    80,
-						},
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 80,
+						Target:    80,
 					},
 				},
-				{
-					Name:  "service2",
-					Image: "image2",
-					Ports: []types.ServicePortConfig{
-						{
-							Published: 8080,
-							Target:    8080,
-						},
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 8080,
+						Target:    8080,
 					},
 				},
 			},
@@ -215,19 +205,16 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimits() {
 	_0_1Gb := 0.1 * 1024 * 1024 * 1024
-	project := compose.Project{
-		Name: "",
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:  "service1",
-					Image: "image1",
-					Deploy: &types.DeployConfig{
-						Resources: types.Resources{
-							Limits: &types.Resource{
-								NanoCPUs:    "0.1",
-								MemoryBytes: types.UnitBytes(_0_1Gb),
-							},
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Limits: &types.Resource{
+							NanoCPUs:    "0.1",
+							MemoryBytes: types.UnitBytes(_0_1Gb),
 						},
 					},
 				},
@@ -245,19 +232,16 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimit
 }
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimitsDefaults() {
-	project := compose.Project{
-		Name: "",
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:  "service1",
-					Image: "image1",
-					Deploy: &types.DeployConfig{
-						Resources: types.Resources{
-							Limits: &types.Resource{
-								NanoCPUs:    "",
-								MemoryBytes: 0,
-							},
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Limits: &types.Resource{
+							NanoCPUs:    "",
+							MemoryBytes: 0,
 						},
 					},
 				},

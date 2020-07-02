@@ -29,7 +29,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 
-	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 )
@@ -47,7 +46,7 @@ const (
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
-func ToContainerGroup(aciContext store.AciContext, p compose.Project) (containerinstance.ContainerGroup, error) {
+func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
 	volumesCache, volumesSlice, err := project.getAciFileVolumes()
@@ -154,7 +153,7 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 	return dnsSideCar
 }
 
-type projectAciHelper compose.Project
+type projectAciHelper types.Project
 
 func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, error) {
 	var secretVolumes []containerinstance.Volume

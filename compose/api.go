@@ -18,12 +18,14 @@ package compose
 
 import (
 	"context"
+
+	"github.com/compose-spec/compose-go/cli"
 )
 
 // Service manages a compose project
 type Service interface {
 	// Up executes the equivalent to a `compose up`
-	Up(ctx context.Context, opts ProjectOptions) error
+	Up(ctx context.Context, opts cli.ProjectOptions) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, opts ProjectOptions) error
+	Down(ctx context.Context, opts cli.ProjectOptions) error
 }

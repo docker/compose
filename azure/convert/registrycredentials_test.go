@@ -24,8 +24,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	cliconfigtypes "github.com/docker/cli/cli/config/types"
 
-	"github.com/docker/api/compose"
-
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 
 	. "github.com/onsi/gomega"
@@ -173,7 +171,7 @@ func (suite *RegistryConvertTestSuite) TestHubAndSeveralACRRegistries() {
 	}))
 }
 
-func composeServices(images ...string) compose.Project {
+func composeServices(images ...string) types.Project {
 	var services []types.ServiceConfig
 	for index, name := range images {
 		service := types.ServiceConfig{
@@ -182,10 +180,8 @@ func composeServices(images ...string) compose.Project {
 		}
 		services = append(services, service)
 	}
-	return compose.Project{
-		Config: types.Config{
-			Services: services,
-		},
+	return types.Project{
+		Services: services,
 	}
 }
 

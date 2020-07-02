@@ -16,7 +16,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 	github.com/Microsoft/hcsshim v0.8.9 // indirect
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/compose-spec/compose-go v0.0.0-20200423124427-63dcf8c22cae
+	github.com/compose-spec/compose-go v0.0.0-20200629133725-59b25574fd55
 	github.com/containerd/console v1.0.0
 	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/containerd/continuity v0.0.0-20200413184840-d3ef23f19fbb // indirect
