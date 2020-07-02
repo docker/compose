@@ -1,5 +1,9 @@
 # Docker CLI plugin for Amazon ECS
 
+## Status
+
+:exclamation: The Docker ECS plugin is still in Beta. It's design and UX will evolve until 1.0 Final release.
+
 ## Architecture
 
 ECS plugin is a [Docker CLI plugin](https://docs.docker.com/engine/extend/cli_plugins/)
