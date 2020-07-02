@@ -265,21 +265,27 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			b = b.Up(uint(numLines))
 			fmt.Fprint(out, b.Column(0).ANSI)
 
+			numLines = getBacktrackLines(logLines, terminalWidth)
+
 			for i := 0; i < currentOutput-1; i++ {
 				fmt.Fprintln(out, logLines[i])
-			}
-
-			numLines = 0
-			for i := 0; i < currentOutput-1; i++ {
-				numLines++
-				if len(logLines[i]) > terminalWidth {
-					numLines += len(logLines[i]) / terminalWidth
-				}
 			}
 
 			time.Sleep(2 * time.Second)
 		}
 	}
+}
+
+func getBacktrackLines(lines []string, terminalWidth int) int {
+	numLines := 0
+	for i := 0; i < len(lines)-1; i++ {
+		numLines++
+		if len(lines[i]) > terminalWidth {
+			numLines += len(lines[i]) / terminalWidth
+		}
+	}
+
+	return numLines
 }
 
 func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
