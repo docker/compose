@@ -18,6 +18,8 @@ package cmd
 
 import (
 	"context"
+	"io"
+	"os"
 
 	"github.com/containerd/console"
 	"github.com/pkg/errors"
@@ -55,11 +57,17 @@ func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
+	var con io.Writer
+
+	con = os.Stdout
+	if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
+		con = c
+	}
 
 	req := containers.LogsRequest{
 		Follow: opts.Follow,
 		Tail:   opts.Tail,
-		Writer: console.Current(),
+		Writer: con,
 	}
 
 	return c.ContainerService().Logs(ctx, containerName, req)
