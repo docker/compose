@@ -125,7 +125,7 @@ func (s *E2eACISuite) TestACIBackend() {
 		uploadFile(credential, u.String(), testFileName, testFileContent)
 
 		mountTarget := "/usr/share/nginx/html"
-		output := s.NewDockerCommand("run", "nginx",
+		output := s.NewDockerCommand("run", "-d", "nginx",
 			"-v", fmt.Sprintf("%s:%s@%s:%s",
 				testStorageAccountName, firstKey, testShareName, mountTarget),
 			"-p", "80:80",
@@ -169,6 +169,52 @@ func (s *E2eACISuite) TestACIBackend() {
 
 		output := <-outChan
 
+		Expect(output).To(ContainSubstring("/test"))
+	})
+
+	s.T().Run("removes container nginx", func(t *testing.T) {
+		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
+		Expect(Lines(output)[0]).To(Equal(testContainerName))
+	})
+
+	s.T().Run("re-run nginx with modified cpu/mem, and without --detach and follow logs", func(t *testing.T) {
+		shutdown := make(chan time.Time)
+		errs := make(chan error)
+		outChan := make(chan string)
+		cmd := s.NewDockerCommand("run", "nginx", "--memory", "0.1G", "--cpus", "0.1", "-p", "80:80", "--name", testContainerName).WithTimeout(shutdown)
+		go func() {
+			output, err := cmd.Exec()
+			outChan <- output
+			errs <- err
+		}()
+		var containerID string
+		err := WaitFor(time.Second, 100*time.Second, errs, func() bool {
+			output := s.NewDockerCommand("ps").ExecOrDie()
+			lines := Lines(output)
+			if len(lines) != 2 {
+				return false
+			}
+			containerFields := Columns(lines[1])
+			if containerFields[2] != "Running" {
+				return false
+			}
+			containerID = containerFields[0]
+			nginxExposedURL = strings.ReplaceAll(containerFields[3], "->80/tcp", "")
+			return true
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		s.NewCommand("curl", nginxExposedURL+"/test").ExecOrDie()
+		inspect := s.NewDockerCommand("inspect", containerID).ExecOrDie()
+		Expect(inspect).To(ContainSubstring("\"CPULimit\": 0.1"))
+		Expect(inspect).To(ContainSubstring("\"MemoryLimit\": 107374182"))
+
+		// Give a little time to get logs of the curl call
+		time.Sleep(5 * time.Second)
+		// Kill
+		close(shutdown)
+
+		output := <-outChan
 		Expect(output).To(ContainSubstring("/test"))
 	})
 

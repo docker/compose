@@ -57,9 +57,7 @@ func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
-	var con io.Writer
-
-	con = os.Stdout
+	var con io.Writer = os.Stdout
 	if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
 		con = c
 	}

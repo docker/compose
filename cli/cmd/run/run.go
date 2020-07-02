@@ -19,8 +19,13 @@ package run
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
+	"github.com/containerd/console"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/containers"
 
 	"github.com/docker/api/cli/options/run"
 	"github.com/docker/api/client"
@@ -43,7 +48,7 @@ func Command() *cobra.Command {
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
 	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: user:key@my_share:/absolute/path/to/target")
-	cmd.Flags().BoolP("detach", "d", true, "Run container in background and print container ID")
+	cmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	cmd.Flags().Float64Var(&opts.Cpus, "cpus", 1., "Number of CPUs")
 	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
 
@@ -64,8 +69,22 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 	err = progress.Run(ctx, func(ctx context.Context) error {
 		return c.ContainerService().Run(ctx, containerConfig)
 	})
-	if err == nil {
-		fmt.Println(opts.Name)
+	if err != nil {
+		return err
 	}
-	return err
+	if !opts.Detach {
+		var con io.Writer = os.Stdout
+		if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
+			con = c
+		}
+
+		req := containers.LogsRequest{
+			Follow: true,
+			Writer: con,
+		}
+
+		return c.ContainerService().Logs(ctx, opts.Name, req)
+	}
+	fmt.Println(opts.Name)
+	return nil
 }

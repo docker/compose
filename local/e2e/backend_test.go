@@ -45,7 +45,7 @@ func (m *LocalBackendTestSuite) TestPs() {
 }
 
 func (m *LocalBackendTestSuite) TestRun() {
-	_, err := m.NewDockerCommand("run", "--name", "nginx", "nginx").Exec()
+	_, err := m.NewDockerCommand("run", "-d", "--name", "nginx", "nginx").Exec()
 	require.Nil(m.T(), err)
 	out := m.NewDockerCommand("ps").ExecOrDie()
 	defer func() {
@@ -55,7 +55,7 @@ func (m *LocalBackendTestSuite) TestRun() {
 }
 
 func (m *LocalBackendTestSuite) TestRunWithPorts() {
-	_, err := m.NewDockerCommand("run", "--name", "nginx", "-p", "8080:80", "nginx").Exec()
+	_, err := m.NewDockerCommand("run", "-d", "--name", "nginx", "-p", "8080:80", "nginx").Exec()
 	require.Nil(m.T(), err)
 	out := m.NewDockerCommand("ps").ExecOrDie()
 	defer func() {

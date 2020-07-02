@@ -36,6 +36,7 @@ type Opts struct {
 	Volumes []string
 	Cpus    float64
 	Memory  formatter.MemBytes
+	Detach  bool
 }
 
 // ToContainerConfig convert run options to a container configuration
