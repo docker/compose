@@ -288,7 +288,7 @@ func (s *E2eSuite) TestMockBackend() {
 	})
 
 	It("can run 'run' command", func() {
-		output := s.NewDockerCommand("run", "nginx", "-p", "80:80").ExecOrDie()
+		output := s.NewDockerCommand("run", "-d", "nginx", "-p", "80:80").ExecOrDie()
 		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
 	})
 }
