@@ -18,8 +18,8 @@ package cmd
 
 import (
 	"context"
-	"os"
 
+	"github.com/containerd/console"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -59,7 +59,7 @@ func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 	req := containers.LogsRequest{
 		Follow: opts.Follow,
 		Tail:   opts.Tail,
-		Writer: os.Stdout,
+		Writer: console.Current(),
 	}
 
 	return c.ContainerService().Logs(ctx, containerName, req)
