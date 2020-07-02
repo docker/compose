@@ -201,9 +201,9 @@ pipeline {
                         checkout scm
                         sh """
                             rm -rf build/ dist/
-                            pip install wheel
-                            python setup.py sdist bdist_wheel
-                            pip install twine
+                            pip3 install wheel
+                            python3 setup.py sdist bdist_wheel
+                            pip3 install twine
                             ~/.local/bin/twine upload --config-file ${PYPIRC} ./dist/docker-compose-*.tar.gz ./dist/docker_compose-*-py2.py3-none-any.whl
                         """
                     }
