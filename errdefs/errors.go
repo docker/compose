@@ -20,6 +20,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	//ExitCodeLoginRequired exit code when command cannot execute because it requires cloud login
+	// This will be used by VSCode to detect when creating context if the user needs to login first
+	ExitCodeLoginRequired = 5
+)
+
 var (
 	// ErrNotFound is returned when an object is not found
 	ErrNotFound = errors.New("not found")
@@ -31,6 +37,8 @@ var (
 	ErrUnknown = errors.New("unknown")
 	// ErrLoginFailed is returned when login failed
 	ErrLoginFailed = errors.New("login failed")
+	// ErrLoginRequired is returned when login is required for a specific action
+	ErrLoginRequired = errors.New("login required")
 	// ErrNotImplemented is returned when a backend doesn't implement
 	// an action
 	ErrNotImplemented = errors.New("not implemented")
