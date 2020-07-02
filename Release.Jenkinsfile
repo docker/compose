@@ -20,7 +20,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         buildImage('alpine')
@@ -28,7 +28,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         buildImage('debian')
@@ -55,7 +55,7 @@ pipeline {
         }
         stage('Generate Changelog') {
             agent {
-                label 'linux'
+                label 'linux && docker && ubuntu-2004'
             }
             steps {
                 checkout scm
@@ -92,7 +92,7 @@ pipeline {
                 }
                 stage('linux binary') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         checkout scm
@@ -128,7 +128,7 @@ pipeline {
                 }
                 stage('alpine image') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         buildRuntimeImage('alpine')
@@ -136,7 +136,7 @@ pipeline {
                 }
                 stage('debian image') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         buildRuntimeImage('debian')
@@ -151,7 +151,7 @@ pipeline {
             parallel {
                 stage('Pushing images') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     steps {
                         pushRuntimeImage('alpine')
@@ -160,7 +160,7 @@ pipeline {
                 }
                 stage('Creating Github Release') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     environment {
                         GITHUB_TOKEN = credentials('github-release-token')
@@ -192,7 +192,7 @@ pipeline {
                 }
                 stage('Publishing Python packages') {
                     agent {
-                        label 'linux'
+                        label 'linux && docker && ubuntu-2004'
                     }
                     environment {
                         PYPIRC = credentials('pypirc-docker-dsg-cibot')
