@@ -26,6 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -167,28 +168,26 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return err
 	}
 
-	project := compose.Project{
+	project := types.Project{
 		Name: r.ID,
-		Config: types.Config{
-			Services: []types.ServiceConfig{
-				{
-					Name:    singleContainerName,
-					Image:   r.Image,
-					Ports:   ports,
-					Labels:  r.Labels,
-					Volumes: serviceConfigVolumes,
-					Deploy: &types.DeployConfig{
-						Resources: types.Resources{
-							Limits: &types.Resource{
-								NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
-								MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
-							},
+		Services: []types.ServiceConfig{
+			{
+				Name:    singleContainerName,
+				Image:   r.Image,
+				Ports:   ports,
+				Labels:  r.Labels,
+				Volumes: serviceConfigVolumes,
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Limits: &types.Resource{
+							NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
+							MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
 						},
 					},
 				},
 			},
-			Volumes: projectVolumes,
 		},
+		Volumes: projectVolumes,
 	}
 
 	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
@@ -301,8 +300,8 @@ type aciComposeService struct {
 	ctx store.AciContext
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions) error {
-	project, err := compose.ProjectFromOptions(&opts)
+func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) error {
+	project, err := cli.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
 	}
@@ -315,8 +314,8 @@ func (cs *aciComposeService) Up(ctx context.Context, opts compose.ProjectOptions
 	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func (cs *aciComposeService) Down(ctx context.Context, opts compose.ProjectOptions) error {
-	project, err := compose.ProjectFromOptions(&opts)
+func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) error {
+	project, err := cli.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
 	}

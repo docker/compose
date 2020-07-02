@@ -20,14 +20,14 @@ import (
 	"context"
 	"errors"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
-	"github.com/docker/api/compose"
 )
 
 func downCommand() *cobra.Command {
-	opts := compose.ProjectOptions{}
+	opts := cli.ProjectOptions{}
 	downCmd := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,13 +35,13 @@ func downCommand() *cobra.Command {
 		},
 	}
 	downCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	downCmd.Flags().StringVar(&opts.WorkDir, "workdir", ".", "Work dir")
+	downCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
 	downCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 
 	return downCmd
 }
 
-func runDown(ctx context.Context, opts compose.ProjectOptions) error {
+func runDown(ctx context.Context, opts cli.ProjectOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err

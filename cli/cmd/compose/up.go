@@ -20,15 +20,15 @@ import (
 	"context"
 	"errors"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
-	"github.com/docker/api/compose"
 	"github.com/docker/api/progress"
 )
 
 func upCommand() *cobra.Command {
-	opts := compose.ProjectOptions{}
+	opts := cli.ProjectOptions{}
 	upCmd := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,7 +36,7 @@ func upCommand() *cobra.Command {
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	upCmd.Flags().StringVar(&opts.WorkDir, "workdir", ".", "Work dir")
+	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")
@@ -44,7 +44,7 @@ func upCommand() *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts compose.ProjectOptions) error {
+func runUp(ctx context.Context, opts cli.ProjectOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err

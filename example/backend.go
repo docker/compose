@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/compose-spec/compose-go/cli"
 	"io"
 
 	"github.com/docker/api/context/cloud"
@@ -109,8 +110,8 @@ func (cs *containerService) Delete(ctx context.Context, id string, force bool) e
 
 type composeService struct{}
 
-func (cs *composeService) Up(ctx context.Context, opts compose.ProjectOptions) error {
-	prj, err := compose.ProjectFromOptions(&opts)
+func (cs *composeService) Up(ctx context.Context, opts cli.ProjectOptions) error {
+	prj, err := cli.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
 	}
@@ -118,8 +119,8 @@ func (cs *composeService) Up(ctx context.Context, opts compose.ProjectOptions) e
 	return nil
 }
 
-func (cs *composeService) Down(ctx context.Context, opts compose.ProjectOptions) error {
-	prj, err := compose.ProjectFromOptions(&opts)
+func (cs *composeService) Down(ctx context.Context, opts cli.ProjectOptions) error {
+	prj, err := cli.ProjectFromOptions(&opts)
 	if err != nil {
 		return err
 	}
