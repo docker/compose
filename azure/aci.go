@@ -27,6 +27,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/buger/goterm"
 	tm "github.com/buger/goterm"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -242,7 +243,8 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 }
 
 func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, out io.Writer) error {
-	lastOutput := 0
+	terminalWidth := goterm.Width()
+	numLines := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -260,14 +262,20 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			// the kind of logs ACI is giving us. Hopefully Azue will give us
 			// a real logs streaming api soon.
 			b := aec.EmptyBuilder
-			b = b.Up(uint(lastOutput))
+			b = b.Up(uint(numLines))
 			fmt.Fprint(out, b.Column(0).ANSI)
 
 			for i := 0; i < currentOutput-1; i++ {
 				fmt.Fprintln(out, logLines[i])
 			}
 
-			lastOutput = currentOutput - 1
+			numLines = 0
+			for i := 0; i < currentOutput-1; i++ {
+				numLines++
+				if len(logLines[i]) > terminalWidth {
+					numLines += len(logLines[i]) / terminalWidth
+				}
+			}
 
 			time.Sleep(2 * time.Second)
 		}
