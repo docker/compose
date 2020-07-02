@@ -221,7 +221,7 @@ func (s *MockResourceGroupHelper) CreateOrUpdate(ctx context.Context, subscripti
 	return args.Get(0).(resources.Group), args.Error(1)
 }
 
-func (s *MockResourceGroupHelper) Delete(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
+func (s *MockResourceGroupHelper) DeleteAsync(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
 	args := s.Called(ctx, subscriptionID, resourceGroupName)
 	return args.Error(0)
 }
