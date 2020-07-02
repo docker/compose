@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/api/errdefs"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -174,13 +176,21 @@ func main() {
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
-			fatal(err)
+			exit(err)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
-		fatal(err)
+		exit(err)
 	}
+}
+
+func exit(err error) {
+	if errors.Is(err, errdefs.ErrLoginRequired) {
+		fmt.Fprintln(os.Stderr, fmt.Errorf("%v", err))
+		os.Exit(errdefs.ExitCodeLoginRequired)
+	}
+	fatal(err)
 }
 
 func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string) {

@@ -127,7 +127,7 @@ func getSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
 	err := setupClient(&subc.Client)
 	if err != nil {
-		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginFailed, err.Error())
+		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginRequired, err.Error())
 	}
 	return subc, nil
 }
