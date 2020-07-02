@@ -32,7 +32,7 @@ type ACIResourceGroupHelper interface {
 	ListGroups(ctx context.Context, subscriptionID string) ([]resources.Group, error)
 	GetGroup(ctx context.Context, subscriptionID string, groupName string) (resources.Group, error)
 	CreateOrUpdate(ctx context.Context, subscriptionID string, resourceGroupName string, parameters resources.Group) (result resources.Group, err error)
-	Delete(ctx context.Context, subscriptionID string, resourceGroupName string) error
+	DeleteAsync(ctx context.Context, subscriptionID string, resourceGroupName string) error
 }
 
 type aciResourceGroupHelperImpl struct {
@@ -87,18 +87,15 @@ func (mgt aciResourceGroupHelperImpl) CreateOrUpdate(ctx context.Context, subscr
 	return gc.CreateOrUpdate(ctx, resourceGroupName, parameters)
 }
 
-// Delete deletes a resource group
-func (mgt aciResourceGroupHelperImpl) Delete(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
+// DeleteAsync deletes a resource group. Does not wait for full deletion to return (long operation)
+func (mgt aciResourceGroupHelperImpl) DeleteAsync(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
 	gc, err := getGroupsClient(subscriptionID)
 	if err != nil {
 		return err
 	}
 
-	future, err := gc.Delete(ctx, resourceGroupName)
-	if err != nil {
-		return err
-	}
-	return future.WaitForCompletionRef(ctx, gc.Client)
+	_, err = gc.Delete(ctx, resourceGroupName)
+	return err
 }
 
 // GetSubscriptionIDs Return available subscription IDs based on azure login

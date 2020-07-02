@@ -331,7 +331,7 @@ func deleteResourceGroup(groupName string) {
 	helper := azure.NewACIResourceGroupHelper()
 	models, err := helper.GetSubscriptionIDs(ctx)
 	Expect(err).To(BeNil())
-	err = helper.Delete(ctx, *models[0].SubscriptionID, groupName)
+	err = helper.DeleteAsync(ctx, *models[0].SubscriptionID, groupName)
 	Expect(err).To(BeNil())
 }
 
