@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/docker/ecs-plugin/cmd/commands"
+	"github.com/docker/ecs-plugin/internal"
 
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
@@ -16,7 +17,7 @@ func main() {
 	}, manager.Metadata{
 		SchemaVersion: "0.1.0",
 		Vendor:        "Docker Inc.",
-		Version:       commands.Version,
+		Version:       internal.Version,
 		Experimental:  true,
 	})
 }

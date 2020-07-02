@@ -3,14 +3,9 @@ package commands
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-)
+	"github.com/docker/ecs-plugin/internal"
 
-var (
-	// Version is the git tag that this was built from.
-	Version = "unknown"
-	// GitCommit is the commit that this was built from.
-	GitCommit = "unknown"
+	"github.com/spf13/cobra"
 )
 
 func VersionCommand() *cobra.Command {
@@ -18,7 +13,7 @@ func VersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Show version.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "Docker ECS plugin %s (%s)\n", Version, GitCommit)
+			fmt.Fprintf(cmd.OutOrStdout(), "Docker ECS plugin %s (%s)\n", internal.Version, internal.GitCommit)
 			return nil
 		},
 	}

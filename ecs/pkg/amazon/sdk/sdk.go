@@ -6,6 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/ecs-plugin/internal"
+
+	"github.com/aws/aws-sdk-go/aws/request"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
@@ -39,6 +43,9 @@ type sdk struct {
 }
 
 func NewAPI(sess *session.Session) API {
+	sess.Handlers.Build.PushBack(func(r *request.Request) {
+		request.AddToUserAgent(r, fmt.Sprintf("Docker CLI %s", internal.Version))
+	})
 	return sdk{
 		ECS: ecs.New(sess),
 		EC2: ec2.New(sess),

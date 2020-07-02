@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/ecs-plugin/internal"
+
 	"gotest.tools/v3/assert"
 )
 
@@ -14,5 +16,5 @@ func TestVersion(t *testing.T) {
 	root.SetOut(&out)
 	root.SetArgs([]string{"version"})
 	root.Execute()
-	assert.Check(t, strings.Contains(out.String(), Version))
+	assert.Check(t, strings.Contains(out.String(), internal.Version))
 }

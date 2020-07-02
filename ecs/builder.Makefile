@@ -8,8 +8,8 @@ endif
 
 STATIC_FLAGS=CGO_ENABLED=0
 LDFLAGS := "-s -w \
-  -X github.com/docker/ecs-plugin/cmd/commands.GitCommit=$(COMMIT) \
-  -X github.com/docker/ecs-plugin/cmd/commands.Version=$(TAG)"
+  -X github.com/docker/ecs-plugin/internal.GitCommit=$(COMMIT) \
+  -X github.com/docker/ecs-plugin/internal.Version=$(TAG)"
 GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
 BINARY=dist/docker-ecs
