@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/docker/api/containers"
+
 	"github.com/stretchr/testify/suite"
 
 	. "github.com/onsi/gomega"
@@ -49,6 +51,14 @@ func (suite *BackendSuiteTest) TestErrorMessageDeletingContainerFromComposeAppli
 
 	Expect(err).NotTo(BeNil())
 	Expect(err.Error()).To(Equal("cannot delete service \"service1\" from compose app \"compose-app\", you must delete the entire compose app with docker compose down"))
+}
+
+func (suite *BackendSuiteTest) TestErrorMessageRunSingleContainerNameWithComposeSeparator() {
+	service := aciContainerService{}
+	err := service.Run(context.TODO(), containers.ContainerConfig{ID: "container_name"})
+
+	Expect(err).NotTo(BeNil())
+	Expect(err.Error()).To(Equal("invalid container name. ACI container name cannot include \"_\""))
 }
 
 func TestBackendSuite(t *testing.T) {

@@ -42,7 +42,10 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-const singleContainerName = "single--container--aci"
+const (
+	singleContainerName       = "single--container--aci"
+	composeContainerSeparator = "_"
+)
 
 // ErrNoSuchContainer is returned when the mentioned container does not exist
 var ErrNoSuchContainer = errors.New("no such container")
@@ -135,7 +138,7 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 			if *container.Name == singleContainerName {
 				containerID = *containerGroup.Name
 			} else {
-				containerID = *containerGroup.Name + "_" + *container.Name
+				containerID = *containerGroup.Name + composeContainerSeparator + *container.Name
 			}
 			status := "Unknown"
 			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
@@ -155,6 +158,10 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
+	if strings.Contains(r.ID, composeContainerSeparator) {
+		return errors.New(fmt.Sprintf(`invalid container name. ACI container name cannot include "%s"`, composeContainerSeparator))
+	}
+
 	var ports []types.ServicePortConfig
 	for _, p := range r.Ports {
 		ports = append(ports, types.ServicePortConfig{
@@ -204,7 +211,7 @@ func (cs *aciContainerService) Stop(ctx context.Context, containerName string, t
 }
 
 func getGroupAndContainerName(containerID string) (groupName string, containerName string) {
-	tokens := strings.Split(containerID, "_")
+	tokens := strings.Split(containerID, composeContainerSeparator)
 	groupName = tokens[0]
 	if len(tokens) > 1 {
 		containerName = tokens[len(tokens)-1]
@@ -322,7 +329,7 @@ func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) 
 	var project types.Project
 
 	if opts.Name != "" {
-		project = types.Project{Name:opts.Name}
+		project = types.Project{Name: opts.Name}
 	} else {
 		fullProject, err := cli.ProjectFromOptions(&opts)
 		if err != nil {
