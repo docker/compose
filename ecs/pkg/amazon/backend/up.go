@@ -105,7 +105,6 @@ func (b Backend) GetLoadBalancer(ctx context.Context, project *types.Project) (s
 		if !ok {
 			return "", fmt.Errorf("Load Balancer does not exist: %s", lb)
 		}
-		return b.api.GetLoadBalancerARN(ctx, lbName)
 	}
 	return "", nil
 }

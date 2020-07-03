@@ -14,7 +14,31 @@ func (b *Backend) Ps(ctx context.Context, project *types.Project) ([]compose.Ser
 		cluster = project.Name
 	}
 
-	status, err := b.api.DescribeServices(ctx, cluster, project.Name)
+	resources, err := b.api.ListStackResources(ctx, project.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	var loadBalancer string
+	if lb, ok := project.Extensions[compose.ExtensionLB]; ok {
+		loadBalancer = lb.(string)
+	}
+	servicesARN := []string{}
+	for _, r := range resources {
+		switch r.Type {
+		case "AWS::ECS::Service":
+			servicesARN = append(servicesARN, r.ARN)
+		case "AWS::ElasticLoadBalancingV2::LoadBalancer":
+			loadBalancer = r.ARN
+		}
+	}
+
+	status, err := b.api.DescribeServices(ctx, cluster, servicesARN)
+	if err != nil {
+		return nil, err
+	}
+
+	url, err := b.api.GetLoadBalancerURL(ctx, loadBalancer)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +50,7 @@ func (b *Backend) Ps(ctx context.Context, project *types.Project) ([]compose.Ser
 		}
 		ports := []string{}
 		for _, p := range s.Ports {
-			ports = append(ports, fmt.Sprintf("*:%d->%d/%s", p.Published, p.Target, p.Protocol))
+			ports = append(ports, fmt.Sprintf("%s:%d->%d/%s", url, p.Published, p.Target, p.Protocol))
 		}
 		state.Ports = ports
 		status[i] = state

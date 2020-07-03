@@ -222,6 +222,27 @@ func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudf
 	}
 }
 
+func (s sdk) ListStackResources(ctx context.Context, name string) ([]compose.StackResource, error) {
+	// FIXME handle pagination
+	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
+		StackName: aws.String(name),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []compose.StackResource{}
+	for _, r := range res.StackResourceSummaries {
+		resources = append(resources, compose.StackResource{
+			LogicalID: *r.LogicalResourceId,
+			Type:      *r.ResourceType,
+			ARN:       *r.PhysicalResourceId,
+			Status:    *r.ResourceStatus,
+		})
+	}
+	return resources, nil
+}
+
 func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	logrus.Debug("Delete CloudFormation stack")
 	_, err := s.CF.DeleteStackWithContext(ctx, &cloudformation.DeleteStackInput{
@@ -270,7 +291,6 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (compose.Secret, erro
 }
 
 func (s sdk) ListSecrets(ctx context.Context) ([]compose.Secret, error) {
-
 	logrus.Debug("List secrets ...")
 	response, err := s.SM.ListSecrets(&secretsmanager.ListSecretsInput{})
 	if err != nil {
@@ -336,18 +356,10 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer compose.LogConsu
 	}
 }
 
-func (s sdk) DescribeServices(ctx context.Context, cluster string, project string) ([]compose.ServiceStatus, error) {
-	// TODO handle pagination
-	list, err := s.ECS.ListServicesWithContext(ctx, &ecs.ListServicesInput{
-		Cluster: aws.String(cluster),
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string) ([]compose.ServiceStatus, error) {
 	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
 		Cluster:  aws.String(cluster),
-		Services: list.ServiceArns,
+		Services: aws.StringSlice(arns),
 		Include:  aws.StringSlice([]string{"TAGS"}),
 	})
 	if err != nil {
@@ -356,17 +368,13 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, project strin
 	status := []compose.ServiceStatus{}
 	for _, service := range services.Services {
 		var name string
-		var stack string
 		for _, t := range service.Tags {
-			switch *t.Key {
-			case compose.ProjectTag:
-				stack = *t.Value
-			case compose.ServiceTag:
+			if *t.Key == compose.ServiceTag {
 				name = *t.Value
 			}
 		}
-		if stack != project {
-			continue
+		if name == "" {
+			return nil, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceTag)
 		}
 		status = append(status, compose.ServiceStatus{
 			ID:       *service.ServiceName,
@@ -410,10 +418,10 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	return publicIPs, nil
 }
 
-func (s sdk) LoadBalancerExists(ctx context.Context, name string) (bool, error) {
-	logrus.Debug("Check if cluster was already created: ", name)
+func (s sdk) LoadBalancerExists(ctx context.Context, arn string) (bool, error) {
+	logrus.Debug("Check if LoadBalancer exists: ", arn)
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
-		Names: []*string{aws.String(name)},
+		LoadBalancerArns: []*string{aws.String(arn)},
 	})
 	if err != nil {
 		return false, err
@@ -421,13 +429,13 @@ func (s sdk) LoadBalancerExists(ctx context.Context, name string) (bool, error) 
 	return len(lbs.LoadBalancers) > 0, nil
 }
 
-func (s sdk) GetLoadBalancerARN(ctx context.Context, name string) (string, error) {
-	logrus.Debug("Check if cluster was already created: ", name)
+func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error) {
+	logrus.Debug("Retrieve load balancer URL: ", arn)
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
-		Names: []*string{aws.String(name)},
+		LoadBalancerArns: []*string{aws.String(arn)},
 	})
 	if err != nil {
 		return "", err
 	}
-	return *lbs.LoadBalancers[0].LoadBalancerArn, nil
+	return *lbs.LoadBalancers[0].DNSName, nil
 }

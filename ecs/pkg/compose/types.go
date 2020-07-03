@@ -2,6 +2,13 @@ package compose
 
 import "encoding/json"
 
+type StackResource struct {
+	LogicalID string
+	Type      string
+	ARN       string
+	Status    string
+}
+
 type ServiceStatus struct {
 	ID       string
 	Name     string
