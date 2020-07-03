@@ -271,7 +271,11 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 				fmt.Fprintln(out, logLines[i])
 			}
 
-			time.Sleep(2 * time.Second)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(2 * time.Second):
+			}
 		}
 	}
 }
