@@ -319,9 +319,16 @@ func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) er
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(&opts)
-	if err != nil {
-		return err
+	var project types.Project
+
+	if opts.Name != "" {
+		project = types.Project{Name:opts.Name}
+	} else {
+		fullProject, err := cli.ProjectFromOptions(&opts)
+		if err != nil {
+			return err
+		}
+		project = *fullProject
 	}
 	logrus.Debugf("Down on project with name %q\n", project.Name)
 

@@ -297,7 +297,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	s.T().Run("shutdown compose app", func(t *testing.T) {
-		s.NewDockerCommand("compose", "down", "-f", composeFile, "--project-name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "down", "--project-name", "acidemo").ExecOrDie()
 	})
 
 	s.T().Run("switches back to default context", func(t *testing.T) {
