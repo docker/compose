@@ -50,7 +50,7 @@ func (suite *BackendSuiteTest) TestErrorMessageDeletingContainerFromComposeAppli
 	err := service.Delete(context.TODO(), "compose-app_service1", false)
 
 	Expect(err).NotTo(BeNil())
-	Expect(err.Error()).To(Equal("cannot delete service \"service1\" from compose app \"compose-app\", you must delete the entire compose app with docker compose down"))
+	Expect(err.Error()).To(Equal("cannot delete service \"service1\" from compose application \"compose-app\", you can delete the entire compose app with docker compose down --project-name compose-app"))
 }
 
 func (suite *BackendSuiteTest) TestErrorMessageRunSingleContainerNameWithComposeSeparator() {
