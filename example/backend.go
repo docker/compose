@@ -22,8 +22,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/compose-spec/compose-go/cli"
 	"io"
+
+	"github.com/compose-spec/compose-go/cli"
 
 	"github.com/docker/api/context/cloud"
 
