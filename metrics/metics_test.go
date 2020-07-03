@@ -95,8 +95,6 @@ func TestFlag(t *testing.T) {
 
 func TestEcs(t *testing.T) {
 	root := &cobra.Command{}
-	root.PersistentFlags().BoolP("debug", "d", false, "debug")
-	root.PersistentFlags().String("str", "str", "str")
 
 	testCases := []struct {
 		name     string
@@ -157,6 +155,54 @@ func TestEcs(t *testing.T) {
 			name:     "setup",
 			args:     []string{"ecs", "setup"},
 			expected: "ecs setup",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := getCommand(testCase.args, root.PersistentFlags())
+			assert.Equal(t, testCase.expected, result)
+		})
+	}
+}
+
+func TestScan(t *testing.T) {
+	root := &cobra.Command{}
+
+	testCases := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "scan",
+			args:     []string{"scan"},
+			expected: "scan",
+		},
+		{
+			name:     "scan image with long flags",
+			args:     []string{"scan", "--file", "file", "image"},
+			expected: "scan",
+		},
+		{
+			name:     "scan image with short flags",
+			args:     []string{"scan", "-f", "file", "image"},
+			expected: "scan",
+		},
+		{
+			name:     "scan with long flag",
+			args:     []string{"scan", "--dependency-tree", "image"},
+			expected: "scan",
+		},
+		{
+			name:     "auth",
+			args:     []string{"scan", "--auth"},
+			expected: "scan auth",
+		},
+		{
+			name:     "version",
+			args:     []string{"scan", "--version"},
+			expected: "scan version",
 		},
 	}
 
