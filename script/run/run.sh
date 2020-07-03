@@ -38,6 +38,9 @@ if [ -n "$COMPOSE_FILE" ]; then
     COMPOSE_OPTIONS="$COMPOSE_OPTIONS -e COMPOSE_FILE=$COMPOSE_FILE"
     compose_dir=$(realpath "$(dirname "$COMPOSE_FILE")")
 fi
+if [ -n "$COMPOSE_PROJECT_NAME" ]; then
+    COMPOSE_OPTIONS="-e COMPOSE_PROJECT_NAME $COMPOSE_OPTIONS"
+fi
 # TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
