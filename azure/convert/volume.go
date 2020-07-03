@@ -70,13 +70,13 @@ type volumeInput struct {
 func escapeKeySlashes(rawURL string) (string, error) {
 	urlSplit := strings.Split(rawURL, "@")
 	if len(urlSplit) < 1 {
-		return "", errors.Wrap(errdefs.ErrParsingFailed, "invalid url format "+rawURL)
+		return "", fmt.Errorf("invalid URL format: %s", rawURL)
 	}
 	userPasswd := strings.ReplaceAll(urlSplit[0], "/", "_")
 
 	atIndex := strings.Index(rawURL, "@")
 	if atIndex < 0 {
-		return "", errors.Wrap(errdefs.ErrParsingFailed, "no share specified in "+rawURL)
+		return "", fmt.Errorf("no share specified in: %s", rawURL)
 	}
 
 	scaped := userPasswd + rawURL[atIndex:]
@@ -98,7 +98,7 @@ func volumeURL(pathURL string) (*url.URL, error) {
 
 	count := strings.Count(pathURL, ":")
 	if count > 2 {
-		return nil, errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("unable to parse volume mount %q", pathURL))
+		return nil, fmt.Errorf("invalid path URL: %s", pathURL)
 	}
 	if count == 2 {
 		tokens := strings.Split(pathURL, ":")
@@ -110,20 +110,20 @@ func volumeURL(pathURL string) (*url.URL, error) {
 func (v *volumeInput) parse(name string, s string) error {
 	volumeURL, err := volumeURL(s)
 	if err != nil {
-		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q could not be parsed %q", s, err))
+		return errors.Wrapf(errdefs.ErrParsingFailed, "unable to parse volume specification: %s", err.Error())
 	}
 	v.username = volumeURL.User.Username()
 	if v.username == "" {
-		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage username", v))
+		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage username", v)
 	}
 	key, ok := volumeURL.User.Password()
 	if !ok || key == "" {
-		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage key", v))
+		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage key", v)
 	}
 	v.key = unescapeKey(key)
 	v.share = volumeURL.Host
 	if v.share == "" {
-		return errors.Wrap(errdefs.ErrParsingFailed, fmt.Sprintf("volume specification %q does not include a storage file share", v))
+		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage file share", v)
 	}
 	v.name = name
 	v.target = volumeURL.Path
