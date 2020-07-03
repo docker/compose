@@ -28,13 +28,20 @@ var managementCommands = []string{
 	"builder",
 	"buildx",
 	"ecs",
+	"ecs compose",
 	"cluster",
 	"compose",
 	"config",
 	"container",
 	"context",
+	// We add "context create" as a management command to be able to catch
+	// calls to "context create aci"
+	"context create",
 	"help",
 	"image",
+	// Adding "login" as a management command so that the system can catch
+	// commands like `docker login azure`
+	"login",
 	"manifest",
 	"network",
 	"node",
@@ -48,6 +55,19 @@ var managementCommands = []string{
 	"template",
 	"trust",
 	"volume",
+}
+
+// managementSubCommands holds a list of allowed subcommands of a management
+// command. For example we want to send an event for "docker login azure" but
+// we don't wat to send the name of the registry when the user does a
+// "docker login my-registry", we only want to send "login"
+var managementSubCommands = map[string][]string{
+	"login": {
+		"azure",
+	},
+	"context create": {
+		"aci",
+	},
 }
 
 const (
@@ -91,9 +111,8 @@ func getCommand(args []string, flags *flag.FlagSet) string {
 		}
 
 		for {
-			currentCommand := strippedArgs[0]
-			if contains(managementCommands, currentCommand) {
-				if sub := getSubCommand(strippedArgs[1:]); sub != "" {
+			if contains(managementCommands, command) {
+				if sub := getSubCommand(command, strippedArgs[1:]); sub != "" {
 					command += " " + sub
 					strippedArgs = strippedArgs[1:]
 					continue
@@ -120,10 +139,22 @@ func getScanCommand(args []string) string {
 	return command
 }
 
-func getSubCommand(args []string) string {
-	if len(args) != 0 && isArg(args[0]) {
+func getSubCommand(command string, args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	if val, ok := managementSubCommands[command]; ok {
+		if contains(val, args[0]) {
+			return args[0]
+		}
+		return ""
+	}
+
+	if isArg(args[0]) {
 		return args[0]
 	}
+
 	return ""
 }
 
