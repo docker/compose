@@ -267,7 +267,7 @@ func (cs *aciContainerService) Logs(ctx context.Context, containerName string, r
 func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _ bool) error {
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
-		return errors.New(fmt.Sprintf(`cannot delete service "%s" from compose app "%s", you must delete the entire compose app with docker compose down`, containerName, groupName))
+		return errors.New(fmt.Sprintf("cannot delete service %q from compose app %q, you must delete the entire compose app with docker compose down", containerName, groupName))
 	}
 	cg, err := deleteACIContainerGroup(ctx, cs.ctx, groupName)
 	if err != nil {
