@@ -17,6 +17,7 @@
 package azure
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -40,6 +41,14 @@ func (suite *BackendSuiteTest) TestGetContainerName() {
 	group, container = getGroupAndContainerName("compose_stack_service1")
 	Expect(group).To(Equal("compose_stack"))
 	Expect(container).To(Equal("service1"))
+}
+
+func (suite *BackendSuiteTest) TestErrorMessageDeletingContainerFromComposeApplication() {
+	service := aciContainerService{}
+	err := service.Delete(context.TODO(), "compose-app_service1", false)
+
+	Expect(err).NotTo(BeNil())
+	Expect(err.Error()).To(Equal("cannot delete service \"service1\" from compose app \"compose-app\", you must delete the entire compose app with docker compose down"))
 }
 
 func TestBackendSuite(t *testing.T) {
