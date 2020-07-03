@@ -52,12 +52,17 @@ var managementCommands = []string{
 
 // Track sends the tracking analytics to Docker Desktop
 func Track(context string, args []string, flags *flag.FlagSet) {
+	wasIn := make(chan bool)
+
 	// Fire and forget, we don't want to slow down the user waiting for DD
 	// metrics endpoint to respond. We could lose some events but that's ok.
 	go func() {
 		defer func() {
 			_ = recover()
 		}()
+
+		wasIn <- true
+
 		command := getCommand(args, flags)
 		if command != "" {
 			c := NewClient()
@@ -67,6 +72,7 @@ func Track(context string, args []string, flags *flag.FlagSet) {
 			})
 		}
 	}()
+	<-wasIn
 }
 
 func getCommand(args []string, flags *flag.FlagSet) string {
