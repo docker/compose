@@ -50,6 +50,10 @@ var managementCommands = []string{
 	"volume",
 }
 
+const (
+	scanCommand = "scan"
+)
+
 // Track sends the tracking analytics to Docker Desktop
 func Track(context string, args []string, flags *flag.FlagSet) {
 	// Fire and forget, we don't want to slow down the user waiting for DD
@@ -71,21 +75,40 @@ func Track(context string, args []string, flags *flag.FlagSet) {
 
 func getCommand(args []string, flags *flag.FlagSet) string {
 	command := ""
-	args = stripFlags(args, flags)
+	strippedArgs := stripFlags(args, flags)
 
-	if len(args) != 0 {
-		command = args[0]
+	if len(strippedArgs) != 0 {
+		command = strippedArgs[0]
+
+		if command == scanCommand {
+			return getScanCommand(args)
+		}
+
 		for {
-			currentCommand := args[0]
+			currentCommand := strippedArgs[0]
 			if contains(managementCommands, currentCommand) {
-				if sub := getSubCommand(args[1:]); sub != "" {
+				if sub := getSubCommand(strippedArgs[1:]); sub != "" {
 					command += " " + sub
-					args = args[1:]
+					strippedArgs = strippedArgs[1:]
 					continue
 				}
 			}
 			break
 		}
+	}
+
+	return command
+}
+
+func getScanCommand(args []string) string {
+	command := args[0]
+
+	if contains(args, "--auth") {
+		return command + " auth"
+	}
+
+	if contains(args, "--version") {
+		return command + " version"
 	}
 
 	return command
