@@ -58,4 +58,15 @@ To get the values to be set in local environment variables, you can create a new
 az ad sp create-for-rbac --name 'MyTestServicePrincipal' --sdk-auth
 ```
 Running aci e2e tests will override your local login, the service principal credentials use a token that cannot be refreshed automatically. 
-You might need to run again `docker login azure` to properly use the command line after running ACI e2e tests. 
+You might need to run again `docker login azure` to properly use the command line after running ACI e2e tests.
+
+## Release
+
+To create a new release:   
+* check that the CI is green on the master commit you want to release 
+* simply create a new tag of th form vx.y.z, following existing tags, and push the tag
+
+Pushing the tag will automatically ceate a new release and make binaries (mac, win, linux) available for download. 
+
+Note: Linux binaries are not automatically copied to /docker/aci-integration-beta, if you want to make the linux binary publically available, you'll need to manually create a release in aci-integration-beta and upload the binary.  
+For Desktop integration, you need to make a PR in /docker/pinata and update the cli release number [here](https://github.com/docker/pinata/blob/master/build.json#L25)
