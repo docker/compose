@@ -17,6 +17,7 @@
 package convert
 
 import (
+	"os"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
@@ -258,6 +259,31 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimit
 	limits := *container1.Resources.Limits
 	Expect(*limits.CPU).To(Equal(float64(1)))
 	Expect(*limits.MemoryInGB).To(Equal(float64(1)))
+}
+
+func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerenvVar() {
+	os.Setenv("key2", "value2")
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Environment: types.MappingWithEquals{
+					"key1": to.StringPtr("value1"),
+					"key2": nil,
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+
+	container1 := (*group.Containers)[0]
+	envVars := *container1.EnvironmentVariables
+	Expect(len(envVars)).To(Equal(2))
+	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key1"), Value: to.StringPtr("value1")}))
+	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key2"), Value: to.StringPtr("value2")}))
 }
 
 func TestConvertTestSuite(t *testing.T) {

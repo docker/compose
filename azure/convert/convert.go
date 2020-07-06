@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 
@@ -280,7 +281,8 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 	return containerinstance.Container{
 		Name: to.StringPtr(s.Name),
 		ContainerProperties: &containerinstance.ContainerProperties{
-			Image: to.StringPtr(s.Image),
+			Image:                to.StringPtr(s.Image),
+			EnvironmentVariables: getEnvVariables(s.Environment),
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{
 					MemoryInGB: to.Float64Ptr(memLimit),
@@ -294,7 +296,23 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 			VolumeMounts: volumes,
 		},
 	}, nil
+}
 
+func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.EnvironmentVariable {
+	result := []containerinstance.EnvironmentVariable{}
+	for key, value := range composeEnv {
+		var strValue string
+		if value == nil {
+			strValue = os.Getenv(key)
+		} else {
+			strValue = *value
+		}
+		result = append(result, containerinstance.EnvironmentVariable{
+			Name:  to.StringPtr(key),
+			Value: to.StringPtr(strValue),
+		})
+	}
+	return &result
 }
 
 func bytesToGb(b types.UnitBytes) float64 {
