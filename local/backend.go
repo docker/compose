@@ -88,10 +88,11 @@ func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, 
 	}
 
 	return containers.Container{
-		ID:      stringid.TruncateID(c.ID),
-		Status:  status,
-		Image:   c.Image,
-		Command: command,
+		ID:       stringid.TruncateID(c.ID),
+		Status:   status,
+		Image:    c.Image,
+		Command:  command,
+		Platform: c.Platform,
 	}, nil
 }
 

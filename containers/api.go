@@ -37,6 +37,7 @@ type Container struct {
 	PidsLimit   uint64
 	Labels      []string
 	Ports       []Port
+	Platform    string
 }
 
 // Port represents a published port of a container

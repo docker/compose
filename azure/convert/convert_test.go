@@ -62,6 +62,7 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 				}},
 				IP: to.StringPtr("42.42.42.42"),
 			},
+			OsType: "Linux",
 		},
 	}
 	myContainer := containerinstance.Container{
@@ -95,6 +96,7 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 		Command:     "mycommand",
 		CPULimit:    3,
 		MemoryLimit: 107374182,
+		Platform:    "Linux",
 		Ports: []containers.Port{{
 			HostPort:      uint32(80),
 			ContainerPort: uint32(80),

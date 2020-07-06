@@ -10,5 +10,6 @@
     "PidsCurrent": 0,
     "PidsLimit": 0,
     "Labels": null,
-    "Ports": null
+    "Ports": null,
+    "Platform": "Linux"
 }
