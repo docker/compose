@@ -150,6 +150,15 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("GET"))
 	})
 
+	s.T().Run("exec command", func(t *testing.T) {
+		output := s.NewDockerCommand("exec", testContainerName, "pwd").ExecOrDie()
+		Expect(output).To(ContainSubstring("/"))
+
+		output = s.NewDockerCommand("exec", testContainerName, "echo", "fail_with_argument").ExecOrDie()
+		Expect(output).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
+			"Only the binary should be specified"))
+	})
+
 	s.T().Run("follow logs from nginx", func(t *testing.T) {
 		timeChan := make(chan time.Time)
 
