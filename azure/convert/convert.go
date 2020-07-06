@@ -327,6 +327,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 	if cc.InstanceView != nil && cc.InstanceView.CurrentState != nil {
 		status = *cc.InstanceView.CurrentState.State
 	}
+	platform := string(cg.OsType)
 
 	c := containers.Container{
 		ID:          containerID,
@@ -341,6 +342,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		PidsLimit:   0,
 		Labels:      nil,
 		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
+		Platform:    platform,
 	}
 
 	return c, nil
