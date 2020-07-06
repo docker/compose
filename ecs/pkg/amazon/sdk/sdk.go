@@ -143,7 +143,9 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 		StackName: aws.String(name),
 	})
 	if err != nil {
-		// FIXME doesn't work as expected
+		if strings.HasPrefix(err.Error(), fmt.Sprintf("ValidationError: Stack with id %s does not exist", name)) {
+			return false, nil
+		}
 		return false, nil
 	}
 	return len(stacks.Stacks) > 0, nil

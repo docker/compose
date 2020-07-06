@@ -47,11 +47,7 @@ func CreateSecret(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create NAME",
 		Short: "Creates a secret.",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			if len(args) == 0 {
 				return errors.New("Missing mandatory parameter: NAME")
 			}
@@ -73,11 +69,7 @@ func InspectSecret(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "inspect ID",
 		Short: "Displays secret details",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			if len(args) == 0 {
 				return errors.New("Missing mandatory parameter: ID")
 			}
@@ -102,11 +94,7 @@ func ListSecrets(dockerCli command.Cli) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List secrets stored for the existing account.",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			secrets, err := backend.ListSecrets(context.Background())
 			if err != nil {
 				return err
@@ -125,11 +113,7 @@ func DeleteSecret(dockerCli command.Cli) *cobra.Command {
 		Use:     "delete NAME",
 		Aliases: []string{"rm", "remove"},
 		Short:   "Removes a secret.",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			if len(args) == 0 {
 				return errors.New("Missing mandatory parameter: [NAME]")
 			}

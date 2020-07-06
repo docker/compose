@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-func (b *Backend) Ps(ctx context.Context, project *types.Project) ([]compose.ServiceStatus, error) {
+func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose.ServiceStatus, error) {
+	project, err := cli.ProjectFromOptions(&options)
+	if err != nil {
+		return nil, err
+	}
+
 	cluster := b.Cluster
 	if cluster == "" {
 		cluster = project.Name

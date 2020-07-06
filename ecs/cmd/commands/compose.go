@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	"github.com/docker/ecs-plugin/pkg/docker"
@@ -43,15 +42,11 @@ func (o upOptions) LoadBalancerArn() *string {
 	return &o.loadBalancerArn
 }
 
-func ConvertCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
+func ConvertCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
-		RunE: WithProject(projectOpts, func(project *types.Project, args []string) error {
-			clusteropts, err := docker.GetAwsContext(dockerCli)
-			if err != nil {
-				return err
-			}
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
+		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
+			project, err := cli.ProjectFromOptions(options)
 			if err != nil {
 				return err
 			}
@@ -72,36 +67,24 @@ func ConvertCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cob
 	return cmd
 }
 
-func UpCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
+func UpCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
-			return backend.Up(context.Background(), *projectOpts)
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+			return backend.Up(context.Background(), *options)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
 	return cmd
 }
 
-func PsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
+func PsCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "ps",
-		RunE: WithProject(projectOpts, func(project *types.Project, args []string) error {
-			clusteropts, err := docker.GetAwsContext(dockerCli)
-			if err != nil {
-				return err
-			}
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
-			status, err := backend.Ps(context.Background(), project)
+		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
+			status, err := backend.Ps(context.Background(), *options)
 			if err != nil {
 				return err
 			}
@@ -125,11 +108,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
+		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
 			return backend.Down(context.Background(), *projectOpts)
 		}),
 	}
@@ -140,23 +119,8 @@ func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.
 func LogsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "logs [PROJECT NAME]",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, args []string) error {
-			backend, err := amazon.NewBackend(clusteropts.Profile, clusteropts.Cluster, clusteropts.Region)
-			if err != nil {
-				return err
-			}
-			var name string
-
-			if len(args) == 0 {
-				project, err := cli.ProjectFromOptions(projectOpts)
-				if err != nil {
-					return err
-				}
-				name = project.Name
-			} else {
-				name = args[0]
-			}
-			return backend.Logs(context.Background(), name)
+		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+			return backend.Logs(context.Background(), *projectOpts)
 		}),
 	}
 	return cmd

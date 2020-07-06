@@ -3,9 +3,11 @@ package docker
 import (
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/context/store"
+	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 )
@@ -72,7 +74,7 @@ func checkAwsContextExists(contextName string) (*AwsContext, error) {
 	return &awsContext, nil
 }
 
-type ContextFunc func(ctx AwsContext, args []string) error
+type ContextFunc func(ctx AwsContext, backend *amazon.Backend, args []string) error
 
 func WithAwsContext(dockerCli command.Cli, f ContextFunc) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
@@ -80,7 +82,15 @@ func WithAwsContext(dockerCli command.Cli, f ContextFunc) func(cmd *cobra.Comman
 		if err != nil {
 			return err
 		}
-		return f(*ctx, args)
+		backend, err := amazon.NewBackend(ctx.Profile, ctx.Cluster, ctx.Region)
+		if err != nil {
+			return err
+		}
+		err = f(*ctx, backend, args)
+		if e, ok := err.(awserr.Error); ok {
+			return fmt.Errorf(e.Message())
+		}
+		return err
 	}
 }
 

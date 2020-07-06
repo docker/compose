@@ -13,8 +13,8 @@ type API interface {
 	Down(ctx context.Context, options cli.ProjectOptions) error
 
 	Convert(project *types.Project) (*cloudformation.Template, error)
-	Logs(ctx context.Context, projectName string) error
-	Ps(background context.Context, project *types.Project) ([]ServiceStatus, error)
+	Logs(ctx context.Context, projectName cli.ProjectOptions) error
+	Ps(background context.Context, options cli.ProjectOptions) ([]ServiceStatus, error)
 
 	CreateSecret(ctx context.Context, secret Secret) (string, error)
 	InspectSecret(ctx context.Context, id string) (Secret, error)

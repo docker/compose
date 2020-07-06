@@ -8,11 +8,22 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/cli"
+
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) Logs(ctx context.Context, projectName string) error {
-	err := b.api.GetLogs(ctx, projectName, &logConsumer{
+func (b *Backend) Logs(ctx context.Context, options cli.ProjectOptions) error {
+	name := options.Name
+	if name == "" {
+		project, err := cli.ProjectFromOptions(&options)
+		if err != nil {
+			return err
+		}
+		name = project.Name
+	}
+
+	err := b.api.GetLogs(ctx, name, &logConsumer{
 		colors: map[string]console.ColorFunc{},
 		width:  0,
 	})
