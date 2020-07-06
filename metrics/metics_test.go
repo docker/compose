@@ -83,6 +83,56 @@ func TestFlag(t *testing.T) {
 			args:     []string{"image", "ls", "-q"},
 			expected: "image ls",
 		},
+		{
+			name:     "azure login",
+			args:     []string{"login", "azure"},
+			expected: "login azure",
+		},
+		{
+			name:     "azure login with flags",
+			args:     []string{"login", "-u", "test", "azure"},
+			expected: "login azure",
+		},
+		{
+			name:     "azure login with azure user",
+			args:     []string{"login", "-u", "azure"},
+			expected: "login",
+		},
+		{
+			name:     "login to a registry",
+			args:     []string{"login", "registry"},
+			expected: "login",
+		},
+		{
+			name:     "context create aci",
+			args:     []string{"context", "create", "aci"},
+			expected: "context create aci",
+		},
+		{
+			name:     "create a context from another context",
+			args:     []string{"context", "create", "test-context", "--from=default"},
+			expected: "context create",
+		},
+		{
+			name:     "create a container",
+			args:     []string{"create"},
+			expected: "create",
+		},
+		{
+			name:     "create a container named aci",
+			args:     []string{"create", "aci"},
+			expected: "create",
+		},
+		{
+			name:     "create a container named test-container",
+			args:     []string{"create", "test-container"},
+			expected: "create",
+		},
+		{
+			name:     "create with flags",
+			args:     []string{"create", "--rm", "test"},
+			expected: "create",
+		},
 	}
 
 	for _, testCase := range testCases {
