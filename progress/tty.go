@@ -67,14 +67,17 @@ func (w *ttyWriter) Event(e Event) {
 		w.eventIDs = append(w.eventIDs, e.ID)
 	}
 	if _, ok := w.events[e.ID]; ok {
-		event := w.events[e.ID]
-		if event.Status != Done && e.Status == Done {
-			event.stop()
+		last := w.events[e.ID]
+		switch e.Status {
+		case Done, Error:
+			if last.Status != e.Status {
+				last.stop()
+			}
 		}
-		event.Status = e.Status
-		event.Text = e.Text
-		event.StatusText = e.StatusText
-		w.events[e.ID] = event
+		last.Status = e.Status
+		last.Text = e.Text
+		last.StatusText = e.StatusText
+		w.events[e.ID] = last
 	} else {
 		e.startTime = time.Now()
 		e.spinner = newSpinner()
