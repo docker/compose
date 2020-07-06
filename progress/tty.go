@@ -68,8 +68,11 @@ func (w *ttyWriter) Event(e Event) {
 	}
 	if _, ok := w.events[e.ID]; ok {
 		event := w.events[e.ID]
-		if event.Status != Done && e.Status == Done {
-			event.stop()
+		switch e.Status {
+		case Done, Error:
+			if event.Status != e.Status {
+				event.stop()
+			}
 		}
 		event.Status = e.Status
 		event.Text = e.Text
