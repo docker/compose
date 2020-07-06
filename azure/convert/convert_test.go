@@ -262,7 +262,8 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimit
 }
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerenvVar() {
-	os.Setenv("key2", "value2")
+	err := os.Setenv("key2", "value2")
+	Expect(err).To(BeNil())
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{

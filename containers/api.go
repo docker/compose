@@ -68,6 +68,8 @@ type ContainerConfig struct {
 	MemLimit formatter.MemBytes
 	// CPUlimit
 	CPULimit float64
+	// Environment variables
+	Environment []string
 }
 
 // LogsRequest contains configuration about a log request
