@@ -226,11 +226,13 @@ func (s *E2eACISuite) TestACIBackend() {
 	var exposedURL string
 	const composeFile = "../composefiles/aci-demo/aci_demo_port.yaml"
 	const composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
-	const serverContainer = "acidemo_web"
-	const wordsContainer = "acidemo_words"
+	const composeProjectName = "acie2e"
+	const serverContainer = composeProjectName + "_web"
+	const wordsContainer = composeProjectName + "_words"
 
 	s.T().Run("deploys a compose app", func(t *testing.T) {
-		s.NewDockerCommand("compose", "up", "-f", composeFile, "--project-name", "acidemo").ExecOrDie()
+		// specifically do not specify project name here, it will be derived from current folder "acie2e"
+		s.NewDockerCommand("compose", "up", "-f", composeFile).ExecOrDie()
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
 		Expect(len(Lines)).To(Equal(4))
@@ -261,7 +263,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	s.T().Run("updates a compose app", func(t *testing.T) {
-		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName).ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		Lines := Lines(output)
@@ -297,7 +299,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	})
 
 	s.T().Run("shutdown compose app", func(t *testing.T) {
-		s.NewDockerCommand("compose", "down", "--project-name", "acidemo").ExecOrDie()
+		s.NewDockerCommand("compose", "down", "--project-name", composeProjectName).ExecOrDie()
 	})
 
 	s.T().Run("switches back to default context", func(t *testing.T) {
