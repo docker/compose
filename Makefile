@@ -22,6 +22,8 @@ ifeq ($(UNAME_S),Darwin)
 	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
 endif
 
+GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
+
 all: cli
 
 protos: ## Generate go code from .proto files
@@ -32,6 +34,7 @@ cli: ## Compile the cli
 	@docker build . --target cli \
 	--platform local \
 	--build-arg BUILD_TAGS=example,local \
+	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
 e2e-local: ## Run End to end local tests
@@ -46,18 +49,22 @@ e2e-aci: ## Run End to end ACI tests (requires azure login)
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \
 	--build-arg BUILD_TAGS \
+	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin \
 
 test: ## Run unit tests
 	@docker build . \
 	--build-arg BUILD_TAGS=example,local \
+	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target test
 
 cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 lint: ## run linter(s)
-	@docker build . --target lint
+	@docker build . \
+	--build-arg GIT_TAG=$(GIT_TAG) \
+	--target lint
 
 serve: cli ## start server
 	@./bin/docker serve --address unix:///tmp/backend.sock

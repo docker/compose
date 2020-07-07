@@ -36,9 +36,11 @@ FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS lint-base
 FROM base AS lint
 ENV CGO_ENABLED=0
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
+ARG GIT_TAG
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/.cache/golangci-lint \
+    GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile lint
 
 FROM base AS make-cli
@@ -46,18 +48,22 @@ ENV CGO_ENABLED=0
 ARG TARGETOS
 ARG TARGETARCH
 ARG BUILD_TAGS
+ARG GIT_TAG
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
     BUILD_TAGS=${BUILD_TAGS} \
+    GIT_TAG=${GIT_TAG} \
     make BINARY=/out/docker -f builder.Makefile cli
 
 FROM base AS make-cross
 ARG BUILD_TAGS
+ARG GIT_TAG
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
+    GIT_TAG=${GIT_TAG} \
     make BINARY=/out/docker  -f builder.Makefile cross
 
 FROM scratch AS protos
@@ -70,9 +76,11 @@ FROM scratch AS cross
 COPY --from=make-cross /out/* .
 
 FROM base as test
-ARG BUILD_TAGS
 ENV CGO_ENABLED=0
+ARG BUILD_TAGS
+ARG GIT_TAG
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
+    GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile test
