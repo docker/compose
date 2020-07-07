@@ -19,15 +19,14 @@ Linux it needs to be installed manually.
 You can download the Docker ECS plugin from this repository using the following
 command:
 
-<!-- FIXME(chris-crone): get real download link -->
 ```console
-$ curl -L http://xxx | tar xzf -
+$ curl -L https://github.com/docker/ecs-plugin/releases/latest/download/docker-ecs-linux-amd64
 ```
 
 You will then need to make it executable:
 
 ```console
-$ chmod +x docker-ecs
+$ chmod +x docker-ecs-linux-amd64
 ```
 
 ### Plugin install
@@ -38,7 +37,7 @@ it to the right place:
 ```console
 $ mkdir -p /usr/local/lib/docker/cli-plugins
 
-$ mv docker-ecs /usr/local/lib/docker/cli-plugins/
+$ mv docker-ecs-linux-amd64 /usr/local/lib/docker/cli-plugins/docker-ecs
 ```
 
 You can put the CLI plugin into any of the following directories:
@@ -80,5 +79,4 @@ $ docker ecs version
 Docker ECS plugin 0.0.1
 ```
 
-<!-- FIXME(chris-crone): Link to ECS docs -->
-You are now ready to [start deploying to ECS](http://xxx)
+You are now ready to [start deploying to ECS](https://docs.docker.com/engine/context/ecs-integration/)
