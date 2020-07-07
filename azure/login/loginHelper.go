@@ -23,9 +23,10 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os/exec"
+	"runtime"
 	"strings"
 
-	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 )
 
@@ -40,7 +41,7 @@ type azureAPIHelper struct{}
 func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
 	state := randomString("", 10)
 	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
-	return browser.OpenURL(authURL)
+	return openbrowser(authURL)
 }
 
 func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
@@ -77,6 +78,19 @@ func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azure
 		return azureToken{}, err
 	}
 	return token, nil
+}
+
+func openbrowser(url string) error {
+	switch runtime.GOOS {
+	case "linux":
+		return exec.Command("xdg-open", url).Start()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		return exec.Command("open", url).Start()
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
 }
 
 var (

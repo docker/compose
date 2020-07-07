@@ -134,6 +134,7 @@ func (login AzureLoginService) Login(ctx context.Context, requestedTenantID stri
 	if redirectURL == "" {
 		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
 	}
+
 	if err = login.apiHelper.openAzureLoginPage(redirectURL); err != nil {
 		return err
 	}
