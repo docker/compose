@@ -302,6 +302,28 @@ func (s *E2eACISuite) TestACIBackend() {
 		s.NewDockerCommand("compose", "down", "--project-name", composeProjectName).ExecOrDie()
 	})
 
+	s.T().Run("runs mysql with env variables", func(t *testing.T) {
+		err := os.Setenv("MYSQL_USER", "user1")
+		Expect(err).To(BeNil())
+		s.NewDockerCommand("run", "-d", "mysql:5.7", "-e", "MYSQL_ROOT_PASSWORD=rootpwd", "-e", "MYSQL_DATABASE=mytestdb", "-e", "MYSQL_USER", "-e", "MYSQL_PASSWORD=userpwd").ExecOrDie()
+
+		output := s.NewDockerCommand("ps").ExecOrDie()
+		lines := Lines(output)
+		Expect(len(lines)).To(Equal(2))
+
+		containerFields := Columns(lines[1])
+		containerID := containerFields[0]
+		Expect(containerFields[1]).To(Equal("mysql:5.7"))
+		Expect(containerFields[2]).To(Equal("Running"))
+
+		errs := make(chan error)
+		err = WaitFor(time.Second, 100*time.Second, errs, func() bool {
+			output = s.NewDockerCommand("logs", containerID).ExecOrDie()
+			return strings.Contains(output, "Giving user user1 access to schema mytestdb")
+		})
+		Expect(err).To(BeNil())
+	})
+
 	s.T().Run("switches back to default context", func(t *testing.T) {
 		output := s.NewCommand("docker", "context", "use", "default").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))

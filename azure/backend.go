@@ -162,39 +162,9 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return errors.New(fmt.Sprintf("invalid container name. ACI container name cannot include %q", composeContainerSeparator))
 	}
 
-	var ports []types.ServicePortConfig
-	for _, p := range r.Ports {
-		ports = append(ports, types.ServicePortConfig{
-			Target:    p.ContainerPort,
-			Published: p.HostPort,
-		})
-	}
-
-	projectVolumes, serviceConfigVolumes, err := convert.GetRunVolumes(r.Volumes)
+	project, err := convert.ContainerToComposeProject(r, singleContainerName)
 	if err != nil {
 		return err
-	}
-
-	project := types.Project{
-		Name: r.ID,
-		Services: []types.ServiceConfig{
-			{
-				Name:    singleContainerName,
-				Image:   r.Image,
-				Ports:   ports,
-				Labels:  r.Labels,
-				Volumes: serviceConfigVolumes,
-				Deploy: &types.DeployConfig{
-					Resources: types.Resources{
-						Limits: &types.Resource{
-							NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
-							MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
-						},
-					},
-				},
-			},
-		},
-		Volumes: projectVolumes,
 	}
 
 	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
