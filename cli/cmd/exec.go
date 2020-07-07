@@ -19,6 +19,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/containerd/console"
@@ -56,9 +57,8 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	con := console.Current()
-
 	if opts.Tty {
+		con := console.Current()
 		if err := con.SetRaw(); err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 				fmt.Println("Unable to close the console")
 			}
 		}()
+		return c.ContainerService().Exec(ctx, name, command, con, con)
 	}
-
-	return c.ContainerService().Exec(ctx, name, command, con, con)
+	return c.ContainerService().Exec(ctx, name, command, os.Stdin, os.Stdout)
 }
