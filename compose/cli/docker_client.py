@@ -140,6 +140,11 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         if tls:
             context.set_endpoint("docker", host=host, tls_cfg=tls, skip_tls_verify=not verify)
 
+    if not context.is_docker_host():
+        raise UserError(
+            "The platform targeted with the current context is not supported.\n"
+            "Make sure the context in use targets a Docker Engine.\n")
+
     kwargs['base_url'] = context.Host
     if context.TLSConfig:
         kwargs['tls'] = context.TLSConfig

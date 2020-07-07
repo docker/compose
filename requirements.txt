@@ -1,10 +1,10 @@
 backports.shutil_get_terminal_size==1.0.0
 cached-property==1.5.1
-certifi==2020.4.5.1
+certifi==2020.6.20
 chardet==3.0.4
 colorama==0.4.3; sys_platform == 'win32'
 distro==1.5.0
-docker==4.2.1
+docker==4.2.2
 docker-pycreds==0.4.0
 dockerpty==0.4.1
 docopt==0.6.2
@@ -15,9 +15,9 @@ ipaddress==1.0.23
 jsonschema==3.2.0
 paramiko==2.7.1
 PySocks==1.7.1
-python-dotenv==0.13.0
+python-dotenv==0.14.0
 pywin32==227; sys_platform == 'win32'
-PyYAML==5.3
+PyYAML==5.3.1
 requests==2.22.0
 texttable==1.6.2
 urllib3==1.25.9; python_version == '3.3'
