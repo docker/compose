@@ -61,6 +61,15 @@ func (suite *BackendSuiteTest) TestErrorMessageRunSingleContainerNameWithCompose
 	Expect(err.Error()).To(Equal("invalid container name. ACI container name cannot include \"_\""))
 }
 
+func (suite *BackendSuiteTest) TestVerifyCommand() {
+	err := verifyExecCommand("command") // Command without an argument
+	Expect(err).To(BeNil())
+	err = verifyExecCommand("command argument") // Command with argument
+	Expect(err).NotTo(BeNil())
+	Expect(err.Error()).To(Equal("ACI exec command does not accept arguments to the command. " +
+		"Only the binary should be specified"))
+}
+
 func TestBackendSuite(t *testing.T) {
 	RegisterTestingT(t)
 	suite.Run(t, new(BackendSuiteTest))

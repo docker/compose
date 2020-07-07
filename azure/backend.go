@@ -193,6 +193,10 @@ func getGroupAndContainerName(containerID string) (groupName string, containerNa
 }
 
 func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
+	err := verifyExecCommand(command)
+	if err != nil {
+		return err
+	}
 	groupName, containerAciName := getGroupAndContainerName(name)
 	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, groupName, containerAciName)
 	if err != nil {
@@ -206,6 +210,15 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 		reader,
 		writer,
 	)
+}
+
+func verifyExecCommand(command string) error {
+	tokens := strings.Split(command, " ")
+	if len(tokens) > 1 {
+		return errors.New("ACI exec command does not accept arguments to the command. " +
+			"Only the binary should be specified")
+	}
+	return nil
 }
 
 func (cs *aciContainerService) Logs(ctx context.Context, containerName string, req containers.LogsRequest) error {
