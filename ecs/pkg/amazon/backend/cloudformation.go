@@ -17,6 +17,7 @@ import (
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/compatibility"
+	"github.com/compose-spec/compose-go/errdefs"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
@@ -39,8 +40,7 @@ func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortCo
 		p.Published = p.Target
 	}
 	if p.Published != p.Target {
-		c.Error("published port can't be set to a distinct value than container port")
-		p.Published = p.Target
+		c.Incompatible("published port can't be set to a distinct value than container port")
 	}
 }
 
@@ -51,7 +51,7 @@ func (c *FargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) 
 		case "SYS_PTRACE":
 			add = append(add, cap)
 		default:
-			c.Error("service.cap_add = %s", cap)
+			c.Incompatible("ECS doesn't allow to add capability %s", cap)
 		}
 	}
 	service.CapAdd = add
@@ -86,7 +86,14 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 	}
 	compatibility.Check(project, checker)
 	for _, err := range checker.Errors() {
-		logrus.Warn(err.Error())
+		if errdefs.IsIncompatibleError(err) {
+			logrus.Error(err.Error())
+		} else {
+			logrus.Warn(err.Error())
+		}
+	}
+	if !compatibility.IsCompatible(checker) {
+		return nil, fmt.Errorf("compose file is incompatible with Amazon ECS")
 	}
 
 	template := cloudformation.NewTemplate()
