@@ -20,9 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -134,9 +137,7 @@ func (login AzureLoginService) Login(ctx context.Context, requestedTenantID stri
 	if redirectURL == "" {
 		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
 	}
-	if err = login.apiHelper.openAzureLoginPage(redirectURL); err != nil {
-		return err
-	}
+	login.apiHelper.openAzureLoginPage(redirectURL)
 
 	select {
 	case <-ctx.Done():
@@ -300,4 +301,22 @@ func (login AzureLoginService) refreshToken(currentRefreshToken string, tenantID
 	}
 
 	return toOAuthToken(token), nil
+}
+
+func openbrowser(url string) {
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 }

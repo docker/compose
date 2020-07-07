@@ -25,22 +25,21 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 )
 
 type apiHelper interface {
 	queryToken(data url.Values, tenantID string) (azureToken, error)
-	openAzureLoginPage(redirectURL string) error
+	openAzureLoginPage(redirectURL string)
 	queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error)
 }
 
 type azureAPIHelper struct{}
 
-func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
+func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) {
 	state := randomString("", 10)
 	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
-	return browser.OpenURL(authURL)
+	openbrowser(authURL)
 }
 
 func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
