@@ -173,6 +173,11 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
+		//if user canceled request, simply exit without any error message
+		if errors.Is(ctx.Err(), context.Canceled) {
+			os.Exit(130)
+		}
+
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
