@@ -61,7 +61,7 @@ type E2eACISuite struct {
 }
 
 func (s *E2eACISuite) TestContextDefault() {
-	s.T().Run("should be initialized with default context", func(t *testing.T) {
+	s.Step("should be initialized with default context", func() {
 		_, err := s.NewCommand("docker", "context", "rm", "-f", contextName).Exec()
 		if err == nil {
 			log.Println("Cleaning existing test context")
@@ -75,7 +75,7 @@ func (s *E2eACISuite) TestContextDefault() {
 }
 
 func (s *E2eACISuite) TestACIBackend() {
-	s.T().Run("Logs in azure using service principal credentials", func(t *testing.T) {
+	s.Step("Logs in azure using service principal credentials", func() {
 		login, err := login.NewAzureLoginService()
 		Expect(err).To(BeNil())
 		// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
@@ -86,7 +86,7 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(err).To(BeNil())
 	})
 
-	s.T().Run("creates a new aci context for tests", func(t *testing.T) {
+	s.Step("creates a new aci context for tests", func() {
 		setupTestResourceGroup(resourceGroupName)
 		helper := azure.NewACIResourceGroupHelper()
 		models, err := helper.GetSubscriptionIDs(context.TODO())
@@ -98,20 +98,20 @@ func (s *E2eACISuite) TestACIBackend() {
 
 	defer deleteResourceGroup(resourceGroupName)
 
-	s.T().Run("uses the aci context", func(t *testing.T) {
+	s.Step("uses the aci context", func() {
 		currentContext := s.NewCommand("docker", "context", "use", contextName).ExecOrDie()
 		Expect(currentContext).To(ContainSubstring(contextName))
 		output := s.NewCommand("docker", "context", "ls").ExecOrDie()
 		Expect(output).To(ContainSubstring("acitest *"))
 	})
 
-	It("ensures no container is running initially", func() {
+	s.Step("ensures no container is running initially", func() {
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		Expect(len(Lines(output))).To(Equal(1))
 	})
 
 	var nginxExposedURL string
-	s.T().Run("runs nginx on port 80", func(t *testing.T) {
+	s.Step("runs nginx on port 80", func() {
 		aciContext := store.AciContext{
 			SubscriptionID: subscriptionID,
 			Location:       location,
@@ -150,13 +150,13 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("GET"))
 	})
 
-	s.T().Run("exec command", func(t *testing.T) {
+	s.Step("exec command", func() {
 		_, err := s.NewDockerCommand("exec", testContainerName, "echo", "fail_with_argument").Exec()
 		Expect(err.Error()).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
 			"Only the binary should be specified"))
 	})
 
-	s.T().Run("follow logs from nginx", func(t *testing.T) {
+	s.Step("follow logs from nginx", func() {
 		timeChan := make(chan time.Time)
 
 		ctx := s.NewDockerCommand("logs", "--follow", testContainerName).WithTimeout(timeChan)
@@ -178,12 +178,12 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("/test"))
 	})
 
-	s.T().Run("removes container nginx", func(t *testing.T) {
+	s.Step("removes container nginx", func() {
 		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
 		Expect(Lines(output)[0]).To(Equal(testContainerName))
 	})
 
-	s.T().Run("re-run nginx with modified cpu/mem, and without --detach and follow logs", func(t *testing.T) {
+	s.Step("re-run nginx with modified cpu/mem, and without --detach and follow logs", func() {
 		shutdown := make(chan time.Time)
 		errs := make(chan error)
 		outChan := make(chan string)
@@ -224,7 +224,7 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("/test"))
 	})
 
-	s.T().Run("removes container nginx", func(t *testing.T) {
+	s.Step("removes container nginx", func() {
 		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
 		Expect(Lines(output)[0]).To(Equal(testContainerName))
 	})
@@ -236,7 +236,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	const serverContainer = composeProjectName + "_web"
 	const wordsContainer = composeProjectName + "_words"
 
-	s.T().Run("deploys a compose app", func(t *testing.T) {
+	s.Step("deploys a compose app", func() {
 		// specifically do not specify project name here, it will be derived from current folder "acie2e"
 		s.NewDockerCommand("compose", "up", "-f", composeFile).ExecOrDie()
 		output := s.NewDockerCommand("ps").ExecOrDie()
@@ -263,12 +263,12 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(webChecked).To(BeTrue())
 	})
 
-	s.T().Run("get logs from web service", func(t *testing.T) {
+	s.Step("get logs from web service", func() {
 		output := s.NewDockerCommand("logs", serverContainer).ExecOrDie()
 		Expect(output).To(ContainSubstring("Listening on port 80"))
 	})
 
-	s.T().Run("updates a compose app", func(t *testing.T) {
+	s.Step("updates a compose app", func() {
 		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName).ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := s.NewDockerCommand("ps").ExecOrDie()
@@ -304,11 +304,11 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(wordsChecked).To(BeTrue())
 	})
 
-	s.T().Run("shutdown compose app", func(t *testing.T) {
+	s.Step("shutdown compose app", func() {
 		s.NewDockerCommand("compose", "down", "--project-name", composeProjectName).ExecOrDie()
 	})
 
-	s.T().Run("runs mysql with env variables", func(t *testing.T) {
+	s.Step("runs mysql with env variables", func() {
 		err := os.Setenv("MYSQL_USER", "user1")
 		Expect(err).To(BeNil())
 		s.NewDockerCommand("run", "-d", "mysql:5.7", "-e", "MYSQL_ROOT_PASSWORD=rootpwd", "-e", "MYSQL_DATABASE=mytestdb", "-e", "MYSQL_USER", "-e", "MYSQL_PASSWORD=userpwd").ExecOrDie()
@@ -330,12 +330,12 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(err).To(BeNil())
 	})
 
-	s.T().Run("switches back to default context", func(t *testing.T) {
+	s.Step("switches back to default context", func() {
 		output := s.NewCommand("docker", "context", "use", "default").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
 	})
 
-	s.T().Run("deletes test context", func(t *testing.T) {
+	s.Step("deletes test context", func() {
 		output := s.NewCommand("docker", "context", "rm", contextName).ExecOrDie()
 		Expect(output).To(ContainSubstring(contextName))
 	})

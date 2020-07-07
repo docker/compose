@@ -99,7 +99,7 @@ func (s *E2eSuite) TestContextLsFormat() {
 }
 
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
-	It("should dispay new cli error when parsing context create flags", func() {
+	s.Step("should dispay new cli error when parsing context create flags", func() {
 		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
 		Expect(err.Error()).NotTo(ContainSubstring("unknown flag"))
 		Expect(err.Error()).To(ContainSubstring("accepts 1 arg(s), received 0"))
@@ -154,7 +154,7 @@ func (s *E2eSuite) TestCloudLogin() {
 }
 
 func (s *E2eSuite) TestSetupError() {
-	It("should display an error if cannot shell out to com.docker.cli", func() {
+	s.Step("should display an error if cannot shell out to com.docker.cli", func() {
 		err := os.Setenv("PATH", s.BinDir)
 		Expect(err).To(BeNil())
 		err = os.Remove(filepath.Join(s.BinDir, DockerClassicExecutable()))
@@ -167,23 +167,23 @@ func (s *E2eSuite) TestSetupError() {
 }
 
 func (s *E2eSuite) TestLegacy() {
-	It("should list all legacy commands", func() {
+	s.Step("should list all legacy commands", func() {
 		output := s.NewDockerCommand("--help").ExecOrDie()
 		Expect(output).To(ContainSubstring("swarm"))
 	})
 
-	It("should execute legacy commands", func() {
+	s.Step("should execute legacy commands", func() {
 		output, _ := s.NewDockerCommand("swarm", "join").Exec()
 		Expect(output).To(ContainSubstring("\"docker swarm join\" requires exactly 1 argument."))
 	})
 
-	It("should run local container in less than 10 secs", func() {
+	s.Step("should run local container in less than 10 secs", func() {
 		s.NewDockerCommand("pull", "hello-world").ExecOrDie()
 		output := s.NewDockerCommand("run", "--rm", "hello-world").WithTimeout(time.NewTimer(20 * time.Second).C).ExecOrDie()
 		Expect(output).To(ContainSubstring("Hello from Docker!"))
 	})
 
-	It("should execute legacy commands in other moby contexts", func() {
+	s.Step("should execute legacy commands in other moby contexts", func() {
 		s.NewDockerCommand("context", "create", "mobyCtx", "--from=default").ExecOrDie()
 		s.NewDockerCommand("context", "use", "mobyCtx").ExecOrDie()
 		output, _ := s.NewDockerCommand("swarm", "join").Exec()
@@ -256,12 +256,12 @@ func (s *E2eSuite) TestAllowsFormatFlagInVersion() {
 }
 
 func (s *E2eSuite) TestMockBackend() {
-	It("creates a new test context to hardcoded example backend", func() {
+	s.Step("creates a new test context to hardcoded example backend", func() {
 		s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
 		// Expect(output).To(ContainSubstring("test-example context acitest created"))
 	})
 
-	It("uses the test context", func() {
+	s.Step("uses the test context", func() {
 		currentContext := s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
 		Expect(currentContext).To(ContainSubstring("test-example"))
 		output := s.NewDockerCommand("context", "ls").ExecOrDie()
@@ -270,14 +270,14 @@ func (s *E2eSuite) TestMockBackend() {
 		Expect(output).To(ContainSubstring("test-example"))
 	})
 
-	It("can run ps command", func() {
+	s.Step("can run ps command", func() {
 		output := s.NewDockerCommand("ps").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(3))
 		Expect(lines[2]).To(ContainSubstring("1234                alpine"))
 	})
 
-	It("can run quiet ps command", func() {
+	s.Step("can run quiet ps command", func() {
 		output := s.NewDockerCommand("ps", "-q").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(2))
@@ -285,7 +285,7 @@ func (s *E2eSuite) TestMockBackend() {
 		Expect(lines[1]).To(Equal("1234"))
 	})
 
-	It("can run ps command with all ", func() {
+	s.Step("can run ps command with all ", func() {
 		output := s.NewDockerCommand("ps", "-q", "--all").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(3))
@@ -294,11 +294,11 @@ func (s *E2eSuite) TestMockBackend() {
 		Expect(lines[2]).To(Equal("stopped"))
 	})
 
-	It("can run inspect command on container", func() {
+	s.Step("can run inspect command on container", func() {
 		golden.Assert(s.T(), s.NewDockerCommand("inspect", "id").ExecOrDie(), "inspect-id.golden")
 	})
 
-	It("can run 'run' command", func() {
+	s.Step("can run 'run' command", func() {
 		output := s.NewDockerCommand("run", "-d", "nginx", "-p", "80:80").ExecOrDie()
 		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
 	})

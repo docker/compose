@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/robpike/filter"
-	"github.com/sirupsen/logrus"
 )
 
 func nonEmptyString(s string) bool {
@@ -49,10 +48,4 @@ func GoldenFile(name string) string {
 // IsWindows windows or other GOOS
 func IsWindows() bool {
 	return runtime.GOOS == "windows"
-}
-
-// It runs func
-func It(description string, test func()) {
-	test()
-	logrus.Print("Passed: ", description)
 }
