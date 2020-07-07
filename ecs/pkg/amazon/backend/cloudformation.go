@@ -40,6 +40,7 @@ func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortCo
 	}
 	if p.Published != p.Target {
 		c.Error("published port can't be set to a distinct value than container port")
+		p.Published = p.Target
 	}
 }
 
