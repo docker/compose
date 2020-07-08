@@ -128,7 +128,7 @@ services:
 `)
 	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	container := def.ContainerDefinitions[0]
-	assert.Equal(t, container.Image, "docker.io/library/image")
+	assert.Equal(t, container.Image, "image")
 	assert.Equal(t, container.Command[0], "command")
 	assert.Equal(t, container.EntryPoint[0], "entrypoint")
 	assert.Equal(t, get(container.Environment, "FOO"), "BAR")

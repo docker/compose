@@ -52,7 +52,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 				FirelensConfiguration: nil,
 				HealthCheck:           toHealthCheck(service.HealthCheck),
 				Hostname:              service.Hostname,
-				Image:                 getImage(service.Image),
+				Image:                 service.Image,
 				Interactive:           false,
 				Links:                 nil,
 				LinuxParameters:       toLinuxParameters(service),
@@ -306,17 +306,6 @@ func toKeyValuePair(environment types.MappingWithEquals) []ecs.TaskDefinition_Ke
 		})
 	}
 	return pairs
-}
-
-func getImage(image string) string {
-	switch f := strings.Split(image, "/"); len(f) {
-	case 1:
-		return "docker.io/library/" + image
-	case 2:
-		return "docker.io/" + image
-	default:
-		return image
-	}
 }
 
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
