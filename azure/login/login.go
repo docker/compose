@@ -22,14 +22,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	auth2 "github.com/Azure/go-autorest/autorest/azure/auth"
-	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -80,7 +79,7 @@ const tokenStoreFilename = "dockerAccessToken.json"
 
 // NewAzureLoginService creates a NewAzureLoginService
 func NewAzureLoginService() (AzureLoginService, error) {
-	return newAzureLoginServiceFromPath(getTokenStorePath(), azureAPIHelper{})
+	return newAzureLoginServiceFromPath(GetTokenStorePath(), azureAPIHelper{})
 }
 
 func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (AzureLoginService, error) {
@@ -118,6 +117,15 @@ func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, cl
 		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
 	}
 	return nil
+}
+
+// Logout remove azure token data
+func (login AzureLoginService) Logout(ctx context.Context) error {
+	err := login.tokenStore.removeData()
+	if os.IsNotExist(err) {
+		return errors.New("No Azure login data to be removed")
+	}
+	return err
 }
 
 // Login performs an Azure login through a web browser
@@ -208,11 +216,6 @@ func getTenantID(tenantValues []tenantValue, requestedTenantID string) (string, 
 	return "", errors.Errorf("could not find requested azure tenant %s", requestedTenantID)
 }
 
-func getTokenStorePath() string {
-	cliPath, _ := cli.AccessTokensPath()
-	return filepath.Join(filepath.Dir(cliPath), tokenStoreFilename)
-}
-
 func toOAuthToken(token azureToken) oauth2.Token {
 	expireTime := time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
 	oauthToken := oauth2.Token{
@@ -241,7 +244,7 @@ func spToOAuthToken(token adal.Token) (oauth2.Token, error) {
 
 // NewAuthorizerFromLogin creates an authorizer based on login access token
 func NewAuthorizerFromLogin() (autorest.Authorizer, error) {
-	return newAuthorizerFromLoginStorePath(getTokenStorePath())
+	return newAuthorizerFromLoginStorePath(GetTokenStorePath())
 }
 
 func newAuthorizerFromLoginStorePath(storeTokenPath string) (autorest.Authorizer, error) {

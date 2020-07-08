@@ -35,7 +35,7 @@ import (
 func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login [OPTIONS] [SERVER]",
-		Short: "Log in to a Docker registry",
+		Short: "Log in to a Docker registry or cloud backend",
 		Long:  "Log in to a Docker registry or cloud backend.\nIf no registry server is specified, the default is defined by the daemon.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runLogin,

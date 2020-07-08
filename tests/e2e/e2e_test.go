@@ -18,17 +18,13 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
-	"github.com/docker/api/errdefs"
-
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
-
 	"gotest.tools/golden"
 
 	. "github.com/docker/api/tests/framework"
@@ -44,14 +40,6 @@ func (s *E2eSuite) TestContextHelp() {
 	Expect(output).To(ContainSubstring("--location"))
 	Expect(output).To(ContainSubstring("--subscription-id"))
 	Expect(output).To(ContainSubstring("--resource-group"))
-}
-
-func (s *E2eSuite) TestContextCreateAciExitWithErrorCodeIfLoginRequired() {
-	cmd := exec.Command("docker", "context", "create", "aci", "someContext")
-	output, err := cmd.CombinedOutput()
-	Expect(err).NotTo(BeNil())
-	Expect(string(output)).To(ContainSubstring("not logged in to azure, you need to run \"docker login azure\" first"))
-	Expect(cmd.ProcessState.ExitCode()).To(Equal(errdefs.ExitCodeLoginRequired))
 }
 
 func (s *E2eSuite) TestListAndShowDefaultContext() {

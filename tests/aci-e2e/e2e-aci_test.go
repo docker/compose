@@ -22,9 +22,12 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/api/errdefs"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
@@ -56,6 +59,25 @@ var (
 
 type E2eACISuite struct {
 	Suite
+}
+
+func (s *E2eACISuite) TestLoginLogoutCreateContextError() {
+	s.Step("Logs in azure using service principal credentials", azureLogin)
+
+	s.Step("logout from azure", func() {
+		output := s.NewDockerCommand("logout", "azure").ExecOrDie()
+		Expect(output).To(ContainSubstring(""))
+		_, err := os.Stat(login.GetTokenStorePath())
+		Expect(os.IsNotExist(err)).To(BeTrue())
+	})
+
+	s.Step("check context create fails with an explicit error and returns a specific error code", func() {
+		cmd := exec.Command("docker", "context", "create", "aci", "someContext")
+		bytes, err := cmd.CombinedOutput()
+		Expect(err).NotTo(BeNil())
+		Expect(string(bytes)).To(ContainSubstring("not logged in to azure, you need to run \"docker login azure\" first"))
+		Expect(cmd.ProcessState.ExitCode()).To(Equal(errdefs.ExitCodeLoginRequired))
+	})
 }
 
 func (s *E2eACISuite) TestACIRunSingleContainer() {
