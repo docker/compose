@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -101,10 +102,17 @@ func saveCredentials(profile string, accessKeyID string, secretAccessKey string)
 	}
 
 	if err.(awserr.Error).Code() == "SharedCredsLoad" && err.(awserr.Error).Message() == "failed to load shared credentials file" {
-		os.Create(p.Filename)
+		err = os.MkdirAll(filepath.Dir(p.Filename), 0700)
+		if err != nil {
+			return err
+		}
+		_, err = os.Create(p.Filename)
+		if err != nil {
+			return err
+		}
 	}
 
-	credIni, err := ini.Load(p.Filename)
+	credIni, err := ini.LooseLoad(p.Filename)
 	if err != nil {
 		return err
 	}
@@ -122,7 +130,7 @@ func awsProfiles(filename string) (map[string]ini.Section, error) {
 	if filename == "" {
 		filename = defaults.SharedConfigFilename()
 	}
-	credIni, err := ini.Load(filename)
+	credIni, err := ini.LooseLoad(filename)
 	if err != nil {
 		return nil, err
 	}
