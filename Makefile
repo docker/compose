@@ -23,6 +23,7 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
+TESTIFY_OPTS=$(if $(TESTIFY),-testify.m $(TESTIFY),)
 
 all: cli
 
@@ -37,14 +38,14 @@ cli: ## Compile the cli
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
-e2e-local: ## Run End to end local tests
-	go test -v ./tests/e2e ./tests/skip-win-ci-e2e ./local/e2e
+e2e-local: ## Run End to end local tests. set env TESTIFY=Test1 for running single test
+	go test -v ./tests/e2e ./tests/skip-win-ci-e2e ./local/e2e $(TESTIFY_OPTS)
 
-e2e-win-ci: ## Run End to end local tests on windows CI, no docker for linux containers available ATM
-	go test -v ./tests/e2e
+e2e-win-ci: ## Run End to end local tests on windows CI, no docker for linux containers available ATM. set env TESTIFY=Test1 for running single test
+	go test -v ./tests/e2e $(TESTIFY_OPTS)
 
-e2e-aci: ## Run End to end ACI tests (requires azure login)
-	go test -v ./tests/aci-e2e
+e2e-aci: ## Run End to end ACI tests. set env TESTIFY=Test1 for running single test
+	go test -v ./tests/aci-e2e $(TESTIFY_OPTS)
 
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \
