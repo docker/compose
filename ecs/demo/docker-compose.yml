@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  frontend:
+    build: app
+    x-aws-pull_credentials: <<<your arn for your secret you can get with docker ecs secret list>>>
+    image: <<<yourhubname>>>/timestamper
+    ports:
+      - "5000:5000"
+    depends_on:
+      - backend
+  backend:
+    image: redis:alpine
