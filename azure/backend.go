@@ -43,8 +43,9 @@ import (
 )
 
 const (
-	singleContainerName       = "single--container--aci"
+	singleContainerTag        = "single--container--aci"
 	composeContainerSeparator = "_"
+	statusUnknown             = "Unknown"
 )
 
 // ErrNoSuchContainer is returned when the mentioned container does not exist
@@ -129,32 +130,42 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 			return []containers.Container{}, err
 		}
 
+		if _, ok := group.Tags[singleContainerTag]; ok {
+			if group.Containers == nil || len(*group.Containers) < 1 {
+				return []containers.Container{}, fmt.Errorf("no containers to run")
+			}
+			container := (*group.Containers)[0]
+			c := getContainer(*containerGroup.Name, group.IPAddress, container)
+			res = append(res, c)
+			continue
+		}
+
 		for _, container := range *group.Containers {
 			var containerID string
 			// don't list sidecar container
 			if *container.Name == convert.ComposeDNSSidecarName {
 				continue
 			}
-			if *container.Name == singleContainerName {
-				containerID = *containerGroup.Name
-			} else {
-				containerID = *containerGroup.Name + composeContainerSeparator + *container.Name
-			}
-			status := "Unknown"
-			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
-				status = *container.InstanceView.CurrentState.State
-			}
-
-			res = append(res, containers.Container{
-				ID:     containerID,
-				Image:  *container.Image,
-				Status: status,
-				Ports:  convert.ToPorts(group.IPAddress, *container.Ports),
-			})
+			containerID = *containerGroup.Name + composeContainerSeparator + *container.Name
+			c := getContainer(containerID, group.IPAddress, container)
+			res = append(res, c)
 		}
 	}
 
 	return res, nil
+}
+
+func getContainer(containerID string, ipAddress *containerinstance.IPAddress, container containerinstance.Container) containers.Container {
+	status := statusUnknown
+	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
+		status = *container.InstanceView.CurrentState.State
+	}
+	return containers.Container{
+		ID:     containerID,
+		Image:  *container.Image,
+		Status: status,
+		Ports:  convert.ToPorts(ipAddress, *container.Ports),
+	}
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
@@ -162,7 +173,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return errors.New(fmt.Sprintf("invalid container name. ACI container name cannot include %q", composeContainerSeparator))
 	}
 
-	project, err := convert.ContainerToComposeProject(r, singleContainerName)
+	project, err := convert.ContainerToComposeProject(r)
 	if err != nil {
 		return err
 	}
@@ -173,6 +184,11 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return err
 	}
 
+	if groupDefinition.Tags == nil {
+		groupDefinition.Tags = make(map[string]*string, 1)
+	}
+	groupDefinition.Tags[singleContainerTag] = to.StringPtr("")
+
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
@@ -180,14 +196,13 @@ func (cs *aciContainerService) Stop(ctx context.Context, containerName string, t
 	return errdefs.ErrNotImplemented
 }
 
-func getGroupAndContainerName(containerID string) (groupName string, containerName string) {
+func getGroupAndContainerName(containerID string) (string, string) {
 	tokens := strings.Split(containerID, composeContainerSeparator)
-	groupName = tokens[0]
+	groupName := tokens[0]
+	containerName := groupName
 	if len(tokens) > 1 {
 		containerName = tokens[len(tokens)-1]
 		groupName = containerID[:len(containerID)-(len(containerName)+1)]
-	} else {
-		containerName = singleContainerName
 	}
 	return groupName, containerName
 }

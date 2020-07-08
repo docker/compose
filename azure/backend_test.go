@@ -34,7 +34,7 @@ type BackendSuiteTest struct {
 func (suite *BackendSuiteTest) TestGetContainerName() {
 	group, container := getGroupAndContainerName("docker1234")
 	Expect(group).To(Equal("docker1234"))
-	Expect(container).To(Equal(singleContainerName))
+	Expect(container).To(Equal("docker1234"))
 
 	group, container = getGroupAndContainerName("compose_service1")
 	Expect(group).To(Equal("compose"))

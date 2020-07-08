@@ -10,7 +10,7 @@ import (
 )
 
 // ContainerToComposeProject convert container config to compose project
-func ContainerToComposeProject(r containers.ContainerConfig, containerID string) (types.Project, error) {
+func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, error) {
 	var ports []types.ServicePortConfig
 	for _, p := range r.Ports {
 		ports = append(ports, types.ServicePortConfig{
@@ -28,7 +28,7 @@ func ContainerToComposeProject(r containers.ContainerConfig, containerID string)
 		Name: r.ID,
 		Services: []types.ServiceConfig{
 			{
-				Name:        containerID,
+				Name:        r.ID,
 				Image:       r.Image,
 				Ports:       ports,
 				Labels:      r.Labels,
