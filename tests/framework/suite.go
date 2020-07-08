@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -131,6 +132,13 @@ func (s *Suite) NewCommand(command string, args ...string) *CmdContext {
 		args:    args,
 		retries: RetriesContext{interval: time.Second},
 	}
+}
+
+// Step runs a step in a test, with an identified name and output in test results
+func (s *Suite) Step(name string, test func()) {
+	s.T().Run(name, func(t *testing.T) {
+		test()
+	})
 }
 
 func dockerExecutable() string {

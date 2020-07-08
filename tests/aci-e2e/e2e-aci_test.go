@@ -51,77 +51,31 @@ const (
 )
 
 var (
-	subscriptionID         string
-	resourceGroupName      = "resourceGroupTestE2E-" + RandStringBytes(10)
-	testStorageAccountName = "storageteste2e" + RandStringBytes(6) // "between 3 and 24 characters in length and use numbers and lower-case letters only"
+	subscriptionID string
 )
 
 type E2eACISuite struct {
 	Suite
 }
 
-func (s *E2eACISuite) TestContextDefault() {
-	s.T().Run("should be initialized with default context", func(t *testing.T) {
-		_, err := s.NewCommand("docker", "context", "rm", "-f", contextName).Exec()
-		if err == nil {
-			log.Println("Cleaning existing test context")
-		}
-
-		s.NewCommand("docker", "context", "use", "default").ExecOrDie()
-		output := s.NewCommand("docker", "context", "ls").ExecOrDie()
-		Expect(output).To(Not(ContainSubstring(contextName)))
-		Expect(output).To(ContainSubstring("default *"))
-	})
-}
-
-func (s *E2eACISuite) TestACIBackend() {
-	s.T().Run("Logs in azure using service principal credentials", func(t *testing.T) {
-		login, err := login.NewAzureLoginService()
-		Expect(err).To(BeNil())
-		// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
-		clientID := os.Getenv("AZURE_CLIENT_ID")
-		clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
-		tenantID := os.Getenv("AZURE_TENANT_ID")
-		err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
-		Expect(err).To(BeNil())
-	})
-
-	s.T().Run("creates a new aci context for tests", func(t *testing.T) {
-		setupTestResourceGroup(resourceGroupName)
-		helper := azure.NewACIResourceGroupHelper()
-		models, err := helper.GetSubscriptionIDs(context.TODO())
-		Expect(err).To(BeNil())
-		subscriptionID = *models[0].SubscriptionID
-
-		s.NewDockerCommand("context", "create", "aci", contextName, "--subscription-id", subscriptionID, "--resource-group", resourceGroupName, "--location", location).ExecOrDie()
-	})
-
+func (s *E2eACISuite) TestACIRunSingleContainer() {
+	resourceGroupName := s.setupTestResourceGroup()
 	defer deleteResourceGroup(resourceGroupName)
 
-	s.T().Run("uses the aci context", func(t *testing.T) {
-		currentContext := s.NewCommand("docker", "context", "use", contextName).ExecOrDie()
-		Expect(currentContext).To(ContainSubstring(contextName))
-		output := s.NewCommand("docker", "context", "ls").ExecOrDie()
-		Expect(output).To(ContainSubstring("acitest *"))
-	})
-
-	It("ensures no container is running initially", func() {
-		output := s.NewDockerCommand("ps").ExecOrDie()
-		Expect(len(Lines(output))).To(Equal(1))
-	})
-
 	var nginxExposedURL string
-	s.T().Run("runs nginx on port 80", func(t *testing.T) {
+	s.Step("runs nginx on port 80", func() {
 		aciContext := store.AciContext{
 			SubscriptionID: subscriptionID,
 			Location:       location,
 			ResourceGroup:  resourceGroupName,
 		}
+
+		testStorageAccountName := "storageteste2e" + RandStringBytes(6) // "between 3 and 24 characters in length and use numbers and lower-case letters only"
 		createStorageAccount(aciContext, testStorageAccountName)
-		defer deleteStorageAccount(aciContext)
+		defer deleteStorageAccount(aciContext, testStorageAccountName)
 		keys := getStorageKeys(aciContext, testStorageAccountName)
 		firstKey := *keys[0].Value
-		credential, u := createFileShare(firstKey, testShareName)
+		credential, u := createFileShare(firstKey, testShareName, testStorageAccountName)
 		uploadFile(credential, u.String(), testFileName, testFileContent)
 
 		mountTarget := "/usr/share/nginx/html"
@@ -150,13 +104,13 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("GET"))
 	})
 
-	s.T().Run("exec command", func(t *testing.T) {
+	s.Step("exec command", func() {
 		_, err := s.NewDockerCommand("exec", testContainerName, "echo", "fail_with_argument").Exec()
 		Expect(err.Error()).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
 			"Only the binary should be specified"))
 	})
 
-	s.T().Run("follow logs from nginx", func(t *testing.T) {
+	s.Step("follow logs from nginx", func() {
 		timeChan := make(chan time.Time)
 
 		ctx := s.NewDockerCommand("logs", "--follow", testContainerName).WithTimeout(timeChan)
@@ -178,12 +132,12 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("/test"))
 	})
 
-	s.T().Run("removes container nginx", func(t *testing.T) {
+	s.Step("removes container nginx", func() {
 		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
 		Expect(Lines(output)[0]).To(Equal(testContainerName))
 	})
 
-	s.T().Run("re-run nginx with modified cpu/mem, and without --detach and follow logs", func(t *testing.T) {
+	s.Step("re-run nginx with modified cpu/mem, and without --detach and follow logs", func() {
 		shutdown := make(chan time.Time)
 		errs := make(chan error)
 		outChan := make(chan string)
@@ -224,10 +178,14 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(output).To(ContainSubstring("/test"))
 	})
 
-	s.T().Run("removes container nginx", func(t *testing.T) {
+	s.Step("removes container nginx", func() {
 		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
 		Expect(Lines(output)[0]).To(Equal(testContainerName))
 	})
+}
+
+func (s *E2eACISuite) TestACIComposeApplication() {
+	defer deleteResourceGroup(s.setupTestResourceGroup())
 
 	var exposedURL string
 	const composeFile = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -236,7 +194,7 @@ func (s *E2eACISuite) TestACIBackend() {
 	const serverContainer = composeProjectName + "_web"
 	const wordsContainer = composeProjectName + "_words"
 
-	s.T().Run("deploys a compose app", func(t *testing.T) {
+	s.Step("deploys a compose app", func() {
 		// specifically do not specify project name here, it will be derived from current folder "acie2e"
 		s.NewDockerCommand("compose", "up", "-f", composeFile).ExecOrDie()
 		output := s.NewDockerCommand("ps").ExecOrDie()
@@ -263,12 +221,12 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(webChecked).To(BeTrue())
 	})
 
-	s.T().Run("get logs from web service", func(t *testing.T) {
+	s.Step("get logs from web service", func() {
 		output := s.NewDockerCommand("logs", serverContainer).ExecOrDie()
 		Expect(output).To(ContainSubstring("Listening on port 80"))
 	})
 
-	s.T().Run("updates a compose app", func(t *testing.T) {
+	s.Step("updates a compose app", func() {
 		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName).ExecOrDie()
 		// Expect(output).To(ContainSubstring("Successfully deployed"))
 		output := s.NewDockerCommand("ps").ExecOrDie()
@@ -304,11 +262,15 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(wordsChecked).To(BeTrue())
 	})
 
-	s.T().Run("shutdown compose app", func(t *testing.T) {
+	s.Step("shutdown compose app", func() {
 		s.NewDockerCommand("compose", "down", "--project-name", composeProjectName).ExecOrDie()
 	})
+}
 
-	s.T().Run("runs mysql with env variables", func(t *testing.T) {
+func (s *E2eACISuite) TestACIDeployMySQlwithEnvVars() {
+	defer deleteResourceGroup(s.setupTestResourceGroup())
+
+	s.Step("runs mysql with env variables", func() {
 		err := os.Setenv("MYSQL_USER", "user1")
 		Expect(err).To(BeNil())
 		s.NewDockerCommand("run", "-d", "mysql:5.7", "-e", "MYSQL_ROOT_PASSWORD=rootpwd", "-e", "MYSQL_DATABASE=mytestdb", "-e", "MYSQL_USER", "-e", "MYSQL_PASSWORD=userpwd").ExecOrDie()
@@ -330,15 +292,67 @@ func (s *E2eACISuite) TestACIBackend() {
 		Expect(err).To(BeNil())
 	})
 
-	s.T().Run("switches back to default context", func(t *testing.T) {
+	s.Step("switches back to default context", func() {
 		output := s.NewCommand("docker", "context", "use", "default").ExecOrDie()
 		Expect(output).To(ContainSubstring("default"))
 	})
 
-	s.T().Run("deletes test context", func(t *testing.T) {
+	s.Step("deletes test context", func() {
 		output := s.NewCommand("docker", "context", "rm", contextName).ExecOrDie()
 		Expect(output).To(ContainSubstring(contextName))
 	})
+}
+
+func (s *E2eACISuite) setupTestResourceGroup() string {
+	var resourceGroupName = randomResourceGroup()
+	s.Step("should be initialized with default context", s.checkDefaultContext)
+	s.Step("Logs in azure using service principal credentials", azureLogin)
+	s.Step("creates a new aci context for tests and use it", s.createAciContextAndUseIt(resourceGroupName))
+	s.Step("ensures no container is running initially", s.checkNoContainnersRunning)
+	return resourceGroupName
+}
+
+func (s *E2eACISuite) checkDefaultContext() {
+	output := s.NewCommand("docker", "context", "ls").ExecOrDie()
+	Expect(output).To(Not(ContainSubstring(contextName)))
+	Expect(output).To(ContainSubstring("default *"))
+}
+
+func azureLogin() {
+	login, err := login.NewAzureLoginService()
+	Expect(err).To(BeNil())
+	// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
+	clientID := os.Getenv("AZURE_CLIENT_ID")
+	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
+	tenantID := os.Getenv("AZURE_TENANT_ID")
+	err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
+	Expect(err).To(BeNil())
+}
+
+func (s *E2eACISuite) createAciContextAndUseIt(resourceGroupName string) func() {
+	return func() {
+		setupTestResourceGroup(resourceGroupName)
+		helper := azure.NewACIResourceGroupHelper()
+		models, err := helper.GetSubscriptionIDs(context.TODO())
+		Expect(err).To(BeNil())
+		subscriptionID = *models[0].SubscriptionID
+
+		s.NewDockerCommand("context", "create", "aci", contextName, "--subscription-id", subscriptionID, "--resource-group", resourceGroupName, "--location", location).ExecOrDie()
+
+		currentContext := s.NewCommand("docker", "context", "use", contextName).ExecOrDie()
+		Expect(currentContext).To(ContainSubstring(contextName))
+		output := s.NewCommand("docker", "context", "ls").ExecOrDie()
+		Expect(output).To(ContainSubstring("acitest *"))
+	}
+}
+
+func (s *E2eACISuite) checkNoContainnersRunning() {
+	output := s.NewDockerCommand("ps").ExecOrDie()
+	Expect(len(Lines(output))).To(Equal(1))
+}
+
+func randomResourceGroup() string {
+	return "resourceGroupTestE2E-" + RandStringBytes(10)
 }
 
 func createStorageAccount(aciContext store.AciContext, accountName string) azure_storage.Account {
@@ -358,13 +372,13 @@ func getStorageKeys(aciContext store.AciContext, storageAccountName string) []az
 	return *list.Keys
 }
 
-func deleteStorageAccount(aciContext store.AciContext) {
+func deleteStorageAccount(aciContext store.AciContext, testStorageAccountName string) {
 	log.Println("Deleting storage account " + testStorageAccountName)
 	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, testStorageAccountName)
 	Expect(err).To(BeNil())
 }
 
-func createFileShare(key, shareName string) (azfile.SharedKeyCredential, url.URL) {
+func createFileShare(key, shareName string, testStorageAccountName string) (azfile.SharedKeyCredential, url.URL) {
 	// Create a ShareURL object that wraps a soon-to-be-created share's URL and a default pipeline.
 	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", testStorageAccountName, shareName))
 	credential, err := azfile.NewSharedKeyCredential(testStorageAccountName, key)
@@ -389,25 +403,25 @@ func TestE2eACI(t *testing.T) {
 	suite.Run(t, new(E2eACISuite))
 }
 
-func setupTestResourceGroup(groupName string) {
+func setupTestResourceGroup(resourceGroupName string) {
 	log.Println("Creating resource group " + resourceGroupName)
 	ctx := context.TODO()
 	helper := azure.NewACIResourceGroupHelper()
 	models, err := helper.GetSubscriptionIDs(ctx)
 	Expect(err).To(BeNil())
-	_, err = helper.CreateOrUpdate(ctx, *models[0].SubscriptionID, groupName, resources.Group{
+	_, err = helper.CreateOrUpdate(ctx, *models[0].SubscriptionID, resourceGroupName, resources.Group{
 		Location: to.StringPtr(location),
 	})
 	Expect(err).To(BeNil())
 }
 
-func deleteResourceGroup(groupName string) {
+func deleteResourceGroup(resourceGroupName string) {
 	log.Println("Deleting resource group " + resourceGroupName)
 	ctx := context.TODO()
 	helper := azure.NewACIResourceGroupHelper()
 	models, err := helper.GetSubscriptionIDs(ctx)
 	Expect(err).To(BeNil())
-	err = helper.DeleteAsync(ctx, *models[0].SubscriptionID, groupName)
+	err = helper.DeleteAsync(ctx, *models[0].SubscriptionID, resourceGroupName)
 	Expect(err).To(BeNil())
 }
 
