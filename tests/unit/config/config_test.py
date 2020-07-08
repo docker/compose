@@ -3655,6 +3655,7 @@ class InterpolationTest(unittest.TestCase):
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
+    @pytest.mark.skip(reason='compatibility mode was removed internally')
     def test_compatibility_mode_warnings(self):
         config_details = build_config_details({
             'version': '3.5',
@@ -3693,6 +3694,7 @@ class InterpolationTest(unittest.TestCase):
         assert 'restart_policy.delay' in warn_message
         assert 'restart_policy.window' in warn_message
 
+    @pytest.mark.skip(reason='compatibility mode was removed internally')
     def test_compatibility_mode_load(self):
         config_details = build_config_details({
             'version': '3.5',

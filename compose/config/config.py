@@ -365,7 +365,7 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-def check_swarm_only_config(service_dicts, compatibility=False):
+def check_swarm_only_config(service_dicts):
     warning_template = (
         "Some services ({services}) use the '{key}' key, which will be ignored. "
         "Compose does not support '{key}' configuration - use "
@@ -386,7 +386,7 @@ def check_swarm_only_config(service_dicts, compatibility=False):
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details, compatibility=False, interpolate=True):
+def load(config_details, interpolate=True):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
@@ -416,13 +416,13 @@ def load(config_details, compatibility=False, interpolate=True):
     configs = load_mapping(
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
-    service_dicts = load_services(config_details, main_file, compatibility, interpolate=interpolate)
+    service_dicts = load_services(config_details, main_file, interpolate=interpolate)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    check_swarm_only_config(service_dicts, compatibility)
+    check_swarm_only_config(service_dicts)
 
     version = main_file.version
 
@@ -469,7 +469,7 @@ def validate_external(entity_type, name, config, version):
                     entity_type, name, ', '.join(k for k in config if k != 'external')))
 
 
-def load_services(config_details, config_file, compatibility=False, interpolate=True):
+def load_services(config_details, config_file, interpolate=True):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
@@ -488,7 +488,6 @@ def load_services(config_details, config_file, compatibility=False, interpolate=
             service_names,
             config_file.version,
             config_details.environment,
-            compatibility,
             interpolate
         )
         return service_dict
@@ -887,7 +886,7 @@ def finalize_service_volumes(service_dict, environment):
     return service_dict
 
 
-def finalize_service(service_config, service_names, version, environment, compatibility,
+def finalize_service(service_config, service_names, version, environment,
                      interpolate=True):
     service_dict = dict(service_config.config)
 
@@ -929,17 +928,6 @@ def finalize_service(service_config, service_names, version, environment, compat
 
     normalize_build(service_dict, service_config.working_dir, environment)
 
-    if compatibility:
-        service_dict = translate_credential_spec_to_security_opt(service_dict)
-        service_dict, ignored_keys = translate_deploy_keys_to_container_config(
-            service_dict
-        )
-        if ignored_keys:
-            log.warning(
-                'The following deploy sub-keys are not supported in compatibility mode and have'
-                ' been ignored: {}'.format(', '.join(ignored_keys))
-            )
-
     service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
 
@@ -971,62 +959,6 @@ def convert_credential_spec_to_security_opt(credential_spec):
     if 'file' in credential_spec:
         return 'file://{file}'.format(file=credential_spec['file'])
     return 'registry://{registry}'.format(registry=credential_spec['registry'])
-
-
-def translate_credential_spec_to_security_opt(service_dict):
-    result = []
-
-    if 'credential_spec' in service_dict:
-        spec = convert_credential_spec_to_security_opt(service_dict['credential_spec'])
-        result.append('credentialspec={spec}'.format(spec=spec))
-
-    if result:
-        service_dict['security_opt'] = result
-
-    return service_dict
-
-
-def translate_deploy_keys_to_container_config(service_dict):
-    if 'credential_spec' in service_dict:
-        del service_dict['credential_spec']
-    if 'configs' in service_dict:
-        del service_dict['configs']
-
-    if 'deploy' not in service_dict:
-        return service_dict, []
-
-    deploy_dict = service_dict['deploy']
-    ignored_keys = [
-        k for k in ['endpoint_mode', 'labels', 'update_config', 'rollback_config']
-        if k in deploy_dict
-    ]
-
-    if 'replicas' in deploy_dict and deploy_dict.get('mode', 'replicated') == 'replicated':
-        scale = deploy_dict.get('replicas', 1)
-        max_replicas = deploy_dict.get('placement', {}).get('max_replicas_per_node', scale)
-        service_dict['scale'] = min(scale, max_replicas)
-        if max_replicas < scale:
-            log.warning("Scale is limited to {} ('max_replicas_per_node' field).".format(
-                max_replicas))
-
-    if 'restart_policy' in deploy_dict:
-        service_dict['restart'] = {
-            'Name': convert_restart_policy(deploy_dict['restart_policy'].get('condition', 'any')),
-            'MaximumRetryCount': deploy_dict['restart_policy'].get('max_attempts', 0)
-        }
-        for k in deploy_dict['restart_policy'].keys():
-            if k != 'condition' and k != 'max_attempts':
-                ignored_keys.append('restart_policy.{}'.format(k))
-
-    ignored_keys.extend(
-        translate_resource_keys_to_container_config(
-            deploy_dict.get('resources', {}), service_dict
-        )
-    )
-
-    del service_dict['deploy']
-
-    return service_dict, ignored_keys
 
 
 def normalize_v1_service_format(service_dict):
