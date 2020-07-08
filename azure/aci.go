@@ -36,6 +36,7 @@ import (
 
 	"github.com/docker/api/azure/convert"
 	"github.com/docker/api/azure/login"
+	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/progress"
 )
@@ -166,7 +167,7 @@ func getTermSize() (*int32, *int32) {
 	return to.Int32Ptr(int32(rows)), to.Int32Ptr(int32(cols))
 }
 
-func exec(ctx context.Context, address string, password string, reader io.Reader, writer io.Writer) error {
+func exec(ctx context.Context, address string, password string, request containers.ExecRequest) error {
 	conn, _, _, err := ws.DefaultDialer.Dial(ctx, address)
 	if err != nil {
 		return err
@@ -190,34 +191,36 @@ func exec(ctx context.Context, address string, password string, reader io.Reader
 				downstreamChannel <- err
 				return
 			}
-			fmt.Fprint(writer, string(msg))
+			fmt.Fprint(request.Stdout, string(msg))
 		}
 	}()
 
-	go func() {
-		for {
-			// We send each byte, byte-per-byte over the
-			// websocket because the console is in raw mode
-			buffer := make([]byte, 1)
-			n, err := reader.Read(buffer)
-			if err != nil {
-				if err == io.EOF {
-					upstreamChannel <- nil
-					return
-				}
-				upstreamChannel <- err
-				return
-			}
-
-			if n > 0 {
-				err := wsutil.WriteClientMessage(conn, ws.OpText, buffer)
+	if request.Interactive {
+		go func() {
+			for {
+				// We send each byte, byte-per-byte over the
+				// websocket because the console is in raw mode
+				buffer := make([]byte, 1)
+				n, err := request.Stdin.Read(buffer)
 				if err != nil {
+					if err == io.EOF {
+						upstreamChannel <- nil
+						return
+					}
 					upstreamChannel <- err
 					return
 				}
+
+				if n > 0 {
+					err := wsutil.WriteClientMessage(conn, ws.OpText, buffer)
+					if err != nil {
+						upstreamChannel <- err
+						return
+					}
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	for {
 		select {

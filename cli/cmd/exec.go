@@ -27,10 +27,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/containers"
 )
 
 type execOpts struct {
-	Tty bool
+	tty         bool
+	interactive bool
 }
 
 // ExecCommand runs a command in a running container
@@ -45,8 +47,8 @@ func ExecCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Tty, "tty", "t", false, "Allocate a pseudo-TTY")
-	cmd.Flags().BoolP("interactive", "i", false, "Keep STDIN open even if not attached")
+	cmd.Flags().BoolVarP(&opts.tty, "tty", "t", false, "Allocate a pseudo-TTY")
+	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", false, "Keep STDIN open even if not attached")
 
 	return cmd
 }
@@ -57,7 +59,16 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	if opts.Tty {
+	request := containers.ExecRequest{
+		Command:     command,
+		Tty:         opts.tty,
+		Interactive: opts.interactive,
+		Stdin:       os.Stdin,
+		Stdout:      os.Stdout,
+		Stderr:      os.Stderr,
+	}
+
+	if opts.tty {
 		con := console.Current()
 		if err := con.SetRaw(); err != nil {
 			return err
@@ -67,7 +78,11 @@ func runExec(ctx context.Context, opts execOpts, name string, command string) er
 				fmt.Println("Unable to close the console")
 			}
 		}()
-		return c.ContainerService().Exec(ctx, name, command, con, con)
+
+		request.Stdin = con
+		request.Stdout = con
+		request.Stderr = con
 	}
-	return c.ContainerService().Exec(ctx, name, command, os.Stdin, os.Stdout)
+
+	return c.ContainerService().Exec(ctx, name, request)
 }

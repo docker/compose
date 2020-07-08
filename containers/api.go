@@ -72,6 +72,16 @@ type ContainerConfig struct {
 	Environment []string
 }
 
+// ExecRequest contaiens configuration about an exec request
+type ExecRequest struct {
+	Stdin       io.Reader
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Command     string
+	Interactive bool
+	Tty         bool
+}
+
 // LogsRequest contains configuration about a log request
 type LogsRequest struct {
 	Follow bool
@@ -88,7 +98,7 @@ type Service interface {
 	// Run creates and starts a container
 	Run(ctx context.Context, config ContainerConfig) error
 	// Exec executes a command inside a running container
-	Exec(ctx context.Context, containerName string, command string, reader io.Reader, writer io.Writer) error
+	Exec(ctx context.Context, containerName string, request ExecRequest) error
 	// Logs returns all the logs of a container
 	Logs(ctx context.Context, containerName string, request LogsRequest) error
 	// Delete removes containers

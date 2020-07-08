@@ -19,7 +19,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -192,13 +191,13 @@ func getGroupAndContainerName(containerID string) (groupName string, containerNa
 	return groupName, containerName
 }
 
-func (cs *aciContainerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
-	err := verifyExecCommand(command)
+func (cs *aciContainerService) Exec(ctx context.Context, name string, request containers.ExecRequest) error {
+	err := verifyExecCommand(request.Command)
 	if err != nil {
 		return err
 	}
 	groupName, containerAciName := getGroupAndContainerName(name)
-	containerExecResponse, err := execACIContainer(ctx, cs.ctx, command, groupName, containerAciName)
+	containerExecResponse, err := execACIContainer(ctx, cs.ctx, request.Command, groupName, containerAciName)
 	if err != nil {
 		return err
 	}
@@ -207,8 +206,7 @@ func (cs *aciContainerService) Exec(ctx context.Context, name string, command st
 		context.Background(),
 		*containerExecResponse.WebSocketURI,
 		*containerExecResponse.Password,
-		reader,
-		writer,
+		request,
 	)
 }
 

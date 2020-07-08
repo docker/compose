@@ -179,9 +179,9 @@ func (ms *local) Stop(ctx context.Context, containerID string, timeout *uint32) 
 	return ms.apiClient.ContainerStop(ctx, containerID, t)
 }
 
-func (ms *local) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
+func (ms *local) Exec(ctx context.Context, name string, request containers.ExecRequest) error {
 	cec, err := ms.apiClient.ContainerExecCreate(ctx, name, types.ExecConfig{
-		Cmd:          []string{command},
+		Cmd:          []string{request.Command},
 		Tty:          true,
 		AttachStdin:  true,
 		AttachStdout: true,
@@ -202,12 +202,12 @@ func (ms *local) Exec(ctx context.Context, name string, command string, reader i
 	writeChannel := make(chan error, 10)
 
 	go func() {
-		_, err := io.Copy(writer, resp.Reader)
+		_, err := io.Copy(request.Stdout, resp.Reader)
 		readChannel <- err
 	}()
 
 	go func() {
-		_, err := io.Copy(resp.Conn, reader)
+		_, err := io.Copy(resp.Conn, request.Stdin)
 		writeChannel <- err
 	}()
 

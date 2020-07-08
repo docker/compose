@@ -105,6 +105,9 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 	})
 
 	s.Step("exec command", func() {
+		output := s.NewDockerCommand("exec", testContainerName, "pwd").ExecOrDie()
+		Expect(output).To(ContainSubstring("/"))
+
 		_, err := s.NewDockerCommand("exec", testContainerName, "echo", "fail_with_argument").Exec()
 		Expect(err.Error()).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
 			"Only the binary should be specified"))
