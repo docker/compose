@@ -3,7 +3,7 @@ services:
   frontend:
     build: app
     x-aws-pull_credentials: <<<your arn for your secret you can get with docker ecs secret list>>>
-    image: <<<yourhubname>>>/timestamper
+    image: <<<your docker hub user name>>>/timestamper
     ports:
       - "5000:5000"
     depends_on:
