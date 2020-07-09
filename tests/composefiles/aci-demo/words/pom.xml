@@ -88,7 +88,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>29.0-jre</version>
+            <version>[24.1.1,)</version>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
