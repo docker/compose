@@ -4,6 +4,10 @@
 
 :exclamation: The Docker ECS plugin is still in Beta. It's design and UX will evolve until 1.0 Final release.
 
+## Example
+
+You can find an application for testing this in [example](./example).
+
 ## Architecture
 
 ECS plugin is a [Docker CLI plugin](https://docs.docker.com/engine/extend/cli_plugins/)
