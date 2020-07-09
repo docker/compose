@@ -17,10 +17,6 @@ import (
 )
 
 func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
-	if service.Image == "" {
-		return nil, fmt.Errorf("service %s doesn't define a Docker image to run", service.Name)
-	}
-
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err

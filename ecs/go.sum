@@ -58,6 +58,8 @@ github.com/compose-spec/compose-go v0.0.0-20200624120600-614475470cd8 h1:sVvKsoX
 github.com/compose-spec/compose-go v0.0.0-20200624120600-614475470cd8/go.mod h1:ih9anT8po+49hrb+1j3ldIJ/YRAaBH52ErlQLTKE2Yo=
 github.com/compose-spec/compose-go v0.0.0-20200707124823-710ff8e60ad9 h1:WkFqc6UpRqxROso9KC+ceaTiXx/VWpeO1x+NV0d4d+o=
 github.com/compose-spec/compose-go v0.0.0-20200707124823-710ff8e60ad9/go.mod h1:ArodJ6gsEB7iWKrbV3fSHZ08LlBvSVB0Oqg04fX86t4=
+github.com/compose-spec/compose-go v0.0.0-20200709084333-492a50989a5a h1:pIiSz5jML7rQ1aupg/KHlTqCxhyXvIgeDMf4kDTzIg8=
+github.com/compose-spec/compose-go v0.0.0-20200709084333-492a50989a5a/go.mod h1:ArodJ6gsEB7iWKrbV3fSHZ08LlBvSVB0Oqg04fX86t4=
 github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/containerd/console v0.0.0-20180822173158-c12b1e7919c1/go.mod h1:Tj/on1eG8kiEhd0+fhSDzsPAFESxzBBvdyEgyryXffw=
 github.com/containerd/containerd v1.3.0-beta.2.0.20190828155532-0293cbd26c69/go.mod h1:bC6axHOhabU15QhwfG7w5PipXdVtMXFTttgp+kVtyUA=
