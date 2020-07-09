@@ -49,6 +49,7 @@ message Container {
 	repeated string labels = 10;
 	repeated Port ports = 11;
 	uint64 cpu_limit = 12;
+	string platform = 13;
 }
 
 message InspectRequest {

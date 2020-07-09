@@ -113,6 +113,7 @@ func toGrpcContainer(c containers.Container) *containersv1.Container {
 		CpuTime:     c.CPUTime,
 		MemoryUsage: c.MemoryUsage,
 		MemoryLimit: c.MemoryLimit,
+		Platform:    c.Platform,
 		PidsCurrent: c.PidsCurrent,
 		PidsLimit:   c.PidsLimit,
 		Labels:      c.Labels,
