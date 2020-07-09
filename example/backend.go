@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/compose-spec/compose-go/cli"
 
@@ -95,8 +94,8 @@ func (cs *containerService) Stop(ctx context.Context, containerName string, time
 	return errors.New("not implemented")
 }
 
-func (cs *containerService) Exec(ctx context.Context, name string, command string, reader io.Reader, writer io.Writer) error {
-	fmt.Printf("Executing command %q on container %q", command, name)
+func (cs *containerService) Exec(ctx context.Context, name string, request containers.ExecRequest) error {
+	fmt.Printf("Executing command %q on container %q", request.Command, name)
 	return nil
 }
 

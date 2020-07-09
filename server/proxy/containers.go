@@ -92,7 +92,12 @@ func (p *proxy) Exec(ctx context.Context, request *containersv1.ExecRequest) (*c
 		Stream: stream,
 	}
 
-	return &containersv1.ExecResponse{}, Client(ctx).ContainerService().Exec(ctx, request.GetId(), request.GetCommand(), io, io)
+	return &containersv1.ExecResponse{}, Client(ctx).ContainerService().Exec(ctx, request.GetId(), containers.ExecRequest{
+		Stdin:   io,
+		Stdout:  io,
+		Command: request.GetCommand(),
+		Tty:     request.GetTty(),
+	})
 }
 
 func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Containers_LogsServer) error {
