@@ -73,19 +73,27 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 	if err != nil {
 		return err
 	}
+
 	if !opts.Detach {
 		var con io.Writer = os.Stdout
+		req := containers.LogsRequest{
+			Follow: true,
+		}
 		if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
+			size, err := c.Size()
+			if err != nil {
+				return err
+			}
+			req.Width = int(size.Width)
 			con = c
 		}
 
-		req := containers.LogsRequest{
-			Follow: true,
-			Writer: con,
-		}
+		req.Writer = con
 
 		return c.ContainerService().Logs(ctx, opts.Name, req)
 	}
+
 	fmt.Println(opts.Name)
+
 	return nil
 }

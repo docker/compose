@@ -57,16 +57,23 @@ func runLogs(ctx context.Context, containerName string, opts logsOpts) error {
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
-	var con io.Writer = os.Stdout
-	if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
-		con = c
-	}
 
 	req := containers.LogsRequest{
 		Follow: opts.Follow,
 		Tail:   opts.Tail,
-		Writer: con,
 	}
+
+	var con io.Writer = os.Stdout
+	if c, err := console.ConsoleFromFile(os.Stdout); err == nil {
+		size, err := c.Size()
+		if err != nil {
+			return err
+		}
+		req.Width = int(size.Width)
+		con = c
+	}
+
+	req.Writer = con
 
 	return c.ContainerService().Logs(ctx, containerName, req)
 }

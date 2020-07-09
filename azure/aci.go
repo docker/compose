@@ -27,7 +27,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/buger/goterm"
 	tm "github.com/buger/goterm"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -36,6 +35,7 @@ import (
 
 	"github.com/docker/api/azure/convert"
 	"github.com/docker/api/azure/login"
+	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/progress"
 )
@@ -242,8 +242,7 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 	return *logs.Content, err
 }
 
-func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, out io.Writer) error {
-	terminalWidth := goterm.Width()
+func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, req containers.LogsRequest) error {
 	numLines := 0
 	for {
 		select {
@@ -263,12 +262,12 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			// a real logs streaming api soon.
 			b := aec.EmptyBuilder
 			b = b.Up(uint(numLines))
-			fmt.Fprint(out, b.Column(0).ANSI)
+			fmt.Fprint(req.Writer, b.Column(0).ANSI)
 
-			numLines = getBacktrackLines(logLines, terminalWidth)
+			numLines = getBacktrackLines(logLines, req.Width)
 
 			for i := 0; i < currentOutput-1; i++ {
-				fmt.Fprintln(out, logLines[i])
+				fmt.Fprintln(req.Writer, logLines[i])
 			}
 
 			select {

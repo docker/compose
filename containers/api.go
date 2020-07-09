@@ -76,6 +76,7 @@ type ContainerConfig struct {
 type LogsRequest struct {
 	Follow bool
 	Tail   string
+	Width  int
 	Writer io.Writer
 }
 

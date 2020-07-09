@@ -226,7 +226,7 @@ func (cs *aciContainerService) Logs(ctx context.Context, containerName string, r
 	var tail *int32
 
 	if req.Follow {
-		return streamLogs(ctx, cs.ctx, groupName, containerAciName, req.Writer)
+		return streamLogs(ctx, cs.ctx, groupName, containerAciName, req)
 	}
 
 	if req.Tail != "all" {
