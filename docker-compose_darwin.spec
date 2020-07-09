@@ -32,8 +32,8 @@ coll = COLLECT(exe,
                 'DATA'
             ),
             (
-                'compose/config/config_schema_v4.0.json',
-                'compose/config/config_schema_v4.0.json',
+                'compose/config/config_schema_compose_spec.json',
+                'compose/config/config_schema_compose_spec.json',
                 'DATA'
             ),
             (

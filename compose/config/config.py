@@ -12,8 +12,8 @@ import yaml
 from cached_property import cached_property
 
 from . import types
+from ..const import COMPOSE_SPEC as VERSION
 from ..const import COMPOSEFILE_V1 as V1
-from ..const import COMPOSEFILE_V4 as VERSION
 from ..utils import build_string_dict
 from ..utils import json_hash
 from ..utils import parse_bytes
@@ -214,7 +214,7 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                 .format(self.filename))
 
         if isinstance(version, str):
-            version_pattern = re.compile(r"^[1-4]+(\.\d+)?$")
+            version_pattern = re.compile(r"^[1-3]+(\.\d+)?$")
             if not version_pattern.match(version):
                 raise ConfigurationError(
                     'Version "{}" in "{}" is invalid.'

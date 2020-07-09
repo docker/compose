@@ -20,8 +20,8 @@ from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from ..helpers import create_host_file
 from compose.cli.command import get_project
 from compose.config.errors import DuplicateOverrideFileFound
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V4 as VERSION
 from compose.container import Container
 from compose.project import OneOffFilter
 from compose.utils import nanoseconds_from_time_seconds

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "id": "config_schema_v4.0.json",
+  "id": "config_schema_compose_spec.json",
   "type": "object",
   "properties": {
     "version": {

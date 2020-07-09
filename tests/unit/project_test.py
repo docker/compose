@@ -13,8 +13,8 @@ from ..helpers import BUSYBOX_IMAGE_WITH_TAG
 from compose.config import ConfigurationError
 from compose.config.config import Config
 from compose.config.types import VolumeFromSpec
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V4 as VERSION
 from compose.const import DEFAULT_TIMEOUT
 from compose.const import LABEL_SERVICE
 from compose.container import Container

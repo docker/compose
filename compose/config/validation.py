@@ -282,7 +282,7 @@ def handle_error_for_schema_with_id(error, path):
             invalid_config_key = parse_key_from_error_msg(error)
             return get_unsupported_config_msg(path, invalid_config_key)
 
-        if schema_id.startswith('config_schema_v'):
+        if schema_id.startswith('config_schema_'):
             invalid_config_key = parse_key_from_error_msg(error)
             return ('Invalid top-level property "{key}". Valid top-level '
                     'sections for this Compose file are: {properties}, and '
@@ -487,9 +487,13 @@ def get_schema_path():
 
 
 def load_jsonschema(version):
+    suffix = "compose_spec"
+    if version == V1:
+        suffix = "v1"
+
     filename = os.path.join(
         get_schema_path(),
-        "config_schema_v{0}.json".format(version))
+        "config_schema_{0}.json".format(suffix))
 
     if not os.path.exists(filename):
         raise ConfigurationError(

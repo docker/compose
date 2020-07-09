@@ -21,7 +21,7 @@ from compose.config import ConfigurationError
 from compose.config import types
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import COMPOSEFILE_V4 as VERSION
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container

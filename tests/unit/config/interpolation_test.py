@@ -8,7 +8,7 @@ from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
 from compose.config.interpolation import TemplateWithDefaults
 from compose.config.interpolation import UnsetRequiredSubstitution
-from compose.const import COMPOSEFILE_V4 as VERSION
+from compose.const import COMPOSE_SPEC as VERSION
 
 
 @pytest.fixture

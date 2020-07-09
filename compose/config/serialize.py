@@ -1,8 +1,8 @@
 import yaml
 
 from compose.config import types
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V4 as VERSION
 
 
 def serialize_config_type(dumper, data):

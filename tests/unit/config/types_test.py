@@ -5,8 +5,8 @@ from compose.config.types import parse_extra_hosts
 from compose.config.types import ServicePort
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V4 as VERSION
 
 
 def test_parse_extra_hosts_list():

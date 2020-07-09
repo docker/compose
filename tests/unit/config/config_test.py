@@ -26,8 +26,8 @@ from compose.config.serialize import denormalize_service_dict
 from compose.config.serialize import serialize_config
 from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V4 as VERSION
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
