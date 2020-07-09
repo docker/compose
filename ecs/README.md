@@ -1,7 +1,7 @@
 # Docker CLI plugin for Amazon ECS
 
 This was announced at AWS Cloud Containers Conference 2020, read the
-[blog post](https://www.docker.com/blog/https-docker-com-blog-from-docker-straight-to-aws/).
+[blog post](https://www.docker.com/blog/from-docker-straight-to-aws/).
 
 ## Status
 
