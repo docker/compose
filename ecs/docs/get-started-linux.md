@@ -20,7 +20,7 @@ You can download the Docker ECS plugin from this repository using the following
 command:
 
 ```console
-$ curl -L https://github.com/docker/ecs-plugin/releases/latest/download/docker-ecs-linux-amd64
+$ curl -LO https://github.com/docker/ecs-plugin/releases/latest/download/docker-ecs-linux-amd64
 ```
 
 You will then need to make it executable:
