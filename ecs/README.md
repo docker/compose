@@ -1,9 +1,20 @@
 # Docker CLI plugin for Amazon ECS
 
+This was announced at AWS Cloud Containers Conference 2020, read the
+[blog post](https://www.docker.com/blog/https-docker-com-blog-from-docker-straight-to-aws/).
+
 ## Status
 
 :exclamation: The Docker ECS plugin is still in Beta.
 Its design and UX will evolve until 1.0 Final release.
+
+## Get started
+
+If you're using macOS or Windows you just need to install
+[Docker Desktop Edge](https://www.docker.com/products/docker-desktop) and you
+will have the ECS integration installed.
+
+You can find Linux install instructions [here](./docs/get-started-linux.md).
 
 ## Example and documentation
 
