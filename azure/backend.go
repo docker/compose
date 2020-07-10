@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	clilogin "github.com/docker/api/cli/cmd/login"
+
 	acicontext "github.com/docker/api/cli/cmd/context"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -353,8 +355,9 @@ type aciCloudService struct {
 	loginService login.AzureLoginService
 }
 
-func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
-	return cs.loginService.Login(ctx, params[login.TenantIDLoginParam])
+func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
+	createOpts := params.(clilogin.AzureLoginOpts)
+	return cs.loginService.Login(ctx, createOpts.TenantID)
 }
 
 func (cs *aciCloudService) Logout(ctx context.Context) error {

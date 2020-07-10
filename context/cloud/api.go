@@ -25,7 +25,7 @@ import (
 // Service cloud specific services
 type Service interface {
 	// Login login to cloud provider
-	Login(ctx context.Context, params map[string]string) error
+	Login(ctx context.Context, params interface{}) error
 	// Logout logout from cloud provider
 	Logout(ctx context.Context) error
 	// CreateContextData create data for cloud context
@@ -45,7 +45,7 @@ func (cs notImplementedCloudService) Logout(ctx context.Context) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (cs notImplementedCloudService) Login(ctx context.Context, params map[string]string) error {
+func (cs notImplementedCloudService) Login(ctx context.Context, params interface{}) error {
 	return errdefs.ErrNotImplemented
 }
 

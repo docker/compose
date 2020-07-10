@@ -45,9 +45,6 @@ const (
 	// v1 scope like "https://management.azure.com/.default" for ARM access
 	scopes   = "offline_access https://management.azure.com/.default"
 	clientID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" // Azure CLI client id
-
-	// TenantIDLoginParam
-	TenantIDLoginParam = "tenantId"
 )
 
 type (
