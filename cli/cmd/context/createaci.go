@@ -75,7 +75,7 @@ func getAciContextData(ctx context.Context, opts aciCreateOpts) (interface{}, st
 
 func convertAciOpts(opts aciCreateOpts) map[string]string {
 	return map[string]string{
-		"aciSubscriptionId": opts.subscriptionID,
+		"aciSubscriptionID": opts.subscriptionID,
 		"aciResourceGroup":  opts.resourceGroup,
 		"aciLocation":       opts.location,
 		"description":       opts.description,
