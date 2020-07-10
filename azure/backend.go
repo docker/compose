@@ -132,7 +132,7 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 
 		if _, ok := group.Tags[singleContainerTag]; ok {
 			if group.Containers == nil || len(*group.Containers) < 1 {
-				return []containers.Container{}, fmt.Errorf("found no containers in ACI container group %s", *containerGroup.Name)
+				return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *containerGroup.Name)
 			}
 			container := (*group.Containers)[0]
 			c := getContainer(*containerGroup.Name, group.IPAddress, container)
