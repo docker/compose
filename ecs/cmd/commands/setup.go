@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
+	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	contextStore "github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -52,6 +54,14 @@ func SetupCommand() *cobra.Command {
 				if err := saveCredentials(opts.context.Profile, opts.accessKeyID, opts.secretAccessKey); err != nil {
 					return err
 				}
+			}
+			backend, err := amazon.NewBackend(opts.context.Profile, opts.context.Cluster, opts.context.Region)
+			if err != nil {
+				return err
+			}
+			_, _, err = backend.CreateContextData(context.Background(), nil)
+			if err != nil {
+				return err
 			}
 			return contextStore.NewContext(opts.name, &opts.context)
 		},
@@ -206,6 +216,7 @@ func setCluster(opts *setupOptions, err error) error {
 	if err != nil {
 		return err
 	}
+
 	opts.context.Cluster = result
 	return nil
 }

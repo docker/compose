@@ -1,1 +1,0 @@
-{"Name":"aws","Metadata":{"Type":"aws"},"Endpoints":{"aws":{"Profile":"profileName","Cluster":"clusterName","Region":"regionName"},"docker":{"Profile":"profileName","Cluster":"clusterName","Region":"regionName"}}}

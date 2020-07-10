@@ -12,6 +12,8 @@ type API interface {
 	Up(ctx context.Context, options cli.ProjectOptions) error
 	Down(ctx context.Context, options cli.ProjectOptions) error
 
+	CreateContextData(ctx context.Context, params map[string]string) (contextData interface{}, description string, err error)
+
 	Convert(project *types.Project) (*cloudformation.Template, error)
 	Logs(ctx context.Context, projectName cli.ProjectOptions) error
 	Ps(background context.Context, options cli.ProjectOptions) ([]ServiceStatus, error)

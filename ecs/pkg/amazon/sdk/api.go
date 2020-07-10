@@ -9,6 +9,8 @@ import (
 )
 
 type API interface {
+	CheckRequirements(ctx context.Context) error
+
 	GetDefaultVPC(ctx context.Context) (string, error)
 	VpcExists(ctx context.Context, vpcID string) (bool, error)
 	GetSubNets(ctx context.Context, vpcID string) ([]string, error)

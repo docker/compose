@@ -2,15 +2,13 @@ package sdk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/docker/ecs-plugin/internal"
-
-	"github.com/aws/aws-sdk-go/aws/request"
-
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudformation/cloudformationiface"
@@ -27,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	cf "github.com/awslabs/goformation/v4/cloudformation"
+	"github.com/docker/ecs-plugin/internal"
 	"github.com/docker/ecs-plugin/pkg/compose"
 	"github.com/sirupsen/logrus"
 )
@@ -57,8 +56,23 @@ func NewAPI(sess *session.Session) API {
 	}
 }
 
+func (s sdk) CheckRequirements(ctx context.Context) error {
+	settings, err := s.ECS.ListAccountSettingsWithContext(ctx, &ecs.ListAccountSettingsInput{
+		EffectiveSettings: aws.Bool(true),
+		Name:              aws.String("serviceLongArnFormat"),
+	})
+	if err != nil {
+		return err
+	}
+	serviceLongArnFormat := settings.Settings[0].Value
+	if *serviceLongArnFormat != "enabled" {
+		return errors.New("this tool requires the \"new ARN resource ID format\"")
+	}
+	return nil
+}
+
 func (s sdk) ClusterExists(ctx context.Context, name string) (bool, error) {
-	logrus.Debug("Check if cluster was already created: ", name)
+	logrus.Debug("CheckRequirements if cluster was already created: ", name)
 	clusters, err := s.ECS.DescribeClustersWithContext(ctx, &ecs.DescribeClustersInput{
 		Clusters: []*string{aws.String(name)},
 	})
@@ -78,7 +92,7 @@ func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
 }
 
 func (s sdk) VpcExists(ctx context.Context, vpcID string) (bool, error) {
-	logrus.Debug("Check if VPC exists: ", vpcID)
+	logrus.Debug("CheckRequirements if VPC exists: ", vpcID)
 	_, err := s.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
 	return err == nil, err
 }
@@ -421,7 +435,7 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 }
 
 func (s sdk) LoadBalancerExists(ctx context.Context, arn string) (bool, error) {
-	logrus.Debug("Check if LoadBalancer exists: ", arn)
+	logrus.Debug("CheckRequirements if LoadBalancer exists: ", arn)
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
 		LoadBalancerArns: []*string{aws.String(arn)},
 	})
