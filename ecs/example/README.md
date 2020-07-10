@@ -36,8 +36,11 @@ If you have 2FA enabled on your Hub account you will need to create a PAT.
 You can read more about managing access tokens here:
 https://docs.docker.com/docker-hub/access-tokens/
 
+
+You can then create `DockerHubToken` secret on [AWS Secret Manager](https://aws.amazon.com/secrets-manager/) using following command
+
 ```console
-docker ecs secret create -d MyKey -u myhubusername -p myhubpat
+docker ecs secret create -d MyKey -u myhubusername -p myhubpat DockerHubToken
 ```
 
 ### Create an AWS Docker context and list available contexts
