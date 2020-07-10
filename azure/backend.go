@@ -340,6 +340,10 @@ func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) 
 	return cs.loginService.Login(ctx, params[login.TenantIDLoginParam])
 }
 
+func (cs *aciCloudService) Logout(ctx context.Context) error {
+	return cs.loginService.Logout(ctx)
+}
+
 func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {
 	contextHelper := newContextCreateHelper()
 	return contextHelper.createContextData(ctx, params)

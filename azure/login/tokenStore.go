@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Azure/go-autorest/autorest/azure/cli"
+
 	"golang.org/x/oauth2"
 )
 
@@ -57,6 +59,12 @@ func newTokenStore(path string) (tokenStore, error) {
 	}, nil
 }
 
+// GetTokenStorePath the path for token store
+func GetTokenStorePath() string {
+	cliPath, _ := cli.AccessTokensPath()
+	return filepath.Join(filepath.Dir(cliPath), tokenStoreFilename)
+}
+
 func (store tokenStore) writeLoginInfo(info TokenInfo) error {
 	bytes, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
@@ -75,4 +83,8 @@ func (store tokenStore) readToken() (TokenInfo, error) {
 		return TokenInfo{}, err
 	}
 	return loginInfo, nil
+}
+
+func (store tokenStore) removeData() error {
+	return os.Remove(store.filePath)
 }

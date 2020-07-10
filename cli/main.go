@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/api/cli/cmd/logout"
+
 	"github.com/docker/api/errdefs"
 
 	"github.com/pkg/errors"
@@ -59,6 +61,7 @@ var (
 	ownCommands = map[string]struct{}{
 		"context": {},
 		"login":   {},
+		"logout":  {},
 		"serve":   {},
 		"version": {},
 	}
@@ -117,6 +120,7 @@ func main() {
 		cmd.InspectCommand(),
 		compose.Command(),
 		login.Command(),
+		logout.Command(),
 		cmd.VersionCommand(version),
 	)
 
