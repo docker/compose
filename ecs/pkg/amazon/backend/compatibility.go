@@ -14,6 +14,8 @@ var compatibleComposeAttributes = []string{
 	"services.container_name",
 	"services.cap_drop",
 	"services.depends_on",
+	"services.deploy",
+	"services.deploy.replicas",
 	"services.entrypoint",
 	"services.environment",
 	"service.image",

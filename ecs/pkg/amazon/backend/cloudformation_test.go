@@ -93,6 +93,20 @@ services:
 	assert.Check(t, len(lb.SecurityGroups) > 0)
 }
 
+func TestServiceReplicas(t *testing.T) {
+	template := convertYaml(t, `
+version: "3"
+services:
+  test:
+    image: nginx
+    deploy:
+      replicas: 10
+`)
+	s := template.Resources["TestService"].(*ecs.Service)
+	assert.Check(t, s != nil)
+	assert.Check(t, s.DesiredCount == 10)
+}
+
 func TestLoadBalancerTypeNetwork(t *testing.T) {
 	template := convertYaml(t, `
 version: "3"
