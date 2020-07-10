@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	acicontext "github.com/docker/api/cli/cmd/context"
+
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/cli"
@@ -359,7 +361,8 @@ func (cs *aciCloudService) Logout(ctx context.Context) error {
 	return cs.loginService.Logout(ctx)
 }
 
-func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {
+func (cs *aciCloudService) CreateContextData(ctx context.Context, params interface{}) (interface{}, string, error) {
 	contextHelper := newContextCreateHelper()
-	return contextHelper.createContextData(ctx, params)
+	createOpts := params.(acicontext.AciCreateOpts)
+	return contextHelper.createContextData(ctx, createOpts)
 }
