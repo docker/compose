@@ -37,10 +37,10 @@ func (suite *ContainerConvertTestSuite) TestConvertContainerEnvironment() {
 		ID:          "container1",
 		Environment: []string{"key1=value1", "key2", "key3=value3"},
 	}
-	project, err := ContainerToComposeProject(container, "ID")
+	project, err := ContainerToComposeProject(container)
 	Expect(err).To(BeNil())
 	service1 := project.Services[0]
-	Expect(service1.Name).To(Equal("ID"))
+	Expect(service1.Name).To(Equal(container.ID))
 	Expect(service1.Environment).To(Equal(types.MappingWithEquals{
 		"key1": to.StringPtr("value1"),
 		"key2": nil,
