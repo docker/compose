@@ -142,13 +142,18 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 		outChan := make(chan string)
 
 		go func() {
-			output, _ := ctx.Exec()
+			output, err := ctx.Exec()
+			// check the process is cancelled by the test, not another unexpected error
+			Expect(err.Error()).To(ContainSubstring("timed out"))
 			outChan <- output
 		}()
+		// Ensure logs -- follow is strated before we curl nginx
+		time.Sleep(5 * time.Second)
 
 		s.NewCommand("curl", nginxExposedURL+"/test").ExecOrDie()
 		// Give the `logs --follow` a little time to get logs of the curl call
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
+
 		// Trigger a timeout to make ctx.Exec exit
 		timeChan <- time.Now()
 

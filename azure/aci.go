@@ -27,7 +27,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/buger/goterm"
 	tm "github.com/buger/goterm"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
@@ -245,8 +244,7 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 	return *logs.Content, err
 }
 
-func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, out io.Writer) error {
-	terminalWidth := goterm.Width()
+func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, req containers.LogsRequest) error {
 	numLines := 0
 	for {
 		select {
@@ -266,12 +264,12 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			// a real logs streaming api soon.
 			b := aec.EmptyBuilder
 			b = b.Up(uint(numLines))
-			fmt.Fprint(out, b.Column(0).ANSI)
+			fmt.Fprint(req.Writer, b.Column(0).ANSI)
 
-			numLines = getBacktrackLines(logLines, terminalWidth)
+			numLines = getBacktrackLines(logLines, req.Width)
 
 			for i := 0; i < currentOutput-1; i++ {
-				fmt.Fprintln(out, logLines[i])
+				fmt.Fprintln(req.Writer, logLines[i])
 			}
 
 			select {
@@ -284,6 +282,9 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 }
 
 func getBacktrackLines(lines []string, terminalWidth int) int {
+	if terminalWidth == 0 { // no terminal width has been set, do not divide by zero
+		return len(lines)
+	}
 	numLines := 0
 	for i := 0; i < len(lines)-1; i++ {
 		numLines++
