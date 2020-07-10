@@ -932,35 +932,6 @@ def finalize_service(service_config, service_names, version, environment,
     return normalize_v1_service_format(service_dict)
 
 
-def translate_resource_keys_to_container_config(resources_dict, service_dict):
-    if 'limits' in resources_dict:
-        service_dict['mem_limit'] = resources_dict['limits'].get('memory')
-        if 'cpus' in resources_dict['limits']:
-            service_dict['cpus'] = float(resources_dict['limits']['cpus'])
-    if 'reservations' in resources_dict:
-        service_dict['mem_reservation'] = resources_dict['reservations'].get('memory')
-        if 'cpus' in resources_dict['reservations']:
-            return ['resources.reservations.cpus']
-    return []
-
-
-def convert_restart_policy(name):
-    try:
-        return {
-            'any': 'always',
-            'none': 'no',
-            'on-failure': 'on-failure'
-        }[name]
-    except KeyError:
-        raise ConfigurationError('Invalid restart policy "{}"'.format(name))
-
-
-def convert_credential_spec_to_security_opt(credential_spec):
-    if 'file' in credential_spec:
-        return 'file://{file}'.format(file=credential_spec['file'])
-    return 'registry://{registry}'.format(registry=credential_spec['registry'])
-
-
 def normalize_v1_service_format(service_dict):
     if 'log_driver' in service_dict or 'log_opt' in service_dict:
         if 'logging' not in service_dict:
