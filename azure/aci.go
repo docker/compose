@@ -280,6 +280,9 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 }
 
 func getBacktrackLines(lines []string, terminalWidth int) int {
+	if terminalWidth == 0 { // no terminal width has been set, do not divide by zero
+		return len(lines)
+	}
 	numLines := 0
 	for i := 0; i < len(lines)-1; i++ {
 		numLines++
