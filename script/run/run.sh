@@ -47,16 +47,24 @@ fi
 if [ -n "$HOME" ]; then
     VOLUMES="$VOLUMES -v $HOME:$HOME -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
 fi
-index=1
-for arg in "$@"; do
-    index=$((index + 1));
+i=$#
+while [ $i -gt 0 ]; do
+    arg=$1
+    i=$((i - 1))
+    shift
 
-    if [ "$arg" = "-f" ] || [ "$arg" = "--file" ]; then
-        value=$(eval "echo \"\$$index\"")
-        file_dir=$(realpath "$(dirname "${value}")")
-        VOLUMES="$VOLUMES -v $file_dir:$file_dir"
-        continue 2
-    fi
+    case "$arg" in
+        -f|--file)
+            value=$1
+            i=$((i - 1))
+            shift
+            set -- "$@" "$arg" "$value"
+
+            file_dir=$(realpath "$(dirname "$value")")
+            VOLUMES="$VOLUMES -v $file_dir:$file_dir"
+        ;;
+        *) set -- "$@" "$arg" ;;
+    esac
 done
 
 # Setup environment variables for compose config and context
