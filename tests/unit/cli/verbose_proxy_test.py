@@ -1,8 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import six
-
 from compose.cli import verbose_proxy
 from tests import unittest
 
@@ -10,7 +5,7 @@ from tests import unittest
 class VerboseProxyTestCase(unittest.TestCase):
 
     def test_format_call(self):
-        prefix = '' if six.PY3 else 'u'
+        prefix = ''
         expected = "(%(p)s'arg1', True, key=%(p)s'value')" % dict(p=prefix)
         actual = verbose_proxy.format_call(
             ("arg1", True),

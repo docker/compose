@@ -24,8 +24,6 @@ RUN apk add --no-cache \
     musl-dev \
     openssl \
     openssl-dev \
-    python2 \
-    python2-dev \
     zlib-dev
 ENV BUILD_BOOTLOADER=1
 
@@ -40,7 +38,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libssl-dev \
     make \
     openssl \
-    python2.7-dev \
     zlib1g-dev
 
 FROM build-${BUILD_PLATFORM} AS build
@@ -52,6 +49,7 @@ WORKDIR /code/
 RUN pip install virtualenv==16.2.0
 RUN pip install tox==2.9.1
 
+COPY requirements-indirect.txt .
 COPY requirements.txt .
 COPY requirements-dev.txt .
 COPY .pre-commit-config.yaml .

@@ -1,9 +1,9 @@
 Click==7.1.2
-coverage==5.0.3
+coverage==5.1
 ddt==1.4.1
-flake8==3.8.1
+flake8==3.8.3
 gitpython==2.1.15
 mock==3.0.5
-pytest==5.4.2; python_version >= '3.5'
+pytest==5.4.3; python_version >= '3.5'
 pytest==4.6.5; python_version < '3.5'
-pytest-cov==2.8.1
+pytest-cov==2.10.0

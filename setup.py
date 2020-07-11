@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import codecs
 import os
 import re
@@ -37,9 +33,8 @@ install_requires = [
     'texttable >= 0.9.0, < 2',
     'websocket-client >= 0.32.0, < 1',
     'distro >= 1.5.0, < 2',
-    'docker[ssh] >= 3.7.0, < 5',
+    'docker[ssh] >= 4.2.2, < 5',
     'dockerpty >= 0.4.1, < 1',
-    'six >= 1.3.0, < 2',
     'jsonschema >= 2.5.1, < 4',
     'python-dotenv >= 0.13.0, < 1',
 ]
@@ -108,8 +103,6 @@ setup(
         'Environment :: Console',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.6',

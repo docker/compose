@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION

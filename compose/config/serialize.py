@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import six
 import yaml
 
 from compose.config import types
@@ -15,7 +11,7 @@ from compose.const import COMPOSEFILE_V3_5 as V3_5
 
 
 def serialize_config_type(dumper, data):
-    representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
+    representer = dumper.represent_str
     return representer(data.repr())
 
 
@@ -25,9 +21,9 @@ def serialize_dict_type(dumper, data):
 
 def serialize_string(dumper, data):
     """ Ensure boolean-like strings are quoted in the output """
-    representer = dumper.represent_str if six.PY3 else dumper.represent_unicode
+    representer = dumper.represent_str
 
-    if isinstance(data, six.binary_type):
+    if isinstance(data, bytes):
         data = data.decode('utf-8')
 
     if data.lower() in ('y', 'n', 'yes', 'no', 'on', 'off', 'true', 'false'):
@@ -98,10 +94,10 @@ def v3_introduced_name_key(key):
 def serialize_config(config, image_digests=None, escape_dollar=True):
     if escape_dollar:
         yaml.SafeDumper.add_representer(str, serialize_string_escape_dollar)
-        yaml.SafeDumper.add_representer(six.text_type, serialize_string_escape_dollar)
+        yaml.SafeDumper.add_representer(str, serialize_string_escape_dollar)
     else:
         yaml.SafeDumper.add_representer(str, serialize_string)
-        yaml.SafeDumper.add_representer(six.text_type, serialize_string)
+        yaml.SafeDumper.add_representer(str, serialize_string)
     return yaml.safe_dump(
         denormalize_config(config, image_digests),
         default_flow_style=False,

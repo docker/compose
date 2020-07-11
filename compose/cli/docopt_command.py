@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from inspect import getdoc
 
 from docopt import docopt

@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import contextlib
 import functools
 import json
@@ -237,7 +233,7 @@ class TopLevelCommand(object):
       top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
-      version            Show the Docker-Compose version information
+      version            Show version information and quit
     """
 
     def __init__(self, project, options=None):
@@ -1122,7 +1118,7 @@ class TopLevelCommand(object):
     @classmethod
     def version(cls, options):
         """
-        Show version information
+        Show version information and quit.
 
         Usage: version [--short]
 

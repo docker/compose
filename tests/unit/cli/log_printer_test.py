@@ -1,13 +1,10 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import itertools
+from io import StringIO
+from queue import Queue
 
 import pytest
 import requests
-import six
 from docker.errors import APIError
-from six.moves.queue import Queue
 
 from compose.cli.log_printer import build_log_generator
 from compose.cli.log_printer import build_log_presenters
@@ -22,7 +19,7 @@ from tests import mock
 
 @pytest.fixture
 def output_stream():
-    output = six.StringIO()
+    output = StringIO()
     output.flush = mock.Mock()
     return output
 

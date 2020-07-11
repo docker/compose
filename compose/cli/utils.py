@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import unicode_literals
-
 import math
 import os
 import platform
@@ -11,7 +7,6 @@ import sys
 
 import distro
 import docker
-import six
 
 import compose
 from ..const import IS_WINDOWS_PLATFORM
@@ -145,7 +140,7 @@ def human_readable_file_size(size):
 
 
 def binarystr_to_unicode(s):
-    if not isinstance(s, six.binary_type):
+    if not isinstance(s, bytes):
         return s
 
     if IS_WINDOWS_PLATFORM:

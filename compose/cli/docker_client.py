@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import os.path
 import ssl
 
-import six
 from docker import APIClient
 from docker import Context
 from docker import ContextAPI
@@ -31,7 +27,7 @@ def default_cert_path():
 
 def make_context(host, options, environment):
     tls = tls_config_from_options(options, environment)
-    ctx = Context("compose", host=host)
+    ctx = Context("compose", host=host, tls=tls.verify if tls else False)
     if tls:
         ctx.set_endpoint("docker", host, tls, skip_tls_verify=not tls.verify)
     return ctx
@@ -47,7 +43,7 @@ def get_client(environment, verbose=False, version=None, context=None):
         environment=environment, tls_version=get_tls_version(environment)
     )
     if verbose:
-        version_info = six.iteritems(client.version())
+        version_info = client.version().items()
         log.info(get_version_info('full'))
         log.info("Docker base_url: %s", client.base_url)
         log.info("Docker version: %s",
@@ -138,11 +134,16 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         tls = kwargs.get("tls", None)
         verify = False if not tls else tls.verify
         if host:
-            context = Context("compose", host=host)
+            context = Context("compose", host=host, tls=verify)
         else:
             context = ContextAPI.get_current_context()
         if tls:
             context.set_endpoint("docker", host=host, tls_cfg=tls, skip_tls_verify=not verify)
+
+    if not context.is_docker_host():
+        raise UserError(
+            "The platform targeted with the current context is not supported.\n"
+            "Make sure the context in use targets a Docker Engine.\n")
 
     kwargs['base_url'] = context.Host
     if context.TLSConfig:

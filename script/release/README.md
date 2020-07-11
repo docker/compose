@@ -4,7 +4,7 @@ The release process is fully automated by `Release.Jenkinsfile`.
 
 ## Usage
 
-1. In the appropriate branch, run `./scripts/release/release tag <version>`
+1. In the appropriate branch, run `./script/release/release.py tag <version>`
 
 By appropriate, we mean for a version `1.26.0` or `1.26.0-rc1` you should run the script in the `1.26.x` branch.
 
@@ -16,3 +16,8 @@ After the executions, you should have a commit with the proper bumps for `docker
 This should trigger a new CI build on the new tag. When the CI finishes with the tests and builds a new draft release would be available on github's releases page.
 
 3. Check and confirm the release on github's release page.
+
+4. In case of a GA version, please update `docker-compose`s release notes and version on [github documentation repository](https://github.com/docker/docker.github.io):
+  - [Release Notes](https://github.com/docker/docker.github.io/blob/master/compose/release-notes.md)
+  - [Config version](https://github.com/docker/docker.github.io/blob/master/_config.yml)
+  - [Config authoring version](https://github.com/docker/docker.github.io/blob/master/_config_authoring.yml)

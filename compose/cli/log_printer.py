@@ -1,18 +1,14 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import _thread as thread
 import sys
 from collections import namedtuple
 from itertools import cycle
+from queue import Empty
+from queue import Queue
 from threading import Thread
 
 from docker.errors import APIError
-from six.moves import _thread as thread
-from six.moves.queue import Empty
-from six.moves.queue import Queue
 
 from . import colors
-from compose import utils
 from compose.cli.signals import ShutdownException
 from compose.utils import split_buffer
 
@@ -67,7 +63,7 @@ class LogPrinter(object):
         self.containers = containers
         self.presenters = presenters
         self.event_stream = event_stream
-        self.output = utils.get_output_stream(output)
+        self.output = output
         self.cascade_stop = cascade_stop
         self.log_args = log_args or {}
 

@@ -1,18 +1,15 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import _thread as thread
 import logging
 import operator
 import sys
+from queue import Empty
+from queue import Queue
 from threading import Lock
 from threading import Semaphore
 from threading import Thread
 
 from docker.errors import APIError
 from docker.errors import ImageNotFound
-from six.moves import _thread as thread
-from six.moves.queue import Empty
-from six.moves.queue import Queue
 
 from compose.cli.colors import green
 from compose.cli.colors import red
@@ -21,7 +18,6 @@ from compose.const import PARALLEL_LIMIT
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
 from compose.errors import OperationFailedError
-from compose.utils import get_output_stream
 
 
 log = logging.getLogger(__name__)
@@ -85,7 +81,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, fa
         in the CLI logs, but don't raise an exception (such as attempting to start 0 containers)
     """
     objects = list(objects)
-    stream = get_output_stream(sys.stderr)
+    stream = sys.stderr
 
     if ParallelStreamWriter.instance:
         writer = ParallelStreamWriter.instance

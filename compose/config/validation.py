@@ -1,13 +1,9 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import json
 import logging
 import os
 import re
 import sys
 
-import six
 from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
@@ -75,13 +71,13 @@ def format_ports(instance):
     try:
         split_port(instance)
     except ValueError as e:
-        raise ValidationError(six.text_type(e))
+        raise ValidationError(str(e))
     return True
 
 
 @FormatChecker.cls_checks(format="expose", raises=ValidationError)
 def format_expose(instance):
-    if isinstance(instance, six.string_types):
+    if isinstance(instance, str):
         if not re.match(VALID_EXPOSE_FORMAT, instance):
             raise ValidationError(
                 "should be of the format 'PORT[/PROTOCOL]'")
@@ -91,7 +87,7 @@ def format_expose(instance):
 
 @FormatChecker.cls_checks("subnet_ip_address", raises=ValidationError)
 def format_subnet_ip_address(instance):
-    if isinstance(instance, six.string_types):
+    if isinstance(instance, str):
         if not re.match(VALID_REGEX_IPV4_CIDR, instance) and \
                 not re.match(VALID_REGEX_IPV6_CIDR, instance):
             raise ValidationError("should use the CIDR format")
@@ -138,7 +134,7 @@ def validate_config_section(filename, config, section):
                 type=anglicize_json_type(python_type_to_yaml_type(config))))
 
     for key, value in config.items():
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise ConfigurationError(
                 "In file '{filename}', the {section} name {name} must be a "
                 "quoted string, i.e. '{name}'.".format(
@@ -166,7 +162,7 @@ def validate_top_level_object(config_file):
 
 def validate_ulimits(service_config):
     ulimit_config = service_config.config.get('ulimits', {})
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+    for limit_name, soft_hard_values in ulimit_config.items():
         if isinstance(soft_hard_values, dict):
             if not soft_hard_values['soft'] <= soft_hard_values['hard']:
                 raise ConfigurationError(
@@ -329,7 +325,7 @@ def handle_generic_error(error, path):
             required_keys)
 
     elif error.cause:
-        error_msg = six.text_type(error.cause)
+        error_msg = str(error.cause)
         msg_format = "{path} is invalid: {msg}"
 
     elif error.path:
@@ -349,7 +345,7 @@ def parse_key_from_error_msg(error):
 
 
 def path_string(path):
-    return ".".join(c for c in path if isinstance(c, six.string_types))
+    return ".".join(c for c in path if isinstance(c, str))
 
 
 def _parse_valid_types_from_validator(validator):

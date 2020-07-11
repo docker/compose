@@ -1,14 +1,10 @@
 # ~*~ encoding: utf-8 ~*~
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import io
 import os
 import random
 import shutil
 import tempfile
-
-from six import StringIO
+from io import StringIO
 
 from compose import progress_stream
 from tests import unittest
