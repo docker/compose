@@ -71,8 +71,9 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
+	groupDisplay := "Group " + *groupDefinition.Name
 	w.Event(progress.Event{
-		ID:         *groupDefinition.Name,
+		ID:         groupDisplay,
 		Status:     progress.Working,
 		StatusText: "Waiting",
 	})
@@ -88,7 +89,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 	}
 
 	w.Event(progress.Event{
-		ID:         *groupDefinition.Name,
+		ID:         groupDisplay,
 		Status:     progress.Done,
 		StatusText: "Created",
 	})

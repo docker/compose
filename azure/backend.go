@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	singleContainerTag        = "single--container--aci"
+	singleContainerTag        = "docker-single-container"
+	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
 	statusUnknown             = "Unknown"
 )
@@ -144,7 +145,7 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 
 		if _, ok := group.Tags[singleContainerTag]; ok {
 			if group.Containers == nil || len(*group.Containers) < 1 {
-				return []containers.Container{}, fmt.Errorf("no containers to run")
+				return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *containerGroup.Name)
 			}
 			container := (*group.Containers)[0]
 			c := getContainer(*containerGroup.Name, group.IPAddress, container)
@@ -195,13 +196,16 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	if err != nil {
 		return err
 	}
+	addTag(groupDefinition, singleContainerTag)
 
+	return createACIContainers(ctx, cs.ctx, groupDefinition)
+}
+
+func addTag(groupDefinition containerinstance.ContainerGroup, tagName string) {
 	if groupDefinition.Tags == nil {
 		groupDefinition.Tags = make(map[string]*string, 1)
 	}
-	groupDefinition.Tags[singleContainerTag] = to.StringPtr("")
-
-	return createACIContainers(ctx, cs.ctx, groupDefinition)
+	groupDefinition.Tags[tagName] = to.StringPtr("")
 }
 
 func (cs *aciContainerService) Stop(ctx context.Context, containerName string, timeout *uint32) error {
@@ -328,6 +332,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) er
 	}
 	logrus.Debugf("Up on project with name %q\n", project.Name)
 	groupDefinition, err := convert.ToContainerGroup(cs.ctx, *project)
+	addTag(groupDefinition, composeContainerTag)
 
 	if err != nil {
 		return err
