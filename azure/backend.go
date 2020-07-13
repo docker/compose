@@ -50,6 +50,19 @@ const (
 // ErrNoSuchContainer is returned when the mentioned container does not exist
 var ErrNoSuchContainer = errors.New("no such container")
 
+// ContextParams options for creating ACI context
+type ContextParams struct {
+	Description    string
+	Location       string
+	SubscriptionID string
+	ResourceGroup  string
+}
+
+// LoginParams azure login options
+type LoginParams struct {
+	TenantID string
+}
+
 func init() {
 	backend.Register("aci", "aci", service, getCloudService)
 }
@@ -351,15 +364,17 @@ type aciCloudService struct {
 	loginService login.AzureLoginService
 }
 
-func (cs *aciCloudService) Login(ctx context.Context, params map[string]string) error {
-	return cs.loginService.Login(ctx, params[login.TenantIDLoginParam])
+func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
+	createOpts := params.(LoginParams)
+	return cs.loginService.Login(ctx, createOpts.TenantID)
 }
 
 func (cs *aciCloudService) Logout(ctx context.Context) error {
 	return cs.loginService.Logout(ctx)
 }
 
-func (cs *aciCloudService) CreateContextData(ctx context.Context, params map[string]string) (interface{}, string, error) {
+func (cs *aciCloudService) CreateContextData(ctx context.Context, params interface{}) (interface{}, string, error) {
 	contextHelper := newContextCreateHelper()
-	return contextHelper.createContextData(ctx, params)
+	createOpts := params.(ContextParams)
+	return contextHelper.createContextData(ctx, createOpts)
 }

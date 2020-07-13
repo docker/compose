@@ -43,10 +43,10 @@ func newContextCreateHelper() contextCreateACIHelper {
 	}
 }
 
-func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts map[string]string) (interface{}, string, error) {
+func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts ContextParams) (interface{}, string, error) {
 	var subscriptionID string
-	if opts["aciSubscriptionID"] != "" {
-		subscriptionID = opts["aciSubscriptionID"]
+	if opts.SubscriptionID != "" {
+		subscriptionID = opts.SubscriptionID
 	} else {
 		subs, err := helper.resourceGroupHelper.GetSubscriptionIDs(ctx)
 		if err != nil {
@@ -61,10 +61,10 @@ func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts
 	var group resources.Group
 	var err error
 
-	if opts["aciResourceGroup"] != "" {
-		group, err = helper.resourceGroupHelper.GetGroup(ctx, subscriptionID, opts["aciResourceGroup"])
+	if opts.ResourceGroup != "" {
+		group, err = helper.resourceGroupHelper.GetGroup(ctx, subscriptionID, opts.ResourceGroup)
 		if err != nil {
-			return nil, "", errors.Wrapf(err, "Could not find resource group %q", opts["aciResourceGroup"])
+			return nil, "", errors.Wrapf(err, "Could not find resource group %q", opts.ResourceGroup)
 		}
 	} else {
 		groups, err := helper.resourceGroupHelper.ListGroups(ctx, subscriptionID)
@@ -80,8 +80,8 @@ func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts
 	location := *group.Location
 
 	description := fmt.Sprintf("%s@%s", *group.Name, location)
-	if opts["description"] != "" {
-		description = fmt.Sprintf("%s (%s)", opts["description"], description)
+	if opts.Description != "" {
+		description = fmt.Sprintf("%s (%s)", opts.Description, description)
 	}
 
 	return store.AciContext{
@@ -108,7 +108,7 @@ func (helper contextCreateACIHelper) createGroup(ctx context.Context, subscripti
 	return g, nil
 }
 
-func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscriptionID string, opts map[string]string, groups []resources.Group) (resources.Group, error) {
+func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscriptionID string, opts ContextParams, groups []resources.Group) (resources.Group, error) {
 	groupNames := []string{"create a new resource group"}
 	for _, g := range groups {
 		groupNames = append(groupNames, fmt.Sprintf("%s (%s)", *g.Name, *g.Location))
@@ -124,7 +124,7 @@ func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscripti
 	}
 
 	if group == 0 {
-		return helper.createGroup(ctx, subscriptionID, opts["aciLocation"])
+		return helper.createGroup(ctx, subscriptionID, opts.Location)
 	}
 
 	return groups[group-1], nil

@@ -59,7 +59,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	return mobycli.ExecCmd(cmd)
 }
 
-func cloudLogin(cmd *cobra.Command, backendType string, params map[string]string) error {
+func cloudLogin(cmd *cobra.Command, backendType string, params interface{}) error {
 	ctx := cmd.Context()
 	cs, err := client.GetCloudService(ctx, backendType)
 	if err != nil {

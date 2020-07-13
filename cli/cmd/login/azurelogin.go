@@ -3,26 +3,22 @@ package login
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/azure/login"
+	"github.com/docker/api/azure"
 )
-
-type azureLoginOpts struct {
-	tenantID string
-}
 
 // AzureLoginCommand returns the azure login command
 func AzureLoginCommand() *cobra.Command {
-	opts := azureLoginOpts{}
+	opts := azure.LoginParams{}
 	cmd := &cobra.Command{
 		Use:   "azure",
 		Short: "Log in to azure",
 		Args:  cobra.MaximumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cloudLogin(cmd, "aci", map[string]string{login.TenantIDLoginParam: opts.tenantID})
+			return cloudLogin(cmd, "aci", opts)
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opts.tenantID, "tenant-id", "", "Specify tenant ID to use from your azure account")
+	flags.StringVar(&opts.TenantID, "tenant-id", "", "Specify tenant ID to use from your azure account")
 
 	return cmd
 }

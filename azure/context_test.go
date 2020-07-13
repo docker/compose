@@ -175,11 +175,11 @@ func aciContext(subscriptionID string, resourceGroupName string, location string
 	}
 }
 
-func options(subscriptionID string, resourceGroupName string) map[string]string {
-	return map[string]string{
-		"aciSubscriptionID": subscriptionID,
-		"aciResourceGroup":  resourceGroupName,
-		"aciLocation":       "eastus",
+func options(subscriptionID string, resourceGroupName string) ContextParams {
+	return ContextParams{
+		SubscriptionID: subscriptionID,
+		ResourceGroup:  resourceGroupName,
+		Location:       "eastus",
 	}
 }
 

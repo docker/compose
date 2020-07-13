@@ -22,20 +22,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/azure"
 	"github.com/docker/api/client"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
 )
 
-type aciCreateOpts struct {
-	description    string
-	location       string
-	subscriptionID string
-	resourceGroup  string
-}
-
 func createAciCommand() *cobra.Command {
-	var opts aciCreateOpts
+	var opts azure.ContextParams
 	cmd := &cobra.Command{
 		Use:   "aci CONTEXT [flags]",
 		Short: "Create a context for Azure Container Instances",
@@ -45,15 +39,15 @@ func createAciCommand() *cobra.Command {
 		},
 	}
 
-	addDescriptionFlag(cmd, &opts.description)
-	cmd.Flags().StringVar(&opts.location, "location", "eastus", "Location")
-	cmd.Flags().StringVar(&opts.subscriptionID, "subscription-id", "", "Location")
-	cmd.Flags().StringVar(&opts.resourceGroup, "resource-group", "", "Resource group")
+	addDescriptionFlag(cmd, &opts.Description)
+	cmd.Flags().StringVar(&opts.Location, "location", "eastus", "Location")
+	cmd.Flags().StringVar(&opts.SubscriptionID, "subscription-id", "", "Location")
+	cmd.Flags().StringVar(&opts.ResourceGroup, "resource-group", "", "Resource group")
 
 	return cmd
 }
 
-func runCreateAci(ctx context.Context, contextName string, opts aciCreateOpts) error {
+func runCreateAci(ctx context.Context, contextName string, opts azure.ContextParams) error {
 	if contextExists(ctx, contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
 	}
@@ -65,19 +59,10 @@ func runCreateAci(ctx context.Context, contextName string, opts aciCreateOpts) e
 
 }
 
-func getAciContextData(ctx context.Context, opts aciCreateOpts) (interface{}, string, error) {
+func getAciContextData(ctx context.Context, opts azure.ContextParams) (interface{}, string, error) {
 	cs, err := client.GetCloudService(ctx, store.AciContextType)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "cannot connect to ACI backend")
 	}
-	return cs.CreateContextData(ctx, convertAciOpts(opts))
-}
-
-func convertAciOpts(opts aciCreateOpts) map[string]string {
-	return map[string]string{
-		"aciSubscriptionId": opts.subscriptionID,
-		"aciResourceGroup":  opts.resourceGroup,
-		"aciLocation":       opts.location,
-		"description":       opts.description,
-	}
+	return cs.CreateContextData(ctx, opts)
 }
