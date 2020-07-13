@@ -2,16 +2,13 @@ package login
 
 import (
 	"github.com/spf13/cobra"
-)
 
-// AzureLoginOpts azure login options
-type AzureLoginOpts struct {
-	TenantID string
-}
+	"github.com/docker/api/azure"
+)
 
 // AzureLoginCommand returns the azure login command
 func AzureLoginCommand() *cobra.Command {
-	opts := AzureLoginOpts{}
+	opts := azure.LoginParams{}
 	cmd := &cobra.Command{
 		Use:   "azure",
 		Short: "Log in to azure",

@@ -23,10 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	clilogin "github.com/docker/api/cli/cmd/login"
-
-	acicontext "github.com/docker/api/cli/cmd/context"
-
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/cli"
@@ -53,6 +49,19 @@ const (
 
 // ErrNoSuchContainer is returned when the mentioned container does not exist
 var ErrNoSuchContainer = errors.New("no such container")
+
+// ContextParams options for creating ACI context
+type ContextParams struct {
+	Description    string
+	Location       string
+	SubscriptionID string
+	ResourceGroup  string
+}
+
+// LoginParams azure login options
+type LoginParams struct {
+	TenantID string
+}
 
 func init() {
 	backend.Register("aci", "aci", service, getCloudService)
@@ -356,7 +365,7 @@ type aciCloudService struct {
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
-	createOpts := params.(clilogin.AzureLoginOpts)
+	createOpts := params.(LoginParams)
 	return cs.loginService.Login(ctx, createOpts.TenantID)
 }
 
@@ -366,6 +375,6 @@ func (cs *aciCloudService) Logout(ctx context.Context) error {
 
 func (cs *aciCloudService) CreateContextData(ctx context.Context, params interface{}) (interface{}, string, error) {
 	contextHelper := newContextCreateHelper()
-	createOpts := params.(acicontext.AciCreateOpts)
+	createOpts := params.(ContextParams)
 	return contextHelper.createContextData(ctx, createOpts)
 }

@@ -20,8 +20,6 @@ import (
 	"context"
 	"testing"
 
-	acicontext "github.com/docker/api/cli/cmd/context"
-
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -177,8 +175,8 @@ func aciContext(subscriptionID string, resourceGroupName string, location string
 	}
 }
 
-func options(subscriptionID string, resourceGroupName string) acicontext.AciCreateOpts {
-	return acicontext.AciCreateOpts{
+func options(subscriptionID string, resourceGroupName string) ContextParams {
+	return ContextParams{
 		SubscriptionID: subscriptionID,
 		ResourceGroup:  resourceGroupName,
 		Location:       "eastus",

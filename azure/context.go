@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"os"
 
-	acicontext "github.com/docker/api/cli/cmd/context"
-
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
@@ -45,7 +43,7 @@ func newContextCreateHelper() contextCreateACIHelper {
 	}
 }
 
-func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts acicontext.AciCreateOpts) (interface{}, string, error) {
+func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts ContextParams) (interface{}, string, error) {
 	var subscriptionID string
 	if opts.SubscriptionID != "" {
 		subscriptionID = opts.SubscriptionID
@@ -110,7 +108,7 @@ func (helper contextCreateACIHelper) createGroup(ctx context.Context, subscripti
 	return g, nil
 }
 
-func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscriptionID string, opts acicontext.AciCreateOpts, groups []resources.Group) (resources.Group, error) {
+func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscriptionID string, opts ContextParams, groups []resources.Group) (resources.Group, error) {
 	groupNames := []string{"create a new resource group"}
 	for _, g := range groups {
 		groupNames = append(groupNames, fmt.Sprintf("%s (%s)", *g.Name, *g.Location))
