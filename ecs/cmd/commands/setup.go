@@ -66,7 +66,7 @@ func SetupCommand() *cobra.Command {
 			return contextStore.NewContext(opts.name, &opts.context)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.name, "name", "n", "aws", "Context Name")
+	cmd.Flags().StringVarP(&opts.name, "name", "n", "ecs", "Context Name")
 	cmd.Flags().StringVarP(&opts.context.Profile, "profile", "p", "", "AWS Profile")
 	cmd.Flags().StringVarP(&opts.context.Cluster, "cluster", "c", "", "ECS cluster")
 	cmd.Flags().StringVarP(&opts.context.Region, "region", "r", "", "AWS region")
