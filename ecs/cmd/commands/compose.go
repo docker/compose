@@ -46,7 +46,8 @@ func ConvertCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.C
 	cmd := &cobra.Command{
 		Use: "convert",
 		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
-			project, err := cli.ProjectFromOptions(options)
+			opts := options.WithOsEnv()
+			project, err := cli.ProjectFromOptions(&opts)
 			if err != nil {
 				return err
 			}
