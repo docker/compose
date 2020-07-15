@@ -18,6 +18,7 @@ type API interface {
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template *cloudformation.Template, parameters map[string]string) error
 	DeleteStack(ctx context.Context, name string) error
+	ListStackParameters(ctx context.Context, name string) (map[string]string, error)
 	ListStackResources(ctx context.Context, name string) ([]compose.StackResource, error)
 	GetStackID(ctx context.Context, name string) (string, error)
 	WaitStackComplete(ctx context.Context, name string, operation int) error

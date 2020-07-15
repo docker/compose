@@ -9,13 +9,9 @@ import (
 )
 
 func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
-	name := options.Name
-	if name == "" {
-		project, err := cli.ProjectFromOptions(&options)
-		if err != nil {
-			return err
-		}
-		name = project.Name
+	name, err2 := b.projectName(options)
+	if err2 != nil {
+		return err2
 	}
 
 	err := b.api.DeleteStack(ctx, name)
@@ -29,4 +25,16 @@ func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
 		return err
 	}
 	return nil
+}
+
+func (b *Backend) projectName(options cli.ProjectOptions) (string, error) {
+	name := options.Name
+	if name == "" {
+		project, err := cli.ProjectFromOptions(&options)
+		if err != nil {
+			return "", err
+		}
+		name = project.Name
+	}
+	return name, nil
 }

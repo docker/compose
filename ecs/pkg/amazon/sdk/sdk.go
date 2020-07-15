@@ -238,6 +238,21 @@ func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudf
 	}
 }
 
+func (s sdk) ListStackParameters(ctx context.Context, name string) (map[string]string, error) {
+	st, err := s.CF.DescribeStacksWithContext(ctx, &cloudformation.DescribeStacksInput{
+		NextToken: nil,
+		StackName: aws.String(name),
+	})
+	if err != nil {
+		return nil, err
+	}
+	parameters := map[string]string{}
+	for _, parameter := range st.Stacks[0].Parameters {
+		parameters[*parameter.ParameterKey] = *parameter.ParameterValue
+	}
+	return parameters, nil
+}
+
 func (s sdk) ListStackResources(ctx context.Context, name string) ([]compose.StackResource, error) {
 	// FIXME handle pagination
 	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
