@@ -79,7 +79,7 @@ func (suite *ContextSuiteTest) TestCreateNewResourceGroup() {
 	suite.mockResourceGroupHeper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
 
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserSelector.On("userSelect", "Select a resource group", selectOptions).Return(0, nil)
+	suite.mockUserSelector.On("Select", "Select a resource group", selectOptions).Return(0, nil)
 	suite.mockResourceGroupHeper.On("CreateOrUpdate", ctx, "1234", mock.AnythingOfType("string"), mock.AnythingOfType("resources.Group")).Return(group("newResourceGroup", "eastus"), nil)
 	suite.mockResourceGroupHeper.On("ListGroups", ctx, "1234").Return([]resources.Group{
 		group("group1", "eastus"),
@@ -97,7 +97,7 @@ func (suite *ContextSuiteTest) TestSelectExistingResourceGroup() {
 	ctx := context.TODO()
 	opts := options("1234", "")
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserSelector.On("userSelect", "Select a resource group", selectOptions).Return(2, nil)
+	suite.mockUserSelector.On("Select", "Select a resource group", selectOptions).Return(2, nil)
 	suite.mockResourceGroupHeper.On("ListGroups", ctx, "1234").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
@@ -138,9 +138,9 @@ func (suite *ContextSuiteTest) TestSelectSubscriptionIdAndExistingResourceGroup(
 	suite.mockResourceGroupHeper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{sub1, sub2}, nil)
 
 	selectOptions := []string{"Subscription1 (1234)", "Subscription2 (5678)"}
-	suite.mockUserSelector.On("userSelect", "Select a subscription ID", selectOptions).Return(1, nil)
+	suite.mockUserSelector.On("Select", "Select a subscription ID", selectOptions).Return(1, nil)
 	selectOptions = []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserSelector.On("userSelect", "Select a resource group", selectOptions).Return(2, nil)
+	suite.mockUserSelector.On("Select", "Select a resource group", selectOptions).Return(2, nil)
 	suite.mockResourceGroupHeper.On("ListGroups", ctx, "5678").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
@@ -192,9 +192,23 @@ type MockUserSelector struct {
 	mock.Mock
 }
 
-func (s *MockUserSelector) userSelect(message string, options []string) (int, error) {
+func (s *MockUserSelector) Select(message string, options []string) (int, error) {
 	args := s.Called(message, options)
 	return args.Int(0), args.Error(1)
+}
+func (s *MockUserSelector) Confirm(message string, defaultValue bool) (bool, error) {
+	args := s.Called(message, options)
+	return args.Bool(0), args.Error(1)
+}
+
+func (s *MockUserSelector) Input(message string, defaultValue string) (string, error) {
+	args := s.Called(message, options)
+	return args.String(0), args.Error(1)
+}
+
+func (s *MockUserSelector) Password(message string) (string, error) {
+	args := s.Called(message, options)
+	return args.String(0), args.Error(1)
 }
 
 type MockResourceGroupHelper struct {

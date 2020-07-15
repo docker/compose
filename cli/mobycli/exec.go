@@ -46,7 +46,7 @@ func ExecIfDefaultCtxType(ctx context.Context) {
 }
 
 func mustDelegateToMoby(ctxType string) bool {
-	return ctxType == store.DefaultContextType || ctxType == store.AwsContextType
+	return ctxType == store.DefaultContextType
 }
 
 // Exec delegates to com.docker.cli if on moby context

@@ -336,13 +336,16 @@ func createDirIfNotExist(dir string) error {
 // be able to manage other contexts.
 func getters() map[string]func() interface{} {
 	return map[string]func() interface{}{
-		"aci": func() interface{} {
+		AciContextType: func() interface{} {
 			return &AciContext{}
 		},
-		"local": func() interface{} {
+		AwsContextType: func() interface{} {
+			return &AwsContext{}
+		},
+		LocalContextType: func() interface{} {
 			return &LocalContext{}
 		},
-		"example": func() interface{} {
+		ExampleContextType: func() interface{} {
 			return &ExampleContext{}
 		},
 	}
