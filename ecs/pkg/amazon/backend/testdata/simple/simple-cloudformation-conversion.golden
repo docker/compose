@@ -71,6 +71,9 @@
       "Type": "AWS::Logs::LogGroup"
     },
     "SimpleService": {
+      "DependsOn": [
+        "SimpleTCP80Listener"
+      ],
       "Properties": {
         "Cluster": {
           "Fn::If": [
@@ -85,6 +88,15 @@
         },
         "DesiredCount": 1,
         "LaunchType": "FARGATE",
+        "LoadBalancers": [
+          {
+            "ContainerName": "simple",
+            "ContainerPort": 80,
+            "TargetGroupArn": {
+              "Ref": "SimpleTCP80TargetGroup"
+            }
+          }
+        ],
         "NetworkConfiguration": {
           "AwsvpcConfiguration": {
             "AssignPublicIp": "ENABLED",
@@ -152,6 +164,56 @@
       },
       "Type": "AWS::ServiceDiscovery::Service"
     },
+    "SimpleTCP80Listener": {
+      "Properties": {
+        "DefaultActions": [
+          {
+            "ForwardConfig": {
+              "TargetGroups": [
+                {
+                  "TargetGroupArn": {
+                    "Ref": "SimpleTCP80TargetGroup"
+                  }
+                }
+              ]
+            },
+            "Type": "forward"
+          }
+        ],
+        "LoadBalancerArn": {
+          "Fn::If": [
+            "CreateLoadBalancer",
+            {
+              "Ref": "TestSimpleConvertLoadBalancer"
+            },
+            {
+              "Ref": "ParameterLoadBalancerARN"
+            }
+          ]
+        },
+        "Port": 80,
+        "Protocol": "HTTP"
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::Listener"
+    },
+    "SimpleTCP80TargetGroup": {
+      "Properties": {
+        "Name": "SimpleTCP80TargetGroup",
+        "Port": 80,
+        "Protocol": "HTTP",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ],
+        "TargetType": "ip",
+        "VpcId": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+    },
     "SimpleTaskDefinition": {
       "Properties": {
         "ContainerDefinitions": [
@@ -188,7 +250,14 @@
                 "awslogs-stream-prefix": "TestSimpleConvert"
               }
             },
-            "Name": "simple"
+            "Name": "simple",
+            "PortMappings": [
+              {
+                "ContainerPort": 80,
+                "HostPort": 80,
+                "Protocol": "tcp"
+              }
+            ]
           }
         ],
         "Cpu": "256",
@@ -231,6 +300,15 @@
       "Properties": {
         "GroupDescription": "TestSimpleConvert default Security Group",
         "GroupName": "TestSimpleConvertDefaultNetwork",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "simple:80/tcp",
+            "FromPort": 80,
+            "IpProtocol": "TCP",
+            "ToPort": 80
+          }
+        ],
         "Tags": [
           {
             "Key": "com.docker.compose.project",

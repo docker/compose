@@ -142,14 +142,16 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 						protocol = elbv2.ProtocolEnumHttp
 					}
 				}
-				targetGroupName := createTargetGroup(project, service, port, template, protocol)
-				listenerName := createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
-				dependsOn = append(dependsOn, listenerName)
-				serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
-					ContainerName:  service.Name,
-					ContainerPort:  int(port.Target),
-					TargetGroupArn: cloudformation.Ref(targetGroupName),
-				})
+				if loadBalancerARN != "" {
+					targetGroupName := createTargetGroup(project, service, port, template, protocol)
+					listenerName := createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
+					dependsOn = append(dependsOn, listenerName)
+					serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
+						ContainerName:  service.Name,
+						ContainerPort:  int(port.Target),
+						TargetGroupArn: cloudformation.Ref(targetGroupName),
+					})
+				}
 			}
 		}
 
@@ -218,6 +220,15 @@ func getLoadBalancerSecurityGroups(project *types.Project, template *cloudformat
 }
 
 func createLoadBalancer(project *types.Project, template *cloudformation.Template) string {
+	ports := 0
+	for _, service := range project.Services {
+		ports += len(service.Ports)
+	}
+	if ports == 0 {
+		// Project do not expose any port (batch jobs?)
+		// So no need to create a LoadBalancer
+		return ""
+	}
 
 	// load balancer names are limited to 32 characters total
 	loadBalancerName := fmt.Sprintf("%.32s", fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name)))

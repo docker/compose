@@ -26,13 +26,6 @@ func TestSimpleConvert(t *testing.T) {
 	golden.Assert(t, result, expected)
 }
 
-func TestSimpleWithOverrides(t *testing.T) {
-	project := load(t, "testdata/input/simple-single-service.yaml", "testdata/input/simple-single-service-with-overrides.yaml")
-	result := convertResultAsString(t, project, "TestCluster")
-	expected := "simple/simple-cloudformation-with-overrides-conversion.golden"
-	golden.Assert(t, result, expected)
-}
-
 func TestRolePolicy(t *testing.T) {
 	template := convertYaml(t, "test", `
 version: "3"
@@ -92,6 +85,22 @@ services:
 	assert.Check(t, len(lb.Name) <= 32)
 	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumApplication)
 	assert.Check(t, len(lb.SecurityGroups) > 0)
+}
+
+func TestNoLoadBalancerIfNoPortExposed(t *testing.T) {
+	template := convertYaml(t, "test", `
+version: "3"
+services:
+  test:
+    image: nginx
+  foo:
+    image: bar
+`)
+	for _, r := range template.Resources {
+		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::TargetGroup")
+		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::Listener")
+		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::LoadBalancer")
+	}
 }
 
 func TestServiceReplicas(t *testing.T) {

@@ -2,3 +2,5 @@ version: "3"
 services:
   simple:
     image: nginx
+    ports:
+      - "80:80"
