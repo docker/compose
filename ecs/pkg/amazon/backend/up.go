@@ -16,14 +16,14 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 		return err
 	}
 
-	if b.Cluster != "" {
-		ok, err := b.api.ClusterExists(ctx, b.Cluster)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return fmt.Errorf("configured cluster %q does not exist", b.Cluster)
-		}
+	err = b.api.CheckRequirements(ctx)
+	if err != nil {
+		return err
+	}
+
+	cluster, err := b.GetCluster(ctx, project)
+	if err != nil {
+		return err
 	}
 
 	update, err := b.api.StackExists(ctx, project.Name)
@@ -55,7 +55,7 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 	}
 
 	parameters := map[string]string{
-		ParameterClusterName:     b.Cluster,
+		ParameterClusterName:     cluster,
 		ParameterVPCId:           vpc,
 		ParameterSubnet1Id:       subNets[0],
 		ParameterSubnet2Id:       subNets[1],
@@ -96,15 +96,32 @@ func (b Backend) GetVPC(ctx context.Context, project *types.Project) (string, er
 
 func (b Backend) GetLoadBalancer(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if lb, ok := project.Extensions[compose.ExtensionLB]; ok {
-		lbName := lb.(string)
-		ok, err := b.api.LoadBalancerExists(ctx, lbName)
+	if ext, ok := project.Extensions[compose.ExtensionLB]; ok {
+		lb := ext.(string)
+		ok, err := b.api.LoadBalancerExists(ctx, lb)
 		if err != nil {
 			return "", err
 		}
 		if !ok {
-			return "", fmt.Errorf("Load Balancer does not exist: %s", lb)
+			return "", fmt.Errorf("load balancer does not exist: %s", lb)
 		}
+		return lb, nil
 	}
 	return "", nil
+}
+
+func (b Backend) GetCluster(ctx context.Context, project *types.Project) (string, error) {
+	//check compose file for custom VPC selected
+	if ext, ok := project.Extensions[compose.ExtensionCluster]; ok {
+		cluster := ext.(string)
+		ok, err := b.api.ClusterExists(ctx, cluster)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", fmt.Errorf("cluster does not exist: %s", cluster)
+		}
+		return cluster, nil
+	}
+	return b.Cluster, nil
 }

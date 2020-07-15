@@ -39,7 +39,10 @@ dev: build
 lint: ## Verify Go files
 	@docker build . --target lint
 
+fmt: ## Format go files
+	go fmt ./...
+
 clean:
 	rm -rf dist/
 
-.PHONY: clean build test dev lint e2e cross
+.PHONY: clean build test dev lint e2e cross fmt

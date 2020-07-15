@@ -14,25 +14,28 @@ func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose
 		return nil, err
 	}
 
-	cluster := b.Cluster
-	if cluster == "" {
-		cluster = project.Name
-	}
-
 	resources, err := b.api.ListStackResources(ctx, project.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	var loadBalancer string
-	if lb, ok := project.Extensions[compose.ExtensionLB]; ok {
-		loadBalancer = lb.(string)
+	loadBalancer, err := b.GetLoadBalancer(ctx, project)
+	if err != nil {
+		return nil, err
 	}
+
+	cluster, err := b.GetCluster(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+
 	servicesARN := []string{}
 	for _, r := range resources {
 		switch r.Type {
 		case "AWS::ECS::Service":
 			servicesARN = append(servicesARN, r.ARN)
+		case "AWS::ECS::Cluster":
+			cluster = r.ARN
 		case "AWS::ElasticLoadBalancingV2::LoadBalancer":
 			loadBalancer = r.ARN
 		}
