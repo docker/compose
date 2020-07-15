@@ -218,7 +218,9 @@ func getLoadBalancerSecurityGroups(project *types.Project, template *cloudformat
 }
 
 func createLoadBalancer(project *types.Project, template *cloudformation.Template) string {
-	loadBalancerName := fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name))
+
+	// load balancer names are limited to 32 characters total
+	loadBalancerName := fmt.Sprintf("%.32s", fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name)))
 	// Create LoadBalancer if `ParameterLoadBalancerName` is not set
 	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
 

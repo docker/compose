@@ -34,7 +34,7 @@ func TestSimpleWithOverrides(t *testing.T) {
 }
 
 func TestRolePolicy(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   foo:
@@ -54,14 +54,14 @@ services:
 }
 
 func TestMapNetworksToSecurityGroups(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   test:
     image: hello_world
     networks:
-      - front-tier 
-      - back-tier 
+      - front-tier
+      - back-tier
 
 networks:
   front-tier:
@@ -79,7 +79,7 @@ networks:
 }
 
 func TestLoadBalancerTypeApplication(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test123456789009876543211234567890", `
 version: "3"
 services:
   test:
@@ -89,12 +89,13 @@ services:
 `)
 	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
 	assert.Check(t, lb != nil)
+	assert.Check(t, len(lb.Name) <= 32)
 	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumApplication)
 	assert.Check(t, len(lb.SecurityGroups) > 0)
 }
 
 func TestServiceReplicas(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   test:
@@ -108,7 +109,7 @@ services:
 }
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   test:
@@ -123,7 +124,7 @@ services:
 }
 
 func TestServiceMapping(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   test:
@@ -163,7 +164,7 @@ func get(l []ecs.TaskDefinition_KeyValuePair, name string) string {
 }
 
 func TestResourcesHaveProjectTagSet(t *testing.T) {
-	template := convertYaml(t, `
+	template := convertYaml(t, "test", `
 version: "3"
 services:
   test:
@@ -207,7 +208,7 @@ func load(t *testing.T, paths ...string) *types.Project {
 	return project
 }
 
-func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
+func convertYaml(t *testing.T, name string, yaml string) *cloudformation.Template {
 	dict, err := loader.ParseYAML([]byte(yaml))
 	assert.NilError(t, err)
 	model, err := loader.Load(types.ConfigDetails{

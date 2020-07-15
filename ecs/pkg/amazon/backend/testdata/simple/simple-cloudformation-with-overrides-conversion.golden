@@ -260,10 +260,10 @@
       },
       "Type": "AWS::EC2::SecurityGroupIngress"
     },
-    "TestSimpleWithOverridesLoadBalancer": {
+    "TestSimpleWithOverridesLoadBalan": {
       "Condition": "CreateLoadBalancer",
       "Properties": {
-        "Name": "TestSimpleWithOverridesLoadBalancer",
+        "Name": "TestSimpleWithOverridesLoadBalan",
         "Scheme": "internet-facing",
         "SecurityGroups": [
           {
