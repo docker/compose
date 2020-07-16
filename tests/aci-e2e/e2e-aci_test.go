@@ -81,6 +81,7 @@ func (s *E2eACISuite) TestLoginLogoutCreateContextError() {
 }
 
 func (s *E2eACISuite) TestACIRunSingleContainer() {
+	var containerName string
 	resourceGroupName := s.setupTestResourceGroup()
 	defer deleteResourceGroup(resourceGroupName)
 
@@ -105,8 +106,10 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 			"-v", fmt.Sprintf("%s:%s@%s:%s",
 				testStorageAccountName, firstKey, testShareName, mountTarget),
 			"-p", "80:80",
-			"--name", testContainerName).ExecOrDie()
-		Expect(output).To(ContainSubstring(testContainerName))
+		).ExecOrDie()
+		runOutput := Lines(output)
+		containerName = runOutput[len(runOutput)-1]
+
 		output = s.NewDockerCommand("ps").ExecOrDie()
 		lines := Lines(output)
 		Expect(len(lines)).To(Equal(2))
@@ -127,10 +130,10 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 	})
 
 	s.Step("exec command", func() {
-		output := s.NewDockerCommand("exec", testContainerName, "pwd").ExecOrDie()
+		output := s.NewDockerCommand("exec", containerName, "pwd").ExecOrDie()
 		Expect(output).To(ContainSubstring("/"))
 
-		_, err := s.NewDockerCommand("exec", testContainerName, "echo", "fail_with_argument").Exec()
+		_, err := s.NewDockerCommand("exec", containerName, "echo", "fail_with_argument").Exec()
 		Expect(err.Error()).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
 			"Only the binary should be specified"))
 	})
@@ -138,7 +141,7 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 	s.Step("follow logs from nginx", func() {
 		timeChan := make(chan time.Time)
 
-		ctx := s.NewDockerCommand("logs", "--follow", testContainerName).WithTimeout(timeChan)
+		ctx := s.NewDockerCommand("logs", "--follow", containerName).WithTimeout(timeChan)
 		outChan := make(chan string)
 
 		go func() {
@@ -163,8 +166,8 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 	})
 
 	s.Step("removes container nginx", func() {
-		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
-		Expect(Lines(output)[0]).To(Equal(testContainerName))
+		output := s.NewDockerCommand("rm", containerName).ExecOrDie()
+		Expect(Lines(output)[0]).To(Equal(containerName))
 	})
 
 	s.Step("re-run nginx with modified cpu/mem, and without --detach and follow logs", func() {
