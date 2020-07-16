@@ -11,10 +11,12 @@ Its design and UX will evolve until 1.0 Final release.
 ## Get started
 
 If you're using macOS or Windows you just need to install
-[Docker Desktop Edge](https://www.docker.com/products/docker-desktop) and you
-will have the ECS integration installed.
+Docker Desktop **Edge** and you will have the ECS integration installed.
+You can find links here:
+- [macOS](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
+- [Windows](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
 
-You can find Linux install instructions [here](./docs/get-started-linux.md).
+Linux install instructions are [here](./docs/get-started-linux.md).
 
 ## Example and documentation
 
