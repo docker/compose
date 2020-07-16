@@ -19,6 +19,7 @@ type ServiceStatus struct {
 
 const (
 	StackCreate = iota
+	StackUpdate
 	StackDelete
 )
 

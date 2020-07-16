@@ -23,6 +23,8 @@ type API interface {
 	GetStackID(ctx context.Context, name string) (string, error)
 	WaitStackComplete(ctx context.Context, name string, operation int) error
 	DescribeStackEvents(ctx context.Context, stackID string) ([]*cf.StackEvent, error)
+	CreateChangeSet(ctx context.Context, name string, template *cloudformation.Template, parameters map[string]string) (string, error)
+	UpdateStack(ctx context.Context, changeset string) error
 
 	DescribeServices(ctx context.Context, cluster string, arns []string) ([]compose.ServiceStatus, error)
 

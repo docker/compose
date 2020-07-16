@@ -175,9 +175,8 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 	param := []*cloudformation.Parameter{}
 	for name, value := range parameters {
 		param = append(param, &cloudformation.Parameter{
-			ParameterKey:     aws.String(name),
-			ParameterValue:   aws.String(value),
-			UsePreviousValue: aws.Bool(true),
+			ParameterKey:   aws.String(name),
+			ParameterValue: aws.String(value),
 		})
 	}
 
@@ -190,6 +189,60 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
 		},
+	})
+	return err
+}
+
+func (s sdk) CreateChangeSet(ctx context.Context, name string, template *cf.Template, parameters map[string]string) (string, error) {
+	logrus.Debug("Create CloudFormation Changeset")
+	json, err := template.JSON()
+	if err != nil {
+		return "", err
+	}
+
+	param := []*cloudformation.Parameter{}
+	for name := range parameters {
+		param = append(param, &cloudformation.Parameter{
+			ParameterKey:     aws.String(name),
+			UsePreviousValue: aws.Bool(true),
+		})
+	}
+
+	update := fmt.Sprintf("Update%s", time.Now().Format("2006-01-02-15-04-05"))
+	changeset, err := s.CF.CreateChangeSetWithContext(ctx, &cloudformation.CreateChangeSetInput{
+		ChangeSetName: aws.String(update),
+		ChangeSetType: aws.String(cloudformation.ChangeSetTypeUpdate),
+		StackName:     aws.String(name),
+		TemplateBody:  aws.String(string(json)),
+		Parameters:    param,
+		Capabilities: []*string{
+			aws.String(cloudformation.CapabilityCapabilityIam),
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	err = s.CF.WaitUntilChangeSetCreateCompleteWithContext(ctx, &cloudformation.DescribeChangeSetInput{
+		ChangeSetName: changeset.Id,
+	})
+	return *changeset.Id, err
+}
+
+func (s sdk) UpdateStack(ctx context.Context, changeset string) error {
+	desc, err := s.CF.DescribeChangeSetWithContext(ctx, &cloudformation.DescribeChangeSetInput{
+		ChangeSetName: aws.String(changeset),
+	})
+	if err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(aws.StringValue(desc.StatusReason), "The submitted information didn't contain changes.") {
+		return nil
+	}
+
+	_, err = s.CF.ExecuteChangeSet(&cloudformation.ExecuteChangeSetInput{
+		ChangeSetName: aws.String(changeset),
 	})
 	return err
 }
