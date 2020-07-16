@@ -13,8 +13,8 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(&options)
+func (b *Backend) Up(ctx context.Context, options *cli.ProjectOptions) error {
+	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
 		return err
 	}

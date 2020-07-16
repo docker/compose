@@ -13,10 +13,10 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) Logs(ctx context.Context, options cli.ProjectOptions) error {
+func (b *Backend) Logs(ctx context.Context, options *cli.ProjectOptions) error {
 	name := options.Name
 	if name == "" {
-		project, err := cli.ProjectFromOptions(&options)
+		project, err := cli.ProjectFromOptions(options)
 		if err != nil {
 			return err
 		}

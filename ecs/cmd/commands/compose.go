@@ -18,7 +18,7 @@ func ComposeCommand(dockerCli command.Cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "compose",
 	}
-	opts := &cli.ProjectOptions{}
+	opts := &composeOptions{}
 	AddFlags(opts, cmd.Flags())
 
 	cmd.AddCommand(
@@ -42,12 +42,15 @@ func (o upOptions) LoadBalancerArn() *string {
 	return &o.loadBalancerArn
 }
 
-func ConvertCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
+func ConvertCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
 		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
-			opts := options.WithOsEnv()
-			project, err := cli.ProjectFromOptions(&opts)
+			opts, err := options.toProjectOptions()
+			if err != nil {
+				return err
+			}
+			project, err := cli.ProjectFromOptions(opts)
 			if err != nil {
 				return err
 			}
@@ -68,24 +71,32 @@ func ConvertCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.C
 	return cmd
 }
 
-func UpCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
+func UpCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
 		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
-			return backend.Up(context.Background(), *options)
+			opts, err := options.toProjectOptions()
+			if err != nil {
+				return err
+			}
+			return backend.Up(context.Background(), opts)
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
 	return cmd
 }
 
-func PsCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
+func PsCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "ps",
-		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
-			status, err := backend.Ps(context.Background(), *options)
+		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+			opts, err := options.toProjectOptions()
+			if err != nil {
+				return err
+			}
+			status, err := backend.Ps(context.Background(), opts)
 			if err != nil {
 				return err
 			}
@@ -105,23 +116,31 @@ type downOptions struct {
 	DeleteCluster bool
 }
 
-func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
+func DownCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
-			return backend.Down(context.Background(), *projectOpts)
+		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+			opts, err := options.toProjectOptions()
+			if err != nil {
+				return err
+			}
+			return backend.Down(context.Background(), opts)
 		}),
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
 	return cmd
 }
 
-func LogsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
+func LogsCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "logs [PROJECT NAME]",
 		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
-			return backend.Logs(context.Background(), *projectOpts)
+			opts, err := options.toProjectOptions()
+			if err != nil {
+				return err
+			}
+			return backend.Logs(context.Background(), opts)
 		}),
 	}
 	return cmd

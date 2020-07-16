@@ -3,16 +3,13 @@ package backend
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
-var targetGroupLogicalName = regexp.MustCompile("(.*)(TCP|UDP)([0-9]+)TargetGroup")
-
-func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose.ServiceStatus, error) {
+func (b *Backend) Ps(ctx context.Context, options *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
 	projectName, err := b.projectName(options)
 	if err != nil {
 		return nil, err

@@ -8,7 +8,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
+func (b *Backend) Down(ctx context.Context, options *cli.ProjectOptions) error {
 	name, err := b.projectName(options)
 	if err != nil {
 		return err
@@ -27,10 +27,10 @@ func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
 	return nil
 }
 
-func (b *Backend) projectName(options cli.ProjectOptions) (string, error) {
+func (b *Backend) projectName(options *cli.ProjectOptions) (string, error) {
 	name := options.Name
 	if name == "" {
-		project, err := cli.ProjectFromOptions(&options)
+		project, err := cli.ProjectFromOptions(options)
 		if err != nil {
 			return "", err
 		}
