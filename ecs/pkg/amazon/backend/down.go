@@ -9,12 +9,12 @@ import (
 )
 
 func (b *Backend) Down(ctx context.Context, options cli.ProjectOptions) error {
-	name, err2 := b.projectName(options)
-	if err2 != nil {
-		return err2
+	name, err := b.projectName(options)
+	if err != nil {
+		return err
 	}
 
-	err := b.api.DeleteStack(ctx, name)
+	err = b.api.DeleteStack(ctx, name)
 	if err != nil {
 		return err
 	}

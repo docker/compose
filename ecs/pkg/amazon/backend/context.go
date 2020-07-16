@@ -2,7 +2,13 @@ package backend
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/docker/ecs-plugin/pkg/docker"
+)
+
+const (
+	ContextParamRegion  = "region"
+	ContextParamProfile = "profile"
 )
 
 func (b *Backend) CreateContextData(ctx context.Context, params map[string]string) (contextData interface{}, description string, err error) {
@@ -11,14 +17,8 @@ func (b *Backend) CreateContextData(ctx context.Context, params map[string]strin
 		return "", "", err
 	}
 
-	if b.Cluster != "" {
-		exists, err := b.api.ClusterExists(ctx, b.Cluster)
-		if err != nil {
-			return "", "", err
-		}
-		if !exists {
-			return "", "", fmt.Errorf("cluster %s does not exists", b.Cluster)
-		}
-	}
-	return "", "", nil
+	return docker.AwsContext{
+		Profile: params[ContextParamProfile],
+		Region:  params[ContextParamRegion],
+	}, "Amazon ECS context", nil
 }

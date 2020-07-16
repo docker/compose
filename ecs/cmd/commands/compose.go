@@ -45,7 +45,7 @@ func (o upOptions) LoadBalancerArn() *string {
 func ConvertCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert",
-		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
+		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
 			opts := options.WithOsEnv()
 			project, err := cli.ProjectFromOptions(&opts)
 			if err != nil {
@@ -72,7 +72,7 @@ func UpCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Comman
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "up",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			return backend.Up(context.Background(), *options)
 		}),
 	}
@@ -84,7 +84,7 @@ func PsCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Comman
 	opts := upOptions{}
 	cmd := &cobra.Command{
 		Use: "ps",
-		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
+		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
 			status, err := backend.Ps(context.Background(), *options)
 			if err != nil {
 				return err
@@ -109,7 +109,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.
 	opts := downOptions{}
 	cmd := &cobra.Command{
 		Use: "down",
-		RunE: docker.WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
+		RunE: WithAwsContext(dockerCli, func(ctx docker.AwsContext, backend *amazon.Backend, args []string) error {
 			return backend.Down(context.Background(), *projectOpts)
 		}),
 	}
@@ -120,7 +120,7 @@ func DownCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.
 func LogsCommand(dockerCli command.Cli, projectOpts *cli.ProjectOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "logs [PROJECT NAME]",
-		RunE: docker.WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
+		RunE: WithAwsContext(dockerCli, func(clusteropts docker.AwsContext, backend *amazon.Backend, args []string) error {
 			return backend.Logs(context.Background(), *projectOpts)
 		}),
 	}

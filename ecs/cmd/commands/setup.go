@@ -22,17 +22,18 @@ const enterLabelPrefix = "Enter "
 
 type setupOptions struct {
 	name            string
-	context         contextStore.AwsContext
+	profile         string
+	region          string
 	accessKeyID     string
 	secretAccessKey string
 }
 
 func (s setupOptions) unsetRequiredArgs() []string {
 	unset := []string{}
-	if s.context.Profile == "" {
+	if s.profile == "" {
 		unset = append(unset, "profile")
 	}
-	if s.context.Region == "" {
+	if s.region == "" {
 		unset = append(unset, "region")
 	}
 	return unset
@@ -51,25 +52,28 @@ func SetupCommand() *cobra.Command {
 				}
 			}
 			if opts.accessKeyID != "" && opts.secretAccessKey != "" {
-				if err := saveCredentials(opts.context.Profile, opts.accessKeyID, opts.secretAccessKey); err != nil {
+				if err := saveCredentials(opts.profile, opts.accessKeyID, opts.secretAccessKey); err != nil {
 					return err
 				}
 			}
-			backend, err := amazon.NewBackend(opts.context.Profile, opts.context.Cluster, opts.context.Region)
+			backend, err := amazon.NewBackend(opts.profile, opts.region)
 			if err != nil {
 				return err
 			}
-			_, _, err = backend.CreateContextData(context.Background(), nil)
+
+			context, _, err := backend.CreateContextData(context.Background(), map[string]string{
+				amazon.ContextParamProfile: opts.profile,
+				amazon.ContextParamRegion:  opts.region,
+			})
 			if err != nil {
 				return err
 			}
-			return contextStore.NewContext(opts.name, &opts.context)
+			return contextStore.NewContext(opts.name, context)
 		},
 	}
 	cmd.Flags().StringVarP(&opts.name, "name", "n", "ecs", "Context Name")
-	cmd.Flags().StringVarP(&opts.context.Profile, "profile", "p", "", "AWS Profile")
-	cmd.Flags().StringVarP(&opts.context.Cluster, "cluster", "c", "", "ECS cluster")
-	cmd.Flags().StringVarP(&opts.context.Region, "region", "r", "", "AWS region")
+	cmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "AWS Profile")
+	cmd.Flags().StringVarP(&opts.region, "region", "r", "", "AWS region")
 	cmd.Flags().StringVarP(&opts.accessKeyID, "aws-key-id", "k", "", "AWS Access Key ID")
 	cmd.Flags().StringVarP(&opts.secretAccessKey, "aws-secret-key", "s", "", "AWS Secret Access Key")
 
@@ -85,10 +89,6 @@ func interactiveCli(opts *setupOptions) error {
 
 	section, err := setProfile(opts, section)
 	if err != nil {
-		return err
-	}
-
-	if err := setCluster(opts, err); err != nil {
 		return err
 	}
 
@@ -156,7 +156,7 @@ func awsProfiles(filename string) (map[string]ini.Section, error) {
 }
 
 func setContextName(opts *setupOptions) error {
-	if opts.name == "aws" {
+	if opts.name == "ecs" {
 		result, err := promptString(opts.name, "context name", enterLabelPrefix, 2)
 		if err != nil {
 			return err
@@ -171,7 +171,7 @@ func setProfile(opts *setupOptions, section ini.Section) (ini.Section, error) {
 	if err != nil {
 		return ini.Section{}, err
 	}
-	section, ok := profilesList[opts.context.Profile]
+	section, ok := profilesList[opts.profile]
 	if !ok {
 		prompt := promptui.Select{
 			Label: "Select AWS Profile",
@@ -179,14 +179,14 @@ func setProfile(opts *setupOptions, section ini.Section) (ini.Section, error) {
 		}
 		_, result, err := prompt.Run()
 		if result == "new profile" {
-			result, err := promptString(opts.context.Profile, "profile name", enterLabelPrefix, 2)
+			result, err := promptString(opts.profile, "profile name", enterLabelPrefix, 2)
 			if err != nil {
 				return ini.Section{}, err
 			}
-			opts.context.Profile = result
+			opts.profile = result
 		} else {
 			section = profilesList[result]
-			opts.context.Profile = result
+			opts.profile = result
 		}
 		if err != nil {
 			return ini.Section{}, err
@@ -196,7 +196,7 @@ func setProfile(opts *setupOptions, section ini.Section) (ini.Section, error) {
 }
 
 func setRegion(opts *setupOptions, section ini.Section) error {
-	defaultRegion := opts.context.Region
+	defaultRegion := opts.region
 	if defaultRegion == "" && section.Name() != "" {
 		region, err := section.GetKey("region")
 		if err == nil {
@@ -207,17 +207,7 @@ func setRegion(opts *setupOptions, section ini.Section) error {
 	if err != nil {
 		return err
 	}
-	opts.context.Region = result
-	return nil
-}
-
-func setCluster(opts *setupOptions, err error) error {
-	result, err := promptString(opts.context.Cluster, "cluster name", enterLabelPrefix, 0)
-	if err != nil {
-		return err
-	}
-
-	opts.context.Cluster = result
+	opts.region = result
 	return nil
 }
 

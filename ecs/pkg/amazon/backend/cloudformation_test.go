@@ -21,7 +21,7 @@ import (
 
 func TestSimpleConvert(t *testing.T) {
 	project := load(t, "testdata/input/simple-single-service.yaml")
-	result := convertResultAsString(t, project, "TestCluster")
+	result := convertResultAsString(t, project)
 	expected := "simple/simple-cloudformation-conversion.golden"
 	golden.Assert(t, result, expected)
 }
@@ -197,10 +197,10 @@ services:
 	}
 }
 
-func convertResultAsString(t *testing.T, project *types.Project, clusterName string) string {
-	client, err := NewBackend("", clusterName, "")
+func convertResultAsString(t *testing.T, project *types.Project) string {
+	backend, err := NewBackend("", "")
 	assert.NilError(t, err)
-	result, err := client.Convert(project)
+	result, err := backend.Convert(project)
 	assert.NilError(t, err)
 	resultAsJSON, err := result.JSON()
 	assert.NilError(t, err)

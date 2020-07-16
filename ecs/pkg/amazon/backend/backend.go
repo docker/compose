@@ -6,7 +6,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/amazon/sdk"
 )
 
-func NewBackend(profile string, cluster string, region string) (*Backend, error) {
+func NewBackend(profile string, region string) (*Backend, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Profile: profile,
 		Config: aws.Config{
@@ -17,14 +17,12 @@ func NewBackend(profile string, cluster string, region string) (*Backend, error)
 		return nil, err
 	}
 	return &Backend{
-		Cluster: cluster,
-		Region:  region,
-		api:     sdk.NewAPI(sess),
+		Region: region,
+		api:    sdk.NewAPI(sess),
 	}, nil
 }
 
 type Backend struct {
-	Cluster string
-	Region  string
-	api     sdk.API
+	Region string
+	api    sdk.API
 }

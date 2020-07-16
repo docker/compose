@@ -3,13 +3,10 @@ package docker
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/context/store"
-	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	"github.com/mitchellh/mapstructure"
-	"github.com/spf13/cobra"
 )
 
 const contextType = "aws"
@@ -24,16 +21,15 @@ func getter() interface{} {
 
 type AwsContext struct {
 	Profile string
-	Cluster string
 	Region  string
 }
 
-func NewContext(name string, awsContext *AwsContext) error {
-	_, err := NewContextWithStore(name, awsContext, cliconfig.ContextStoreDir())
+func NewContext(name string, awsContext interface{}) error {
+	_, err := NewContextWithStore(name, awsContext.(AwsContext), cliconfig.ContextStoreDir())
 	return err
 }
 
-func NewContextWithStore(name string, awsContext *AwsContext, contextDirectory string) (store.Store, error) {
+func NewContextWithStore(name string, awsContext AwsContext, contextDirectory string) (store.Store, error) {
 	contextStore := initContextStore(contextDirectory)
 	endpoints := map[string]interface{}{
 		"aws":    awsContext,
@@ -72,26 +68,6 @@ func checkAwsContextExists(contextName string) (*AwsContext, error) {
 		return nil, fmt.Errorf("can't use \"%s\" with ECS command because it is not an AWS context", contextName)
 	}
 	return &awsContext, nil
-}
-
-type ContextFunc func(ctx AwsContext, backend *amazon.Backend, args []string) error
-
-func WithAwsContext(dockerCli command.Cli, f ContextFunc) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		ctx, err := GetAwsContext(dockerCli)
-		if err != nil {
-			return err
-		}
-		backend, err := amazon.NewBackend(ctx.Profile, ctx.Cluster, ctx.Region)
-		if err != nil {
-			return err
-		}
-		err = f(*ctx, backend, args)
-		if e, ok := err.(awserr.Error); ok {
-			return fmt.Errorf(e.Message())
-		}
-		return err
-	}
 }
 
 func GetAwsContext(dockerCli command.Cli) (*AwsContext, error) {

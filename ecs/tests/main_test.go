@@ -58,7 +58,7 @@ func (d dockerCliCommand) createTestCmd(ops ...ConfigFileOperator) (icmd.Cmd, fu
 		Profile: "sandbox.devtools.developer",
 		Region:  "eu-west-3",
 	}
-	testStore, err := docker.NewContextWithStore(testContextName, &awsContext, filepath.Join(configDir, "contexts"))
+	testStore, err := docker.NewContextWithStore(testContextName, awsContext, filepath.Join(configDir, "contexts"))
 	if err != nil {
 		panic(err)
 	}

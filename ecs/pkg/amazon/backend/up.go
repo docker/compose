@@ -123,5 +123,5 @@ func (b Backend) GetCluster(ctx context.Context, project *types.Project) (string
 		}
 		return cluster, nil
 	}
-	return b.Cluster, nil
+	return "", nil
 }
