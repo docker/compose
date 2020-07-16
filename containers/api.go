@@ -25,19 +25,20 @@ import (
 
 // Container represents a created container
 type Container struct {
-	ID          string
-	Status      string
-	Image       string
-	Command     string
-	CPUTime     uint64
-	CPULimit    float64
-	MemoryUsage uint64
-	MemoryLimit uint64
-	PidsCurrent uint64
-	PidsLimit   uint64
-	Labels      []string
-	Ports       []Port
-	Platform    string
+	ID                     string
+	Status                 string
+	Image                  string
+	Command                string
+	CPUTime                uint64
+	CPULimit               float64
+	MemoryUsage            uint64
+	MemoryLimit            uint64
+	PidsCurrent            uint64
+	PidsLimit              uint64
+	Labels                 []string
+	Ports                  []Port
+	Platform               string
+	RestartPolicyCondition string
 }
 
 // Port represents a published port of a container
@@ -70,6 +71,8 @@ type ContainerConfig struct {
 	CPULimit float64
 	// Environment variables
 	Environment []string
+	// Restart policy condition
+	RestartPolicyCondition string
 }
 
 // ExecRequest contaiens configuration about an exec request

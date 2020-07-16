@@ -24,6 +24,11 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 		return types.Project{}, err
 	}
 
+	composeRestartPolicyCondition := r.RestartPolicyCondition
+	if composeRestartPolicyCondition == "no" {
+		composeRestartPolicyCondition = "none"
+	}
+
 	project := types.Project{
 		Name: r.ID,
 		Services: []types.ServiceConfig{
@@ -40,6 +45,9 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 							NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
 							MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
 						},
+					},
+					RestartPolicy: &types.RestartPolicy{
+						Condition: composeRestartPolicyCondition,
 					},
 				},
 			},

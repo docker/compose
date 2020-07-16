@@ -52,6 +52,7 @@ func Command() *cobra.Command {
 	cmd.Flags().Float64Var(&opts.Cpus, "cpus", 1., "Number of CPUs")
 	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
 	cmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
+	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", "no", "Restart policy to apply when a container exits")
 
 	return cmd
 }

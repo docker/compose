@@ -11,5 +11,6 @@
     "PidsLimit": 0,
     "Labels": null,
     "Ports": null,
-    "Platform": "Linux"
+    "Platform": "Linux",
+    "RestartPolicyCondition": ""
 }

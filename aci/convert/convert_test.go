@@ -104,6 +104,7 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 			Protocol:      "tcp",
 			HostIP:        "42.42.42.42",
 		}},
+		RestartPolicyCondition: "any",
 	}
 
 	container, err := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
@@ -156,6 +157,47 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSi
 	Expect(len(*group.Containers)).To(Equal(1))
 	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
 	Expect(*(*group.Containers)[0].Image).To(Equal("image1"))
+}
+
+func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerSpecificRestartPolicy() {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					RestartPolicy: &types.RestartPolicy{
+						Condition: "on-failure",
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+
+	Expect(len(*group.Containers)).To(Equal(1))
+	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
+	Expect(group.RestartPolicy).To(Equal(containerinstance.OnFailure))
+}
+
+func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerDefaultRestartPolicy() {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(suite.ctx, project)
+	Expect(err).To(BeNil())
+
+	Expect(len(*group.Containers)).To(Equal(1))
+	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
+	Expect(group.RestartPolicy).To(Equal(containerinstance.Always))
 }
 
 func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts() {
@@ -285,6 +327,20 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerenvVar() {
 	Expect(len(envVars)).To(Equal(2))
 	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key1"), Value: to.StringPtr("value1")}))
 	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key2"), Value: to.StringPtr("value2")}))
+}
+
+func (suite *ConvertTestSuite) TestConvertToAciRestartPolicyCondition() {
+	Expect(toAciRestartPolicy("none")).To(Equal(containerinstance.Never))
+	Expect(toAciRestartPolicy("always")).To(Equal(containerinstance.Always))
+	Expect(toAciRestartPolicy("on-failure")).To(Equal(containerinstance.OnFailure))
+	Expect(toAciRestartPolicy("on-failure:5")).To(Equal(containerinstance.Always))
+}
+
+func (suite *ConvertTestSuite) TestConvertToDockerRestartPolicyCondition() {
+	Expect(toContainerRestartPolicy(containerinstance.Never)).To(Equal("none"))
+	Expect(toContainerRestartPolicy(containerinstance.Always)).To(Equal("any"))
+	Expect(toContainerRestartPolicy(containerinstance.OnFailure)).To(Equal("on-failure"))
+	Expect(toContainerRestartPolicy("")).To(Equal("any"))
 }
 
 func TestConvertTestSuite(t *testing.T) {
