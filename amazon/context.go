@@ -26,14 +26,12 @@ func newContextCreateHelper() contextCreateAWSHelper {
 	}
 }
 
-func (h contextCreateAWSHelper) createContextData(ctx context.Context, opts ContextParams) (interface{}, string, error) {
-
+func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
 	accessKey := opts.AwsID
 	secretKey := opts.AwsSecret
 
 	awsCtx := store.AwsContext{
 		Profile: opts.Profile,
-		Cluster: opts.Cluster,
 		Region:  opts.Region,
 	}
 
@@ -51,12 +49,6 @@ func (h contextCreateAWSHelper) createContextData(ctx context.Context, opts Cont
 			}
 			awsCtx.Profile = profile
 		}
-		// set cluster
-		cluster, err := h.chooseCluster(awsCtx.Cluster)
-		if err != nil {
-			return nil, "", err
-		}
-		awsCtx.Cluster = cluster
 		// set region
 		region, err := h.chooseRegion(awsCtx.Region, profilesList[awsCtx.Profile])
 		if err != nil {
@@ -75,7 +67,7 @@ func (h contextCreateAWSHelper) createContextData(ctx context.Context, opts Cont
 		}
 	}
 
-	description := fmt.Sprintf("%s@%s", awsCtx.Cluster, awsCtx.Region)
+	description := awsCtx.Region
 	if opts.Description != "" {
 		description = fmt.Sprintf("%s (%s)", opts.Description, description)
 	}
@@ -99,9 +91,11 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	}
 
 	if err.(awserr.Error).Code() == "SharedCredsLoad" && err.(awserr.Error).Message() == "failed to load shared credentials file" {
-		os.Create(p.Filename)
+		_, err := os.Create(p.Filename)
+		if err != nil {
+			return err
+		}
 	}
-
 	credIni, err := ini.Load(p.Filename)
 	if err != nil {
 		return err
@@ -110,8 +104,14 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	if err != nil {
 		return err
 	}
-	section.NewKey("aws_access_key_id", accessKeyID)
-	section.NewKey("aws_secret_access_key", secretAccessKey)
+	_, err = section.NewKey("aws_access_key_id", accessKeyID)
+	if err != nil {
+		return err
+	}
+	_, err = section.NewKey("aws_secret_access_key", secretAccessKey)
+	if err != nil {
+		return err
+	}
 	return credIni.SaveTo(p.Filename)
 }
 
@@ -164,17 +164,6 @@ func (h contextCreateAWSHelper) chooseRegion(region string, section ini.Section)
 		}
 	}
 	result, err := h.user.Input("Region", defaultRegion)
-	if err != nil {
-		return "", err
-	}
-	return result, nil
-}
-
-func (h contextCreateAWSHelper) chooseCluster(cluster string) (string, error) {
-	if cluster == "" {
-		cluster = "default"
-	}
-	result, err := h.user.Input("Cluster name", cluster)
 	if err != nil {
 		return "", err
 	}

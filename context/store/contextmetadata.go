@@ -52,7 +52,6 @@ type AciContext struct {
 // AwsContext is the context for the AWS backend
 type AwsContext struct {
 	Profile string `json:",omitempty"`
-	Cluster string `json:",omitempty"`
 	Region  string `json:",omitempty"`
 }
 

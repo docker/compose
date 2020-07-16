@@ -4,6 +4,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 )
 
+// UI - prompt user input
 type UI interface {
 	Select(message string, options []string) (int, error)
 	Input(message string, defaultValue string) (string, error)
@@ -11,8 +12,10 @@ type UI interface {
 	Password(message string) (string, error)
 }
 
+// User - aggregates prompt methods
 type User struct{}
 
+// Select - displays a list
 func (u User) Select(message string, options []string) (int, error) {
 	qs := &survey.Select{
 		Message: message,
@@ -22,6 +25,8 @@ func (u User) Select(message string, options []string) (int, error) {
 	err := survey.AskOne(qs, &selected, nil)
 	return selected, err
 }
+
+// Input text with default value
 func (u User) Input(message string, defaultValue string) (string, error) {
 	qs := &survey.Input{
 		Message: message,
@@ -32,6 +37,7 @@ func (u User) Input(message string, defaultValue string) (string, error) {
 	return s, err
 }
 
+// Confirm asks for yes or no input
 func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 	qs := &survey.Confirm{
 		Message: message,
@@ -42,6 +48,7 @@ func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 	return b, err
 }
 
+// Password  implemetns a text input with masked characters
 func (u User) Password(message string) (string, error) {
 	qs := &survey.Password{
 		Message: message,

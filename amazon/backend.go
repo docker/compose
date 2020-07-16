@@ -17,7 +17,6 @@ type ContextParams struct {
 	Description string
 	Region      string
 	Profile     string
-	Cluster     string
 
 	AwsID     string
 	AwsSecret string
@@ -40,7 +39,7 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getAwsAPIService(awsCtx store.AwsContext) (*awsAPIService, error) {
-	backend, err := aws.NewBackend(awsCtx.Profile, awsCtx.Cluster, awsCtx.Region)
+	backend, err := aws.NewBackend(awsCtx.Profile, awsCtx.Region)
 	if err != nil {
 		return nil, err
 	}

@@ -41,7 +41,6 @@ func createAwsCommand() *cobra.Command {
 
 	addDescriptionFlag(cmd, &opts.Description)
 	cmd.Flags().StringVar(&opts.Profile, "profile", "", "AWS Profile")
-	cmd.Flags().StringVar(&opts.Cluster, "cluster", "", "ECS cluster")
 	cmd.Flags().StringVar(&opts.Region, "region", "", "AWS region")
 	cmd.Flags().StringVar(&opts.AwsID, "key-id", "", "AWS Access Key ID")
 	cmd.Flags().StringVar(&opts.AwsSecret, "secret-key", "", "AWS Secret Access Key")
