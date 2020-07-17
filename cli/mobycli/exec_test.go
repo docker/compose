@@ -15,7 +15,7 @@ type MobyExecSuite struct {
 
 func (sut *MobyExecSuite) TestDelegateContextTypeToMoby() {
 	Expect(mustDelegateToMoby("moby")).To(BeTrue())
-	Expect(mustDelegateToMoby("aws")).To(BeTrue())
+	Expect(mustDelegateToMoby("aws")).To(BeFalse())
 	Expect(mustDelegateToMoby("aci")).To(BeFalse())
 }
 
