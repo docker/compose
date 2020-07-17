@@ -133,6 +133,9 @@ func (s *E2eSuite) TestClassicLogin() {
 	output, err := s.NewDockerCommand("login", "someregistry.docker.io").Exec()
 	Expect(output).To(ContainSubstring("Cannot perform an interactive login from a non TTY device"))
 	Expect(err).NotTo(BeNil())
+	output, err = s.NewDockerCommand("logout", "someregistry.docker.io").Exec()
+	Expect(output).To(ContainSubstring("Removing login credentials for someregistry.docker.io"))
+	Expect(err).To(BeNil())
 }
 
 func (s *E2eSuite) TestCloudLogin() {

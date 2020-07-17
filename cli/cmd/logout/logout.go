@@ -12,7 +12,7 @@ func Command() *cobra.Command {
 		Use:   "logout [SERVER]",
 		Short: "Log out from a Docker registry or cloud backend",
 		Long:  "Log out from a Docker registry or cloud backend.\nIf no server is specified, the default is defined by the daemon.",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.MaximumNArgs(1),
 		RunE:  runLogout,
 	}
 
