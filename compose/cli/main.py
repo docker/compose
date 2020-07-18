@@ -1010,6 +1010,7 @@ class TopLevelCommand(object):
             --abort-on-container-exit  Stops all containers if any container was
                                        stopped. Incompatible with -d.
             --attach-dependencies      Attach to dependent containers
+            -y, --yes                  Opt-in to all yes/no prompts with 'yes'
             -t, --timeout TIMEOUT      Use this timeout in seconds for container
                                        shutdown when attached or when containers are
                                        already running. (default: 10)
@@ -1032,6 +1033,7 @@ class TopLevelCommand(object):
         detached = options.get('--detach')
         no_start = options.get('--no-start')
         attach_dependencies = options.get('--attach-dependencies')
+        skipYesNo = options.get('--yes')
 
         if detached and (cascade_stop or exit_value_from or attach_dependencies):
             raise UserError(
@@ -1078,9 +1080,10 @@ class TopLevelCommand(object):
                     "If you continue, volume data could be lost. Consider backing up your data "
                     "before continuing.\n"
                 )
-                res = yesno("Continue with the new image? [yN]", False)
-                if res is None or not res:
-                    raise e
+                if not skipYesNo:
+                    res = yesno("Continue with the new image? [yN]", False)
+                    if res is None or not res:
+                        raise e
 
                 to_attach = up(True)
 
