@@ -36,8 +36,8 @@ const (
 	DefaultContextName = "default"
 	// DefaultContextType is the type for all moby contexts (not associated with cli backend)
 	DefaultContextType = "moby"
-	// AwsContextType is the type for ecs contexts (currently a CLI plugin, not associated with cli backend)
-	AwsContextType = "aws"
+	// EcsContextType is the type for ecs contexts (currently a CLI plugin, not associated with cli backend)
+	EcsContextType = "ecs"
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"
@@ -339,8 +339,8 @@ func getters() map[string]func() interface{} {
 		AciContextType: func() interface{} {
 			return &AciContext{}
 		},
-		AwsContextType: func() interface{} {
-			return &AwsContext{}
+		EcsContextType: func() interface{} {
+			return &EcsContext{}
 		},
 		LocalContextType: func() interface{} {
 			return &LocalContext{}

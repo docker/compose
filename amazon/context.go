@@ -1,3 +1,18 @@
+// +build ecs
+
+/*
+   Copyright 2020 Docker, Inc.
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package amazon
 
 import (
@@ -30,31 +45,31 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 	accessKey := opts.AwsID
 	secretKey := opts.AwsSecret
 
-	awsCtx := store.AwsContext{
+	ecsCtx := store.EcsContext{
 		Profile: opts.Profile,
 		Region:  opts.Region,
 	}
 
-	if h.missingRequiredFlags(awsCtx) {
+	if h.missingRequiredFlags(ecsCtx) {
 		profilesList, err := h.getProfiles()
 		if err != nil {
 			return nil, "", err
 		}
 		// get profile
-		_, ok := profilesList[awsCtx.Profile]
+		_, ok := profilesList[ecsCtx.Profile]
 		if !ok {
 			profile, err := h.chooseProfile(profilesList)
 			if err != nil {
 				return nil, "", err
 			}
-			awsCtx.Profile = profile
+			ecsCtx.Profile = profile
 		}
 		// set region
-		region, err := h.chooseRegion(awsCtx.Region, profilesList[awsCtx.Profile])
+		region, err := h.chooseRegion(ecsCtx.Region, profilesList[ecsCtx.Profile])
 		if err != nil {
 			return nil, "", err
 		}
-		awsCtx.Region = region
+		ecsCtx.Region = region
 
 		accessKey, secretKey, err = h.askCredentials()
 		if err != nil {
@@ -62,20 +77,20 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 		}
 	}
 	if accessKey != "" && secretKey != "" {
-		if err := h.saveCredentials(awsCtx.Profile, accessKey, secretKey); err != nil {
+		if err := h.saveCredentials(ecsCtx.Profile, accessKey, secretKey); err != nil {
 			return nil, "", err
 		}
 	}
 
-	description := awsCtx.Region
+	description := ecsCtx.Region
 	if opts.Description != "" {
 		description = fmt.Sprintf("%s (%s)", opts.Description, description)
 	}
 
-	return awsCtx, description, nil
+	return ecsCtx, description, nil
 }
 
-func (h contextCreateAWSHelper) missingRequiredFlags(ctx store.AwsContext) bool {
+func (h contextCreateAWSHelper) missingRequiredFlags(ctx store.EcsContext) bool {
 	if ctx.Profile == "" || ctx.Region == "" {
 		return true
 	}
@@ -86,8 +101,7 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	p := credentials.SharedCredentialsProvider{Profile: profile}
 	_, err := p.Retrieve()
 	if err == nil {
-		fmt.Println("credentials already exists!")
-		return nil
+		return fmt.Errorf("credentials already exists!")
 	}
 
 	if err.(awserr.Error).Code() == "SharedCredsLoad" && err.(awserr.Error).Message() == "failed to load shared credentials file" {
@@ -121,9 +135,6 @@ func (h contextCreateAWSHelper) getProfiles() (map[string]ini.Section, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 	for _, section := range credIni.Sections() {
 		if strings.HasPrefix(section.Name(), "profile") {
 			profiles[section.Name()[len("profile "):]] = *section
@@ -142,14 +153,12 @@ func (h contextCreateAWSHelper) chooseProfile(section map[string]ini.Section) (s
 	selected, err := h.user.Select("Select AWS Profile", profiles)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			os.Exit(0)
+			os.Exit(-1)
 		}
 		return "", err
 	}
 	profile := profiles[selected]
-
 	if profiles[selected] == "new profile" {
-
 		return h.user.Input("profile name", "")
 	}
 	return profile, nil

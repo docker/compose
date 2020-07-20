@@ -1,3 +1,5 @@
+// +build ecs
+
 /*
    Copyright 2020 Docker, Inc.
 
@@ -28,39 +30,48 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-func createAwsCommand() *cobra.Command {
+func init() {
+	extraCommands = append(extraCommands, createEcsCommand)
+	extraHelp = append(extraHelp, `
+Create Amazon ECS context:
+$ docker context create ecs CONTEXT [flags]
+(see docker context create ecs --help)
+`)
+}
+
+func createEcsCommand() *cobra.Command {
 	var opts amazon.ContextParams
 	cmd := &cobra.Command{
-		Use:   "aws CONTEXT [flags]",
+		Use:   "ecs CONTEXT [flags]",
 		Short: "Create a context for Amazon ECS",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateAws(cmd.Context(), args[0], opts)
+			return runCreateEcs(cmd.Context(), args[0], opts)
 		},
 	}
 
 	addDescriptionFlag(cmd, &opts.Description)
-	cmd.Flags().StringVar(&opts.Profile, "profile", "", "AWS Profile")
-	cmd.Flags().StringVar(&opts.Region, "region", "", "AWS region")
+	cmd.Flags().StringVar(&opts.Profile, "profile", "", "Profile")
+	cmd.Flags().StringVar(&opts.Region, "region", "", "Region")
 	cmd.Flags().StringVar(&opts.AwsID, "key-id", "", "AWS Access Key ID")
 	cmd.Flags().StringVar(&opts.AwsSecret, "secret-key", "", "AWS Secret Access Key")
 	return cmd
 }
 
-func runCreateAws(ctx context.Context, contextName string, opts amazon.ContextParams) error {
+func runCreateEcs(ctx context.Context, contextName string, opts amazon.ContextParams) error {
 	if contextExists(ctx, contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
 	}
-	contextData, description, err := getAwsContextData(ctx, opts)
+	contextData, description, err := getEcsContextData(ctx, opts)
 	if err != nil {
 		return err
 	}
-	return createDockerContext(ctx, contextName, store.AwsContextType, description, contextData)
+	return createDockerContext(ctx, contextName, store.EcsContextType, description, contextData)
 
 }
 
-func getAwsContextData(ctx context.Context, opts amazon.ContextParams) (interface{}, string, error) {
-	cs, err := client.GetCloudService(ctx, store.AwsContextType)
+func getEcsContextData(ctx context.Context, opts amazon.ContextParams) (interface{}, string, error) {
+	cs, err := client.GetCloudService(ctx, store.EcsContextType)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "cannot connect to AWS backend")
 	}

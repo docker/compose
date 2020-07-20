@@ -1,7 +1,8 @@
 module github.com/docker/api
 
 go 1.14
-
+// the distribution version from ecs plugin is quite old and it breaks containerd
+// we need to create a new release tag for docker/distribution
 replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
 
 require (
@@ -24,7 +25,7 @@ require (
 	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200309214505-aa6a9891b09c+incompatible
-	github.com/docker/ecs-plugin v1.0.0-beta.2
+	github.com/docker/ecs-plugin v1.0.0-beta.4
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect

@@ -28,6 +28,15 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
+func init() {
+	extraCommands = append(extraCommands, createAciCommand)
+	extraHelp = append(extraHelp, `
+Create Azure Container Instances context:
+$ docker context create aci CONTEXT [flags]
+(see docker context create aci --help)
+`)
+}
+
 func createAciCommand() *cobra.Command {
 	var opts azure.ContextParams
 	cmd := &cobra.Command{

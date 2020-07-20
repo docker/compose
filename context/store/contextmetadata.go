@@ -49,8 +49,8 @@ type AciContext struct {
 	ResourceGroup  string `json:",omitempty"`
 }
 
-// AwsContext is the context for the AWS backend
-type AwsContext struct {
+// EcsContext is the context for the AWS backend
+type EcsContext struct {
 	Profile string `json:",omitempty"`
 	Region  string `json:",omitempty"`
 }

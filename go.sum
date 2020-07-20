@@ -172,6 +172,8 @@ github.com/docker/docker-credential-helpers v0.6.3 h1:zI2p9+1NQYdnG6sMU26EX4aVGl
 github.com/docker/docker-credential-helpers v0.6.3/go.mod h1:WRaJzqw3CTB9bk10avuGsjVBZsD05qeibJ1/TYlvc0Y=
 github.com/docker/ecs-plugin v1.0.0-beta.2 h1:Z9Krz+7zKXusWzENXuskQg7n/3/ViC/cfUl4XYiJWUI=
 github.com/docker/ecs-plugin v1.0.0-beta.2/go.mod h1:1YaNZwrNr0dFjTP3v7zwepluaZgVNV94s0M6fL+i/iA=
+github.com/docker/ecs-plugin v1.0.0-beta.4 h1:hZKojW0tqsdhJjfMKPw6piMw/GJgfX6CVXd1YUuXLg4=
+github.com/docker/ecs-plugin v1.0.0-beta.4/go.mod h1:1YaNZwrNr0dFjTP3v7zwepluaZgVNV94s0M6fL+i/iA=
 github.com/docker/go v1.5.1-1 h1:hr4w35acWBPhGBXlzPoHpmZ/ygPjnmFVxGxxGnMyP7k=
 github.com/docker/go v1.5.1-1/go.mod h1:CADgU4DSXK5QUlFslkQu2yW2TKzFZcXq/leZfM0UH5Q=
 github.com/docker/go-connections v0.4.0 h1:El9xVISelRB7BuFusrZozjnkIM5YnzCViNKohAFqRJQ=
