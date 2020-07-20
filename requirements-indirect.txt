@@ -23,6 +23,6 @@ pyrsistent==0.16.0
 smmap==3.0.4
 smmap2==3.0.1
 toml==0.10.1
-tox==2.9.1
+tox==3.17.1
 virtualenv==16.2.0
 wcwidth==0.1.9
