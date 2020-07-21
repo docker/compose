@@ -21,7 +21,6 @@ func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose
 	if err != nil {
 		return nil, err
 	}
-	loadBalancer := parameters[ParameterLoadBalancerARN]
 	cluster := parameters[ParameterClusterName]
 
 	resources, err := b.api.ListStackResources(ctx, projectName)
@@ -30,20 +29,14 @@ func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose
 	}
 
 	servicesARN := []string{}
-	targetGroups := []string{}
 	for _, r := range resources {
 		switch r.Type {
 		case "AWS::ECS::Service":
 			servicesARN = append(servicesARN, r.ARN)
 		case "AWS::ECS::Cluster":
 			cluster = r.ARN
-		case "AWS::ElasticLoadBalancingV2::LoadBalancer":
-			loadBalancer = r.ARN
-		case "AWS::ElasticLoadBalancingV2::TargetGroup":
-			targetGroups = append(targetGroups, r.LogicalID)
 		}
 	}
-
 	if len(servicesARN) == 0 {
 		return nil, nil
 	}
@@ -52,18 +45,15 @@ func (b *Backend) Ps(ctx context.Context, options cli.ProjectOptions) ([]compose
 		return nil, err
 	}
 
-	url, err := b.api.GetLoadBalancerURL(ctx, loadBalancer)
-	if err != nil {
-		return nil, err
-	}
-
 	for i, state := range status {
 		ports := []string{}
-		for _, tg := range targetGroups {
-			groups := targetGroupLogicalName.FindStringSubmatch(tg)
-			if groups[0] == state.Name {
-				ports = append(ports, fmt.Sprintf("%s:%s->%s/%s", url, groups[2], groups[2], strings.ToLower(groups[1])))
-			}
+		for _, lb := range state.LoadBalancers {
+			ports = append(ports, fmt.Sprintf(
+				"%s:%d->%d/%s",
+				lb.URL,
+				lb.PublishedPort,
+				lb.TargetPort,
+				strings.ToLower(lb.Protocol)))
 		}
 		state.Ports = ports
 		status[i] = state

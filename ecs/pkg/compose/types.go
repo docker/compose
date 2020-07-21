@@ -9,12 +9,25 @@ type StackResource struct {
 	Status    string
 }
 
+type PortMapping struct {
+	Source int
+	Target int
+}
+
+type LoadBalancer struct {
+	URL           string
+	TargetPort    int
+	PublishedPort int
+	Protocol      string
+}
+
 type ServiceStatus struct {
-	ID       string
-	Name     string
-	Replicas int
-	Desired  int
-	Ports    []string
+	ID            string
+	Name          string
+	Replicas      int
+	Desired       int
+	Ports         []string
+	LoadBalancers []LoadBalancer
 }
 
 const (

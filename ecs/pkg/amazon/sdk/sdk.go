@@ -449,6 +449,7 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 	if err != nil {
 		return nil, err
 	}
+
 	status := []compose.ServiceStatus{}
 	for _, service := range services.Services {
 		var name string
@@ -460,15 +461,74 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 		if name == "" {
 			return nil, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceTag)
 		}
+		targetGroupArns := []string{}
+		for _, lb := range service.LoadBalancers {
+			targetGroupArns = append(targetGroupArns, *lb.TargetGroupArn)
+		}
+		// getURLwithPortMapping makes 2 queries
+		// one to get the target groups and another for load balancers
+		loadBalancers, err := s.getURLWithPortMapping(ctx, targetGroupArns)
+		if err != nil {
+			return nil, err
+		}
 		status = append(status, compose.ServiceStatus{
-			ID:       *service.ServiceName,
-			Name:     name,
-			Replicas: int(*service.RunningCount),
-			Desired:  int(*service.DesiredCount),
+			ID:            *service.ServiceName,
+			Name:          name,
+			Replicas:      int(*service.RunningCount),
+			Desired:       int(*service.DesiredCount),
+			LoadBalancers: loadBalancers,
 		})
 	}
-
 	return status, nil
+}
+
+func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.LoadBalancer, error) {
+	if len(targetGroupArns) == 0 {
+		return nil, nil
+	}
+	groups, err := s.ELB.DescribeTargetGroups(&elbv2.DescribeTargetGroupsInput{
+		TargetGroupArns: aws.StringSlice(targetGroupArns),
+	})
+	if err != nil {
+		return nil, err
+	}
+	lbarns := []*string{}
+	for _, tg := range groups.TargetGroups {
+		lbarns = append(lbarns, tg.LoadBalancerArns...)
+	}
+
+	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
+		LoadBalancerArns: lbarns,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	filterLB := func(arn *string, lbs []*elbv2.LoadBalancer) *elbv2.LoadBalancer {
+		for _, lb := range lbs {
+			if *lb.LoadBalancerArn == *arn {
+				return lb
+			}
+		}
+		return nil
+	}
+	loadBalancers := []compose.LoadBalancer{}
+	for _, tg := range groups.TargetGroups {
+		for _, lbarn := range tg.LoadBalancerArns {
+			lb := filterLB(lbarn, lbs.LoadBalancers)
+			if lb == nil {
+				continue
+			}
+			loadBalancers = append(loadBalancers, compose.LoadBalancer{
+				URL:           *lb.DNSName,
+				TargetPort:    int(*tg.Port),
+				PublishedPort: int(*tg.Port),
+				Protocol:      *tg.Protocol,
+			})
+
+		}
+	}
+	return loadBalancers, nil
 }
 
 func (s sdk) ListTasks(ctx context.Context, cluster string, family string) ([]string, error) {

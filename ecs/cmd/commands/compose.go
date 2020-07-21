@@ -91,7 +91,7 @@ func PsCommand(dockerCli command.Cli, options *cli.ProjectOptions) *cobra.Comman
 			}
 			printSection(os.Stdout, len(status), func(w io.Writer) {
 				for _, service := range status {
-					fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, " "))
+					fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
 				}
 			}, "ID", "NAME", "REPLICAS", "PORTS")
 			return nil
