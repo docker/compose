@@ -301,7 +301,7 @@ func (s sdk) ListStackParameters(ctx context.Context, name string) (map[string]s
 	}
 	parameters := map[string]string{}
 	for _, parameter := range st.Stacks[0].Parameters {
-		parameters[*parameter.ParameterKey] = *parameter.ParameterValue
+		parameters[aws.StringValue(parameter.ParameterKey)] = aws.StringValue(parameter.ParameterValue)
 	}
 	return parameters, nil
 }
@@ -318,10 +318,10 @@ func (s sdk) ListStackResources(ctx context.Context, name string) ([]compose.Sta
 	resources := []compose.StackResource{}
 	for _, r := range res.StackResourceSummaries {
 		resources = append(resources, compose.StackResource{
-			LogicalID: *r.LogicalResourceId,
-			Type:      *r.ResourceType,
-			ARN:       *r.PhysicalResourceId,
-			Status:    *r.ResourceStatus,
+			LogicalID: aws.StringValue(r.LogicalResourceId),
+			Type:      aws.StringValue(r.ResourceType),
+			ARN:       aws.StringValue(r.PhysicalResourceId),
+			Status:    aws.StringValue(r.ResourceStatus),
 		})
 	}
 	return resources, nil
@@ -350,7 +350,7 @@ func (s sdk) CreateSecret(ctx context.Context, secret compose.Secret) (string, e
 	if err != nil {
 		return "", err
 	}
-	return *response.ARN, nil
+	return aws.StringValue(response.ARN), nil
 }
 
 func (s sdk) InspectSecret(ctx context.Context, id string) (compose.Secret, error) {
@@ -361,11 +361,11 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (compose.Secret, erro
 	}
 	labels := map[string]string{}
 	for _, tag := range response.Tags {
-		labels[*tag.Key] = *tag.Value
+		labels[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 	}
 	secret := compose.Secret{
-		ID:     *response.ARN,
-		Name:   *response.Name,
+		ID:     aws.StringValue(response.ARN),
+		Name:   aws.StringValue(response.Name),
 		Labels: labels,
 	}
 	if response.Description != nil {
@@ -431,8 +431,8 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer compose.LogConsu
 			}
 
 			for _, event := range events.Events {
-				p := strings.Split(*event.LogStreamName, "/")
-				consumer.Log(p[1], p[2], *event.Message)
+				p := strings.Split(aws.StringValue(event.LogStreamName), "/")
+				consumer.Log(p[1], p[2], aws.StringValue(event.Message))
 				startTime = *event.IngestionTime
 			}
 		}
@@ -455,7 +455,7 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 		var name string
 		for _, t := range service.Tags {
 			if *t.Key == compose.ServiceTag {
-				name = *t.Value
+				name = aws.StringValue(t.Value)
 			}
 		}
 		if name == "" {
@@ -472,10 +472,10 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 			return nil, err
 		}
 		status = append(status, compose.ServiceStatus{
-			ID:            *service.ServiceName,
+			ID:            aws.StringValue(service.ServiceName),
 			Name:          name,
-			Replicas:      int(*service.RunningCount),
-			Desired:       int(*service.DesiredCount),
+			Replicas:      int(aws.Int64Value(service.RunningCount)),
+			Desired:       int(aws.Int64Value(service.DesiredCount)),
 			LoadBalancers: loadBalancers,
 		})
 	}
@@ -505,8 +505,12 @@ func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string
 		return nil, err
 	}
 	filterLB := func(arn *string, lbs []*elbv2.LoadBalancer) *elbv2.LoadBalancer {
+		if aws.StringValue(arn) == "" {
+			// load balancer arn is nil/""
+			return nil
+		}
 		for _, lb := range lbs {
-			if *lb.LoadBalancerArn == *arn {
+			if aws.StringValue(lb.LoadBalancerArn) == aws.StringValue(arn) {
 				return lb
 			}
 		}
@@ -520,10 +524,10 @@ func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string
 				continue
 			}
 			loadBalancers = append(loadBalancers, compose.LoadBalancer{
-				URL:           *lb.DNSName,
-				TargetPort:    int(*tg.Port),
-				PublishedPort: int(*tg.Port),
-				Protocol:      *tg.Protocol,
+				URL:           aws.StringValue(lb.DNSName),
+				TargetPort:    int(aws.Int64Value(tg.Port)),
+				PublishedPort: int(aws.Int64Value(tg.Port)),
+				Protocol:      aws.StringValue(tg.Protocol),
 			})
 
 		}
@@ -556,7 +560,7 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	publicIPs := map[string]string{}
 	for _, interf := range desc.NetworkInterfaces {
 		if interf.Association != nil {
-			publicIPs[*interf.NetworkInterfaceId] = *interf.Association.PublicIp
+			publicIPs[aws.StringValue(interf.NetworkInterfaceId)] = aws.StringValue(interf.Association.PublicIp)
 		}
 	}
 	return publicIPs, nil
@@ -581,5 +585,9 @@ func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return *lbs.LoadBalancers[0].DNSName, nil
+	dnsName := aws.StringValue(lbs.LoadBalancers[0].DNSName)
+	if dnsName == "" {
+		return "", fmt.Errorf("Load balancer %s doesn't have a dns name", aws.StringValue(lbs.LoadBalancers[0].LoadBalancerArn))
+	}
+	return dnsName, nil
 }
