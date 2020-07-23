@@ -116,7 +116,7 @@ func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl 
 	return sys
 }
 
-const Mb = 1024 * 1024
+const MiB = 1024 * 1024
 
 func toLimits(service types.ServiceConfig) (string, string, error) {
 	// All possible cpu/mem values for Fargate
@@ -149,9 +149,9 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	}
 
 	for cpu, mem := range cpuToMem {
-		if v <= cpu*Mb {
+		if v <= cpu*MiB {
 			for _, m := range mem {
-				if limits.MemoryBytes <= m*Mb {
+				if limits.MemoryBytes <= m*MiB {
 					cpuLimit = strconv.FormatInt(cpu, 10)
 					memLimit = strconv.FormatInt(int64(m), 10)
 					return cpuLimit, memLimit, nil
@@ -174,7 +174,7 @@ func toContainerReservation(service types.ServiceConfig) (string, int, error) {
 	if reservations == nil {
 		return cpuReservation, memReservation, nil
 	}
-	return reservations.NanoCPUs, int(reservations.MemoryBytes / Mb), nil
+	return reservations.NanoCPUs, int(reservations.MemoryBytes / MiB), nil
 }
 
 func toRequiresCompatibilities(isolation string) []*string {

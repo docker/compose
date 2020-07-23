@@ -154,6 +154,21 @@ services:
 	assert.Equal(t, def.Cpu, "4096")
 	assert.Equal(t, def.Memory, "8192")
 }
+func TestTaskSizeConvertFailure(t *testing.T) {
+	model := loadConfig(t, "test", `
+version: "3"
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2043248M
+`)
+	_, err := Backend{}.Convert(model)
+	assert.ErrorContains(t, err, "unable to find cpu/mem for the required resources")
+}
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
 	template := convertYaml(t, "test", `
@@ -256,6 +271,13 @@ func load(t *testing.T, paths ...string) *types.Project {
 }
 
 func convertYaml(t *testing.T, name string, yaml string) *cloudformation.Template {
+	model := loadConfig(t, name, yaml)
+	template, err := Backend{}.Convert(model)
+	assert.NilError(t, err)
+	return template
+}
+
+func loadConfig(t *testing.T, name string, yaml string) *types.Project {
 	dict, err := loader.ParseYAML([]byte(yaml))
 	assert.NilError(t, err)
 	model, err := loader.Load(types.ConfigDetails{
@@ -266,7 +288,5 @@ func convertYaml(t *testing.T, name string, yaml string) *cloudformation.Templat
 		options.Name = "Test"
 	})
 	assert.NilError(t, err)
-	template, err := Backend{}.Convert(model)
-	assert.NilError(t, err)
-	return template
+	return model
 }
