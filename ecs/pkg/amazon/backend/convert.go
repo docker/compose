@@ -21,6 +21,10 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 	if err != nil {
 		return nil, err
 	}
+	_, memReservation, err := toContainerReservation(service)
+	if err != nil {
+		return nil, err
+	}
 	credential := getRepoCredentials(service)
 
 	// override resolve.conf search directive to also search <project>.local
@@ -60,6 +64,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 						"awslogs-stream-prefix": project.Name,
 					},
 				},
+				MemoryReservation:      memReservation,
 				Name:                   service.Name,
 				PortMappings:           toPortMappings(service.Ports),
 				Privileged:             service.Privileged,
@@ -111,6 +116,8 @@ func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl 
 	return sys
 }
 
+const Mb = 1024 * 1024
+
 func toLimits(service types.ServiceConfig) (string, string, error) {
 	// All possible cpu/mem values for Fargate
 	cpuToMem := map[int64][]types.UnitBytes{
@@ -142,9 +149,9 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	}
 
 	for cpu, mem := range cpuToMem {
-		if v <= cpu*1024*1024 {
+		if v <= cpu*Mb {
 			for _, m := range mem {
-				if limits.MemoryBytes <= m*1024*1024 {
+				if limits.MemoryBytes <= m*Mb {
 					cpuLimit = strconv.FormatInt(cpu, 10)
 					memLimit = strconv.FormatInt(int64(m), 10)
 					return cpuLimit, memLimit, nil
@@ -153,6 +160,21 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 		}
 	}
 	return "", "", fmt.Errorf("unable to find cpu/mem for the required resources")
+}
+
+func toContainerReservation(service types.ServiceConfig) (string, int, error) {
+	cpuReservation := ".0"
+	memReservation := 0
+
+	if service.Deploy == nil {
+		return cpuReservation, memReservation, nil
+	}
+
+	reservations := service.Deploy.Resources.Reservations
+	if reservations == nil {
+		return cpuReservation, memReservation, nil
+	}
+	return reservations.NanoCPUs, int(reservations.MemoryBytes / Mb), nil
 }
 
 func toRequiresCompatibilities(isolation string) []*string {
@@ -205,8 +227,6 @@ func toUlimits(ulimits map[string]*types.UlimitsConfig) []ecs.TaskDefinition_Uli
 	}
 	return u
 }
-
-const Mb = 1024 * 1024
 
 func toLinuxParameters(service types.ServiceConfig) *ecs.TaskDefinition_LinuxParameters {
 	return &ecs.TaskDefinition_LinuxParameters{

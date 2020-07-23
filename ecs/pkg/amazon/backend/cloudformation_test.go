@@ -117,6 +117,44 @@ services:
 	assert.Check(t, s.DesiredCount == 10)
 }
 
+func TestTaskSizeConvert(t *testing.T) {
+	template := convertYaml(t, "test", `
+version: "3"
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 2048M
+`)
+	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "512")
+	assert.Equal(t, def.Memory, "2048")
+
+	template = convertYaml(t, "test", `
+version: "3"
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8192M
+        reservations:
+          cpus: '4'
+          memory: 8192M
+`)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "4096")
+	assert.Equal(t, def.Memory, "8192")
+}
+
 func TestLoadBalancerTypeNetwork(t *testing.T) {
 	template := convertYaml(t, "test", `
 version: "3"
