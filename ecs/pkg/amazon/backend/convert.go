@@ -159,7 +159,7 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 			}
 		}
 	}
-	return "", "", fmt.Errorf("unable to find cpu/mem for the required resources")
+	return "", "", fmt.Errorf("The resources requested are not supported by ECS/Fargate")
 }
 
 func toContainerReservation(service types.ServiceConfig) (string, int, error) {

@@ -167,7 +167,7 @@ services:
           memory: 2043248M
 `)
 	_, err := Backend{}.Convert(model)
-	assert.ErrorContains(t, err, "unable to find cpu/mem for the required resources")
+	assert.ErrorContains(t, err, "The resources requested are not supported by ECS/Fargate")
 }
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
