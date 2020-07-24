@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -148,7 +149,14 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 		return "", "", err
 	}
 
-	for cpu, mem := range cpuToMem {
+	var cpus []int64
+	for k := range cpuToMem {
+		cpus = append(cpus, k)
+	}
+	sort.Slice(cpus, func(i, j int) bool { return cpus[i] < cpus[j] })
+
+	for _, cpu := range cpus {
+		mem := cpuToMem[cpu]
 		if v <= cpu*MiB {
 			for _, m := range mem {
 				if limits.MemoryBytes <= m*MiB {
@@ -159,7 +167,7 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 			}
 		}
 	}
-	return "", "", fmt.Errorf("The resources requested are not supported by ECS/Fargate")
+	return "", "", fmt.Errorf("the resources requested are not supported by ECS/Fargate")
 }
 
 func toContainerReservation(service types.ServiceConfig) (string, int, error) {
