@@ -40,6 +40,9 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 	if err != nil {
 		return err
 	}
+	if len(subNets) < 2 {
+		return fmt.Errorf("VPC %s should have at least 2 associated subnets in different availability zones", vpc)
+	}
 
 	lb, err := b.GetLoadBalancer(ctx, project)
 	if err != nil {
@@ -95,6 +98,7 @@ func (b Backend) GetVPC(ctx context.Context, project *types.Project) (string, er
 		if !ok {
 			return "", fmt.Errorf("VPC does not exist: %s", vpc)
 		}
+		return vpcID, nil
 	}
 	defaultVPC, err := b.api.GetDefaultVPC(ctx)
 	if err != nil {

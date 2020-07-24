@@ -125,10 +125,6 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
 				Name:   aws.String("vpc-id"),
 				Values: []*string{aws.String(vpcID)},
 			},
-			{
-				Name:   aws.String("default-for-az"),
-				Values: []*string{aws.String("true")},
-			},
 		},
 	})
 	if err != nil {
