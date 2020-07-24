@@ -37,14 +37,29 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 			fmt.Sprintf(" %s.local", project.Name),
 		}))
 
+	tags := []tags.Tag{
+		{
+			Key:   compose.ProjectTag,
+			Value: project.Name,
+		},
+		{
+			Key:   compose.ServiceTag,
+			Value: service.Name,
+		},
+	}
+	tags = append(tags, toTags(service.Labels)...)
+
 	return &ecs.TaskDefinition{
 		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
 			{
-				Command:               service.Command,
-				DisableNetworking:     service.NetworkMode == "none",
-				DnsSearchDomains:      service.DNSSearch,
-				DnsServers:            service.DNS,
-				DockerLabels:          nil,
+				Command:           service.Command,
+				DisableNetworking: service.NetworkMode == "none",
+				DnsSearchDomains:  service.DNSSearch,
+				DnsServers:        service.DNS,
+				DockerLabels: map[string]string{
+					compose.ProjectTag: project.Name,
+					compose.ServiceTag: service.Name,
+				},
 				DockerSecurityOptions: service.SecurityOpt,
 				EntryPoint:            service.Entrypoint,
 				Environment:           toKeyValuePair(service.Environment),
@@ -78,8 +93,9 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 				SystemControls:         toSystemControls(service.Sysctls),
 				Ulimits:                toUlimits(service.Ulimits),
 				User:                   service.User,
-				VolumesFrom:            nil,
-				WorkingDirectory:       service.WorkingDir,
+
+				VolumesFrom:      nil,
+				WorkingDirectory: service.WorkingDir,
 			},
 		},
 		Cpu:                     cpu,
@@ -91,7 +107,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		PlacementConstraints:    toPlacementConstraints(service.Deploy),
 		ProxyConfiguration:      nil,
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
-		Tags:                    toTags(service.Labels),
+		Tags:                    tags,
 	}, nil
 }
 
