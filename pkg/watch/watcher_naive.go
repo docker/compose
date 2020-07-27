@@ -136,6 +136,12 @@ func (d *naiveNotify) Errors() chan error {
 func (d *naiveNotify) loop() {
 	defer close(d.wrappedEvents)
 	for e := range d.events {
+		// The Windows fsnotify event stream sometimes gets events with empty names
+		// that are also sent to the error stream. Hmmmm...
+		if e.Name == "" {
+			continue
+		}
+
 		if e.Op&fsnotify.Create != fsnotify.Create {
 			if d.shouldNotify(e.Name) {
 				d.wrappedEvents <- FileEvent{e.Name}
@@ -251,6 +257,7 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	if err != nil {
 		return nil, err
 	}
+	MaybeIncreaseBufferSize(fsw)
 
 	err = fsw.SetRecursive()
 	isWatcherRecursive := err == nil
