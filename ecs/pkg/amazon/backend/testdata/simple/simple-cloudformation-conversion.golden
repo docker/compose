@@ -18,6 +18,7 @@
       ]
     }
   },
+  "Description": "CloudFormation template created by Docker for deploying applications on Amazon ECS",
   "Parameters": {
     "ParameterClusterName": {
       "Description": "Name of the ECS cluster to deploy to (optional)",

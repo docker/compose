@@ -51,7 +51,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 	}
 
 	template := cloudformation.NewTemplate()
-
+	template.Description = "CloudFormation template created by Docker for deploying applications on Amazon ECS"
 	template.Parameters[ParameterClusterName] = cloudformation.Parameter{
 		Type:        "String",
 		Description: "Name of the ECS cluster to deploy to (optional)",
