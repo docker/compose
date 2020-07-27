@@ -1,13 +1,8 @@
 import yaml
 
 from compose.config import types
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V2_1 as V2_1
-from compose.const import COMPOSEFILE_V2_3 as V2_3
-from compose.const import COMPOSEFILE_V3_0 as V3_0
-from compose.const import COMPOSEFILE_V3_2 as V3_2
-from compose.const import COMPOSEFILE_V3_4 as V3_4
-from compose.const import COMPOSEFILE_V3_5 as V3_5
 
 
 def serialize_config_type(dumper, data):
@@ -49,7 +44,7 @@ yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
 def denormalize_config(config, image_digests=None):
-    result = {'version': str(V2_1) if config.version == V1 else str(config.version)}
+    result = {'version': str(config.version)}
     denormalized_services = [
         denormalize_service_dict(
             service_dict,
@@ -72,23 +67,9 @@ def denormalize_config(config, image_digests=None):
                 del conf['external_name']
 
             if 'name' in conf:
-                if config.version < V2_1 or (
-                        config.version >= V3_0 and config.version < v3_introduced_name_key(key)):
-                    del conf['name']
-                elif 'external' in conf:
+                if 'external' in conf:
                     conf['external'] = bool(conf['external'])
-
-            if 'attachable' in conf and config.version < V3_2:
-                # For compatibility mode, this option is invalid in v2
-                del conf['attachable']
-
     return result
-
-
-def v3_introduced_name_key(key):
-    if key == 'volumes':
-        return V3_4
-    return V3_5
 
 
 def serialize_config(config, image_digests=None, escape_dollar=True):
@@ -140,7 +121,7 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
 
-    if 'depends_on' in service_dict and (version < V2_1 or version >= V3_0):
+    if 'depends_on' in service_dict:
         service_dict['depends_on'] = sorted([
             svc for svc in service_dict['depends_on'].keys()
         ])
@@ -162,10 +143,10 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
 
     if 'ports' in service_dict:
         service_dict['ports'] = [
-            p.legacy_repr() if p.external_ip or version < V3_2 else p
+            p.legacy_repr() if p.external_ip or version < VERSION else p
             for p in service_dict['ports']
         ]
-    if 'volumes' in service_dict and (version < V2_3 or (version > V3_0 and version < V3_2)):
+    if 'volumes' in service_dict and (version == V1):
         service_dict['volumes'] = [
             v.legacy_repr() if isinstance(v, types.MountSpec) else v for v in service_dict['volumes']
         ]

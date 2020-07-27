@@ -282,7 +282,7 @@ def handle_error_for_schema_with_id(error, path):
             invalid_config_key = parse_key_from_error_msg(error)
             return get_unsupported_config_msg(path, invalid_config_key)
 
-        if schema_id.startswith('config_schema_v'):
+        if schema_id.startswith('config_schema_'):
             invalid_config_key = parse_key_from_error_msg(error)
             return ('Invalid top-level property "{key}". Valid top-level '
                     'sections for this Compose file are: {properties}, and '
@@ -435,15 +435,29 @@ def process_config_schema_errors(error):
     return handle_generic_error(error, path)
 
 
-def validate_against_config_schema(config_file):
-    schema = load_jsonschema(config_file)
+def keys_to_str(config_file):
+    """
+        Non-string keys may break validator with patterned fields.
+    """
+    d = {}
+    for k, v in config_file.items():
+        d[str(k)] = v
+        if isinstance(v, dict):
+            d[str(k)] = keys_to_str(v)
+    return d
+
+
+def validate_against_config_schema(config_file, version):
+    schema = load_jsonschema(version)
+    config = keys_to_str(config_file.config)
+
     format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),
         format_checker=format_checker)
     handle_errors(
-        validator.iter_errors(config_file.config),
+        validator.iter_errors(config),
         process_config_schema_errors,
         config_file.filename)
 
@@ -453,7 +467,7 @@ def validate_service_constraints(config, service_name, config_file):
         return process_service_constraint_errors(
             errors, service_name, config_file.version)
 
-    schema = load_jsonschema(config_file)
+    schema = load_jsonschema(config_file.version)
     validator = Draft4Validator(schema['definitions']['constraints']['service'])
     handle_errors(validator.iter_errors(config), handler, None)
 
@@ -472,16 +486,19 @@ def get_schema_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def load_jsonschema(config_file):
+def load_jsonschema(version):
+    suffix = "compose_spec"
+    if version == V1:
+        suffix = "v1"
+
     filename = os.path.join(
         get_schema_path(),
-        "config_schema_v{0}.json".format(config_file.version))
+        "config_schema_{0}.json".format(suffix))
 
     if not os.path.exists(filename):
         raise ConfigurationError(
             'Version in "{}" is unsupported. {}'
-            .format(config_file.filename, VERSION_EXPLANATION))
-
+            .format(filename, VERSION_EXPLANATION))
     with open(filename, "r") as fh:
         return json.load(fh)
 

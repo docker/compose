@@ -123,6 +123,18 @@ class Project(object):
                 service_dict.pop('secrets', None) or [],
                 config_data.secrets)
 
+            service_dict['scale'] = project.get_service_scale(service_dict)
+
+            service_dict = translate_credential_spec_to_security_opt(service_dict)
+            service_dict, ignored_keys = translate_deploy_keys_to_container_config(
+                service_dict
+            )
+            if ignored_keys:
+                log.warning(
+                    'The following deploy sub-keys are not supported and have'
+                    ' been ignored: {}'.format(', '.join(ignored_keys))
+                )
+
             project.services.append(
                 Service(
                     service_dict.pop('name'),
@@ -261,6 +273,35 @@ class Project(object):
                 )
 
         return PidMode(pid_mode)
+
+    def get_service_scale(self, service_dict):
+        # service.scale for v2 and deploy.replicas for v3
+        scale = service_dict.get('scale', None)
+        deploy_dict = service_dict.get('deploy', None)
+        if not deploy_dict:
+            return 1 if scale is None else scale
+
+        if deploy_dict.get('mode', 'replicated') != 'replicated':
+            return 1 if scale is None else scale
+
+        replicas = deploy_dict.get('replicas', None)
+        if scale and replicas:
+            raise ConfigurationError(
+                "Both service.scale and service.deploy.replicas are set."
+                " Only one of them must be set."
+            )
+        if replicas:
+            scale = replicas
+        # deploy may contain placement constraints introduced in v3.8
+        max_replicas = deploy_dict.get('placement', {}).get(
+            'max_replicas_per_node',
+            scale)
+
+        scale = min(scale, max_replicas)
+        if max_replicas < scale:
+            log.warning("Scale is limited to {} ('max_replicas_per_node' field).".format(
+                max_replicas))
+        return scale
 
     def start(self, service_names=None, **options):
         containers = []
@@ -775,6 +816,81 @@ class Project(object):
                 _options['timeout'] = service.stop_timeout(None)
             return getattr(container, operation)(**_options)
         return container_operation_with_timeout
+
+
+def translate_credential_spec_to_security_opt(service_dict):
+    result = []
+
+    if 'credential_spec' in service_dict:
+        spec = convert_credential_spec_to_security_opt(service_dict['credential_spec'])
+        result.append('credentialspec={spec}'.format(spec=spec))
+
+    if result:
+        service_dict['security_opt'] = result
+
+    return service_dict
+
+
+def translate_resource_keys_to_container_config(resources_dict, service_dict):
+    if 'limits' in resources_dict:
+        service_dict['mem_limit'] = resources_dict['limits'].get('memory')
+        if 'cpus' in resources_dict['limits']:
+            service_dict['cpus'] = float(resources_dict['limits']['cpus'])
+    if 'reservations' in resources_dict:
+        service_dict['mem_reservation'] = resources_dict['reservations'].get('memory')
+        if 'cpus' in resources_dict['reservations']:
+            return ['resources.reservations.cpus']
+    return []
+
+
+def convert_restart_policy(name):
+    try:
+        return {
+            'any': 'always',
+            'none': 'no',
+            'on-failure': 'on-failure'
+        }[name]
+    except KeyError:
+        raise ConfigurationError('Invalid restart policy "{}"'.format(name))
+
+
+def convert_credential_spec_to_security_opt(credential_spec):
+    if 'file' in credential_spec:
+        return 'file://{file}'.format(file=credential_spec['file'])
+    return 'registry://{registry}'.format(registry=credential_spec['registry'])
+
+
+def translate_deploy_keys_to_container_config(service_dict):
+    if 'credential_spec' in service_dict:
+        del service_dict['credential_spec']
+    if 'configs' in service_dict:
+        del service_dict['configs']
+
+    if 'deploy' not in service_dict:
+        return service_dict, []
+
+    deploy_dict = service_dict['deploy']
+    ignored_keys = [
+        k for k in ['endpoint_mode', 'labels', 'update_config', 'rollback_config']
+        if k in deploy_dict
+    ]
+
+    if 'restart_policy' in deploy_dict:
+        service_dict['restart'] = {
+            'Name': convert_restart_policy(deploy_dict['restart_policy'].get('condition', 'any')),
+            'MaximumRetryCount': deploy_dict['restart_policy'].get('max_attempts', 0)
+        }
+        for k in deploy_dict['restart_policy'].keys():
+            if k != 'condition' and k != 'max_attempts':
+                ignored_keys.append('restart_policy.{}'.format(k))
+
+    ignored_keys.extend(
+        translate_resource_keys_to_container_config(
+            deploy_dict.get('resources', {}), service_dict
+        )
+    )
+    del service_dict['deploy']
+    return service_dict, ignored_keys
 
 
 def get_volumes_from(project, service_dict):
