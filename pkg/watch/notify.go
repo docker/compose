@@ -3,7 +3,11 @@ package watch
 import (
 	"expvar"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 
 	"github.com/tilt-dev/tilt/pkg/logger"
 )
@@ -66,4 +70,23 @@ var _ PathMatcher = EmptyMatcher{}
 
 func NewWatcher(paths []string, ignore PathMatcher, l logger.Logger) (Notify, error) {
 	return newWatcher(paths, ignore, l)
+}
+
+const WindowsBufferSizeEnvVar = "TILT_WATCH_WINDOWS_BUFFER_SIZE"
+
+const defaultBufferSize int = 65536
+
+func DesiredWindowsBufferSize() int {
+	envVar := os.Getenv(WindowsBufferSizeEnvVar)
+	if envVar != "" {
+		size, err := strconv.Atoi(envVar)
+		if err != nil {
+			return size
+		}
+	}
+	return defaultBufferSize
+}
+
+func IsWindowsShortReadError(err error) bool {
+	return runtime.GOOS == "windows" && err != nil && strings.Contains(err.Error(), "short read")
 }
