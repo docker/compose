@@ -23,6 +23,20 @@ import (
 // Each implementation of the notify interface should have the same basic
 // behavior.
 
+func TestWindowsBufferSize(t *testing.T) {
+	orig := os.Getenv(WindowsBufferSizeEnvVar)
+	defer os.Setenv(WindowsBufferSizeEnvVar, orig)
+
+	os.Setenv(WindowsBufferSizeEnvVar, "")
+	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
+
+	os.Setenv(WindowsBufferSizeEnvVar, "a")
+	assert.Equal(t, defaultBufferSize, DesiredWindowsBufferSize())
+
+	os.Setenv(WindowsBufferSizeEnvVar, "10")
+	assert.Equal(t, 10, DesiredWindowsBufferSize())
+}
+
 func TestNoEvents(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()

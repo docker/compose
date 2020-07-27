@@ -80,7 +80,7 @@ func DesiredWindowsBufferSize() int {
 	envVar := os.Getenv(WindowsBufferSizeEnvVar)
 	if envVar != "" {
 		size, err := strconv.Atoi(envVar)
-		if err != nil {
+		if err == nil {
 			return size
 		}
 	}
