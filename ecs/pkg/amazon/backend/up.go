@@ -3,6 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -84,6 +87,15 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 	for k := range template.Resources {
 		w.ResourceEvent(k, "PENDING", "")
 	}
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		fmt.Println("user interrupted deployment. Deleting stack...")
+		b.Down(ctx, options)
+	}()
+
 	return b.WaitStackCompletion(ctx, project.Name, operation, w)
 }
 

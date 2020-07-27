@@ -9,11 +9,6 @@ type StackResource struct {
 	Status    string
 }
 
-type PortMapping struct {
-	Source int
-	Target int
-}
-
 type LoadBalancer struct {
 	URL           string
 	TargetPort    int
