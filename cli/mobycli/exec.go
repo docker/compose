@@ -18,6 +18,7 @@ package mobycli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -51,6 +52,12 @@ func mustDelegateToMoby(ctxType string) bool {
 
 // Exec delegates to com.docker.cli if on moby context
 func Exec(ctx context.Context) {
+	if os.Args[1] == "compose" {
+		// command is not implemented for moby or aws context
+		fmt.Fprintln(os.Stderr, errors.New("'compose' command is not implemented for the context in use"))
+		os.Exit(1)
+	}
+
 	cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
