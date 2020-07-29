@@ -17,6 +17,11 @@
 package compose
 
 import (
+	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/store"
+	"github.com/docker/api/errdefs"
+	"github.com/pkg/errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +30,22 @@ func Command() *cobra.Command {
 	command := &cobra.Command{
 		Short: "Docker Compose",
 		Use:   "compose",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			currentContext := apicontext.CurrentContext(cmd.Context())
+			s := store.ContextStore(cmd.Context())
+			cc, err := s.Get(currentContext)
+			if err != nil {
+				return err
+			}
+			switch cc.Type() {
+			case store.AciContextType:
+				return nil
+			case store.AwsContextType:
+				return errors.New("use 'docker ecs compose' on context type " + cc.Type())
+			default:
+				return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
+			}
+		},
 	}
 
 	command.AddCommand(
