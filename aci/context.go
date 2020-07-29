@@ -33,7 +33,7 @@ import (
 
 type contextCreateACIHelper struct {
 	selector            prompt.UI
-	resourceGroupHelper ACIResourceGroupHelper
+	resourceGroupHelper ResourceGroupHelper
 }
 
 func newContextCreateHelper() contextCreateACIHelper {

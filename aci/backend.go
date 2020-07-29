@@ -41,9 +41,8 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-const backendType = store.AciContextType
-
 const (
+	backendType               = store.AciContextType
 	singleContainerTag        = "docker-single-container"
 	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
