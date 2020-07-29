@@ -86,6 +86,15 @@ func (s *E2eSuite) TestContextLsFormat() {
 	Expect(output).To(ContainSubstring(`"Name":"default"`))
 }
 
+func (s *E2eSuite) TestComposeOnDefaultContext() {
+	s.NewDockerCommand("context", "use", "default").ExecOrDie()
+	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
+	Expect(output).To(ContainSubstring(`"Name": "default"`))
+	output, err := s.NewDockerCommand("compose", "up").Exec()
+	Expect(err).NotTo(BeNil())
+	Expect(output).To(ContainSubstring(`compose command not supported on context type`))
+}
+
 func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
 	s.Step("should dispay new cli error when parsing context create flags", func() {
 		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
