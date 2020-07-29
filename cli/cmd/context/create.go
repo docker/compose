@@ -76,7 +76,6 @@ $ docker context create my-context --description "some description" --docker "ho
 	}
 
 	cmd.AddCommand(
-		createAciCommand(),
 		createLocalCommand(),
 		createExampleCommand(),
 	)

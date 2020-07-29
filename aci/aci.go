@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package azure
+package aci
 
 import (
 	"context"
@@ -33,8 +33,8 @@ import (
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 
-	"github.com/docker/api/azure/convert"
-	"github.com/docker/api/azure/login"
+	"github.com/docker/api/aci/convert"
+	"github.com/docker/api/aci/login"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/progress"

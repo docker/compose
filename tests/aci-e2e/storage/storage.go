@@ -24,7 +24,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"github.com/docker/api/azure/login"
+	"github.com/docker/api/aci/login"
 	"github.com/docker/api/context/store"
 )
 

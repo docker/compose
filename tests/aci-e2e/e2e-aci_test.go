@@ -37,8 +37,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/docker/api/azure"
-	"github.com/docker/api/azure/login"
+	azure "github.com/docker/api/aci"
+	"github.com/docker/api/aci/login"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/tests/aci-e2e/storage"
 	. "github.com/docker/api/tests/framework"

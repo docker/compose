@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-package amazon
+package ecs
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
-	ecs "github.com/docker/ecs-plugin/pkg/amazon/backend"
+	ecsplugin "github.com/docker/ecs-plugin/pkg/amazon/backend"
 )
 
 const backendType = store.EcsContextType
@@ -57,7 +57,7 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
-	backend, err := ecs.NewBackend(ecsCtx.Profile, ecsCtx.Region)
+	backend, err := ecsplugin.NewBackend(ecsCtx.Profile, ecsCtx.Region)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 
 type ecsAPIService struct {
 	ctx            store.EcsContext
-	composeBackend *ecs.Backend
+	composeBackend *ecsplugin.Backend
 }
 
 func (a *ecsAPIService) ContainerService() containers.Service {

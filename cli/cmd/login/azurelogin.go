@@ -3,12 +3,12 @@ package login
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/azure"
+	"github.com/docker/api/aci"
 )
 
 // AzureLoginCommand returns the azure login command
 func AzureLoginCommand() *cobra.Command {
-	opts := azure.LoginParams{}
+	opts := aci.LoginParams{}
 	cmd := &cobra.Command{
 		Use:   "azure",
 		Short: "Log in to azure",

@@ -13,7 +13,7 @@
    limitations under the License.
 */
 
-package amazon
+package ecs
 
 import (
 	"context"
@@ -26,9 +26,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
+	"gopkg.in/ini.v1"
+
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/prompt"
-	"gopkg.in/ini.v1"
 )
 
 type contextCreateAWSHelper struct {

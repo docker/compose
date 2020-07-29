@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/azure"
+	"github.com/docker/api/aci"
 	"github.com/docker/api/client"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
@@ -38,7 +38,7 @@ $ docker context create aci CONTEXT [flags]
 }
 
 func createAciCommand() *cobra.Command {
-	var opts azure.ContextParams
+	var opts aci.ContextParams
 	cmd := &cobra.Command{
 		Use:   "aci CONTEXT [flags]",
 		Short: "Create a context for Azure Container Instances",
@@ -56,7 +56,7 @@ func createAciCommand() *cobra.Command {
 	return cmd
 }
 
-func runCreateAci(ctx context.Context, contextName string, opts azure.ContextParams) error {
+func runCreateAci(ctx context.Context, contextName string, opts aci.ContextParams) error {
 	if contextExists(ctx, contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
 	}
@@ -68,7 +68,7 @@ func runCreateAci(ctx context.Context, contextName string, opts azure.ContextPar
 
 }
 
-func getAciContextData(ctx context.Context, opts azure.ContextParams) (interface{}, string, error) {
+func getAciContextData(ctx context.Context, opts aci.ContextParams) (interface{}, string, error) {
 	cs, err := client.GetCloudService(ctx, store.AciContextType)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "cannot connect to ACI backend")

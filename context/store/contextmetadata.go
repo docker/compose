@@ -55,6 +55,9 @@ type EcsContext struct {
 	Region  string `json:",omitempty"`
 }
 
+// AwsContext is the context for the ecs plugin
+type AwsContext EcsContext
+
 // LocalContext is the context for the local backend
 type LocalContext struct{}
 

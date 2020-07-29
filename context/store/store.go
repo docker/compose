@@ -36,7 +36,13 @@ const (
 	DefaultContextName = "default"
 	// DefaultContextType is the type for all moby contexts (not associated with cli backend)
 	DefaultContextType = "moby"
-	// EcsContextType is the type for ecs contexts (currently a CLI plugin, not associated with cli backend)
+
+	// AwsContextType is the type for aws contexts (currently a CLI plugin, not associated with cli backend)
+	// to be removed with the cli plugin
+	AwsContextType = "aws"
+
+	// EcsContextType is the endpoint key in the context endpoints for an ECS
+	// backend
 	EcsContextType = "ecs"
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend

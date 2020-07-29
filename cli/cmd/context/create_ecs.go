@@ -24,9 +24,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/amazon"
 	"github.com/docker/api/client"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/ecs"
 	"github.com/docker/api/errdefs"
 )
 
@@ -40,7 +40,7 @@ $ docker context create ecs CONTEXT [flags]
 }
 
 func createEcsCommand() *cobra.Command {
-	var opts amazon.ContextParams
+	var opts ecs.ContextParams
 	cmd := &cobra.Command{
 		Use:   "ecs CONTEXT [flags]",
 		Short: "Create a context for Amazon ECS",
@@ -58,9 +58,9 @@ func createEcsCommand() *cobra.Command {
 	return cmd
 }
 
-func runCreateEcs(ctx context.Context, contextName string, opts amazon.ContextParams) error {
+func runCreateEcs(ctx context.Context, contextName string, opts ecs.ContextParams) error {
 	if contextExists(ctx, contextName) {
-		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
+		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 	contextData, description, err := getEcsContextData(ctx, opts)
 	if err != nil {
@@ -70,7 +70,7 @@ func runCreateEcs(ctx context.Context, contextName string, opts amazon.ContextPa
 
 }
 
-func getEcsContextData(ctx context.Context, opts amazon.ContextParams) (interface{}, string, error) {
+func getEcsContextData(ctx context.Context, opts ecs.ContextParams) (interface{}, string, error) {
 	cs, err := client.GetCloudService(ctx, store.EcsContextType)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "cannot connect to AWS backend")

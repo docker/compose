@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package azure
+package aci
 
 import (
 	"context"
