@@ -36,7 +36,8 @@ import (
 	"github.com/spf13/cobra"
 
 	// Backend registrations
-	_ "github.com/docker/api/azure"
+	_ "github.com/docker/api/aci"
+	_ "github.com/docker/api/ecs"
 	_ "github.com/docker/api/example"
 	_ "github.com/docker/api/local"
 	"github.com/docker/api/metrics"

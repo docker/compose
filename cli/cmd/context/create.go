@@ -18,6 +18,8 @@ package context
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,15 +31,18 @@ type descriptionCreateOpts struct {
 	description string
 }
 
+var extraCommands []func() *cobra.Command
+var extraHelp []string
+
 func createCommand() *cobra.Command {
-	const longHelp = `Create a new context
+	help := strings.Join(extraHelp, "\n")
+
+	longHelp := fmt.Sprintf(`Create a new context
 
 Create docker engine context: 
 $ docker context create CONTEXT [flags]
 
-Create Azure Container Instances context:
-$ docker context create aci CONTEXT [flags]
-(see docker context create aci --help)
+%s
 
 Docker endpoint config:
 
@@ -59,7 +64,7 @@ namespace-override   Overrides the namespace set in the kubernetes config file
 
 Example:
 
-$ docker context create my-context --description "some description" --docker "host=tcp://myserver:2376,ca=~/ca-file,cert=~/cert-file,key=~/key-file"`
+$ docker context create my-context --description "some description" --docker "host=tcp://myserver:2376,ca=~/ca-file,cert=~/cert-file,key=~/key-file"`, help)
 
 	cmd := &cobra.Command{
 		Use:   "create CONTEXT",
@@ -71,10 +76,12 @@ $ docker context create my-context --description "some description" --docker "ho
 	}
 
 	cmd.AddCommand(
-		createAciCommand(),
 		createLocalCommand(),
 		createExampleCommand(),
 	)
+	for _, command := range extraCommands {
+		cmd.AddCommand(command())
+	}
 
 	flags := cmd.Flags()
 	flags.String("description", "", "Description of the context")

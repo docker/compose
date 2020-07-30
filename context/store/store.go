@@ -36,8 +36,14 @@ const (
 	DefaultContextName = "default"
 	// DefaultContextType is the type for all moby contexts (not associated with cli backend)
 	DefaultContextType = "moby"
-	// AwsContextType is the type for ecs contexts (currently a CLI plugin, not associated with cli backend)
+
+	// AwsContextType is the type for aws contexts (currently a CLI plugin, not associated with cli backend)
+	// to be removed with the cli plugin
 	AwsContextType = "aws"
+
+	// EcsContextType is the endpoint key in the context endpoints for an ECS
+	// backend
+	EcsContextType = "ecs"
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"
@@ -336,13 +342,16 @@ func createDirIfNotExist(dir string) error {
 // be able to manage other contexts.
 func getters() map[string]func() interface{} {
 	return map[string]func() interface{}{
-		"aci": func() interface{} {
+		AciContextType: func() interface{} {
 			return &AciContext{}
 		},
-		"local": func() interface{} {
+		EcsContextType: func() interface{} {
+			return &EcsContext{}
+		},
+		LocalContextType: func() interface{} {
 			return &LocalContext{}
 		},
-		"example": func() interface{} {
+		ExampleContextType: func() interface{} {
 			return &ExampleContext{}
 		},
 	}

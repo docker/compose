@@ -49,6 +49,15 @@ type AciContext struct {
 	ResourceGroup  string `json:",omitempty"`
 }
 
+// EcsContext is the context for the AWS backend
+type EcsContext struct {
+	Profile string `json:",omitempty"`
+	Region  string `json:",omitempty"`
+}
+
+// AwsContext is the context for the ecs plugin
+type AwsContext EcsContext
+
 // LocalContext is the context for the local backend
 type LocalContext struct{}
 

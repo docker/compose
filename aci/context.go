@@ -14,31 +14,31 @@
    limitations under the License.
 */
 
-package azure
+package aci
 
 import (
 	"context"
 	"fmt"
 	"os"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/tj/survey/terminal"
 
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/prompt"
 )
 
 type contextCreateACIHelper struct {
-	selector            userSelector
-	resourceGroupHelper ACIResourceGroupHelper
+	selector            prompt.UI
+	resourceGroupHelper ResourceGroupHelper
 }
 
 func newContextCreateHelper() contextCreateACIHelper {
 	return contextCreateACIHelper{
-		selector:            cliUserSelector{},
+		selector:            prompt.User{},
 		resourceGroupHelper: aciResourceGroupHelperImpl{},
 	}
 }
@@ -114,7 +114,7 @@ func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscripti
 		groupNames = append(groupNames, fmt.Sprintf("%s (%s)", *g.Name, *g.Location))
 	}
 
-	group, err := helper.selector.userSelect("Select a resource group", groupNames)
+	group, err := helper.selector.Select("Select a resource group", groupNames)
 	if err != nil {
 		if err == terminal.InterruptErr {
 			os.Exit(0)
@@ -140,32 +140,17 @@ func (helper contextCreateACIHelper) chooseSub(subs []subscription.Model) (strin
 	for _, sub := range subs {
 		options = append(options, display(sub))
 	}
-	selected, err := helper.selector.userSelect("Select a subscription ID", options)
+	selected, err := helper.selector.Select("Select a subscription ID", options)
 	if err != nil {
 		if err == terminal.InterruptErr {
 			os.Exit(0)
 		}
 		return "", err
 	}
+
 	return *subs[selected].SubscriptionID, nil
 }
 
 func display(sub subscription.Model) string {
 	return fmt.Sprintf("%s (%s)", *sub.DisplayName, *sub.SubscriptionID)
-}
-
-type userSelector interface {
-	userSelect(message string, options []string) (int, error)
-}
-
-type cliUserSelector struct{}
-
-func (us cliUserSelector) userSelect(message string, options []string) (int, error) {
-	qs := &survey.Select{
-		Message: message,
-		Options: options,
-	}
-	var selected int
-	err := survey.AskOne(qs, &selected, nil)
-	return selected, err
 }

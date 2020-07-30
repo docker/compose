@@ -29,6 +29,8 @@ import (
 	"github.com/docker/api/context/store"
 )
 
+var delegatedContextTypes = []string{store.DefaultContextType}
+
 // ComDockerCli name of the classic cli binary
 const ComDockerCli = "com.docker.cli"
 
@@ -46,7 +48,12 @@ func ExecIfDefaultCtxType(ctx context.Context) {
 }
 
 func mustDelegateToMoby(ctxType string) bool {
-	return ctxType == store.DefaultContextType || ctxType == store.AwsContextType
+	for _, ctype := range delegatedContextTypes {
+		if ctxType == ctype {
+			return true
+		}
+	}
+	return false
 }
 
 // Exec delegates to com.docker.cli if on moby context

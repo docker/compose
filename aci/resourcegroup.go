@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package azure
+package aci
 
 import (
 	"context"
@@ -26,8 +26,8 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-// ACIResourceGroupHelper interface to manage resource groups and subscription IDs
-type ACIResourceGroupHelper interface {
+// ResourceGroupHelper interface to manage resource groups and subscription IDs
+type ResourceGroupHelper interface {
 	GetSubscriptionIDs(ctx context.Context) ([]subscription.Model, error)
 	ListGroups(ctx context.Context, subscriptionID string) ([]resources.Group, error)
 	GetGroup(ctx context.Context, subscriptionID string, groupName string) (resources.Group, error)
@@ -38,8 +38,8 @@ type ACIResourceGroupHelper interface {
 type aciResourceGroupHelperImpl struct {
 }
 
-// NewACIResourceGroupHelper create a new ACIResourceGroupHelper
-func NewACIResourceGroupHelper() ACIResourceGroupHelper {
+// NewACIResourceGroupHelper create a new ResourceGroupHelper
+func NewACIResourceGroupHelper() ResourceGroupHelper {
 	return aciResourceGroupHelperImpl{}
 }
 

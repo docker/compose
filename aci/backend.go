@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package azure
+package aci
 
 import (
 	"context"
@@ -30,8 +30,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/api/azure/convert"
-	"github.com/docker/api/azure/login"
+	"github.com/docker/api/aci/convert"
+	"github.com/docker/api/aci/login"
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
@@ -42,6 +42,7 @@ import (
 )
 
 const (
+	backendType               = store.AciContextType
 	singleContainerTag        = "docker-single-container"
 	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
@@ -65,7 +66,7 @@ type LoginParams struct {
 }
 
 func init() {
-	backend.Register("aci", "aci", service, getCloudService)
+	backend.Register(backendType, backendType, service, getCloudService)
 }
 
 func service(ctx context.Context) (backend.Service, error) {
