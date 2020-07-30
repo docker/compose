@@ -140,6 +140,9 @@ func New(opts ...Opt) (Store, error) {
 
 // Get returns the context with the given name
 func (s *store) Get(name string) (*DockerContext, error) {
+	if name == "default" {
+		return dockerDefaultContext()
+	}
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name), metaFile)
 	m, err := read(meta)
 	if os.IsNotExist(err) {

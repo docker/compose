@@ -59,6 +59,7 @@ var (
 
 var (
 	ownCommands = map[string]struct{}{
+		"compose": {},
 		"context": {},
 		"login":   {},
 		"logout":  {},
@@ -181,7 +182,6 @@ func main() {
 		if errors.Is(ctx.Err(), context.Canceled) {
 			os.Exit(130)
 		}
-
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
@@ -196,7 +196,7 @@ func main() {
 
 func exit(err error) {
 	if errors.Is(err, errdefs.ErrLoginRequired) {
-		fmt.Fprintln(os.Stderr, fmt.Errorf("%v", err))
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
 	fatal(err)
@@ -242,6 +242,6 @@ func determineCurrentContext(flag string, configDir string) string {
 }
 
 func fatal(err error) {
-	fmt.Fprint(os.Stderr, err)
+	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
 }
