@@ -33,10 +33,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func testLoginService(t *testing.T, m *MockAzureHelper) (AzureLoginService, error) {
+func testLoginService(t *testing.T, m *MockAzureHelper) (*AzureLoginService, error) {
 	dir, err := ioutil.TempDir("", "test_store")
 	if err != nil {
-		return AzureLoginService{}, err
+		return nil, err
 	}
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
