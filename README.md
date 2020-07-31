@@ -68,10 +68,10 @@ TESTIFY=TestACIRunSingleContainer AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZ
 ## Release
 
 To create a new release:
-* check that the CI is green on the master commit you want to release
+* check that the CI is green on the main branch's commit you want to release
 * simply create a new tag of the form vx.y.z, following existing tags, and push the tag
 
 Pushing the tag will automatically create a new release and make binaries (mac, win, linux) available for download.
 
-Note: Linux binaries are not automatically copied to /docker/aci-integration-beta, if you want to make the linux binary publically available, you'll need to manually create a release in aci-integration-beta and upload the binary.
+Note: Linux binaries are not automatically copied to /docker/aci-integration-beta, if you want to make the linux binary publicly available, you'll need to manually create a release in aci-integration-beta and upload the binary.
 For Desktop integration, you need to make a PR in /docker/pinata and update the cli release number [here](https://github.com/docker/pinata/blob/master/build.json#L25)
