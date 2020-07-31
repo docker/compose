@@ -3,7 +3,7 @@ package aci
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestGetLinesWritten(t *testing.T) {

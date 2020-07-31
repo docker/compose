@@ -22,55 +22,39 @@ import (
 
 	"github.com/docker/api/containers"
 
-	"github.com/stretchr/testify/suite"
-
-	. "github.com/onsi/gomega"
+	"gotest.tools/v3/assert"
 )
 
-type BackendSuiteTest struct {
-	suite.Suite
-}
-
-func (suite *BackendSuiteTest) TestGetContainerName() {
+func TestGetContainerName(t *testing.T) {
 	group, container := getGroupAndContainerName("docker1234")
-	Expect(group).To(Equal("docker1234"))
-	Expect(container).To(Equal("docker1234"))
+	assert.Equal(t, group, "docker1234")
+	assert.Equal(t, container, "docker1234")
 
 	group, container = getGroupAndContainerName("compose_service1")
-	Expect(group).To(Equal("compose"))
-	Expect(container).To(Equal("service1"))
+	assert.Equal(t, group, "compose")
+	assert.Equal(t, container, "service1")
 
 	group, container = getGroupAndContainerName("compose_stack_service1")
-	Expect(group).To(Equal("compose_stack"))
-	Expect(container).To(Equal("service1"))
+	assert.Equal(t, group, "compose_stack")
+	assert.Equal(t, container, "service1")
 }
 
-func (suite *BackendSuiteTest) TestErrorMessageDeletingContainerFromComposeApplication() {
+func TestErrorMessageDeletingContainerFromComposeApplication(t *testing.T) {
 	service := aciContainerService{}
 	err := service.Delete(context.TODO(), "compose-app_service1", false)
-
-	Expect(err).NotTo(BeNil())
-	Expect(err.Error()).To(Equal("cannot delete service \"service1\" from compose application \"compose-app\", you can delete the entire compose app with docker compose down --project-name compose-app"))
+	assert.Error(t, err, "cannot delete service \"service1\" from compose application \"compose-app\", you can delete the entire compose app with docker compose down --project-name compose-app")
 }
 
-func (suite *BackendSuiteTest) TestErrorMessageRunSingleContainerNameWithComposeSeparator() {
+func TestErrorMessageRunSingleContainerNameWithComposeSeparator(t *testing.T) {
 	service := aciContainerService{}
 	err := service.Run(context.TODO(), containers.ContainerConfig{ID: "container_name"})
-
-	Expect(err).NotTo(BeNil())
-	Expect(err.Error()).To(Equal("invalid container name. ACI container name cannot include \"_\""))
+	assert.Error(t, err, "invalid container name. ACI container name cannot include \"_\"")
 }
 
-func (suite *BackendSuiteTest) TestVerifyCommand() {
+func TestVerifyCommand(t *testing.T) {
 	err := verifyExecCommand("command") // Command without an argument
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 	err = verifyExecCommand("command argument") // Command with argument
-	Expect(err).NotTo(BeNil())
-	Expect(err.Error()).To(Equal("ACI exec command does not accept arguments to the command. " +
-		"Only the binary should be specified"))
-}
-
-func TestBackendSuite(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(BackendSuiteTest))
+	assert.Error(t, err, "ACI exec command does not accept arguments to the command. "+
+		"Only the binary should be specified")
 }
