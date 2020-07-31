@@ -8,7 +8,8 @@ import (
 
 func NewBackend(profile string, region string) (*Backend, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Profile: profile,
+		Profile:           profile,
+		SharedConfigState: session.SharedConfigEnable,
 		Config: aws.Config{
 			Region: aws.String(region),
 		},
