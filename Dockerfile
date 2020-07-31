@@ -13,7 +13,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 ARG GO_VERSION=1.14.6-alpine
-ARG GOLANGCI_LINT_VERSION=v1.28.3-alpine
+ARG GOLANGCI_LINT_VERSION=v1.29.0-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /api
