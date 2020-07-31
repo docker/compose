@@ -23,38 +23,29 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
-
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
-type ConvertTestSuite struct {
-	suite.Suite
-	ctx store.AciContext
+var convertCtx = store.AciContext{
+	SubscriptionID: "subID",
+	ResourceGroup:  "rg",
+	Location:       "eu",
 }
 
-func (suite *ConvertTestSuite) BeforeTest(suiteName, testName string) {
-	suite.ctx = store.AciContext{
-		SubscriptionID: "subID",
-		ResourceGroup:  "rg",
-		Location:       "eu",
-	}
-}
-
-func (suite *ConvertTestSuite) TestProjectName() {
+func TestProjectName(t *testing.T) {
 	project := types.Project{
 		Name: "TEST",
 	}
-	containerGroup, err := ToContainerGroup(suite.ctx, project)
-	require.NoError(suite.T(), err)
-	require.Equal(suite.T(), *containerGroup.Name, "test")
+	containerGroup, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
+	assert.Equal(t, *containerGroup.Name, "test")
 }
 
-func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
+func TestContainerGroupToContainer(t *testing.T) {
 	myContainerGroup := containerinstance.ContainerGroup{
 		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{
 			IPAddress: &containerinstance.IPAddress{
@@ -108,11 +99,11 @@ func (suite *ConvertTestSuite) TestContainerGroupToContainer() {
 	}
 
 	container, err := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
-	Expect(err).To(BeNil())
-	Expect(container).To(Equal(expectedContainer))
+	assert.NilError(t, err)
+	assert.DeepEqual(t, container, expectedContainer)
 }
 
-func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerWithDnsSideCarSide() {
+func TestComposeContainerGroupToContainerWithDnsSideCarSide(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -126,22 +117,22 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerWithDnsSideCa
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
-	Expect(len(*group.Containers)).To(Equal(3))
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
+	assert.Assert(t, is.Len(*group.Containers, 3))
 
-	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
-	Expect(*(*group.Containers)[1].Name).To(Equal("service2"))
-	Expect(*(*group.Containers)[2].Name).To(Equal(ComposeDNSSidecarName))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	assert.Equal(t, *(*group.Containers)[1].Name, "service2")
+	assert.Equal(t, *(*group.Containers)[2].Name, ComposeDNSSidecarName)
 
-	Expect(*(*group.Containers)[2].Command).To(Equal([]string{"sh", "-c", "echo 127.0.0.1 service1 >> /etc/hosts;echo 127.0.0.1 service2 >> /etc/hosts;sleep infinity"}))
+	assert.DeepEqual(t, *(*group.Containers)[2].Command, []string{"sh", "-c", "echo 127.0.0.1 service1 >> /etc/hosts;echo 127.0.0.1 service2 >> /etc/hosts;sleep infinity"})
 
-	Expect(*(*group.Containers)[0].Image).To(Equal("image1"))
-	Expect(*(*group.Containers)[1].Image).To(Equal("image2"))
-	Expect(*(*group.Containers)[2].Image).To(Equal(dnsSidecarImage))
+	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
+	assert.Equal(t, *(*group.Containers)[1].Image, "image2")
+	assert.Equal(t, *(*group.Containers)[2].Image, dnsSidecarImage)
 }
 
-func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSideCarSide() {
+func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -151,15 +142,15 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerNoDnsSi
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	Expect(len(*group.Containers)).To(Equal(1))
-	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
-	Expect(*(*group.Containers)[0].Image).To(Equal("image1"))
+	assert.Assert(t, is.Len(*group.Containers, 1))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
 }
 
-func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerSpecificRestartPolicy() {
+func TestComposeSingleContainerGroupToContainerSpecificRestartPolicy(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -174,15 +165,15 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerSpecifi
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	Expect(len(*group.Containers)).To(Equal(1))
-	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
-	Expect(group.RestartPolicy).To(Equal(containerinstance.OnFailure))
+	assert.Assert(t, is.Len(*group.Containers, 1))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
 }
 
-func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerDefaultRestartPolicy() {
+func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -192,15 +183,15 @@ func (suite *ConvertTestSuite) TestComposeSingleContainerGroupToContainerDefault
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	Expect(len(*group.Containers)).To(Equal(1))
-	Expect(*(*group.Containers)[0].Name).To(Equal("service1"))
-	Expect(group.RestartPolicy).To(Equal(containerinstance.Always))
+	assert.Assert(t, is.Len(*group.Containers, 1))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	assert.Equal(t, group.RestartPolicy, containerinstance.Always)
 }
 
-func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts() {
+func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -226,29 +217,27 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerMultiplePorts
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
-	Expect(len(*group.Containers)).To(Equal(3))
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
+	assert.Assert(t, is.Len(*group.Containers, 3))
 
 	container1 := (*group.Containers)[0]
-	container2 := (*group.Containers)[1]
-	Expect(*container1.Name).To(Equal("service1"))
-	Expect(*container1.Image).To(Equal("image1"))
-	portsC1 := *container1.Ports
-	Expect(*portsC1[0].Port).To(Equal(int32(80)))
+	assert.Equal(t, *container1.Name, "service1")
+	assert.Equal(t, *container1.Image, "image1")
+	assert.Equal(t, *(*container1.Ports)[0].Port, int32(80))
 
-	Expect(*container2.Name).To(Equal("service2"))
-	Expect(*container2.Image).To(Equal("image2"))
-	portsC2 := *container2.Ports
-	Expect(*portsC2[0].Port).To(Equal(int32(8080)))
+	container2 := (*group.Containers)[1]
+	assert.Equal(t, *container2.Name, "service2")
+	assert.Equal(t, *container2.Image, "image2")
+	assert.Equal(t, *(*container2.Ports)[0].Port, int32(8080))
 
 	groupPorts := *group.IPAddress.Ports
-	Expect(len(groupPorts)).To(Equal(2))
-	Expect(*groupPorts[0].Port).To(Equal(int32(80)))
-	Expect(*groupPorts[1].Port).To(Equal(int32(8080)))
+	assert.Assert(t, is.Len(groupPorts, 2))
+	assert.Equal(t, *groupPorts[0].Port, int32(80))
+	assert.Equal(t, *groupPorts[1].Port, int32(8080))
 }
 
-func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimits() {
+func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
 	_0_1Gb := 0.1 * 1024 * 1024 * 1024
 	project := types.Project{
 		Services: []types.ServiceConfig{
@@ -267,16 +256,15 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimit
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	container1 := (*group.Containers)[0]
-	limits := *container1.Resources.Limits
-	Expect(*limits.CPU).To(Equal(float64(0.1)))
-	Expect(*limits.MemoryInGB).To(Equal(float64(0.1)))
+	limits := *((*group.Containers)[0]).Resources.Limits
+	assert.Equal(t, *limits.CPU, float64(0.1))
+	assert.Equal(t, *limits.MemoryInGB, float64(0.1))
 }
 
-func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimitsDefaults() {
+func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -294,18 +282,17 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerResourceLimit
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	container1 := (*group.Containers)[0]
-	limits := *container1.Resources.Limits
-	Expect(*limits.CPU).To(Equal(float64(1)))
-	Expect(*limits.MemoryInGB).To(Equal(float64(1)))
+	limits := *((*group.Containers)[0]).Resources.Limits
+	assert.Equal(t, *limits.CPU, float64(1))
+	assert.Equal(t, *limits.MemoryInGB, float64(1))
 }
 
-func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerenvVar() {
+func TestComposeContainerGroupToContainerenvVar(t *testing.T) {
 	err := os.Setenv("key2", "value2")
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -319,31 +306,25 @@ func (suite *ConvertTestSuite) TestComposeContainerGroupToContainerenvVar() {
 		},
 	}
 
-	group, err := ToContainerGroup(suite.ctx, project)
-	Expect(err).To(BeNil())
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
 
-	container1 := (*group.Containers)[0]
-	envVars := *container1.EnvironmentVariables
-	Expect(len(envVars)).To(Equal(2))
-	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key1"), Value: to.StringPtr("value1")}))
-	Expect(envVars).To(ContainElement(containerinstance.EnvironmentVariable{Name: to.StringPtr("key2"), Value: to.StringPtr("value2")}))
+	envVars := *((*group.Containers)[0]).EnvironmentVariables
+	assert.Assert(t, is.Len(envVars, 2))
+	assert.Assert(t, is.Contains(envVars, containerinstance.EnvironmentVariable{Name: to.StringPtr("key1"), Value: to.StringPtr("value1")}))
+	assert.Assert(t, is.Contains(envVars, containerinstance.EnvironmentVariable{Name: to.StringPtr("key2"), Value: to.StringPtr("value2")}))
 }
 
-func (suite *ConvertTestSuite) TestConvertToAciRestartPolicyCondition() {
-	Expect(toAciRestartPolicy("none")).To(Equal(containerinstance.Never))
-	Expect(toAciRestartPolicy("always")).To(Equal(containerinstance.Always))
-	Expect(toAciRestartPolicy("on-failure")).To(Equal(containerinstance.OnFailure))
-	Expect(toAciRestartPolicy("on-failure:5")).To(Equal(containerinstance.Always))
+func TestConvertToAciRestartPolicyCondition(t *testing.T) {
+	assert.Equal(t, toAciRestartPolicy("none"), containerinstance.Never)
+	assert.Equal(t, toAciRestartPolicy("always"), containerinstance.Always)
+	assert.Equal(t, toAciRestartPolicy("on-failure"), containerinstance.OnFailure)
+	assert.Equal(t, toAciRestartPolicy("on-failure:5"), containerinstance.Always)
 }
 
-func (suite *ConvertTestSuite) TestConvertToDockerRestartPolicyCondition() {
-	Expect(toContainerRestartPolicy(containerinstance.Never)).To(Equal("none"))
-	Expect(toContainerRestartPolicy(containerinstance.Always)).To(Equal("any"))
-	Expect(toContainerRestartPolicy(containerinstance.OnFailure)).To(Equal("on-failure"))
-	Expect(toContainerRestartPolicy("")).To(Equal("any"))
-}
-
-func TestConvertTestSuite(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(ConvertTestSuite))
+func TestConvertToDockerRestartPolicyCondition(t *testing.T) {
+	assert.Equal(t, toContainerRestartPolicy(containerinstance.Never), "none")
+	assert.Equal(t, toContainerRestartPolicy(containerinstance.Always), "any")
+	assert.Equal(t, toContainerRestartPolicy(containerinstance.OnFailure), "on-failure")
+	assert.Equal(t, toContainerRestartPolicy(""), "any")
 }

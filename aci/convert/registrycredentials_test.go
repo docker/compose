@@ -26,7 +26,7 @@ import (
 	cliconfigtypes "github.com/docker/cli/cli/config/types"
 	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 const getAllCredentials = "getAllRegistryCredentials"
@@ -144,7 +144,6 @@ func TestNoMoreRegistriesThanImages(t *testing.T) {
 			Password: to.StringPtr("pwd"),
 		},
 	})
-
 }
 
 func TestHubAndSeveralACRRegistries(t *testing.T) {
@@ -161,19 +160,17 @@ func TestHubAndSeveralACRRegistries(t *testing.T) {
 	creds, err := getRegistryCredentials(composeServices("mycontainerregistry1.azurecr.io/privateimg", "someuser/privateImg2", "mycontainerregistry2.azurecr.io/privateimg"), loader)
 	assert.NilError(t, err)
 
-	assert.Assert(t, cmp.Contains(creds, containerinstance.ImageRegistryCredential{
+	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
 		Server:   to.StringPtr("mycontainerregistry1.azurecr.io"),
 		Username: to.StringPtr(tokenUsername),
 		Password: to.StringPtr("123456"),
 	}))
-
-	assert.Assert(t, cmp.Contains(creds, containerinstance.ImageRegistryCredential{
+	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
 		Server:   to.StringPtr("mycontainerregistry2.azurecr.io"),
 		Username: to.StringPtr(tokenUsername),
 		Password: to.StringPtr("456789"),
 	}))
-
-	assert.Assert(t, cmp.Contains(creds, containerinstance.ImageRegistryCredential{
+	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
 		Server:   to.StringPtr(dockerHub),
 		Username: to.StringPtr("toto"),
 		Password: to.StringPtr("pwd"),

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/api/errdefs"
 )
@@ -96,28 +96,28 @@ func TestGetRunVolumes(t *testing.T) {
 
 func TestGetRunVolumesMissingFileShare(t *testing.T) {
 	_, _, err := GetRunVolumes([]string{"myuser:mykey@"})
-	assert.Equal(t, true, errdefs.IsErrParsingFailed(err))
+	assert.Assert(t, errdefs.IsErrParsingFailed(err))
 	assert.ErrorContains(t, err, "does not include a storage file share")
 }
 
 func TestGetRunVolumesMissingUser(t *testing.T) {
 	_, _, err := GetRunVolumes([]string{":mykey@myshare"})
-	assert.Equal(t, true, errdefs.IsErrParsingFailed(err))
+	assert.Assert(t, errdefs.IsErrParsingFailed(err))
 	assert.ErrorContains(t, err, "does not include a storage username")
 }
 
 func TestGetRunVolumesMissingKey(t *testing.T) {
 	_, _, err := GetRunVolumes([]string{"userwithnokey:@myshare"})
-	assert.Equal(t, true, errdefs.IsErrParsingFailed(err))
+	assert.Assert(t, errdefs.IsErrParsingFailed(err))
 	assert.ErrorContains(t, err, "does not include a storage key")
 
 	_, _, err = GetRunVolumes([]string{"userwithnokeytoo@myshare"})
-	assert.Equal(t, true, errdefs.IsErrParsingFailed(err))
+	assert.Assert(t, errdefs.IsErrParsingFailed(err))
 	assert.ErrorContains(t, err, "does not include a storage key")
 }
 
 func TestGetRunVolumesNoShare(t *testing.T) {
 	_, _, err := GetRunVolumes([]string{"noshare"})
-	assert.Equal(t, true, errdefs.IsErrParsingFailed(err))
+	assert.Assert(t, errdefs.IsErrParsingFailed(err))
 	assert.ErrorContains(t, err, "no share specified")
 }

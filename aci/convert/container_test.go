@@ -21,46 +21,35 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/api/containers"
-
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
 )
 
-type ContainerConvertTestSuite struct {
-	suite.Suite
-}
-
-func (suite *ContainerConvertTestSuite) TestConvertContainerEnvironment() {
+func TestConvertContainerEnvironment(t *testing.T) {
 	container := containers.ContainerConfig{
 		ID:          "container1",
 		Environment: []string{"key1=value1", "key2", "key3=value3"},
 	}
 	project, err := ContainerToComposeProject(container)
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 	service1 := project.Services[0]
-	Expect(service1.Name).To(Equal(container.ID))
-	Expect(service1.Environment).To(Equal(types.MappingWithEquals{
+	assert.Equal(t, service1.Name, container.ID)
+	assert.DeepEqual(t, service1.Environment, types.MappingWithEquals{
 		"key1": to.StringPtr("value1"),
 		"key2": nil,
 		"key3": to.StringPtr("value3"),
-	}))
+	})
 }
 
-func (suite *ContainerConvertTestSuite) TestConvertRestartPolicy() {
+func TestConvertRestartPolicy(t *testing.T) {
 	container := containers.ContainerConfig{
 		ID:                     "container1",
 		RestartPolicyCondition: "none",
 	}
 	project, err := ContainerToComposeProject(container)
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 	service1 := project.Services[0]
-	Expect(service1.Name).To(Equal(container.ID))
-	Expect(service1.Deploy.RestartPolicy.Condition).To(Equal("none"))
-}
-
-func TestContainerConvertTestSuite(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(ContainerConvertTestSuite))
+	assert.Equal(t, service1.Name, container.ID)
+	assert.Equal(t, service1.Deploy.RestartPolicy.Condition, "none")
 }
