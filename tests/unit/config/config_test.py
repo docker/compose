@@ -3231,12 +3231,12 @@ web:
 
         with self.assertRaises(ConfigurationError) as e:
             config.load(config1)
-        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+        self.assertEqual(str(e.exception), 'Duplicate mount points: [%s]' % (
             ', '.join(['/tmp/foo:/tmp/foo:rw']*2)))
 
         with self.assertRaises(ConfigurationError) as e:
             config.load(config2)
-        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+        self.assertEqual(str(e.exception), 'Duplicate mount points: [%s]' % (
             ', '.join(['/x:/y:rw', '/z:/y:rw'])))
 
 
