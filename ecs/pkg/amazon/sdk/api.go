@@ -9,7 +9,7 @@ import (
 )
 
 type API interface {
-	CheckRequirements(ctx context.Context) error
+	CheckRequirements(ctx context.Context, region string) error
 
 	GetDefaultVPC(ctx context.Context) (string, error)
 	VpcExists(ctx context.Context, vpcID string) (bool, error)

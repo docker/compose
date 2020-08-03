@@ -2,7 +2,6 @@ package sdk
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ func NewAPI(sess *session.Session) API {
 	}
 }
 
-func (s sdk) CheckRequirements(ctx context.Context) error {
+func (s sdk) CheckRequirements(ctx context.Context, region string) error {
 	settings, err := s.ECS.ListAccountSettingsWithContext(ctx, &ecs.ListAccountSettingsInput{
 		EffectiveSettings: aws.Bool(true),
 		Name:              aws.String("serviceLongArnFormat"),
@@ -66,7 +65,9 @@ func (s sdk) CheckRequirements(ctx context.Context) error {
 	}
 	serviceLongArnFormat := settings.Settings[0].Value
 	if *serviceLongArnFormat != "enabled" {
-		return errors.New("this tool requires the \"new ARN resource ID format\"")
+		return fmt.Errorf("this tool requires the \"new ARN resource ID format\".\n"+
+			"Check https://%s.console.aws.amazon.com/ecs/home#/settings\n"+
+			"Learn more: https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2", region)
 	}
 	return nil
 }

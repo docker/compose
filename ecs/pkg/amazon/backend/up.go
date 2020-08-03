@@ -19,7 +19,7 @@ func (b *Backend) Up(ctx context.Context, options cli.ProjectOptions) error {
 		return err
 	}
 
-	err = b.api.CheckRequirements(ctx)
+	err = b.api.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
 	}
