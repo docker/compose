@@ -3,7 +3,7 @@ package proxy
 import (
 	"testing"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/api/containers"
 	"github.com/docker/api/formatter"

@@ -23,85 +23,77 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/api/config"
 	apicontext "github.com/docker/api/context"
 )
 
-type interceptorSuite struct {
-	suite.Suite
-	dir string
-	ctx context.Context
-}
-
-func (is *interceptorSuite) BeforeTest(suiteName, testName string) {
+func testContext(t *testing.T) context.Context {
 	dir, err := ioutil.TempDir("", "example")
-	require.Nil(is.T(), err)
+	assert.NilError(t, err)
+
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
 
 	ctx := context.Background()
 	ctx = config.WithDir(ctx, dir)
 	err = ioutil.WriteFile(path.Join(dir, "config.json"), []byte(`{"currentContext": "default"}`), 0644)
-	require.Nil(is.T(), err)
+	assert.NilError(t, err)
 
-	is.dir = dir
-	is.ctx = ctx
+	return ctx
 }
 
-func (is *interceptorSuite) AfterTest(suiteName, tesName string) {
-	err := os.RemoveAll(is.dir)
-	require.Nil(is.T(), err)
+func TestUnaryGetCurrentContext(t *testing.T) {
+	ctx := testContext(t)
+	interceptor := unaryServerInterceptor(ctx)
+
+	currentContext := callUnary(context.Background(), t, interceptor)
+	assert.Equal(t, currentContext, "default")
 }
 
-func (is *interceptorSuite) TestUnaryGetCurrentContext() {
-	interceptor := unaryServerInterceptor(is.ctx)
-
-	currentContext := is.callUnary(context.Background(), interceptor)
-
-	assert.Equal(is.T(), "default", currentContext)
-}
-
-func (is *interceptorSuite) TestUnaryContextFromMetadata() {
+func TestUnaryContextFromMetadata(t *testing.T) {
+	ctx := testContext(t)
 	contextName := "test"
 
-	interceptor := unaryServerInterceptor(is.ctx)
+	interceptor := unaryServerInterceptor(ctx)
 	reqCtx := context.Background()
 	reqCtx = metadata.NewIncomingContext(reqCtx, metadata.MD{
 		(key): []string{contextName},
 	})
 
-	currentContext := is.callUnary(reqCtx, interceptor)
-
-	assert.Equal(is.T(), contextName, currentContext)
+	currentContext := callUnary(reqCtx, t, interceptor)
+	assert.Equal(t, contextName, currentContext)
 }
 
-func (is *interceptorSuite) TestStreamGetCurrentContext() {
-	interceptor := streamServerInterceptor(is.ctx)
+func TestStreamGetCurrentContext(t *testing.T) {
+	ctx := testContext(t)
+	interceptor := streamServerInterceptor(ctx)
 
-	currentContext := is.callStream(context.Background(), interceptor)
+	currentContext := callStream(context.Background(), t, interceptor)
 
-	assert.Equal(is.T(), "default", currentContext)
+	assert.Equal(t, currentContext, "default")
 }
 
-func (is *interceptorSuite) TestStreamContextFromMetadata() {
+func TestStreamContextFromMetadata(t *testing.T) {
+	ctx := testContext(t)
 	contextName := "test"
 
-	interceptor := streamServerInterceptor(is.ctx)
+	interceptor := streamServerInterceptor(ctx)
 	reqCtx := context.Background()
 	reqCtx = metadata.NewIncomingContext(reqCtx, metadata.MD{
 		(key): []string{contextName},
 	})
 
-	currentContext := is.callStream(reqCtx, interceptor)
-
-	assert.Equal(is.T(), contextName, currentContext)
+	currentContext := callStream(reqCtx, t, interceptor)
+	assert.Equal(t, currentContext, contextName)
 }
 
-func (is *interceptorSuite) callStream(ctx context.Context, interceptor grpc.StreamServerInterceptor) string {
+func callStream(ctx context.Context, t *testing.T, interceptor grpc.StreamServerInterceptor) string {
 	currentContext := ""
 	err := interceptor(nil, &contextServerStream{
 		ctx: ctx,
@@ -112,12 +104,12 @@ func (is *interceptorSuite) callStream(ctx context.Context, interceptor grpc.Str
 		return nil
 	})
 
-	require.Nil(is.T(), err)
+	assert.NilError(t, err)
 
 	return currentContext
 }
 
-func (is *interceptorSuite) callUnary(ctx context.Context, interceptor grpc.UnaryServerInterceptor) string {
+func callUnary(ctx context.Context, t *testing.T, interceptor grpc.UnaryServerInterceptor) string {
 	currentContext := ""
 	resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{
 		FullMethod: "/com.docker.api.protos.context.v1.Contexts/test",
@@ -126,12 +118,8 @@ func (is *interceptorSuite) callUnary(ctx context.Context, interceptor grpc.Unar
 		return nil, nil
 	})
 
-	require.Nil(is.T(), err)
-	require.Nil(is.T(), resp)
+	assert.NilError(t, err)
+	assert.Assert(t, cmp.Nil(resp))
 
 	return currentContext
-}
-
-func TestInterceptor(t *testing.T) {
-	suite.Run(t, new(interceptorSuite))
 }
