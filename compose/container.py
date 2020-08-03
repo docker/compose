@@ -189,7 +189,7 @@ class Container(object):
     @property
     def has_api_logs(self):
         log_type = self.log_driver
-        return not log_type or log_type in ('json-file', 'journald')
+        return not log_type or log_type in ('json-file', 'journald', 'local')
 
     @property
     def human_readable_health_status(self):
@@ -204,8 +204,8 @@ class Container(object):
         return status_string
 
     def attach_log_stream(self):
-        """A log stream can only be attached if the container uses a json-file
-        log driver.
+        """A log stream can only be attached if the container uses a
+        json-file, journald or local log driver.
         """
         if self.has_api_logs:
             self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
