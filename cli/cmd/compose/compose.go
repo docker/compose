@@ -17,9 +17,12 @@
 package compose
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/api/client"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
@@ -31,20 +34,7 @@ func Command() *cobra.Command {
 		Short: "Docker Compose",
 		Use:   "compose",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			currentContext := apicontext.CurrentContext(cmd.Context())
-			s := store.ContextStore(cmd.Context())
-			cc, err := s.Get(currentContext)
-			if err != nil {
-				return err
-			}
-			switch cc.Type() {
-			case store.AciContextType:
-				return nil
-			case store.AwsContextType:
-				return errors.New("use 'docker ecs compose' on context type " + cc.Type())
-			default:
-				return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
-			}
+			return runCompose(cmd.Context())
 		},
 	}
 
@@ -54,4 +44,27 @@ func Command() *cobra.Command {
 	)
 
 	return command
+}
+
+func runCompose(ctx context.Context) error {
+	c, err := client.New(ctx)
+	if err == nil {
+		composeService := c.ComposeService()
+		if composeService == nil {
+			return errors.New("compose not implemented in current context")
+		}
+		return nil
+	}
+	currentContext := apicontext.CurrentContext(ctx)
+	s := store.ContextStore(ctx)
+	cc, err := s.Get(currentContext)
+	if err != nil {
+		return err
+	}
+	switch cc.Type() {
+	case store.AwsContextType:
+		return errors.New("use 'docker ecs compose' on context type " + cc.Type())
+	default:
+		return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
+	}
 }
