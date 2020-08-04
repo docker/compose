@@ -22,103 +22,100 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/api/errdefs"
 )
 
-type StoreTestSuite struct {
-	suite.Suite
-	store Store
-	dir   string
+func testStore(t *testing.T) Store {
+	d, err := ioutil.TempDir("", "store")
+	assert.NilError(t, err)
+
+	t.Cleanup(func() {
+		_ = os.RemoveAll(d)
+	})
+
+	s, err := New(WithRoot(d))
+	assert.NilError(t, err)
+
+	return s
 }
 
-func (suite *StoreTestSuite) BeforeTest(suiteName, testName string) {
-	dir, err := ioutil.TempDir("", "store")
-	require.Nil(suite.T(), err)
+func TestCreate(t *testing.T) {
+	s := testStore(t)
+	err := s.Create("test", "test", "description", ContextMetadata{})
+	assert.NilError(t, err)
 
-	store, err := New(WithRoot(dir))
-	require.Nil(suite.T(), err)
-
-	suite.dir = dir
-	suite.store = store
+	err = s.Create("test", "test", "descrsiption", ContextMetadata{})
+	assert.Error(t, err, `context "test": already exists`)
+	assert.Assert(t, errdefs.IsAlreadyExistsError(err))
 }
 
-func (suite *StoreTestSuite) AfterTest(suiteName, testName string) {
-	err := os.RemoveAll(suite.dir)
-	require.Nil(suite.T(), err)
-}
-
-func (suite *StoreTestSuite) TestCreate() {
-	err := suite.store.Create("test", "test", "description", ContextMetadata{})
-	require.Nil(suite.T(), err)
-
-	err = suite.store.Create("test", "test", "descrsiption", ContextMetadata{})
-	require.EqualError(suite.T(), err, `context "test": already exists`)
-	require.True(suite.T(), errdefs.IsAlreadyExistsError(err))
-}
-
-func (suite *StoreTestSuite) TestGetEndpoint() {
-	err := suite.store.Create("aci", "aci", "description", AciContext{
+func TestGetEndpoint(t *testing.T) {
+	s := testStore(t)
+	err := s.Create("aci", "aci", "description", AciContext{
 		Location: "eu",
 	})
-	require.Nil(suite.T(), err)
+	assert.NilError(t, err)
 
 	var ctx AciContext
-	err = suite.store.GetEndpoint("aci", &ctx)
-	assert.Equal(suite.T(), nil, err)
-	assert.Equal(suite.T(), "eu", ctx.Location)
+	err = s.GetEndpoint("aci", &ctx)
+	assert.NilError(t, err)
+	assert.Equal(t, ctx.Location, "eu")
 
 	var exampleCtx ExampleContext
-	err = suite.store.GetEndpoint("aci", &exampleCtx)
-	assert.EqualError(suite.T(), err, "wrong context type")
+	err = s.GetEndpoint("aci", &exampleCtx)
+	assert.Error(t, err, "wrong context type")
 }
 
-func (suite *StoreTestSuite) TestGetUnknown() {
-	meta, err := suite.store.Get("unknown")
-	require.Nil(suite.T(), meta)
-	require.EqualError(suite.T(), err, `context "unknown": not found`)
-	require.True(suite.T(), errdefs.IsNotFoundError(err))
+func TestGetUnknown(t *testing.T) {
+	s := testStore(t)
+	meta, err := s.Get("unknown")
+	assert.Assert(t, cmp.Nil(meta))
+	assert.Error(t, err, `context "unknown": not found`)
+	assert.Assert(t, errdefs.IsNotFoundError(err))
 }
 
-func (suite *StoreTestSuite) TestGet() {
-	err := suite.store.Create("test", "type", "description", ContextMetadata{})
-	require.Nil(suite.T(), err)
+func TestGet(t *testing.T) {
+	s := testStore(t)
+	err := s.Create("test", "type", "description", ContextMetadata{})
+	assert.NilError(t, err)
 
-	meta, err := suite.store.Get("test")
-	require.Nil(suite.T(), err)
-	require.NotNil(suite.T(), meta)
-	require.Equal(suite.T(), "test", meta.Name)
+	meta, err := s.Get("test")
+	assert.NilError(t, err)
+	assert.Assert(t, meta != nil)
+	var m DockerContext
+	if meta != nil {
+		m = *meta
+	}
 
-	require.Equal(suite.T(), "description", meta.Metadata.Description)
-	require.Equal(suite.T(), "type", meta.Type())
+	assert.Equal(t, m.Name, "test")
+	assert.Equal(t, m.Metadata.Description, "description")
+	assert.Equal(t, m.Type(), "type")
 }
 
-func (suite *StoreTestSuite) TestRemoveNotFound() {
-	err := suite.store.Remove("notfound")
-	require.EqualError(suite.T(), err, `context "notfound": not found`)
-	require.True(suite.T(), errdefs.IsNotFoundError(err))
+func TestRemoveNotFound(t *testing.T) {
+	s := testStore(t)
+	err := s.Remove("notfound")
+	assert.Error(t, err, `context "notfound": not found`)
+	assert.Assert(t, errdefs.IsNotFoundError(err))
 }
 
-func (suite *StoreTestSuite) TestRemove() {
-	err := suite.store.Create("testremove", "type", "description", ContextMetadata{})
-	require.Nil(suite.T(), err)
+func TestRemove(t *testing.T) {
+	s := testStore(t)
+	err := s.Create("testremove", "type", "description", ContextMetadata{})
+	assert.NilError(t, err)
 
-	meta, err := suite.store.Get("testremove")
-	require.Nil(suite.T(), err)
-	require.NotNil(suite.T(), meta)
+	meta, err := s.Get("testremove")
+	assert.NilError(t, err)
+	assert.Assert(t, meta != nil)
 
-	err = suite.store.Remove("testremove")
-	require.Nil(suite.T(), err)
+	err = s.Remove("testremove")
+	assert.NilError(t, err)
 
-	meta, err = suite.store.Get("testremove")
-	require.EqualError(suite.T(), err, `context "testremove": not found`)
-	require.Nil(suite.T(), meta)
+	meta, err = s.Get("testremove")
+	assert.Error(t, err, `context "testremove": not found`)
+	assert.Assert(t, cmp.Nil(meta))
 
-}
-
-func TestExampleTestSuite(t *testing.T) {
-	suite.Run(t, new(StoreTestSuite))
 }
