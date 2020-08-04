@@ -20,33 +20,33 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestIsNotFound(t *testing.T) {
 	err := errors.Wrap(ErrNotFound, `object "name"`)
-	assert.True(t, IsNotFoundError(err))
+	assert.Assert(t, IsNotFoundError(err))
 
-	assert.False(t, IsNotFoundError(errors.New("another error")))
+	assert.Assert(t, !IsNotFoundError(errors.New("another error")))
 }
 
 func TestIsAlreadyExists(t *testing.T) {
 	err := errors.Wrap(ErrAlreadyExists, `object "name"`)
-	assert.True(t, IsAlreadyExistsError(err))
+	assert.Assert(t, IsAlreadyExistsError(err))
 
-	assert.False(t, IsAlreadyExistsError(errors.New("another error")))
+	assert.Assert(t, !IsAlreadyExistsError(errors.New("another error")))
 }
 
 func TestIsForbidden(t *testing.T) {
 	err := errors.Wrap(ErrForbidden, `object "name"`)
-	assert.True(t, IsForbiddenError(err))
+	assert.Assert(t, IsForbiddenError(err))
 
-	assert.False(t, IsForbiddenError(errors.New("another error")))
+	assert.Assert(t, !IsForbiddenError(errors.New("another error")))
 }
 
 func TestIsUnknown(t *testing.T) {
 	err := errors.Wrap(ErrUnknown, `object "name"`)
-	assert.True(t, IsUnknownError(err))
+	assert.Assert(t, IsUnknownError(err))
 
-	assert.False(t, IsUnknownError(errors.New("another error")))
+	assert.Assert(t, !IsUnknownError(errors.New("another error")))
 }
