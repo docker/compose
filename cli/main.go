@@ -151,7 +151,7 @@ func main() {
 
 	// --host and --version should immediately be forwarded to the original cli
 	if opts.Host != "" || opts.Version {
-		mobycli.Exec(ctx)
+		mobycli.Exec()
 	}
 
 	if opts.Config == "" {

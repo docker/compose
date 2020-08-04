@@ -23,8 +23,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
 )
@@ -43,7 +41,7 @@ func ExecIfDefaultCtxType(ctx context.Context) {
 	currentCtx, err := s.Get(currentContext)
 	// Only run original docker command if the current context is not ours.
 	if err != nil || mustDelegateToMoby(currentCtx.Type()) {
-		Exec(ctx)
+		Exec()
 	}
 }
 
@@ -57,11 +55,12 @@ func mustDelegateToMoby(ctxType string) bool {
 }
 
 // Exec delegates to com.docker.cli if on moby context
-func Exec(ctx context.Context) {
-	cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
+func Exec() {
+	cmd := exec.Command(ComDockerCli, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	if err := cmd.Run(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exiterr.ExitCode())
@@ -70,14 +69,6 @@ func Exec(ctx context.Context) {
 		os.Exit(1)
 	}
 	os.Exit(0)
-}
-
-// ExecCmd delegates the cli command to com.docker.cli. The error is never
-// returned (process will exit with docker classic exit code), the return type
-// is to make it easier to use with cobra commands
-func ExecCmd(command *cobra.Command) error {
-	Exec(command.Context())
-	return nil
 }
 
 // IsDefaultContextCommand checks if the command exists in the classic cli (issues a shellout --help)

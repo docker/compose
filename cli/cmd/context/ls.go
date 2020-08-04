@@ -69,7 +69,8 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return err
 	}
 	if opts.format != "" {
-		return mobycli.ExecCmd(cmd)
+		mobycli.Exec()
+		return nil
 	}
 
 	ctx := cmd.Context()
