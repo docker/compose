@@ -179,6 +179,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 					},
 				},
 			},
+			PropagateTags:      ecsapi.PropagateTagsService,
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
 			Tags: []tags.Tag{

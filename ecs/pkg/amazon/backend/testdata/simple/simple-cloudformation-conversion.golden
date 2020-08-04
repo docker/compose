@@ -116,6 +116,7 @@
             ]
           }
         },
+        "PropagateTags": "SERVICE",
         "SchedulingStrategy": "REPLICA",
         "ServiceRegistries": [
           {
