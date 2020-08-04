@@ -20,15 +20,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
 )
 
-type ContextTestSuite struct {
-	suite.Suite
-}
-
-func (suite *ContextTestSuite) TestDockerContextMetadataKeepAdditionalFields() {
+func TestDockerContextMetadataKeepAdditionalFields(t *testing.T) {
 	c := ContextMetadata{
 		Description:       "test",
 		Type:              "aci",
@@ -38,19 +33,14 @@ func (suite *ContextTestSuite) TestDockerContextMetadataKeepAdditionalFields() {
 		},
 	}
 	jsonBytes, err := json.Marshal(c)
-	Expect(err).To(BeNil())
-	Expect(string(jsonBytes)).To(Equal(`{"Description":"test","StackOrchestrator":"swarm","Type":"aci","foo":"bar"}`))
+	assert.NilError(t, err)
+	assert.Equal(t, string(jsonBytes), `{"Description":"test","StackOrchestrator":"swarm","Type":"aci","foo":"bar"}`)
 
 	var c2 ContextMetadata
 	err = json.Unmarshal(jsonBytes, &c2)
-	Expect(err).To(BeNil())
-	Expect(c2.AdditionalFields["foo"]).To(Equal("bar"))
-	Expect(c2.Type).To(Equal("aci"))
-	Expect(c2.StackOrchestrator).To(Equal("swarm"))
-	Expect(c2.Description).To(Equal("test"))
-}
-
-func TestPs(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(ContextTestSuite))
+	assert.NilError(t, err)
+	assert.Equal(t, c2.AdditionalFields["foo"], "bar")
+	assert.Equal(t, c2.Type, "aci")
+	assert.Equal(t, c2.StackOrchestrator, "swarm")
+	assert.Equal(t, c2.Description, "test")
 }
