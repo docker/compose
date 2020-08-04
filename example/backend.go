@@ -57,9 +57,10 @@ type containerService struct{}
 
 func (cs *containerService) Inspect(ctx context.Context, id string) (containers.Container, error) {
 	return containers.Container{
-		ID:       "id",
-		Image:    "nginx",
-		Platform: "Linux",
+		ID:                     "id",
+		Image:                  "nginx",
+		Platform:               "Linux",
+		RestartPolicyCondition: "none",
 	}, nil
 }
 

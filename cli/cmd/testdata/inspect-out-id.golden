@@ -12,5 +12,5 @@
     "Labels": null,
     "Ports": null,
     "Platform": "Linux",
-    "RestartPolicyCondition": ""
+    "RestartPolicyCondition": "none"
 }

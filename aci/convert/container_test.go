@@ -51,7 +51,7 @@ func (suite *ContainerConvertTestSuite) TestConvertContainerEnvironment() {
 func (suite *ContainerConvertTestSuite) TestConvertRestartPolicy() {
 	container := containers.ContainerConfig{
 		ID:                     "container1",
-		RestartPolicyCondition: "no",
+		RestartPolicyCondition: "none",
 	}
 	project, err := ContainerToComposeProject(container)
 	Expect(err).To(BeNil())

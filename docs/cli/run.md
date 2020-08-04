@@ -31,7 +31,7 @@ docker run [OPTIONS] _image_ [COMMAND] [ARG...]
       --cpus                           Number of CPUs to allocate, approximately
   -p, --publish list                   Publish a container's port(s) to the host
   -P, --publish-all                    Publish all exposed ports to random ports
-      --restart string                 Restart policy to apply when a container exits (default "no")
+      --restart string                 Restart policy to apply when a container exits (default "none")
       --entrypoint string              Overwrite the default ENTRYPOINT of the image
 
       --mount mount                    Attach a filesystem mount to the container

@@ -23,6 +23,18 @@ import (
 	"github.com/docker/api/formatter"
 )
 
+const (
+	// RestartPolicyAny Always restarts
+	RestartPolicyAny = "any"
+	// RestartPolicyNone Never restarts
+	RestartPolicyNone = "none"
+	// RestartPolicyOnFailure Restarts only on failure
+	RestartPolicyOnFailure = "on-failure"
+)
+
+// RestartPolicyList all available restart policy values
+var RestartPolicyList = []string{RestartPolicyNone, RestartPolicyAny, RestartPolicyOnFailure}
+
 // Container represents a created container
 type Container struct {
 	ID                     string

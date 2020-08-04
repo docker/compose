@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/docker/api/utils"
+
 	"github.com/buger/goterm"
 	"github.com/morikuni/aec"
 )
@@ -63,7 +65,7 @@ func (w *ttyWriter) Stop() {
 func (w *ttyWriter) Event(e Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	if !contains(w.eventIDs, e.ID) {
+	if !utils.StringContains(w.eventIDs, e.ID) {
 		w.eventIDs = append(w.eventIDs, e.ID)
 	}
 	if _, ok := w.events[e.ID]; ok {
@@ -180,13 +182,4 @@ func numDone(events map[string]Event) int {
 
 func align(l, r string, w int) string {
 	return fmt.Sprintf("%-[2]*[1]s %[3]s", l, w-len(r)-1, r)
-}
-
-func contains(ar []string, needle string) bool {
-	for _, v := range ar {
-		if needle == v {
-			return true
-		}
-	}
-	return false
 }

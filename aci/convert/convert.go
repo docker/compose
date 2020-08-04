@@ -71,15 +71,6 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 		return containerinstance.ContainerGroup{}, err
 	}
 
-	var restartPolicyCondition containerinstance.ContainerGroupRestartPolicy
-	if len(p.Services) == 1 &&
-		p.Services[0].Deploy != nil &&
-		p.Services[0].Deploy.RestartPolicy != nil {
-		restartPolicyCondition = toAciRestartPolicy(p.Services[0].Deploy.RestartPolicy.Condition)
-	} else {
-		restartPolicyCondition = containerinstance.Always
-	}
-
 	var containers []containerinstance.Container
 	groupDefinition := containerinstance.ContainerGroup{
 		Name:     &containerGroupName,
@@ -89,7 +80,7 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 			Containers:               &containers,
 			Volumes:                  volumes,
 			ImageRegistryCredentials: &registryCreds,
-			RestartPolicy:            restartPolicyCondition,
+			RestartPolicy:            project.getRestartPolicy(),
 		},
 	}
 
@@ -133,32 +124,6 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 	groupDefinition.ContainerGroupProperties.Containers = &containers
 
 	return groupDefinition, nil
-}
-
-func toAciRestartPolicy(restartPolicy string) containerinstance.ContainerGroupRestartPolicy {
-	switch restartPolicy {
-	case containers.RestartPolicyNone:
-		return containerinstance.Never
-	case containers.RestartPolicyAny:
-		return containerinstance.Always
-	case containers.RestartPolicyOnFailure:
-		return containerinstance.OnFailure
-	default:
-		return containerinstance.Always
-	}
-}
-
-func toContainerRestartPolicy(aciRestartPolicy containerinstance.ContainerGroupRestartPolicy) string {
-	switch aciRestartPolicy {
-	case containerinstance.Never:
-		return containers.RestartPolicyNone
-	case containerinstance.Always:
-		return containers.RestartPolicyAny
-	case containerinstance.OnFailure:
-		return containers.RestartPolicyOnFailure
-	default:
-		return containers.RestartPolicyAny
-	}
 }
 
 func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
@@ -249,6 +214,44 @@ func (p projectAciHelper) getAciFileVolumes() (map[string]bool, []containerinsta
 		}
 	}
 	return azureFileVolumesMap, azureFileVolumesSlice, nil
+}
+
+func (p projectAciHelper) getRestartPolicy() containerinstance.ContainerGroupRestartPolicy {
+	var restartPolicyCondition containerinstance.ContainerGroupRestartPolicy
+	if len(p.Services) == 1 &&
+		p.Services[0].Deploy != nil &&
+		p.Services[0].Deploy.RestartPolicy != nil {
+		restartPolicyCondition = toAciRestartPolicy(p.Services[0].Deploy.RestartPolicy.Condition)
+	} else {
+		restartPolicyCondition = containerinstance.Always
+	}
+	return restartPolicyCondition
+}
+
+func toAciRestartPolicy(restartPolicy string) containerinstance.ContainerGroupRestartPolicy {
+	switch restartPolicy {
+	case containers.RestartPolicyNone:
+		return containerinstance.Never
+	case containers.RestartPolicyAny:
+		return containerinstance.Always
+	case containers.RestartPolicyOnFailure:
+		return containerinstance.OnFailure
+	default:
+		return containerinstance.Always
+	}
+}
+
+func toContainerRestartPolicy(aciRestartPolicy containerinstance.ContainerGroupRestartPolicy) string {
+	switch aciRestartPolicy {
+	case containerinstance.Never:
+		return containers.RestartPolicyNone
+	case containerinstance.Always:
+		return containers.RestartPolicyAny
+	case containerinstance.OnFailure:
+		return containers.RestartPolicyOnFailure
+	default:
+		return containers.RestartPolicyAny
+	}
 }
 
 type serviceConfigAciHelper types.ServiceConfig

@@ -173,3 +173,46 @@ func TestLabels(t *testing.T) {
 		assert.DeepEqual(t, result, testCase.expected)
 	}
 }
+
+func TestValidateRestartPolicy(t *testing.T) {
+	testCases := []struct {
+		in            string
+		expected      string
+		expectedError error
+	}{
+		{
+			in:            "none",
+			expected:      "none",
+			expectedError: nil,
+		},
+		{
+			in:            "any",
+			expected:      "any",
+			expectedError: nil,
+		},
+		{
+			in:            "on-failure",
+			expected:      "on-failure",
+			expectedError: nil,
+		},
+		{
+			in:            "",
+			expected:      "none",
+			expectedError: nil,
+		},
+		{
+			in:            "toto",
+			expected:      "",
+			expectedError: errors.New("invalid restart value, must be one of none, any, on-failure"),
+		},
+	}
+	for _, testCase := range testCases {
+		result, err := toRestartPolicy(testCase.in)
+		if testCase.expectedError == nil {
+			assert.NilError(t, err)
+		} else {
+			assert.Error(t, err, testCase.expectedError.Error())
+		}
+		assert.Equal(t, testCase.expected, result)
+	}
+}

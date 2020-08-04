@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/api/utils"
+
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
@@ -57,6 +59,11 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		return containers.ContainerConfig{}, err
 	}
 
+	restartPolicy, err := toRestartPolicy(r.RestartPolicyCondition)
+	if err != nil {
+		return containers.ContainerConfig{}, err
+	}
+
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
@@ -66,8 +73,19 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		MemLimit:               r.Memory,
 		CPULimit:               r.Cpus,
 		Environment:            r.Environment,
-		RestartPolicyCondition: r.RestartPolicyCondition,
+		RestartPolicyCondition: restartPolicy,
 	}, nil
+}
+
+func toRestartPolicy(value string) (string, error) {
+	if value == "" {
+		return containers.RestartPolicyNone, nil
+	}
+	if utils.StringContains(containers.RestartPolicyList, value) {
+		return value, nil
+	}
+
+	return "", fmt.Errorf("invalid restart value, must be one of %s", strings.Join(containers.RestartPolicyList, ", "))
 }
 
 func (r *Opts) toPorts() ([]containers.Port, error) {

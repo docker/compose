@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	flag "github.com/spf13/pflag"
+
+	"github.com/docker/api/utils"
 )
 
 var managementCommands = []string{
@@ -111,7 +113,7 @@ func getCommand(args []string, flags *flag.FlagSet) string {
 		}
 
 		for {
-			if contains(managementCommands, command) {
+			if utils.StringContains(managementCommands, command) {
 				if sub := getSubCommand(command, strippedArgs[1:]); sub != "" {
 					command += " " + sub
 					strippedArgs = strippedArgs[1:]
@@ -128,11 +130,11 @@ func getCommand(args []string, flags *flag.FlagSet) string {
 func getScanCommand(args []string) string {
 	command := args[0]
 
-	if contains(args, "--auth") {
+	if utils.StringContains(args, "--auth") {
 		return command + " auth"
 	}
 
-	if contains(args, "--version") {
+	if utils.StringContains(args, "--version") {
 		return command + " version"
 	}
 
@@ -145,7 +147,7 @@ func getSubCommand(command string, args []string) string {
 	}
 
 	if val, ok := managementSubCommands[command]; ok {
-		if contains(val, args[0]) {
+		if utils.StringContains(val, args[0]) {
 			return args[0]
 		}
 		return ""
@@ -156,15 +158,6 @@ func getSubCommand(command string, args []string) string {
 	}
 
 	return ""
-}
-
-func contains(array []string, needle string) bool {
-	for _, val := range array {
-		if val == needle {
-			return true
-		}
-	}
-	return false
 }
 
 func stripFlags(args []string, flags *flag.FlagSet) []string {

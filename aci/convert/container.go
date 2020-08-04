@@ -24,11 +24,6 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 		return types.Project{}, err
 	}
 
-	composeRestartPolicyCondition := r.RestartPolicyCondition
-	if composeRestartPolicyCondition == "no" {
-		composeRestartPolicyCondition = "none"
-	}
-
 	project := types.Project{
 		Name: r.ID,
 		Services: []types.ServiceConfig{
@@ -47,7 +42,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 						},
 					},
 					RestartPolicy: &types.RestartPolicy{
-						Condition: composeRestartPolicyCondition,
+						Condition: r.RestartPolicyCondition,
 					},
 				},
 			},
