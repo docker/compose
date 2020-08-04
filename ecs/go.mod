@@ -5,8 +5,8 @@ require (
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
-	github.com/aws/aws-sdk-go v1.30.22
-	github.com/awslabs/goformation/v4 v4.8.0
+	github.com/aws/aws-sdk-go v1.33.18
+	github.com/awslabs/goformation/v4 v4.14.0
 	github.com/bitly/go-hostpool v0.1.0 // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
@@ -28,6 +28,7 @@ require (
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
+	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/jinzhu/gorm v1.9.12 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/lib/pq v1.3.0 // indirect
