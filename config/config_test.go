@@ -22,8 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
 )
 
 var sampleConfig = []byte(`{
@@ -31,62 +30,54 @@ var sampleConfig = []byte(`{
 	"currentContext": "local"
 }`)
 
-type ConfigTestSuite struct {
-	suite.Suite
-	configDir string
-}
-
-func (s *ConfigTestSuite) BeforeTest(suite, test string) {
+func testConfigDir(t *testing.T) string {
 	d, _ := ioutil.TempDir("", "")
-	s.configDir = d
-}
-
-func (s *ConfigTestSuite) AfterTest(suite, test string) {
-	err := os.RemoveAll(s.configDir)
-	require.NoError(s.T(), err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(d)
+	})
+	return d
 }
 
 func writeSampleConfig(t *testing.T, d string) {
 	err := ioutil.WriteFile(filepath.Join(d, ConfigFileName), sampleConfig, 0644)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 }
 
-func (s *ConfigTestSuite) TestLoadFile() {
-	writeSampleConfig(s.T(), s.configDir)
-	f, err := LoadFile(s.configDir)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "local", f.CurrentContext)
+func TestLoadFile(t *testing.T) {
+	d := testConfigDir(t)
+	writeSampleConfig(t, d)
+	f, err := LoadFile(d)
+	assert.NilError(t, err)
+	assert.Equal(t, f.CurrentContext, "local")
 }
 
-func (s *ConfigTestSuite) TestOverWriteCurrentContext() {
-	writeSampleConfig(s.T(), s.configDir)
-	f, err := LoadFile(s.configDir)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "local", f.CurrentContext)
+func TestOverWriteCurrentContext(t *testing.T) {
+	d := testConfigDir(t)
+	writeSampleConfig(t, d)
+	f, err := LoadFile(d)
+	assert.NilError(t, err)
+	assert.Equal(t, f.CurrentContext, "local")
 
-	err = WriteCurrentContext(s.configDir, "overwrite")
-	require.NoError(s.T(), err)
-	f, err = LoadFile(s.configDir)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "overwrite", f.CurrentContext)
+	err = WriteCurrentContext(d, "overwrite")
+	assert.NilError(t, err)
+	f, err = LoadFile(d)
+	assert.NilError(t, err)
+	assert.Equal(t, f.CurrentContext, "overwrite")
 
 	m := map[string]interface{}{}
-	err = loadFile(filepath.Join(s.configDir, ConfigFileName), &m)
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), "overwrite", m["currentContext"])
-	require.Equal(s.T(), "value", m["otherField"])
+	err = loadFile(filepath.Join(d, ConfigFileName), &m)
+	assert.NilError(t, err)
+	assert.Equal(t, "overwrite", m["currentContext"])
+	assert.Equal(t, "value", m["otherField"])
 }
 
 // TestWriteDefaultContextToEmptyConfig tests a specific case seen on the CI:
 // panic when setting context to default with empty config file
-func (s *ConfigTestSuite) TestWriteDefaultContextToEmptyConfig() {
-	err := WriteCurrentContext(s.configDir, "default")
-	require.NoError(s.T(), err)
-	d, err := ioutil.ReadFile(filepath.Join(s.configDir, ConfigFileName))
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), string(d), "{}")
-}
-
-func TestConfig(t *testing.T) {
-	suite.Run(t, new(ConfigTestSuite))
+func TestWriteDefaultContextToEmptyConfig(t *testing.T) {
+	d := testConfigDir(t)
+	err := WriteCurrentContext(d, "default")
+	assert.NilError(t, err)
+	c, err := ioutil.ReadFile(filepath.Join(d, ConfigFileName))
+	assert.NilError(t, err)
+	assert.Equal(t, string(c), "{}")
 }
