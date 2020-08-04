@@ -19,7 +19,8 @@ package formatter
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 )
 
 const (
@@ -31,29 +32,29 @@ const (
 
 func TestMemBytes(t *testing.T) {
 	var m MemBytes
-	assert.Nil(t, m.Set("42"))
+	assert.Assert(t, cmp.Nil(m.Set("42")))
 	assert.Equal(t, int64(42), m.Value())
 	assert.Equal(t, "42B", m.String())
 
-	assert.Nil(t, m.Set("1b"))
+	assert.Assert(t, cmp.Nil(m.Set("1b")))
 	assert.Equal(t, int64(1), m.Value())
 	assert.Equal(t, "1B", m.String())
 
-	assert.Nil(t, m.Set("1k"))
+	assert.Assert(t, cmp.Nil(m.Set("1k")))
 	assert.Equal(t, int64(kb), m.Value())
 	assert.Equal(t, "1KiB", m.String())
 
-	assert.Nil(t, m.Set("1m"))
+	assert.Assert(t, cmp.Nil(m.Set("1m")))
 	assert.Equal(t, int64(mb), m.Value())
 	assert.Equal(t, "1MiB", m.String())
 
-	assert.Nil(t, m.Set("1g"))
+	assert.Assert(t, cmp.Nil(m.Set("1g")))
 	assert.Equal(t, int64(gb), m.Value())
 	assert.Equal(t, "1GiB", m.String())
 
-	assert.Nil(t, m.Set("42g"))
+	assert.Assert(t, cmp.Nil(m.Set("42g")))
 	assert.Equal(t, int64(42*gb), m.Value())
 	assert.Equal(t, "42GiB", m.String())
 
-	assert.Error(t, m.Set("###"))
+	assert.Error(t, m.Set("###"), "invalid size: '###'")
 }

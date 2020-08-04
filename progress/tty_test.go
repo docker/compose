@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
 )
 
 func TestLineText(t *testing.T) {
@@ -42,18 +42,18 @@ func TestLineText(t *testing.T) {
 	lineWidth := len(fmt.Sprintf("%s %s", ev.ID, ev.Text))
 
 	out := lineText(ev, 50, lineWidth, true)
-	assert.Equal(t, "\x1b[37m . id Text Status                            0.0s\n\x1b[0m", out)
+	assert.Equal(t, out, "\x1b[37m . id Text Status                            0.0s\n\x1b[0m")
 
 	out = lineText(ev, 50, lineWidth, false)
-	assert.Equal(t, " . id Text Status                            0.0s\n", out)
+	assert.Equal(t, out, " . id Text Status                            0.0s\n")
 
 	ev.Status = Done
 	out = lineText(ev, 50, lineWidth, true)
-	assert.Equal(t, "\x1b[34m . id Text Status                            0.0s\n\x1b[0m", out)
+	assert.Equal(t, out, "\x1b[34m . id Text Status                            0.0s\n\x1b[0m")
 
 	ev.Status = Error
 	out = lineText(ev, 50, lineWidth, true)
-	assert.Equal(t, "\x1b[31m . id Text Status                            0.0s\n\x1b[0m", out)
+	assert.Equal(t, out, "\x1b[31m . id Text Status                            0.0s\n\x1b[0m")
 }
 
 func TestErrorEvent(t *testing.T) {
@@ -74,13 +74,13 @@ func TestErrorEvent(t *testing.T) {
 	// Fire "Working" event and check end time isn't touched
 	w.Event(e)
 	event, ok := w.events[e.ID]
-	assert.True(t, ok)
-	assert.True(t, event.endTime.Equal(time.Time{}))
+	assert.Assert(t, ok)
+	assert.Assert(t, event.endTime.Equal(time.Time{}))
 
 	// Fire "Error" event and check end time is set
 	e.Status = Error
 	w.Event(e)
 	event, ok = w.events[e.ID]
-	assert.True(t, ok)
-	assert.True(t, event.endTime.After(time.Now().Add(-10*time.Second)))
+	assert.Assert(t, ok)
+	assert.Assert(t, event.endTime.After(time.Now().Add(-10*time.Second)))
 }
