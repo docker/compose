@@ -21,16 +21,11 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/api/containers"
 )
-
-type RunOptsSuite struct {
-	suite.Suite
-}
 
 var (
 	// AzureNameRegex is used to validate container names
@@ -40,14 +35,14 @@ var (
 )
 
 // TestAzureRandomName ensures compliance with Azure naming requirements
-func (s *RunOptsSuite) TestAzureRandomName() {
+func TestAzureRandomName(t *testing.T) {
 	n := getRandomName()
-	require.Less(s.T(), len(n), 64)
-	require.Greater(s.T(), len(n), 1)
-	require.Regexp(s.T(), AzureNameRegex, n)
+	assert.Assert(t, len(n) < 64)
+	assert.Assert(t, len(n) > 1)
+	assert.Assert(t, cmp.Regexp(AzureNameRegex, n))
 }
 
-func (s *RunOptsSuite) TestPortParse() {
+func TestPortParse(t *testing.T) {
 	testCases := []struct {
 		in       string
 		expected []containers.Port
@@ -125,12 +120,12 @@ func (s *RunOptsSuite) TestPortParse() {
 			Publish: []string{testCase.in},
 		}
 		result, err := opts.toPorts()
-		require.Nil(s.T(), err)
-		assert.ElementsMatch(s.T(), testCase.expected, result)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, result, testCase.expected)
 	}
 }
 
-func (s *RunOptsSuite) TestLabels() {
+func TestLabels(t *testing.T) {
 	testCases := []struct {
 		in            []string
 		expected      map[string]string
@@ -167,11 +162,11 @@ func (s *RunOptsSuite) TestLabels() {
 
 	for _, testCase := range testCases {
 		result, err := toLabels(testCase.in)
-		assert.Equal(s.T(), testCase.expectedError, err)
-		assert.Equal(s.T(), testCase.expected, result)
+		if testCase.expectedError == nil {
+			assert.NilError(t, err)
+		} else {
+			assert.Error(t, err, testCase.expectedError.Error())
+		}
+		assert.DeepEqual(t, result, testCase.expected)
 	}
-}
-
-func TestExampleTestSuite(t *testing.T) {
-	suite.Run(t, new(RunOptsSuite))
 }
