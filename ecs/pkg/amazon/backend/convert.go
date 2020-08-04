@@ -17,6 +17,8 @@ import (
 	"github.com/docker/ecs-plugin/pkg/compose"
 )
 
+const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
+
 func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
@@ -37,50 +39,118 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 			fmt.Sprintf(" %s.local", project.Name),
 		}))
 
-	return &ecs.TaskDefinition{
-		ContainerDefinitions: []ecs.TaskDefinition_ContainerDefinition{
-			{
-				Command:               service.Command,
-				DisableNetworking:     service.NetworkMode == "none",
-				DnsSearchDomains:      service.DNSSearch,
-				DnsServers:            service.DNS,
-				DockerSecurityOptions: service.SecurityOpt,
-				EntryPoint:            service.Entrypoint,
-				Environment:           toKeyValuePair(service.Environment),
-				Essential:             true,
-				ExtraHosts:            toHostEntryPtr(service.ExtraHosts),
-				FirelensConfiguration: nil,
-				HealthCheck:           toHealthCheck(service.HealthCheck),
-				Hostname:              service.Hostname,
-				Image:                 service.Image,
-				Interactive:           false,
-				Links:                 nil,
-				LinuxParameters:       toLinuxParameters(service),
-				LogConfiguration: &ecs.TaskDefinition_LogConfiguration{
-					LogDriver: ecsapi.LogDriverAwslogs,
-					Options: map[string]string{
-						"awslogs-region":        cloudformation.Ref("AWS::Region"),
-						"awslogs-group":         cloudformation.Ref("LogGroup"),
-						"awslogs-stream-prefix": project.Name,
-					},
-				},
-				MemoryReservation:      memReservation,
-				Name:                   service.Name,
-				PortMappings:           toPortMappings(service.Ports),
-				Privileged:             service.Privileged,
-				PseudoTerminal:         service.Tty,
-				ReadonlyRootFilesystem: service.ReadOnly,
-				RepositoryCredentials:  credential,
-				ResourceRequirements:   nil,
-				StartTimeout:           0,
-				StopTimeout:            durationToInt(service.StopGracePeriod),
-				SystemControls:         toSystemControls(service.Sysctls),
-				Ulimits:                toUlimits(service.Ulimits),
-				User:                   service.User,
-				VolumesFrom:            nil,
-				WorkingDirectory:       service.WorkingDir,
-			},
+	logConfiguration := &ecs.TaskDefinition_LogConfiguration{
+		LogDriver: ecsapi.LogDriverAwslogs,
+		Options: map[string]string{
+			"awslogs-region":        cloudformation.Ref("AWS::Region"),
+			"awslogs-group":         cloudformation.Ref("LogGroup"),
+			"awslogs-stream-prefix": project.Name,
 		},
+	}
+
+	var (
+		containers     []ecs.TaskDefinition_ContainerDefinition
+		volumes        []ecs.TaskDefinition_Volume
+		mounts         []ecs.TaskDefinition_MountPoint
+		initContainers []ecs.TaskDefinition_ContainerDependency
+	)
+	if len(service.Secrets) > 0 {
+		volumes = append(volumes, ecs.TaskDefinition_Volume{
+			Name: "secrets",
+		})
+		mounts = append(mounts, ecs.TaskDefinition_MountPoint{
+			ContainerPath: "/run/secrets/",
+			ReadOnly:      true,
+			SourceVolume:  "secrets",
+		})
+		initContainers = append(initContainers, ecs.TaskDefinition_ContainerDependency{
+			Condition:     ecsapi.ContainerConditionSuccess,
+			ContainerName: "Secrets_InitContainer",
+		})
+
+		var (
+			names   []string
+			secrets []ecs.TaskDefinition_Secret
+		)
+		for _, s := range service.Secrets {
+			secretConfig := project.Secrets[s.Source]
+			if s.Target == "" {
+				s.Target = s.Source
+			}
+			secrets = append(secrets, ecs.TaskDefinition_Secret{
+				Name:      s.Target,
+				ValueFrom: secretConfig.Name,
+			})
+			name := s.Target
+			if ext, ok := secretConfig.Extensions[compose.ExtensionKeys]; ok {
+				var keys []string
+				if key, ok := ext.(string); ok {
+					keys = append(keys, key)
+				} else {
+					for _, k := range ext.([]interface{}) {
+						keys = append(keys, k.(string))
+					}
+				}
+				name = fmt.Sprintf("%s:%s", s.Target, strings.Join(keys, ","))
+			}
+			names = append(names, name)
+		}
+		containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
+			Name:             fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name)),
+			Image:            secretsInitContainerImage,
+			Command:          names,
+			Essential:        false, // FIXME this will be ignored, see https://github.com/awslabs/goformation/issues/61#issuecomment-625139607
+			LogConfiguration: logConfiguration,
+			MountPoints: []ecs.TaskDefinition_MountPoint{
+				{
+					ContainerPath: "/run/secrets/",
+					ReadOnly:      false,
+					SourceVolume:  "secrets",
+				},
+			},
+			Secrets: secrets,
+		})
+	}
+
+	containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
+		Command:                service.Command,
+		DisableNetworking:      service.NetworkMode == "none",
+		DependsOnProp:          initContainers,
+		DnsSearchDomains:       service.DNSSearch,
+		DnsServers:             service.DNS,
+		DockerSecurityOptions:  service.SecurityOpt,
+		EntryPoint:             service.Entrypoint,
+		Environment:            toKeyValuePair(service.Environment),
+		Essential:              true,
+		ExtraHosts:             toHostEntryPtr(service.ExtraHosts),
+		FirelensConfiguration:  nil,
+		HealthCheck:            toHealthCheck(service.HealthCheck),
+		Hostname:               service.Hostname,
+		Image:                  service.Image,
+		Interactive:            false,
+		Links:                  nil,
+		LinuxParameters:        toLinuxParameters(service),
+		LogConfiguration:       logConfiguration,
+		MemoryReservation:      memReservation,
+		MountPoints:            mounts,
+		Name:                   service.Name,
+		PortMappings:           toPortMappings(service.Ports),
+		Privileged:             service.Privileged,
+		PseudoTerminal:         service.Tty,
+		ReadonlyRootFilesystem: service.ReadOnly,
+		RepositoryCredentials:  credential,
+		ResourceRequirements:   nil,
+		StartTimeout:           0,
+		StopTimeout:            durationToInt(service.StopGracePeriod),
+		SystemControls:         toSystemControls(service.Sysctls),
+		Ulimits:                toUlimits(service.Ulimits),
+		User:                   service.User,
+		VolumesFrom:            nil,
+		WorkingDirectory:       service.WorkingDir,
+	})
+
+	return &ecs.TaskDefinition{
+		ContainerDefinitions:    containers,
 		Cpu:                     cpu,
 		Family:                  fmt.Sprintf("%s-%s", project.Name, service.Name),
 		IpcMode:                 service.Ipc,
@@ -90,6 +160,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		PlacementConstraints:    toPlacementConstraints(service.Deploy),
 		ProxyConfiguration:      nil,
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
+		Volumes:                 volumes,
 	}, nil
 }
 

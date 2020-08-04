@@ -2,8 +2,11 @@ package backend
 
 import (
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strings"
+
+	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
@@ -91,6 +94,30 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 	networks := map[string]string{}
 	for _, net := range project.Networks {
 		networks[net.Name] = convertNetwork(project, net, cloudformation.Ref(ParameterVPCId), template)
+	}
+
+	for i, s := range project.Secrets {
+		if s.External.External {
+			continue
+		}
+		secret, err := ioutil.ReadFile(s.File)
+		if err != nil {
+			return nil, err
+		}
+
+		name := fmt.Sprintf("%sSecret", normalizeResourceName(s.Name))
+		template.Resources[name] = &secretsmanager.Secret{
+			Description:  "",
+			SecretString: string(secret),
+			Tags: []tags.Tag{
+				{
+					Key:   compose.ProjectTag,
+					Value: project.Name,
+				},
+			},
+		}
+		s.Name = cloudformation.Ref(name)
+		project.Secrets[i] = s
 	}
 
 	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)

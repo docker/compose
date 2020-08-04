@@ -6,4 +6,5 @@ const (
 	ExtensionPullCredentials = "x-aws-pull_credentials"
 	ExtensionLB              = "x-aws-loadbalancer"
 	ExtensionCluster         = "x-aws-cluster"
+	ExtensionKeys            = "x-aws-keys"
 )

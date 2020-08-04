@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	cloudformation2 "github.com/docker/ecs-plugin/pkg/amazon/cloudformation"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -164,7 +166,7 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 
 func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template, parameters map[string]string) error {
 	logrus.Debug("Create CloudFormation stack")
-	json, err := template.JSON()
+	json, err := cloudformation2.Marshall(template)
 	if err != nil {
 		return err
 	}
@@ -192,7 +194,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 
 func (s sdk) CreateChangeSet(ctx context.Context, name string, template *cf.Template, parameters map[string]string) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
-	json, err := template.JSON()
+	json, err := cloudformation2.Marshall(template)
 	if err != nil {
 		return "", err
 	}

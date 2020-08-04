@@ -37,8 +37,14 @@ var compatibleComposeAttributes = []string{
 	"services.ports.mode",
 	"services.ports.target",
 	"services.ports.protocol",
+	"services.secrets",
+	"services.secrets.source",
+	"services.secrets.target",
 	"services.user",
 	"services.working_dir",
+	"secrets.external",
+	"secrets.name",
+	"secrets.file",
 }
 
 func (c *FargateCompatibilityChecker) CheckImage(service *types.ServiceConfig) {
