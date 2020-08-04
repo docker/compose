@@ -22,13 +22,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"gotest.tools/v3/assert"
+
 	"github.com/docker/api/cli/cmd"
 	"github.com/docker/api/cli/cmd/context"
 	"github.com/docker/api/cli/cmd/login"
 	"github.com/docker/api/cli/cmd/run"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/docker/api/config"
 )
 
@@ -40,33 +39,33 @@ func TestDetermineCurrentContext(t *testing.T) {
 	d, err := ioutil.TempDir("", "")
 	// nolint errcheck
 	defer os.RemoveAll(d)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 	err = ioutil.WriteFile(filepath.Join(d, config.ConfigFileName), contextSetConfig, 0644)
-	require.NoError(t, err)
+	assert.NilError(t, err)
 
 	// If nothing set, fallback to default
 	c := determineCurrentContext("", "")
-	require.Equal(t, "default", c)
+	assert.Equal(t, c, "default")
 
 	// If context flag set, use that
 	c = determineCurrentContext("other-context", "")
-	require.Equal(t, "other-context", c)
+	assert.Equal(t, c, "other-context")
 
 	// If no context flag, use config
 	c = determineCurrentContext("", d)
-	require.Equal(t, "some-context", c)
+	assert.Equal(t, c, "some-context")
 
 	// Ensure context flag overrides config
 	c = determineCurrentContext("other-context", d)
-	require.Equal(t, "other-context", c)
+	assert.Equal(t, "other-context", c)
 }
 
 func TestCheckOwnCommand(t *testing.T) {
-	require.True(t, isOwnCommand(login.Command()))
-	require.True(t, isOwnCommand(context.Command()))
-	require.True(t, isOwnCommand(cmd.ServeCommand()))
-	require.False(t, isOwnCommand(run.Command()))
-	require.False(t, isOwnCommand(cmd.ExecCommand()))
-	require.False(t, isOwnCommand(cmd.LogsCommand()))
-	require.False(t, isOwnCommand(cmd.PsCommand()))
+	assert.Assert(t, isOwnCommand(login.Command()))
+	assert.Assert(t, isOwnCommand(context.Command()))
+	assert.Assert(t, isOwnCommand(cmd.ServeCommand()))
+	assert.Assert(t, !isOwnCommand(run.Command()))
+	assert.Assert(t, !isOwnCommand(cmd.ExecCommand()))
+	assert.Assert(t, !isOwnCommand(cmd.LogsCommand()))
+	assert.Assert(t, !isOwnCommand(cmd.PsCommand()))
 }

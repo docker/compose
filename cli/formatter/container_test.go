@@ -19,7 +19,6 @@ package formatter
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/api/cli/options/run"
@@ -69,7 +68,7 @@ func TestDisplayPorts(t *testing.T) {
 				Publish: testCase.in,
 			}
 			containerConfig, err := runOpts.ToContainerConfig("test")
-			require.Nil(t, err)
+			assert.NilError(t, err)
 
 			out := PortsString(containerConfig.Ports)
 			assert.Equal(t, testCase.expected, out)
