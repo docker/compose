@@ -187,7 +187,7 @@ class CLITestCase(DockerClientTestCase):
     def test_help(self):
         self.base_dir = 'tests/fixtures/no-composefile'
         result = self.dispatch(['help', 'up'], returncode=0)
-        assert 'Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]' in result.stdout
+        assert 'Usage: up [options] [--scale SERVICE=NUM...] [--] [SERVICE...]' in result.stdout
         # Prevent tearDown from trying to create a project
         self.base_dir = None
 
@@ -2862,3 +2862,129 @@ services:
         assert re.search(r'foo1.+test[ \t]+dev', result.stdout) is not None
         assert re.search(r'foo2.+test[ \t]+prod', result.stdout) is not None
         assert re.search(r'foo3.+test[ \t]+latest', result.stdout) is not None
+
+    def test_build_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        result = self.dispatch(['build', '--pull', '--', '--test-service'])
+
+        assert BUILD_PULL_TEXT in result.stdout
+
+    def test_events_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        events_proc = start_process(self.base_dir, ['events', '--json', '--', '--test-service'])
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        wait_on_condition(ContainerCountCondition(self.project, 1))
+
+        os.kill(events_proc.pid, signal.SIGINT)
+        result = wait_on_process(events_proc, returncode=1)
+        lines = [json.loads(line) for line in result.stdout.rstrip().split('\n')]
+        assert Counter(e['action'] for e in lines) == {'create': 1, 'start': 1}
+
+    def test_exec_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        assert len(self.project.containers()) == 1
+
+        stdout, stderr = self.dispatch(['exec', '-T', '--', '--test-service', 'ls', '-1d', '/'])
+
+        assert stderr == ""
+        assert stdout == "/\n"
+
+    def test_images_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        result = self.dispatch(['images', '--', '--test-service'])
+
+        assert "busybox" in result.stdout
+
+    def test_kill_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        service = self.project.get_service('--test-service')
+
+        assert len(service.containers()) == 1
+        assert service.containers()[0].is_running
+
+        self.dispatch(['kill', '--', '--test-service'])
+
+        assert len(service.containers(stopped=True)) == 1
+        assert not service.containers(stopped=True)[0].is_running
+
+    def test_logs_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--log-service'])
+        result = self.dispatch(['logs', '--', '--log-service'])
+
+        assert 'hello' in result.stdout
+        assert 'exited with' not in result.stdout
+
+    def test_port_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        result = self.dispatch(['port', '--', '--test-service', '80'])
+
+        assert result.stdout.strip() == "0.0.0.0:8080"
+
+    def test_ps_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+
+        result = self.dispatch(['ps', '--', '--test-service'])
+
+        assert 'flag-as-service-name_--test-service_1' in result.stdout
+
+    def test_pull_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        result = self.dispatch(['pull', '--', '--test-service'])
+
+        assert 'Pulling --test-service' in result.stderr
+        assert 'failed' not in result.stderr
+
+    def test_rm_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '--no-start', '--', '--test-service'])
+        service = self.project.get_service('--test-service')
+        assert len(service.containers(stopped=True)) == 1
+
+        self.dispatch(['rm', '--force', '--', '--test-service'])
+        assert len(service.containers(stopped=True)) == 0
+
+    def test_run_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        result = self.dispatch(['run', '--no-deps', '--', '--test-service', 'echo', '-hello'])
+
+        assert 'hello' in result.stdout
+        assert len(self.project.containers()) == 0
+
+    def test_stop_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        service = self.project.get_service('--test-service')
+        assert len(service.containers()) == 1
+        assert service.containers()[0].is_running
+
+        self.dispatch(['stop', '-t', '1', '--', '--test-service'])
+
+        assert len(service.containers(stopped=True)) == 1
+        assert not service.containers(stopped=True)[0].is_running
+
+    def test_restart_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service'])
+        service = self.project.get_service('--test-service')
+        assert len(service.containers()) == 1
+        assert service.containers()[0].is_running
+
+        self.dispatch(['restart', '-t', '1', '--', '--test-service'])
+
+        assert len(service.containers()) == 1
+        assert service.containers()[0].is_running
+
+    def test_up_with_stop_process_flag(self):
+        self.base_dir = 'tests/fixtures/flag-as-service-name'
+        self.dispatch(['up', '-d', '--', '--test-service', '--log-service'])
+
+        service = self.project.get_service('--test-service')
+        another = self.project.get_service('--log-service')
+        assert len(service.containers()) == 1
+        assert len(another.containers()) == 1
