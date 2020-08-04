@@ -7,7 +7,7 @@ go 1.14
 replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.0.8
+	github.com/AlecAivazis/survey/v2 v2.1.0
 	github.com/Azure/azure-sdk-for-go v43.3.0+incompatible
 	github.com/Azure/azure-storage-file-go v0.8.0
 	github.com/Azure/go-autorest/autorest v0.11.2
