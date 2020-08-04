@@ -22,11 +22,12 @@ import (
 	"testing"
 
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	streamsv1 "github.com/docker/api/protos/streams/v1"
 )
@@ -76,7 +77,7 @@ func getReader(t *testing.T, in []byte, errResult error) IO {
 		Value: in,
 	}
 	m, err := ptypes.MarshalAny(&message)
-	require.Nil(t, err)
+	assert.NilError(t, err)
 
 	return IO{
 		Stream: &Stream{
@@ -93,7 +94,7 @@ func getAny(t *testing.T, in []byte) *any.Any {
 		Type:  streamsv1.IOStream_STDOUT,
 		Value: in,
 	})
-	require.Nil(t, err)
+	assert.NilError(t, err)
 	return value
 }
 
@@ -104,9 +105,9 @@ func TestStreamReader(t *testing.T) {
 
 	n, err := r.Read(buffer)
 
-	assert.Nil(t, err)
-	assert.Equal(t, 5, n)
-	assert.Equal(t, in, buffer)
+	assert.NilError(t, err)
+	assert.Equal(t, n, 5)
+	assert.DeepEqual(t, buffer, in)
 }
 
 func TestStreamReaderError(t *testing.T) {
@@ -116,8 +117,8 @@ func TestStreamReaderError(t *testing.T) {
 
 	n, err := r.Read(buffer)
 
-	assert.Equal(t, 0, n)
-	assert.Equal(t, err, errResult)
+	assert.Equal(t, n, 0)
+	assert.Error(t, err, errResult.Error())
 }
 
 func TestStreamWriter(t *testing.T) {
@@ -132,7 +133,9 @@ func TestStreamWriter(t *testing.T) {
 	}
 
 	n, err := w.Write(in)
-	assert.Nil(t, err)
-	assert.Equal(t, len(in), n)
-	assert.Equal(t, expected, bs.sendResult)
+	assert.NilError(t, err)
+	assert.Assert(t, cmp.Len(in, n))
+	sendResult, ok := (bs.sendResult).(*anypb.Any)
+	assert.Assert(t, ok)
+	assert.DeepEqual(t, sendResult.Value, expected.Value)
 }

@@ -20,8 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/metadata"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	v1 "github.com/docker/api/protos/containers/v1"
 )
@@ -68,7 +69,9 @@ func TestLogStreamWriter(t *testing.T) {
 
 	l, err := sw.Write(in)
 
-	assert.Nil(t, err)
-	assert.Equal(t, len(in), l)
-	assert.Equal(t, expected, ls.logs)
+	assert.NilError(t, err)
+	assert.Assert(t, cmp.Len(in, l))
+	logs, ok := (ls.logs).(*v1.LogsResponse)
+	assert.Assert(t, ok)
+	assert.DeepEqual(t, logs.Value, expected.Value)
 }
