@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
@@ -121,7 +122,9 @@ func TestPortParse(t *testing.T) {
 		}
 		result, err := opts.toPorts()
 		assert.NilError(t, err)
-		assert.DeepEqual(t, result, testCase.expected)
+		assert.DeepEqual(t, result, testCase.expected, cmpopts.SortSlices(func(x, y containers.Port) bool {
+			return x.ContainerPort < y.ContainerPort
+		}))
 	}
 }
 
