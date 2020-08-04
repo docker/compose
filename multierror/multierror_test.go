@@ -20,19 +20,20 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 )
 
 func TestSingleError(t *testing.T) {
 	var err *Error
 	err = Append(err, errors.New("error"))
-	assert.Equal(t, 1, len(err.WrappedErrors()))
+	assert.Assert(t, cmp.Len(err.WrappedErrors(), 1))
 }
 
 func TestGoError(t *testing.T) {
 	var err error
 	result := Append(err, errors.New("error"))
-	assert.Equal(t, 1, len(result.WrappedErrors()))
+	assert.Assert(t, cmp.Len(result.WrappedErrors(), 1))
 }
 
 func TestMultiError(t *testing.T) {
@@ -41,24 +42,24 @@ func TestMultiError(t *testing.T) {
 		errors.New("first"),
 		errors.New("second"),
 	)
-	assert.Equal(t, 2, len(err.WrappedErrors()))
-	assert.Equal(t, "Error: first\nError: second", err.Error())
+	assert.Assert(t, cmp.Len(err.WrappedErrors(), 2))
+	assert.Error(t, err, "Error: first\nError: second")
 }
 
 func TestUnwrap(t *testing.T) {
 	var err *Error
-	assert.Equal(t, nil, errors.Unwrap(err))
+	assert.NilError(t, errors.Unwrap(err))
 
 	err = Append(err, errors.New("first"))
 	e := errors.Unwrap(err)
-	assert.Equal(t, "first", e.Error())
+	assert.Error(t, e, "first")
 }
 
 func TestErrorOrNil(t *testing.T) {
 	var err *Error
-	assert.Equal(t, nil, err.ErrorOrNil())
+	assert.NilError(t, err.ErrorOrNil())
 
 	err = Append(err, errors.New("error"))
 	e := err.ErrorOrNil()
-	assert.Equal(t, "error", e.Error())
+	assert.Error(t, e, "error")
 }
