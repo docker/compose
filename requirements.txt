@@ -19,7 +19,7 @@ pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.7.1
 python-dotenv==0.14.0
 PyYAML==5.3.1
-requests==2.22.0
+requests==2.24.0
 texttable==1.6.2
 urllib3==1.25.9; python_version == '3.3'
 websocket-client==0.57.0
