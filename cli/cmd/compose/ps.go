@@ -61,17 +61,17 @@ func runPs(ctx context.Context, opts cli.ProjectOptions) error {
 	if err != nil {
 		return err
 	}
-	printSection(os.Stdout, func(w io.Writer) {
+	err = printSection(os.Stdout, func(w io.Writer) {
 		for _, service := range serviceList {
 			fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
 		}
 	}, "ID", "NAME", "REPLICAS", "PORTS")
-	return nil
+	return err
 }
 
-func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
+func printSection(out io.Writer, printer func(io.Writer), headers ...string) error {
 	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
 	fmt.Fprintln(w, strings.Join(headers, "\t"))
 	printer(w)
-	w.Flush()
+	return w.Flush()
 }
