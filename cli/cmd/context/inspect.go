@@ -27,7 +27,8 @@ func inspectCommand() *cobra.Command {
 		Use:   "inspect",
 		Short: "Display detailed information on one or more contexts",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return mobycli.ExecCmd(cmd)
+			mobycli.Exec()
+			return nil
 		},
 	}
 	// flags matching delegated command in moby cli

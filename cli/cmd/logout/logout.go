@@ -21,5 +21,6 @@ func Command() *cobra.Command {
 }
 
 func runLogout(cmd *cobra.Command, args []string) error {
-	return mobycli.ExecCmd(cmd)
+	mobycli.Exec()
+	return nil
 }

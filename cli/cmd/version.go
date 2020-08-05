@@ -51,7 +51,8 @@ func runVersion(cmd *cobra.Command, version string) error {
 	// we don't want to fail on error, there is an error if the engine is not available but it displays client version info
 	// Still, technically the [] byte versionResult could be nil, just let the original command display what it has to display
 	if versionResult == nil {
-		return mobycli.ExecCmd(cmd)
+		mobycli.Exec()
+		return nil
 	}
 	var s string = string(versionResult)
 	fmt.Print(strings.Replace(s, "\n Version:", "\n Azure integration  "+displayedVersion+"\n Version:", 1))
