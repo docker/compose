@@ -111,19 +111,20 @@ func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Cont
 
 func toGrpcContainer(c containers.Container) *containersv1.Container {
 	return &containersv1.Container{
-		Id:          c.ID,
-		Image:       c.Image,
-		Status:      c.Status,
-		Command:     c.Command,
-		CpuTime:     c.CPUTime,
-		MemoryUsage: c.MemoryUsage,
-		MemoryLimit: c.MemoryLimit,
-		Platform:    c.Platform,
-		PidsCurrent: c.PidsCurrent,
-		PidsLimit:   c.PidsLimit,
-		Labels:      c.Labels,
-		Ports:       portsToGrpc(c.Ports),
-		CpuLimit:    uint64(c.CPULimit),
+		Id:                     c.ID,
+		Image:                  c.Image,
+		Status:                 c.Status,
+		Command:                c.Command,
+		CpuTime:                c.CPUTime,
+		MemoryUsage:            c.MemoryUsage,
+		MemoryLimit:            c.MemoryLimit,
+		Platform:               c.Platform,
+		PidsCurrent:            c.PidsCurrent,
+		PidsLimit:              c.PidsLimit,
+		Labels:                 c.Labels,
+		Ports:                  portsToGrpc(c.Ports),
+		CpuLimit:               uint64(c.CPULimit),
+		RestartPolicyCondition: c.RestartPolicyCondition,
 	}
 }
 
@@ -139,12 +140,13 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 	}
 
 	return containers.ContainerConfig{
-		ID:       request.GetId(),
-		Image:    request.GetImage(),
-		Ports:    ports,
-		Labels:   request.GetLabels(),
-		Volumes:  request.GetVolumes(),
-		MemLimit: formatter.MemBytes(request.GetMemoryLimit()),
-		CPULimit: float64(request.GetCpuLimit()),
+		ID:                     request.GetId(),
+		Image:                  request.GetImage(),
+		Ports:                  ports,
+		Labels:                 request.GetLabels(),
+		Volumes:                request.GetVolumes(),
+		MemLimit:               formatter.MemBytes(request.GetMemoryLimit()),
+		CPULimit:               float64(request.GetCpuLimit()),
+		RestartPolicyCondition: request.RestartPolicyCondition,
 	}
 }
