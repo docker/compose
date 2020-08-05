@@ -25,4 +25,4 @@ smmap2==3.0.1
 toml==0.10.1
 tox==3.18.1
 virtualenv==20.0.29
-wcwidth==0.1.9
+wcwidth==0.2.5
