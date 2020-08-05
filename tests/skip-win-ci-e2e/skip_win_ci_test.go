@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/api/cli/mobycli"
+
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 
@@ -50,9 +52,10 @@ RUN sleep 100`), 0644)).To(Succeed())
 			_, err := ctx.Exec()
 			errs <- err
 		}()
+		mobyBuild := mobycli.ComDockerCli + " build --no-cache -t " + imageName
 		err := WaitFor(time.Second, 10*time.Second, errs, func() bool {
 			out := s.ListProcessesCommand().ExecOrDie()
-			return strings.Contains(out, imageName)
+			return strings.Contains(out, mobyBuild)
 		})
 		Expect(err).NotTo(HaveOccurred())
 		log.Println("Killing docker process")
@@ -60,7 +63,7 @@ RUN sleep 100`), 0644)).To(Succeed())
 		close(shutdown)
 		err = WaitFor(time.Second, 12*time.Second, nil, func() bool {
 			out := s.ListProcessesCommand().ExecOrDie()
-			return !strings.Contains(out, imageName)
+			return !strings.Contains(out, mobyBuild)
 		})
 		Expect(err).NotTo(HaveOccurred())
 	})
