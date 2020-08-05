@@ -20,12 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/store"
-	"github.com/docker/api/multierror"
 )
 
 type removeOpts struct {
@@ -56,8 +57,7 @@ func runRemove(ctx context.Context, args []string, force bool) error {
 	for _, contextName := range args {
 		if currentContext == contextName {
 			if force {
-				err := runUse(ctx, "default")
-				if err != nil {
+				if err := runUse(ctx, "default"); err != nil {
 					errs = multierror.Append(errs, errors.New("cannot delete current context"))
 				} else {
 					errs = removeContext(s, contextName, errs)
@@ -69,7 +69,18 @@ func runRemove(ctx context.Context, args []string, force bool) error {
 			errs = removeContext(s, contextName, errs)
 		}
 	}
+	if errs != nil {
+		errs.ErrorFormat = formatErrors
+	}
 	return errs.ErrorOrNil()
+}
+
+func formatErrors(errs []error) string {
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = "Error: "+err.Error()
+	}
+	return strings.Join(messages, "\n")
 }
 
 func removeContext(s store.Store, n string, errs *multierror.Error) *multierror.Error {
