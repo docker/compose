@@ -73,8 +73,10 @@ func getRegistryCredentials(project compose.Project, registryLoader registryConf
 	var registryCreds []containerinstance.ImageRegistryCredential
 	for name, oneCred := range allCreds {
 		parsedURL, err := url.Parse(name)
+		// Credentials can contain some garbage, we don't return the error here
+		// because we don't care about these garbage creds.
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		hostname := parsedURL.Host
