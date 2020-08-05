@@ -61,6 +61,15 @@ func TestRegistryNameWithoutProtocol(t *testing.T) {
 	})
 }
 
+func TestInvalidCredentials(t *testing.T) {
+	loader := &MockRegistryLoader{}
+	loader.On(getAllCredentials).Return(registry("18.195.159.6:444", userPwdCreds("toto", "pwd")), nil)
+
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), loader)
+	assert.NilError(t, err)
+	assert.Equal(t, len(creds), 0)
+}
+
 func TestImageWithDotInName(t *testing.T) {
 	loader := &MockRegistryLoader{}
 	loader.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
