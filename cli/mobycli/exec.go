@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 
 	apicontext "github.com/docker/api/context"
@@ -60,6 +61,17 @@ func Exec() {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	s := make(chan os.Signal)
+	signal.Notify(s) // catch all signals
+	go func() {
+		for sig := range s {
+			err := cmd.Process.Signal(sig)
+			if err != nil {
+				fmt.Printf("WARNING could not forward signal %s to %s : %s\n", sig.String(), ComDockerCli, err.Error())
+			}
+		}
+	}()
 
 	if err := cmd.Run(); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
