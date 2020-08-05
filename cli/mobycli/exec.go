@@ -62,18 +62,26 @@ func Exec() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	s := make(chan os.Signal)
-	signal.Notify(s) // catch all signals
+	signals := make(chan os.Signal)
+	childExit := make(chan bool)
+	signal.Notify(signals) // catch all signals
 	go func() {
-		for sig := range s {
-			err := cmd.Process.Signal(sig)
-			if err != nil {
-				fmt.Printf("WARNING could not forward signal %s to %s : %s\n", sig.String(), ComDockerCli, err.Error())
+		for {
+			select {
+			case sig := <-signals:
+				err := cmd.Process.Signal(sig)
+				if err != nil {
+					fmt.Printf("WARNING could not forward signal %s to %s : %s\n", sig.String(), ComDockerCli, err.Error())
+				}
+			case <-childExit:
+				return
 			}
 		}
 	}()
 
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	childExit <- true
+	if err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exiterr.ExitCode())
 		}
