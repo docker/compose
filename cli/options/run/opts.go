@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/api/utils"
+
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
@@ -30,14 +32,15 @@ import (
 
 // Opts contain run command options
 type Opts struct {
-	Name        string
-	Publish     []string
-	Labels      []string
-	Volumes     []string
-	Cpus        float64
-	Memory      formatter.MemBytes
-	Detach      bool
-	Environment []string
+	Name                   string
+	Publish                []string
+	Labels                 []string
+	Volumes                []string
+	Cpus                   float64
+	Memory                 formatter.MemBytes
+	Detach                 bool
+	Environment            []string
+	RestartPolicyCondition string
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -56,16 +59,33 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		return containers.ContainerConfig{}, err
 	}
 
+	restartPolicy, err := toRestartPolicy(r.RestartPolicyCondition)
+	if err != nil {
+		return containers.ContainerConfig{}, err
+	}
+
 	return containers.ContainerConfig{
-		ID:          r.Name,
-		Image:       image,
-		Ports:       publish,
-		Labels:      labels,
-		Volumes:     r.Volumes,
-		MemLimit:    r.Memory,
-		CPULimit:    r.Cpus,
-		Environment: r.Environment,
+		ID:                     r.Name,
+		Image:                  image,
+		Ports:                  publish,
+		Labels:                 labels,
+		Volumes:                r.Volumes,
+		MemLimit:               r.Memory,
+		CPULimit:               r.Cpus,
+		Environment:            r.Environment,
+		RestartPolicyCondition: restartPolicy,
 	}, nil
+}
+
+func toRestartPolicy(value string) (string, error) {
+	if value == "" {
+		return containers.RestartPolicyNone, nil
+	}
+	if utils.StringContains(containers.RestartPolicyList, value) {
+		return value, nil
+	}
+
+	return "", fmt.Errorf("invalid restart value, must be one of %s", strings.Join(containers.RestartPolicyList, ", "))
 }
 
 func (r *Opts) toPorts() ([]containers.Port, error) {

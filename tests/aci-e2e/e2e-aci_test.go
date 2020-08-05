@@ -86,6 +86,7 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 	defer deleteResourceGroup(resourceGroupName)
 
 	var nginxExposedURL string
+	var containerID string
 	s.Step("runs nginx on port 80", func() {
 		aciContext := store.AciContext{
 			SubscriptionID: subscriptionID,
@@ -118,7 +119,7 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 		Expect(containerFields[1]).To(Equal("nginx"))
 		Expect(containerFields[2]).To(Equal("Running"))
 		exposedIP := containerFields[3]
-		containerID := containerFields[0]
+		containerID = containerFields[0]
 		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
 
 		nginxExposedURL = strings.ReplaceAll(exposedIP, "->80/tcp", "")
@@ -127,6 +128,13 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 
 		output = s.NewDockerCommand("logs", containerID).ExecOrDie()
 		Expect(output).To(ContainSubstring("GET"))
+	})
+
+	s.Step("inspect command", func() {
+		inspect := s.NewDockerCommand("inspect", containerID).ExecOrDie()
+		Expect(inspect).To(ContainSubstring("\"Platform\": \"Linux\""))
+		Expect(inspect).To(ContainSubstring("\"CPULimit\": 1"))
+		Expect(inspect).To(ContainSubstring("\"RestartPolicyCondition\": \"none\""))
 	})
 
 	s.Step("exec command", func() {
@@ -174,13 +182,12 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 		shutdown := make(chan time.Time)
 		errs := make(chan error)
 		outChan := make(chan string)
-		cmd := s.NewDockerCommand("run", "nginx", "--memory", "0.1G", "--cpus", "0.1", "-p", "80:80", "--name", testContainerName).WithTimeout(shutdown)
+		cmd := s.NewDockerCommand("run", "nginx", "--restart", "on-failure", "--memory", "0.1G", "--cpus", "0.1", "-p", "80:80", "--name", testContainerName).WithTimeout(shutdown)
 		go func() {
 			output, err := cmd.Exec()
 			outChan <- output
 			errs <- err
 		}()
-		var containerID string
 		err := WaitFor(time.Second, 100*time.Second, errs, func() bool {
 			output := s.NewDockerCommand("ps").ExecOrDie()
 			lines := Lines(output)
@@ -201,6 +208,7 @@ func (s *E2eACISuite) TestACIRunSingleContainer() {
 		inspect := s.NewDockerCommand("inspect", containerID).ExecOrDie()
 		Expect(inspect).To(ContainSubstring("\"CPULimit\": 0.1"))
 		Expect(inspect).To(ContainSubstring("\"MemoryLimit\": 107374182"))
+		Expect(inspect).To(ContainSubstring("\"RestartPolicyCondition\": \"on-failure\""))
 
 		// Give a little time to get logs of the curl call
 		time.Sleep(5 * time.Second)

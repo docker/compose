@@ -18,6 +18,8 @@ package ecs
 import (
 	"context"
 
+	ecsplugin "github.com/docker/ecs-plugin/pkg/amazon/backend"
+
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
@@ -25,7 +27,6 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
-	ecsplugin "github.com/docker/ecs-plugin/pkg/amazon/backend"
 )
 
 const backendType = store.EcsContextType

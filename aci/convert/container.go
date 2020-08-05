@@ -41,6 +41,9 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 							MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
 						},
 					},
+					RestartPolicy: &types.RestartPolicy{
+						Condition: r.RestartPolicyCondition,
+					},
 				},
 			},
 		},

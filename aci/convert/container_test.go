@@ -48,6 +48,18 @@ func (suite *ContainerConvertTestSuite) TestConvertContainerEnvironment() {
 	}))
 }
 
+func (suite *ContainerConvertTestSuite) TestConvertRestartPolicy() {
+	container := containers.ContainerConfig{
+		ID:                     "container1",
+		RestartPolicyCondition: "none",
+	}
+	project, err := ContainerToComposeProject(container)
+	Expect(err).To(BeNil())
+	service1 := project.Services[0]
+	Expect(service1.Name).To(Equal(container.ID))
+	Expect(service1.Deploy.RestartPolicy.Condition).To(Equal("none"))
+}
+
 func TestContainerConvertTestSuite(t *testing.T) {
 	RegisterTestingT(t)
 	suite.Run(t, new(ContainerConvertTestSuite))

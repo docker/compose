@@ -50,6 +50,7 @@ message Container {
 	repeated Port ports = 11;
 	uint64 cpu_limit = 12;
 	string platform = 13;
+	string restart_policy_condition = 14;
 }
 
 message InspectRequest {
@@ -84,6 +85,7 @@ message RunRequest {
 	repeated string volumes = 5;
 	uint64 memory_limit = 6;
 	uint64 cpu_limit = 7;
+	string restart_policy_condition= 8;
 }
 
 message RunResponse {
