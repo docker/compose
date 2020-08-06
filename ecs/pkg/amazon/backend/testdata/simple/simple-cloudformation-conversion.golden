@@ -87,6 +87,13 @@
             }
           ]
         },
+        "DeploymentConfiguration": {
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 100
+        },
+        "DeploymentController": {
+          "Type": "ECS"
+        },
         "DesiredCount": 1,
         "LaunchType": "FARGATE",
         "LoadBalancers": [
@@ -220,10 +227,6 @@
       "Properties": {
         "ContainerDefinitions": [
           {
-            "DockerLabels": {
-              "com.docker.compose.project": "TestSimpleConvert",
-              "com.docker.compose.service": "simple"
-            },
             "Environment": [
               {
                 "Name": "LOCALDOMAIN",
@@ -275,16 +278,6 @@
         "NetworkMode": "awsvpc",
         "RequiresCompatibilities": [
           "FARGATE"
-        ],
-        "Tags": [
-          {
-            "Key": "com.docker.compose.project",
-            "Value": "TestSimpleConvert"
-          },
-          {
-            "Key": "com.docker.compose.service",
-            "Value": "simple"
-          }
         ]
       },
       "Type": "AWS::ECS::TaskDefinition"

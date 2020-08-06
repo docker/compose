@@ -163,12 +163,20 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 		for _, dependency := range service.DependsOn {
 			dependsOn = append(dependsOn, serviceResourceName(dependency))
 		}
+
 		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
 			AWSCloudFormationDependsOn: dependsOn,
 			Cluster:                    cluster,
 			DesiredCount:               desiredCount,
-			LaunchType:                 ecsapi.LaunchTypeFargate,
-			LoadBalancers:              serviceLB,
+			DeploymentController: &ecs.Service_DeploymentController{
+				Type: ecsapi.DeploymentControllerTypeEcs,
+			},
+			DeploymentConfiguration: &ecs.Service_DeploymentConfiguration{
+				MaximumPercent:        200,
+				MinimumHealthyPercent: 100,
+			},
+			LaunchType:    ecsapi.LaunchTypeFargate,
+			LoadBalancers: serviceLB,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
