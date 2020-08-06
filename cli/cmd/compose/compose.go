@@ -34,7 +34,7 @@ func Command() *cobra.Command {
 		Short: "Docker Compose",
 		Use:   "compose",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return runCompose(cmd.Context())
+			return checkComposeSupport(cmd.Context())
 		},
 	}
 
@@ -46,7 +46,7 @@ func Command() *cobra.Command {
 	return command
 }
 
-func runCompose(ctx context.Context) error {
+func checkComposeSupport(ctx context.Context) error {
 	c, err := client.New(ctx)
 	if err == nil {
 		composeService := c.ComposeService()
