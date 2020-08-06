@@ -23,11 +23,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
-	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
-
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 )
 
 var convertCtx = store.AciContext{
@@ -150,7 +149,7 @@ func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
 }
 
-func TestComposeSingleContainerGroupToContainerSpecificRestartPolicy(t *testing.T) {
+func TestComposeSingleContainerRestartPolicy(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -171,6 +170,68 @@ func TestComposeSingleContainerGroupToContainerSpecificRestartPolicy(t *testing.
 	assert.Assert(t, is.Len(*group.Containers, 1))
 	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
 	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
+}
+
+func TestComposeMultiContainerRestartPolicy(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					RestartPolicy: &types.RestartPolicy{
+						Condition: "on-failure",
+					},
+				},
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
+				Deploy: &types.DeployConfig{
+					RestartPolicy: &types.RestartPolicy{
+						Condition: "on-failure",
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(convertCtx, project)
+	assert.NilError(t, err)
+
+	assert.Assert(t, is.Len(*group.Containers, 3))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
+	assert.Equal(t, *(*group.Containers)[1].Name, "service2")
+	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
+}
+
+func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					RestartPolicy: &types.RestartPolicy{
+						Condition: "any",
+					},
+				},
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
+				Deploy: &types.DeployConfig{
+					RestartPolicy: &types.RestartPolicy{
+						Condition: "on-failure",
+					},
+				},
+			},
+		},
+	}
+
+	_, err := ToContainerGroup(convertCtx, project)
+	assert.Error(t, err, "ACI integration does not support specifying different restart policies on containers in the same compose application")
 }
 
 func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T) {

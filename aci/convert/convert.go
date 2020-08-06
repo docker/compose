@@ -72,6 +72,10 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 	}
 
 	var containers []containerinstance.Container
+	restartPolicy, err := project.getRestartPolicy()
+	if err != nil {
+		return containerinstance.ContainerGroup{}, err
+	}
 	groupDefinition := containerinstance.ContainerGroup{
 		Name:     &containerGroupName,
 		Location: &aciContext.Location,
@@ -80,7 +84,7 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 			Containers:               &containers,
 			Volumes:                  volumes,
 			ImageRegistryCredentials: &registryCreds,
-			RestartPolicy:            project.getRestartPolicy(),
+			RestartPolicy:            restartPolicy,
 		},
 	}
 
@@ -216,16 +220,26 @@ func (p projectAciHelper) getAciFileVolumes() (map[string]bool, []containerinsta
 	return azureFileVolumesMap, azureFileVolumesSlice, nil
 }
 
-func (p projectAciHelper) getRestartPolicy() containerinstance.ContainerGroupRestartPolicy {
+func (p projectAciHelper) getRestartPolicy() (containerinstance.ContainerGroupRestartPolicy, error) {
 	var restartPolicyCondition containerinstance.ContainerGroupRestartPolicy
-	if len(p.Services) == 1 &&
-		p.Services[0].Deploy != nil &&
-		p.Services[0].Deploy.RestartPolicy != nil {
-		restartPolicyCondition = toAciRestartPolicy(p.Services[0].Deploy.RestartPolicy.Condition)
-	} else {
+	if len(p.Services) >= 1 {
+		alreadySpecified := false
 		restartPolicyCondition = containerinstance.Always
+		for _, service := range p.Services {
+			if service.Deploy != nil &&
+				service.Deploy.RestartPolicy != nil {
+				if !alreadySpecified {
+					alreadySpecified = true
+					restartPolicyCondition = toAciRestartPolicy(service.Deploy.RestartPolicy.Condition)
+				}
+				if alreadySpecified && restartPolicyCondition != toAciRestartPolicy(service.Deploy.RestartPolicy.Condition) {
+					return "", errors.New("ACI integration does not support specifying different restart policies on containers in the same compose application")
+				}
+
+			}
+		}
 	}
-	return restartPolicyCondition
+	return restartPolicyCondition, nil
 }
 
 func toAciRestartPolicy(restartPolicy string) containerinstance.ContainerGroupRestartPolicy {
