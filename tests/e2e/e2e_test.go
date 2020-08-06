@@ -17,293 +17,444 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
-	"gotest.tools/golden"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/golden"
+	"gotest.tools/v3/icmd"
 
 	. "github.com/docker/api/tests/framework"
 )
 
-type E2eSuite struct {
-	Suite
-}
+var binDir string
 
-func (s *E2eSuite) TestContextHelp() {
-	output := s.NewDockerCommand("context", "create", "aci", "--help").ExecOrDie()
-	Expect(output).To(ContainSubstring("docker context create aci CONTEXT [flags]"))
-	Expect(output).To(ContainSubstring("--location"))
-	Expect(output).To(ContainSubstring("--subscription-id"))
-	Expect(output).To(ContainSubstring("--resource-group"))
-}
-
-func (s *E2eSuite) TestListAndShowDefaultContext() {
-	output := s.NewDockerCommand("context", "show").ExecOrDie()
-	Expect(output).To(ContainSubstring("default"))
-	output = s.NewCommand("docker", "context", "ls").ExecOrDie()
-	golden.Assert(s.T(), output, GoldenFile("ls-out-default"))
-}
-
-func (s *E2eSuite) TestCreateDockerContextAndListIt() {
-	s.NewDockerCommand("context", "create", "test-docker", "--from", "default").ExecOrDie()
-	output := s.NewCommand("docker", "context", "ls").ExecOrDie()
-	golden.Assert(s.T(), output, GoldenFile("ls-out-test-docker"))
-}
-
-func (s *E2eSuite) TestContextListQuiet() {
-	s.NewDockerCommand("context", "create", "test-docker", "--from", "default").ExecOrDie()
-	output := s.NewCommand("docker", "context", "ls", "-q").ExecOrDie()
-	Expect(output).To(Equal(`default
-test-docker
-`))
-}
-
-func (s *E2eSuite) TestInspectDefaultContext() {
-	output := s.NewDockerCommand("context", "inspect", "default").ExecOrDie()
-	Expect(output).To(ContainSubstring(`"Name": "default"`))
-}
-
-func (s *E2eSuite) TestInspectContextNoArgs() {
-	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
-	Expect(output).To(ContainSubstring(`"Name": "default"`))
-}
-
-func (s *E2eSuite) TestInspectContextRegardlessCurrentContext() {
-	s.NewDockerCommand("context", "create", "local", "localCtx").ExecOrDie()
-	s.NewDockerCommand("context", "use", "localCtx").ExecOrDie()
-	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
-	Expect(output).To(ContainSubstring(`"Name": "localCtx"`))
-}
-
-func (s *E2eSuite) TestContextLsFormat() {
-	output, err := s.NewDockerCommand("context", "ls", "--format", "{{ json . }}").Exec()
-	Expect(err).To(BeNil())
-	Expect(output).To(ContainSubstring(`"Name":"default"`))
-}
-
-func (s *E2eSuite) TestComposeOnDefaultContext() {
-	s.NewDockerCommand("context", "use", "default").ExecOrDie()
-	output := s.NewDockerCommand("context", "inspect").ExecOrDie()
-	Expect(output).To(ContainSubstring(`"Name": "default"`))
-	output, err := s.NewDockerCommand("compose", "up").Exec()
-	Expect(err).NotTo(BeNil())
-	Expect(output).To(ContainSubstring(`compose command not supported on context type`))
-}
-
-func (s *E2eSuite) TestContextCreateParseErrorDoesNotDelegateToLegacy() {
-	s.Step("should dispay new cli error when parsing context create flags", func() {
-		_, err := s.NewDockerCommand("context", "create", "aci", "--subscription-id", "titi").Exec()
-		Expect(err.Error()).NotTo(ContainSubstring("unknown flag"))
-		Expect(err.Error()).To(ContainSubstring("accepts 1 arg(s), received 0"))
-	})
-}
-
-func (s *E2eSuite) TestCannotRemoveCurrentContext() {
-	s.NewDockerCommand("context", "create", "test-context-rm", "--from", "default").ExecOrDie()
-	s.NewDockerCommand("context", "use", "test-context-rm").ExecOrDie()
-	_, err := s.NewDockerCommand("context", "rm", "test-context-rm").Exec()
-	Expect(err.Error()).To(ContainSubstring("cannot delete current context"))
-}
-
-func (s *E2eSuite) TestCanForceRemoveCurrentContext() {
-	s.NewDockerCommand("context", "create", "test-context-rmf", "--from", "default").ExecOrDie()
-	s.NewDockerCommand("context", "use", "test-context-rmf").ExecOrDie()
-	s.NewDockerCommand("context", "rm", "-f", "test-context-rmf").ExecOrDie()
-	out := s.NewDockerCommand("context", "ls").ExecOrDie()
-	Expect(out).To(ContainSubstring("default *"))
-}
-
-func (s *E2eSuite) TestContextCreateAciChecksContextNameBeforeInteractivePart() {
-	s.NewDockerCommand("context", "create", "mycontext", "--from", "default").ExecOrDie()
-	_, err := s.NewDockerCommand("context", "create", "aci", "mycontext").Exec()
-	Expect(err.Error()).To(ContainSubstring("context mycontext: already exists"))
-}
-
-func (s *E2eSuite) TestClassicLoginWithparameters() {
-	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
-	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
-	Expect(err).NotTo(BeNil())
-}
-
-func (s *E2eSuite) TestClassicLoginRegardlessCurrentContext() {
-	s.NewDockerCommand("context", "create", "local", "localCtx").ExecOrDie()
-	s.NewDockerCommand("context", "use", "localCtx").ExecOrDie()
-	output, err := s.NewDockerCommand("login", "-u", "nouser", "-p", "wrongpasword").Exec()
-	Expect(output).To(ContainSubstring("Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password"))
-	Expect(err).NotTo(BeNil())
-}
-
-func (s *E2eSuite) TestClassicLogin() {
-	output, err := s.NewDockerCommand("login", "someregistry.docker.io").Exec()
-	Expect(output).To(ContainSubstring("Cannot perform an interactive login from a non TTY device"))
-	Expect(err).NotTo(BeNil())
-	output, err = s.NewDockerCommand("logout", "someregistry.docker.io").Exec()
-	Expect(output).To(ContainSubstring("someregistry.docker.io"))
-	Expect(err).To(BeNil())
-}
-
-func (s *E2eSuite) TestCloudLogin() {
-	output, err := s.NewDockerCommand("login", "mycloudbackend").Exec()
-	Expect(output).To(ContainSubstring("unknown backend type for cloud login: mycloudbackend"))
-	Expect(err).NotTo(BeNil())
-}
-
-func (s *E2eSuite) TestSetupError() {
-	s.Step("should display an error if cannot shell out to com.docker.cli", func() {
-		err := os.Setenv("PATH", s.BinDir)
-		Expect(err).To(BeNil())
-		err = os.Remove(filepath.Join(s.BinDir, DockerClassicExecutable()))
-		Expect(err).To(BeNil())
-		output, err := s.NewDockerCommand("ps").Exec()
-		Expect(output).To(ContainSubstring("com.docker.cli"))
-		Expect(output).To(ContainSubstring("not found"))
-		Expect(err).NotTo(BeNil())
-	})
-}
-
-func (s *E2eSuite) TestLegacy() {
-	s.Step("should list all legacy commands", func() {
-		output := s.NewDockerCommand("--help").ExecOrDie()
-		Expect(output).To(ContainSubstring("swarm"))
-	})
-
-	s.Step("should execute legacy commands", func() {
-		output, _ := s.NewDockerCommand("swarm", "join").Exec()
-		Expect(output).To(ContainSubstring("\"docker swarm join\" requires exactly 1 argument."))
-	})
-
-	s.Step("should run local container in less than 10 secs", func() {
-		s.NewDockerCommand("pull", "hello-world").ExecOrDie()
-		output := s.NewDockerCommand("run", "--rm", "hello-world").WithTimeout(time.NewTimer(20 * time.Second).C).ExecOrDie()
-		Expect(output).To(ContainSubstring("Hello from Docker!"))
-	})
-
-	s.Step("should execute legacy commands in other moby contexts", func() {
-		s.NewDockerCommand("context", "create", "mobyCtx", "--from=default").ExecOrDie()
-		s.NewDockerCommand("context", "use", "mobyCtx").ExecOrDie()
-		output, _ := s.NewDockerCommand("swarm", "join").Exec()
-		Expect(output).To(ContainSubstring("\"docker swarm join\" requires exactly 1 argument."))
-	})
-}
-
-func (s *E2eSuite) TestLeaveLegacyErrorMessagesUnchanged() {
-	output, err := s.NewDockerCommand("foo").Exec()
-	golden.Assert(s.T(), output, "unknown-foo-command.golden")
-	Expect(err).NotTo(BeNil())
-}
-
-func (s *E2eSuite) TestPassThroughRootLegacyFlags() {
-	output, err := s.NewDockerCommand("-H", "tcp://localhost:123", "version").Exec()
-	Expect(err).NotTo(BeNil())
-	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
-	Expect(output).To(ContainSubstring("localhost:123"))
-
-	output, _ = s.NewDockerCommand("-H", "tcp://localhost:123", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
-	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
-	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
-
-	output, _ = s.NewDockerCommand("--log-level", "debug", "login", "-u", "nouser", "-p", "wrongpasword").Exec()
-	Expect(output).NotTo(ContainSubstring("unknown shorthand flag"))
-	Expect(output).To(ContainSubstring("WARNING! Using --password via the CLI is insecure"))
-
-	output, _ = s.NewDockerCommand("login", "--help").Exec()
-	Expect(output).NotTo(ContainSubstring("--log-level"))
-}
-
-func (s *E2eSuite) TestDisplayFriendlyErrorMessageForLegacyCommands() {
-	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
-	output, err := s.NewDockerCommand("--context", "test-example", "images").Exec()
-	Expect(output).To(Equal("Command \"images\" not available in current context (test-example), you can use the \"default\" context to run this command\n"))
-	Expect(err).NotTo(BeNil())
-}
-
-func (s *E2eSuite) TestExecMobyIfUsingHostFlag() {
-	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
-	s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
-	output, err := s.NewDockerCommand("-H", defaultEndpoint(), "ps").Exec()
-	Expect(err).To(BeNil())
-	Expect(output).To(ContainSubstring("CONTAINER ID"))
-}
-
-func defaultEndpoint() string {
-	if runtime.GOOS == "windows" {
-		return "npipe:////./pipe/docker_engine"
+func TestMain(m *testing.M) {
+	p, cleanup, err := SetupExistingCLI()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	return "unix:///var/run/docker.sock"
+	binDir = p
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
 }
 
-func (s *E2eSuite) TestExecMobyIfUsingversionFlag() {
-	s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
-	s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
-	output, err := s.NewDockerCommand("-v").Exec()
-	Expect(err).To(BeNil())
-	Expect(output).To(ContainSubstring("Docker version"))
-}
-
-func (s *E2eSuite) TestDisplaysAdditionalLineInDockerVersion() {
-	output := s.NewDockerCommand("version").ExecOrDie()
-	Expect(output).To(ContainSubstring("Azure integration"))
-}
-
-func (s *E2eSuite) TestAllowsFormatFlagInVersion() {
-	s.NewDockerCommand("version", "-f", "{{ json . }}").ExecOrDie()
-	s.NewDockerCommand("version", "--format", "{{ json . }}").ExecOrDie()
-}
-
-func (s *E2eSuite) TestMockBackend() {
-	s.Step("creates a new test context to hardcoded example backend", func() {
-		s.NewDockerCommand("context", "create", "example", "test-example").ExecOrDie()
-		// Expect(output).To(ContainSubstring("test-example context acitest created"))
-	})
-
-	s.Step("uses the test context", func() {
-		currentContext := s.NewDockerCommand("context", "use", "test-example").ExecOrDie()
-		Expect(currentContext).To(ContainSubstring("test-example"))
-		output := s.NewDockerCommand("context", "ls").ExecOrDie()
-		golden.Assert(s.T(), output, GoldenFile("ls-out-test-example"))
-		output = s.NewDockerCommand("context", "show").ExecOrDie()
-		Expect(output).To(ContainSubstring("test-example"))
-	})
-
-	s.Step("can run ps command", func() {
-		output := s.NewDockerCommand("ps").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(3))
-		Expect(lines[2]).To(ContainSubstring("1234                alpine"))
-	})
-
-	s.Step("can run quiet ps command", func() {
-		output := s.NewDockerCommand("ps", "-q").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(2))
-		Expect(lines[0]).To(Equal("id"))
-		Expect(lines[1]).To(Equal("1234"))
-	})
-
-	s.Step("can run ps command with all ", func() {
-		output := s.NewDockerCommand("ps", "-q", "--all").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(3))
-		Expect(lines[0]).To(Equal("id"))
-		Expect(lines[1]).To(Equal("1234"))
-		Expect(lines[2]).To(Equal("stopped"))
-	})
-
-	s.Step("can run inspect command on container", func() {
-		golden.Assert(s.T(), s.NewDockerCommand("inspect", "id").ExecOrDie(), "inspect-id.golden")
-	})
-
-	s.Step("can run 'run' command", func() {
-		output := s.NewDockerCommand("run", "-d", "nginx", "-p", "80:80").ExecOrDie()
-		Expect(output).To(ContainSubstring("Running container \"nginx\" with name"))
+func TestComposeNotImplemented(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	res := c.RunDockerCmd("context", "show")
+	res.Assert(t, icmd.Expected{Out: "default"})
+	res = c.RunDockerCmd("compose", "up")
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      `compose command not supported on context type "moby": not implemented`,
 	})
 }
 
-func TestE2e(t *testing.T) {
-	suite.Run(t, new(E2eSuite))
+func TestContextDefault(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("show", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "show")
+		res.Assert(t, icmd.Expected{Out: "default"})
+	})
+
+	t.Run("ls", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-default"))
+	})
+
+	t.Run("inspect", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "inspect", "default")
+		res.Assert(t, icmd.Expected{Out: `"Name": "default"`})
+	})
+
+	t.Run("inspect current", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "inspect")
+		res.Assert(t, icmd.Expected{Out: `"Name": "default"`})
+	})
+}
+
+func TestContextCreateDocker(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	res := c.RunDockerCmd("context", "create", "test-docker", "--from", "default")
+	res.Assert(t, icmd.Expected{Out: "test-docker"})
+
+	t.Run("ls", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-test-docker"))
+	})
+
+	t.Run("ls quiet", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "ls", "-q")
+		golden.Assert(t, res.Stdout(), "ls-out-test-docker-quiet.golden")
+	})
+
+	t.Run("ls format", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "ls", "--format", "{{ json . }}")
+		res.Assert(t, icmd.Expected{Out: `"Name":"default"`})
+	})
+}
+
+func TestContextInspect(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	res := c.RunDockerCmd("context", "create", "test-docker", "--from", "default")
+	res.Assert(t, icmd.Expected{Out: "test-docker"})
+
+	t.Run("inspect current", func(t *testing.T) {
+		// Cannot be run in parallel because of "context use"
+		res := c.RunDockerCmd("context", "use", "test-docker")
+		res.Assert(t, icmd.Expected{Out: "test-docker"})
+
+		res = c.RunDockerCmd("context", "inspect")
+		res.Assert(t, icmd.Expected{Out: `"Name": "test-docker"`})
+	})
+}
+
+func TestContextHelpACI(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "create", "aci", "--help")
+		// Can't use golden here as the help prints the config directory which changes
+		res.Assert(t, icmd.Expected{Out: "docker context create aci CONTEXT [flags]"})
+		res.Assert(t, icmd.Expected{Out: "--location"})
+		res.Assert(t, icmd.Expected{Out: "--subscription-id"})
+		res.Assert(t, icmd.Expected{Out: "--resource-group"})
+	})
+
+	t.Run("check exec", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "create", "aci", "--subscription-id", "invalid-id")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "accepts 1 arg(s), received 0",
+		})
+		assert.Assert(t, !strings.Contains(res.Combined(), "unknown flag"))
+	})
+}
+
+func TestContextDuplicateACI(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	c.RunDockerCmd("context", "create", "mycontext", "--from", "default").Assert(t, icmd.Success)
+	res := c.RunDockerCmd("context", "create", "aci", "mycontext")
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      "context mycontext: already exists",
+	})
+}
+
+func TestContextRemove(t *testing.T) {
+
+	t.Run("remove current", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+
+		c.RunDockerCmd("context", "create", "test-context-rm", "--from", "default").Assert(t, icmd.Success)
+		res := c.RunDockerCmd("context", "use", "test-context-rm")
+		res.Assert(t, icmd.Expected{Out: "test-context-rm"})
+		res = c.RunDockerCmd("context", "rm", "test-context-rm")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "cannot delete current context",
+		})
+	})
+
+	t.Run("force remove current", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+
+		c.RunDockerCmd("context", "create", "test-context-rmf").Assert(t, icmd.Success)
+		c.RunDockerCmd("context", "use", "test-context-rmf").Assert(t, icmd.Success)
+		res := c.RunDockerCmd("context", "rm", "-f", "test-context-rmf")
+		res.Assert(t, icmd.Expected{Out: "test-context-rmf"})
+		res = c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Expected{Out: "default *"})
+	})
+}
+
+func TestLoginCommandDelegation(t *testing.T) {
+	// These tests just check that the existing CLI is called in various cases.
+	// They do not test actual login functionality.
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("default context", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("login", "-u", "nouser", "-p", "wrongpasword")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password",
+		})
+	})
+
+	t.Run("interactive", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("login", "someregistry.docker.io")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Cannot perform an interactive login from a non TTY device",
+		})
+	})
+
+	t.Run("logout", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("logout", "someregistry.docker.io")
+		res.Assert(t, icmd.Expected{Out: "someregistry.docker.io"})
+	})
+
+	t.Run("existing context", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+		c.RunDockerCmd("context", "create", "local", "local").Assert(t, icmd.Success)
+		c.RunDockerCmd("context", "use", "local").Assert(t, icmd.Success)
+		res := c.RunDockerCmd("login", "-u", "nouser", "-p", "wrongpasword")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password",
+		})
+	})
+}
+
+func TestCloudLogin(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("unknown backend", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("login", "mycloudbackend")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "unknown backend type for cloud login: mycloudbackend",
+		})
+	})
+}
+
+func TestMissingExistingCLI(t *testing.T) {
+	t.Parallel()
+	home, err := ioutil.TempDir("", "")
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(home)
+	})
+
+	bin, err := ioutil.TempDir("", "")
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(bin)
+	})
+	err = CopyFile(filepath.Join(binDir, DockerExecutableName), filepath.Join(bin, DockerExecutableName))
+	assert.NilError(t, err)
+
+	c := icmd.Cmd{
+		Env:     []string{"HOME=" + home, "PATH=" + bin},
+		Command: []string{filepath.Join(bin, "docker")},
+	}
+	res := icmd.RunCmd(c)
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      `"com.docker.cli": executable file not found`,
+	})
+}
+
+func TestLegacy(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("--help")
+		res.Assert(t, icmd.Expected{Out: "swarm"})
+	})
+
+	t.Run("swarm", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("swarm", "join")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      `"docker swarm join" requires exactly 1 argument.`,
+		})
+	})
+
+	t.Run("local run", func(t *testing.T) {
+		t.Parallel()
+		cmd := c.NewDockerCmd("run", "--rm", "hello-world")
+		cmd.Timeout = 20 * time.Second
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{Out: "Hello from Docker!"})
+	})
+
+	t.Run("error messages", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("foo")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "docker: 'foo' is not a docker command.",
+		})
+	})
+
+	t.Run("host flag", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("-H", "tcp://localhost:123", "version")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Cannot connect to the Docker daemon at tcp://localhost:123",
+		})
+	})
+
+	t.Run("existing contexts delegate", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+		c.RunDockerCmd("context", "create", "moby-ctx", "--from=default").Assert(t, icmd.Success)
+		c.RunDockerCmd("context", "use", "moby-ctx").Assert(t, icmd.Success)
+		res := c.RunDockerCmd("swarm", "join")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      `"docker swarm join" requires exactly 1 argument.`,
+		})
+	})
+
+	t.Run("host flag overrides context", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+		c.RunDockerCmd("context", "create", "example", "test-example").Assert(t, icmd.Success)
+		c.RunDockerCmd("context", "use", "test-example").Assert(t, icmd.Success)
+		endpoint := "unix:///var/run/docker.sock"
+		if runtime.GOOS == "windows" {
+			endpoint = "npipe:////./pipe/docker_engine"
+		}
+		res := c.RunDockerCmd("-H", endpoint, "ps")
+		res.Assert(t, icmd.Success)
+		// Example backend's ps output includes these strings
+		assert.Assert(t, !strings.Contains(res.Stdout(), "id"))
+		assert.Assert(t, !strings.Contains(res.Stdout(), "1234"))
+	})
+}
+
+func TestLegacyLogin(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("host flag login", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("-H", "tcp://localhost:123", "login", "-u", "nouser", "-p", "wrongpasword")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "WARNING! Using --password via the CLI is insecure. Use --password-stdin.",
+		})
+	})
+
+	t.Run("log level flag login", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("--log-level", "debug", "login", "-u", "nouser", "-p", "wrongpasword")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "WARNING! Using --password via the CLI is insecure",
+		})
+	})
+
+	t.Run("login help global flags", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("login", "--help")
+		res.Assert(t, icmd.Success)
+		assert.Assert(t, !strings.Contains(res.Combined(), "--log-level"))
+	})
+}
+
+func TestUnsupportedCommand(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	res := c.RunDockerCmd("context", "create", "example", "test-example")
+	res.Assert(t, icmd.Success)
+	res = c.RunDockerCmd("--context", "test-example", "images")
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      `Command "images" not available in current context (test-example), you can use the "default" context to run this command`,
+	})
+}
+
+func TestVersion(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("azure version", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("version")
+		res.Assert(t, icmd.Expected{Out: "Azure integration"})
+	})
+
+	t.Run("format", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("version", "-f", "{{ json . }}")
+		res.Assert(t, icmd.Expected{Out: `"Client":`})
+		res = c.RunDockerCmd("version", "--format", "{{ json . }}")
+		res.Assert(t, icmd.Expected{Out: `"Client":`})
+	})
+
+	t.Run("delegate version flag", func(t *testing.T) {
+		c := NewParallelE2eCLI(t, binDir)
+		c.RunDockerCmd("context", "create", "example", "test-example").Assert(t, icmd.Success)
+		c.RunDockerCmd("context", "use", "test-example").Assert(t, icmd.Success)
+		res := c.RunDockerCmd("-v")
+		res.Assert(t, icmd.Expected{Out: "Docker version"})
+	})
+}
+
+func TestMockBackend(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	c.RunDockerCmd("context", "create", "example", "test-example").Assert(t, icmd.Success)
+	res := c.RunDockerCmd("context", "use", "test-example")
+	res.Assert(t, icmd.Expected{Out: "test-example"})
+
+	t.Run("use", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("context", "show")
+		res.Assert(t, icmd.Expected{Out: "test-example"})
+		res = c.RunDockerCmd("context", "ls")
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-test-example"))
+	})
+
+	t.Run("ps", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), "ps-out-example.golden")
+	})
+
+	t.Run("ps quiet", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("ps", "-q")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), "ps-quiet-out-example.golden")
+	})
+
+	t.Run("ps quiet all", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("ps", "-q", "--all")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), "ps-quiet-all-out-example.golden")
+	})
+
+	t.Run("inspect", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("inspect", "id")
+		res.Assert(t, icmd.Success)
+		golden.Assert(t, res.Stdout(), "inspect-id.golden")
+	})
+
+	t.Run("run", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("run", "-d", "nginx", "-p", "80:80")
+		res.Assert(t, icmd.Expected{
+			Out: `Running container "nginx" with name`,
+		})
+	})
 }

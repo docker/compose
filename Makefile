@@ -23,7 +23,12 @@ ifeq ($(UNAME_S),Darwin)
 endif
 
 GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
-TESTIFY_OPTS=$(if $(TESTIFY),-testify.m $(TESTIFY),)
+TEST_FLAGS?=
+E2E_TEST?=
+ifeq ($(E2E_TEST),)
+else
+	TEST_FLAGS=-run $(E2E_TEST)
+endif
 
 all: cli
 
@@ -38,14 +43,14 @@ cli: ## Compile the cli
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
-e2e-local: ## Run End to end local tests. set env TESTIFY=Test1 for running single test
-	go test -v ./tests/e2e ./tests/skip-win-ci-e2e ./local/e2e $(TESTIFY_OPTS)
+e2e-local: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
+	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e ./tests/skip-win-ci-e2e ./local/e2e
 
-e2e-win-ci: ## Run End to end local tests on windows CI, no docker for linux containers available ATM. set env TESTIFY=Test1 for running single test
-	go test -v ./tests/e2e $(TESTIFY_OPTS)
+e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux containers available ATM. Set E2E_TEST=TestName to run a single test
+	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e
 
-e2e-aci: ## Run End to end ACI tests. set env TESTIFY=Test1 for running single test
-	go test -v ./tests/aci-e2e $(TESTIFY_OPTS)
+e2e-aci: ## Run End to end ACI tests. Set E2E_TEST=TestName to run a single test
+	go test -count=1 -v $(TEST_FLAGS) ./tests/aci-e2e
 
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \

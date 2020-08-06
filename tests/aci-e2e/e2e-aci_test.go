@@ -18,460 +18,595 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"math/rand"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
-	"github.com/docker/api/errdefs"
+	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
+	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
-	. "github.com/onsi/gomega"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/suite"
 
-	azure "github.com/docker/api/aci"
+	"github.com/docker/api/aci"
 	"github.com/docker/api/aci/login"
+	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/errdefs"
 	"github.com/docker/api/tests/aci-e2e/storage"
 	. "github.com/docker/api/tests/framework"
 )
 
 const (
-	location          = "westeurope"
-	contextName       = "acitest"
-	testContainerName = "testcontainername"
-	testShareName     = "dockertestshare"
-	testFileContent   = "Volume mounted with success!"
-	testFileName      = "index.html"
+	contextName = "aci-test"
+	location    = "westeurope"
 )
 
-var (
-	subscriptionID string
-)
+var binDir string
 
-type E2eACISuite struct {
-	Suite
+func TestMain(m *testing.M) {
+	p, cleanup, err := SetupExistingCLI()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	binDir = p
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
 }
 
-func (s *E2eACISuite) TestLoginLogoutCreateContextError() {
-	s.Step("Logs in azure using service principal credentials", azureLogin)
+// Cannot be parallelized as login/logout is global.
+func TestLoginLogout(t *testing.T) {
+	startTime := strconv.Itoa(int(time.Now().UnixNano()))
+	c := NewE2eCLI(t, binDir)
+	rg := "E2E-" + startTime
 
-	s.Step("logout from azure", func() {
-		output := s.NewDockerCommand("logout", "azure").ExecOrDie()
-		Expect(output).To(ContainSubstring(""))
+	t.Run("login", func(t *testing.T) {
+		azureLogin(t)
+	})
+
+	t.Run("create context", func(t *testing.T) {
+		sID := getSubscriptionID(t)
+		err := createResourceGroup(sID, rg)
+		assert.Check(t, is.Nil(err))
+		t.Cleanup(func() {
+			_ = deleteResourceGroup(rg)
+		})
+
+		res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
+		res.Assert(t, icmd.Success)
+		res = c.RunDockerCmd("context", "use", contextName)
+		res.Assert(t, icmd.Expected{Out: contextName})
+		res = c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Expected{Out: contextName + " *"})
+	})
+
+	t.Run("delete context", func(t *testing.T) {
+		res := c.RunDockerCmd("context", "use", "default")
+		res.Assert(t, icmd.Expected{Out: "default"})
+
+		res = c.RunDockerCmd("context", "rm", contextName)
+		res.Assert(t, icmd.Expected{Out: contextName})
+	})
+
+	t.Run("logout", func(t *testing.T) {
 		_, err := os.Stat(login.GetTokenStorePath())
-		Expect(os.IsNotExist(err)).To(BeTrue())
+		assert.NilError(t, err)
+		res := c.RunDockerCmd("logout", "azure")
+		res.Assert(t, icmd.Expected{Out: "Removing login credentials for Azure"})
+		_, err = os.Stat(login.GetTokenStorePath())
+		assert.ErrorContains(t, err, "no such file or directory")
 	})
 
-	s.Step("check context create fails with an explicit error and returns a specific error code", func() {
-		cmd := exec.Command("docker", "context", "create", "aci", "someContext")
-		bytes, err := cmd.CombinedOutput()
-		Expect(err).NotTo(BeNil())
-		Expect(string(bytes)).To(ContainSubstring("not logged in to azure, you need to run \"docker login azure\" first"))
-		Expect(cmd.ProcessState.ExitCode()).To(Equal(errdefs.ExitCodeLoginRequired))
+	t.Run("create context fail", func(t *testing.T) {
+		res := c.RunDockerCmd("context", "create", "aci", "fail-context")
+		res.Assert(t, icmd.Expected{
+			ExitCode: errdefs.ExitCodeLoginRequired,
+			Err:      `not logged in to azure, you need to run "docker login azure" first`,
+		})
 	})
 }
 
-func (s *E2eACISuite) TestACIRunSingleContainer() {
-	var containerName string
-	resourceGroupName := s.setupTestResourceGroup()
-	defer deleteResourceGroup(resourceGroupName)
+func TestContainerRun(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	sID, rg := setupTestResourceGroup(t, c)
 
-	var nginxExposedURL string
-	var containerID string
-	s.Step("runs nginx on port 80", func() {
-		aciContext := store.AciContext{
-			SubscriptionID: subscriptionID,
-			Location:       location,
-			ResourceGroup:  resourceGroupName,
+	const (
+		testShareName   = "dockertestshare"
+		testFileContent = "Volume mounted successfully!"
+		testFileName    = "index.html"
+	)
+
+	// Bootstrap volume
+	aciContext := store.AciContext{
+		SubscriptionID: sID,
+		Location:       location,
+		ResourceGroup:  rg,
+	}
+	saName := "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
+	_, cleanupSa := createStorageAccount(t, aciContext, saName)
+	t.Cleanup(func() {
+		if err := cleanupSa(); err != nil {
+			t.Error(err)
 		}
+	})
+	keys := getStorageKeys(t, aciContext, saName)
+	assert.Assert(t, len(keys) > 0)
+	k := *keys[0].Value
+	cred, u := createFileShare(t, k, testShareName, saName)
+	uploadFile(t, *cred, u.String(), testFileName, testFileContent)
 
-		testStorageAccountName := "storageteste2e" + RandStringBytes(6) // "between 3 and 24 characters in length and use numbers and lower-case letters only"
-		createStorageAccount(aciContext, testStorageAccountName)
-		defer deleteStorageAccount(aciContext, testStorageAccountName)
-		keys := getStorageKeys(aciContext, testStorageAccountName)
-		firstKey := *keys[0].Value
-		credential, u := createFileShare(firstKey, testShareName, testStorageAccountName)
-		uploadFile(credential, u.String(), testFileName, testFileContent)
+	// Used in subtests
+	var (
+		container string
+		hostIP    string
+		endpoint  string
+	)
 
+	t.Run("run", func(t *testing.T) {
 		mountTarget := "/usr/share/nginx/html"
-		output := s.NewDockerCommand("run", "-d", "nginx",
-			"-v", fmt.Sprintf("%s:%s@%s:%s",
-				testStorageAccountName, firstKey, testShareName, mountTarget),
+		res := c.RunDockerCmd(
+			"run", "-d",
+			"-v", fmt.Sprintf("%s:%s@%s:%s", saName, k, testShareName, mountTarget),
 			"-p", "80:80",
-		).ExecOrDie()
-		runOutput := Lines(output)
-		containerName = runOutput[len(runOutput)-1]
-
-		output = s.NewDockerCommand("ps").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(2))
-
-		containerFields := Columns(lines[1])
-		Expect(containerFields[1]).To(Equal("nginx"))
-		Expect(containerFields[2]).To(Equal("Running"))
-		exposedIP := containerFields[3]
-		containerID = containerFields[0]
-		Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
-
-		nginxExposedURL = strings.ReplaceAll(exposedIP, "->80/tcp", "")
-		output = s.NewCommand("curl", nginxExposedURL).ExecOrDie()
-		Expect(output).To(ContainSubstring(testFileContent))
-
-		output = s.NewDockerCommand("logs", containerID).ExecOrDie()
-		Expect(output).To(ContainSubstring("GET"))
+			"nginx",
+		)
+		res.Assert(t, icmd.Success)
+		container = getContainerName(res.Stdout())
+		t.Logf("Container name: %s", container)
 	})
 
-	s.Step("inspect command", func() {
-		inspect := s.NewDockerCommand("inspect", containerID).ExecOrDie()
-		Expect(inspect).To(ContainSubstring("\"Platform\": \"Linux\""))
-		Expect(inspect).To(ContainSubstring("\"CPULimit\": 1"))
-		Expect(inspect).To(ContainSubstring("\"RestartPolicyCondition\": \"none\""))
+	t.Run("inspect", func(t *testing.T) {
+		res := c.RunDockerCmd("inspect", container)
+		res.Assert(t, icmd.Success)
+
+		containerInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Equal(t, containerInspect.Platform, "Linux")
+		assert.Equal(t, containerInspect.CPULimit, 1.0)
+		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyNone)
+
+		assert.Assert(t, is.Len(containerInspect.Ports, 1))
+		hostIP = containerInspect.Ports[0].HostIP
+		endpoint = fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+		t.Logf("Endpoint: %s", endpoint)
 	})
 
-	s.Step("exec command", func() {
-		output := s.NewDockerCommand("exec", containerName, "pwd").ExecOrDie()
-		Expect(output).To(ContainSubstring("/"))
-
-		_, err := s.NewDockerCommand("exec", containerName, "echo", "fail_with_argument").Exec()
-		Expect(err.Error()).To(ContainSubstring("ACI exec command does not accept arguments to the command. " +
-			"Only the binary should be specified"))
+	t.Run("ps", func(t *testing.T) {
+		res := c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		l := out[len(out)-1]
+		assert.Assert(t, strings.Contains(l, container))
+		assert.Assert(t, strings.Contains(l, "nginx"))
+		assert.Assert(t, strings.Contains(l, "Running"))
+		assert.Assert(t, strings.Contains(l, hostIP+":80->80/tcp"))
 	})
 
-	s.Step("follow logs from nginx", func() {
-		timeChan := make(chan time.Time)
-
-		ctx := s.NewDockerCommand("logs", "--follow", containerName).WithTimeout(timeChan)
-		outChan := make(chan string)
-
-		go func() {
-			output, err := ctx.Exec()
-			// check the process is cancelled by the test, not another unexpected error
-			Expect(err.Error()).To(ContainSubstring("timed out"))
-			outChan <- output
-		}()
-		// Ensure logs -- follow is strated before we curl nginx
-		time.Sleep(5 * time.Second)
-
-		s.NewCommand("curl", nginxExposedURL+"/test").ExecOrDie()
-		// Give the `logs --follow` a little time to get logs of the curl call
-		time.Sleep(5 * time.Second)
-
-		// Trigger a timeout to make ctx.Exec exit
-		timeChan <- time.Now()
-
-		output := <-outChan
-
-		Expect(output).To(ContainSubstring("/test"))
+	t.Run("http get", func(t *testing.T) {
+		r, err := http.Get(endpoint)
+		assert.NilError(t, err)
+		assert.Equal(t, r.StatusCode, http.StatusOK)
+		b, err := ioutil.ReadAll(r.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(b), testFileContent), "Actual content: "+string(b))
 	})
 
-	s.Step("removes container nginx", func() {
-		output := s.NewDockerCommand("rm", containerName).ExecOrDie()
-		Expect(Lines(output)[0]).To(Equal(containerName))
+	t.Run("logs", func(t *testing.T) {
+		res := c.RunDockerCmd("logs", container)
+		res.Assert(t, icmd.Expected{Out: "GET"})
 	})
 
-	s.Step("re-run nginx with modified cpu/mem, and without --detach and follow logs", func() {
-		shutdown := make(chan time.Time)
-		errs := make(chan error)
-		outChan := make(chan string)
-		cmd := s.NewDockerCommand("run", "nginx", "--restart", "on-failure", "--memory", "0.1G", "--cpus", "0.1", "-p", "80:80", "--name", testContainerName).WithTimeout(shutdown)
-		go func() {
-			output, err := cmd.Exec()
-			outChan <- output
-			errs <- err
-		}()
-		err := WaitFor(time.Second, 100*time.Second, errs, func() bool {
-			output := s.NewDockerCommand("ps").ExecOrDie()
-			lines := Lines(output)
-			if len(lines) != 2 {
-				return false
-			}
-			containerFields := Columns(lines[1])
-			if containerFields[2] != "Running" {
-				return false
-			}
-			containerID = containerFields[0]
-			nginxExposedURL = strings.ReplaceAll(containerFields[3], "->80/tcp", "")
-			return true
+	t.Run("exec", func(t *testing.T) {
+		res := c.RunDockerCmd("exec", container, "pwd")
+		res.Assert(t, icmd.Expected{Out: "/"})
+
+		res = c.RunDockerCmd("exec", container, "echo", "fail_with_argument")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "ACI exec command does not accept arguments to the command. Only the binary should be specified",
 		})
-		Expect(err).NotTo(HaveOccurred())
-
-		s.NewCommand("curl", nginxExposedURL+"/test").ExecOrDie()
-		inspect := s.NewDockerCommand("inspect", containerID).ExecOrDie()
-		Expect(inspect).To(ContainSubstring("\"CPULimit\": 0.1"))
-		Expect(inspect).To(ContainSubstring("\"MemoryLimit\": 107374182"))
-		Expect(inspect).To(ContainSubstring("\"RestartPolicyCondition\": \"on-failure\""))
-
-		// Give a little time to get logs of the curl call
-		time.Sleep(5 * time.Second)
-		// Kill
-		close(shutdown)
-
-		output := <-outChan
-		Expect(output).To(ContainSubstring("/test"))
 	})
 
-	s.Step("removes container nginx", func() {
-		output := s.NewDockerCommand("rm", testContainerName).ExecOrDie()
-		Expect(Lines(output)[0]).To(Equal(testContainerName))
-	})
-}
+	t.Run("logs follow", func(t *testing.T) {
+		cmd := c.NewDockerCmd("logs", "--follow", container)
+		res := icmd.StartCmd(cmd)
 
-func (s *E2eACISuite) TestACIComposeApplication() {
-	defer deleteResourceGroup(s.setupTestResourceGroup())
-
-	var exposedURL string
-	const composeFile = "../composefiles/aci-demo/aci_demo_port.yaml"
-	const composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
-	const composeProjectName = "acie2e"
-	const serverContainer = composeProjectName + "_web"
-	const wordsContainer = composeProjectName + "_words"
-
-	s.Step("deploys a compose app", func() {
-		// specifically do not specify project name here, it will be derived from current folder "acie2e"
-		s.NewDockerCommand("compose", "up", "-f", composeFile).ExecOrDie()
-		output := s.NewDockerCommand("ps").ExecOrDie()
-		Lines := Lines(output)
-		Expect(len(Lines)).To(Equal(4))
-		webChecked := false
-
-		for _, line := range Lines[1:] {
-			Expect(line).To(ContainSubstring("Running"))
-			if strings.Contains(line, serverContainer) {
-				webChecked = true
-				containerFields := Columns(line)
-				exposedIP := containerFields[3]
-				Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
-
-				exposedURL = strings.ReplaceAll(exposedIP, "->80/tcp", "")
-				output = s.NewCommand("curl", exposedURL).ExecOrDie()
-				Expect(output).To(ContainSubstring("Docker Compose demo"))
-				output = s.NewCommand("curl", exposedURL+"/words/noun").ExecOrDie()
-				Expect(output).To(ContainSubstring("\"word\":"))
+		checkUp := func(t poll.LogT) poll.Result {
+			r, _ := http.Get(endpoint + "/is_up")
+			if r != nil && r.StatusCode == http.StatusNotFound {
+				return poll.Success()
 			}
+			return poll.Continue("waiting for container to serve request")
+		}
+		poll.WaitOn(t, checkUp, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+
+		assert.Assert(t, !strings.Contains(res.Stdout(), "/test"))
+
+		checkLogs := func(t poll.LogT) poll.Result {
+			if strings.Contains(res.Stdout(), "/test") {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for logs to contain /test")
 		}
 
-		Expect(webChecked).To(BeTrue())
+		// Do request on /test
+		go func() {
+			time.Sleep(3 * time.Second)
+			_, _ = http.Get(endpoint + "/test")
+		}()
+
+		poll.WaitOn(t, checkLogs, poll.WithDelay(3*time.Second), poll.WithTimeout(20*time.Second))
+
+		if runtime.GOOS == "windows" {
+			err := res.Cmd.Process.Kill()
+			assert.NilError(t, err)
+		} else {
+			err := res.Cmd.Process.Signal(syscall.SIGTERM)
+			assert.NilError(t, err)
+		}
 	})
 
-	s.Step("get logs from web service", func() {
-		output := s.NewDockerCommand("logs", serverContainer).ExecOrDie()
-		Expect(output).To(ContainSubstring("Listening on port 80"))
-	})
-
-	s.Step("updates a compose app", func() {
-		s.NewDockerCommand("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName).ExecOrDie()
-		// Expect(output).To(ContainSubstring("Successfully deployed"))
-		output := s.NewDockerCommand("ps").ExecOrDie()
-		Lines := Lines(output)
-		Expect(len(Lines)).To(Equal(4))
-		webChecked := false
-		wordsChecked := false
-
-		for _, line := range Lines[1:] {
-			Expect(line).To(ContainSubstring("Running"))
-			if strings.Contains(line, serverContainer) {
-				webChecked = true
-				containerFields := Columns(line)
-				exposedIP := containerFields[3]
-				Expect(exposedIP).To(ContainSubstring(":80->80/tcp"))
-
-				url := strings.ReplaceAll(exposedIP, "->80/tcp", "")
-				Expect(exposedURL).To(Equal(url))
+	t.Run("rm", func(t *testing.T) {
+		res := c.RunDockerCmd("rm", container)
+		res.Assert(t, icmd.Expected{Out: container})
+		checkStopped := func(t poll.LogT) poll.Result {
+			res := c.RunDockerCmd("inspect", container)
+			if res.ExitCode == 1 {
+				return poll.Success()
 			}
-			if strings.Contains(line, wordsContainer) {
-				wordsChecked = true
-				containerFields := Columns(line)
-				exposedIP := containerFields[3]
-				Expect(exposedIP).To(ContainSubstring(":8080->8080/tcp"))
+			return poll.Continue("waiting for container to stop")
+		}
+		poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+	})
+}
 
-				url := strings.ReplaceAll(exposedIP, "->8080/tcp", "")
-				output = s.NewCommand("curl", url+"/noun").ExecOrDie()
-				Expect(output).To(ContainSubstring("\"word\":"))
+func TestContainerRunAttached(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	_, _ = setupTestResourceGroup(t, c)
+
+	// Used in subtests
+	var (
+		container string
+		endpoint  string
+	)
+
+	t.Run("run attached limits", func(t *testing.T) {
+		container = "test-container"
+		cmd := c.NewDockerCmd(
+			"run",
+			"--name", container,
+			"--restart", "on-failure",
+			"--memory", "0.1G", "--cpus", "0.1",
+			"-p", "80:80",
+			"nginx",
+		)
+		runRes := icmd.StartCmd(cmd)
+
+		checkRunning := func(t poll.LogT) poll.Result {
+			res := c.RunDockerCmd("inspect", container)
+			if res.ExitCode == 0 {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for container to be running")
+		}
+		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+
+		inspectRes := c.RunDockerCmd("inspect", container)
+		inspectRes.Assert(t, icmd.Success)
+
+		containerInspect, err := ParseContainerInspect(inspectRes.Stdout())
+		assert.NilError(t, err)
+		assert.Equal(t, containerInspect.Platform, "Linux")
+		assert.Equal(t, containerInspect.CPULimit, 0.1)
+		assert.Equal(t, containerInspect.MemoryLimit, uint64(107374182))
+		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyOnFailure)
+
+		assert.Assert(t, is.Len(containerInspect.Ports, 1))
+		endpoint = fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+		t.Logf("Endpoint: %s", endpoint)
+
+		assert.Assert(t, !strings.Contains(runRes.Stdout(), "/test"))
+		checkRequest := func(t poll.LogT) poll.Result {
+			r, _ := http.Get(endpoint + "/test")
+			if r != nil && r.StatusCode == http.StatusNotFound {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for container to serve request")
+		}
+		poll.WaitOn(t, checkRequest, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+
+		checkLog := func(t poll.LogT) poll.Result {
+			if strings.Contains(runRes.Stdout(), "/test") {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for logs to contain /test")
+		}
+		poll.WaitOn(t, checkLog, poll.WithDelay(1*time.Second), poll.WithTimeout(20*time.Second))
+	})
+
+	t.Run("rm attached", func(t *testing.T) {
+		res := c.RunDockerCmd("rm", container)
+		res.Assert(t, icmd.Expected{Out: container})
+	})
+}
+
+func TestCompose(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	_, _ = setupTestResourceGroup(t, c)
+
+	const (
+		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
+		composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
+		composeProjectName       = "acie2e"
+		serverContainer          = composeProjectName + "_web"
+		wordsContainer           = composeProjectName + "_words"
+	)
+
+	t.Run("compose up", func(t *testing.T) {
+		// Name of Compose project is taken from current folder "acie2e"
+		res := c.RunDockerCmd("compose", "up", "-f", composeFile)
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		// Check three containers are running
+		assert.Assert(t, is.Len(out, 4))
+		webRunning := false
+		for _, l := range out {
+			if strings.Contains(l, serverContainer) {
+				webRunning = true
+				strings.Contains(l, ":80->80/tcp")
 			}
 		}
+		assert.Assert(t, webRunning, "web container not running")
 
-		Expect(webChecked).To(BeTrue())
-		Expect(wordsChecked).To(BeTrue())
+		res = c.RunDockerCmd("inspect", serverContainer)
+		res.Assert(t, icmd.Success)
+
+		containerInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Assert(t, is.Len(containerInspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+		t.Logf("Endpoint: %s", endpoint)
+
+		r, err := http.Get(endpoint + "/words/noun")
+		assert.NilError(t, err)
+		assert.Equal(t, r.StatusCode, http.StatusOK)
+		b, err := ioutil.ReadAll(r.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(b), `"word":`))
 	})
 
-	s.Step("shutdown compose app", func() {
-		s.NewDockerCommand("compose", "down", "--project-name", composeProjectName).ExecOrDie()
+	t.Run("logs web", func(t *testing.T) {
+		res := c.RunDockerCmd("logs", serverContainer)
+		res.Assert(t, icmd.Expected{Out: "Listening on port 80"})
+	})
+
+	t.Run("update", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		// Check three containers are running
+		assert.Assert(t, is.Len(out, 4))
+
+		for _, cName := range []string{serverContainer, wordsContainer} {
+			res = c.RunDockerCmd("inspect", cName)
+			res.Assert(t, icmd.Success)
+
+			containerInspect, err := ParseContainerInspect(res.Stdout())
+			assert.NilError(t, err)
+			assert.Assert(t, is.Len(containerInspect.Ports, 1))
+			endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+			t.Logf("Endpoint: %s", endpoint)
+			var route string
+			switch cName {
+			case serverContainer:
+				route = "/words/noun"
+				assert.Equal(t, containerInspect.Ports[0].HostPort, uint32(80))
+				assert.Equal(t, containerInspect.Ports[0].ContainerPort, uint32(80))
+			case wordsContainer:
+				route = "/noun"
+				assert.Equal(t, containerInspect.Ports[0].HostPort, uint32(8080))
+				assert.Equal(t, containerInspect.Ports[0].ContainerPort, uint32(8080))
+			}
+			checkUp := func(t poll.LogT) poll.Result {
+				r, _ := http.Get(endpoint + route)
+				if r != nil && r.StatusCode == http.StatusOK {
+					return poll.Success()
+				}
+				return poll.Continue("Waiting for container to serve request")
+			}
+			poll.WaitOn(t, checkUp, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+
+			res = c.RunDockerCmd("ps")
+			p := containerInspect.Ports[0]
+			res.Assert(t, icmd.Expected{
+				Out: fmt.Sprintf("%s:%d->%d/tcp", p.HostIP, p.HostPort, p.ContainerPort),
+			})
+		}
+	})
+
+	t.Run("down", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		assert.Equal(t, len(out), 1)
 	})
 }
 
-func (s *E2eACISuite) TestACIDeployMySQlwithEnvVars() {
-	defer deleteResourceGroup(s.setupTestResourceGroup())
+func TestRunEnvVars(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	_, _ = setupTestResourceGroup(t, c)
 
-	s.Step("runs mysql with env variables", func() {
-		err := os.Setenv("MYSQL_USER", "user1")
-		Expect(err).To(BeNil())
-		s.NewDockerCommand("run", "-d", "mysql:5.7", "-e", "MYSQL_ROOT_PASSWORD=rootpwd", "-e", "MYSQL_DATABASE=mytestdb", "-e", "MYSQL_USER", "-e", "MYSQL_PASSWORD=userpwd").ExecOrDie()
+	t.Run("run", func(t *testing.T) {
+		cmd := c.NewDockerCmd(
+			"run", "-d",
+			"-e", "MYSQL_ROOT_PASSWORD=rootpwd",
+			"-e", "MYSQL_DATABASE=mytestdb",
+			"-e", "MYSQL_USER",
+			"-e", "MYSQL_PASSWORD=userpwd",
+			"mysql:5.7",
+		)
+		cmd.Env = append(cmd.Env, "MYSQL_USER=user1")
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		container := strings.TrimSpace(out[len(out)-1])
+		t.Logf("Container name: %s", container)
 
-		output := s.NewDockerCommand("ps").ExecOrDie()
-		lines := Lines(output)
-		Expect(len(lines)).To(Equal(2))
+		res = c.RunDockerCmd("inspect", container)
+		res.Assert(t, icmd.Success)
 
-		containerFields := Columns(lines[1])
-		containerID := containerFields[0]
-		Expect(containerFields[1]).To(Equal("mysql:5.7"))
-		Expect(containerFields[2]).To(Equal("Running"))
+		containerInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Equal(t, containerInspect.Image, "mysql:5.7")
 
-		errs := make(chan error)
-		err = WaitFor(time.Second, 100*time.Second, errs, func() bool {
-			output = s.NewDockerCommand("logs", containerID).ExecOrDie()
-			return strings.Contains(output, "Giving user user1 access to schema mytestdb")
-		})
-		Expect(err).To(BeNil())
-	})
-
-	s.Step("switches back to default context", func() {
-		output := s.NewCommand("docker", "context", "use", "default").ExecOrDie()
-		Expect(output).To(ContainSubstring("default"))
-	})
-
-	s.Step("deletes test context", func() {
-		output := s.NewCommand("docker", "context", "rm", contextName).ExecOrDie()
-		Expect(output).To(ContainSubstring(contextName))
+		check := func(t poll.LogT) poll.Result {
+			res := c.RunDockerCmd("logs", container)
+			if strings.Contains(res.Stdout(), "Giving user user1 access to schema mytestdb") {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for DB container to be up")
+		}
+		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 	})
 }
 
-func (s *E2eACISuite) setupTestResourceGroup() string {
-	var resourceGroupName = randomResourceGroup()
-	s.Step("should be initialized with default context", s.checkDefaultContext)
-	s.Step("Logs in azure using service principal credentials", azureLogin)
-	s.Step("creates a new aci context for tests and use it", s.createAciContextAndUseIt(resourceGroupName))
-	s.Step("ensures no container is running initially", s.checkNoContainnersRunning)
-	return resourceGroupName
+func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
+	startTime := strconv.Itoa(int(time.Now().UnixNano()))
+	name := "E2E-" + startTime
+	azureLogin(t)
+	sID := getSubscriptionID(t)
+	t.Logf("Create resource group %q", name)
+	err := createResourceGroup(sID, name)
+	assert.Check(t, is.Nil(err))
+	t.Cleanup(func() {
+		if err := deleteResourceGroup(name); err != nil {
+			t.Error(err)
+		}
+	})
+	createAciContextAndUseIt(t, c, sID, name)
+	// Check nothing is running
+	res := c.RunDockerCmd("ps")
+	res.Assert(t, icmd.Success)
+	assert.Assert(t, is.Len(strings.Split(strings.TrimSpace(res.Stdout()), "\n"), 1))
+	return sID, name
 }
 
-func (s *E2eACISuite) checkDefaultContext() {
-	output := s.NewCommand("docker", "context", "ls").ExecOrDie()
-	Expect(output).To(Not(ContainSubstring(contextName)))
-	Expect(output).To(ContainSubstring("default *"))
+func deleteResourceGroup(rgName string) error {
+	ctx := context.TODO()
+	helper := aci.NewACIResourceGroupHelper()
+	models, err := helper.GetSubscriptionIDs(ctx)
+	if err != nil {
+		return err
+	}
+	if len(models) == 0 {
+		return errors.New("unable to delete resource group: no models")
+	}
+	return helper.DeleteAsync(ctx, *models[0].SubscriptionID, rgName)
 }
 
-func azureLogin() {
+func azureLogin(t *testing.T) {
+	t.Log("Log in to Azure")
 	login, err := login.NewAzureLoginService()
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
+
 	// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 	tenantID := os.Getenv("AZURE_TENANT_ID")
 	err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 }
 
-func (s *E2eACISuite) createAciContextAndUseIt(resourceGroupName string) func() {
-	return func() {
-		setupTestResourceGroup(resourceGroupName)
-		helper := azure.NewACIResourceGroupHelper()
-		models, err := helper.GetSubscriptionIDs(context.TODO())
-		Expect(err).To(BeNil())
-		subscriptionID = *models[0].SubscriptionID
-
-		s.NewDockerCommand("context", "create", "aci", contextName, "--subscription-id", subscriptionID, "--resource-group", resourceGroupName, "--location", location).ExecOrDie()
-
-		currentContext := s.NewCommand("docker", "context", "use", contextName).ExecOrDie()
-		Expect(currentContext).To(ContainSubstring(contextName))
-		output := s.NewCommand("docker", "context", "ls").ExecOrDie()
-		Expect(output).To(ContainSubstring("acitest *"))
-	}
+func getSubscriptionID(t *testing.T) string {
+	ctx := context.TODO()
+	helper := aci.NewACIResourceGroupHelper()
+	models, err := helper.GetSubscriptionIDs(ctx)
+	assert.Check(t, is.Nil(err))
+	assert.Check(t, len(models) == 1)
+	return *models[0].SubscriptionID
 }
 
-func (s *E2eACISuite) checkNoContainnersRunning() {
-	output := s.NewDockerCommand("ps").ExecOrDie()
-	Expect(len(Lines(output))).To(Equal(1))
+func createResourceGroup(sID, rgName string) error {
+	helper := aci.NewACIResourceGroupHelper()
+	_, err := helper.CreateOrUpdate(context.TODO(), sID, rgName, resources.Group{Location: to.StringPtr(location)})
+	return err
 }
 
-func randomResourceGroup() string {
-	return "resourceGroupTestE2E-" + RandStringBytes(10)
+func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
+	t.Log("Create ACI context")
+	res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
+	res.Assert(t, icmd.Success)
+	res = c.RunDockerCmd("context", "use", contextName)
+	res.Assert(t, icmd.Expected{Out: contextName})
+	res = c.RunDockerCmd("context", "ls")
+	res.Assert(t, icmd.Expected{Out: contextName + " *"})
 }
 
-func createStorageAccount(aciContext store.AciContext, accountName string) azure_storage.Account {
-	log.Println("Creating storage account " + accountName)
-	storageAccount, err := storage.CreateStorageAccount(context.TODO(), aciContext, accountName)
-	Expect(err).To(BeNil())
-	Expect(*storageAccount.Name).To(Equal(accountName))
-	return storageAccount
+func createStorageAccount(t *testing.T, aciContext store.AciContext, name string) (azure_storage.Account, func() error) {
+	t.Logf("Create storage account %q", name)
+	account, err := storage.CreateStorageAccount(context.TODO(), aciContext, name)
+	assert.Check(t, is.Nil(err))
+	assert.Check(t, is.Equal(*(account.Name), name))
+	return account, func() error { return deleteStorageAccount(aciContext, name) }
 }
 
-func getStorageKeys(aciContext store.AciContext, storageAccountName string) []azure_storage.AccountKey {
-	list, err := storage.ListKeys(context.TODO(), aciContext, storageAccountName)
-	Expect(err).To(BeNil())
-	Expect(list.Keys).ToNot(BeNil())
-	Expect(len(*list.Keys)).To(BeNumerically(">", 0))
-
-	return *list.Keys
+func deleteStorageAccount(aciContext store.AciContext, name string) error {
+	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, name)
+	return err
 }
 
-func deleteStorageAccount(aciContext store.AciContext, testStorageAccountName string) {
-	log.Println("Deleting storage account " + testStorageAccountName)
-	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, testStorageAccountName)
-	Expect(err).To(BeNil())
+func getStorageKeys(t *testing.T, aciContext store.AciContext, saName string) []azure_storage.AccountKey {
+	l, err := storage.ListKeys(context.TODO(), aciContext, saName)
+	assert.NilError(t, err)
+	assert.Assert(t, l.Keys != nil)
+	return *l.Keys
 }
 
-func createFileShare(key, shareName string, testStorageAccountName string) (azfile.SharedKeyCredential, url.URL) {
+func createFileShare(t *testing.T, key, share, storageAccount string) (*azfile.SharedKeyCredential, *url.URL) {
 	// Create a ShareURL object that wraps a soon-to-be-created share's URL and a default pipeline.
-	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", testStorageAccountName, shareName))
-	credential, err := azfile.NewSharedKeyCredential(testStorageAccountName, key)
-	Expect(err).To(BeNil())
+	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", storageAccount, share))
+	cred, err := azfile.NewSharedKeyCredential(storageAccount, key)
+	assert.NilError(t, err)
 
-	shareURL := azfile.NewShareURL(*u, azfile.NewPipeline(credential, azfile.PipelineOptions{}))
+	shareURL := azfile.NewShareURL(*u, azfile.NewPipeline(cred, azfile.PipelineOptions{}))
 	_, err = shareURL.Create(context.TODO(), azfile.Metadata{}, 0)
-	Expect(err).To(BeNil())
-
-	return *credential, *u
+	assert.NilError(t, err)
+	return cred, u
 }
 
-func uploadFile(credential azfile.SharedKeyCredential, baseURL, fileName, fileContent string) {
+func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName, content string) {
 	fURL, err := url.Parse(baseURL + "/" + fileName)
-	Expect(err).To(BeNil())
-	fileURL := azfile.NewFileURL(*fURL, azfile.NewPipeline(&credential, azfile.PipelineOptions{}))
-	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(fileContent), fileURL, azfile.UploadToAzureFileOptions{})
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
+	fileURL := azfile.NewFileURL(*fURL, azfile.NewPipeline(&cred, azfile.PipelineOptions{}))
+	err = azfile.UploadBufferToAzureFile(context.TODO(), []byte(content), fileURL, azfile.UploadToAzureFileOptions{})
+	assert.NilError(t, err)
 }
 
-func TestE2eACI(t *testing.T) {
-	suite.Run(t, new(E2eACISuite))
-}
-
-func setupTestResourceGroup(resourceGroupName string) {
-	log.Println("Creating resource group " + resourceGroupName)
-	ctx := context.TODO()
-	helper := azure.NewACIResourceGroupHelper()
-	models, err := helper.GetSubscriptionIDs(ctx)
-	Expect(err).To(BeNil())
-	_, err = helper.CreateOrUpdate(ctx, *models[0].SubscriptionID, resourceGroupName, resources.Group{
-		Location: to.StringPtr(location),
-	})
-	Expect(err).To(BeNil())
-}
-
-func deleteResourceGroup(resourceGroupName string) {
-	log.Println("Deleting resource group " + resourceGroupName)
-	ctx := context.TODO()
-	helper := azure.NewACIResourceGroupHelper()
-	models, err := helper.GetSubscriptionIDs(ctx)
-	Expect(err).To(BeNil())
-	err = helper.DeleteAsync(ctx, *models[0].SubscriptionID, resourceGroupName)
-	Expect(err).To(BeNil())
-}
-
-func RandStringBytes(n int) string {
-	rand.Seed(time.Now().UnixNano())
-	const digits = "0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = digits[rand.Intn(len(digits))]
-	}
-	return string(b)
+func getContainerName(stdout string) string {
+	out := strings.Split(strings.TrimSpace(stdout), "\n")
+	return strings.TrimSpace(out[len(out)-1])
 }

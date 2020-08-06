@@ -17,61 +17,67 @@
 package e2e
 
 import (
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/icmd"
 
-	"github.com/docker/api/tests/framework"
+	. "github.com/docker/api/tests/framework"
 )
 
-type LocalBackendTestSuite struct {
-	framework.Suite
+var binDir string
+
+func TestMain(m *testing.M) {
+	p, cleanup, err := SetupExistingCLI()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	binDir = p
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
 }
 
-func (m *LocalBackendTestSuite) BeforeTest(suiteName string, testName string) {
-	m.NewDockerCommand("context", "create", "local", "test-context").ExecOrDie()
-	m.NewDockerCommand("context", "use", "test-context").ExecOrDie()
-}
+func TestLocalBackend(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	c.RunDockerCmd("context", "create", "local", "test-context").Assert(t, icmd.Success)
+	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
 
-func (m *LocalBackendTestSuite) AfterTest(suiteName string, testName string) {
-	m.NewDockerCommand("context", "rm", "-f", "test-context").ExecOrDie()
-}
+	t.Run("run", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("run", "-d", "nginx")
+		res.Assert(t, icmd.Success)
+		containerName := strings.TrimSpace(res.Combined())
+		t.Cleanup(func() {
+			_ = c.RunDockerCmd("rm", "-f", containerName)
+		})
+		res = c.RunDockerCmd("inspect", containerName)
+		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
+	})
 
-func (m *LocalBackendTestSuite) TestPs() {
-	out := m.NewDockerCommand("ps").ExecOrDie()
-	require.Equal(m.T(), "CONTAINER ID        IMAGE               COMMAND             STATUS              PORTS\n", out)
-}
+	t.Run("run with ports", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("run", "-d", "-p", "8080:80", "nginx")
+		res.Assert(t, icmd.Success)
+		containerName := strings.TrimSpace(res.Combined())
+		t.Cleanup(func() {
+			_ = c.RunDockerCmd("rm", "-f", containerName)
+		})
+		res = c.RunDockerCmd("inspect", containerName)
+		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
+		res = c.RunDockerCmd("ps")
+		res.Assert(t, icmd.Expected{Out: "0.0.0.0:8080->80/tcp"})
+	})
 
-func (m *LocalBackendTestSuite) TestRun() {
-	_, err := m.NewDockerCommand("run", "-d", "--name", "nginx", "nginx").Exec()
-	require.Nil(m.T(), err)
-	out := m.NewDockerCommand("ps").ExecOrDie()
-	defer func() {
-		m.NewDockerCommand("rm", "-f", "nginx").ExecOrDie()
-	}()
-	assert.Contains(m.T(), out, "nginx")
-}
-
-func (m *LocalBackendTestSuite) TestRunWithPorts() {
-	_, err := m.NewDockerCommand("run", "-d", "--name", "nginx", "-p", "8080:80", "nginx").Exec()
-	require.Nil(m.T(), err)
-	out := m.NewDockerCommand("ps").ExecOrDie()
-	defer func() {
-		m.NewDockerCommand("rm", "-f", "nginx").ExecOrDie()
-	}()
-	assert.Contains(m.T(), out, "8080")
-
-	out = m.NewDockerCommand("inspect", "nginx").ExecOrDie()
-	assert.Contains(m.T(), out, "\"Status\": \"running\"")
-}
-
-func (m *LocalBackendTestSuite) TestInspectNotFound() {
-	out, _ := m.NewDockerCommand("inspect", "nonexistentcontainer").Exec()
-	assert.Contains(m.T(), out, "Error: No such container: nonexistentcontainer")
-}
-
-func TestLocalBackendTestSuite(t *testing.T) {
-	suite.Run(t, new(LocalBackendTestSuite))
+	t.Run("inspect not found", func(t *testing.T) {
+		t.Parallel()
+		res := c.RunDockerCmd("inspect", "nonexistentcontainer")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Error: No such container: nonexistentcontainer",
+		})
+	})
 }

@@ -17,58 +17,89 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
-	"log"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
-	"github.com/docker/api/cli/mobycli"
-
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 
 	. "github.com/docker/api/tests/framework"
 )
 
-type NonWinCIE2eSuite struct {
-	Suite
+var binDir string
+
+func TestMain(m *testing.M) {
+	p, cleanup, err := SetupExistingCLI()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	binDir = p
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
 }
 
-func (s *NonWinCIE2eSuite) TestKillChildOnCancel() {
-	s.Step("should kill com.docker.cli if parent command is cancelled", func() {
-		imageName := "test-sleep-image"
-		out := s.ListProcessesCommand().ExecOrDie()
-		Expect(out).NotTo(ContainSubstring(imageName))
+func TestKillChildProcess(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
 
-		dir := s.ConfigDir
-		Expect(ioutil.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(`FROM alpine:3.10
-RUN sleep 100`), 0644)).To(Succeed())
-		shutdown := make(chan time.Time)
-		errs := make(chan error)
-		ctx := s.NewDockerCommand("build", "--no-cache", "-t", imageName, ".").WithinDirectory(dir).WithTimeout(shutdown)
-		go func() {
-			_, err := ctx.Exec()
-			errs <- err
-		}()
-		mobyBuild := mobycli.ComDockerCli + " build --no-cache -t " + imageName
-		err := WaitFor(time.Second, 10*time.Second, errs, func() bool {
-			out := s.ListProcessesCommand().ExecOrDie()
-			return strings.Contains(out, mobyBuild)
-		})
-		Expect(err).NotTo(HaveOccurred())
-		log.Println("Killing docker process")
+	image := "test-sleep-image"
+	pCmd := icmd.Command("ps", "-x")
+	if runtime.GOOS == "windows" {
+		pCmd = icmd.Command("tasklist")
+	}
+	pRes := icmd.RunCmd(pCmd)
+	pRes.Assert(t, icmd.Success)
+	assert.Assert(t, !strings.Contains(pRes.Combined(), image))
 
-		close(shutdown)
-		err = WaitFor(time.Second, 12*time.Second, nil, func() bool {
-			out := s.ListProcessesCommand().ExecOrDie()
-			return !strings.Contains(out, mobyBuild)
-		})
-		Expect(err).NotTo(HaveOccurred())
+	d := writeDockerfile(t)
+	buildArgs := []string{"build", "--no-cache", "-t", image, "."}
+	cmd := c.NewDockerCmd(buildArgs...)
+	cmd.Dir = d
+	res := icmd.StartCmd(cmd)
+
+	buildRunning := func(t poll.LogT) poll.Result {
+		res := icmd.RunCmd(pCmd)
+		if strings.Contains(res.Combined(), strings.Join(buildArgs, " ")) {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for child process to be running")
+	}
+	poll.WaitOn(t, buildRunning, poll.WithDelay(1*time.Second))
+
+	if runtime.GOOS == "windows" {
+		err := res.Cmd.Process.Kill()
+		assert.NilError(t, err)
+	} else {
+		err := res.Cmd.Process.Signal(syscall.SIGTERM)
+		assert.NilError(t, err)
+	}
+	buildStopped := func(t poll.LogT) poll.Result {
+		res := icmd.RunCmd(pCmd)
+		if !strings.Contains(res.Combined(), strings.Join(buildArgs, " ")) {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for child process to be killed")
+	}
+	poll.WaitOn(t, buildStopped, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+}
+
+func writeDockerfile(t *testing.T) string {
+	d, err := ioutil.TempDir("", "")
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(d)
 	})
-}
-
-func TestNonWinCIE2(t *testing.T) {
-	suite.Run(t, new(NonWinCIE2eSuite))
+	err = ioutil.WriteFile(filepath.Join(d, "Dockerfile"), []byte(`FROM alpine:3.10
+RUN sleep 100`), 0644)
+	assert.NilError(t, err)
+	return d
 }
