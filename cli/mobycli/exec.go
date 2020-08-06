@@ -69,6 +69,9 @@ func Exec() {
 		for {
 			select {
 			case sig := <-signals:
+				if cmd.Process == nil {
+					continue // can happen if receiving signal before the process is actually started
+				}
 				err := cmd.Process.Signal(sig)
 				if err != nil {
 					fmt.Printf("WARNING could not forward signal %s to %s : %s\n", sig.String(), ComDockerCli, err.Error())
