@@ -17,54 +17,43 @@
 package login
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
 )
 
-type tokenStoreTestSuite struct {
-	suite.Suite
-}
-
-func (suite *tokenStoreTestSuite) TestCreateStoreFromExistingFolder() {
+func TestCreateStoreFromExistingFolder(t *testing.T) {
 	existingDir, err := ioutil.TempDir("", "test_store")
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 
 	storePath := filepath.Join(existingDir, tokenStoreFilename)
 	store, err := newTokenStore(storePath)
-	Expect(err).To(BeNil())
-	Expect((store.filePath)).To(Equal(storePath))
+	assert.NilError(t, err)
+	assert.Equal(t, store.filePath, storePath)
 }
 
-func (suite *tokenStoreTestSuite) TestCreateStoreFromNonExistingFolder() {
+func TestCreateStoreFromNonExistingFolder(t *testing.T) {
 	existingDir, err := ioutil.TempDir("", "test_store")
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 
 	storePath := filepath.Join(existingDir, "new", tokenStoreFilename)
 	store, err := newTokenStore(storePath)
-	Expect(err).To(BeNil())
-	Expect((store.filePath)).To(Equal(storePath))
+	assert.NilError(t, err)
+	assert.Equal(t, store.filePath, storePath)
 
 	newDir, err := os.Stat(filepath.Join(existingDir, "new"))
-	Expect(err).To(BeNil())
-	Expect(newDir.Mode().IsDir()).To(BeTrue())
+	assert.NilError(t, err)
+	assert.Assert(t, newDir.Mode().IsDir())
 }
 
-func (suite *tokenStoreTestSuite) TestErrorIfParentFolderIsAFile() {
+func TestErrorIfParentFolderIsAFile(t *testing.T) {
 	existingDir, err := ioutil.TempFile("", "test_store")
-	Expect(err).To(BeNil())
+	assert.NilError(t, err)
 
 	storePath := filepath.Join(existingDir.Name(), tokenStoreFilename)
 	_, err = newTokenStore(storePath)
-	Expect(err).To(MatchError(errors.New("cannot use path " + storePath + " ; " + existingDir.Name() + " already exists and is not a directory")))
-}
-
-func TestTokenStoreSuite(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(tokenStoreTestSuite))
+	assert.Error(t, err, "cannot use path "+storePath+" ; "+existingDir.Name()+" already exists and is not a directory")
 }

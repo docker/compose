@@ -21,7 +21,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/api/containers"
 )
@@ -119,7 +119,7 @@ func TestPortConvert(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ports := ToPorts(testCase.ip, testCase.ports)
-			assert.Equal(t, testCase.expected, ports)
+			assert.DeepEqual(t, testCase.expected, ports)
 		})
 	}
 }

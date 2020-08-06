@@ -75,16 +75,16 @@ type AzureLoginService struct {
 const tokenStoreFilename = "dockerAccessToken.json"
 
 // NewAzureLoginService creates a NewAzureLoginService
-func NewAzureLoginService() (AzureLoginService, error) {
+func NewAzureLoginService() (*AzureLoginService, error) {
 	return newAzureLoginServiceFromPath(GetTokenStorePath(), azureAPIHelper{})
 }
 
-func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (AzureLoginService, error) {
+func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (*AzureLoginService, error) {
 	store, err := newTokenStore(tokenStorePath)
 	if err != nil {
-		return AzureLoginService{}, err
+		return nil, err
 	}
-	return AzureLoginService{
+	return &AzureLoginService{
 		tokenStore: store,
 		apiHelper:  helper,
 	}, nil
@@ -92,7 +92,7 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (Azur
 
 // TestLoginFromServicePrincipal login with clientId / clientSecret from a previously created service principal.
 // The resulting token does not include a refresh token, used for tests only
-func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+func (login *AzureLoginService) TestLoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
 	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
 	creds := auth2.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 
@@ -117,7 +117,7 @@ func (login AzureLoginService) TestLoginFromServicePrincipal(clientID string, cl
 }
 
 // Logout remove azure token data
-func (login AzureLoginService) Logout(ctx context.Context) error {
+func (login *AzureLoginService) Logout(ctx context.Context) error {
 	err := login.tokenStore.removeData()
 	if os.IsNotExist(err) {
 		return errors.New("No Azure login data to be removed")
@@ -126,7 +126,7 @@ func (login AzureLoginService) Logout(ctx context.Context) error {
 }
 
 // Login performs an Azure login through a web browser
-func (login AzureLoginService) Login(ctx context.Context, requestedTenantID string) error {
+func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID string) error {
 	queryCh := make(chan localResponse, 1)
 	s, err := NewLocalServer(queryCh)
 	if err != nil {
@@ -267,7 +267,7 @@ func newAuthorizerFromLoginStorePath(storeTokenPath string) (autorest.Authorizer
 }
 
 // GetValidToken returns an access token. Refresh token if needed
-func (login AzureLoginService) GetValidToken() (oauth2.Token, error) {
+func (login *AzureLoginService) GetValidToken() (oauth2.Token, error) {
 	loginInfo, err := login.tokenStore.readToken()
 	if err != nil {
 		return oauth2.Token{}, err
@@ -288,7 +288,7 @@ func (login AzureLoginService) GetValidToken() (oauth2.Token, error) {
 	return token, nil
 }
 
-func (login AzureLoginService) refreshToken(currentRefreshToken string, tenantID string) (oauth2.Token, error) {
+func (login *AzureLoginService) refreshToken(currentRefreshToken string, tenantID string) (oauth2.Token, error) {
 	data := url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{clientID},

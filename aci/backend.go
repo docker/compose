@@ -367,7 +367,7 @@ func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) 
 }
 
 type aciCloudService struct {
-	loginService login.AzureLoginService
+	loginService *login.AzureLoginService
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {

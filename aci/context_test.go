@@ -25,132 +25,131 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/api/context/store"
-
-	. "github.com/onsi/gomega"
 )
 
-type ContextSuiteTest struct {
-	suite.Suite
-	mockUserPrompt         *mockUserPrompt
-	mockResourceGroupHeper *MockResourceGroupHelper
-	contextCreateHelper    contextCreateACIHelper
+type contextMocks struct {
+	userPrompt          *mockUserPrompt
+	resourceGroupHelper *MockResourceGroupHelper
+	contextCreateHelper contextCreateACIHelper
 }
 
-func (suite *ContextSuiteTest) BeforeTest(suiteName, testName string) {
-	suite.mockUserPrompt = &mockUserPrompt{}
-	suite.mockResourceGroupHeper = &MockResourceGroupHelper{}
-	suite.contextCreateHelper = contextCreateACIHelper{
-		suite.mockUserPrompt,
-		suite.mockResourceGroupHeper,
+func testContextMocks() contextMocks {
+	mockUserPrompt := &mockUserPrompt{}
+	mockResourceGroupHelper := &MockResourceGroupHelper{}
+	contextCreateHelper := contextCreateACIHelper{
+		mockUserPrompt,
+		mockResourceGroupHelper,
 	}
+	return contextMocks{mockUserPrompt, mockResourceGroupHelper, contextCreateHelper}
 }
 
-func (suite *ContextSuiteTest) TestCreateSpecifiedSubscriptionAndGroup() {
+func TestCreateSpecifiedSubscriptionAndGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "myResourceGroup")
-	suite.mockResourceGroupHeper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(err).To(BeNil())
-	Expect(description).To(Equal("myResourceGroup@eastus"))
-	Expect(data).To(Equal(aciContext("1234", "myResourceGroup", "eastus")))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "myResourceGroup@eastus")
+	assert.DeepEqual(t, data, aciContext("1234", "myResourceGroup", "eastus"))
 }
 
-func (suite *ContextSuiteTest) TestErrorOnNonExistentResourceGroup() {
+func TestErrorOnNonExistentResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "myResourceGroup")
 	notFoundError := errors.New(`Not Found: "myResourceGroup"`)
-	suite.mockResourceGroupHeper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(resources.Group{}, notFoundError)
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(resources.Group{}, notFoundError)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(data).To(BeNil())
-	Expect(description).To(Equal(""))
-	Expect(err.Error()).To(Equal("Could not find resource group \"myResourceGroup\": Not Found: \"myResourceGroup\""))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.Assert(t, cmp.Nil(data))
+	assert.Equal(t, description, "")
+	assert.Error(t, err, "Could not find resource group \"myResourceGroup\": Not Found: \"myResourceGroup\"")
 }
 
-func (suite *ContextSuiteTest) TestCreateNewResourceGroup() {
+func TestCreateNewResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "")
-	suite.mockResourceGroupHeper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
 
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserPrompt.On("Select", "Select a resource group", selectOptions).Return(0, nil)
-	suite.mockResourceGroupHeper.On("CreateOrUpdate", ctx, "1234", mock.AnythingOfType("string"), mock.AnythingOfType("resources.Group")).Return(group("newResourceGroup", "eastus"), nil)
-	suite.mockResourceGroupHeper.On("ListGroups", ctx, "1234").Return([]resources.Group{
+	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(0, nil)
+	m.resourceGroupHelper.On("CreateOrUpdate", ctx, "1234", mock.AnythingOfType("string"), mock.AnythingOfType("resources.Group")).Return(group("newResourceGroup", "eastus"), nil)
+	m.resourceGroupHelper.On("ListGroups", ctx, "1234").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
 	}, nil)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(err).To(BeNil())
-	Expect(description).To(Equal("newResourceGroup@eastus"))
-	Expect(data).To(Equal(aciContext("1234", "newResourceGroup", "eastus")))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "newResourceGroup@eastus")
+	assert.DeepEqual(t, data, aciContext("1234", "newResourceGroup", "eastus"))
 }
 
-func (suite *ContextSuiteTest) TestSelectExistingResourceGroup() {
+func TestSelectExistingResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "")
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
-	suite.mockResourceGroupHeper.On("ListGroups", ctx, "1234").Return([]resources.Group{
+	m := testContextMocks()
+	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
+	m.resourceGroupHelper.On("ListGroups", ctx, "1234").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
 	}, nil)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(err).To(BeNil())
-	Expect(description).To(Equal("group2@westeurope"))
-	Expect(data).To(Equal(aciContext("1234", "group2", "westeurope")))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "group2@westeurope")
+	assert.DeepEqual(t, data, aciContext("1234", "group2", "westeurope"))
 }
 
-func (suite *ContextSuiteTest) TestSelectSingleSubscriptionIdAndExistingResourceGroup() {
+func TestSelectSingleSubscriptionIdAndExistingResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("", "")
-	suite.mockResourceGroupHeper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("123456", "Subscription1")}, nil)
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("123456", "Subscription1")}, nil)
 
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
-	suite.mockResourceGroupHeper.On("ListGroups", ctx, "123456").Return([]resources.Group{
+	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
+	m.resourceGroupHelper.On("ListGroups", ctx, "123456").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
 	}, nil)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(err).To(BeNil())
-	Expect(description).To(Equal("group2@westeurope"))
-	Expect(data).To(Equal(aciContext("123456", "group2", "westeurope")))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "group2@westeurope")
+	assert.DeepEqual(t, data, aciContext("123456", "group2", "westeurope"))
 }
 
-func (suite *ContextSuiteTest) TestSelectSubscriptionIdAndExistingResourceGroup() {
+func TestSelectSubscriptionIdAndExistingResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("", "")
 	sub1 := subModel("1234", "Subscription1")
 	sub2 := subModel("5678", "Subscription2")
 
-	suite.mockResourceGroupHeper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{sub1, sub2}, nil)
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{sub1, sub2}, nil)
 
 	selectOptions := []string{"Subscription1 (1234)", "Subscription2 (5678)"}
-	suite.mockUserPrompt.On("Select", "Select a subscription ID", selectOptions).Return(1, nil)
+	m.userPrompt.On("Select", "Select a subscription ID", selectOptions).Return(1, nil)
 	selectOptions = []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
-	suite.mockUserPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
-	suite.mockResourceGroupHeper.On("ListGroups", ctx, "5678").Return([]resources.Group{
+	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
+	m.resourceGroupHelper.On("ListGroups", ctx, "5678").Return([]resources.Group{
 		group("group1", "eastus"),
 		group("group2", "westeurope"),
 	}, nil)
 
-	data, description, err := suite.contextCreateHelper.createContextData(ctx, opts)
-
-	Expect(err).To(BeNil())
-	Expect(description).To(Equal("group2@westeurope"))
-	Expect(data).To(Equal(aciContext("5678", "group2", "westeurope")))
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "group2@westeurope")
+	assert.DeepEqual(t, data, aciContext("5678", "group2", "westeurope"))
 }
 
 func subModel(subID string, display string) subscription.Model {
@@ -181,11 +180,6 @@ func options(subscriptionID string, resourceGroupName string) ContextParams {
 		ResourceGroup:  resourceGroupName,
 		Location:       "eastus",
 	}
-}
-
-func TestContextSuite(t *testing.T) {
-	RegisterTestingT(t)
-	suite.Run(t, new(ContextSuiteTest))
 }
 
 type mockUserPrompt struct {
