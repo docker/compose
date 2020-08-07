@@ -1780,6 +1780,14 @@ services:
         assert len(db.containers()) == 1
         assert len(console.containers()) == 0
 
+    def test_run_service_with_unhealthy_dependencies(self):
+        self.base_dir = 'tests/fixtures/v2-unhealthy-dependencies'
+        result = self.dispatch(['run', 'web', '/bin/true'], returncode=1)
+        assert re.search(
+            re.compile('for web .*is unhealthy.*', re.MULTILINE),
+            result.stderr
+        )
+
     def test_run_service_with_scaled_dependencies(self):
         self.base_dir = 'tests/fixtures/v2-dependencies'
         self.dispatch(['up', '-d', '--scale', 'db=2', '--scale', 'console=0'])

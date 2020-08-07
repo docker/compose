@@ -1298,31 +1298,28 @@ def build_one_off_container_options(options, detach, command):
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
                           toplevel_environment):
-    if not options['--no-deps']:
-        deps = service.get_dependency_names()
-        if deps:
-            project.up(
-                service_names=deps,
-                start_deps=True,
-                strategy=ConvergenceStrategy.never,
-                rescale=False
-            )
-
-    project.initialize()
-
-    container = service.create_container(
-        quiet=True,
+    detach = options.get('--detach')
+    use_network_aliases = options.get('--use-aliases')
+    containers = project.up(
+        service_names=[service.name],
+        start_deps=not options['--no-deps'],
+        strategy=ConvergenceStrategy.never,
+        detached=detach,
+        rescale=False,
         one_off=True,
-        **container_options)
+        override_options=container_options,
+    )
+    try:
+        container = next(c for c in containers if c.service == service.name)
+    except StopIteration:
+        raise OperationFailedError('Could not bring up the requested service')
 
-    use_network_aliases = options['--use-aliases']
-
-    if options.get('--detach'):
+    if detach:
         service.start_container(container, use_network_aliases)
         print(container.name)
         return
 
-    def remove_container(force=False):
+    def remove_container():
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
@@ -1355,7 +1352,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
             exit_code = 1
     except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
-        remove_container(force=True)
+        remove_container()
         sys.exit(2)
 
     remove_container()
