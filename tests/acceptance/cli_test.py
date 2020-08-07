@@ -1681,7 +1681,6 @@ services:
         host_mode_container = self.project.get_service('host').containers()[0]
         assert host_mode_container.get('HostConfig.PidMode') == 'host'
 
-    @v2_only()
     @no_cluster('Container IPC mode does not work across clusters')
     def test_up_with_ipc_mode(self):
         c = self.client.create_container(
