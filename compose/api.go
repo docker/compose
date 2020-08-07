@@ -29,6 +29,8 @@ type Service interface {
 	Up(ctx context.Context, opts cli.ProjectOptions) error
 	// Down executes the equivalent to a `compose down`
 	Down(ctx context.Context, opts cli.ProjectOptions) error
-	Logs(ctx context.Context, projectName cli.ProjectOptions) error
-	Ps(background context.Context, options cli.ProjectOptions) ([]types.ServiceStatus, error)
+	// Logs executes the equivalent to a `compose logs`
+	Logs(ctx context.Context, opts cli.ProjectOptions) error
+	// Ps executes the equivalent to a `compose ps`
+	Ps(ctx context.Context, opts cli.ProjectOptions) ([]types.ServiceStatus, error)
 }

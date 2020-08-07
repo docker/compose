@@ -131,6 +131,7 @@ func (cs *composeService) Down(ctx context.Context, opts cli.ProjectOptions) err
 	fmt.Printf("Down command on project %q", prj.Name)
 	return nil
 }
+
 func (cs *composeService) Ps(ctx context.Context, opts cli.ProjectOptions) ([]ecstypes.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
