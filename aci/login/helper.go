@@ -30,6 +30,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	letterRunes = []rune("abcdefghijklmnopqrstuvwxyz123456789")
+)
+
 type apiHelper interface {
 	queryToken(data url.Values, tenantID string) (azureToken, error)
 	openAzureLoginPage(redirectURL string) error
@@ -80,22 +84,30 @@ func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azure
 	return token, nil
 }
 
-func openbrowser(url string) error {
+func openbrowser(address string) error {
 	switch runtime.GOOS {
 	case "linux":
-		return exec.Command("xdg-open", url).Start()
+		if isWsl() {
+			return exec.Command("wslview", address).Start()
+		}
+		return exec.Command("xdg-open", address).Start()
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", address).Start()
 	case "darwin":
-		return exec.Command("open", url).Start()
+		return exec.Command("open", address).Start()
 	default:
 		return fmt.Errorf("unsupported platform")
 	}
 }
 
-var (
-	letterRunes = []rune("abcdefghijklmnopqrstuvwxyz123456789")
-)
+func isWsl() bool {
+	b, err := ioutil.ReadFile("/proc/version")
+	if err != nil {
+		return false
+	}
+
+	return strings.Contains(string(b), "microsoft")
+}
 
 func randomString(prefix string, length int) string {
 	b := make([]rune, length)
