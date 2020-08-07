@@ -46,11 +46,6 @@ from compose.utils import parse_nanoseconds_int
 from tests.helpers import create_custom_host_file
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
-from tests.integration.testcases import v2_1_only
-from tests.integration.testcases import v2_2_only
-from tests.integration.testcases import v2_3_only
-from tests.integration.testcases import v2_only
-from tests.integration.testcases import v3_only
 
 
 def create_and_start_container(service, **override_options):
@@ -136,7 +131,6 @@ class ServiceTest(DockerClientTestCase):
         assert container.get('HostConfig.CpuRealtimeRuntime') == 40000
         assert container.get('HostConfig.CpuRealtimePeriod') == 150000
 
-    @v2_2_only()
     def test_create_container_with_cpu_count(self):
         self.require_api_version('1.25')
         service = self.create_service('db', cpu_count=2)
@@ -144,7 +138,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.CpuCount') == 2
 
-    @v2_2_only()
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='cpu_percent is not supported for Linux')
     def test_create_container_with_cpu_percent(self):
         self.require_api_version('1.25')
@@ -153,7 +146,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.CpuPercent') == 12
 
-    @v2_2_only()
     def test_create_container_with_cpus(self):
         self.require_api_version('1.25')
         service = self.create_service('db', cpus=1)
@@ -301,7 +293,6 @@ class ServiceTest(DockerClientTestCase):
             "Last component differs: %s, %s" % (actual_host_path, host_path)
         )
 
-    @v2_3_only()
     def test_create_container_with_host_mount(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
@@ -321,7 +312,6 @@ class ServiceTest(DockerClientTestCase):
         assert path.basename(mount['Source']) == path.basename(host_path)
         assert mount['RW'] is False
 
-    @v2_3_only()
     def test_create_container_with_tmpfs_mount(self):
         container_path = '/container-tmpfs'
         service = self.create_service(
@@ -334,7 +324,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Type'] == 'tmpfs'
 
-    @v2_3_only()
     def test_create_container_with_tmpfs_mount_tmpfs_size(self):
         container_path = '/container-tmpfs'
         service = self.create_service(
@@ -351,7 +340,6 @@ class ServiceTest(DockerClientTestCase):
             'SizeBytes': 5368709
         }
 
-    @v2_3_only()
     def test_create_container_with_volume_mount(self):
         container_path = '/container-volume'
         volume_name = 'composetest_abcde'
@@ -366,7 +354,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Name'] == volume_name
 
-    @v3_only()
     def test_create_container_with_legacy_mount(self):
         # Ensure mounts are converted to volumes if API version < 1.30
         # Needed to support long syntax in the 3.2 format
@@ -383,7 +370,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Name'] == volume_name
 
-    @v3_only()
     def test_create_container_with_legacy_tmpfs_mount(self):
         # Ensure tmpfs mounts are converted to tmpfs entries if API version < 1.30
         # Needed to support long syntax in the 3.2 format
@@ -590,7 +576,6 @@ class ServiceTest(DockerClientTestCase):
 
             orig_container = new_container
 
-    @v2_3_only()
     def test_execute_convergence_plan_recreate_twice_with_mount(self):
         service = self.create_service(
             'db',
@@ -1135,7 +1120,6 @@ class ServiceTest(DockerClientTestCase):
 
         assert service.image()
 
-    @v2_3_only()
     @no_cluster('Not supported on UCP 2.2.0-beta1')  # FIXME: remove once support is added
     def test_build_with_target(self):
         self.require_api_version('1.30')
@@ -1158,7 +1142,6 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test.target'] == 'one'
 
-    @v2_3_only()
     def test_build_with_extra_hosts(self):
         self.require_api_version('1.27')
         base_dir = tempfile.mkdtemp()
@@ -1199,7 +1182,6 @@ class ServiceTest(DockerClientTestCase):
         service.build(gzip=True)
         assert service.image()
 
-    @v2_1_only()
     def test_build_with_isolation(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -1492,13 +1474,11 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         assert container.get('HostConfig.IpcMode') == 'host'
 
-    @v2_1_only()
     def test_userns_mode_none_defined(self):
         service = self.create_service('web', userns_mode=None)
         container = create_and_start_container(service)
         assert container.get('HostConfig.UsernsMode') == ''
 
-    @v2_1_only()
     def test_userns_mode_host(self):
         service = self.create_service('web', userns_mode='host')
         container = create_and_start_container(service)
@@ -1574,7 +1554,6 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         assert container.get('HostConfig.DnsSearch') == ['dc1.example.com', 'dc2.example.com']
 
-    @v2_only()
     def test_tmpfs(self):
         service = self.create_service('web', tmpfs=['/run'])
         container = create_and_start_container(service)
@@ -1608,7 +1587,6 @@ class ServiceTest(DockerClientTestCase):
         }.items():
             assert env[k] == v
 
-    @v3_only()
     def test_build_with_cachefrom(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)

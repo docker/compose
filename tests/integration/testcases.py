@@ -53,26 +53,6 @@ def min_version_skip(version):
     )
 
 
-def v2_only():
-    return min_version_skip(VERSION)
-
-
-def v2_1_only():
-    return min_version_skip(VERSION)
-
-
-def v2_2_only():
-    return min_version_skip(VERSION)
-
-
-def v2_3_only():
-    return min_version_skip(VERSION)
-
-
-def v3_only():
-    return min_version_skip(VERSION)
-
-
 class DockerClientTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
