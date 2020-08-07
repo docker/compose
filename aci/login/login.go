@@ -266,6 +266,15 @@ func newAuthorizerFromLoginStorePath(storeTokenPath string) (autorest.Authorizer
 	return autorest.NewBearerAuthorizer(&token), nil
 }
 
+// GetTenantID returns tenantID for current login
+func (login AzureLoginService) GetTenantID() (string, error) {
+	loginInfo, err := login.tokenStore.readToken()
+	if err != nil {
+		return "", err
+	}
+	return loginInfo.TenantID, err
+}
+
 // GetValidToken returns an access token. Refresh token if needed
 func (login *AzureLoginService) GetValidToken() (oauth2.Token, error) {
 	loginInfo, err := login.tokenStore.readToken()
