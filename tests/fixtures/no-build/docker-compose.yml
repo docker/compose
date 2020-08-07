@@ -5,4 +5,4 @@ services:
         container_name: alpine
         entrypoint: 'echo It works!'
         build:
-          context: /this/path/doesnt/exists # and we don't really care. We just want to run containers already pulled.
+          context: /this/path/doesnt/exist # and we don't really care. We just want to run containers already pulled.
