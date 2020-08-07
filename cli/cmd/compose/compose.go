@@ -41,6 +41,8 @@ func Command() *cobra.Command {
 	command.AddCommand(
 		upCommand(),
 		downCommand(),
+		psCommand(),
+		logsCommand(),
 	)
 
 	return command

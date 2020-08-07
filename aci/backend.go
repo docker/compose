@@ -39,6 +39,7 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
+	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 )
 
 const (
@@ -364,6 +365,14 @@ func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) 
 	}
 
 	return err
+}
+
+func (cs *aciComposeService) Ps(ctx context.Context, opts cli.ProjectOptions) ([]ecstypes.ServiceStatus, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (cs *aciComposeService) Logs(ctx context.Context, opts cli.ProjectOptions) error {
+	return errdefs.ErrNotImplemented
 }
 
 type aciCloudService struct {

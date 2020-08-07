@@ -26,10 +26,12 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 
 	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/errdefs"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
+	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 )
 
 type apiService struct {
@@ -128,4 +130,12 @@ func (cs *composeService) Down(ctx context.Context, opts cli.ProjectOptions) err
 	}
 	fmt.Printf("Down command on project %q", prj.Name)
 	return nil
+}
+
+func (cs *composeService) Ps(ctx context.Context, opts cli.ProjectOptions) ([]ecstypes.ServiceStatus, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (cs *composeService) Logs(ctx context.Context, opts cli.ProjectOptions) error {
+	return errdefs.ErrNotImplemented
 }
