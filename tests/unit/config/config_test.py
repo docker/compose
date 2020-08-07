@@ -26,21 +26,13 @@ from compose.config.serialize import denormalize_service_dict
 from compose.config.serialize import serialize_config
 from compose.config.serialize import serialize_ns_time_value
 from compose.config.types import VolumeSpec
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
-from compose.const import COMPOSEFILE_V2_0 as V2_0
-from compose.const import COMPOSEFILE_V2_1 as V2_1
-from compose.const import COMPOSEFILE_V2_2 as V2_2
-from compose.const import COMPOSEFILE_V2_3 as V2_3
-from compose.const import COMPOSEFILE_V3_0 as V3_0
-from compose.const import COMPOSEFILE_V3_1 as V3_1
-from compose.const import COMPOSEFILE_V3_2 as V3_2
-from compose.const import COMPOSEFILE_V3_3 as V3_3
-from compose.const import COMPOSEFILE_V3_5 as V3_5
 from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 from tests import unittest
 
-DEFAULT_VERSION = V2_0
+DEFAULT_VERSION = VERSION
 
 
 def make_service_dict(name, service_dict, working_dir='.', filename=None):
@@ -73,8 +65,10 @@ class ConfigTest(unittest.TestCase):
         service_dicts = config.load(
             build_config_details(
                 {
-                    'foo': {'image': 'busybox'},
-                    'bar': {'image': 'busybox', 'environment': ['FOO=1']},
+                    'services': {
+                        'foo': {'image': 'busybox'},
+                        'bar': {'image': 'busybox', 'environment': ['FOO=1']},
+                    }
                 },
                 'tests/fixtures/extends',
                 'common.yml'
@@ -169,23 +163,23 @@ class ConfigTest(unittest.TestCase):
     def test_valid_versions(self):
         for version in ['2', '2.0']:
             cfg = config.load(build_config_details({'version': version}))
-            assert cfg.version == V2_0
+            assert cfg.version == VERSION
 
         cfg = config.load(build_config_details({'version': '2.1'}))
-        assert cfg.version == V2_1
+        assert cfg.version == VERSION
 
         cfg = config.load(build_config_details({'version': '2.2'}))
-        assert cfg.version == V2_2
+        assert cfg.version == VERSION
 
         cfg = config.load(build_config_details({'version': '2.3'}))
-        assert cfg.version == V2_3
+        assert cfg.version == VERSION
 
         for version in ['3', '3.0']:
             cfg = config.load(build_config_details({'version': version}))
-            assert cfg.version == V3_0
+            assert cfg.version == VERSION
 
         cfg = config.load(build_config_details({'version': '3.1'}))
-        assert cfg.version == V3_1
+        assert cfg.version == VERSION
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -197,7 +191,7 @@ class ConfigTest(unittest.TestCase):
         assert list(s['name'] for s in cfg.services) == ['version']
 
     def test_wrong_version_type(self):
-        for version in [None, 1, 2, 2.0]:
+        for version in [1, 2, 2.0]:
             with pytest.raises(ConfigurationError) as excinfo:
                 config.load(
                     build_config_details(
@@ -213,12 +207,12 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {'version': '2.18'},
+                    {'version': '1'},
                     filename='filename.yml',
                 )
             )
 
-        assert 'Version in "filename.yml" is unsupported' in excinfo.exconly()
+        assert 'Version in "filename.yml" is invalid' in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
     def test_version_1_is_invalid(self):
@@ -328,7 +322,6 @@ class ConfigTest(unittest.TestCase):
                     }
                 }, 'working_dir', 'filename.yml')
             )
-
         assert 'Unexpected type for "version" key in "filename.yml"' \
             in mock_logging.warning.call_args[0][0]
 
@@ -376,7 +369,7 @@ class ConfigTest(unittest.TestCase):
         base_file = config.ConfigFile(
             'base.yaml',
             {
-                'version': str(V2_1),
+                'version': '2',
                 'services': {
                     'web': {
                         'image': 'example/web',
@@ -511,7 +504,15 @@ class ConfigTest(unittest.TestCase):
         for invalid_name in ['?not?allowed', ' ', '', '!', '/', '\xe2']:
             with pytest.raises(ConfigurationError) as exc:
                 config.load(build_config_details(
-                    {invalid_name: {'image': 'busybox'}}))
+                    {
+                        'version': '2',
+                        'services': {
+                            invalid_name:
+                            {
+                                'image': 'busybox'
+                            }
+                        }
+                    }))
             assert 'Invalid service name \'%s\'' % invalid_name in exc.exconly()
 
     def test_load_config_invalid_service_names_v2(self):
@@ -543,17 +544,24 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
                 {
-                    'web': {'image': 'busybox', 'name': 'bogus'},
+                    'version': '2',
+                    'services': {
+                        'web': {'image': 'busybox', 'name': 'bogus'}
+                    }
                 },
                 'working_dir',
                 'filename.yml',
             ))
-
-        assert "Unsupported config option for web: 'name'" in exc.exconly()
+        assert "Unsupported config option for services.web: 'name'" in exc.exconly()
 
     def test_load_invalid_service_definition(self):
         config_details = build_config_details(
-            {'web': 'wrong'},
+            {
+                'version': '2',
+                'services': {
+                    'web': 'wrong'
+                }
+            },
             'working_dir',
             'filename.yml')
         with pytest.raises(ConfigurationError) as exc:
@@ -585,7 +593,10 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {1: {'image': 'busybox'}},
+                    {
+                        'version': '2',
+                        'services': {1: {'image': 'busybox'}}
+                    },
                     'working_dir',
                     'filename.yml'
                 )
@@ -836,10 +847,10 @@ class ConfigTest(unittest.TestCase):
     def test_load_with_multiple_files_and_invalid_override(self):
         base_file = config.ConfigFile(
             'base.yaml',
-            {'web': {'image': 'example/web'}})
+            {'version': '2', 'services': {'web': {'image': 'example/web'}}})
         override_file = config.ConfigFile(
             'override.yaml',
-            {'bogus': 'thing'})
+            {'version': '2', 'services': {'bogus': 'thing'}})
         details = config.ConfigDetails('.', [base_file, override_file])
 
         with pytest.raises(ConfigurationError) as exc:
@@ -977,7 +988,6 @@ class ConfigTest(unittest.TestCase):
         service = config.load(
             build_config_details(
                 {
-                    'version': str(V3_3),
                     'services': {
                         'web': {
                             'build': {
@@ -1424,7 +1434,7 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'version': str(V2_1),
+                        'version': str(VERSION),
                         'networks': {
                             'foo': {
                                 'driver': 'default',
@@ -1455,7 +1465,6 @@ class ConfigTest(unittest.TestCase):
         networks = config.load(
             build_config_details(
                 {
-                    'version': str(V2_1),
                     'networks': {
                         'foo': {
                             'driver': 'default',
@@ -1487,7 +1496,10 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'foo': {'image': 'busybox', 'privilige': 'something'},
+                        'version': str(VERSION),
+                        'services': {
+                            'foo': {'image': 'busybox', 'privilige': 'something'},
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1508,7 +1520,10 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'foo': {'image': 1},
+                        'version': str(VERSION),
+                        'services': {
+                            'foo': {'image': 1},
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1555,7 +1570,10 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'foo': {'image': 'busybox', 'links': 'an_link'},
+                        'version': str(VERSION),
+                        'services': {
+                            'foo': {'image': 'busybox', 'links': 'an_link'},
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1583,7 +1601,10 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo', '/dev/foo:/dev/foo']}
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {'build': '.', 'devices': ['/dev/foo:/dev/foo', '/dev/foo:/dev/foo']}
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1597,7 +1618,10 @@ class ConfigTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {'build': '.', 'command': [1]}
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {'build': '.', 'command': [1]}
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -1622,10 +1646,13 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {'web': {
-                        'image': 'busybox',
-                        'extra_hosts': 'somehost:162.242.195.82'
-                    }},
+                    {
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {
+                                'image': 'busybox',
+                                'extra_hosts': 'somehost:162.242.195.82'}}
+                    },
                     'working_dir',
                     'filename.yml'
                 )
@@ -1638,13 +1665,16 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as excinfo:
             config.load(
                 build_config_details(
-                    {'web': {
-                        'image': 'busybox',
-                        'extra_hosts': [
-                            {'somehost': '162.242.195.82'},
-                            {'otherhost': '50.31.209.229'}
-                        ]
-                    }},
+                    {
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {
+                                'image': 'busybox',
+                                'extra_hosts': [
+                                    {'somehost': '162.242.195.82'},
+                                    {'otherhost': '50.31.209.229'}
+                                ]}}
+                    },
                     'working_dir',
                     'filename.yml'
                 )
@@ -1658,13 +1688,16 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
                 {
-                    'web': {
-                        'image': 'busybox',
-                        'ulimits': {
-                            'nofile': {
-                                "not_soft_or_hard": 100,
-                                "soft": 10000,
-                                "hard": 20000,
+                    'version': str(VERSION),
+                    'services': {
+                        'web': {
+                            'image': 'busybox',
+                            'ulimits': {
+                                'nofile': {
+                                    "not_soft_or_hard": 100,
+                                    "soft": 10000,
+                                    "hard": 20000,
+                                }
                             }
                         }
                     }
@@ -1679,9 +1712,12 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
                 {
-                    'web': {
-                        'image': 'busybox',
-                        'ulimits': {'nofile': {"soft": 10000}}
+                    'version': str(VERSION),
+                    'services': {
+                        'web': {
+                            'image': 'busybox',
+                            'ulimits': {'nofile': {"soft": 10000}}
+                        }
                     }
                 },
                 'working_dir',
@@ -1695,10 +1731,13 @@ class ConfigTest(unittest.TestCase):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details(
                 {
-                    'web': {
-                        'image': 'busybox',
-                        'ulimits': {
-                            'nofile': {"soft": 10000, "hard": 1000}
+                    'version': str(VERSION),
+                    'services': {
+                        'web': {
+                            'image': 'busybox',
+                            'ulimits': {
+                                'nofile': {"soft": 10000, "hard": 1000}
+                            }
                         }
                     }
                 },
@@ -1711,10 +1750,12 @@ class ConfigTest(unittest.TestCase):
         for expose in expose_values:
             service = config.load(
                 build_config_details(
-                    {'web': {
-                        'image': 'busybox',
-                        'expose': expose
-                    }},
+                    {
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {
+                                'image': 'busybox',
+                                'expose': expose}}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -1726,10 +1767,12 @@ class ConfigTest(unittest.TestCase):
         for entrypoint in entrypoint_values:
             service = config.load(
                 build_config_details(
-                    {'web': {
-                        'image': 'busybox',
-                        'entrypoint': entrypoint
-                    }},
+                    {
+                        'version': str(VERSION),
+                        'services': {
+                            'web': {
+                                'image': 'busybox',
+                                'entrypoint': entrypoint}}},
                     'working_dir',
                     'filename.yml'
                 )
@@ -1738,9 +1781,12 @@ class ConfigTest(unittest.TestCase):
 
     def test_logs_warning_for_boolean_in_environment(self):
         config_details = build_config_details({
-            'web': {
-                'image': 'busybox',
-                'environment': {'SHOW_STUFF': True}
+            'version': str(VERSION),
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'environment': {'SHOW_STUFF': True}
+                }
             }
         })
 
@@ -1752,10 +1798,12 @@ class ConfigTest(unittest.TestCase):
     def test_config_valid_environment_dict_key_contains_dashes(self):
         services = config.load(
             build_config_details(
-                {'web': {
-                    'image': 'busybox',
-                    'environment': {'SPRING_JPA_HIBERNATE_DDL-AUTO': 'none'}
-                }},
+                {
+                    'version': str(VERSION),
+                    'services': {
+                        'web': {
+                            'image': 'busybox',
+                            'environment': {'SPRING_JPA_HIBERNATE_DDL-AUTO': 'none'}}}},
                 'working_dir',
                 'filename.yml'
             )
@@ -1794,9 +1842,12 @@ web:
     def test_validate_extra_hosts_invalid(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details({
-                'web': {
-                    'image': 'alpine',
-                    'extra_hosts': "www.example.com: 192.168.0.17",
+                'version': str(VERSION),
+                'services': {
+                    'web': {
+                        'image': 'alpine',
+                        'extra_hosts': "www.example.com: 192.168.0.17",
+                    }
                 }
             }))
         assert "web.extra_hosts contains an invalid type" in exc.exconly()
@@ -1804,22 +1855,28 @@ web:
     def test_validate_extra_hosts_invalid_list(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details({
-                'web': {
-                    'image': 'alpine',
-                    'extra_hosts': [
-                        {'www.example.com': '192.168.0.17'},
-                        {'api.example.com': '192.168.0.18'}
-                    ],
+                'version': str(VERSION),
+                'services': {
+                    'web': {
+                        'image': 'alpine',
+                        'extra_hosts': [
+                            {'www.example.com': '192.168.0.17'},
+                            {'api.example.com': '192.168.0.18'}
+                        ],
+                    }
                 }
             }))
         assert "which is an invalid type" in exc.exconly()
 
     def test_normalize_dns_options(self):
         actual = config.load(build_config_details({
-            'web': {
-                'image': 'alpine',
-                'dns': '8.8.8.8',
-                'dns_search': 'domain.local',
+            'version': str(VERSION),
+            'services': {
+                'web': {
+                    'image': 'alpine',
+                    'dns': '8.8.8.8',
+                    'dns_search': 'domain.local',
+                }
             }
         }))
         assert actual.services == [
@@ -1947,7 +2004,6 @@ web:
 
     def test_isolation_option(self):
         actual = config.load(build_config_details({
-            'version': str(V2_1),
             'services': {
                 'web': {
                     'image': 'win10',
@@ -1966,7 +2022,6 @@ web:
 
     def test_runtime_option(self):
         actual = config.load(build_config_details({
-            'version': str(V2_3),
             'services': {
                 'web': {
                     'image': 'nvidia/cuda',
@@ -2088,7 +2143,7 @@ web:
         }
 
         actual = config.merge_service_dicts_from_files(
-            base, override, V3_2
+            base, override, VERSION
         )
 
         assert actual['volumes'] == [
@@ -2135,7 +2190,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2169,7 +2224,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2201,7 +2256,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2233,7 +2288,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2262,7 +2317,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2282,7 +2337,7 @@ web:
                 }
             }
         }
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2304,7 +2359,7 @@ web:
             }
         }
         override = {}
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'alpine:edge',
             'logging': {
@@ -2332,7 +2387,7 @@ web:
             'ports': ['1245:1245/udp']
         }
 
-        actual = config.merge_service_dicts(base, override, V3_1)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
@@ -2348,7 +2403,7 @@ web:
             }
         }
         override = {}
-        actual = config.merge_service_dicts(base, override, V2_1)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == base
 
     def test_merge_depends_on_mixed_syntax(self):
@@ -2363,7 +2418,7 @@ web:
             'depends_on': ['app3']
         }
 
-        actual = config.merge_service_dicts(base, override, V2_1)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'busybox',
             'depends_on': {
@@ -2401,7 +2456,7 @@ web:
             'labels': {'com.docker.compose.test': 'yes'}
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'busybox',
             'pid': 'host',
@@ -2417,7 +2472,7 @@ web:
         }
         override = {'secrets': ['other-src.txt']}
 
-        actual = config.merge_service_dicts(base, override, V3_1)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert secret_sort(actual['secrets']) == secret_sort([
             {'source': 'src.txt'},
             {'source': 'other-src.txt'}
@@ -2437,7 +2492,7 @@ web:
                 }
             ]
         }
-        actual = config.merge_service_dicts(base, override, V3_1)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['secrets'] == override['secrets']
 
     def test_merge_different_configs(self):
@@ -2449,7 +2504,7 @@ web:
         }
         override = {'configs': ['other-src.txt']}
 
-        actual = config.merge_service_dicts(base, override, V3_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert secret_sort(actual['configs']) == secret_sort([
             {'source': 'src.txt'},
             {'source': 'other-src.txt'}
@@ -2469,7 +2524,7 @@ web:
                 }
             ]
         }
-        actual = config.merge_service_dicts(base, override, V3_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['configs'] == override['configs']
 
     def test_merge_deploy(self):
@@ -2484,7 +2539,7 @@ web:
                 }
             }
         }
-        actual = config.merge_service_dicts(base, override, V3_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['deploy'] == override['deploy']
 
     def test_merge_deploy_override(self):
@@ -2540,7 +2595,7 @@ web:
                 'update_config': {'max_failure_ratio': 0.712, 'parallelism': 4}
             }
         }
-        actual = config.merge_service_dicts(base, override, V3_5)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['deploy'] == {
             'mode': 'replicated',
             'endpoint_mode': 'vip',
@@ -2596,7 +2651,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V3_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['credential_spec'] == override['credential_spec']
 
     def test_merge_scale(self):
@@ -2609,7 +2664,7 @@ web:
             'scale': 4,
         }
 
-        actual = config.merge_service_dicts(base, override, V2_2)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {'image': 'bar', 'scale': 4}
 
     def test_merge_blkio_config(self):
@@ -2644,7 +2699,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_2)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'bar',
             'blkio_config': {
@@ -2671,7 +2726,7 @@ web:
             'extra_hosts': ['bar:5.6.7.8', 'foo:127.0.0.1']
         }
 
-        actual = config.merge_service_dicts(base, override, V2_0)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['extra_hosts'] == {
             'foo': '127.0.0.1',
             'bar': '5.6.7.8',
@@ -2695,7 +2750,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['healthcheck'] == {
             'start_period': base['healthcheck']['start_period'],
             'test': override['healthcheck']['test'],
@@ -2721,7 +2776,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['healthcheck'] == {'disabled': True}
 
     def test_merge_healthcheck_override_enables(self):
@@ -2743,7 +2798,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['healthcheck'] == override['healthcheck']
 
     def test_merge_device_cgroup_rules(self):
@@ -2756,7 +2811,7 @@ web:
             'device_cgroup_rules': ['c 7:128 rwm', 'f 0:128 n']
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert sorted(actual['device_cgroup_rules']) == sorted(
             ['c 7:128 rwm', 'x 3:244 rw', 'f 0:128 n']
         )
@@ -2771,7 +2826,7 @@ web:
             'isolation': 'hyperv',
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual == {
             'image': 'bar',
             'isolation': 'hyperv',
@@ -2793,7 +2848,7 @@ web:
             }
         }
 
-        actual = config.merge_service_dicts(base, override, V2_3)
+        actual = config.merge_service_dicts(base, override, VERSION)
         assert actual['storage_opt'] == {
             'size': '2G',
             'readonly': 'false',
@@ -3176,12 +3231,12 @@ web:
 
         with self.assertRaises(ConfigurationError) as e:
             config.load(config1)
-        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+        self.assertEqual(str(e.exception), 'Duplicate mount points: [%s]' % (
             ', '.join(['/tmp/foo:/tmp/foo:rw']*2)))
 
         with self.assertRaises(ConfigurationError) as e:
             config.load(config2)
-        self.assertEquals(str(e.exception), 'Duplicate mount points: [%s]' % (
+        self.assertEqual(str(e.exception), 'Duplicate mount points: [%s]' % (
             ', '.join(['/x:/y:rw', '/z:/y:rw'])))
 
 
@@ -3350,6 +3405,7 @@ class PortsTest(unittest.TestCase):
 
             assert "non-unique" in exc.value.msg
 
+    @pytest.mark.skip(reason="Validator is one_off (generic error)")
     def test_config_invalid_ports_format_validation(self):
         for invalid_ports in self.INVALID_PORT_MAPPINGS:
             with pytest.raises(ConfigurationError) as exc:
@@ -3599,6 +3655,7 @@ class InterpolationTest(unittest.TestCase):
             assert 'BAR' in warnings[0]
             assert 'FOO' in warnings[1]
 
+    @pytest.mark.skip(reason='compatibility mode was removed internally')
     def test_compatibility_mode_warnings(self):
         config_details = build_config_details({
             'version': '3.5',
@@ -3637,6 +3694,7 @@ class InterpolationTest(unittest.TestCase):
         assert 'restart_policy.delay' in warn_message
         assert 'restart_policy.window' in warn_message
 
+    @pytest.mark.skip(reason='compatibility mode was removed internally')
     def test_compatibility_mode_load(self):
         config_details = build_config_details({
             'version': '3.5',
@@ -4369,7 +4427,8 @@ class EnvTest(unittest.TestCase):
 
         service_dict = config.load(
             build_config_details(
-                {'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}},
+                {'services': {
+                    'foo': {'build': '.', 'volumes': ['$HOSTENV:$CONTAINERENV']}}},
                 "tests/fixtures/env",
             )
         ).services[0]
@@ -4377,7 +4436,8 @@ class EnvTest(unittest.TestCase):
 
         service_dict = config.load(
             build_config_details(
-                {'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}},
+                {'services': {
+                    'foo': {'build': '.', 'volumes': ['/opt${HOSTENV}:/opt${CONTAINERENV}']}}},
                 "tests/fixtures/env",
             )
         ).services[0]
@@ -4498,7 +4558,11 @@ class ExtendsTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {'image': 'busybox', 'extends': {}},
+                        'version': '3',
+                        'services':
+                        {
+                            'web': {'image': 'busybox', 'extends': {}},
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -4512,7 +4576,14 @@ class ExtendsTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {'image': 'busybox', 'extends': {'file': 'common.yml'}},
+                        'version': '3',
+                        'services':
+                        {
+                            'web': {
+                                'image': 'busybox',
+                                'extends': {'file': 'common.yml'}
+                            }
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -4526,14 +4597,18 @@ class ExtendsTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {
-                            'image': 'busybox',
-                            'extends': {
-                                'file': 'common.yml',
-                                'service': 'web',
-                                'rogue_key': 'is not allowed'
-                            }
-                        },
+                        'version': '3',
+                        'services':
+                        {
+                            'web': {
+                                'image': 'busybox',
+                                'extends': {
+                                    'file': 'common.yml',
+                                    'service': 'web',
+                                    'rogue_key': 'is not allowed'
+                                }
+                            },
+                        }
                     },
                     'tests/fixtures/extends',
                     'filename.yml'
@@ -4548,11 +4623,14 @@ class ExtendsTest(unittest.TestCase):
             config.load(
                 build_config_details(
                     {
-                        'web': {
-                            'image': 'busybox',
-                            'extends': {
-                                'file': 1,
-                                'service': 'web',
+                        'version': '3',
+                        'services': {
+                            'web': {
+                                'image': 'busybox',
+                                'extends': {
+                                    'file': 1,
+                                    'service': 'web',
+                                }
                             }
                         },
                     },
@@ -5205,7 +5283,7 @@ class SerializeTest(unittest.TestCase):
             }
         }
 
-        assert denormalize_service_dict(service_dict, V3_0) == {
+        assert denormalize_service_dict(service_dict, VERSION) == {
             'image': 'busybox',
             'command': 'true',
             'depends_on': ['service2', 'service3']
@@ -5221,7 +5299,11 @@ class SerializeTest(unittest.TestCase):
             }
         }
 
-        assert denormalize_service_dict(service_dict, V2_1) == service_dict
+        assert denormalize_service_dict(service_dict, VERSION) == {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': ['service2', 'service3']
+        }
 
     def test_serialize_time(self):
         data = {
@@ -5255,7 +5337,7 @@ class SerializeTest(unittest.TestCase):
         processed_service = config.process_service(config.ServiceConfig(
             '.', 'test', 'test', service_dict
         ))
-        denormalized_service = denormalize_service_dict(processed_service, V2_3)
+        denormalized_service = denormalize_service_dict(processed_service, VERSION)
         assert denormalized_service['healthcheck']['interval'] == '100s'
         assert denormalized_service['healthcheck']['timeout'] == '30s'
         assert denormalized_service['healthcheck']['start_period'] == '2090ms'
@@ -5266,7 +5348,7 @@ class SerializeTest(unittest.TestCase):
         }
         image_digest = 'busybox@sha256:abcde'
 
-        assert denormalize_service_dict(service_dict, V3_0, image_digest) == {
+        assert denormalize_service_dict(service_dict, VERSION, image_digest) == {
             'image': 'busybox@sha256:abcde'
         }
 
@@ -5275,7 +5357,7 @@ class SerializeTest(unittest.TestCase):
             'image': 'busybox'
         }
 
-        assert denormalize_service_dict(service_dict, V3_0) == {
+        assert denormalize_service_dict(service_dict, VERSION) == {
             'image': 'busybox'
         }
 
@@ -5308,10 +5390,10 @@ class SerializeTest(unittest.TestCase):
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['secrets']) == secret_sort(service_dict['secrets'])
         assert 'secrets' in serialized_config
-        assert serialized_config['secrets']['two'] == secrets_dict['two']
+        assert serialized_config['secrets']['two'] == {'external': True, 'name': 'two'}
 
     def test_serialize_ports(self):
-        config_dict = config.Config(version=V2_0, services=[
+        config_dict = config.Config(version=VERSION, services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, None)],
                 'image': 'alpine',
@@ -5320,10 +5402,10 @@ class SerializeTest(unittest.TestCase):
         ], volumes={}, networks={}, secrets={}, configs={})
 
         serialized_config = yaml.safe_load(serialize_config(config_dict))
-        assert '8080:80/tcp' in serialized_config['services']['web']['ports']
+        assert [{'published': 8080, 'target': 80}] == serialized_config['services']['web']['ports']
 
     def test_serialize_ports_with_ext_ip(self):
-        config_dict = config.Config(version=V3_5, services=[
+        config_dict = config.Config(version=VERSION, services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, '127.0.0.1')],
                 'image': 'alpine',
@@ -5363,7 +5445,7 @@ class SerializeTest(unittest.TestCase):
         serialized_service = serialized_config['services']['web']
         assert secret_sort(serialized_service['configs']) == secret_sort(service_dict['configs'])
         assert 'configs' in serialized_config
-        assert serialized_config['configs']['two'] == configs_dict['two']
+        assert serialized_config['configs']['two'] == {'external': True, 'name': 'two'}
 
     def test_serialize_bool_string(self):
         cfg = {

@@ -12,18 +12,13 @@ import yaml
 from cached_property import cached_property
 
 from . import types
-from .. import const
+from ..const import COMPOSE_SPEC as VERSION
 from ..const import COMPOSEFILE_V1 as V1
-from ..const import COMPOSEFILE_V2_1 as V2_1
-from ..const import COMPOSEFILE_V2_3 as V2_3
-from ..const import COMPOSEFILE_V3_0 as V3_0
-from ..const import COMPOSEFILE_V3_4 as V3_4
 from ..utils import build_string_dict
 from ..utils import json_hash
 from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
-from ..version import ComposeVersion
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -189,15 +184,28 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
     @cached_property
     def version(self):
-        if 'version' not in self.config:
-            return V1
+        version = self.config.get('version', None)
+        if not version:
+            # no version is specified in the config file
+            services = self.config.get('services', None)
+            networks = self.config.get('networks', None)
+            volumes = self.config.get('volumes', None)
+            if services or networks or volumes:
+                # validate V2/V3 structure
+                for section in ['services', 'networks', 'volumes']:
+                    validate_config_section(
+                        self.filename, self.config.get(section, {}), section)
+                return VERSION
 
-        version = self.config['version']
+            # validate V1 structure
+            validate_config_section(
+                self.filename, self.config, 'services')
+            return V1
 
         if isinstance(version, dict):
             log.warning('Unexpected type for "version" key in "{}". Assuming '
                         '"version" is the name of a service, and defaulting to '
-                        'Compose file version 1.'.format(self.filename))
+                        'Compose file version {}.'.format(self.filename, V1))
             return V1
 
         if not isinstance(version, str):
@@ -205,31 +213,32 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                 'Version in "{}" is invalid - it should be a string.'
                 .format(self.filename))
 
-        if version == '1':
+        if isinstance(version, str):
+            version_pattern = re.compile(r"^[1-3]+(\.\d+)?$")
+            if not version_pattern.match(version):
+                raise ConfigurationError(
+                    'Version "{}" in "{}" is invalid.'
+                    .format(version, self.filename))
+
+            if version.startswith("1"):
+                version = V1
+            else:
+                version = VERSION
+
+        if version == V1:
             raise ConfigurationError(
                 'Version in "{}" is invalid. {}'
                 .format(self.filename, VERSION_EXPLANATION)
             )
-
-        version_pattern = re.compile(r"^[2-9]+(\.\d+)?$")
-        if not version_pattern.match(version):
-            raise ConfigurationError(
-                'Version "{}" in "{}" is invalid.'
-                .format(version, self.filename))
-
-        if version == '2':
-            return const.COMPOSEFILE_V2_0
-
-        if version == '3':
-            return const.COMPOSEFILE_V3_0
-
-        return ComposeVersion(version)
+        return version
 
     def get_service(self, name):
         return self.get_service_dicts()[name]
 
     def get_service_dicts(self):
-        return self.config if self.version == V1 else self.config.get('services', {})
+        if self.version == V1:
+            return self.config
+        return self.config.get('services', {})
 
     def get_volumes(self):
         return {} if self.version == V1 else self.config.get('volumes', {})
@@ -238,10 +247,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return {} if self.version == V1 else self.config.get('networks', {})
 
     def get_secrets(self):
-        return {} if self.version < const.COMPOSEFILE_V3_1 else self.config.get('secrets', {})
+        return {} if self.version == V1 else self.config.get('secrets', {})
 
     def get_configs(self):
-        return {} if self.version < const.COMPOSEFILE_V3_3 else self.config.get('configs', {})
+        return {} if self.version == V1 else self.config.get('configs', {})
 
 
 class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
@@ -299,6 +308,7 @@ def find(base_dir, filenames, environment, override_dir=None):
 def validate_config_version(config_files):
     main_file = config_files[0]
     validate_top_level_object(main_file)
+
     for next_file in config_files[1:]:
         validate_top_level_object(next_file)
 
@@ -355,7 +365,7 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
-def check_swarm_only_config(service_dicts, compatibility=False):
+def check_swarm_only_config(service_dicts):
     warning_template = (
         "Some services ({services}) use the '{key}' key, which will be ignored. "
         "Compose does not support '{key}' configuration - use "
@@ -371,18 +381,20 @@ def check_swarm_only_config(service_dicts, compatibility=False):
                     key=key
                 )
             )
-    if not compatibility:
-        check_swarm_only_key(service_dicts, 'deploy')
+
+    check_swarm_only_key(service_dicts, 'deploy')
     check_swarm_only_key(service_dicts, 'configs')
 
 
-def load(config_details, compatibility=False, interpolate=True):
+def load(config_details, interpolate=True):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
     of each other to create the final configuration.
 
     Return a fully interpolated, extended and validated configuration.
     """
+
+    # validate against latest version and if fails do it against v1 schema
     validate_config_version(config_details.config_files)
 
     processed_files = [
@@ -404,15 +416,15 @@ def load(config_details, compatibility=False, interpolate=True):
     configs = load_mapping(
         config_details.config_files, 'get_configs', 'Config', config_details.working_dir
     )
-    service_dicts = load_services(config_details, main_file, compatibility, interpolate=interpolate)
+    service_dicts = load_services(config_details, main_file, interpolate=interpolate)
 
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    check_swarm_only_config(service_dicts, compatibility)
+    check_swarm_only_config(service_dicts)
 
-    version = V2_3 if compatibility and main_file.version >= V3_0 else main_file.version
+    version = main_file.version
 
     return Config(version, service_dicts, volumes, networks, secrets, configs)
 
@@ -449,14 +461,15 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
 
 
 def validate_external(entity_type, name, config, version):
-    if (version < V2_1 or (version >= V3_0 and version < V3_4)) and len(config.keys()) > 1:
-        raise ConfigurationError(
-            "{} {} declared as external but specifies additional attributes "
-            "({}).".format(
-                entity_type, name, ', '.join(k for k in config if k != 'external')))
+    for k in config.keys():
+        if k not in ['external', 'name']:
+            raise ConfigurationError(
+                "{} {} declared as external but specifies additional attributes "
+                "({}).".format(
+                    entity_type, name, ', '.join(k for k in config if k != 'external')))
 
 
-def load_services(config_details, config_file, compatibility=False, interpolate=True):
+def load_services(config_details, config_file, interpolate=True):
     def build_service(service_name, service_dict, service_names):
         service_config = ServiceConfig.with_abs_paths(
             config_details.working_dir,
@@ -475,7 +488,6 @@ def load_services(config_details, config_file, compatibility=False, interpolate=
             service_names,
             config_file.version,
             config_details.environment,
-            compatibility,
             interpolate
         )
         return service_dict
@@ -554,27 +566,25 @@ def process_config_file(config_file, environment, service_name=None, interpolate
             environment,
             interpolate,
         )
-        if config_file.version >= const.COMPOSEFILE_V3_1:
-            processed_config['secrets'] = process_config_section(
-                config_file,
-                config_file.get_secrets(),
-                'secret',
-                environment,
-                interpolate,
-            )
-        if config_file.version >= const.COMPOSEFILE_V3_3:
-            processed_config['configs'] = process_config_section(
-                config_file,
-                config_file.get_configs(),
-                'config',
-                environment,
-                interpolate,
-            )
+        processed_config['secrets'] = process_config_section(
+            config_file,
+            config_file.get_secrets(),
+            'secret',
+            environment,
+            interpolate,
+        )
+        processed_config['configs'] = process_config_section(
+            config_file,
+            config_file.get_configs(),
+            'config',
+            environment,
+            interpolate,
+        )
     else:
         processed_config = services
 
     config_file = config_file._replace(config=processed_config)
-    validate_against_config_schema(config_file)
+    validate_against_config_schema(config_file, config_file.version)
 
     if service_name and service_name not in services:
         raise ConfigurationError(
@@ -889,7 +899,7 @@ def finalize_service_volumes(service_dict, environment):
     return service_dict
 
 
-def finalize_service(service_config, service_names, version, environment, compatibility,
+def finalize_service(service_config, service_names, version, environment,
                      interpolate=True):
     service_dict = dict(service_config.config)
 
@@ -931,104 +941,8 @@ def finalize_service(service_config, service_names, version, environment, compat
 
     normalize_build(service_dict, service_config.working_dir, environment)
 
-    if compatibility:
-        service_dict = translate_credential_spec_to_security_opt(service_dict)
-        service_dict, ignored_keys = translate_deploy_keys_to_container_config(
-            service_dict
-        )
-        if ignored_keys:
-            log.warning(
-                'The following deploy sub-keys are not supported in compatibility mode and have'
-                ' been ignored: {}'.format(', '.join(ignored_keys))
-            )
-
     service_dict['name'] = service_config.name
     return normalize_v1_service_format(service_dict)
-
-
-def translate_resource_keys_to_container_config(resources_dict, service_dict):
-    if 'limits' in resources_dict:
-        service_dict['mem_limit'] = resources_dict['limits'].get('memory')
-        if 'cpus' in resources_dict['limits']:
-            service_dict['cpus'] = float(resources_dict['limits']['cpus'])
-    if 'reservations' in resources_dict:
-        service_dict['mem_reservation'] = resources_dict['reservations'].get('memory')
-        if 'cpus' in resources_dict['reservations']:
-            return ['resources.reservations.cpus']
-    return []
-
-
-def convert_restart_policy(name):
-    try:
-        return {
-            'any': 'always',
-            'none': 'no',
-            'on-failure': 'on-failure'
-        }[name]
-    except KeyError:
-        raise ConfigurationError('Invalid restart policy "{}"'.format(name))
-
-
-def convert_credential_spec_to_security_opt(credential_spec):
-    if 'file' in credential_spec:
-        return 'file://{file}'.format(file=credential_spec['file'])
-    return 'registry://{registry}'.format(registry=credential_spec['registry'])
-
-
-def translate_credential_spec_to_security_opt(service_dict):
-    result = []
-
-    if 'credential_spec' in service_dict:
-        spec = convert_credential_spec_to_security_opt(service_dict['credential_spec'])
-        result.append('credentialspec={spec}'.format(spec=spec))
-
-    if result:
-        service_dict['security_opt'] = result
-
-    return service_dict
-
-
-def translate_deploy_keys_to_container_config(service_dict):
-    if 'credential_spec' in service_dict:
-        del service_dict['credential_spec']
-    if 'configs' in service_dict:
-        del service_dict['configs']
-
-    if 'deploy' not in service_dict:
-        return service_dict, []
-
-    deploy_dict = service_dict['deploy']
-    ignored_keys = [
-        k for k in ['endpoint_mode', 'labels', 'update_config', 'rollback_config']
-        if k in deploy_dict
-    ]
-
-    if 'replicas' in deploy_dict and deploy_dict.get('mode', 'replicated') == 'replicated':
-        scale = deploy_dict.get('replicas', 1)
-        max_replicas = deploy_dict.get('placement', {}).get('max_replicas_per_node', scale)
-        service_dict['scale'] = min(scale, max_replicas)
-        if max_replicas < scale:
-            log.warning("Scale is limited to {} ('max_replicas_per_node' field).".format(
-                max_replicas))
-
-    if 'restart_policy' in deploy_dict:
-        service_dict['restart'] = {
-            'Name': convert_restart_policy(deploy_dict['restart_policy'].get('condition', 'any')),
-            'MaximumRetryCount': deploy_dict['restart_policy'].get('max_attempts', 0)
-        }
-        for k in deploy_dict['restart_policy'].keys():
-            if k != 'condition' and k != 'max_attempts':
-                ignored_keys.append('restart_policy.{}'.format(k))
-
-    ignored_keys.extend(
-        translate_resource_keys_to_container_config(
-            deploy_dict.get('resources', {}), service_dict
-        )
-    )
-
-    del service_dict['deploy']
-
-    return service_dict, ignored_keys
 
 
 def normalize_v1_service_format(service_dict):

@@ -66,7 +66,6 @@ def project_from_options(project_dir, options, additional_options=None):
         context=context,
         environment=environment,
         override_dir=override_dir,
-        compatibility=compatibility_from_options(project_dir, options, environment),
         interpolate=(not additional_options.get('--no-interpolate')),
         environment_file=environment_file
     )
@@ -98,7 +97,6 @@ def get_config_from_options(base_dir, options, additional_options=None):
     )
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
-        compatibility_from_options(config_path, options, environment),
         not additional_options.get('--no-interpolate')
     )
 
@@ -120,14 +118,14 @@ def get_config_path_from_options(base_dir, options, environment):
 
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 context=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True, environment_file=None):
+                interpolate=True, environment_file=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details, compatibility, interpolate)
+    config_data = config.load(config_details, interpolate)
 
     api_version = environment.get(
         'COMPOSE_API_VERSION',
@@ -188,13 +186,3 @@ def get_project_name(working_dir, project_name=None, environment=None):
         return normalize_name(project)
 
     return 'default'
-
-
-def compatibility_from_options(working_dir, options=None, environment=None):
-    """Get compose v3 compatibility from --compatibility option
-       or from COMPOSE_COMPATIBILITY environment variable."""
-
-    compatibility_option = options.get('--compatibility')
-    compatibility_environment = environment.get_boolean('COMPOSE_COMPATIBILITY')
-
-    return compatibility_option or compatibility_environment

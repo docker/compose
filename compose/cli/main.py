@@ -24,7 +24,6 @@ from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
-from ..const import COMPOSEFILE_V2_2 as V2_2
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..progress_stream import StreamOutputError
@@ -180,7 +179,7 @@ class TopLevelCommand(object):
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f <arg>...] [options] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [options] [--] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
@@ -205,7 +204,7 @@ class TopLevelCommand(object):
       --project-directory PATH    Specify an alternate working directory
                                   (default: the path of the Compose file)
       --compatibility             If set, Compose will attempt to convert keys
-                                  in v3 files to their non-Swarm equivalent
+                                  in v3 files to their non-Swarm equivalent (DEPRECATED)
       --env-file PATH             Specify an alternate environment file
 
     Commands:
@@ -233,7 +232,7 @@ class TopLevelCommand(object):
       top                Display the running processes
       unpause            Unpause services
       up                 Create and start containers
-      version            Show the Docker-Compose version information
+      version            Show version information and quit
     """
 
     def __init__(self, project, options=None):
@@ -257,7 +256,7 @@ class TopLevelCommand(object):
         e.g. `composetest_db`. If you change a service's `Dockerfile` or the
         contents of its build directory, you can run `docker-compose build` to rebuild it.
 
-        Usage: build [options] [--build-arg key=val...] [SERVICE...]
+        Usage: build [options] [--build-arg key=val...] [--] [SERVICE...]
 
         Options:
             --build-arg key=val     Set build-time variables for services.
@@ -423,7 +422,7 @@ class TopLevelCommand(object):
         """
         Receive real time events from containers.
 
-        Usage: events [options] [SERVICE...]
+        Usage: events [options] [--] [SERVICE...]
 
         Options:
             --json      Output events as a stream of json objects
@@ -448,7 +447,7 @@ class TopLevelCommand(object):
         """
         Execute a command in a running container
 
-        Usage: exec [options] [-e KEY=VAL...] SERVICE COMMAND [ARGS...]
+        Usage: exec [options] [-e KEY=VAL...] [--] SERVICE COMMAND [ARGS...]
 
         Options:
             -d, --detach      Detached mode: Run command in the background.
@@ -536,7 +535,7 @@ class TopLevelCommand(object):
     def images(self, options):
         """
         List images used by the created containers.
-        Usage: images [options] [SERVICE...]
+        Usage: images [options] [--] [SERVICE...]
 
         Options:
             -q, --quiet  Only display IDs
@@ -591,7 +590,7 @@ class TopLevelCommand(object):
         """
         Force stop service containers.
 
-        Usage: kill [options] [SERVICE...]
+        Usage: kill [options] [--] [SERVICE...]
 
         Options:
             -s SIGNAL         SIGNAL to send to the container.
@@ -605,7 +604,7 @@ class TopLevelCommand(object):
         """
         View output from containers.
 
-        Usage: logs [options] [SERVICE...]
+        Usage: logs [options] [--] [SERVICE...]
 
         Options:
             --no-color          Produce monochrome output.
@@ -648,7 +647,7 @@ class TopLevelCommand(object):
         """
         Print the public port for a port binding.
 
-        Usage: port [options] SERVICE PRIVATE_PORT
+        Usage: port [options] [--] SERVICE PRIVATE_PORT
 
         Options:
             --protocol=proto  tcp or udp [default: tcp]
@@ -669,7 +668,7 @@ class TopLevelCommand(object):
         """
         List containers.
 
-        Usage: ps [options] [SERVICE...]
+        Usage: ps [options] [--] [SERVICE...]
 
         Options:
             -q, --quiet          Only display IDs
@@ -725,7 +724,7 @@ class TopLevelCommand(object):
         """
         Pulls images for services defined in a Compose file, but does not start the containers.
 
-        Usage: pull [options] [SERVICE...]
+        Usage: pull [options] [--] [SERVICE...]
 
         Options:
             --ignore-pull-failures  Pull what it can and ignores images with pull failures.
@@ -748,7 +747,7 @@ class TopLevelCommand(object):
         """
         Pushes images for services.
 
-        Usage: push [options] [SERVICE...]
+        Usage: push [options] [--] [SERVICE...]
 
         Options:
             --ignore-push-failures  Push what it can and ignores images with push failures.
@@ -767,7 +766,7 @@ class TopLevelCommand(object):
 
         Any data which is not in a volume will be lost.
 
-        Usage: rm [options] [SERVICE...]
+        Usage: rm [options] [--] [SERVICE...]
 
         Options:
             -f, --force   Don't ask to confirm removal
@@ -815,7 +814,7 @@ class TopLevelCommand(object):
         `docker-compose run --no-deps SERVICE COMMAND [ARGS...]`.
 
         Usage:
-            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...]
+            run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] [--]
                 SERVICE [COMMAND] [ARGS...]
 
         Options:
@@ -882,16 +881,10 @@ class TopLevelCommand(object):
         """
         timeout = timeout_from_opts(options)
 
-        if self.project.config_version == V2_2:
-            raise UserError(
-                'The scale command is incompatible with the v2.2 format. '
-                'Use the up command with the --scale flag instead.'
-            )
-        else:
-            log.warning(
-                'The scale command is deprecated. '
-                'Use the up command with the --scale flag instead.'
-            )
+        log.warning(
+            'The scale command is deprecated. '
+            'Use the up command with the --scale flag instead.'
+        )
 
         for service_name, num in parse_scale_args(options['SERVICE=NUM']).items():
             self.project.get_service(service_name).scale(num, timeout=timeout)
@@ -911,7 +904,7 @@ class TopLevelCommand(object):
 
         They can be started again with `docker-compose start`.
 
-        Usage: stop [options] [SERVICE...]
+        Usage: stop [options] [--] [SERVICE...]
 
         Options:
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
@@ -924,7 +917,7 @@ class TopLevelCommand(object):
         """
         Restart running containers.
 
-        Usage: restart [options] [SERVICE...]
+        Usage: restart [options] [--] [SERVICE...]
 
         Options:
           -t, --timeout TIMEOUT      Specify a shutdown timeout in seconds.
@@ -989,7 +982,7 @@ class TopLevelCommand(object):
         If you want to force Compose to stop and recreate all containers, use the
         `--force-recreate` flag.
 
-        Usage: up [options] [--scale SERVICE=NUM...] [SERVICE...]
+        Usage: up [options] [--scale SERVICE=NUM...] [--] [SERVICE...]
 
         Options:
             -d, --detach               Detached mode: Run containers in the background,
@@ -1118,7 +1111,7 @@ class TopLevelCommand(object):
     @classmethod
     def version(cls, options):
         """
-        Show version information
+        Show version information and quit.
 
         Usage: version [--short]
 
@@ -1305,31 +1298,28 @@ def build_one_off_container_options(options, detach, command):
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
                           toplevel_environment):
-    if not options['--no-deps']:
-        deps = service.get_dependency_names()
-        if deps:
-            project.up(
-                service_names=deps,
-                start_deps=True,
-                strategy=ConvergenceStrategy.never,
-                rescale=False
-            )
-
-    project.initialize()
-
-    container = service.create_container(
-        quiet=True,
+    detach = options.get('--detach')
+    use_network_aliases = options.get('--use-aliases')
+    containers = project.up(
+        service_names=[service.name],
+        start_deps=not options['--no-deps'],
+        strategy=ConvergenceStrategy.never,
+        detached=detach,
+        rescale=False,
         one_off=True,
-        **container_options)
+        override_options=container_options,
+    )
+    try:
+        container = next(c for c in containers if c.service == service.name)
+    except StopIteration:
+        raise OperationFailedError('Could not bring up the requested service')
 
-    use_network_aliases = options['--use-aliases']
-
-    if options.get('--detach'):
+    if detach:
         service.start_container(container, use_network_aliases)
         print(container.name)
         return
 
-    def remove_container(force=False):
+    def remove_container():
         if options['--rm']:
             project.client.remove_container(container.id, force=True, v=True)
 
@@ -1362,7 +1352,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
             exit_code = 1
     except (signals.ShutdownException, signals.HangUpException):
         project.client.kill(container.id)
-        remove_container(force=True)
+        remove_container()
         sys.exit(2)
 
     remove_container()

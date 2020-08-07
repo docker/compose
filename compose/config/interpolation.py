@@ -3,7 +3,7 @@ import re
 from string import Template
 
 from .errors import ConfigurationError
-from compose.const import COMPOSEFILE_V2_0 as V2_0
+from compose.const import COMPOSEFILE_V1 as V1
 from compose.utils import parse_bytes
 from compose.utils import parse_nanoseconds_int
 
@@ -25,7 +25,7 @@ class Interpolator(object):
 
 
 def interpolate_environment_variables(version, config, section, environment):
-    if version <= V2_0:
+    if version == V1:
         interpolator = Interpolator(Template, environment)
     else:
         interpolator = Interpolator(TemplateWithDefaults, environment)
