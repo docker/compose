@@ -220,6 +220,55 @@ class CLITestCase(unittest.TestCase):
 
         assert not mock_client.create_host_config.call_args[1].get('restart_policy')
 
+    @mock.patch('compose.project.Project.up')
+    @mock.patch.dict(os.environ)
+    def test_run_up_with_docker_cli_build(self, mock_project_up):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '1'
+        mock_client = mock.create_autospec(docker.APIClient)
+        mock_client.api_version = DEFAULT_DOCKER_API_VERSION
+        mock_client._general_configs = {}
+        container = Container(mock_client, {
+            'Id': '37b35e0ba80d91009d37e16f249b32b84f72bda269985578ed6c75a0a13fcaa8',
+            'Name': 'composetest_service_37b35',
+            'Config': {
+                'Labels': {
+                    LABEL_SERVICE: 'service',
+                }
+            },
+        }, has_been_inspected=True)
+        mock_project_up.return_value = [container]
+
+        project = Project.from_config(
+            name='composetest',
+            config_data=build_config({
+                'service': {'image': 'busybox'}
+            }),
+            client=mock_client,
+        )
+
+        command = TopLevelCommand(project)
+        command.run({
+            'SERVICE': 'service',
+            'COMMAND': None,
+            '-e': [],
+            '--label': [],
+            '--user': None,
+            '--no-deps': None,
+            '--detach': True,
+            '-T': None,
+            '--entrypoint': None,
+            '--service-ports': None,
+            '--use-aliases': None,
+            '--publish': [],
+            '--volume': [],
+            '--rm': None,
+            '--name': None,
+            '--workdir': None,
+        })
+
+        _, _, call_kwargs = mock_project_up.mock_calls[0]
+        assert call_kwargs.get('cli')
+
     def test_command_manual_and_service_ports_together(self):
         project = Project.from_config(
             name='composetest',
