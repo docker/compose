@@ -1298,6 +1298,7 @@ def build_one_off_container_options(options, detach, command):
 
 def run_one_off_container(container_options, project, service, options, toplevel_options,
                           toplevel_environment):
+    native_builder = toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
     detach = options.get('--detach')
     use_network_aliases = options.get('--use-aliases')
     containers = project.up(
@@ -1306,6 +1307,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
         strategy=ConvergenceStrategy.never,
         detached=detach,
         rescale=False,
+        cli=native_builder,
         one_off=True,
         override_options=container_options,
     )
