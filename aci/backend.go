@@ -64,7 +64,19 @@ type ContextParams struct {
 
 // LoginParams azure login options
 type LoginParams struct {
-	TenantID string
+	TenantID     string
+	ClientID     string
+	ClientSecret string
+}
+
+// Validate returns an error if options are not used properly
+func (opts LoginParams) Validate() error {
+	if opts.ClientID != "" || opts.ClientSecret != "" {
+		if opts.ClientID == "" || opts.ClientSecret == "" || opts.TenantID == "" {
+			return errors.New("for Service Principal login, 3 options must be specified: --client-id, --client-secret and --tenant-id")
+		}
+	}
+	return nil
 }
 
 func init() {
@@ -377,12 +389,18 @@ func (cs *aciComposeService) Logs(ctx context.Context, opts cli.ProjectOptions) 
 }
 
 type aciCloudService struct {
-	loginService *login.AzureLoginService
+	loginService login.AzureLoginServiceAPI
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
-	createOpts := params.(LoginParams)
-	return cs.loginService.Login(ctx, createOpts.TenantID)
+	opts, ok := params.(LoginParams)
+	if !ok {
+		return errors.New("Could not read azure LoginParams struct from generic parameter")
+	}
+	if opts.ClientID != "" {
+		return cs.loginService.LoginServicePrincipal(opts.ClientID, opts.ClientSecret, opts.TenantID)
+	}
+	return cs.loginService.Login(ctx, opts.TenantID)
 }
 
 func (cs *aciCloudService) Logout(ctx context.Context) error {

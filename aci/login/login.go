@@ -72,6 +72,13 @@ type AzureLoginService struct {
 	apiHelper  apiHelper
 }
 
+// AzureLoginServiceAPI interface for Azure login service
+type AzureLoginServiceAPI interface {
+	LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error
+	Login(ctx context.Context, requestedTenantID string) error
+	Logout(ctx context.Context) error
+}
+
 const tokenStoreFilename = "dockerAccessToken.json"
 
 // NewAzureLoginService creates a NewAzureLoginService
@@ -90,9 +97,9 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (*Azu
 	}, nil
 }
 
-// TestLoginFromServicePrincipal login with clientId / clientSecret from a previously created service principal.
-// The resulting token does not include a refresh token, used for tests only
-func (login *AzureLoginService) TestLoginFromServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+// LoginServicePrincipal login with clientId / clientSecret from a service principal.
+// The resulting token does not include a refresh token
+func (login *AzureLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error {
 	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
 	creds := auth2.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 
