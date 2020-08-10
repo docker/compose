@@ -307,7 +307,6 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 		port.Published,
 	)
 	template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
-		Name:     targetGroupName,
 		Port:     int(port.Target),
 		Protocol: protocol,
 		Tags: []tags.Tag{
