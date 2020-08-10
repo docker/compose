@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v43.3.0+incompatible
 	github.com/Azure/azure-storage-file-go v0.8.0
 	github.com/Azure/go-autorest/autorest v0.11.3
-	github.com/Azure/go-autorest/autorest/adal v0.9.0
+	github.com/Azure/go-autorest/autorest/adal v0.9.1
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.0
 	github.com/Azure/go-autorest/autorest/azure/cli v0.4.0
 	github.com/Azure/go-autorest/autorest/date v0.3.0
