@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
-
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
@@ -17,6 +15,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
+	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/compatibility"

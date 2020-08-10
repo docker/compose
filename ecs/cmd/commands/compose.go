@@ -7,11 +7,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/ecs-plugin/pkg/amazon/cloudformation"
-
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/cli/cli/command"
 	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
+	"github.com/docker/ecs-plugin/pkg/amazon/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/docker"
 	"github.com/spf13/cobra"
 )
@@ -60,13 +59,11 @@ func ConvertCommand(dockerCli command.Cli, options *composeOptions) *cobra.Comma
 			if err != nil {
 				return err
 			}
-
 			json, err := cloudformation.Marshall(template)
 			if err != nil {
-				fmt.Printf("Failed to generate JSON: %s\n", err)
-			} else {
-				fmt.Printf("%s\n", string(json))
+				return err
 			}
+			fmt.Printf("%s\n", string(json))
 			return nil
 		}),
 	}
