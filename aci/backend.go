@@ -30,6 +30,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
+
 	"github.com/docker/api/aci/convert"
 	"github.com/docker/api/aci/login"
 	"github.com/docker/api/backend"
@@ -39,7 +41,6 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
-	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 )
 
 const (

@@ -28,10 +28,11 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
 
+	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
+
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
-	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 )
 
 type apiService struct {

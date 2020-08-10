@@ -23,10 +23,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/api/containers"
-	"github.com/docker/api/context/store"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
+
+	"github.com/docker/api/containers"
+	"github.com/docker/api/context/store"
 )
 
 var convertCtx = store.AciContext{
