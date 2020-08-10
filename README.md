@@ -62,7 +62,7 @@ You might need to run again `docker login azure` to properly use the command lin
 
 You can also run a single ACI test from the test suite:
 ```
-TESTIFY=TestACIRunSingleContainer AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make e2e-aci
+AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make E2E_TEST=TestContainerRun e2e-aci
 ```
 
 ## Release

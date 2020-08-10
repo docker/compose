@@ -41,11 +41,10 @@ require (
 	github.com/hashicorp/go-version v1.2.1 // indirect
 	github.com/moby/term v0.0.0-20200611042045-63b9a826fb74
 	github.com/morikuni/aec v1.0.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/robpike/filter v0.0.0-20150108201509-2984852a2183
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
@@ -58,6 +57,5 @@ require (
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/ini.v1 v1.57.0
-	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2
 )
