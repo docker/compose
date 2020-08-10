@@ -28,6 +28,7 @@ var compatibleComposeAttributes = []string{
 	"services.init",
 	"services.healthcheck",
 	"services.healthcheck.interval",
+	"services.healthcheck.retries",
 	"services.healthcheck.start_period",
 	"services.healthcheck.test",
 	"services.healthcheck.timeout",
