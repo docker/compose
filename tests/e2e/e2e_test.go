@@ -315,10 +315,14 @@ func TestLegacy(t *testing.T) {
 
 	t.Run("host flag", func(t *testing.T) {
 		t.Parallel()
+		stderr := "Cannot connect to the Docker daemon at tcp://localhost:123"
+		if runtime.GOOS == "windows" {
+			stderr = "error during connect: Get http://localhost:123"
+		}
 		res := c.RunDockerCmd("-H", "tcp://localhost:123", "version")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Cannot connect to the Docker daemon at tcp://localhost:123",
+			Err:      stderr,
 		})
 	})
 
