@@ -259,8 +259,16 @@ func TestMissingExistingCLI(t *testing.T) {
 	err = CopyFile(filepath.Join(binDir, DockerExecutableName), filepath.Join(bin, DockerExecutableName))
 	assert.NilError(t, err)
 
+	env := []string{"PATH=" + bin}
+	if runtime.GOOS == "windows" {
+		env = append(env, "USERPROFILE="+home)
+
+	} else {
+		env = append(env, "HOME="+home)
+	}
+
 	c := icmd.Cmd{
-		Env:     []string{"HOME=" + home, "PATH=" + bin},
+		Env:     env,
 		Command: []string{filepath.Join(bin, "docker")},
 	}
 	res := icmd.RunCmd(c)
