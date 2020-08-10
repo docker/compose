@@ -26,14 +26,17 @@ from .network import get_networks
 from .network import ProjectNetworks
 from .progress_stream import read_status
 from .service import BuildAction
+from .service import ContainerIpcMode
 from .service import ContainerNetworkMode
 from .service import ContainerPidMode
 from .service import ConvergenceStrategy
+from .service import IpcMode
 from .service import NetworkMode
 from .service import NoSuchImageError
 from .service import parse_repository_tag
 from .service import PidMode
 from .service import Service
+from .service import ServiceIpcMode
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
 from .utils import microseconds_from_time_nano
@@ -106,6 +109,7 @@ class Project(object):
 
             service_dict.pop('networks', None)
             links = project.get_links(service_dict)
+            ipc_mode = project.get_ipc_mode(service_dict)
             network_mode = project.get_network_mode(
                 service_dict, list(service_networks.keys())
             )
@@ -147,6 +151,7 @@ class Project(object):
                     volumes_from=volumes_from,
                     secrets=secrets,
                     pid_mode=pid_mode,
+                    ipc_mode=ipc_mode,
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
                     extra_labels=extra_labels,
@@ -273,6 +278,27 @@ class Project(object):
                 )
 
         return PidMode(pid_mode)
+
+    def get_ipc_mode(self, service_dict):
+        ipc_mode = service_dict.pop('ipc', None)
+        if not ipc_mode:
+            return IpcMode(None)
+
+        service_name = get_service_name_from_network_mode(ipc_mode)
+        if service_name:
+            return ServiceIpcMode(self.get_service(service_name))
+
+        container_name = get_container_name_from_network_mode(ipc_mode)
+        if container_name:
+            try:
+                return ContainerIpcMode(Container.from_id(self.client, container_name))
+            except APIError:
+                raise ConfigurationError(
+                    "Service '{name}' uses the IPC namespace of container '{dep}' which "
+                    "does not exist.".format(name=service_dict['name'], dep=container_name)
+                )
+
+        return IpcMode(ipc_mode)
 
     def get_service_scale(self, service_dict):
         # service.scale for v2 and deploy.replicas for v3

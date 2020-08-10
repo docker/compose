@@ -47,6 +47,7 @@ from .validation import validate_credential_spec
 from .validation import validate_depends_on
 from .validation import validate_extends_file_path
 from .validation import validate_healthcheck
+from .validation import validate_ipc_mode
 from .validation import validate_links
 from .validation import validate_network_mode
 from .validation import validate_pid_mode
@@ -734,6 +735,7 @@ def validate_service(service_config, service_names, config_file):
 
     validate_cpu(service_config)
     validate_ulimits(service_config)
+    validate_ipc_mode(service_config, service_names)
     validate_network_mode(service_config, service_names)
     validate_pid_mode(service_config, service_names)
     validate_depends_on(service_config, service_names)
