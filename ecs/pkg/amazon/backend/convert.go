@@ -1,11 +1,14 @@
 package backend
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/docker/ecs-plugin/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -55,6 +58,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		initContainers []ecs.TaskDefinition_ContainerDependency
 	)
 	if len(service.Secrets) > 0 {
+		initContainerName := fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name))
 		volumes = append(volumes, ecs.TaskDefinition_Volume{
 			Name: "secrets",
 		})
@@ -65,25 +69,24 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		})
 		initContainers = append(initContainers, ecs.TaskDefinition_ContainerDependency{
 			Condition:     ecsapi.ContainerConditionSuccess,
-			ContainerName: "Secrets_InitContainer",
+			ContainerName: initContainerName,
 		})
 
 		var (
-			names   []string
-			secrets []ecs.TaskDefinition_Secret
+			args        []secrets.Secret
+			taskSecrets []ecs.TaskDefinition_Secret
 		)
 		for _, s := range service.Secrets {
 			secretConfig := project.Secrets[s.Source]
 			if s.Target == "" {
 				s.Target = s.Source
 			}
-			secrets = append(secrets, ecs.TaskDefinition_Secret{
+			taskSecrets = append(taskSecrets, ecs.TaskDefinition_Secret{
 				Name:      s.Target,
 				ValueFrom: secretConfig.Name,
 			})
-			name := s.Target
+			var keys []string
 			if ext, ok := secretConfig.Extensions[compose.ExtensionKeys]; ok {
-				var keys []string
 				if key, ok := ext.(string); ok {
 					keys = append(keys, key)
 				} else {
@@ -91,14 +94,20 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 						keys = append(keys, k.(string))
 					}
 				}
-				name = fmt.Sprintf("%s:%s", s.Target, strings.Join(keys, ","))
 			}
-			names = append(names, name)
+			args = append(args, secrets.Secret{
+				Name: s.Target,
+				Keys: keys,
+			})
+		}
+		command, err := json.Marshal(args)
+		if err != nil {
+			return nil, err
 		}
 		containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
-			Name:             fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name)),
+			Name:             initContainerName,
 			Image:            secretsInitContainerImage,
-			Command:          names,
+			Command:          []string{string(command)},
 			Essential:        false, // FIXME this will be ignored, see https://github.com/awslabs/goformation/issues/61#issuecomment-625139607
 			LogConfiguration: logConfiguration,
 			MountPoints: []ecs.TaskDefinition_MountPoint{
@@ -108,7 +117,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 					SourceVolume:  "secrets",
 				},
 			},
-			Secrets: secrets,
+			Secrets: taskSecrets,
 		})
 	}
 

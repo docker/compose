@@ -1,4 +1,4 @@
-package main
+package secrets
 
 import (
 	"io/ioutil"
@@ -10,34 +10,14 @@ import (
 	"gotest.tools/v3/fs"
 )
 
-func TestParseSecrets(t *testing.T) {
-	secrets := parseInput([]string{
-		"foo",
-		"bar:*",
-		"zot:key0,key1",
-	})
-	assert.Check(t, len(secrets) == 3)
-	assert.Check(t, secrets[0].name == "foo")
-	assert.Check(t, secrets[0].keys == nil)
-
-	assert.Check(t, secrets[1].name == "bar")
-	assert.Check(t, len(secrets[1].keys) == 1)
-	assert.Check(t, secrets[1].keys[0] == "*")
-
-	assert.Check(t, secrets[2].name == "zot")
-	assert.Check(t, len(secrets[2].keys) == 2)
-	assert.Check(t, secrets[2].keys[0] == "key0")
-	assert.Check(t, secrets[2].keys[1] == "key1")
-}
-
 func TestRawSecret(t *testing.T) {
 	dir := fs.NewDir(t, "secrets").Path()
 	os.Setenv("raw", "something_secret")
 	defer os.Unsetenv("raw")
 
-	err := createSecretFiles(secret{
-		name: "raw",
-		keys: nil,
+	err := CreateSecretFiles(Secret{
+		Name: "raw",
+		Keys: nil,
 	}, dir)
 	assert.NilError(t, err)
 	file, err := ioutil.ReadFile(filepath.Join(dir, "raw"))
@@ -55,9 +35,9 @@ func TestSelectedKeysSecret(t *testing.T) {
 }`)
 	defer os.Unsetenv("json")
 
-	err := createSecretFiles(secret{
-		name: "json",
-		keys: []string{"foo"},
+	err := CreateSecretFiles(Secret{
+		Name: "json",
+		Keys: []string{"foo"},
 	}, dir)
 	assert.NilError(t, err)
 	file, err := ioutil.ReadFile(filepath.Join(dir, "json", "foo"))
@@ -78,9 +58,9 @@ func TestAllKeysSecret(t *testing.T) {
 }`)
 	defer os.Unsetenv("json")
 
-	err := createSecretFiles(secret{
-		name: "json",
-		keys: []string{"*"},
+	err := CreateSecretFiles(Secret{
+		Name: "json",
+		Keys: []string{"*"},
 	}, dir)
 	assert.NilError(t, err)
 	file, err := ioutil.ReadFile(filepath.Join(dir, "json", "foo"))
@@ -97,9 +77,9 @@ func TestAllKeysSecret(t *testing.T) {
 func TestUnknownSecret(t *testing.T) {
 	dir := fs.NewDir(t, "secrets").Path()
 
-	err := createSecretFiles(secret{
-		name: "not_set",
-		keys: nil,
+	err := CreateSecretFiles(Secret{
+		Name: "not_set",
+		Keys: nil,
 	}, dir)
 	assert.Check(t, err != nil)
 }
