@@ -17,8 +17,13 @@
 package convert
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
@@ -27,48 +32,49 @@ import (
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/config/types"
+	"github.com/pkg/errors"
+
+	"github.com/docker/api/aci/login"
 )
 
 // Specific username from ACR docs : https://github.com/Azure/acr/blob/master/docs/AAD-OAuth.md#getting-credentials-programatically
 const (
-	tokenUsername = "00000000-0000-0000-0000-000000000000"
-	dockerHub     = "index.docker.io"
+	tokenUsername     = "00000000-0000-0000-0000-000000000000"
+	dockerHub         = "index.docker.io"
+	acrRegistrySuffix = ".azurecr.io"
 )
 
-type registryConfLoader interface {
+type registryHelper interface {
 	getAllRegistryCredentials() (map[string]types.AuthConfig, error)
+	autoLoginAcr(registry string) error
 }
 
-type cliRegistryConfLoader struct {
+type cliRegistryHelper struct {
 	cfg *configfile.ConfigFile
 }
 
-func (c cliRegistryConfLoader) getAllRegistryCredentials() (map[string]types.AuthConfig, error) {
+func (c cliRegistryHelper) getAllRegistryCredentials() (map[string]types.AuthConfig, error) {
 	return c.cfg.GetAllCredentials()
 }
 
-func newCliRegistryConfLoader() cliRegistryConfLoader {
-	return cliRegistryConfLoader{
+func newCliRegistryConfLoader() cliRegistryHelper {
+	return cliRegistryHelper{
 		cfg: config.LoadDefaultConfigFile(os.Stderr),
 	}
 }
 
-func getRegistryCredentials(project compose.Project, registryLoader registryConfLoader) ([]containerinstance.ImageRegistryCredential, error) {
-	allCreds, err := registryLoader.getAllRegistryCredentials()
+func getRegistryCredentials(project compose.Project, helper registryHelper) ([]containerinstance.ImageRegistryCredential, error) {
+	usedRegistries, acrRegistries := getUsedRegistries(project)
+	for _, registry := range acrRegistries {
+		err := helper.autoLoginAcr(registry)
+		if err != nil {
+			fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
+		}
+	}
+
+	allCreds, err := helper.getAllRegistryCredentials()
 	if err != nil {
 		return nil, err
-	}
-	usedRegistries := map[string]bool{}
-	for _, service := range project.Services {
-		imageName := service.Image
-		tokens := strings.Split(imageName, "/")
-		registry := tokens[0]
-		if len(tokens) == 1 { // ! image names can include "." ...
-			registry = dockerHub
-		} else if !strings.Contains(registry, ".") {
-			registry = dockerHub
-		}
-		usedRegistries[registry] = true
 	}
 	var registryCreds []containerinstance.ImageRegistryCredential
 	for name, oneCred := range allCreds {
@@ -106,4 +112,68 @@ func getRegistryCredentials(project compose.Project, registryLoader registryConf
 		}
 	}
 	return registryCreds, nil
+}
+
+func getUsedRegistries(project compose.Project) (map[string]bool, []string) {
+	usedRegistries := map[string]bool{}
+	acrRegistries := []string{}
+	for _, service := range project.Services {
+		imageName := service.Image
+		tokens := strings.Split(imageName, "/")
+		registry := tokens[0]
+		if len(tokens) == 1 { // ! image names can include "." ...
+			registry = dockerHub
+		} else if !strings.Contains(registry, ".") {
+			registry = dockerHub
+		} else if strings.HasSuffix(registry, acrRegistrySuffix) {
+			acrRegistries = append(acrRegistries, registry)
+		}
+		usedRegistries[registry] = true
+	}
+	return usedRegistries, acrRegistries
+}
+
+func (c cliRegistryHelper) autoLoginAcr(registry string) error {
+	loginService, err := login.NewAzureLoginService()
+	if err != nil {
+		return err
+	}
+	token, err := loginService.GetValidToken()
+	if err != nil {
+		return err
+	}
+	tenantID, err := loginService.GetTenantID()
+	if err != nil {
+		return err
+	}
+
+	data := url.Values{
+		"grant_type":    {"access_token_refresh_token"},
+		"service":       {registry},
+		"tenant":        {tenantID},
+		"refresh_token": {token.RefreshToken},
+		"access_token":  {token.AccessToken},
+	}
+	repoAuthURL := fmt.Sprintf("https://%s/oauth2/exchange", registry)
+	res, err := http.Post(repoAuthURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		return errors.Errorf("error while renewing access token, status : %s", res.Status)
+	}
+	bits, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	type acrToken struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	newToken := acrToken{}
+	if err := json.Unmarshal(bits, &newToken); err != nil {
+		return err
+	}
+	cmd := exec.Command("docker", "login", "-p", newToken.RefreshToken, "-u", tokenUsername, registry)
+	return cmd.Run()
 }

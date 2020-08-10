@@ -17,6 +17,7 @@
 package convert
 
 import (
+	"errors"
 	"strconv"
 	"testing"
 
@@ -30,12 +31,13 @@ import (
 )
 
 const getAllCredentials = "getAllRegistryCredentials"
+const autoLoginAcr = "autoLoginAcr"
 
 func TestHubPrivateImage(t *testing.T) {
-	loader := &MockRegistryLoader{}
-	loader.On(getAllCredentials).Return(registry("https://index.docker.io", userPwdCreds("toto", "pwd")), nil)
+	registryHelper := &MockRegistryHelper{}
+	registryHelper.On(getAllCredentials).Return(registry("https://index.docker.io", userPwdCreds("toto", "pwd")), nil)
 
-	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -47,10 +49,10 @@ func TestHubPrivateImage(t *testing.T) {
 }
 
 func TestRegistryNameWithoutProtocol(t *testing.T) {
-	loader := &MockRegistryLoader{}
-	loader.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
+	registryHelper := &MockRegistryHelper{}
+	registryHelper.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
 
-	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -62,19 +64,19 @@ func TestRegistryNameWithoutProtocol(t *testing.T) {
 }
 
 func TestInvalidCredentials(t *testing.T) {
-	loader := &MockRegistryLoader{}
-	loader.On(getAllCredentials).Return(registry("18.195.159.6:444", userPwdCreds("toto", "pwd")), nil)
+	registryHelper := &MockRegistryHelper{}
+	registryHelper.On(getAllCredentials).Return(registry("18.195.159.6:444", userPwdCreds("toto", "pwd")), nil)
 
-	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("gtardif/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.Equal(t, len(creds), 0)
 }
 
 func TestImageWithDotInName(t *testing.T) {
-	loader := &MockRegistryLoader{}
-	loader.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
+	registryHelper := &MockRegistryHelper{}
+	registryHelper.On(getAllCredentials).Return(registry("index.docker.io", userPwdCreds("toto", "pwd")), nil)
 
-	creds, err := getRegistryCredentials(composeServices("my.image"), loader)
+	creds, err := getRegistryCredentials(composeServices("my.image"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -86,10 +88,11 @@ func TestImageWithDotInName(t *testing.T) {
 }
 
 func TestAcrPrivateImage(t *testing.T) {
-	loader := &MockRegistryLoader{}
-	loader.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", tokenCreds("123456")), nil)
+	registryHelper := &MockRegistryHelper{}
+	registryHelper.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", tokenCreds("123456")), nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistrygta.azurecr.io").Return(nil)
 
-	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -101,12 +104,13 @@ func TestAcrPrivateImage(t *testing.T) {
 }
 
 func TestAcrPrivateImageLinux(t *testing.T) {
-	loader := &MockRegistryLoader{}
+	registryHelper := &MockRegistryHelper{}
 	token := tokenCreds("123456")
 	token.Username = tokenUsername
-	loader.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", token), nil)
+	registryHelper.On(getAllCredentials).Return(registry("https://mycontainerregistrygta.azurecr.io", token), nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistrygta.azurecr.io").Return(nil)
 
-	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -118,14 +122,15 @@ func TestAcrPrivateImageLinux(t *testing.T) {
 }
 
 func TestNoMoreRegistriesThanImages(t *testing.T) {
-	loader := &MockRegistryLoader{}
+	registryHelper := &MockRegistryHelper{}
 	configs := map[string]cliconfigtypes.AuthConfig{
 		"https://mycontainerregistrygta.azurecr.io": tokenCreds("123456"),
 		"https://index.docker.io":                   userPwdCreds("toto", "pwd"),
 	}
-	loader.On(getAllCredentials).Return(configs, nil)
+	registryHelper.On(getAllCredentials).Return(configs, nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistrygta.azurecr.io").Return(nil)
 
-	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistrygta.azurecr.io/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -135,7 +140,7 @@ func TestNoMoreRegistriesThanImages(t *testing.T) {
 		},
 	})
 
-	creds, err = getRegistryCredentials(composeServices("someuser/privateimg"), loader)
+	creds, err = getRegistryCredentials(composeServices("someuser/privateimg"), registryHelper)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, creds, []containerinstance.ImageRegistryCredential{
 		{
@@ -147,7 +152,7 @@ func TestNoMoreRegistriesThanImages(t *testing.T) {
 }
 
 func TestHubAndSeveralACRRegistries(t *testing.T) {
-	loader := &MockRegistryLoader{}
+	registryHelper := &MockRegistryHelper{}
 	configs := map[string]cliconfigtypes.AuthConfig{
 		"https://mycontainerregistry1.azurecr.io": tokenCreds("123456"),
 		"https://mycontainerregistry2.azurecr.io": tokenCreds("456789"),
@@ -155,9 +160,11 @@ func TestHubAndSeveralACRRegistries(t *testing.T) {
 		"https://index.docker.io":                 userPwdCreds("toto", "pwd"),
 		"https://other.registry.io":               userPwdCreds("user", "password"),
 	}
-	loader.On(getAllCredentials).Return(configs, nil)
+	registryHelper.On(getAllCredentials).Return(configs, nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistry1.azurecr.io").Return(nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistry2.azurecr.io").Return(nil)
 
-	creds, err := getRegistryCredentials(composeServices("mycontainerregistry1.azurecr.io/privateimg", "someuser/privateImg2", "mycontainerregistry2.azurecr.io/privateimg"), loader)
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistry1.azurecr.io/privateimg", "someuser/privateImg2", "mycontainerregistry2.azurecr.io/privateimg"), registryHelper)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
@@ -170,6 +177,35 @@ func TestHubAndSeveralACRRegistries(t *testing.T) {
 		Username: to.StringPtr(tokenUsername),
 		Password: to.StringPtr("456789"),
 	}))
+	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
+		Server:   to.StringPtr(dockerHub),
+		Username: to.StringPtr("toto"),
+		Password: to.StringPtr("pwd"),
+	}))
+}
+
+func TestIgnoreACRRegistryFailedAutoLogin(t *testing.T) {
+	registryHelper := &MockRegistryHelper{}
+	configs := map[string]cliconfigtypes.AuthConfig{
+		"https://mycontainerregistry1.azurecr.io": tokenCreds("123456"),
+		"https://mycontainerregistry3.azurecr.io": tokenCreds("123456789"),
+		"https://index.docker.io":                 userPwdCreds("toto", "pwd"),
+		"https://other.registry.io":               userPwdCreds("user", "password"),
+	}
+	registryHelper.On(getAllCredentials).Return(configs, nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistry1.azurecr.io").Return(nil)
+	registryHelper.On(autoLoginAcr, "mycontainerregistry2.azurecr.io").Return(errors.New("could not login"))
+
+	creds, err := getRegistryCredentials(composeServices("mycontainerregistry1.azurecr.io/privateimg", "someuser/privateImg2", "mycontainerregistry2.azurecr.io/privateimg"), registryHelper)
+	assert.NilError(t, err)
+	assert.Equal(t, len(creds), 2)
+
+	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
+		Server:   to.StringPtr("mycontainerregistry1.azurecr.io"),
+		Username: to.StringPtr(tokenUsername),
+		Password: to.StringPtr("123456"),
+	}))
+
 	assert.Assert(t, is.Contains(creds, containerinstance.ImageRegistryCredential{
 		Server:   to.StringPtr(dockerHub),
 		Username: to.StringPtr("toto"),
@@ -210,11 +246,16 @@ func tokenCreds(token string) cliconfigtypes.AuthConfig {
 	}
 }
 
-type MockRegistryLoader struct {
+type MockRegistryHelper struct {
 	mock.Mock
 }
 
-func (s *MockRegistryLoader) getAllRegistryCredentials() (map[string]cliconfigtypes.AuthConfig, error) {
+func (s *MockRegistryHelper) getAllRegistryCredentials() (map[string]cliconfigtypes.AuthConfig, error) {
 	args := s.Called()
 	return args.Get(0).(map[string]cliconfigtypes.AuthConfig), args.Error(1)
+}
+
+func (s *MockRegistryHelper) autoLoginAcr(registry string) error {
+	args := s.Called(registry)
+	return args.Error(0)
 }
