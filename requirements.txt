@@ -21,5 +21,5 @@ python-dotenv==0.14.0
 PyYAML==5.3.1
 requests==2.24.0
 texttable==1.6.2
-urllib3==1.25.9; python_version == '3.3'
+urllib3==1.25.10; python_version == '3.3'
 websocket-client==0.57.0
