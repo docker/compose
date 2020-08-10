@@ -26,6 +26,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"golang.org/x/oauth2"
+
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	compose "github.com/compose-spec/compose-go/types"
@@ -167,10 +169,7 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 		return err
 	}
 
-	type acrToken struct {
-		RefreshToken string `json:"refresh_token"`
-	}
-	newToken := acrToken{}
+	newToken := oauth2.Token{}
 	if err := json.Unmarshal(bits, &newToken); err != nil {
 		return err
 	}
