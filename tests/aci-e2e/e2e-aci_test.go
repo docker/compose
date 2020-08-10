@@ -109,7 +109,11 @@ func TestLoginLogout(t *testing.T) {
 		res := c.RunDockerCmd("logout", "azure")
 		res.Assert(t, icmd.Expected{Out: "Removing login credentials for Azure"})
 		_, err = os.Stat(login.GetTokenStorePath())
-		assert.ErrorContains(t, err, "no such file or directory")
+		errMsg := "no such file or directory"
+		if runtime.GOOS == "windows" {
+			errMsg = "The system cannot find the file specified"
+		}
+		assert.ErrorContains(t, err, errMsg)
 	})
 
 	t.Run("create context fail", func(t *testing.T) {
@@ -123,7 +127,7 @@ func TestLoginLogout(t *testing.T) {
 
 func TestContainerRun(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	sID, rg := setupTestResourceGroup(t, c)
+	sID, rg := setupTestResourceGroup(t, c, "run")
 
 	const (
 		testShareName   = "dockertestshare"
@@ -167,7 +171,7 @@ func TestContainerRun(t *testing.T) {
 		)
 		res.Assert(t, icmd.Success)
 		container = getContainerName(res.Stdout())
-		t.Logf("Container name: %s", container)
+		t.Logf("Container name: %q", container)
 	})
 
 	t.Run("inspect", func(t *testing.T) {
@@ -191,7 +195,7 @@ func TestContainerRun(t *testing.T) {
 		res.Assert(t, icmd.Success)
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		l := out[len(out)-1]
-		assert.Assert(t, strings.Contains(l, container))
+		assert.Assert(t, strings.Contains(l, container), "Looking for %q in line: %s", container, l)
 		assert.Assert(t, strings.Contains(l, "nginx"))
 		assert.Assert(t, strings.Contains(l, "Running"))
 		assert.Assert(t, strings.Contains(l, hostIP+":80->80/tcp"))
@@ -277,7 +281,7 @@ func TestContainerRun(t *testing.T) {
 
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, _ = setupTestResourceGroup(t, c, "runA")
 
 	// Used in subtests
 	var (
@@ -285,8 +289,9 @@ func TestContainerRunAttached(t *testing.T) {
 		endpoint  string
 	)
 
+	container = "test-container"
+
 	t.Run("run attached limits", func(t *testing.T) {
-		container = "test-container"
 		cmd := c.NewDockerCmd(
 			"run",
 			"--name", container,
@@ -317,7 +322,11 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyOnFailure)
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
-		endpoint = fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+		port := containerInspect.Ports[0]
+		assert.Assert(t, len(port.HostIP) > 0)
+		assert.Equal(t, port.ContainerPort, uint32(80))
+		assert.Equal(t, port.HostPort, uint32(80))
+		endpoint = fmt.Sprintf("http://%s:%d", port.HostIP, port.HostPort)
 		t.Logf("Endpoint: %s", endpoint)
 
 		assert.Assert(t, !strings.Contains(runRes.Stdout(), "/test"))
@@ -347,7 +356,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 func TestCompose(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, _ = setupTestResourceGroup(t, c, "compose")
 
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -458,7 +467,7 @@ func TestCompose(t *testing.T) {
 
 func TestRunEnvVars(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, _ = setupTestResourceGroup(t, c, "runEnv")
 
 	t.Run("run", func(t *testing.T) {
 		cmd := c.NewDockerCmd(
@@ -474,7 +483,7 @@ func TestRunEnvVars(t *testing.T) {
 		res.Assert(t, icmd.Success)
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		container := strings.TrimSpace(out[len(out)-1])
-		t.Logf("Container name: %s", container)
+		t.Logf("Container name: %q", container)
 
 		res = c.RunDockerCmd("inspect", container)
 		res.Assert(t, icmd.Success)
@@ -494,25 +503,25 @@ func TestRunEnvVars(t *testing.T) {
 	})
 }
 
-func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
-	startTime := strconv.Itoa(int(time.Now().UnixNano()))
-	name := "E2E-" + startTime
+func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, string) {
+	startTime := strconv.Itoa(int(time.Now().Unix()))
+	rg := "E2E-" + tName + "-" + startTime
 	azureLogin(t)
 	sID := getSubscriptionID(t)
-	t.Logf("Create resource group %q", name)
-	err := createResourceGroup(sID, name)
+	t.Logf("Create resource group %q", rg)
+	err := createResourceGroup(sID, rg)
 	assert.Check(t, is.Nil(err))
 	t.Cleanup(func() {
-		if err := deleteResourceGroup(name); err != nil {
+		if err := deleteResourceGroup(rg); err != nil {
 			t.Error(err)
 		}
 	})
-	createAciContextAndUseIt(t, c, sID, name)
+	createAciContextAndUseIt(t, c, sID, rg)
 	// Check nothing is running
 	res := c.RunDockerCmd("ps")
 	res.Assert(t, icmd.Success)
 	assert.Assert(t, is.Len(strings.Split(strings.TrimSpace(res.Stdout()), "\n"), 1))
-	return sID, name
+	return sID, rg
 }
 
 func deleteResourceGroup(rgName string) error {
