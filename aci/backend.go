@@ -221,8 +221,16 @@ func addTag(groupDefinition *containerinstance.ContainerGroup, tagName string) {
 	groupDefinition.Tags[tagName] = to.StringPtr(tagName)
 }
 
-func (cs *aciContainerService) Stop(ctx context.Context, containerName string, timeout *uint32) error {
-	return errdefs.ErrNotImplemented
+func (cs *aciContainerService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
+	if timeout != nil && *timeout != uint32(0) {
+		return errors.Errorf("ACI integration does not support setting a timeout to stop a container before killing it.")
+	}
+	groupName, containerName := getGroupAndContainerName(containerID)
+	if groupName != containerID {
+		msg := "cannot stop service %q from compose application %q, you can stop the entire compose app with docker stop %s"
+		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+	}
+	return stopACIContainerGroup(ctx, cs.ctx, groupName)
 }
 
 func getGroupAndContainerName(containerID string) (string, string) {

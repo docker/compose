@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/api/errdefs"
+
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -137,6 +139,19 @@ func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, c
 	}
 
 	return containerGroupsClient.Delete(ctx, aciContext.ResourceGroup, containerGroupName)
+}
+
+func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) error {
+	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	if err != nil {
+		return fmt.Errorf("cannot get container group client: %v", err)
+	}
+
+	result, err := containerGroupsClient.Stop(ctx, aciContext.ResourceGroup, containerGroupName)
+	if result.StatusCode == http.StatusNotFound {
+		return errdefs.ErrNotFound
+	}
+	return err
 }
 
 func execACIContainer(ctx context.Context, aciContext store.AciContext, command, containerGroup string, containerName string) (c containerinstance.ContainerExecResponse, err error) {
