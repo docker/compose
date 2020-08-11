@@ -9,4 +9,5 @@ const (
 	ExtensionKeys            = "x-aws-keys"
 	ExtensionMinPercent      = "x-aws-min_percent"
 	ExtensionMaxPercent      = "x-aws-max_percent"
+	ExtensionRetention       = "x-aws-logs_retention"
 )

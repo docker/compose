@@ -119,10 +119,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 		project.Secrets[i] = s
 	}
 
-	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
-	template.Resources["LogGroup"] = &logs.LogGroup{
-		LogGroupName: logGroup,
-	}
+	createLogGroup(project, template)
 
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
 	createCloudMap(project, template)
@@ -190,7 +187,7 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 			dependsOn = append(dependsOn, serviceResourceName(dependency))
 		}
 
-		minPercent, maxPercent, err := b.computeRollingUpdateLimits(service)
+		minPercent, maxPercent, err := computeRollingUpdateLimits(service)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +234,19 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 	return template, nil
 }
 
-func (b Backend) computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
+func createLogGroup(project *types.Project, template *cloudformation.Template) {
+	retention := 0
+	if v, ok := project.Extensions[compose.ExtensionRetention]; ok {
+		retention = v.(int)
+	}
+	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
+	template.Resources["LogGroup"] = &logs.LogGroup{
+		LogGroupName:    logGroup,
+		RetentionInDays: retention,
+	}
+}
+
+func computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
 	maxPercent := 200
 	minPercent := 100
 	if service.Deploy == nil || service.Deploy.UpdateConfig == nil {

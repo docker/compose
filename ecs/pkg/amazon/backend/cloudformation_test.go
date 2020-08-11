@@ -11,6 +11,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
+	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
@@ -26,6 +27,25 @@ func TestSimpleConvert(t *testing.T) {
 	golden.Assert(t, result, expected)
 }
 
+func TestLogging(t *testing.T) {
+	template := convertYaml(t, "test", `
+services:
+  foo:
+    image: hello_world
+    logging:
+      options:
+        awslogs-datetime-pattern: "FOO"
+
+x-aws-logs_retention: 10
+`)
+	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
+	logging := def.ContainerDefinitions[0].LogConfiguration
+	assert.Equal(t, logging.Options["awslogs-datetime-pattern"], "FOO")
+
+	logGroup := template.Resources["LogGroup"].(*logs.LogGroup)
+	assert.Equal(t, logGroup.RetentionInDays, 10)
+}
+
 func TestEnvFile(t *testing.T) {
 	template := convertYaml(t, "test", `
 services:
@@ -36,8 +56,15 @@ services:
 `)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
 	env := def.ContainerDefinitions[0].Environment
-	assert.Equal(t, env[0].Name, "FOO")
-	assert.Equal(t, env[0].Value, "BAR")
+	var found bool
+	for _, pair := range env {
+		if pair.Name == "FOO" {
+			assert.Equal(t, pair.Value, "BAR")
+			found = true
+		}
+	}
+	assert.Check(t, found, "environment variable FOO not set")
+
 }
 
 func TestEnvFileAndEnv(t *testing.T) {

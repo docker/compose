@@ -27,14 +27,16 @@ var compatibleComposeAttributes = []string{
 	"services.entrypoint",
 	"services.environment",
 	"services.env_file",
-	"service.image",
-	"services.init",
 	"services.healthcheck",
 	"services.healthcheck.interval",
 	"services.healthcheck.retries",
 	"services.healthcheck.start_period",
 	"services.healthcheck.test",
 	"services.healthcheck.timeout",
+	"services.image",
+	"services.init",
+	"services.logging",
+	"services.logging.options",
 	"services.networks",
 	"services.ports",
 	"services.ports.mode",
@@ -76,4 +78,10 @@ func (c *FargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) 
 		}
 	}
 	service.CapAdd = add
+}
+
+func (c *FargateCompatibilityChecker) CheckLoggingDriver(config *types.LoggingConfig) {
+	if config.Driver != "" && config.Driver != "awslogs" {
+		c.Unsupported("services.logging.driver %s is not supported", config.Driver)
+	}
 }

@@ -44,14 +44,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 			fmt.Sprintf(" %s.local", project.Name),
 		}))
 
-	logConfiguration := &ecs.TaskDefinition_LogConfiguration{
-		LogDriver: ecsapi.LogDriverAwslogs,
-		Options: map[string]string{
-			"awslogs-region":        cloudformation.Ref("AWS::Region"),
-			"awslogs-group":         cloudformation.Ref("LogGroup"),
-			"awslogs-stream-prefix": project.Name,
-		},
-	}
+	logConfiguration := getLogConfiguration(service, project)
 
 	var (
 		containers     []ecs.TaskDefinition_ContainerDefinition
@@ -220,6 +213,26 @@ func createEnvironment(project *types.Project, service types.ServiceConfig) ([]e
 		})
 	}
 	return pairs, nil
+}
+
+func getLogConfiguration(service types.ServiceConfig, project *types.Project) *ecs.TaskDefinition_LogConfiguration {
+	options := map[string]string{
+		"awslogs-region":        cloudformation.Ref("AWS::Region"),
+		"awslogs-group":         cloudformation.Ref("LogGroup"),
+		"awslogs-stream-prefix": project.Name,
+	}
+	if service.Logging != nil {
+		for k, v := range service.Logging.Options {
+			if strings.HasPrefix(k, "awslogs-") {
+				options[k] = v
+			}
+		}
+	}
+	logConfiguration := &ecs.TaskDefinition_LogConfiguration{
+		LogDriver: ecsapi.LogDriverAwslogs,
+		Options:   options,
+	}
+	return logConfiguration
 }
 
 func toTags(labels types.Labels) []tags.Tag {
