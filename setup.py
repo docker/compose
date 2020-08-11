@@ -49,10 +49,7 @@ if sys.version_info[:2] < (3, 4):
     tests_require.append('mock >= 1.0.1, < 4')
 
 extras_require = {
-    ':python_version < "3.4"': ['enum34 >= 1.0.4, < 2'],
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
-    ':python_version < "3.3"': ['backports.shutil_get_terminal_size == 1.0.0',
-                                'ipaddress >= 1.0.16, < 2'],
     ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
     'tests': tests_require,
@@ -92,7 +89,7 @@ setup(
     install_requires=install_requires,
     extras_require=extras_require,
     tests_require=tests_require,
-    python_requires='>=3.0, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
+    python_requires='>=3.4',
     entry_points={
         'console_scripts': ['docker-compose=compose.cli.main:main'],
     },
