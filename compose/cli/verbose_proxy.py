@@ -6,13 +6,13 @@ from itertools import chain
 
 def format_call(args, kwargs):
     args = (repr(a) for a in args)
-    kwargs = ("{0!s}={1!r}".format(*item) for item in kwargs.items())
-    return "({0})".format(", ".join(chain(args, kwargs)))
+    kwargs = ("{!s}={!r}".format(*item) for item in kwargs.items())
+    return "({})".format(", ".join(chain(args, kwargs)))
 
 
 def format_return(result, max_lines):
     if isinstance(result, (list, tuple, set)):
-        return "({0} with {1} items)".format(type(result).__name__, len(result))
+        return "({} with {} items)".format(type(result).__name__, len(result))
 
     if result:
         lines = pprint.pformat(result).split('\n')
@@ -22,7 +22,7 @@ def format_return(result, max_lines):
     return result
 
 
-class VerboseProxy(object):
+class VerboseProxy:
     """Proxy all function calls to another class and log method name, arguments
     and return values for each call.
     """

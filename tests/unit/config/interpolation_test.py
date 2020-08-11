@@ -1,4 +1,3 @@
-# encoding: utf-8
 import pytest
 
 from compose.config.environment import Environment
@@ -439,7 +438,7 @@ def test_unbraced_separators(defaults_interpolator):
 
 def test_interpolate_unicode_values():
     variable_mapping = {
-        'FOO': '十六夜　咲夜'.encode('utf-8'),
+        'FOO': '十六夜　咲夜'.encode(),
         'BAR': '十六夜　咲夜'
     }
     interpol = Interpolator(TemplateWithDefaults, variable_mapping).interpolate

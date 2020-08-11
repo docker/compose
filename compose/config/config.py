@@ -1,12 +1,13 @@
 import functools
-import io
 import logging
 import os
 import re
 import string
 import sys
 from collections import namedtuple
+from itertools import chain
 from operator import attrgetter
+from operator import itemgetter
 
 import yaml
 from cached_property import cached_property
@@ -166,7 +167,7 @@ class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files envir
     def __new__(cls, working_dir, config_files, environment=None):
         if environment is None:
             environment = Environment.from_env_file(working_dir)
-        return super(ConfigDetails, cls).__new__(
+        return super().__new__(
             cls, working_dir, config_files, environment
         )
 
@@ -315,8 +316,8 @@ def validate_config_version(config_files):
 
         if main_file.version != next_file.version:
             raise ConfigurationError(
-                "Version mismatch: file {0} specifies version {1} but "
-                "extension file {2} uses version {3}".format(
+                "Version mismatch: file {} specifies version {} but "
+                "extension file {} uses version {}".format(
                     main_file.filename,
                     main_file.version,
                     next_file.filename,
@@ -595,7 +596,7 @@ def process_config_file(config_file, environment, service_name=None, interpolate
     return config_file
 
 
-class ServiceExtendsResolver(object):
+class ServiceExtendsResolver:
     def __init__(self, service_config, config_file, environment, already_seen=None):
         self.service_config = service_config
         self.working_dir = service_config.working_dir
@@ -703,7 +704,7 @@ def resolve_build_args(buildargs, environment):
 
 
 def validate_extended_service_dict(service_dict, filename, service):
-    error_prefix = "Cannot extend service '%s' in %s:" % (service, filename)
+    error_prefix = "Cannot extend service '{}' in {}:".format(service, filename)
 
     if 'links' in service_dict:
         raise ConfigurationError(
@@ -826,9 +827,9 @@ def process_ports(service_dict):
 
 def process_depends_on(service_dict):
     if 'depends_on' in service_dict and not isinstance(service_dict['depends_on'], dict):
-        service_dict['depends_on'] = dict([
-            (svc, {'condition': 'service_started'}) for svc in service_dict['depends_on']
-        ])
+        service_dict['depends_on'] = {
+            svc: {'condition': 'service_started'} for svc in service_dict['depends_on']
+        }
     return service_dict
 
 
@@ -1071,9 +1072,9 @@ def merge_service_dicts(base, override, version):
 
 
 def merge_unique_items_lists(base, override):
-    override = [str(o) for o in override]
-    base = [str(b) for b in base]
-    return sorted(set().union(base, override))
+    override = (str(o) for o in override)
+    base = (str(b) for b in base)
+    return sorted(set(chain(base, override)))
 
 
 def merge_healthchecks(base, override):
@@ -1086,9 +1087,7 @@ def merge_healthchecks(base, override):
 
 def merge_ports(md, base, override):
     def parse_sequence_func(seq):
-        acc = []
-        for item in seq:
-            acc.extend(ServicePort.parse(item))
+        acc = [s for item in seq for s in ServicePort.parse(item)]
         return to_mapping(acc, 'merge_field')
 
     field = 'ports'
@@ -1098,7 +1097,7 @@ def merge_ports(md, base, override):
 
     merged = parse_sequence_func(md.base.get(field, []))
     merged.update(parse_sequence_func(md.override.get(field, [])))
-    md[field] = [item for item in sorted(merged.values(), key=lambda x: x.target)]
+    md[field] = [item for item in sorted(merged.values(), key=attrgetter("target"))]
 
 
 def merge_build(output, base, override):
@@ -1170,8 +1169,8 @@ def merge_reservations(base, override):
 
 
 def merge_unique_objects_lists(base, override):
-    result = dict((json_hash(i), i) for i in base + override)
-    return [i[1] for i in sorted([(k, v) for k, v in result.items()], key=lambda x: x[0])]
+    result = {json_hash(i): i for i in base + override}
+    return [i[1] for i in sorted(((k, v) for k, v in result.items()), key=itemgetter(0))]
 
 
 def merge_blkio_config(base, override):
@@ -1179,11 +1178,11 @@ def merge_blkio_config(base, override):
     md.merge_scalar('weight')
 
     def merge_blkio_limits(base, override):
-        index = dict((b['path'], b) for b in base)
-        for o in override:
-            index[o['path']] = o
+        get_path = itemgetter('path')
+        index = {get_path(b): b for b in base}
+        index.update((get_path(o), o) for o in override)
 
-        return sorted(list(index.values()), key=lambda x: x['path'])
+        return sorted(index.values(), key=get_path)
 
     for field in [
             "device_read_bps", "device_read_iops", "device_write_bps",
@@ -1304,7 +1303,7 @@ def resolve_volume_path(working_dir, volume):
         if host_path.startswith('.'):
             host_path = expand_path(working_dir, host_path)
         host_path = os.path.expanduser(host_path)
-        return u"{}:{}{}".format(host_path, container_path, (':' + mode if mode else ''))
+        return "{}:{}{}".format(host_path, container_path, (':' + mode if mode else ''))
 
     return container_path
 
@@ -1447,13 +1446,13 @@ def has_uppercase(name):
 
 def load_yaml(filename, encoding=None, binary=True):
     try:
-        with io.open(filename, 'rb' if binary else 'r', encoding=encoding) as fh:
+        with open(filename, 'rb' if binary else 'r', encoding=encoding) as fh:
             return yaml.safe_load(fh)
-    except (IOError, yaml.YAMLError, UnicodeDecodeError) as e:
+    except (OSError, yaml.YAMLError, UnicodeDecodeError) as e:
         if encoding is None:
             # Sometimes the user's locale sets an encoding that doesn't match
             # the YAML files. Im such cases, retry once with the "default"
             # UTF-8 encoding
             return load_yaml(filename, encoding='utf-8-sig', binary=False)
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
-        raise ConfigurationError(u"{}: {}".format(error_name, e))
+        raise ConfigurationError("{}: {}".format(error_name, e))

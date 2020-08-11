@@ -104,7 +104,7 @@ def serialize_ns_time_value(value):
             result = (int(value), stage[1])
         else:
             break
-    return '{0}{1}'.format(*result)
+    return '{}{}'.format(*result)
 
 
 def denormalize_service_dict(service_dict, version, image_digest=None):

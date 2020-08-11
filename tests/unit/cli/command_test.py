@@ -1,4 +1,3 @@
-# ~*~ encoding: utf-8 ~*~
 import os
 
 import pytest
@@ -9,7 +8,7 @@ from compose.const import IS_WINDOWS_PLATFORM
 from tests import mock
 
 
-class TestGetConfigPathFromOptions(object):
+class TestGetConfigPathFromOptions:
 
     def test_path_from_options(self):
         paths = ['one.yml', 'two.yml']

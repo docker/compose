@@ -2,6 +2,7 @@ import _thread as thread
 import sys
 from collections import namedtuple
 from itertools import cycle
+from operator import attrgetter
 from queue import Empty
 from queue import Queue
 from threading import Thread
@@ -13,7 +14,7 @@ from compose.cli.signals import ShutdownException
 from compose.utils import split_buffer
 
 
-class LogPresenter(object):
+class LogPresenter:
 
     def __init__(self, prefix_width, color_func):
         self.prefix_width = prefix_width
@@ -50,7 +51,7 @@ def max_name_width(service_names, max_index_width=3):
     return max(len(name) for name in service_names) + max_index_width
 
 
-class LogPrinter(object):
+class LogPrinter:
     """Print logs from many containers to a single output stream."""
 
     def __init__(self,
@@ -133,7 +134,7 @@ def build_thread_map(initial_containers, presenters, thread_args):
         # Container order is unspecified, so they are sorted by name in order to make
         # container:presenter (log color) assignment deterministic when given a list of containers
         # with the same names.
-        for container in sorted(initial_containers, key=lambda c: c.name)
+        for container in sorted(initial_containers, key=attrgetter('name'))
     }
 
 
@@ -194,9 +195,9 @@ def build_log_generator(container, log_args):
 def wait_on_exit(container):
     try:
         exit_code = container.wait()
-        return "%s exited with code %s\n" % (container.name, exit_code)
+        return "{} exited with code {}\n".format(container.name, exit_code)
     except APIError as e:
-        return "Unexpected API error for %s (HTTP code %s)\nResponse body:\n%s\n" % (
+        return "Unexpected API error for {} (HTTP code {})\nResponse body:\n{}\n".format(
             container.name, e.response.status_code,
             e.response.text or '[empty]'
         )

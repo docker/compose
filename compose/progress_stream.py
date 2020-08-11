@@ -79,19 +79,19 @@ def print_output_event(event, stream, is_terminal):
     status = event.get('status', '')
 
     if 'progress' in event:
-        write_to_stream("%s %s%s" % (status, event['progress'], terminator), stream)
+        write_to_stream("{} {}{}".format(status, event['progress'], terminator), stream)
     elif 'progressDetail' in event:
         detail = event['progressDetail']
         total = detail.get('total')
         if 'current' in detail and total:
             percentage = float(detail['current']) / float(total) * 100
-            write_to_stream('%s (%.1f%%)%s' % (status, percentage, terminator), stream)
+            write_to_stream('{} ({:.1f}%){}'.format(status, percentage, terminator), stream)
         else:
-            write_to_stream('%s%s' % (status, terminator), stream)
+            write_to_stream('{}{}'.format(status, terminator), stream)
     elif 'stream' in event:
-        write_to_stream("%s%s" % (event['stream'], terminator), stream)
+        write_to_stream("{}{}".format(event['stream'], terminator), stream)
     else:
-        write_to_stream("%s%s\n" % (status, terminator), stream)
+        write_to_stream("{}{}\n".format(status, terminator), stream)
 
 
 def get_digest_from_pull(events):
