@@ -1,6 +1,31 @@
 Change log
 ==========
 
+1.27.0 (2020-08-11)
+-------------------
+
+### Features
+
+- Merge 2.x and 3.x compose formats and align with COMPOSE_SPEC schema
+
+- Implement service mode for ipc
+
+- Pass COMPOSE_PROJECT_NAME environment variable in container mode
+
+- Make run behave in the same way as up
+
+### Bugs
+
+- Ignore build context path validation when building is not required
+
+### Miscellaneous
+
+- Bump `docker-py` to 4.3.0
+
+- Bump `tox` to 3.19.0
+
+- Bump `virtualenv` to 20.0.30
+
 1.26.1 (2020-06-30)
 -------------------
 
