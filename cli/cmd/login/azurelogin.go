@@ -14,11 +14,16 @@ func AzureLoginCommand() *cobra.Command {
 		Short: "Log in to azure",
 		Args:  cobra.MaximumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := opts.Validate(); err != nil {
+				return err
+			}
 			return cloudLogin(cmd, "aci", opts)
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opts.TenantID, "tenant-id", "", "Specify tenant ID to use from your azure account")
+	flags.StringVar(&opts.TenantID, "tenant-id", "", "Specify tenant ID to use")
+	flags.StringVar(&opts.ClientID, "client-id", "", "Client ID for Service principal login")
+	flags.StringVar(&opts.ClientSecret, "client-secret", "", "Client secret for Service principal login")
 
 	return cmd
 }

@@ -20,9 +20,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/api/containers"
-
+	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/api/containers"
 )
 
 func TestGetContainerName(t *testing.T) {
@@ -57,4 +58,87 @@ func TestVerifyCommand(t *testing.T) {
 	err = verifyExecCommand("command argument") // Command with argument
 	assert.Error(t, err, "ACI exec command does not accept arguments to the command. "+
 		"Only the binary should be specified")
+}
+
+func TestLoginParamsValidate(t *testing.T) {
+	err := LoginParams{
+		ClientID: "someID",
+	}.Validate()
+	assert.Error(t, err, "for Service Principal login, 3 options must be specified: --client-id, --client-secret and --tenant-id")
+
+	err = LoginParams{
+		ClientSecret: "someSecret",
+	}.Validate()
+	assert.Error(t, err, "for Service Principal login, 3 options must be specified: --client-id, --client-secret and --tenant-id")
+
+	err = LoginParams{}.Validate()
+	assert.NilError(t, err)
+
+	err = LoginParams{
+		TenantID: "tenant",
+	}.Validate()
+	assert.NilError(t, err)
+}
+
+func TestLoginServicePrincipal(t *testing.T) {
+	loginService := mockLoginService{}
+	loginService.On("LoginServicePrincipal", "someID", "secret", "tenant").Return(nil)
+	loginBackend := aciCloudService{
+		loginService: &loginService,
+	}
+
+	err := loginBackend.Login(context.Background(), LoginParams{
+		ClientID:     "someID",
+		ClientSecret: "secret",
+		TenantID:     "tenant",
+	})
+
+	assert.NilError(t, err)
+}
+
+func TestLoginWithTenant(t *testing.T) {
+	loginService := mockLoginService{}
+	ctx := context.Background()
+	loginService.On("Login", ctx, "tenant").Return(nil)
+	loginBackend := aciCloudService{
+		loginService: &loginService,
+	}
+
+	err := loginBackend.Login(ctx, LoginParams{
+		TenantID: "tenant",
+	})
+
+	assert.NilError(t, err)
+}
+
+func TestLoginWithoutTenant(t *testing.T) {
+	loginService := mockLoginService{}
+	ctx := context.Background()
+	loginService.On("Login", ctx, "").Return(nil)
+	loginBackend := aciCloudService{
+		loginService: &loginService,
+	}
+
+	err := loginBackend.Login(ctx, LoginParams{})
+
+	assert.NilError(t, err)
+}
+
+type mockLoginService struct {
+	mock.Mock
+}
+
+func (s *mockLoginService) Login(ctx context.Context, requestedTenantID string) error {
+	args := s.Called(ctx, requestedTenantID)
+	return args.Error(0)
+}
+
+func (s *mockLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+	args := s.Called(clientID, clientSecret, tenantID)
+	return args.Error(0)
+}
+
+func (s *mockLoginService) Logout(ctx context.Context) error {
+	args := s.Called(ctx)
+	return args.Error(0)
 }

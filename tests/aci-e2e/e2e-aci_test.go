@@ -76,7 +76,7 @@ func TestLoginLogout(t *testing.T) {
 	rg := "E2E-" + startTime
 
 	t.Run("login", func(t *testing.T) {
-		azureLogin(t)
+		azureLogin(t, c)
 	})
 
 	t.Run("create context", func(t *testing.T) {
@@ -506,7 +506,7 @@ func TestRunEnvVars(t *testing.T) {
 func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
 	rg := "E2E-" + tName + "-" + startTime
-	azureLogin(t)
+	azureLogin(t, c)
 	sID := getSubscriptionID(t)
 	t.Logf("Create resource group %q", rg)
 	err := createResourceGroup(sID, rg)
@@ -537,17 +537,14 @@ func deleteResourceGroup(rgName string) error {
 	return helper.DeleteAsync(ctx, *models[0].SubscriptionID, rgName)
 }
 
-func azureLogin(t *testing.T) {
+func azureLogin(t *testing.T, c *E2eCLI) {
 	t.Log("Log in to Azure")
-	login, err := login.NewAzureLoginService()
-	assert.NilError(t, err)
-
 	// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 	tenantID := os.Getenv("AZURE_TENANT_ID")
-	err = login.TestLoginFromServicePrincipal(clientID, clientSecret, tenantID)
-	assert.NilError(t, err)
+	res := c.RunDockerCmd("login", "azure", "--client-id", clientID, "--client-secret", clientSecret, "--tenant-id", tenantID)
+	res.Assert(t, icmd.Success)
 }
 
 func getSubscriptionID(t *testing.T) string {
