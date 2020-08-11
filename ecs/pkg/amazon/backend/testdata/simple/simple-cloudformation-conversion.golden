@@ -207,7 +207,6 @@
     },
     "SimpleTCP80TargetGroup": {
       "Properties": {
-        "Name": "SimpleTCP80TargetGroup",
         "Port": 80,
         "Protocol": "HTTP",
         "Tags": [
