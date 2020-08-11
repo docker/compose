@@ -86,17 +86,17 @@ def recursive_interpolate(obj, interpolator, config_path):
 
 class TemplateWithDefaults(Template):
     pattern = r"""
-        %(delim)s(?:
-            (?P<escaped>%(delim)s) |
-            (?P<named>%(id)s)      |
-            {(?P<braced>%(bid)s)}  |
+        {delim}(?:
+            (?P<escaped>{delim}) |
+            (?P<named>{id})      |
+            {{(?P<braced>{bid})}}  |
             (?P<invalid>)
         )
-        """ % {
-        'delim': re.escape('$'),
-        'id': r'[_a-z][_a-z0-9]*',
-        'bid': r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
-    }
+        """.format(
+        delim=re.escape('$'),
+        id=r'[_a-z][_a-z0-9]*',
+        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+    )
 
     @staticmethod
     def process_braced_group(braced, sep, mapping):
