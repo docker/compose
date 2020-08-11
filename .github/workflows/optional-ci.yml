@@ -3,14 +3,41 @@ name: Continuous integration
 on:
   push:
     branches:
-      - main
+      - test_optional_ci
+  pull_request:
 
 jobs:
+  check-optional-tests:
+    name: Check if needs to run ACI or Windows tests
+    runs-on: ubuntu-latest
+    outputs:
+      trigger-aci: ${{steps.runacitest.outputs.triggered}}
+      trigger-windows: ${{steps.runwindowstest.outputs.triggered}}
+    steps:
+      - run: echo ${{github.ref}}
+      - run: echo ${{github.event_name}}
+      - uses: khan/pull-request-comment-trigger@master
+        name: Check if test ACI
+        if: github.event_name == 'pull_request'
+        id: runacitest
+        with:
+          trigger: '@test-aci'
+      - run: echo ${{steps.runacitest.outputs.triggered}}
+      - uses: khan/pull-request-comment-trigger@master
+        name: Check if test Windows
+        if: github.event_name == 'pull_request'
+        id: runwindowstest
+        with:
+          trigger: '@test-windows'
+      - run: echo ${{steps.runwindowstest.outputs.triggered}}
+
   build:
     name: ACI e2e tests
     runs-on: ubuntu-latest
     env:
       GO111MODULE: "on"
+    needs: check-optional-tests
+    if: github.ref == 'refs/heads/test_optional_ci' || needs.check-optional-tests.outputs.trigger-aci == 'true'
     steps:
       - name: Set up Go 1.14
         uses: actions/setup-go@v1
@@ -41,6 +68,8 @@ jobs:
     runs-on: windows-latest
     env:
       GO111MODULE: "on"
+    needs: check-optional-tests
+    if: github.ref == 'refs/heads/test_optional_ci' || needs.check-optional-tests.outputs.trigger-windows == 'true'
     steps:
       - name: Set up Go 1.14
         uses: actions/setup-go@v1
