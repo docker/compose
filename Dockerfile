@@ -47,7 +47,7 @@ COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /code/
 # FIXME(chris-crone): virtualenv 16.3.0 breaks build, force 16.2.0 until fixed
 RUN pip install virtualenv==20.0.29
-RUN pip install tox==3.18.1
+RUN pip install tox==3.19.0
 
 COPY requirements-indirect.txt .
 COPY requirements.txt .
