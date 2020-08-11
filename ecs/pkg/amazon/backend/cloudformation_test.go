@@ -26,9 +26,38 @@ func TestSimpleConvert(t *testing.T) {
 	golden.Assert(t, result, expected)
 }
 
+func TestRollingUpdateLimits(t *testing.T) {
+	template := convertYaml(t, "test", `
+services:
+  foo:
+    image: hello_world
+    deploy:
+      replicas: 4 
+      update_config:
+        parallelism: 2
+`)
+	service := template.Resources["FooService"].(*ecs.Service)
+	assert.Check(t, service.DeploymentConfiguration.MaximumPercent == 150)
+	assert.Check(t, service.DeploymentConfiguration.MinimumHealthyPercent == 50)
+}
+
+func TestRollingUpdateExtension(t *testing.T) {
+	template := convertYaml(t, "test", `
+services:
+  foo:
+    image: hello_world
+    deploy:
+      update_config:
+        x-aws-min_percent: 25
+        x-aws-max_percent: 125
+`)
+	service := template.Resources["FooService"].(*ecs.Service)
+	assert.Check(t, service.DeploymentConfiguration.MaximumPercent == 125)
+	assert.Check(t, service.DeploymentConfiguration.MinimumHealthyPercent == 25)
+}
+
 func TestRolePolicy(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   foo:
     image: hello_world
@@ -48,7 +77,6 @@ services:
 
 func TestMapNetworksToSecurityGroups(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: hello_world
@@ -73,7 +101,6 @@ networks:
 
 func TestLoadBalancerTypeApplication(t *testing.T) {
 	template := convertYaml(t, "test123456789009876543211234567890", `
-version: "3"
 services:
   test:
     image: nginx
@@ -89,7 +116,6 @@ services:
 
 func TestNoLoadBalancerIfNoPortExposed(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -105,7 +131,6 @@ services:
 
 func TestServiceReplicas(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -119,7 +144,6 @@ services:
 
 func TestTaskSizeConvert(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -137,7 +161,6 @@ services:
 	assert.Equal(t, def.Memory, "2048")
 
 	template = convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -156,7 +179,6 @@ services:
 }
 func TestTaskSizeConvertFailure(t *testing.T) {
 	model := loadConfig(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -172,7 +194,6 @@ services:
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx
@@ -187,7 +208,6 @@ services:
 
 func TestServiceMapping(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: "image"
@@ -227,7 +247,6 @@ func get(l []ecs.TaskDefinition_KeyValuePair, name string) string {
 
 func TestResourcesHaveProjectTagSet(t *testing.T) {
 	template := convertYaml(t, "test", `
-version: "3"
 services:
   test:
     image: nginx

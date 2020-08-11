@@ -190,6 +190,11 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 			dependsOn = append(dependsOn, serviceResourceName(dependency))
 		}
 
+		minPercent, maxPercent, err := b.computeRollingUpdateLimits(service)
+		if err != nil {
+			return nil, err
+		}
+
 		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
 			AWSCloudFormationDependsOn: dependsOn,
 			Cluster:                    cluster,
@@ -198,8 +203,8 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 				Type: ecsapi.DeploymentControllerTypeEcs,
 			},
 			DeploymentConfiguration: &ecs.Service_DeploymentConfiguration{
-				MaximumPercent:        200,
-				MinimumHealthyPercent: 100,
+				MaximumPercent:        maxPercent,
+				MinimumHealthyPercent: minPercent,
 			},
 			LaunchType:    ecsapi.LaunchTypeFargate,
 			LoadBalancers: serviceLB,
@@ -230,6 +235,46 @@ func (b Backend) Convert(project *types.Project) (*cloudformation.Template, erro
 		}
 	}
 	return template, nil
+}
+
+func (b Backend) computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
+	maxPercent := 200
+	minPercent := 100
+	if service.Deploy == nil || service.Deploy.UpdateConfig == nil {
+		return minPercent, maxPercent, nil
+	}
+	updateConfig := service.Deploy.UpdateConfig
+	min, okMin := updateConfig.Extensions[compose.ExtensionMinPercent]
+	if okMin {
+		minPercent = min.(int)
+	}
+	max, okMax := updateConfig.Extensions[compose.ExtensionMaxPercent]
+	if okMax {
+		maxPercent = max.(int)
+	}
+	if okMin && okMax {
+		return minPercent, maxPercent, nil
+	}
+
+	if updateConfig.Parallelism != nil {
+		parallelism := int(*updateConfig.Parallelism)
+		if service.Deploy.Replicas == nil {
+			return minPercent, maxPercent,
+				fmt.Errorf("rolling update configuration require deploy.replicas to be set")
+		}
+		replicas := int(*service.Deploy.Replicas)
+		if replicas < parallelism {
+			return minPercent, maxPercent,
+				fmt.Errorf("deploy.replicas (%d) must be greater than deploy.update_config.parallelism (%d)", replicas, parallelism)
+		}
+		if !okMin {
+			minPercent = (replicas - parallelism) * 100 / replicas
+		}
+		if !okMax {
+			maxPercent = (replicas + parallelism) * 100 / replicas
+		}
+	}
+	return minPercent, maxPercent, nil
 }
 
 func getLoadBalancerType(project *types.Project) string {

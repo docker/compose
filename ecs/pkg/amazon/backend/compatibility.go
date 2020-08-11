@@ -22,6 +22,8 @@ var compatibleComposeAttributes = []string{
 	"services.deploy.resources.reservations",
 	"services.deploy.resources.reservations.cpus",
 	"services.deploy.resources.reservations.memory",
+	"services.deploy.update_config",
+	"services.deploy.update_config.parallelism",
 	"services.entrypoint",
 	"services.environment",
 	"service.image",

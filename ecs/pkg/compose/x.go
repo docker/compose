@@ -7,4 +7,6 @@ const (
 	ExtensionLB              = "x-aws-loadbalancer"
 	ExtensionCluster         = "x-aws-cluster"
 	ExtensionKeys            = "x-aws-keys"
+	ExtensionMinPercent      = "x-aws-min_percent"
+	ExtensionMaxPercent      = "x-aws-max_percent"
 )
