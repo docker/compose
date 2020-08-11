@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 '''
 timeparse.py
 (c) Will Roberts <wildwilhelm@gmail.com>  1 February, 2014
@@ -54,14 +53,14 @@ TIMEFORMAT = r'{HOURS}{MINS}{SECS}{MILLI}{MICRO}{NANO}'.format(
     NANO=opt(NANO),
 )
 
-MULTIPLIERS = dict([
-    ('hours',   60 * 60),
-    ('mins',    60),
-    ('secs',    1),
-    ('milli',   1.0 / 1000),
-    ('micro',   1.0 / 1000.0 / 1000),
-    ('nano',    1.0 / 1000.0 / 1000.0 / 1000.0),
-])
+MULTIPLIERS = {
+    'hours':   60 * 60,
+    'mins':    60,
+    'secs':    1,
+    'milli':   1.0 / 1000,
+    'micro':   1.0 / 1000.0 / 1000,
+    'nano':    1.0 / 1000.0 / 1000.0 / 1000.0,
+}
 
 
 def timeparse(sval):
@@ -90,4 +89,4 @@ def timeparse(sval):
 
 
 def cast(value):
-    return int(value, 10) if value.isdigit() else float(value)
+    return int(value) if value.isdigit() else float(value)

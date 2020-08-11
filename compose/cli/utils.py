@@ -11,13 +11,6 @@ import docker
 import compose
 from ..const import IS_WINDOWS_PLATFORM
 
-# WindowsError is not defined on non-win32 platforms. Avoid runtime errors by
-# defining it as OSError (its parent class) if missing.
-try:
-    WindowsError
-except NameError:
-    WindowsError = OSError
-
 
 def yesno(prompt, default=None):
     """
@@ -58,7 +51,7 @@ def call_silently(*args, **kwargs):
     with open(os.devnull, 'w') as shutup:
         try:
             return subprocess.call(*args, stdout=shutup, stderr=shutup, **kwargs)
-        except WindowsError:
+        except OSError:
             # On Windows, subprocess.call() can still raise exceptions. Normalize
             # to POSIXy behaviour by returning a nonzero exit code.
             return 1
@@ -120,7 +113,7 @@ def generate_user_agent():
     try:
         p_system = platform.system()
         p_release = platform.release()
-    except IOError:
+    except OSError:
         pass
     else:
         parts.append("{}/{}".format(p_system, p_release))
@@ -133,7 +126,7 @@ def human_readable_file_size(size):
     if order >= len(suffixes):
         order = len(suffixes) - 1
 
-    return '{0:.4g} {1}'.format(
+    return '{:.4g} {}'.format(
         size / pow(10, order * 3),
         suffixes[order]
     )

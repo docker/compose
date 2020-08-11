@@ -55,16 +55,16 @@ class OneOffFilter(enum.Enum):
     @classmethod
     def update_labels(cls, value, labels):
         if value == cls.only:
-            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "True"))
+            labels.append('{}={}'.format(LABEL_ONE_OFF, "True"))
         elif value == cls.exclude:
-            labels.append('{0}={1}'.format(LABEL_ONE_OFF, "False"))
+            labels.append('{}={}'.format(LABEL_ONE_OFF, "False"))
         elif value == cls.include:
             pass
         else:
             raise ValueError("Invalid value for one_off: {}".format(repr(value)))
 
 
-class Project(object):
+class Project:
     """
     A collection of services.
     """
@@ -80,7 +80,7 @@ class Project(object):
         name = self.name
         if legacy:
             name = re.sub(r'[_-]', '', name)
-        labels = ['{0}={1}'.format(LABEL_PROJECT, name)]
+        labels = ['{}={}'.format(LABEL_PROJECT, name)]
 
         OneOffFilter.update_labels(one_off, labels)
         return labels
@@ -549,10 +549,10 @@ class Project(object):
                 'action': event['status'],
                 'id': event['Actor']['ID'],
                 'service': container_attrs.get(LABEL_SERVICE),
-                'attributes': dict([
-                    (k, v) for k, v in container_attrs.items()
+                'attributes': {
+                    k: v for k, v in container_attrs.items()
                     if not k.startswith('com.docker.compose.')
-                ]),
+                },
                 'container': container,
             }
 
@@ -812,7 +812,7 @@ class Project(object):
             return
         if remove_orphans:
             for ctnr in orphans:
-                log.info('Removing orphan container "{0}"'.format(ctnr.name))
+                log.info('Removing orphan container "{}"'.format(ctnr.name))
                 try:
                     ctnr.kill()
                 except APIError:
@@ -820,7 +820,7 @@ class Project(object):
                 ctnr.remove(force=True)
         else:
             log.warning(
-                'Found orphan containers ({0}) for this project. If '
+                'Found orphan containers ({}) for this project. If '
                 'you removed or renamed this service in your compose '
                 'file, you can run this command with the '
                 '--remove-orphans flag to clean it up.'.format(
@@ -966,16 +966,16 @@ def get_secrets(service, service_secrets, secret_defs):
                 .format(service=service, secret=secret.source))
 
         if secret_def.get('external'):
-            log.warning("Service \"{service}\" uses secret \"{secret}\" which is external. "
-                        "External secrets are not available to containers created by "
-                        "docker-compose.".format(service=service, secret=secret.source))
+            log.warning('Service "{service}" uses secret "{secret}" which is external. '
+                        'External secrets are not available to containers created by '
+                        'docker-compose.'.format(service=service, secret=secret.source))
             continue
 
         if secret.uid or secret.gid or secret.mode:
             log.warning(
-                "Service \"{service}\" uses secret \"{secret}\" with uid, "
-                "gid, or mode. These fields are not supported by this "
-                "implementation of the Compose file".format(
+                'Service "{service}" uses secret "{secret}" with uid, '
+                'gid, or mode. These fields are not supported by this '
+                'implementation of the Compose file'.format(
                     service=service, secret=secret.source
                 )
             )
@@ -983,8 +983,8 @@ def get_secrets(service, service_secrets, secret_defs):
         secret_file = secret_def.get('file')
         if not path.isfile(str(secret_file)):
             log.warning(
-                "Service \"{service}\" uses an undefined secret file \"{secret_file}\", "
-                "the following file should be created \"{secret_file}\"".format(
+                'Service "{service}" uses an undefined secret file "{secret_file}", '
+                'the following file should be created "{secret_file}"'.format(
                     service=service, secret_file=secret_file
                 )
             )

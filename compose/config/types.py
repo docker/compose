@@ -146,7 +146,7 @@ def normpath(path, win_host=False):
     return path
 
 
-class MountSpec(object):
+class MountSpec:
     options_map = {
         'volume': {
             'nocopy': 'no_copy'
@@ -338,9 +338,9 @@ class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid 
         return self.source
 
     def repr(self):
-        return dict(
-            [(k, v) for k, v in zip(self._fields, self) if v is not None]
-        )
+        return {
+            k: v for k, v in zip(self._fields, self) if v is not None
+        }
 
 
 class ServiceSecret(ServiceConfigBase):
@@ -362,10 +362,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         if published:
             if isinstance(published, str) and '-' in published:  # "x-y:z" format
                 a, b = published.split('-', 1)
-                try:
-                    int(a)
-                    int(b)
-                except ValueError:
+                if not a.isdigit() or not b.isdigit():
                     raise ConfigurationError('Invalid published port: {}'.format(published))
             else:
                 try:
@@ -373,7 +370,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
                 except ValueError:
                     raise ConfigurationError('Invalid published port: {}'.format(published))
 
-        return super(ServicePort, cls).__new__(
+        return super().__new__(
             cls, target, published, *args, **kwargs
         )
 
@@ -422,9 +419,9 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         return (self.target, self.published, self.external_ip, self.protocol)
 
     def repr(self):
-        return dict(
-            [(k, v) for k, v in zip(self._fields, self) if v is not None]
-        )
+        return {
+            k: v for k, v in zip(self._fields, self) if v is not None
+        }
 
     def legacy_repr(self):
         return normalize_port_dict(self.repr())
@@ -484,9 +481,9 @@ class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
 
         if con[0] == 'seccomp' and con[1] != 'unconfined':
             try:
-                with open(unquote_path(con[1]), 'r') as f:
+                with open(unquote_path(con[1])) as f:
                     seccomp_data = json.load(f)
-            except (IOError, ValueError) as e:
+            except (OSError, ValueError) as e:
                 raise ConfigurationError('Error reading seccomp profile: {}'.format(e))
             return cls(
                 'seccomp={}'.format(json.dumps(seccomp_data)), con[1]

@@ -248,7 +248,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', security_opt=security_opt)
         container = service.create_container()
         service.start_container(container)
-        assert set(container.get('HostConfig.SecurityOpt')) == set([o.repr() for o in security_opt])
+        assert set(container.get('HostConfig.SecurityOpt')) == {o.repr() for o in security_opt}
 
     @pytest.mark.xfail(True, reason='Not supported on most drivers')
     def test_create_container_with_storage_opt(self):
@@ -290,7 +290,7 @@ class ServiceTest(DockerClientTestCase):
         actual_host_path = container.get_mount(container_path)['Source']
 
         assert path.basename(actual_host_path) == path.basename(host_path), (
-            "Last component differs: %s, %s" % (actual_host_path, host_path)
+            "Last component differs: {}, {}".format(actual_host_path, host_path)
         )
 
     def test_create_container_with_host_mount(self):
@@ -844,11 +844,11 @@ class ServiceTest(DockerClientTestCase):
         db2 = create_and_start_container(db)
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'db'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_creates_links_with_names(self):
@@ -859,11 +859,11 @@ class ServiceTest(DockerClientTestCase):
         db2 = create_and_start_container(db)
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'custom_link_name'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_with_external_links(self):
@@ -879,11 +879,11 @@ class ServiceTest(DockerClientTestCase):
 
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db_ctnrs[0].name,
             db_ctnrs[1].name,
             'db_3'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -893,7 +893,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
 
         c = create_and_start_container(db)
-        assert set(get_links(c)) == set([])
+        assert set(get_links(c)) == set()
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_one_off_container_creates_links_to_its_own_service(self):
@@ -904,11 +904,11 @@ class ServiceTest(DockerClientTestCase):
 
         c = create_and_start_container(db, one_off=OneOffFilter.only)
 
-        assert set(get_links(c)) == set([
+        assert set(get_links(c)) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'db'
-        ])
+        }
 
     def test_start_container_builds_images(self):
         service = Service(
@@ -1719,14 +1719,14 @@ class ServiceTest(DockerClientTestCase):
         options = service._get_container_create_options({}, service._next_container_number())
         original = Container.create(service.client, **options)
 
-        assert set(service.containers(stopped=True)) == set([original])
+        assert set(service.containers(stopped=True)) == {original}
         assert set(service.duplicate_containers()) == set()
 
         options['name'] = 'temporary_container_name'
         duplicate = Container.create(service.client, **options)
 
-        assert set(service.containers(stopped=True)) == set([original, duplicate])
-        assert set(service.duplicate_containers()) == set([duplicate])
+        assert set(service.containers(stopped=True)) == {original, duplicate}
+        assert set(service.duplicate_containers()) == {duplicate}
 
 
 def converge(service, strategy=ConvergenceStrategy.changed):

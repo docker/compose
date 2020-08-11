@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import datetime
 import json
 import os.path
@@ -99,7 +98,7 @@ def kill_service(service):
             container.kill()
 
 
-class ContainerCountCondition(object):
+class ContainerCountCondition:
 
     def __init__(self, project, expected):
         self.project = project
@@ -112,7 +111,7 @@ class ContainerCountCondition(object):
         return "waiting for counter count == %s" % self.expected
 
 
-class ContainerStateCondition(object):
+class ContainerStateCondition:
 
     def __init__(self, client, name, status):
         self.client = client
@@ -140,7 +139,7 @@ class ContainerStateCondition(object):
 class CLITestCase(DockerClientTestCase):
 
     def setUp(self):
-        super(CLITestCase, self).setUp()
+        super().setUp()
         self.base_dir = 'tests/fixtures/simple-composefile'
         self.override_dir = None
 
@@ -162,7 +161,7 @@ class CLITestCase(DockerClientTestCase):
         if hasattr(self, '_project'):
             del self._project
 
-        super(CLITestCase, self).tearDown()
+        super().tearDown()
 
     @property
     def project(self):
@@ -206,14 +205,14 @@ class CLITestCase(DockerClientTestCase):
 
     def test_shorthand_host_opt(self):
         self.dispatch(
-            ['-H={0}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
+            ['-H={}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
              'up', '-d'],
             returncode=0
         )
 
     def test_shorthand_host_opt_interactive(self):
         self.dispatch(
-            ['-H={0}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
+            ['-H={}'.format(os.environ.get('DOCKER_HOST', 'unix://')),
              'run', 'another', 'ls'],
             returncode=0
         )
@@ -1453,7 +1452,7 @@ services:
             if v['Name'].split('/')[-1].startswith('{}_'.format(self.project.name))
         ]
 
-        assert set([v['Name'].split('/')[-1] for v in volumes]) == {volume_with_label}
+        assert {v['Name'].split('/')[-1] for v in volumes} == {volume_with_label}
         assert 'label_key' in volumes[0]['Labels']
         assert volumes[0]['Labels']['label_key'] == 'label_val'
 
@@ -1866,12 +1865,12 @@ services:
         self.dispatch(['run', 'implicit'])
         service = self.project.get_service('implicit')
         containers = service.containers(stopped=True, one_off=OneOffFilter.only)
-        assert [c.human_readable_command for c in containers] == [u'/bin/sh -c echo "success"']
+        assert [c.human_readable_command for c in containers] == ['/bin/sh -c echo "success"']
 
         self.dispatch(['run', 'explicit'])
         service = self.project.get_service('explicit')
         containers = service.containers(stopped=True, one_off=OneOffFilter.only)
-        assert [c.human_readable_command for c in containers] == [u'/bin/true']
+        assert [c.human_readable_command for c in containers] == ['/bin/true']
 
     @pytest.mark.skipif(SWARM_SKIP_RM_VOLUMES, reason='Swarm DELETE /containers/<id> bug')
     def test_run_rm(self):
@@ -2701,7 +2700,7 @@ services:
             str_iso_date, str_iso_time, container_info = string.split(' ', 2)
             try:
                 return isinstance(datetime.datetime.strptime(
-                    '%s %s' % (str_iso_date, str_iso_time),
+                    '{} {}'.format(str_iso_date, str_iso_time),
                     '%Y-%m-%d %H:%M:%S.%f'),
                     datetime.datetime)
             except ValueError:
@@ -2790,7 +2789,7 @@ services:
         self.base_dir = 'tests/fixtures/extends'
         self.dispatch(['up', '-d'], None)
 
-        assert set([s.name for s in self.project.services]) == {'mydb', 'myweb'}
+        assert {s.name for s in self.project.services} == {'mydb', 'myweb'}
 
         # Sort by name so we get [db, web]
         containers = sorted(

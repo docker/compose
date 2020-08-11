@@ -156,7 +156,7 @@ def main(args):
 
     opts = parse_opts(args)
 
-    with open(opts.filename, 'r') as fh:
+    with open(opts.filename) as fh:
         new_format = migrate(fh.read())
 
     if opts.in_place:
