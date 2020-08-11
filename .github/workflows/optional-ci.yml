@@ -14,22 +14,18 @@ jobs:
       trigger-aci: ${{steps.runacitest.outputs.triggered}}
       trigger-windows: ${{steps.runwindowstest.outputs.triggered}}
     steps:
-      - run: echo ${{github.ref}}
-      - run: echo ${{github.event_name}}
       - uses: khan/pull-request-comment-trigger@master
         name: Check if test ACI
         if: github.event_name == 'pull_request'
         id: runacitest
         with:
           trigger: '@test-aci'
-      - run: echo ${{steps.runacitest.outputs.triggered}}
       - uses: khan/pull-request-comment-trigger@master
         name: Check if test Windows
         if: github.event_name == 'pull_request'
         id: runwindowstest
         with:
           trigger: '@test-windows'
-      - run: echo ${{steps.runwindowstest.outputs.triggered}}
 
   build:
     name: ACI e2e tests
