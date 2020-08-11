@@ -77,7 +77,9 @@ func (p *proxy) Inspect(ctx context.Context, request *containersv1.InspectReques
 }
 
 func (p *proxy) Delete(ctx context.Context, request *containersv1.DeleteRequest) (*containersv1.DeleteResponse, error) {
-	return &containersv1.DeleteResponse{}, Client(ctx).ContainerService().Delete(ctx, request.Id, request.Force)
+	return &containersv1.DeleteResponse{}, Client(ctx).ContainerService().Delete(ctx, request.Id, containers.DeleteRequest{
+		Force: request.Force,
+	})
 }
 
 func (p *proxy) Exec(ctx context.Context, request *containersv1.ExecRequest) (*containersv1.ExecResponse, error) {

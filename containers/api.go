@@ -105,6 +105,11 @@ type LogsRequest struct {
 	Writer io.Writer
 }
 
+// DeleteRequest contains configuration about a delete request
+type DeleteRequest struct {
+	Force bool
+}
+
 // Service interacts with the underlying container backend
 type Service interface {
 	// List returns all the containers
@@ -118,7 +123,7 @@ type Service interface {
 	// Logs returns all the logs of a container
 	Logs(ctx context.Context, containerName string, request LogsRequest) error
 	// Delete removes containers
-	Delete(ctx context.Context, id string, force bool) error
+	Delete(ctx context.Context, containerID string, request DeleteRequest) error
 	// Inspect get a specific container
 	Inspect(ctx context.Context, id string) (Container, error)
 }

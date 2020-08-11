@@ -49,10 +49,8 @@ const (
 	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
 	statusUnknown             = "Unknown"
+	statusRunning             = "Running"
 )
-
-// ErrNoSuchContainer is returned when the mentioned container does not exist
-var ErrNoSuchContainer = errors.New("no such container")
 
 // ContextParams options for creating ACI context
 type ContextParams struct {
@@ -292,18 +290,46 @@ func (cs *aciContainerService) Logs(ctx context.Context, containerName string, r
 	return err
 }
 
-func (cs *aciContainerService) Delete(ctx context.Context, containerID string, _ bool) error {
+func (cs *aciContainerService) Delete(ctx context.Context, containerID string, request containers.DeleteRequest) error {
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
 		msg := "cannot delete service %q from compose application %q, you can delete the entire compose app with docker compose down --project-name %s"
 		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
 	}
-	cg, err := deleteACIContainerGroup(ctx, cs.ctx, groupName)
+
+	containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return err
 	}
+
+	if !request.Force {
+		cg, err := containerGroupsClient.Get(ctx, cs.ctx.ResourceGroup, groupName)
+		if err != nil {
+			if cg.StatusCode == http.StatusNotFound {
+				return errdefs.ErrNotFound
+			}
+			return err
+		}
+
+		for _, container := range *cg.Containers {
+			status := statusUnknown
+			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
+				status = *container.InstanceView.CurrentState.State
+			}
+
+			if status == statusRunning {
+				return errdefs.ErrForbidden
+			}
+		}
+	}
+
+	cg, err := deleteACIContainerGroup(ctx, cs.ctx, groupName)
+	// Delete returns `StatusNoContent` if the group is not found
 	if cg.StatusCode == http.StatusNoContent {
-		return ErrNoSuchContainer
+		return errdefs.ErrNotFound
+	}
+	if err != nil {
+		return err
 	}
 
 	return err
@@ -317,7 +343,7 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		return containers.Container{}, err
 	}
 	if cg.StatusCode == http.StatusNoContent {
-		return containers.Container{}, ErrNoSuchContainer
+		return containers.Container{}, errdefs.ErrNotFound
 	}
 
 	var cc containerinstance.Container
@@ -330,7 +356,7 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		}
 	}
 	if !found {
-		return containers.Container{}, ErrNoSuchContainer
+		return containers.Container{}, errdefs.ErrNotFound
 	}
 
 	return convert.ContainerGroupToContainer(containerID, cg, cc)
@@ -374,7 +400,7 @@ func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) 
 		return err
 	}
 	if cg.StatusCode == http.StatusNoContent {
-		return ErrNoSuchContainer
+		return errdefs.ErrNotFound
 	}
 
 	return err
