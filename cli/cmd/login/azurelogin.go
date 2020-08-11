@@ -14,8 +14,7 @@ func AzureLoginCommand() *cobra.Command {
 		Short: "Log in to azure",
 		Args:  cobra.MaximumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := opts.Validate()
-			if err != nil {
+			if err := opts.Validate(); err != nil {
 				return err
 			}
 			return cloudLogin(cmd, "aci", opts)
