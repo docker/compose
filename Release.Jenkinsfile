@@ -37,6 +37,9 @@ pipeline {
             }
         }
         stage('Test') {
+            agent {
+                label 'linux && docker && ubuntu-2004'
+            }
             steps {
                 // TODO use declarative 1.5.0 `matrix` once available on CI
                 script {
