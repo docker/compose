@@ -78,7 +78,7 @@ func runRemove(ctx context.Context, args []string, force bool) error {
 func formatErrors(errs []error) string {
 	messages := make([]string, len(errs))
 	for i, err := range errs {
-		messages[i] = "Error: "+err.Error()
+		messages[i] = "Error: " + err.Error()
 	}
 	return strings.Join(messages, "\n")
 }

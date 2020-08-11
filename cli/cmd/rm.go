@@ -85,7 +85,7 @@ func runRm(ctx context.Context, args []string, opts rmOpts) error {
 func formatErrors(errs []error) string {
 	messages := make([]string, len(errs))
 	for i, err := range errs {
-		messages[i] = "Error: "+err.Error()
+		messages[i] = "Error: " + err.Error()
 	}
 	return strings.Join(messages, "\n")
 }
