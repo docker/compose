@@ -36,7 +36,7 @@ if ! [ -x "$(command -v python3)" ]; then
   brew install python3
 fi
 if ! [ -x "$(command -v virtualenv)" ]; then
-  pip3 install virtualenv==20.0.29
+  pip3 install virtualenv==20.0.30
 fi
 
 #
