@@ -244,7 +244,7 @@ def buildImage(baseImage) {
 def runTests(dockerVersion, pythonVersion, baseImage) {
     return {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
-            node("linux") {
+            node("linux && docker && ubuntu-2004") {
                 def scmvar = checkout(scm)
                 def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
