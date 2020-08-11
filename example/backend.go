@@ -24,15 +24,13 @@ import (
 	"fmt"
 
 	"github.com/compose-spec/compose-go/cli"
-
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/errdefs"
-
 	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
+	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/errdefs"
 )
 
 type apiService struct {
@@ -108,8 +106,8 @@ func (cs *containerService) Logs(ctx context.Context, containerName string, requ
 	return nil
 }
 
-func (cs *containerService) Delete(ctx context.Context, id string, force bool) error {
-	fmt.Printf("Deleting container %q with force = %t\n", id, force)
+func (cs *containerService) Delete(ctx context.Context, id string, request containers.DeleteRequest) error {
+	fmt.Printf("Deleting container %q with force = %t\n", id, request.Force)
 	return nil
 }
 

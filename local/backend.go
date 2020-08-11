@@ -249,9 +249,9 @@ func (ms *local) Logs(ctx context.Context, containerName string, request contain
 	return err
 }
 
-func (ms *local) Delete(ctx context.Context, containerID string, force bool) error {
+func (ms *local) Delete(ctx context.Context, containerID string, request containers.DeleteRequest) error {
 	err := ms.apiClient.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
-		Force: force,
+		Force: request.Force,
 	})
 	if client.IsErrNotFound(err) {
 		return errors.Wrapf(errdefs.ErrNotFound, "container %q", containerID)

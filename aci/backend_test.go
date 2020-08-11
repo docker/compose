@@ -41,7 +41,7 @@ func TestGetContainerName(t *testing.T) {
 
 func TestErrorMessageDeletingContainerFromComposeApplication(t *testing.T) {
 	service := aciContainerService{}
-	err := service.Delete(context.TODO(), "compose-app_service1", false)
+	err := service.Delete(context.TODO(), "compose-app_service1", containers.DeleteRequest{Force: false})
 	assert.Error(t, err, "cannot delete service \"service1\" from compose application \"compose-app\", you can delete the entire compose app with docker compose down --project-name compose-app")
 }
 

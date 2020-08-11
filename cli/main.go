@@ -179,10 +179,11 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
-		//if user canceled request, simply exit without any error message
+		// if user canceled request, simply exit without any error message
 		if errors.Is(ctx.Err(), context.Canceled) {
 			os.Exit(130)
 		}
+
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
@@ -191,6 +192,7 @@ func main() {
 		mobycli.ExecIfDefaultCtxType(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
+
 		exit(err)
 	}
 }
@@ -201,6 +203,11 @@ func exit(err error) {
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
 	fatal(err)
+}
+
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
 }
 
 func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string) {
@@ -240,9 +247,4 @@ func determineCurrentContext(flag string, configDir string) string {
 		res = "default"
 	}
 	return res
-}
-
-func fatal(err error) {
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
 }

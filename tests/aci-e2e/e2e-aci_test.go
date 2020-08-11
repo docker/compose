@@ -265,9 +265,21 @@ func TestContainerRun(t *testing.T) {
 		}
 	})
 
-	t.Run("rm", func(t *testing.T) {
+	t.Run("rm a running container", func(t *testing.T) {
 		res := c.RunDockerCmd("rm", container)
-		res.Assert(t, icmd.Expected{Out: container})
+		res.Assert(t, icmd.Expected{
+			Err:      fmt.Sprintf("Error: You cannot remove a running container %s. Stop the container before attempting removal or force remove\n", container),
+			ExitCode: 1,
+		})
+	})
+
+	t.Run("force rm", func(t *testing.T) {
+		res := c.RunDockerCmd("rm", "-f", container)
+		res.Assert(t, icmd.Expected{
+			Out:      container,
+			ExitCode: 0,
+		})
+
 		checkStopped := func(t poll.LogT) poll.Result {
 			res := c.RunDockerCmd("inspect", container)
 			if res.ExitCode == 1 {
@@ -349,7 +361,7 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 
 	t.Run("rm attached", func(t *testing.T) {
-		res := c.RunDockerCmd("rm", container)
+		res := c.RunDockerCmd("rm", "-f", container)
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 }

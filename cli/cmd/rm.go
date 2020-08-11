@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/containers"
+	"github.com/docker/api/errdefs"
 	"github.com/docker/api/multierror"
 )
 
@@ -57,11 +59,20 @@ func runRm(ctx context.Context, args []string, opts rmOpts) error {
 
 	var errs *multierror.Error
 	for _, id := range args {
-		err := c.ContainerService().Delete(ctx, id, opts.force)
+		err := c.ContainerService().Delete(ctx, id, containers.DeleteRequest{
+			Force: opts.force,
+		})
 		if err != nil {
-			errs = multierror.Append(errs, err)
+			if errdefs.IsForbiddenError(err) {
+				errs = multierror.Append(errs, fmt.Errorf("you cannot remove a running container %s. Stop the container before attempting removal or force remove", id))
+			} else if errdefs.IsNotFoundError(err) {
+				errs = multierror.Append(errs, fmt.Errorf("container %s not found", id))
+			} else {
+				errs = multierror.Append(errs, err)
+			}
 			continue
 		}
+
 		fmt.Println(id)
 	}
 
