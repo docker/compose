@@ -3,7 +3,7 @@ name: Continuous integration
 on:
   push:
     branches:
-      - test_optional_ci
+      - main
   pull_request:
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
     env:
       GO111MODULE: "on"
     needs: check-optional-tests
-    if: github.ref == 'refs/heads/test_optional_ci' || needs.check-optional-tests.outputs.trigger-aci == 'true'
+    if: github.ref == 'refs/heads/main' || needs.check-optional-tests.outputs.trigger-aci == 'true'
     steps:
       - name: Set up Go 1.14
         uses: actions/setup-go@v1
@@ -69,7 +69,7 @@ jobs:
     env:
       GO111MODULE: "on"
     needs: check-optional-tests
-    if: github.ref == 'refs/heads/test_optional_ci' || needs.check-optional-tests.outputs.trigger-windows == 'true'
+    if: github.ref == 'refs/heads/main' || needs.check-optional-tests.outputs.trigger-windows == 'true'
     steps:
       - name: Set up Go 1.14
         uses: actions/setup-go@v1
