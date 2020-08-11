@@ -61,5 +61,5 @@ func TestErrorOrNil(t *testing.T) {
 
 	err = Append(err, errors.New("error"))
 	e := err.ErrorOrNil()
-	assert.Error(t, e, "error")
+	assert.Error(t, e, "Error: error")
 }

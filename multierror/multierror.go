@@ -95,7 +95,7 @@ func Append(err error, errs ...error) *Error {
 
 func listErrorFunc(errs []error) string {
 	if len(errs) == 1 {
-		return errs[0].Error()
+		return "Error: " + errs[0].Error()
 	}
 
 	messages := make([]string, len(errs))

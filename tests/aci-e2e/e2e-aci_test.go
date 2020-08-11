@@ -268,7 +268,7 @@ func TestContainerRun(t *testing.T) {
 	t.Run("rm a running container", func(t *testing.T) {
 		res := c.RunDockerCmd("rm", container)
 		res.Assert(t, icmd.Expected{
-			Err:      fmt.Sprintf("Error: You cannot remove a running container %s. Stop the container before attempting removal or force remove\n", container),
+			Err:      fmt.Sprintf("Error: you cannot remove a running container %s. Stop the container before attempting removal or force remove", container),
 			ExitCode: 1,
 		})
 	})
