@@ -29,6 +29,7 @@ require (
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/jinzhu/gorm v1.9.12 // indirect
+	github.com/joho/godotenv v1.3.0
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/lib/pq v1.3.0 // indirect
 	github.com/manifoldco/promptui v0.7.0

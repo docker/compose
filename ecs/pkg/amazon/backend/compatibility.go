@@ -26,6 +26,7 @@ var compatibleComposeAttributes = []string{
 	"services.deploy.update_config.parallelism",
 	"services.entrypoint",
 	"services.environment",
+	"services.env_file",
 	"service.image",
 	"services.init",
 	"services.healthcheck",

@@ -3,12 +3,12 @@ package backend
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/docker/ecs-plugin/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -18,6 +18,8 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
 	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/secrets"
+	"github.com/joho/godotenv"
 )
 
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
@@ -121,6 +123,11 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		})
 	}
 
+	pairs, err := createEnvironment(project, service)
+	if err != nil {
+		return nil, err
+	}
+
 	containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
 		Command:                service.Command,
 		DisableNetworking:      service.NetworkMode == "none",
@@ -129,7 +136,7 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		DnsServers:             service.DNS,
 		DockerSecurityOptions:  service.SecurityOpt,
 		EntryPoint:             service.Entrypoint,
-		Environment:            toKeyValuePair(service.Environment),
+		Environment:            pairs,
 		Essential:              true,
 		ExtraHosts:             toHostEntryPtr(service.ExtraHosts),
 		FirelensConfiguration:  nil,
@@ -171,6 +178,48 @@ func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
 		Volumes:                 volumes,
 	}, nil
+}
+
+func createEnvironment(project *types.Project, service types.ServiceConfig) ([]ecs.TaskDefinition_KeyValuePair, error) {
+	environment := map[string]*string{}
+	for _, f := range service.EnvFile {
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(project.WorkingDir, f)
+		}
+		if _, err := os.Stat(f); os.IsNotExist(err) {
+			return nil, err
+		}
+		file, err := os.Open(f)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		env, err := godotenv.Parse(file)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range env {
+			environment[k] = &v
+		}
+	}
+	for k, v := range service.Environment {
+		environment[k] = v
+	}
+
+	var pairs []ecs.TaskDefinition_KeyValuePair
+	for k, v := range environment {
+		name := k
+		var value string
+		if v != nil {
+			value = *v
+		}
+		pairs = append(pairs, ecs.TaskDefinition_KeyValuePair{
+			Name:  name,
+			Value: value,
+		})
+	}
+	return pairs, nil
 }
 
 func toTags(labels types.Labels) []tags.Tag {
@@ -389,25 +438,6 @@ func toHostEntryPtr(hosts types.HostsList) []ecs.TaskDefinition_HostEntry {
 		})
 	}
 	return e
-}
-
-func toKeyValuePair(environment types.MappingWithEquals) []ecs.TaskDefinition_KeyValuePair {
-	if environment == nil || len(environment) == 0 {
-		return nil
-	}
-	pairs := []ecs.TaskDefinition_KeyValuePair{}
-	for k, v := range environment {
-		name := k
-		var value string
-		if v != nil {
-			value = *v
-		}
-		pairs = append(pairs, ecs.TaskDefinition_KeyValuePair{
-			Name:  name,
-			Value: value,
-		})
-	}
-	return pairs
 }
 
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {

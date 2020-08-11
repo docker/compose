@@ -26,6 +26,36 @@ func TestSimpleConvert(t *testing.T) {
 	golden.Assert(t, result, expected)
 }
 
+func TestEnvFile(t *testing.T) {
+	template := convertYaml(t, "test", `
+services:
+  foo:
+    image: hello_world
+    env_file:
+      - testdata/input/envfile
+`)
+	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
+	env := def.ContainerDefinitions[0].Environment
+	assert.Equal(t, env[0].Name, "FOO")
+	assert.Equal(t, env[0].Value, "BAR")
+}
+
+func TestEnvFileAndEnv(t *testing.T) {
+	template := convertYaml(t, "test", `
+services:
+  foo:
+    image: hello_world
+    env_file:
+      - testdata/input/envfile
+    environment:
+      - "FOO=ZOT"
+`)
+	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
+	env := def.ContainerDefinitions[0].Environment
+	assert.Equal(t, env[0].Name, "FOO")
+	assert.Equal(t, env[0].Value, "ZOT")
+}
+
 func TestRollingUpdateLimits(t *testing.T) {
 	template := convertYaml(t, "test", `
 services:
