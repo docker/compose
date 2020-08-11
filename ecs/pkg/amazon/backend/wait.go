@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/docker/ecs-plugin/pkg/console"
+	"github.com/docker/ecs-plugin/pkg/compose"
+	"github.com/docker/ecs-plugin/pkg/progress"
 )
 
-func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operation int, w console.ProgressWriter) error {
+func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operation int) error {
 	knownEvents := map[string]struct{}{}
 
 	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
@@ -22,7 +23,6 @@ func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operatio
 
 	ticker := time.NewTicker(1 * time.Second)
 	done := make(chan bool)
-
 	go func() {
 		b.api.WaitStackComplete(ctx, stackID, operation) //nolint:errcheck
 		ticker.Stop()
@@ -55,11 +55,38 @@ func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operatio
 			resource := aws.StringValue(event.LogicalResourceId)
 			reason := aws.StringValue(event.ResourceStatusReason)
 			status := aws.StringValue(event.ResourceStatus)
-			w.ResourceEvent(resource, status, reason)
-			if stackErr == nil && strings.HasSuffix(status, "_FAILED") {
-				stackErr = fmt.Errorf(reason)
+			progressStatus := progress.Working
+
+			switch status {
+			case "CREATE_COMPLETE":
+				if operation == compose.StackCreate {
+					progressStatus = progress.Done
+
+				}
+			case "UPDATE_COMPLETE":
+				if operation == compose.StackUpdate {
+					progressStatus = progress.Done
+				}
+			case "DELETE_COMPLETE":
+				if operation == compose.StackDelete {
+					progressStatus = progress.Done
+				}
+			default:
+				if strings.HasSuffix(status, "_FAILED") {
+					progressStatus = progress.Error
+					if stackErr == nil {
+						operation = compose.StackDelete
+						stackErr = fmt.Errorf(reason)
+					}
+				}
 			}
+			b.writer.Event(progress.Event{
+				ID:         resource,
+				Status:     progressStatus,
+				StatusText: status,
+			})
 		}
 	}
+
 	return stackErr
 }

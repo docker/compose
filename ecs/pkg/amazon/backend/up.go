@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/ecs-plugin/pkg/compose"
-	"github.com/docker/ecs-plugin/pkg/console"
+	"github.com/docker/ecs-plugin/pkg/progress"
 )
 
 func (b *Backend) Up(ctx context.Context, options *cli.ProjectOptions) error {
@@ -82,10 +83,12 @@ func (b *Backend) Up(ctx context.Context, options *cli.ProjectOptions) error {
 		}
 	}
 
-	fmt.Println()
-	w := console.NewProgressWriter()
 	for k := range template.Resources {
-		w.ResourceEvent(k, "PENDING", "")
+		b.writer.Event(progress.Event{
+			ID:         k,
+			Status:     progress.Working,
+			StatusText: "Pending",
+		})
 	}
 
 	signalChan := make(chan os.Signal, 1)
@@ -96,7 +99,29 @@ func (b *Backend) Up(ctx context.Context, options *cli.ProjectOptions) error {
 		b.Down(ctx, options)
 	}()
 
-	return b.WaitStackCompletion(ctx, project.Name, operation, w)
+	err = b.WaitStackCompletion(ctx, project.Name, operation)
+	// update status for external resources (LB and cluster)
+	loadBalancerName := fmt.Sprintf("%.32s", fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name)))
+	for k := range template.Resources {
+		switch k {
+		case "Cluster":
+			if cluster == "" {
+				continue
+			}
+		case loadBalancerName:
+			if lb == "" {
+				continue
+			}
+		default:
+			continue
+		}
+		b.writer.Event(progress.Event{
+			ID:         k,
+			Status:     progress.Done,
+			StatusText: "",
+		})
+	}
+	return err
 }
 
 func (b Backend) GetVPC(ctx context.Context, project *types.Project) (string, error) {

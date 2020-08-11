@@ -12,6 +12,7 @@ import (
 	amazon "github.com/docker/ecs-plugin/pkg/amazon/backend"
 	"github.com/docker/ecs-plugin/pkg/amazon/cloudformation"
 	"github.com/docker/ecs-plugin/pkg/docker"
+	"github.com/docker/ecs-plugin/pkg/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +80,11 @@ func UpCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return backend.Up(context.Background(), opts)
+
+			return progress.Run(context.Background(), func(ctx context.Context) error {
+				backend.SetWriter(ctx)
+				return backend.Up(ctx, opts)
+			})
 		}),
 	}
 	cmd.Flags().StringVar(&opts.loadBalancerArn, "load-balancer", "", "")
@@ -124,7 +129,10 @@ func DownCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command 
 			if err != nil {
 				return err
 			}
-			return backend.Down(context.Background(), opts)
+			return progress.Run(context.Background(), func(ctx context.Context) error {
+				backend.SetWriter(ctx)
+				return backend.Down(ctx, opts)
+			})
 		}),
 	}
 	cmd.Flags().BoolVar(&opts.DeleteCluster, "delete-cluster", false, "Delete cluster")
@@ -139,7 +147,7 @@ func LogsCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command 
 			if err != nil {
 				return err
 			}
-			return backend.Logs(context.Background(), opts)
+			return backend.Logs(context.Background(), opts, os.Stdout)
 		}),
 	}
 	return cmd

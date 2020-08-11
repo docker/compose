@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -13,7 +15,7 @@ import (
 	"github.com/docker/ecs-plugin/pkg/console"
 )
 
-func (b *Backend) Logs(ctx context.Context, options *cli.ProjectOptions) error {
+func (b *Backend) Logs(ctx context.Context, options *cli.ProjectOptions, writer io.Writer) error {
 	name := options.Name
 	if name == "" {
 		project, err := cli.ProjectFromOptions(options)
@@ -26,6 +28,7 @@ func (b *Backend) Logs(ctx context.Context, options *cli.ProjectOptions) error {
 	err := b.api.GetLogs(ctx, name, &logConsumer{
 		colors: map[string]console.ColorFunc{},
 		width:  0,
+		writer: writer,
 	})
 	if err != nil {
 		return err
@@ -45,8 +48,10 @@ func (l *logConsumer) Log(service, container, message string) {
 		l.computeWidth()
 	}
 	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", service)
+
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Printf("%s %s\n", cf(prefix), line)
+		buf := bytes.NewBufferString(fmt.Sprintf("%s %s\n", cf(prefix), line))
+		l.writer.Write(buf.Bytes())
 	}
 }
 
@@ -63,4 +68,5 @@ func (l *logConsumer) computeWidth() {
 type logConsumer struct {
 	colors map[string]console.ColorFunc
 	width  int
+	writer io.Writer
 }
