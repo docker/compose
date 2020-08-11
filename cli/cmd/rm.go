@@ -19,14 +19,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/errdefs"
-	"github.com/docker/api/multierror"
 )
 
 type rmOpts struct {
@@ -75,6 +76,16 @@ func runRm(ctx context.Context, args []string, opts rmOpts) error {
 
 		fmt.Println(id)
 	}
-
+	if errs != nil {
+		errs.ErrorFormat = formatErrors
+	}
 	return errs.ErrorOrNil()
+}
+
+func formatErrors(errs []error) string {
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = "Error: "+err.Error()
+	}
+	return strings.Join(messages, "\n")
 }
