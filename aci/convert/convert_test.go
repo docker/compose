@@ -235,6 +235,23 @@ func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
 	assert.Error(t, err, "ACI integration does not support specifying different restart policies on containers in the same compose application")
 }
 
+func TestLabelsErrorMessage(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Labels: map[string]string{
+					"label1": "value1",
+				},
+			},
+		},
+	}
+
+	_, err := ToContainerGroup(convertCtx, project)
+	assert.Error(t, err, "ACI integration does not support labels in compose applications")
+}
+
 func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{

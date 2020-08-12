@@ -95,6 +95,9 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 		if err != nil {
 			return containerinstance.ContainerGroup{}, err
 		}
+		if service.Labels != nil && len(service.Labels) > 0 {
+			return containerinstance.ContainerGroup{}, errors.New("ACI integration does not support labels in compose applications")
+		}
 		if service.Ports != nil {
 			var containerPorts []containerinstance.ContainerPort
 			for _, portConfig := range service.Ports {
