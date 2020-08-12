@@ -64,7 +64,6 @@ services:
 		}
 	}
 	assert.Check(t, found, "environment variable FOO not set")
-
 }
 
 func TestEnvFileAndEnv(t *testing.T) {
@@ -79,8 +78,14 @@ services:
 `)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
 	env := def.ContainerDefinitions[0].Environment
-	assert.Equal(t, env[0].Name, "FOO")
-	assert.Equal(t, env[0].Value, "ZOT")
+	var found bool
+	for _, pair := range env {
+		if pair.Name == "FOO" {
+			assert.Equal(t, pair.Value, "ZOT")
+			found = true
+		}
+	}
+	assert.Check(t, found, "environment variable FOO not set")
 }
 
 func TestRollingUpdateLimits(t *testing.T) {
