@@ -56,6 +56,10 @@ func (p *proxy) List(ctx context.Context, request *containersv1.ListRequest) (*c
 	return response, nil
 }
 
+func (p *proxy) Start(ctx context.Context, request *containersv1.StartRequest) (*containersv1.StartResponse, error) {
+	return &containersv1.StartResponse{}, Client(ctx).ContainerService().Start(ctx, request.Id)
+}
+
 func (p *proxy) Stop(ctx context.Context, request *containersv1.StopRequest) (*containersv1.StopResponse, error) {
 	timeoutValue := request.GetTimeout()
 	return &containersv1.StopResponse{}, Client(ctx).ContainerService().Stop(ctx, request.Id, &timeoutValue)

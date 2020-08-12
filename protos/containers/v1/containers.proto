@@ -21,6 +21,7 @@ option go_package = "github.com/docker/api/protos/containers/v1;v1";
 
 service Containers {
 	rpc List(ListRequest) returns (ListResponse);
+	rpc Start(StartRequest) returns (StartResponse);
 	rpc Stop(StopRequest) returns (StopResponse);
 	rpc Run(RunRequest) returns (RunResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
@@ -67,6 +68,13 @@ message DeleteRequest {
 }
 
 message DeleteResponse {
+}
+
+message StartRequest {
+	string id = 1;
+}
+
+message StartResponse {
 }
 
 message StopRequest {
