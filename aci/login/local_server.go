@@ -44,12 +44,12 @@ const successHTML = `
 <html>
 <head>
 	<meta charset="utf-8" />
-	<meta http-equiv="refresh" content="10;url=https://docs.microsoft.com/cli/azure/">
+	<meta http-equiv="refresh" content="10;url=https://docs.docker.com/engine/context/aci-integration/">
 	<title>Login successfully</title>
 </head>
 <body>
 	<h4>You have logged into Microsoft Azure!</h4>
-	<p>You can close this window, or we will redirect you to the <a href="https://docs.microsoft.com/cli/azure/">Azure CLI documents</a> in 10 seconds.</p>
+	<p>You can close this window, or we will redirect you to the <a href="https://docs.docker.com/engine/context/aci-integration/">Docker ACI integration documentation</a> in 10 seconds.</p>
 </body>
 </html>
 `
