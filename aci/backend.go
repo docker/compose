@@ -228,7 +228,7 @@ func addTag(groupDefinition *containerinstance.ContainerGroup, tagName string) {
 func (cs *aciContainerService) Start(ctx context.Context, containerID string) error {
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
-		msg := "cannot delete service %q from compose application %q, you can delete the entire compose app with docker compose down --project-name %s"
+		msg := "cannot start specified service %q from compose application %q, you can update and restart the entire compose app with docker compose up --project-name %s"
 		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
 	}
 
