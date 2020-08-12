@@ -373,6 +373,18 @@ func TestContainerRunAttached(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 
+	t.Run("ps stopped container with --all", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", container)
+		res.Assert(t, icmd.Success)
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		assert.Assert(t, is.Len(out, 1))
+
+		res = c.RunDockerCmd("ps", "--all", container)
+		res.Assert(t, icmd.Success)
+		out = strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		assert.Assert(t, is.Len(out, 2))
+	})
+
 	t.Run("rm stopped container", func(t *testing.T) {
 		res := c.RunDockerCmd("rm", container)
 		res.Assert(t, icmd.Expected{Out: container})

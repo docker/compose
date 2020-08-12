@@ -131,7 +131,7 @@ type aciContainerService struct {
 	ctx store.AciContext
 }
 
-func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.Container, error) {
+func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
 	groupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return nil, err
@@ -156,42 +156,45 @@ func (cs *aciContainerService) List(ctx context.Context, _ bool) ([]containers.C
 			return []containers.Container{}, err
 		}
 
-		if _, ok := group.Tags[singleContainerTag]; ok {
-			if group.Containers == nil || len(*group.Containers) < 1 {
-				return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *containerGroup.Name)
-			}
-			container := (*group.Containers)[0]
-			c := getContainer(*containerGroup.Name, group.IPAddress, container)
-			res = append(res, c)
-			continue
+		if group.Containers == nil || len(*group.Containers) < 1 {
+			return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *containerGroup.Name)
 		}
 
 		for _, container := range *group.Containers {
-			var containerID string
 			// don't list sidecar container
 			if *container.Name == convert.ComposeDNSSidecarName {
 				continue
 			}
-			containerID = *containerGroup.Name + composeContainerSeparator + *container.Name
+			if !all && getStatus(container) != statusRunning {
+				continue
+			}
+			containerID := *containerGroup.Name + composeContainerSeparator + *container.Name
+			if _, ok := group.Tags[singleContainerTag]; ok {
+				containerID = *containerGroup.Name
+			}
 			c := getContainer(containerID, group.IPAddress, container)
 			res = append(res, c)
 		}
 	}
-
 	return res, nil
 }
 
 func getContainer(containerID string, ipAddress *containerinstance.IPAddress, container containerinstance.Container) containers.Container {
-	status := statusUnknown
-	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
-		status = *container.InstanceView.CurrentState.State
-	}
+	status := getStatus(container)
 	return containers.Container{
 		ID:     containerID,
 		Image:  *container.Image,
 		Status: status,
 		Ports:  convert.ToPorts(ipAddress, *container.Ports),
 	}
+}
+
+func getStatus(container containerinstance.Container) string {
+	status := statusUnknown
+	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
+		status = *container.InstanceView.CurrentState.State
+	}
+	return status
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
