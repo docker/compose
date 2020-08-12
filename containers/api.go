@@ -114,6 +114,8 @@ type DeleteRequest struct {
 type Service interface {
 	// List returns all the containers
 	List(ctx context.Context, all bool) ([]Container, error)
+	// Start starts a stopped container
+	Start(ctx context.Context, containerID string) error
 	// Stop stops the running container
 	Stop(ctx context.Context, containerID string, timeout *uint32) error
 	// Run creates and starts a container

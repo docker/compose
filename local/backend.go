@@ -170,6 +170,10 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 	return ms.apiClient.ContainerStart(ctx, created.ID, types.ContainerStartOptions{})
 }
 
+func (ms *local) Start(ctx context.Context, containerID string) error {
+	return ms.apiClient.ContainerStart(ctx, containerID, types.ContainerStartOptions{})
+}
+
 func (ms *local) Stop(ctx context.Context, containerID string, timeout *uint32) error {
 	var t *time.Duration
 	if timeout != nil {
