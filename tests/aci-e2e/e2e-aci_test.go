@@ -385,8 +385,18 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Assert(t, is.Len(out, 2))
 	})
 
+	t.Run("start container", func(t *testing.T) {
+		res := c.RunDockerCmd("start", container)
+		res.Assert(t, icmd.Expected{Out: container})
+		waitForStatus(t, c, container, "Running")
+	})
+
 	t.Run("rm stopped container", func(t *testing.T) {
-		res := c.RunDockerCmd("rm", container)
+		res := c.RunDockerCmd("stop", container)
+		res.Assert(t, icmd.Expected{Out: container})
+		waitForStatus(t, c, container, "Terminated")
+
+		res = c.RunDockerCmd("rm", container)
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 }
@@ -652,4 +662,16 @@ func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName
 func getContainerName(stdout string) string {
 	out := strings.Split(strings.TrimSpace(stdout), "\n")
 	return strings.TrimSpace(out[len(out)-1])
+}
+
+func waitForStatus(t *testing.T, c *E2eCLI, containerID string, status string) {
+	checkStopped := func(t poll.LogT) poll.Result {
+		res := c.RunDockerCmd("inspect", containerID)
+		if strings.Contains(res.Stdout(), status) {
+			return poll.Success()
+		}
+		return poll.Continue("waiting for container to stop")
+	}
+
+	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 }

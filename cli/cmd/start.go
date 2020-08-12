@@ -30,7 +30,7 @@ import (
 	"github.com/docker/api/client"
 )
 
-// StartCommand deletes containers
+// StartCommand starts containers
 func StartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start",
