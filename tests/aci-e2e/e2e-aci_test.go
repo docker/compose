@@ -360,8 +360,21 @@ func TestContainerRunAttached(t *testing.T) {
 		poll.WaitOn(t, checkLog, poll.WithDelay(1*time.Second), poll.WithTimeout(20*time.Second))
 	})
 
-	t.Run("rm attached", func(t *testing.T) {
-		res := c.RunDockerCmd("rm", "-f", container)
+	t.Run("stop wrong container", func(t *testing.T) {
+		res := c.RunDockerCmd("stop", "unknown-container")
+		res.Assert(t, icmd.Expected{
+			Err:      "Error: container unknown-container not found",
+			ExitCode: 1,
+		})
+	})
+
+	t.Run("stop container", func(t *testing.T) {
+		res := c.RunDockerCmd("stop", container)
+		res.Assert(t, icmd.Expected{Out: container})
+	})
+
+	t.Run("rm stopped container", func(t *testing.T) {
+		res := c.RunDockerCmd("rm", container)
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 }
