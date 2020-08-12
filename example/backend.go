@@ -92,6 +92,10 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	return nil
 }
 
+func (cs *containerService) Start(ctx context.Context, containerID string) error {
+	return errors.New("not implemented")
+}
+
 func (cs *containerService) Stop(ctx context.Context, containerName string, timeout *uint32) error {
 	return errors.New("not implemented")
 }

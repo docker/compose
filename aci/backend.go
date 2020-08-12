@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -224,6 +225,32 @@ func addTag(groupDefinition *containerinstance.ContainerGroup, tagName string) {
 	groupDefinition.Tags[tagName] = to.StringPtr(tagName)
 }
 
+func (cs *aciContainerService) Start(ctx context.Context, containerID string) error {
+	groupName, containerName := getGroupAndContainerName(containerID)
+	if groupName != containerID {
+		msg := "cannot delete service %q from compose application %q, you can delete the entire compose app with docker compose down --project-name %s"
+		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+	}
+
+	containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	if err != nil {
+		return err
+	}
+
+	future, err := containerGroupsClient.Start(ctx, cs.ctx.ResourceGroup, containerName)
+	if err != nil {
+		var aerr autorest.DetailedError
+		if ok := errors.As(err, &aerr); ok {
+			if aerr.StatusCode == http.StatusNotFound {
+				return errdefs.ErrNotFound
+			}
+		}
+		return err
+	}
+
+	return future.WaitForCompletionRef(ctx, containerGroupsClient.Client)
+}
+
 func (cs *aciContainerService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
 	if timeout != nil && *timeout != uint32(0) {
 		return errors.Errorf("ACI integration does not support setting a timeout to stop a container before killing it.")
@@ -308,12 +335,12 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
 	}
 
-	containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
-	if err != nil {
-		return err
-	}
-
 	if !request.Force {
+		containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+		if err != nil {
+			return err
+		}
+
 		cg, err := containerGroupsClient.Get(ctx, cs.ctx.ResourceGroup, groupName)
 		if err != nil {
 			if cg.StatusCode == http.StatusNotFound {
