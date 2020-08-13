@@ -21,6 +21,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/pkg/errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
@@ -59,6 +60,7 @@ func Command() *cobra.Command {
 		downCommand(),
 		psCommand(),
 		logsCommand(),
+		convertCommand(),
 	)
 
 	return command
@@ -73,16 +75,14 @@ func checkComposeSupport(ctx context.Context) error {
 		}
 		return nil
 	}
-	currentContext := apicontext.CurrentContext(ctx)
-	s := store.ContextStore(ctx)
-	cc, err := s.Get(currentContext)
-	if err != nil {
-		return err
-	}
-	switch cc.Type() {
-	case store.AwsContextType:
-		return errors.New("use 'docker ecs compose' on context type " + cc.Type())
-	default:
+	if errdefs.IsNotFoundError(err) {
+		currentContext := apicontext.CurrentContext(ctx)
+		s := store.ContextStore(ctx)
+		cc, err := s.Get(currentContext)
+		if err != nil {
+			return err
+		}
 		return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
 	}
+	return err
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/errdefs"
 	"github.com/docker/api/secrets"
 )
 
@@ -87,7 +88,7 @@ func Get(ctx context.Context, backendType string) (Service, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("backend not found for context %q", backendType)
+	return nil, errdefs.ErrNotFound
 }
 
 // GetCloudService returns the backend registered for a particular type, it returns
