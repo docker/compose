@@ -165,7 +165,7 @@ func TestContainerRun(t *testing.T) {
 		mountTarget := "/usr/share/nginx/html"
 		res := c.RunDockerCmd(
 			"run", "-d",
-			"-v", fmt.Sprintf("%s:%s@%s:%s", saName, k, testShareName, mountTarget),
+			"-v", fmt.Sprintf("%s@%s:%s", saName, testShareName, mountTarget),
 			"-p", "80:80",
 			"nginx",
 		)
