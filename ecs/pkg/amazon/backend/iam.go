@@ -22,7 +22,7 @@ var assumeRolePolicyDocument = PolicyDocument{
 	},
 }
 
-// could alternatively depend on https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/master/pkg/cloud/services/iam/types.go#L52
+// could alternatively depend on https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/master/cmd/clusterawsadm/api/iam/v1alpha1/types.go
 type PolicyDocument struct {
 	Version   string            `json:",omitempty"`
 	Statement []PolicyStatement `json:",omitempty"`

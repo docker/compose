@@ -440,15 +440,26 @@ func createTaskExecutionRole(service types.ServiceConfig, err error, definition 
 			PolicyDocument: policy,
 			PolicyName:     fmt.Sprintf("%sGrantAccessToSecrets", service.Name),
 		})
+	}
 
+	if roles, ok := service.Extensions[compose.ExtensionRole]; ok {
+		rolePolicies = append(rolePolicies, iam.Role_Policy{
+			PolicyDocument: roles,
+		})
+	}
+	managedPolicies := []string{
+		ECSTaskExecutionPolicy,
+		ECRReadOnlyPolicy,
+	}
+	if v, ok := service.Extensions[compose.ExtensionManagedPolicies]; ok {
+		for _, s := range v.([]interface{}) {
+			managedPolicies = append(managedPolicies, s.(string))
+		}
 	}
 	template.Resources[taskExecutionRole] = &iam.Role{
 		AssumeRolePolicyDocument: assumeRolePolicyDocument,
 		Policies:                 rolePolicies,
-		ManagedPolicyArns: []string{
-			ECSTaskExecutionPolicy,
-			ECRReadOnlyPolicy,
-		},
+		ManagedPolicyArns:        managedPolicies,
 	}
 	return taskExecutionRole, nil
 }

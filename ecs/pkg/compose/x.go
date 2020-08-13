@@ -10,4 +10,6 @@ const (
 	ExtensionMinPercent      = "x-aws-min_percent"
 	ExtensionMaxPercent      = "x-aws-max_percent"
 	ExtensionRetention       = "x-aws-logs_retention"
+	ExtensionRole            = "x-aws-role"
+	ExtensionManagedPolicies = "x-aws-policies"
 )
