@@ -62,7 +62,7 @@ func Exec() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	childExit := make(chan bool)
 	signal.Notify(signals) // catch all signals
 	go func() {
