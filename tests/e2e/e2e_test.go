@@ -299,7 +299,7 @@ func TestLegacy(t *testing.T) {
 	t.Run("local run", func(t *testing.T) {
 		t.Parallel()
 		cmd := c.NewDockerCmd("run", "--rm", "hello-world")
-		cmd.Timeout = 20 * time.Second
+		cmd.Timeout = 40 * time.Second
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Expected{Out: "Hello from Docker!"})
 	})
