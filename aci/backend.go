@@ -209,7 +209,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	}
 
 	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
-	groupDefinition, err := convert.ToContainerGroup(cs.ctx, project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, project)
 	if err != nil {
 		return err
 	}
@@ -410,7 +410,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) er
 		return err
 	}
 	logrus.Debugf("Up on project with name %q\n", project.Name)
-	groupDefinition, err := convert.ToContainerGroup(cs.ctx, *project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project)
 	addTag(&groupDefinition, composeContainerTag)
 
 	if err != nil {

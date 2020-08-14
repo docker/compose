@@ -17,6 +17,7 @@
 package convert
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -47,7 +48,7 @@ const (
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
-func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
+func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
 	loginService, err := login.NewAzureLoginService()
@@ -58,7 +59,7 @@ func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerin
 		LoginService: *loginService,
 		AciContext:   aciContext,
 	}
-	volumesCache, volumesSlice, err := project.getAciFileVolumes(storageHelper)
+	volumesCache, volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, err
 	}
@@ -199,7 +200,7 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 	return secretVolumes, nil
 }
 
-func (p projectAciHelper) getAciFileVolumes(helper login.StorageAccountHelper) (map[string]bool, []containerinstance.Volume, error) {
+func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageAccountHelper) (map[string]bool, []containerinstance.Volume, error) {
 	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
 	var azureFileVolumesSlice []containerinstance.Volume
 	for name, v := range p.Volumes {
@@ -212,7 +213,7 @@ func (p projectAciHelper) getAciFileVolumes(helper login.StorageAccountHelper) (
 			if !ok {
 				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
 			}
-			accountKey, err := helper.GetAzureStorageAccountKey(accountName)
+			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
 			if err != nil {
 				return nil, nil, err
 			}

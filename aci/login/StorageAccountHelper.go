@@ -16,12 +16,12 @@ type StorageAccountHelper struct {
 }
 
 // GetAzureStorageAccountKey retrieves the storage account ket from the current azure login
-func (helper StorageAccountHelper) GetAzureStorageAccountKey(accountName string) (string, error) {
+func (helper StorageAccountHelper) GetAzureStorageAccountKey(ctx context.Context, accountName string) (string, error) {
 	client, err := GetStorageAccountsClient(helper.AciContext.SubscriptionID)
 	if err != nil {
 		return "", err
 	}
-	result, err := client.ListKeys(context.TODO(), helper.AciContext.ResourceGroup, accountName, "")
+	result, err := client.ListKeys(ctx, helper.AciContext.ResourceGroup, accountName, "")
 	if err != nil {
 		return "", errors.Wrap(err, fmt.Sprintf("could not access storage account acountKeys for %s, using the azure login", accountName))
 	}

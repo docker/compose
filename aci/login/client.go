@@ -13,7 +13,7 @@ import (
 	"github.com/docker/api/errdefs"
 )
 
-const aciDockerUserAgent = "docker-cli"
+const userAgent = "docker-cli"
 
 // GetContainerGroupsClient get client toi manipulate containerGrouos
 func GetContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
@@ -29,7 +29,7 @@ func GetContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 }
 
 func setupClient(aciClient *autorest.Client) error {
-	aciClient.UserAgent = aciDockerUserAgent
+	aciClient.UserAgent = userAgent
 	auth, err := NewAuthorizerFromLogin()
 	if err != nil {
 		return err

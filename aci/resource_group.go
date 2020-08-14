@@ -19,11 +19,11 @@ package aci
 import (
 	"context"
 
-	"github.com/docker/api/aci/login"
-
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/pkg/errors"
+
+	"github.com/docker/api/aci/login"
 )
 
 // ResourceGroupHelper interface to manage resource groups and subscription IDs
