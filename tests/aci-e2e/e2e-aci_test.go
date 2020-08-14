@@ -52,7 +52,7 @@ import (
 
 const (
 	contextName = "aci-test"
-	location    = "westeurope"
+	location    = "eastus2"
 )
 
 var binDir string
@@ -665,12 +665,14 @@ func getContainerName(stdout string) string {
 }
 
 func waitForStatus(t *testing.T, c *E2eCLI, containerID string, status string) {
-	checkStopped := func(t poll.LogT) poll.Result {
+	checkStopped := func(logt poll.LogT) poll.Result {
 		res := c.RunDockerCmd("inspect", containerID)
-		if strings.Contains(res.Stdout(), status) {
+		containerInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		if containerInspect.Status == status {
 			return poll.Success()
 		}
-		return poll.Continue("waiting for container to stop")
+		return poll.Continue("Status %s != %s (expected) for container %s", containerInspect.Status, status, containerID)
 	}
 
 	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
