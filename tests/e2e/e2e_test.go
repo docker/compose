@@ -199,7 +199,7 @@ func TestLoginCommandDelegation(t *testing.T) {
 		res := c.RunDockerCmd("login", "-u", "nouser", "-p", "wrongpasword")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password",
+			Err:      "unauthorized: incorrect username or password",
 		})
 	})
 
@@ -225,7 +225,7 @@ func TestLoginCommandDelegation(t *testing.T) {
 		res := c.RunDockerCmd("login", "-u", "nouser", "-p", "wrongpasword")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      "Get https://registry-1.docker.io/v2/: unauthorized: incorrect username or password",
+			Err:      "unauthorized: incorrect username or password",
 		})
 	})
 }
