@@ -82,7 +82,6 @@ func UpCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command {
 			}
 
 			return progress.Run(context.Background(), func(ctx context.Context) error {
-				backend.SetWriter(ctx)
 				return backend.Up(ctx, opts)
 			})
 		}),
@@ -130,7 +129,6 @@ func DownCommand(dockerCli command.Cli, options *composeOptions) *cobra.Command 
 				return err
 			}
 			return progress.Run(context.Background(), func(ctx context.Context) error {
-				backend.SetWriter(ctx)
 				return backend.Down(ctx, opts)
 			})
 		}),

@@ -14,7 +14,8 @@ import (
 
 func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operation int) error {
 	knownEvents := map[string]struct{}{}
-
+	// progress writer
+	w := progress.ContextWriter(ctx)
 	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
 	stackID, err := b.api.GetStackID(ctx, name)
 	if err != nil {
@@ -80,7 +81,7 @@ func (b *Backend) WaitStackCompletion(ctx context.Context, name string, operatio
 					}
 				}
 			}
-			b.writer.Event(progress.Event{
+			w.Event(progress.Event{
 				ID:         resource,
 				Status:     progressStatus,
 				StatusText: status,
