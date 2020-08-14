@@ -675,5 +675,5 @@ func waitForStatus(t *testing.T, c *E2eCLI, containerID string, status string) {
 		return poll.Continue("Status %s != %s (expected) for container %s", containerInspect.Status, status, containerID)
 	}
 
-	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 }
