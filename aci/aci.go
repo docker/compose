@@ -42,7 +42,7 @@ import (
 )
 
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
-	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
@@ -66,7 +66,7 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 
 func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	w := progress.ContextWriter(ctx)
-	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
@@ -121,7 +121,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 }
 
 func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
-	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -130,7 +130,7 @@ func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, cont
 }
 
 func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
-	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -139,7 +139,7 @@ func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, c
 }
 
 func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) error {
-	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -152,7 +152,7 @@ func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, con
 }
 
 func execACIContainer(ctx context.Context, aciContext store.AciContext, command, containerGroup string, containerName string) (c containerinstance.ContainerExecResponse, err error) {
-	containerClient, err := login.GetContainerClient(aciContext.SubscriptionID)
+	containerClient, err := login.NewContainerClient(aciContext.SubscriptionID)
 	if err != nil {
 		return c, errors.Wrapf(err, "cannot get container client")
 	}
@@ -245,7 +245,7 @@ func exec(ctx context.Context, address string, password string, request containe
 }
 
 func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, tail *int32) (string, error) {
-	containerClient, err := login.GetContainerClient(aciContext.SubscriptionID)
+	containerClient, err := login.NewContainerClient(aciContext.SubscriptionID)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot get container client")
 	}

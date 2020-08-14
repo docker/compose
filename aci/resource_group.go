@@ -45,7 +45,7 @@ func NewACIResourceGroupHelper() ResourceGroupHelper {
 
 // GetGroup get a resource group from its name
 func (mgt aciResourceGroupHelperImpl) GetGroup(ctx context.Context, subscriptionID string, groupName string) (resources.Group, error) {
-	gc, err := login.GetGroupsClient(subscriptionID)
+	gc, err := login.NewGroupsClient(subscriptionID)
 	if err != nil {
 		return resources.Group{}, err
 	}
@@ -54,7 +54,7 @@ func (mgt aciResourceGroupHelperImpl) GetGroup(ctx context.Context, subscription
 
 // ListGroups list resource groups
 func (mgt aciResourceGroupHelperImpl) ListGroups(ctx context.Context, subscriptionID string) ([]resources.Group, error) {
-	gc, err := login.GetGroupsClient(subscriptionID)
+	gc, err := login.NewGroupsClient(subscriptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (mgt aciResourceGroupHelperImpl) ListGroups(ctx context.Context, subscripti
 
 // CreateOrUpdate create or update a resource group
 func (mgt aciResourceGroupHelperImpl) CreateOrUpdate(ctx context.Context, subscriptionID string, resourceGroupName string, parameters resources.Group) (result resources.Group, err error) {
-	gc, err := login.GetGroupsClient(subscriptionID)
+	gc, err := login.NewGroupsClient(subscriptionID)
 	if err != nil {
 		return resources.Group{}, err
 	}
@@ -89,7 +89,7 @@ func (mgt aciResourceGroupHelperImpl) CreateOrUpdate(ctx context.Context, subscr
 
 // DeleteAsync deletes a resource group. Does not wait for full deletion to return (long operation)
 func (mgt aciResourceGroupHelperImpl) DeleteAsync(ctx context.Context, subscriptionID string, resourceGroupName string) (err error) {
-	gc, err := login.GetGroupsClient(subscriptionID)
+	gc, err := login.NewGroupsClient(subscriptionID)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (mgt aciResourceGroupHelperImpl) DeleteAsync(ctx context.Context, subscript
 
 // GetSubscriptionIDs Return available subscription IDs based on azure login
 func (mgt aciResourceGroupHelperImpl) GetSubscriptionIDs(ctx context.Context) ([]subscription.Model, error) {
-	c, err := login.GetSubscriptionsClient()
+	c, err := login.NewSubscriptionsClient()
 	if err != nil {
 		return nil, err
 	}

@@ -15,8 +15,8 @@ import (
 
 const userAgent = "docker-cli"
 
-// GetContainerGroupsClient get client toi manipulate containerGrouos
-func GetContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
+// NewContainerGroupsClient get client toi manipulate containerGrouos
+func NewContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
 	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
 	err := setupClient(&containerGroupsClient.Client)
 	if err != nil {
@@ -38,8 +38,8 @@ func setupClient(aciClient *autorest.Client) error {
 	return nil
 }
 
-// GetStorageAccountsClient get client to manipulate storage accounts
-func GetStorageAccountsClient(subscriptionID string) (storage.AccountsClient, error) {
+// NewStorageAccountsClient get client to manipulate storage accounts
+func NewStorageAccountsClient(subscriptionID string) (storage.AccountsClient, error) {
 	containerGroupsClient := storage.NewAccountsClient(subscriptionID)
 	err := setupClient(&containerGroupsClient.Client)
 	if err != nil {
@@ -51,8 +51,8 @@ func GetStorageAccountsClient(subscriptionID string) (storage.AccountsClient, er
 	return containerGroupsClient, nil
 }
 
-// GetSubscriptionsClient get subscription client
-func GetSubscriptionsClient() (subscription.SubscriptionsClient, error) {
+// NewSubscriptionsClient get subscription client
+func NewSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
 	err := setupClient(&subc.Client)
 	if err != nil {
@@ -61,8 +61,8 @@ func GetSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	return subc, nil
 }
 
-// GetGroupsClient get client to manipulate groups
-func GetGroupsClient(subscriptionID string) (resources.GroupsClient, error) {
+// NewGroupsClient get client to manipulate groups
+func NewGroupsClient(subscriptionID string) (resources.GroupsClient, error) {
 	groupsClient := resources.NewGroupsClient(subscriptionID)
 	err := setupClient(&groupsClient.Client)
 	if err != nil {
@@ -71,8 +71,8 @@ func GetGroupsClient(subscriptionID string) (resources.GroupsClient, error) {
 	return groupsClient, nil
 }
 
-// GetContainerClient get client to manipulate containers
-func GetContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
+// NewContainerClient get client to manipulate containers
+func NewContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
 	containerClient := containerinstance.NewContainerClient(subscriptionID)
 	err := setupClient(&containerClient.Client)
 	if err != nil {
