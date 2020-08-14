@@ -133,7 +133,7 @@ type aciContainerService struct {
 }
 
 func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
-	groupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	groupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	}
 
 	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
-	groupDefinition, err := convert.ToContainerGroup(cs.ctx, project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, project)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (cs *aciContainerService) Start(ctx context.Context, containerID string) er
 		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
 	}
 
-	containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	containerGroupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 	}
 
 	if !request.Force {
-		containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+		containerGroupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
 		if err != nil {
 			return err
 		}
@@ -410,7 +410,7 @@ func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) er
 		return err
 	}
 	logrus.Debugf("Up on project with name %q\n", project.Name)
-	groupDefinition, err := convert.ToContainerGroup(cs.ctx, *project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project)
 	addTag(&groupDefinition, composeContainerTag)
 
 	if err != nil {

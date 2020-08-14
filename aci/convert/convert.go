@@ -17,8 +17,8 @@
 package convert
 
 import (
+	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -29,7 +29,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
 
+	"github.com/docker/api/aci/login"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
 )
@@ -42,15 +44,22 @@ const (
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
-	volumeDriveroptsAccountKeyKey  = "storage_account_key"
 	secretInlineMark               = "inline:"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
-func ToContainerGroup(aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
+func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
-	volumesCache, volumesSlice, err := project.getAciFileVolumes()
+	loginService, err := login.NewAzureLoginService()
+	if err != nil {
+		return containerinstance.ContainerGroup{}, err
+	}
+	storageHelper := login.StorageAccountHelper{
+		LoginService: *loginService,
+		AciContext:   aciContext,
+	}
+	volumesCache, volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, err
 	}
@@ -191,7 +200,7 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 	return secretVolumes, nil
 }
 
-func (p projectAciHelper) getAciFileVolumes() (map[string]bool, []containerinstance.Volume, error) {
+func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageAccountHelper) (map[string]bool, []containerinstance.Volume, error) {
 	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
 	var azureFileVolumesSlice []containerinstance.Volume
 	for name, v := range p.Volumes {
@@ -204,9 +213,9 @@ func (p projectAciHelper) getAciFileVolumes() (map[string]bool, []containerinsta
 			if !ok {
 				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
 			}
-			accountKey, ok := v.DriverOpts[volumeDriveroptsAccountKeyKey]
-			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve account key for Azurefile")
+			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
+			if err != nil {
+				return nil, nil, err
 			}
 			aciVolume := containerinstance.Volume{
 				Name: to.StringPtr(name),

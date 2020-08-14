@@ -17,6 +17,7 @@
 package convert
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestProjectName(t *testing.T) {
 	project := types.Project{
 		Name: "TEST",
 	}
-	containerGroup, err := ToContainerGroup(convertCtx, project)
+	containerGroup, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 	assert.Equal(t, *containerGroup.Name, "test")
 }
@@ -117,7 +118,7 @@ func TestComposeContainerGroupToContainerWithDnsSideCarSide(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 	assert.Assert(t, is.Len(*group.Containers, 3))
 
@@ -142,7 +143,7 @@ func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
@@ -165,7 +166,7 @@ func TestComposeSingleContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
@@ -197,7 +198,7 @@ func TestComposeMultiContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 3))
@@ -231,7 +232,7 @@ func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	_, err := ToContainerGroup(convertCtx, project)
+	_, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.Error(t, err, "ACI integration does not support specifying different restart policies on containers in the same compose application")
 }
 
@@ -248,7 +249,7 @@ func TestLabelsErrorMessage(t *testing.T) {
 		},
 	}
 
-	_, err := ToContainerGroup(convertCtx, project)
+	_, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.Error(t, err, "ACI integration does not support labels in compose applications")
 }
 
@@ -262,7 +263,7 @@ func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
@@ -296,7 +297,7 @@ func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 	assert.Assert(t, is.Len(*group.Containers, 3))
 
@@ -335,7 +336,7 @@ func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	limits := *((*group.Containers)[0]).Resources.Limits
@@ -361,7 +362,7 @@ func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	limits := *((*group.Containers)[0]).Resources.Limits
@@ -385,7 +386,7 @@ func TestComposeContainerGroupToContainerenvVar(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
 	assert.NilError(t, err)
 
 	envVars := *((*group.Containers)[0]).EnvironmentVariables
