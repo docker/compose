@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/api/errdefs"
-
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -39,13 +37,12 @@ import (
 	"github.com/docker/api/aci/login"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/errdefs"
 	"github.com/docker/api/progress"
 )
 
-const aciDockerUserAgent = "docker-cli"
-
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
@@ -69,7 +66,7 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 
 func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	w := progress.ContextWriter(ctx)
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
@@ -124,7 +121,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 }
 
 func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -133,7 +130,7 @@ func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, cont
 }
 
 func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -142,7 +139,7 @@ func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, c
 }
 
 func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) error {
-	containerGroupsClient, err := getContainerGroupsClient(aciContext.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return fmt.Errorf("cannot get container group client: %v", err)
 	}
@@ -155,7 +152,7 @@ func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, con
 }
 
 func execACIContainer(ctx context.Context, aciContext store.AciContext, command, containerGroup string, containerName string) (c containerinstance.ContainerExecResponse, err error) {
-	containerClient, err := getContainerClient(aciContext.SubscriptionID)
+	containerClient, err := login.GetContainerClient(aciContext.SubscriptionID)
 	if err != nil {
 		return c, errors.Wrapf(err, "cannot get container client")
 	}
@@ -248,7 +245,7 @@ func exec(ctx context.Context, address string, password string, request containe
 }
 
 func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, tail *int32) (string, error) {
-	containerClient, err := getContainerClient(aciContext.SubscriptionID)
+	containerClient, err := login.GetContainerClient(aciContext.SubscriptionID)
 	if err != nil {
 		return "", errors.Wrapf(err, "cannot get container client")
 	}
@@ -310,35 +307,4 @@ func getBacktrackLines(lines []string, terminalWidth int) int {
 	}
 
 	return numLines
-}
-
-func getContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
-	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
-	err := setupClient(&containerGroupsClient.Client)
-	if err != nil {
-		return containerinstance.ContainerGroupsClient{}, err
-	}
-	containerGroupsClient.PollingDelay = 5 * time.Second
-	containerGroupsClient.RetryAttempts = 30
-	containerGroupsClient.RetryDuration = 1 * time.Second
-	return containerGroupsClient, nil
-}
-
-func setupClient(aciClient *autorest.Client) error {
-	aciClient.UserAgent = aciDockerUserAgent
-	auth, err := login.NewAuthorizerFromLogin()
-	if err != nil {
-		return err
-	}
-	aciClient.Authorizer = auth
-	return nil
-}
-
-func getContainerClient(subscriptionID string) (containerinstance.ContainerClient, error) {
-	containerClient := containerinstance.NewContainerClient(subscriptionID)
-	err := setupClient(&containerClient.Client)
-	if err != nil {
-		return containerinstance.ContainerClient{}, err
-	}
-	return containerClient, nil
 }

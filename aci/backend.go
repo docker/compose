@@ -133,7 +133,7 @@ type aciContainerService struct {
 }
 
 func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
-	groupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	groupsClient, err := login.GetContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (cs *aciContainerService) Start(ctx context.Context, containerID string) er
 		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
 	}
 
-	containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+	containerGroupsClient, err := login.GetContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 	}
 
 	if !request.Force {
-		containerGroupsClient, err := getContainerGroupsClient(cs.ctx.SubscriptionID)
+		containerGroupsClient, err := login.GetContainerGroupsClient(cs.ctx.SubscriptionID)
 		if err != nil {
 			return err
 		}
