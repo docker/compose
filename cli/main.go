@@ -127,6 +127,9 @@ func main() {
 		cmd.VersionCommand(version),
 		cmd.StopCommand(),
 		cmd.SecretCommand(),
+
+		// Place holders
+		cmd.EcsCommand(),
 	)
 
 	helpFunc := root.HelpFunc()
