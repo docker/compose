@@ -84,3 +84,9 @@ RUN --mount=target=. \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile test
+
+FROM base as check-license-headers
+RUN go get -u github.com/kunalkushwaha/ltag 
+RUN --mount=target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make -f builder.Makefile check-license-headers

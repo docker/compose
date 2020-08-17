@@ -78,6 +78,9 @@ serve: cli ## start server
 moby-cli-link: ## create com.docker.cli symlink if does not already exist
 	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
 
+validate: ## check license header for all files
+	@docker build . --target check-license-headers
+
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
