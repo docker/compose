@@ -1,4 +1,6 @@
-# syntax = docker/dockerfile:experimental
+# syntax=docker/dockerfile:experimental
+
+
 #   Copyright 2020 Docker, Inc.
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -90,3 +92,4 @@ RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile check-license-headers
+
