@@ -4,10 +4,11 @@ certifi==2020.6.20
 chardet==3.0.4
 colorama==0.4.3; sys_platform == 'win32'
 distro==1.5.0
-docker==4.3.0
 docker-pycreds==0.4.0
 dockerpty==0.4.1
 docopt==0.6.2
+# temporary fix for the mem_limit float parsing
+git+git://github.com/docker/docker-py@2c522fb362247a692c0493f0b47a33988eb2f3e3#egg=docker
 idna==2.10
 ipaddress==1.0.23
 jsonschema==3.2.0

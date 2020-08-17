@@ -525,11 +525,11 @@ services:
                         },
                         'resources': {
                             'limits': {
-                                'cpus': '0.05',
+                                'cpus': 0.05,
                                 'memory': '50M',
                             },
                             'reservations': {
-                                'cpus': '0.01',
+                                'cpus': 0.01,
                                 'memory': '20M',
                             },
                         },
