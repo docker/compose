@@ -3,9 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/docker/api/ecs/secrets"
 	"os"
-
-	"github.com/docker/ecs-plugin/secrets"
 )
 
 const secretsFolder = "/run/secrets"

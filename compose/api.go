@@ -18,19 +18,36 @@ package compose
 
 import (
 	"context"
+	"io"
 
 	"github.com/compose-spec/compose-go/cli"
-	types "github.com/docker/ecs-plugin/pkg/compose"
 )
 
 // Service manages a compose project
 type Service interface {
 	// Up executes the equivalent to a `compose up`
-	Up(ctx context.Context, opts cli.ProjectOptions) error
+	Up(ctx context.Context, opts *cli.ProjectOptions) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, opts cli.ProjectOptions) error
+	Down(ctx context.Context, opts *cli.ProjectOptions) error
 	// Logs executes the equivalent to a `compose logs`
-	Logs(ctx context.Context, opts cli.ProjectOptions) error
+	Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error
 	// Ps executes the equivalent to a `compose ps`
-	Ps(ctx context.Context, opts cli.ProjectOptions) ([]types.ServiceStatus, error)
+	Ps(ctx context.Context, opts *cli.ProjectOptions) ([]ServiceStatus, error)
+}
+
+
+type LoadBalancer struct {
+	URL           string
+	TargetPort    int
+	PublishedPort int
+	Protocol      string
+}
+
+type ServiceStatus struct {
+	ID            string
+	Name          string
+	Replicas      int
+	Desired       int
+	Ports         []string
+	LoadBalancers []LoadBalancer
 }

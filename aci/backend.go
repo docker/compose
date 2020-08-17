@@ -19,6 +19,7 @@ package aci
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,8 +31,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 
 	"github.com/docker/api/aci/convert"
 	"github.com/docker/api/aci/login"
@@ -404,8 +403,8 @@ type aciComposeService struct {
 	ctx store.AciContext
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(&opts)
+func (cs *aciComposeService) Up(ctx context.Context, opts *cli.ProjectOptions) error {
+	project, err := cli.ProjectFromOptions(opts)
 	if err != nil {
 		return err
 	}
@@ -419,13 +418,13 @@ func (cs *aciComposeService) Up(ctx context.Context, opts cli.ProjectOptions) er
 	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) error {
+func (cs *aciComposeService) Down(ctx context.Context, opts *cli.ProjectOptions) error {
 	var project types.Project
 
 	if opts.Name != "" {
 		project = types.Project{Name: opts.Name}
 	} else {
-		fullProject, err := cli.ProjectFromOptions(&opts)
+		fullProject, err := cli.ProjectFromOptions(opts)
 		if err != nil {
 			return err
 		}
@@ -444,11 +443,11 @@ func (cs *aciComposeService) Down(ctx context.Context, opts cli.ProjectOptions) 
 	return err
 }
 
-func (cs *aciComposeService) Ps(ctx context.Context, opts cli.ProjectOptions) ([]ecstypes.ServiceStatus, error) {
+func (cs *aciComposeService) Ps(ctx context.Context, opts *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Logs(ctx context.Context, opts cli.ProjectOptions) error {
+func (cs *aciComposeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 

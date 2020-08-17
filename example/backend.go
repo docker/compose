@@ -22,9 +22,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/compose-spec/compose-go/cli"
-	ecstypes "github.com/docker/ecs-plugin/pkg/compose"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
@@ -117,8 +117,8 @@ func (cs *containerService) Delete(ctx context.Context, id string, request conta
 
 type composeService struct{}
 
-func (cs *composeService) Up(ctx context.Context, opts cli.ProjectOptions) error {
-	prj, err := cli.ProjectFromOptions(&opts)
+func (cs *composeService) Up(ctx context.Context, opts *cli.ProjectOptions) error {
+	prj, err := cli.ProjectFromOptions(opts)
 	if err != nil {
 		return err
 	}
@@ -126,8 +126,8 @@ func (cs *composeService) Up(ctx context.Context, opts cli.ProjectOptions) error
 	return nil
 }
 
-func (cs *composeService) Down(ctx context.Context, opts cli.ProjectOptions) error {
-	prj, err := cli.ProjectFromOptions(&opts)
+func (cs *composeService) Down(ctx context.Context, opts *cli.ProjectOptions) error {
+	prj, err := cli.ProjectFromOptions(opts)
 	if err != nil {
 		return err
 	}
@@ -135,10 +135,10 @@ func (cs *composeService) Down(ctx context.Context, opts cli.ProjectOptions) err
 	return nil
 }
 
-func (cs *composeService) Ps(ctx context.Context, opts cli.ProjectOptions) ([]ecstypes.ServiceStatus, error) {
+func (cs *composeService) Ps(ctx context.Context, opts *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Logs(ctx context.Context, opts cli.ProjectOptions) error {
+func (cs *composeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }

@@ -1,5 +1,3 @@
-// +build ecs
-
 /*
    Copyright 2020 Docker, Inc.
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +15,8 @@ package ecs
 
 import (
 	"context"
-
-	ecsplugin "github.com/docker/ecs-plugin/pkg/amazon/backend"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
@@ -58,19 +56,28 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
-	backend, err := ecsplugin.NewBackend(ecsCtx.Profile, ecsCtx.Region)
+	sess, err := session.NewSessionWithOptions(session.Options{
+		Profile:           ecsCtx.Profile,
+		SharedConfigState: session.SharedConfigEnable,
+		Config: aws.Config{
+			Region: aws.String(ecsCtx.Region),
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
+
 	return &ecsAPIService{
-		ctx:            ecsCtx,
-		composeBackend: backend,
+		ctx: ecsCtx,
+		Region: ecsCtx.Region,
+		SDK: NewSDK(sess),
 	}, nil
 }
 
 type ecsAPIService struct {
-	ctx            store.EcsContext
-	composeBackend *ecsplugin.Backend
+	ctx store.EcsContext
+	Region string
+	SDK sdk
 }
 
 func (a *ecsAPIService) ContainerService() containers.Service {
@@ -78,7 +85,7 @@ func (a *ecsAPIService) ContainerService() containers.Service {
 }
 
 func (a *ecsAPIService) ComposeService() compose.Service {
-	return a.composeBackend
+	return a
 }
 
 func getCloudService() (cloud.Service, error) {

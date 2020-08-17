@@ -36,7 +36,7 @@ func psCommand() *cobra.Command {
 	psCmd := &cobra.Command{
 		Use: "ps",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPs(cmd.Context(), opts)
+			return runPs(cmd.Context(), &opts)
 		},
 	}
 	psCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -46,7 +46,7 @@ func psCommand() *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, opts cli.ProjectOptions) error {
+func runPs(ctx context.Context, opts *cli.ProjectOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err

@@ -1,2 +1,0 @@
-flask
-redis

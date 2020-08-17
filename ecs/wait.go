@@ -1,0 +1,92 @@
+package ecs
+
+import (
+	"context"
+	"fmt"
+	"github.com/docker/api/progress"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+)
+
+func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int) error {
+	knownEvents := map[string]struct{}{}
+	// progress writer
+	w := progress.ContextWriter(ctx)
+	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
+	stackID, err := b.SDK.GetStackID(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	done := make(chan bool)
+	go func() {
+		b.SDK.WaitStackComplete(ctx, stackID, operation) //nolint:errcheck
+		ticker.Stop()
+		done <- true
+	}()
+
+	var completed bool
+	var stackErr error
+	for !completed {
+		select {
+		case <-done:
+			completed = true
+		case <-ticker.C:
+		}
+		events, err := b.SDK.DescribeStackEvents(ctx, stackID)
+		if err != nil {
+			return err
+		}
+
+		sort.Slice(events, func(i, j int) bool {
+			return events[i].Timestamp.Before(*events[j].Timestamp)
+		})
+
+		for _, event := range events {
+			if _, ok := knownEvents[*event.EventId]; ok {
+				continue
+			}
+			knownEvents[*event.EventId] = struct{}{}
+
+			resource := aws.StringValue(event.LogicalResourceId)
+			reason := aws.StringValue(event.ResourceStatusReason)
+			status := aws.StringValue(event.ResourceStatus)
+			progressStatus := progress.Working
+
+			switch status {
+			case "CREATE_COMPLETE":
+				if operation == StackCreate {
+					progressStatus = progress.Done
+
+				}
+			case "UPDATE_COMPLETE":
+				if operation == StackUpdate {
+					progressStatus = progress.Done
+				}
+			case "DELETE_COMPLETE":
+				if operation == StackDelete {
+					progressStatus = progress.Done
+				}
+			default:
+				if strings.HasSuffix(status, "_FAILED") {
+					progressStatus = progress.Error
+					if stackErr == nil {
+						operation = StackDelete
+						stackErr = fmt.Errorf(reason)
+					}
+				}
+			}
+			w.Event(progress.Event{
+				ID:         resource,
+				Status:     progressStatus,
+				StatusText: status,
+			})
+		}
+	}
+
+	return stackErr
+}

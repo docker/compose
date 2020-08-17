@@ -31,7 +31,7 @@ func downCommand() *cobra.Command {
 	downCmd := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDown(cmd.Context(), opts)
+			return runDown(cmd.Context(), &opts)
 		},
 	}
 	downCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -41,7 +41,7 @@ func downCommand() *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, opts cli.ProjectOptions) error {
+func runDown(ctx context.Context, opts *cli.ProjectOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
