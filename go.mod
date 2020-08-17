@@ -1,6 +1,6 @@
 module github.com/docker/api
 
-go 1.14
+go 1.15
 
 // the distribution version from ecs plugin is quite old and it breaks containerd
 // we need to create a new release tag for docker/distribution
