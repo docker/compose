@@ -318,6 +318,8 @@ class Project:
             )
         if replicas:
             scale = replicas
+        if scale is None:
+            return 1
         # deploy may contain placement constraints introduced in v3.8
         max_replicas = deploy_dict.get('placement', {}).get(
             'max_replicas_per_node',
