@@ -1,0 +1,5 @@
+version: "3"
+services:
+  simple:
+    image: nginx
+    network_mode: bridge
