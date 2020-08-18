@@ -386,7 +386,7 @@ func bytesToGb(b types.UnitBytes) float64 {
 }
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
-func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) (containers.Container, error) {
+func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) containers.Container {
 	memLimits := 0.
 	if cc.Resources != nil &&
 		cc.Resources.Limits != nil &&
@@ -406,10 +406,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		command = strings.Join(*cc.Command, " ")
 	}
 
-	status := "Unknown"
-	if cc.InstanceView != nil && cc.InstanceView.CurrentState != nil {
-		status = *cc.InstanceView.CurrentState.State
-	}
+	status := GetStatus(cc, cg)
 	platform := string(cg.OsType)
 
 	c := containers.Container{
@@ -429,5 +426,17 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		RestartPolicyCondition: toContainerRestartPolicy(cg.RestartPolicy),
 	}
 
-	return c, nil
+	return c
+}
+
+// GetStatus returns status for the specified container
+func GetStatus(container containerinstance.Container, group containerinstance.ContainerGroup) string {
+	status := "Unknown"
+	if group.InstanceView != nil && group.InstanceView.State != nil {
+		status = "Node " + *group.InstanceView.State
+	}
+	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
+		status = *container.InstanceView.CurrentState.State
+	}
+	return status
 }
