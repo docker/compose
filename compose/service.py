@@ -1856,7 +1856,9 @@ class _CLIBuilder:
 
         magic_word = "Successfully built "
         appear = False
-        with subprocess.Popen(args, stdout=subprocess.PIPE, universal_newlines=True) as p:
+        with subprocess.Popen(args, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              universal_newlines=True) as p:
             while True:
                 line = p.stdout.readline()
                 if not line:
@@ -1864,6 +1866,10 @@ class _CLIBuilder:
                 if line.startswith(magic_word):
                     appear = True
                 yield json.dumps({"stream": line})
+
+            err = p.stderr.readline().strip()
+            if err:
+                raise StreamOutputError(err)
 
         with open(iidfile) as f:
             line = f.readline()
