@@ -23,7 +23,7 @@ import (
 
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
 
-func Convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
+func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err

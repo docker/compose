@@ -1,7 +1,9 @@
 package ecs
 
 import (
+	"context"
 	"fmt"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/docker/api/compose"
 	"io/ioutil"
 	"regexp"
@@ -33,8 +35,20 @@ const (
 	ParameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
+func (b *ecsAPIService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+	project, err := cli.ProjectFromOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	template, err := b.convert(project)
+	if err != nil {
+		return nil, err
+	}
+	return Marshall(template)
+}
+
 // Convert a compose project into a CloudFormation template
-func (b ecsAPIService) Convert(project *types.Project) (*cloudformation.Template, error) {
+func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) {
 	var checker compatibility.Checker = &FargateCompatibilityChecker{
 		compatibility.AllowList{
 			Supported: compatibleComposeAttributes,
@@ -128,7 +142,7 @@ func (b ecsAPIService) Convert(project *types.Project) (*cloudformation.Template
 
 	for _, service := range project.Services {
 
-		definition, err := Convert(project, service)
+		definition, err := convert(project, service)
 		if err != nil {
 			return nil, err
 		}

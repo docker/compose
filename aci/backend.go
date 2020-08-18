@@ -451,6 +451,10 @@ func (cs *aciComposeService) Logs(ctx context.Context, opts *cli.ProjectOptions,
 	return errdefs.ErrNotImplemented
 }
 
+func Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
 type aciCloudService struct {
 	loginService login.AzureLoginServiceAPI
 }

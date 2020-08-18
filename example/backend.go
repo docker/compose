@@ -142,3 +142,7 @@ func (cs *composeService) Ps(ctx context.Context, opts *cli.ProjectOptions) ([]c
 func (cs *composeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
+
+func Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+	return nil, errdefs.ErrNotImplemented
+}

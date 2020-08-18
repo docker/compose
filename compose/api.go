@@ -33,6 +33,8 @@ type Service interface {
 	Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, opts *cli.ProjectOptions) ([]ServiceStatus, error)
+	// Convert translate compose model into backend's native format
+	Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error)
 }
 
 
