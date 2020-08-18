@@ -56,6 +56,9 @@ test:
 lint:
 	golangci-lint run --timeout 10m0s ./...
 
+check-license-headers:
+	./scripts/validate/fileheader
+
 FORCE:
 
 .PHONY: all protos cli cross test lint
