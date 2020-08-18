@@ -72,6 +72,10 @@ lint: ## run linter(s)
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
+import-restrictions: ## run import-restrictions script
+	@docker build . \
+	--target import-restrictions
+
 serve: cli ## start server
 	@./bin/docker serve --address unix:///tmp/backend.sock
 

@@ -21,6 +21,7 @@ FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /api
 ENV GO111MODULE=on
 RUN apk add --no-cache \
+    git \
     docker \
     make \
     protoc \
@@ -44,6 +45,13 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/golangci-lint \
     GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile lint
+
+FROM base AS import-restrictions-base
+RUN go get github.com/docker/import-restrictions
+
+FROM import-restrictions-base AS import-restrictions
+RUN --mount=target=. \
+    make -f builder.Makefile import-restrictions
 
 FROM base AS make-cli
 ENV CGO_ENABLED=0
