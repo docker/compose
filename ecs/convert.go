@@ -62,72 +62,25 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 	logConfiguration := getLogConfiguration(service, project)
 
 	var (
-		containers     []ecs.TaskDefinition_ContainerDefinition
+		initContainers []ecs.TaskDefinition_ContainerDefinition
 		volumes        []ecs.TaskDefinition_Volume
 		mounts         []ecs.TaskDefinition_MountPoint
-		initContainers []ecs.TaskDefinition_ContainerDependency
 	)
 	if len(service.Secrets) > 0 {
-		initContainerName := fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name))
-		volumes = append(volumes, ecs.TaskDefinition_Volume{
-			Name: "secrets",
-		})
-		mounts = append(mounts, ecs.TaskDefinition_MountPoint{
-			ContainerPath: "/run/secrets/",
-			ReadOnly:      true,
-			SourceVolume:  "secrets",
-		})
-		initContainers = append(initContainers, ecs.TaskDefinition_ContainerDependency{
-			Condition:     ecsapi.ContainerConditionSuccess,
-			ContainerName: initContainerName,
-		})
-
-		var (
-			args        []secrets.Secret
-			taskSecrets []ecs.TaskDefinition_Secret
-		)
-		for _, s := range service.Secrets {
-			secretConfig := project.Secrets[s.Source]
-			if s.Target == "" {
-				s.Target = s.Source
-			}
-			taskSecrets = append(taskSecrets, ecs.TaskDefinition_Secret{
-				Name:      s.Target,
-				ValueFrom: secretConfig.Name,
-			})
-			var keys []string
-			if ext, ok := secretConfig.Extensions[ExtensionKeys]; ok {
-				if key, ok := ext.(string); ok {
-					keys = append(keys, key)
-				} else {
-					for _, k := range ext.([]interface{}) {
-						keys = append(keys, k.(string))
-					}
-				}
-			}
-			args = append(args, secrets.Secret{
-				Name: s.Target,
-				Keys: keys,
-			})
-		}
-		command, err := json.Marshal(args)
+		secretsVolume, secretsMount, secretsSideCar, err := createSecretsSideCar(project, service, logConfiguration)
 		if err != nil {
 			return nil, err
 		}
-		containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
-			Name:             initContainerName,
-			Image:            secretsInitContainerImage,
-			Command:          []string{string(command)},
-			Essential:        false, // FIXME this will be ignored, see https://github.com/awslabs/goformation/issues/61#issuecomment-625139607
-			LogConfiguration: logConfiguration,
-			MountPoints: []ecs.TaskDefinition_MountPoint{
-				{
-					ContainerPath: "/run/secrets/",
-					ReadOnly:      false,
-					SourceVolume:  "secrets",
-				},
-			},
-			Secrets: taskSecrets,
+		initContainers = append(initContainers, secretsSideCar)
+		volumes = append(volumes, secretsVolume)
+		mounts = append(mounts, secretsMount)
+	}
+
+	var dependencies []ecs.TaskDefinition_ContainerDependency
+	for _, c := range initContainers {
+		dependencies = append(dependencies, ecs.TaskDefinition_ContainerDependency{
+			Condition:     ecsapi.ContainerConditionSuccess,
+			ContainerName: c.Name,
 		})
 	}
 
@@ -136,10 +89,10 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		return nil, err
 	}
 
-	containers = append(containers, ecs.TaskDefinition_ContainerDefinition{
+	containers := append(initContainers, ecs.TaskDefinition_ContainerDefinition{
 		Command:                service.Command,
 		DisableNetworking:      service.NetworkMode == "none",
-		DependsOnProp:          initContainers,
+		DependsOnProp:          dependencies,
 		DnsSearchDomains:       service.DNSSearch,
 		DnsServers:             service.DNS,
 		DockerSecurityOptions:  service.SecurityOpt,
@@ -186,6 +139,67 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
 		Volumes:                 volumes,
 	}, nil
+}
+
+func createSecretsSideCar(project *types.Project, service types.ServiceConfig, logConfiguration *ecs.TaskDefinition_LogConfiguration) (ecs.TaskDefinition_Volume, ecs.TaskDefinition_MountPoint, ecs.TaskDefinition_ContainerDefinition, error) {
+	initContainerName := fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name))
+	secretsVolume := ecs.TaskDefinition_Volume{
+		Name: "secrets",
+	}
+	secretsMount := ecs.TaskDefinition_MountPoint{
+		ContainerPath: "/run/secrets/",
+		ReadOnly:      true,
+		SourceVolume:  "secrets",
+	}
+
+	var (
+		args        []secrets.Secret
+		taskSecrets []ecs.TaskDefinition_Secret
+	)
+	for _, s := range service.Secrets {
+		secretConfig := project.Secrets[s.Source]
+		if s.Target == "" {
+			s.Target = s.Source
+		}
+		taskSecrets = append(taskSecrets, ecs.TaskDefinition_Secret{
+			Name:      s.Target,
+			ValueFrom: secretConfig.Name,
+		})
+		var keys []string
+		if ext, ok := secretConfig.Extensions[ExtensionKeys]; ok {
+			if key, ok := ext.(string); ok {
+				keys = append(keys, key)
+			} else {
+				for _, k := range ext.([]interface{}) {
+					keys = append(keys, k.(string))
+				}
+			}
+		}
+		args = append(args, secrets.Secret{
+			Name: s.Target,
+			Keys: keys,
+		})
+	}
+	command, err := json.Marshal(args)
+	if err != nil {
+		return ecs.TaskDefinition_Volume{}, ecs.TaskDefinition_MountPoint{}, ecs.TaskDefinition_ContainerDefinition{}, err
+	}
+	secretsSideCar := ecs.TaskDefinition_ContainerDefinition{
+		Name:             initContainerName,
+		Image:            secretsInitContainerImage,
+		Command:          []string{string(command)},
+		Essential:        false, // FIXME this will be ignored, see https://github.com/awslabs/goformation/issues/61#issuecomment-625139607
+		LogConfiguration: logConfiguration,
+		MountPoints: []ecs.TaskDefinition_MountPoint{
+			{
+				ContainerPath: "/run/secrets/",
+				ReadOnly:      false,
+				SourceVolume:  "secrets",
+			},
+		},
+		Secrets: taskSecrets,
+	}
+	return secretsVolume, secretsMount, secretsSideCar, nil
 }
 
 func createEnvironment(project *types.Project, service types.ServiceConfig) ([]ecs.TaskDefinition_KeyValuePair, error) {
