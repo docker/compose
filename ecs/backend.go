@@ -17,6 +17,7 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/docker/api/secrets"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
@@ -85,6 +86,10 @@ func (a *ecsAPIService) ContainerService() containers.Service {
 }
 
 func (a *ecsAPIService) ComposeService() compose.Service {
+	return a
+}
+
+func (a *ecsAPIService) SecretsService() secrets.Service {
 	return a
 }
 

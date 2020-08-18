@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"github.com/docker/api/secrets"
 
 	"github.com/docker/api/context/cloud"
 
@@ -68,4 +69,9 @@ func (c *Client) ContainerService() containers.Service {
 // ComposeService returns the backend service for the current context
 func (c *Client) ComposeService() compose.Service {
 	return c.bs.ComposeService()
+}
+
+// ComposeService returns the backend service for the current context
+func (c *Client) SecretsService() secrets.Service {
+	return c.bs.SecretsService()
 }

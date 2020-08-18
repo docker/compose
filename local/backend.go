@@ -41,6 +41,7 @@ import (
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
+	"github.com/docker/api/secrets"
 )
 
 type local struct {
@@ -67,6 +68,10 @@ func (ms *local) ContainerService() containers.Service {
 }
 
 func (ms *local) ComposeService() compose.Service {
+	return nil
+}
+
+func (ms *local) SecretsService() secrets.Service {
 	return nil
 }
 

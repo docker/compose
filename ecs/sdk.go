@@ -3,9 +3,11 @@ package ecs
 import (
 	"context"
 	"fmt"
-	"github.com/docker/api/compose"
 	"strings"
 	"time"
+
+	"github.com/docker/api/compose"
+	"github.com/docker/api/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -239,6 +241,12 @@ func (s sdk) UpdateStack(ctx context.Context, changeset string) error {
 	return err
 }
 
+const (
+	StackCreate = iota
+	StackUpdate
+	StackDelete
+)
+
 func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) error {
 	input := &cloudformation.DescribeStacksInput{
 		StackName: aws.String(name),
@@ -298,6 +306,12 @@ func (s sdk) ListStackParameters(ctx context.Context, name string) (map[string]s
 	return parameters, nil
 }
 
+type StackResource struct {
+	LogicalID string
+	Type      string
+	ARN       string
+	Status    string
+}
 func (s sdk) ListStackResources(ctx context.Context, name string) ([]StackResource, error) {
 	// FIXME handle pagination
 	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
@@ -327,7 +341,7 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 	return err
 }
 
-func (s sdk) CreateSecret(ctx context.Context, secret Secret) (string, error) {
+func (s sdk) CreateSecret(ctx context.Context, secret secrets.Secret) (string, error) {
 	logrus.Debug("Create secret " + secret.Name)
 	secretStr, err := secret.GetCredString()
 	if err != nil {
@@ -345,17 +359,17 @@ func (s sdk) CreateSecret(ctx context.Context, secret Secret) (string, error) {
 	return aws.StringValue(response.ARN), nil
 }
 
-func (s sdk) InspectSecret(ctx context.Context, id string) (Secret, error) {
+func (s sdk) InspectSecret(ctx context.Context, id string) (secrets.Secret, error) {
 	logrus.Debug("Inspect secret " + id)
 	response, err := s.SM.DescribeSecret(&secretsmanager.DescribeSecretInput{SecretId: &id})
 	if err != nil {
-		return Secret{}, err
+		return secrets.Secret{}, err
 	}
 	labels := map[string]string{}
 	for _, tag := range response.Tags {
 		labels[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 	}
-	secret := Secret{
+	secret := secrets.Secret{
 		ID:     aws.StringValue(response.ARN),
 		Name:   aws.StringValue(response.Name),
 		Labels: labels,
@@ -366,14 +380,14 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (Secret, error) {
 	return secret, nil
 }
 
-func (s sdk) ListSecrets(ctx context.Context) ([]Secret, error) {
+func (s sdk) ListSecrets(ctx context.Context) ([]secrets.Secret, error) {
 	logrus.Debug("List secrets ...")
 	response, err := s.SM.ListSecrets(&secretsmanager.ListSecretsInput{})
 	if err != nil {
-		return []Secret{}, err
+		return nil, err
 	}
-	var secrets []Secret
 
+	var ls []secrets.Secret
 	for _, sec := range response.SecretList {
 
 		labels := map[string]string{}
@@ -384,14 +398,14 @@ func (s sdk) ListSecrets(ctx context.Context) ([]Secret, error) {
 		if sec.Description != nil {
 			description = *sec.Description
 		}
-		secrets = append(secrets, Secret{
+		ls = append(ls, secrets.Secret{
 			ID:          *sec.ARN,
 			Name:        *sec.Name,
 			Labels:      labels,
 			Description: description,
 		})
 	}
-	return secrets, nil
+	return ls, nil
 }
 
 func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
@@ -401,7 +415,7 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	return err
 }
 
-func (s sdk) GetLogs(ctx context.Context, name string, consumer LogConsumer) error {
+func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service, container, message string)) error {
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
@@ -424,7 +438,7 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer LogConsumer) err
 
 			for _, event := range events.Events {
 				p := strings.Split(aws.StringValue(event.LogStreamName), "/")
-				consumer.Log(p[1], p[2], aws.StringValue(event.Message))
+				consumer(p[1], p[2], aws.StringValue(event.Message))
 				startTime = *event.IngestionTime
 			}
 		}

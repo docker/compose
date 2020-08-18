@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"fmt"
+	"github.com/docker/api/compose"
 	"reflect"
 	"testing"
 
@@ -249,7 +250,8 @@ services:
           cpus: '0.5'
           memory: 2043248M
 `)
-	_, err := Backend{}.Convert(model)
+	backend := &ecsAPIService{}
+	_, err := backend.convert(model)
 	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
@@ -331,11 +333,10 @@ services:
 }
 
 func convertResultAsString(t *testing.T, project *types.Project) string {
-	backend, err := NewBackend("", "")
+	backend := &ecsAPIService{}
+	template, err := backend.convert(project)
 	assert.NilError(t, err)
-	result, err := backend.Convert(project)
-	assert.NilError(t, err)
-	resultAsJSON, err := result.JSON()
+	resultAsJSON, err := Marshall(template)
 	assert.NilError(t, err)
 	return fmt.Sprintf("%s\n", string(resultAsJSON))
 }
@@ -351,8 +352,9 @@ func load(t *testing.T, paths ...string) *types.Project {
 }
 
 func convertYaml(t *testing.T, name string, yaml string) *cloudformation.Template {
-	model := loadConfig(t, name, yaml)
-	template, err := Backend{}.Convert(model)
+	project := loadConfig(t, name, yaml)
+	backend := &ecsAPIService{}
+	template, err := backend.convert(project)
 	assert.NilError(t, err)
 	return template
 }

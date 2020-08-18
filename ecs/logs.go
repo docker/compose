@@ -23,11 +23,12 @@ func (b *ecsAPIService) Logs(ctx context.Context, options *cli.ProjectOptions, w
 		name = project.Name
 	}
 
-	err := b.SDK.GetLogs(ctx, name, &logConsumer{
+	consumer := logConsumer{
 		colors: map[string]ColorFunc{},
 		width:  0,
 		writer: writer,
-	})
+	}
+	err := b.SDK.GetLogs(ctx, name, consumer.Log)
 	if err != nil {
 		return err
 	}

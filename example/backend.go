@@ -46,6 +46,11 @@ func (a *apiService) ComposeService() compose.Service {
 	return &a.composeService
 }
 
+func (a *apiService) SecretsService() secrets.Service {
+	return nil
+}
+
+
 func init() {
 	backend.Register("example", "example", service, cloud.NotImplementedCloudService)
 }
@@ -143,6 +148,6 @@ func (cs *composeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w 
 	return errdefs.ErrNotImplemented
 }
 
-func Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+func (cs *composeService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

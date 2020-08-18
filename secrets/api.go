@@ -1,22 +1,16 @@
-package ecs
+package secrets
 
-import "encoding/json"
-
-type StackResource struct {
-	LogicalID string
-	Type      string
-	ARN       string
-	Status    string
-}
-
-const (
-	StackCreate = iota
-	StackUpdate
-	StackDelete
+import (
+	"context"
+	"encoding/json"
 )
 
-type LogConsumer interface {
-	Log(service, container, message string)
+// Service interacts with the underlying secrets backend
+type Service interface {
+	CreateSecret(ctx context.Context, secret Secret) (string, error)
+	InspectSecret(ctx context.Context, id string) (Secret, error)
+	ListSecrets(ctx context.Context) ([]Secret, error)
+	DeleteSecret(ctx context.Context, id string, recover bool) error
 }
 
 type Secret struct {

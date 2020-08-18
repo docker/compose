@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
+	"github.com/docker/api/secrets"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/api/compose"
@@ -51,6 +51,7 @@ var backends = struct {
 // Service aggregates the service interfaces
 type Service interface {
 	ContainerService() containers.Service
+	SecretsService() secrets.Service
 	ComposeService() compose.Service
 }
 

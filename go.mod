@@ -22,7 +22,7 @@ require (
 	github.com/aws/aws-sdk-go v1.34.2
 	github.com/awslabs/goformation/v4 v4.14.0
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/compose-spec/compose-go v0.0.0-20200710075715-6fcc35384ee1
+	github.com/compose-spec/compose-go v0.0.0-20200818070525-eb1188aae4a2
 	github.com/containerd/console v1.0.0
 	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
@@ -51,9 +51,9 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20200519105757-fe76b779f299 // indirect
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0

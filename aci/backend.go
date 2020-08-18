@@ -19,6 +19,7 @@ package aci
 import (
 	"context"
 	"fmt"
+	"github.com/docker/api/secrets"
 	"io"
 	"net/http"
 	"strconv"
@@ -126,6 +127,11 @@ func (a *aciAPIService) ContainerService() containers.Service {
 func (a *aciAPIService) ComposeService() compose.Service {
 	return a.aciComposeService
 }
+
+func (a *aciAPIService) SecretsService() secrets.Service {
+	return nil
+}
+
 
 type aciContainerService struct {
 	ctx store.AciContext
@@ -451,7 +457,7 @@ func (cs *aciComposeService) Logs(ctx context.Context, opts *cli.ProjectOptions,
 	return errdefs.ErrNotImplemented
 }
 
-func Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+func (cs *aciComposeService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
