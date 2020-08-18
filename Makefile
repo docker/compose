@@ -75,11 +75,16 @@ lint: ## run linter(s)
 serve: cli ## start server
 	@./bin/docker serve --address unix:///tmp/backend.sock
 
-moby-cli-link: ## create com.docker.cli symlink if does not already exist
+moby-cli-link: ## Create com.docker.cli symlink if does not already exist
 	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
 
-validate: ## check license header for all files
+validate-headers: ## Check license header for all files
 	@docker build . --target check-license-headers
+
+validate-go-mod: ## Validate go.mod and go.sum are up-to-date
+	@docker build . --target check-go-mod
+
+validate: validate-go-mod validate-headers ## Validate sources
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
@@ -87,4 +92,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all protos cli e2e-local cross test cache-clear lint serve classic-link help
+.PHONY: all validate protos cli e2e-local cross test cache-clear lint serve classic-link help
