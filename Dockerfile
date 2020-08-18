@@ -93,3 +93,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile check-license-headers
 
+FROM base as check-go-mod
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    make -f builder.Makefile check-go-mod
