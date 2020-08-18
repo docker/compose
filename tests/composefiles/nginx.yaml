@@ -3,4 +3,5 @@ version: "3.7"
 services:
   nginx:
     image: nginx
-    isolation: FARGATE
+    ports:
+      - "80:80"

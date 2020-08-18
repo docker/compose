@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-aci: ${{steps.runacitest.outputs.triggered}}
+      trigger-ecs: ${{steps.runecstest.outputs.triggered}}
       trigger-windows: ${{steps.runwindowstest.outputs.triggered}}
     steps:
       - uses: khan/pull-request-comment-trigger@master
@@ -26,8 +27,14 @@ jobs:
         id: runwindowstest
         with:
           trigger: '@test-windows'
+      - uses: khan/pull-request-comment-trigger@master
+        name: Check if test ECS
+        if: github.event_name == 'pull_request'
+        id: runecstest
+        with:
+          trigger: '@test-ecs'
 
-  build:
+  aci-tests:
     name: ACI e2e tests
     runs-on: ubuntu-latest
     env:
@@ -58,6 +65,43 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: make e2e-aci
+
+  ecs-tests:
+    name: ECS e2e tests
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: "on"
+    needs: check-optional-tests
+    if: github.ref == 'refs/heads/main' || needs.check-optional-tests.outputs.trigger-ecs == 'true'
+    steps:
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      - name: Build for ECS e2e tests
+        env:
+          BUILD_TAGS: ecs
+        run: make -f builder.Makefile cli
+
+      - name: create aws config folder
+        run: mkdir -p ~/.aws
+
+      - name: ECS e2e Test
+        env:
+          AWS_DEFAULT_REGION: us-west-2
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+        run: make e2e-ecs
 
   windows-build:
     name: Windows Build
