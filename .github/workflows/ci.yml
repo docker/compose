@@ -18,6 +18,9 @@ jobs:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
+      - name: Validate license headers
+        run: make validate
+
       - name: Run golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.30.0

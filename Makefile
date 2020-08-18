@@ -1,4 +1,4 @@
-#   Copyright 2020 The 2020 Docker, Inc.
+#   Copyright 2020 Docker, Inc.
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -77,6 +77,9 @@ serve: cli ## start server
 
 moby-cli-link: ## create com.docker.cli symlink if does not already exist
 	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
+
+validate: ## check license header for all files
+	@docker build . --target check-license-headers
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:

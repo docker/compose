@@ -1,4 +1,6 @@
-#   Copyright 2020 Docker, Inc.
+#!/usr/bin/env sh
+
+#   Copyright The Compose Specification Authors.
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -11,6 +13,16 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-FROM postgres:10.0-alpine
 
-COPY words.sql /docker-entrypoint-initdb.d/
+
+set -eu -o pipefail
+
+if ! command -v ltag; then
+    >&2 echo "ERROR: ltag not found. Install with:"
+    >&2 echo "    go get -u github.com/kunalkushwaha/ltag"
+    exit 1
+fi
+
+BASEPATH="${1-}"
+
+ltag -t "${BASEPATH}scripts/validate/template" -excludes "validate testdata" --check -v
