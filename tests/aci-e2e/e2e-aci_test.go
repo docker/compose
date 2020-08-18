@@ -394,7 +394,7 @@ func TestContainerRunAttached(t *testing.T) {
 	t.Run("rm stopped container", func(t *testing.T) {
 		res := c.RunDockerCmd("stop", container)
 		res.Assert(t, icmd.Expected{Out: container})
-		waitForStatus(t, c, container, "Terminated")
+		waitForStatus(t, c, container, "Terminated", "Node Stopped")
 
 		res = c.RunDockerCmd("rm", container)
 		res.Assert(t, icmd.Expected{Out: container})
@@ -664,15 +664,17 @@ func getContainerName(stdout string) string {
 	return strings.TrimSpace(out[len(out)-1])
 }
 
-func waitForStatus(t *testing.T, c *E2eCLI, containerID string, status string) {
+func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...string) {
 	checkStopped := func(logt poll.LogT) poll.Result {
 		res := c.RunDockerCmd("inspect", containerID)
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
-		if containerInspect.Status == status {
-			return poll.Success()
+		for _, status := range statuses {
+			if containerInspect.Status == status {
+				return poll.Success()
+			}
 		}
-		return poll.Continue("Status %s != %s (expected) for container %s", containerInspect.Status, status, containerID)
+		return poll.Continue("Status %s != %s (expected) for container %s", containerInspect.Status, statuses, containerID)
 	}
 
 	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
