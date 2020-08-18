@@ -24,11 +24,13 @@ import (
 	"path/filepath"
 )
 
+// Secret define sensitive data to be bound as file
 type Secret struct {
 	Name string
 	Keys []string
 }
 
+// CreateSecretFiles retrieve sensitive data from env and store as plain text a a file in path
 func CreateSecretFiles(secret Secret, path string) error {
 	value, ok := os.LookupEnv(secret.Name)
 	if !ok {

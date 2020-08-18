@@ -132,7 +132,6 @@ func (a *aciAPIService) SecretsService() secrets.Service {
 	return nil
 }
 
-
 type aciContainerService struct {
 	ctx store.AciContext
 }

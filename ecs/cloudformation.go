@@ -46,11 +46,11 @@ import (
 )
 
 const (
-	ParameterClusterName     = "ParameterClusterName"
-	ParameterVPCId           = "ParameterVPCId"
-	ParameterSubnet1Id       = "ParameterSubnet1Id"
-	ParameterSubnet2Id       = "ParameterSubnet2Id"
-	ParameterLoadBalancerARN = "ParameterLoadBalancerARN"
+	parameterClusterName     = "ParameterClusterName"
+	parameterVPCId           = "ParameterVPCId"
+	parameterSubnet1Id       = "ParameterSubnet1Id"
+	parameterSubnet2Id       = "ParameterSubnet2Id"
+	parameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
@@ -62,12 +62,12 @@ func (b *ecsAPIService) Convert(ctx context.Context, opts *cli.ProjectOptions) (
 	if err != nil {
 		return nil, err
 	}
-	return Marshall(template)
+	return marshall(template)
 }
 
 // Convert a compose project into a CloudFormation template
-func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) {
-	var checker compatibility.Checker = &FargateCompatibilityChecker{
+func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) { //nolint:gocyclo
+	var checker compatibility.Checker = &fargateCompatibilityChecker{
 		compatibility.AllowList{
 			Supported: compatibleComposeAttributes,
 		},
@@ -86,12 +86,12 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 	template := cloudformation.NewTemplate()
 	template.Description = "CloudFormation template created by Docker for deploying applications on Amazon ECS"
-	template.Parameters[ParameterClusterName] = cloudformation.Parameter{
+	template.Parameters[parameterClusterName] = cloudformation.Parameter{
 		Type:        "String",
 		Description: "Name of the ECS cluster to deploy to (optional)",
 	}
 
-	template.Parameters[ParameterVPCId] = cloudformation.Parameter{
+	template.Parameters[parameterVPCId] = cloudformation.Parameter{
 		Type:        "AWS::EC2::VPC::Id",
 		Description: "ID of the VPC",
 	}
@@ -103,28 +103,28 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			Description: "The list of SubnetIds, for at least two Availability Zones in the region in your VPC",
 		}
 	*/
-	template.Parameters[ParameterSubnet1Id] = cloudformation.Parameter{
+	template.Parameters[parameterSubnet1Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
 		Description: "SubnetId, for Availability Zone 1 in the region in your VPC",
 	}
-	template.Parameters[ParameterSubnet2Id] = cloudformation.Parameter{
+	template.Parameters[parameterSubnet2Id] = cloudformation.Parameter{
 		Type:        "AWS::EC2::Subnet::Id",
 		Description: "SubnetId, for Availability Zone 2 in the region in your VPC",
 	}
 
-	template.Parameters[ParameterLoadBalancerARN] = cloudformation.Parameter{
+	template.Parameters[parameterLoadBalancerARN] = cloudformation.Parameter{
 		Type:        "String",
 		Description: "Name of the LoadBalancer to connect to (optional)",
 	}
 
 	// Create Cluster is `ParameterClusterName` parameter is not set
-	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(ParameterClusterName))
+	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(parameterClusterName))
 
 	cluster := createCluster(project, template)
 
 	networks := map[string]string{}
 	for _, net := range project.Networks {
-		networks[net.Name] = convertNetwork(project, net, cloudformation.Ref(ParameterVPCId), template)
+		networks[net.Name] = convertNetwork(project, net, cloudformation.Ref(parameterVPCId), template)
 	}
 
 	for i, s := range project.Secrets {
@@ -175,9 +175,6 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		template.Resources[taskDefinition] = definition
 
 		var healthCheck *cloudmap.Service_HealthCheckConfig
-		if service.HealthCheck != nil && !service.HealthCheck.Disable {
-			// FIXME ECS only support HTTP(s) health checks, while Docker only support CMD
-		}
 
 		serviceRegistry := createServiceRegistry(service, template, healthCheck)
 
@@ -242,8 +239,8 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
 					SecurityGroups: serviceSecurityGroups,
 					Subnets: []string{
-						cloudformation.Ref(ParameterSubnet1Id),
-						cloudformation.Ref(ParameterSubnet2Id),
+						cloudformation.Ref(parameterSubnet1Id),
+						cloudformation.Ref(parameterSubnet2Id),
 					},
 				},
 			},
@@ -268,7 +265,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 func createLogGroup(project *types.Project, template *cloudformation.Template) {
 	retention := 0
-	if v, ok := project.Extensions[ExtensionRetention]; ok {
+	if v, ok := project.Extensions[extensionRetention]; ok {
 		retention = v.(int)
 	}
 	logGroup := fmt.Sprintf("/docker-compose/%s", project.Name)
@@ -285,11 +282,11 @@ func computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
 		return minPercent, maxPercent, nil
 	}
 	updateConfig := service.Deploy.UpdateConfig
-	min, okMin := updateConfig.Extensions[ExtensionMinPercent]
+	min, okMin := updateConfig.Extensions[extensionMinPercent]
 	if okMin {
 		minPercent = min.(int)
 	}
-	max, okMax := updateConfig.Extensions[ExtensionMaxPercent]
+	max, okMax := updateConfig.Extensions[extensionMaxPercent]
 	if okMax {
 		maxPercent = max.(int)
 	}
@@ -333,7 +330,7 @@ func getLoadBalancerSecurityGroups(project *types.Project, template *cloudformat
 	securityGroups := []string{}
 	for _, network := range project.Networks {
 		if !network.Internal {
-			net := convertNetwork(project, network, cloudformation.Ref(ParameterVPCId), template)
+			net := convertNetwork(project, network, cloudformation.Ref(parameterVPCId), template)
 			securityGroups = append(securityGroups, net)
 		}
 	}
@@ -354,7 +351,7 @@ func createLoadBalancer(project *types.Project, template *cloudformation.Templat
 	// load balancer names are limited to 32 characters total
 	loadBalancerName := fmt.Sprintf("%.32s", fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name)))
 	// Create PortPublisher if `ParameterLoadBalancerName` is not set
-	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(ParameterLoadBalancerARN))
+	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(parameterLoadBalancerARN))
 
 	loadBalancerType := getLoadBalancerType(project)
 	securityGroups := []string{}
@@ -367,8 +364,8 @@ func createLoadBalancer(project *types.Project, template *cloudformation.Templat
 		Scheme:         elbv2.LoadBalancerSchemeEnumInternetFacing,
 		SecurityGroups: securityGroups,
 		Subnets: []string{
-			cloudformation.Ref(ParameterSubnet1Id),
-			cloudformation.Ref(ParameterSubnet2Id),
+			cloudformation.Ref(parameterSubnet1Id),
+			cloudformation.Ref(parameterSubnet2Id),
 		},
 		Tags: []tags.Tag{
 			{
@@ -379,7 +376,7 @@ func createLoadBalancer(project *types.Project, template *cloudformation.Templat
 		Type:                       loadBalancerType,
 		AWSCloudFormationCondition: "CreateLoadBalancer",
 	}
-	return cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(ParameterLoadBalancerARN))
+	return cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(parameterLoadBalancerARN))
 }
 
 func createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
@@ -427,7 +424,7 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 				Value: project.Name,
 			},
 		},
-		VpcId:      cloudformation.Ref(ParameterVPCId),
+		VpcId:      cloudformation.Ref(parameterVPCId),
 		TargetType: elbv2.TargetTypeEnumIp,
 	}
 	return targetGroupName
@@ -462,7 +459,7 @@ func createServiceRegistry(service types.ServiceConfig, template *cloudformation
 
 func createTaskExecutionRole(service types.ServiceConfig, err error, definition *ecs.TaskDefinition, template *cloudformation.Template) (string, error) {
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
-	policy, err := getPolicy(definition)
+	policy := getPolicy(definition)
 	if err != nil {
 		return taskExecutionRole, err
 	}
@@ -474,16 +471,16 @@ func createTaskExecutionRole(service types.ServiceConfig, err error, definition 
 		})
 	}
 
-	if roles, ok := service.Extensions[ExtensionRole]; ok {
+	if roles, ok := service.Extensions[extensionRole]; ok {
 		rolePolicies = append(rolePolicies, iam.Role_Policy{
 			PolicyDocument: roles,
 		})
 	}
 	managedPolicies := []string{
-		ECSTaskExecutionPolicy,
-		ECRReadOnlyPolicy,
+		ecsTaskExecutionPolicy,
+		ecrReadOnlyPolicy,
 	}
-	if v, ok := service.Extensions[ExtensionManagedPolicies]; ok {
+	if v, ok := service.Extensions[extensionManagedPolicies]; ok {
 		for _, s := range v.([]interface{}) {
 			managedPolicies = append(managedPolicies, s.(string))
 		}
@@ -507,7 +504,7 @@ func createCluster(project *types.Project, template *cloudformation.Template) st
 		},
 		AWSCloudFormationCondition: "CreateCluster",
 	}
-	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(ParameterClusterName))
+	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(parameterClusterName))
 	return cluster
 }
 
@@ -515,12 +512,12 @@ func createCloudMap(project *types.Project, template *cloudformation.Template) {
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
-		Vpc:         cloudformation.Ref(ParameterVPCId),
+		Vpc:         cloudformation.Ref(parameterVPCId),
 	}
 }
 
 func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
-	if sg, ok := net.Extensions[ExtensionSecurityGroup]; ok {
+	if sg, ok := net.Extensions[extensionSecurityGroup]; ok {
 		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
 		return sg.(string)
 	}
@@ -583,7 +580,7 @@ func normalizeResourceName(s string) string {
 	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }
 
-func getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
+func getPolicy(taskDef *ecs.TaskDefinition) *PolicyDocument {
 	arns := []string{}
 	for _, container := range taskDef.ContainerDefinitions {
 		if container.RepositoryCredentials != nil {
@@ -601,12 +598,12 @@ func getPolicy(taskDef *ecs.TaskDefinition) (*PolicyDocument, error) {
 			Statement: []PolicyStatement{
 				{
 					Effect:   "Allow",
-					Action:   []string{ActionGetSecretValue, ActionGetParameters, ActionDecrypt},
+					Action:   []string{actionGetSecretValue, actionGetParameters, actionDecrypt},
 					Resource: arns,
 				}},
-		}, nil
+		}
 	}
-	return nil, nil
+	return nil
 }
 
 func uniqueStrings(items []string) []string {

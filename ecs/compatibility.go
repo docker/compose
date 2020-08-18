@@ -21,7 +21,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-type FargateCompatibilityChecker struct {
+type fargateCompatibilityChecker struct {
 	compatibility.AllowList
 }
 
@@ -68,13 +68,13 @@ var compatibleComposeAttributes = []string{
 	"secrets.file",
 }
 
-func (c *FargateCompatibilityChecker) CheckImage(service *types.ServiceConfig) {
+func (c *fargateCompatibilityChecker) CheckImage(service *types.ServiceConfig) {
 	if service.Image == "" {
 		c.Incompatible("service %s doesn't define a Docker image to run", service.Name)
 	}
 }
 
-func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortConfig) {
+func (c *fargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortConfig) {
 	if p.Published == 0 {
 		p.Published = p.Target
 	}
@@ -83,7 +83,7 @@ func (c *FargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortCo
 	}
 }
 
-func (c *FargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) {
+func (c *fargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) {
 	add := []string{}
 	for _, cap := range service.CapAdd {
 		switch cap {
@@ -96,7 +96,7 @@ func (c *FargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) 
 	service.CapAdd = add
 }
 
-func (c *FargateCompatibilityChecker) CheckLoggingDriver(config *types.LoggingConfig) {
+func (c *fargateCompatibilityChecker) CheckLoggingDriver(config *types.LoggingConfig) {
 	if config.Driver != "" && config.Driver != "awslogs" {
 		c.Unsupported("services.logging.driver %s is not supported", config.Driver)
 	}

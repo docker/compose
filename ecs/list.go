@@ -35,7 +35,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, options *cli.ProjectOptions) ([]
 	if err != nil {
 		return nil, err
 	}
-	cluster := parameters[ParameterClusterName]
+	cluster := parameters[parameterClusterName]
 
 	resources, err := b.SDK.ListStackResources(ctx, projectName)
 	if err != nil {
@@ -61,7 +61,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, options *cli.ProjectOptions) ([]
 
 	for i, state := range status {
 		ports := []string{}
-		for _, lb := range state.LoadBalancers {
+		for _, lb := range state.Publishers {
 			ports = append(ports, fmt.Sprintf(
 				"%s:%d->%d/%s",
 				lb.URL,

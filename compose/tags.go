@@ -17,7 +17,10 @@
 package compose
 
 const (
+	// ProjectTag allow to track resource related to a compose project
 	ProjectTag = "com.docker.compose.project"
+	// NetworkTag allow to track resource related to a compose network
 	NetworkTag = "com.docker.compose.network"
+	// ServiceTag allow to track resource related to a compose service
 	ServiceTag = "com.docker.compose.service"
 )

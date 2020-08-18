@@ -24,7 +24,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation"
 )
 
-func Marshall(template *cloudformation.Template) ([]byte, error) {
+func marshall(template *cloudformation.Template) ([]byte, error) {
 	raw, err := template.JSON()
 	if err != nil {
 		return nil, err

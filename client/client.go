@@ -18,14 +18,14 @@ package client
 
 import (
 	"context"
-	"github.com/docker/api/secrets"
 
-	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/secrets"
 
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
+	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 )
 
@@ -71,7 +71,7 @@ func (c *Client) ComposeService() compose.Service {
 	return c.bs.ComposeService()
 }
 
-// ComposeService returns the backend service for the current context
+// SecretsService returns the backend service for the current context
 func (c *Client) SecretsService() secrets.Service {
 	return c.bs.SecretsService()
 }

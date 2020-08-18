@@ -17,15 +17,15 @@
 package ecs
 
 const (
-	ExtensionSecurityGroup   = "x-aws-securitygroup"
-	ExtensionVPC             = "x-aws-vpc"
-	ExtensionPullCredentials = "x-aws-pull_credentials"
-	ExtensionLB              = "x-aws-loadbalancer"
-	ExtensionCluster         = "x-aws-cluster"
-	ExtensionKeys            = "x-aws-keys"
-	ExtensionMinPercent      = "x-aws-min_percent"
-	ExtensionMaxPercent      = "x-aws-max_percent"
-	ExtensionRetention       = "x-aws-logs_retention"
-	ExtensionRole            = "x-aws-role"
-	ExtensionManagedPolicies = "x-aws-policies"
+	extensionSecurityGroup   = "x-aws-securitygroup"
+	extensionVPC             = "x-aws-vpc"
+	extensionPullCredentials = "x-aws-pull_credentials"
+	extensionLB              = "x-aws-loadbalancer"
+	extensionCluster         = "x-aws-cluster"
+	extensionKeys            = "x-aws-keys"
+	extensionMinPercent      = "x-aws-min_percent"
+	extensionMaxPercent      = "x-aws-max_percent"
+	extensionRetention       = "x-aws-logs_retention"
+	extensionRole            = "x-aws-role"
+	extensionManagedPolicies = "x-aws-policies"
 )

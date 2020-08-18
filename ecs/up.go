@@ -67,20 +67,20 @@ func (b *ecsAPIService) Up(ctx context.Context, options *cli.ProjectOptions) err
 	}
 
 	parameters := map[string]string{
-		ParameterClusterName:     cluster,
-		ParameterVPCId:           vpc,
-		ParameterSubnet1Id:       subNets[0],
-		ParameterSubnet2Id:       subNets[1],
-		ParameterLoadBalancerARN: lb,
+		parameterClusterName:     cluster,
+		parameterVPCId:           vpc,
+		parameterSubnet1Id:       subNets[0],
+		parameterSubnet2Id:       subNets[1],
+		parameterLoadBalancerARN: lb,
 	}
 
 	update, err := b.SDK.StackExists(ctx, project.Name)
 	if err != nil {
 		return err
 	}
-	operation := StackCreate
+	operation := stackCreate
 	if update {
-		operation = StackUpdate
+		operation = stackUpdate
 		changeset, err := b.SDK.CreateChangeSet(ctx, project.Name, template, parameters)
 		if err != nil {
 			return err
@@ -110,7 +110,7 @@ func (b *ecsAPIService) Up(ctx context.Context, options *cli.ProjectOptions) err
 
 func (b ecsAPIService) GetVPC(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if vpc, ok := project.Extensions[ExtensionVPC]; ok {
+	if vpc, ok := project.Extensions[extensionVPC]; ok {
 		vpcID := vpc.(string)
 		ok, err := b.SDK.VpcExists(ctx, vpcID)
 		if err != nil {
@@ -130,7 +130,7 @@ func (b ecsAPIService) GetVPC(ctx context.Context, project *types.Project) (stri
 
 func (b ecsAPIService) GetLoadBalancer(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if ext, ok := project.Extensions[ExtensionLB]; ok {
+	if ext, ok := project.Extensions[extensionLB]; ok {
 		lb := ext.(string)
 		ok, err := b.SDK.LoadBalancerExists(ctx, lb)
 		if err != nil {
@@ -146,7 +146,7 @@ func (b ecsAPIService) GetLoadBalancer(ctx context.Context, project *types.Proje
 
 func (b ecsAPIService) GetCluster(ctx context.Context, project *types.Project) (string, error) {
 	//check compose file for custom VPC selected
-	if ext, ok := project.Extensions[ExtensionCluster]; ok {
+	if ext, ok := project.Extensions[extensionCluster]; ok {
 		cluster := ext.(string)
 		ok, err := b.SDK.ClusterExists(ctx, cluster)
 		if err != nil {

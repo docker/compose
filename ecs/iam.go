@@ -17,12 +17,12 @@
 package ecs
 
 const (
-	ECSTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-	ECRReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+	ecsTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+	ecrReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 
-	ActionGetSecretValue = "secretsmanager:GetSecretValue"
-	ActionGetParameters  = "ssm:GetParameters"
-	ActionDecrypt        = "kms:Decrypt"
+	actionGetSecretValue = "secretsmanager:GetSecretValue"
+	actionGetParameters  = "ssm:GetParameters"
+	actionDecrypt        = "kms:Decrypt"
 )
 
 var assumeRolePolicyDocument = PolicyDocument{
@@ -38,12 +38,14 @@ var assumeRolePolicyDocument = PolicyDocument{
 	},
 }
 
+// PolicyDocument describes an IAM policy document
 // could alternatively depend on https://github.com/kubernetes-sigs/cluster-api-provider-aws/blob/master/cmd/clusterawsadm/api/iam/v1alpha1/types.go
 type PolicyDocument struct {
 	Version   string            `json:",omitempty"`
 	Statement []PolicyStatement `json:",omitempty"`
 }
 
+// PolicyStatement describes an IAM policy statement
 type PolicyStatement struct {
 	Effect    string          `json:",omitempty"`
 	Action    []string        `json:",omitempty"`
@@ -51,6 +53,7 @@ type PolicyStatement struct {
 	Resource  []string        `json:",omitempty"`
 }
 
+// PolicyPrincipal describes an IAM policy principal
 type PolicyPrincipal struct {
 	Service string `json:",omitempty"`
 }

@@ -22,11 +22,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/client"
+
 	"github.com/docker/api/compose"
 	"github.com/docker/api/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudformation/cloudformationiface"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -46,17 +47,16 @@ import (
 )
 
 type sdk struct {
-	sess *session.Session
-	ECS  ecsiface.ECSAPI
-	EC2  ec2iface.EC2API
-	ELB  elbv2iface.ELBV2API
-	CW   cloudwatchlogsiface.CloudWatchLogsAPI
-	IAM  iamiface.IAMAPI
-	CF   cloudformationiface.CloudFormationAPI
-	SM   secretsmanageriface.SecretsManagerAPI
+	ECS ecsiface.ECSAPI
+	EC2 ec2iface.EC2API
+	ELB elbv2iface.ELBV2API
+	CW  cloudwatchlogsiface.CloudWatchLogsAPI
+	IAM iamiface.IAMAPI
+	CF  cloudformationiface.CloudFormationAPI
+	SM  secretsmanageriface.SecretsManagerAPI
 }
 
-func NewSDK(sess *session.Session) sdk {
+func newSDK(sess client.ConfigProvider) sdk {
 	return sdk{
 		ECS: ecs.New(sess),
 		EC2: ec2.New(sess),
@@ -177,7 +177,7 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 
 func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template, parameters map[string]string) error {
 	logrus.Debug("Create CloudFormation stack")
-	json, err := Marshall(template)
+	json, err := marshall(template)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 
 func (s sdk) CreateChangeSet(ctx context.Context, name string, template *cf.Template, parameters map[string]string) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
-	json, err := Marshall(template)
+	json, err := marshall(template)
 	if err != nil {
 		return "", err
 	}
@@ -258,9 +258,9 @@ func (s sdk) UpdateStack(ctx context.Context, changeset string) error {
 }
 
 const (
-	StackCreate = iota
-	StackUpdate
-	StackDelete
+	stackCreate = iota
+	stackUpdate
+	stackDelete
 )
 
 func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) error {
@@ -268,9 +268,9 @@ func (s sdk) WaitStackComplete(ctx context.Context, name string, operation int) 
 		StackName: aws.String(name),
 	}
 	switch operation {
-	case StackCreate:
+	case stackCreate:
 		return s.CF.WaitUntilStackCreateCompleteWithContext(ctx, input)
-	case StackDelete:
+	case stackDelete:
 		return s.CF.WaitUntilStackDeleteCompleteWithContext(ctx, input)
 	default:
 		return fmt.Errorf("internal error: unexpected stack operation %d", operation)
@@ -322,14 +322,14 @@ func (s sdk) ListStackParameters(ctx context.Context, name string) (map[string]s
 	return parameters, nil
 }
 
-type StackResource struct {
+type stackResource struct {
 	LogicalID string
 	Type      string
 	ARN       string
 	Status    string
 }
 
-func (s sdk) ListStackResources(ctx context.Context, name string) ([]StackResource, error) {
+func (s sdk) ListStackResources(ctx context.Context, name string) ([]stackResource, error) {
 	// FIXME handle pagination
 	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
 		StackName: aws.String(name),
@@ -338,9 +338,9 @@ func (s sdk) ListStackResources(ctx context.Context, name string) ([]StackResour
 		return nil, err
 	}
 
-	resources := []StackResource{}
+	resources := []stackResource{}
 	for _, r := range res.StackResourceSummaries {
-		resources = append(resources, StackResource{
+		resources = append(resources, stackResource{
 			LogicalID: aws.StringValue(r.LogicalResourceId),
 			Type:      aws.StringValue(r.ResourceType),
 			ARN:       aws.StringValue(r.PhysicalResourceId),
@@ -495,11 +495,11 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 			return nil, err
 		}
 		status = append(status, compose.ServiceStatus{
-			ID:            aws.StringValue(service.ServiceName),
-			Name:          name,
-			Replicas:      int(aws.Int64Value(service.RunningCount)),
-			Desired:       int(aws.Int64Value(service.DesiredCount)),
-			LoadBalancers: loadBalancers,
+			ID:         aws.StringValue(service.ServiceName),
+			Name:       name,
+			Replicas:   int(aws.Int64Value(service.RunningCount)),
+			Desired:    int(aws.Int64Value(service.DesiredCount)),
+			Publishers: loadBalancers,
 		})
 	}
 	return status, nil

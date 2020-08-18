@@ -29,6 +29,7 @@ type Service interface {
 	DeleteSecret(ctx context.Context, id string, recover bool) error
 }
 
+// Secret hold sensitive data
 type Secret struct {
 	ID          string            `json:"ID"`
 	Name        string            `json:"Name"`
@@ -38,6 +39,7 @@ type Secret struct {
 	password    string
 }
 
+// NewSecret builds a secret
 func NewSecret(name, username, password, description string) Secret {
 	return Secret{
 		Name:        name,
@@ -47,6 +49,7 @@ func NewSecret(name, username, password, description string) Secret {
 	}
 }
 
+// ToJSON marshall a Secret into JSON string
 func (s Secret) ToJSON() (string, error) {
 	b, err := json.MarshalIndent(&s, "", "\t")
 	if err != nil {
@@ -55,6 +58,7 @@ func (s Secret) ToJSON() (string, error) {
 	return string(b), nil
 }
 
+// GetCredString marshall a Secret's sensitive data into JSON string
 func (s Secret) GetCredString() (string, error) {
 	creds := map[string]string{
 		"username": s.username,

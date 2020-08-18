@@ -40,7 +40,7 @@ func (b *ecsAPIService) Logs(ctx context.Context, options *cli.ProjectOptions, w
 	}
 
 	consumer := logConsumer{
-		colors: map[string]ColorFunc{},
+		colors: map[string]colorFunc{},
 		width:  0,
 		writer: writer,
 	}
@@ -58,7 +58,7 @@ func (b *ecsAPIService) Logs(ctx context.Context, options *cli.ProjectOptions, w
 func (l *logConsumer) Log(service, container, message string) {
 	cf, ok := l.colors[service]
 	if !ok {
-		cf = <-Rainbow
+		cf = <-loop
 		l.colors[service] = cf
 		l.computeWidth()
 	}
@@ -81,7 +81,7 @@ func (l *logConsumer) computeWidth() {
 }
 
 type logConsumer struct {
-	colors map[string]ColorFunc
+	colors map[string]colorFunc
 	width  int
 	writer io.Writer
 }

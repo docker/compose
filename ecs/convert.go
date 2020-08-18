@@ -44,10 +44,7 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 	if err != nil {
 		return nil, err
 	}
-	_, memReservation, err := toContainerReservation(service)
-	if err != nil {
-		return nil, err
-	}
+	_, memReservation := toContainerReservation(service)
 	credential := getRepoCredentials(service)
 
 	// override resolve.conf search directive to also search <project>.local
@@ -141,7 +138,11 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 	}, nil
 }
 
-func createSecretsSideCar(project *types.Project, service types.ServiceConfig, logConfiguration *ecs.TaskDefinition_LogConfiguration) (ecs.TaskDefinition_Volume, ecs.TaskDefinition_MountPoint, ecs.TaskDefinition_ContainerDefinition, error) {
+func createSecretsSideCar(project *types.Project, service types.ServiceConfig, logConfiguration *ecs.TaskDefinition_LogConfiguration) (
+	ecs.TaskDefinition_Volume,
+	ecs.TaskDefinition_MountPoint,
+	ecs.TaskDefinition_ContainerDefinition,
+	error) {
 	initContainerName := fmt.Sprintf("%s_Secrets_InitContainer", normalizeResourceName(service.Name))
 	secretsVolume := ecs.TaskDefinition_Volume{
 		Name: "secrets",
@@ -166,7 +167,7 @@ func createSecretsSideCar(project *types.Project, service types.ServiceConfig, l
 			ValueFrom: secretConfig.Name,
 		})
 		var keys []string
-		if ext, ok := secretConfig.Extensions[ExtensionKeys]; ok {
+		if ext, ok := secretConfig.Extensions[extensionKeys]; ok {
 			if key, ok := ext.(string); ok {
 				keys = append(keys, key)
 			} else {
@@ -275,7 +276,7 @@ func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl 
 	return sys
 }
 
-const MiB = 1024 * 1024
+const miB = 1024 * 1024
 
 func toLimits(service types.ServiceConfig) (string, string, error) {
 	// All possible cpu/mem values for Fargate
@@ -315,9 +316,9 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 
 	for _, cpu := range cpus {
 		mem := cpuToMem[cpu]
-		if v <= cpu*MiB {
+		if v <= cpu*miB {
 			for _, m := range mem {
-				if limits.MemoryBytes <= m*MiB {
+				if limits.MemoryBytes <= m*miB {
 					cpuLimit = strconv.FormatInt(cpu, 10)
 					memLimit = strconv.FormatInt(int64(m), 10)
 					return cpuLimit, memLimit, nil
@@ -328,19 +329,19 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	return "", "", fmt.Errorf("the resources requested are not supported by ECS/Fargate")
 }
 
-func toContainerReservation(service types.ServiceConfig) (string, int, error) {
+func toContainerReservation(service types.ServiceConfig) (string, int) {
 	cpuReservation := ".0"
 	memReservation := 0
 
 	if service.Deploy == nil {
-		return cpuReservation, memReservation, nil
+		return cpuReservation, memReservation
 	}
 
 	reservations := service.Deploy.Resources.Reservations
 	if reservations == nil {
-		return cpuReservation, memReservation, nil
+		return cpuReservation, memReservation
 	}
-	return reservations.NanoCPUs, int(reservations.MemoryBytes / MiB), nil
+	return reservations.NanoCPUs, int(reservations.MemoryBytes / miB)
 }
 
 func toPlacementConstraints(deploy *types.DeployConfig) []ecs.TaskDefinition_TaskDefinitionPlacementConstraint {
@@ -467,7 +468,7 @@ func toHostEntryPtr(hosts types.HostsList) []ecs.TaskDefinition_HostEntry {
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
 	// extract registry and namespace string from image name
 	for key, value := range service.Extensions {
-		if key == ExtensionPullCredentials {
+		if key == extensionPullCredentials {
 			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 		}
 	}

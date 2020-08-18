@@ -20,12 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/docker/api/secrets"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/secrets"
 )
 
 var (

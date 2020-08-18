@@ -32,7 +32,7 @@ func (b *ecsAPIService) Down(ctx context.Context, options *cli.ProjectOptions) e
 	if err != nil {
 		return err
 	}
-	return b.WaitStackCompletion(ctx, name, StackDelete)
+	return b.WaitStackCompletion(ctx, name, stackDelete)
 }
 
 func (b *ecsAPIService) projectName(options *cli.ProjectOptions) (string, error) {

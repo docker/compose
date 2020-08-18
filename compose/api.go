@@ -37,6 +37,7 @@ type Service interface {
 	Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error)
 }
 
+// PortPublisher hold status about published port
 type PortPublisher struct {
 	URL           string
 	TargetPort    int
@@ -44,11 +45,12 @@ type PortPublisher struct {
 	Protocol      string
 }
 
+// ServiceStatus hold status about a service
 type ServiceStatus struct {
-	ID            string
-	Name          string
-	Replicas      int
-	Desired       int
-	Ports         []string
-	LoadBalancers []PortPublisher
+	ID         string
+	Name       string
+	Replicas   int
+	Desired    int
+	Ports      []string
+	Publishers []PortPublisher
 }

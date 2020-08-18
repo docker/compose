@@ -28,7 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 )
 
-func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int) error {
+func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int) error { //nolint:gocyclo
 	knownEvents := map[string]struct{}{}
 	// progress writer
 	w := progress.ContextWriter(ctx)
@@ -76,23 +76,23 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 
 			switch status {
 			case "CREATE_COMPLETE":
-				if operation == StackCreate {
+				if operation == stackCreate {
 					progressStatus = progress.Done
 
 				}
 			case "UPDATE_COMPLETE":
-				if operation == StackUpdate {
+				if operation == stackUpdate {
 					progressStatus = progress.Done
 				}
 			case "DELETE_COMPLETE":
-				if operation == StackDelete {
+				if operation == stackDelete {
 					progressStatus = progress.Done
 				}
 			default:
 				if strings.HasSuffix(status, "_FAILED") {
 					progressStatus = progress.Error
 					if stackErr == nil {
-						operation = StackDelete
+						operation = stackDelete
 						stackErr = fmt.Errorf(reason)
 					}
 				}

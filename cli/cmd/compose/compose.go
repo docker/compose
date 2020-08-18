@@ -18,8 +18,8 @@ package compose
 
 import (
 	"context"
-	"github.com/compose-spec/compose-go/cli"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 

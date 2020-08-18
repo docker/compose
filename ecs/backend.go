@@ -76,7 +76,7 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 	return &ecsAPIService{
 		ctx:    ecsCtx,
 		Region: ecsCtx.Region,
-		SDK:    NewSDK(sess),
+		SDK:    newSDK(sess),
 	}, nil
 }
 

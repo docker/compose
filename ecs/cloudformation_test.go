@@ -45,7 +45,7 @@ func TestSimpleConvert(t *testing.T) {
 }
 
 func TestLogging(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
@@ -64,7 +64,7 @@ x-aws-logs_retention: 10
 }
 
 func TestEnvFile(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
@@ -84,7 +84,7 @@ services:
 }
 
 func TestEnvFileAndEnv(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
@@ -106,7 +106,7 @@ services:
 }
 
 func TestRollingUpdateLimits(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
@@ -121,7 +121,7 @@ services:
 }
 
 func TestRollingUpdateExtension(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
@@ -136,16 +136,17 @@ services:
 }
 
 func TestRolePolicy(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   foo:
     image: hello_world
     x-aws-pull_credentials: "secret"
 `)
-	role := template.Resources["FooTaskExecutionRole"].(*iam.Role)
-	assert.Check(t, role != nil)
-	assert.Check(t, role.ManagedPolicyArns[0] == ECSTaskExecutionPolicy)
-	assert.Check(t, role.ManagedPolicyArns[1] == ECRReadOnlyPolicy)
+	x := template.Resources["FooTaskExecutionRole"]
+	assert.Check(t, x != nil)
+	role := *(x.(*iam.Role))
+	assert.Check(t, role.ManagedPolicyArns[0] == ecsTaskExecutionPolicy)
+	assert.Check(t, role.ManagedPolicyArns[1] == ecrReadOnlyPolicy)
 	// We expect an extra policy has been created for x-aws-pull_credentials
 	assert.Check(t, len(role.Policies) == 1)
 	policy := role.Policies[0].PolicyDocument.(*PolicyDocument)
@@ -155,7 +156,7 @@ services:
 }
 
 func TestMapNetworksToSecurityGroups(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: hello_world
@@ -172,29 +173,31 @@ networks:
 	assert.Check(t, template.Resources["TestPublicNetwork"] != nil)
 	assert.Check(t, template.Resources["TestBacktierNetwork"] != nil)
 	assert.Check(t, template.Resources["TestBacktierNetworkIngress"] != nil)
-	ingress := template.Resources["TestPublicNetworkIngress"].(*ec2.SecurityGroupIngress)
-	assert.Check(t, ingress != nil)
+	i := template.Resources["TestPublicNetworkIngress"]
+	assert.Check(t, i != nil)
+	ingress := *i.(*ec2.SecurityGroupIngress)
 	assert.Check(t, ingress.SourceSecurityGroupId == cloudformation.Ref("TestPublicNetwork"))
 
 }
 
 func TestLoadBalancerTypeApplication(t *testing.T) {
-	template := convertYaml(t, "test123456789009876543211234567890", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
     ports:
       - 80:80
 `)
-	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
+	lb := template.Resources["TestLoadBalancer"]
 	assert.Check(t, lb != nil)
-	assert.Check(t, len(lb.Name) <= 32)
-	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumApplication)
-	assert.Check(t, len(lb.SecurityGroups) > 0)
+	loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
+	assert.Check(t, len(loadBalancer.Name) <= 32)
+	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumApplication)
+	assert.Check(t, len(loadBalancer.SecurityGroups) > 0)
 }
 
 func TestNoLoadBalancerIfNoPortExposed(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -209,20 +212,21 @@ services:
 }
 
 func TestServiceReplicas(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
     deploy:
       replicas: 10
 `)
-	s := template.Resources["TestService"].(*ecs.Service)
+	s := template.Resources["TestService"]
 	assert.Check(t, s != nil)
-	assert.Check(t, s.DesiredCount == 10)
+	service := *s.(*ecs.Service)
+	assert.Check(t, service.DesiredCount == 10)
 }
 
 func TestTaskSizeConvert(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -239,7 +243,7 @@ services:
 	assert.Equal(t, def.Cpu, "512")
 	assert.Equal(t, def.Memory, "2048")
 
-	template = convertYaml(t, "test", `
+	template = convertYaml(t, `
 services:
   test:
     image: nginx
@@ -257,7 +261,7 @@ services:
 	assert.Equal(t, def.Memory, "8192")
 }
 func TestTaskSizeConvertFailure(t *testing.T) {
-	model := loadConfig(t, "test", `
+	model := loadConfig(t, `
 services:
   test:
     image: nginx
@@ -273,7 +277,7 @@ services:
 }
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -281,13 +285,14 @@ services:
       - 80:80
       - 88:88
 `)
-	lb := template.Resources["TestLoadBalancer"].(*elasticloadbalancingv2.LoadBalancer)
+	lb := template.Resources["TestLoadBalancer"]
 	assert.Check(t, lb != nil)
-	assert.Check(t, lb.Type == elbv2.LoadBalancerTypeEnumNetwork)
+	loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
+	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumNetwork)
 }
 
 func TestServiceMapping(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: "image"
@@ -326,7 +331,7 @@ func get(l []ecs.TaskDefinition_KeyValuePair, name string) string {
 }
 
 func TestResourcesHaveProjectTagSet(t *testing.T) {
-	template := convertYaml(t, "test", `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -353,7 +358,7 @@ func convertResultAsString(t *testing.T, project *types.Project) string {
 	backend := &ecsAPIService{}
 	template, err := backend.convert(project)
 	assert.NilError(t, err)
-	resultAsJSON, err := Marshall(template)
+	resultAsJSON, err := marshall(template)
 	assert.NilError(t, err)
 	return fmt.Sprintf("%s\n", string(resultAsJSON))
 }
@@ -368,15 +373,15 @@ func load(t *testing.T, paths ...string) *types.Project {
 	return project
 }
 
-func convertYaml(t *testing.T, name string, yaml string) *cloudformation.Template {
-	project := loadConfig(t, name, yaml)
+func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
+	project := loadConfig(t, yaml)
 	backend := &ecsAPIService{}
 	template, err := backend.convert(project)
 	assert.NilError(t, err)
 	return template
 }
 
-func loadConfig(t *testing.T, name string, yaml string) *types.Project {
+func loadConfig(t *testing.T, yaml string) *types.Project {
 	dict, err := loader.ParseYAML([]byte(yaml))
 	assert.NilError(t, err)
 	model, err := loader.Load(types.ConfigDetails{
