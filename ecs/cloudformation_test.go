@@ -1,10 +1,27 @@
+/*
+   Copyright 2020 Docker, Inc.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package ecs
 
 import (
 	"fmt"
-	"github.com/docker/api/compose"
 	"reflect"
 	"testing"
+
+	"github.com/docker/api/compose"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -187,7 +204,7 @@ services:
 	for _, r := range template.Resources {
 		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::TargetGroup")
 		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::Listener")
-		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::LoadBalancer")
+		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::PortPublisher")
 	}
 }
 

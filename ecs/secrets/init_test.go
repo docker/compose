@@ -1,3 +1,19 @@
+/*
+   Copyright 2020 Docker, Inc.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package secrets
 
 import (
@@ -12,10 +28,11 @@ import (
 
 func TestRawSecret(t *testing.T) {
 	dir := fs.NewDir(t, "secrets").Path()
-	os.Setenv("raw", "something_secret")
-	defer os.Unsetenv("raw")
+	err := os.Setenv("raw", "something_secret")
+	assert.NilError(t, err)
+	defer os.Unsetenv("raw") // nolint:errcheck
 
-	err := CreateSecretFiles(Secret{
+	err = CreateSecretFiles(Secret{
 		Name: "raw",
 		Keys: nil,
 	}, dir)
@@ -28,14 +45,15 @@ func TestRawSecret(t *testing.T) {
 
 func TestSelectedKeysSecret(t *testing.T) {
 	dir := fs.NewDir(t, "secrets").Path()
-	os.Setenv("json", `
+	err := os.Setenv("json", `
 {
    "foo": "bar",
    "zot": "qix"
 }`)
-	defer os.Unsetenv("json")
+	assert.NilError(t, err)
+	defer os.Unsetenv("json") // nolint:errcheck
 
-	err := CreateSecretFiles(Secret{
+	err = CreateSecretFiles(Secret{
 		Name: "json",
 		Keys: []string{"foo"},
 	}, dir)
@@ -51,14 +69,15 @@ func TestSelectedKeysSecret(t *testing.T) {
 
 func TestAllKeysSecret(t *testing.T) {
 	dir := fs.NewDir(t, "secrets").Path()
-	os.Setenv("json", `
+	err := os.Setenv("json", `
 {
    "foo": "bar",
    "zot": "qix"
 }`)
-	defer os.Unsetenv("json")
+	assert.NilError(t, err)
+	defer os.Unsetenv("json") // nolint:errcheck
 
-	err := CreateSecretFiles(Secret{
+	err = CreateSecretFiles(Secret{
 		Name: "json",
 		Keys: []string{"*"},
 	}, dir)

@@ -64,8 +64,6 @@ github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuy
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/aws/aws-sdk-go v1.15.11/go.mod h1:mFuSZ37Z9YOHbQEwBWztmVzqXrEkub65tZoCYDt7FT0=
-github.com/aws/aws-sdk-go v1.34.2 h1:9vCknCdTAmmV4ht7lPuda7aJXzllXwEQyCMZKJHjBrM=
-github.com/aws/aws-sdk-go v1.34.2/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/aws/aws-sdk-go v1.34.6 h1:2aPXQGkR6xeheN5dns13mSoDWeUlj4wDmfZ+8ZDHauw=
 github.com/aws/aws-sdk-go v1.34.6/go.mod h1:5zCpMtNQVjRREroY7sYe8lOMRSxkhG6MZveU8YkpAk0=
 github.com/awslabs/goformation/v4 v4.14.0 h1:E2Pet9eIqA4qzt3dzzzE4YN83V4Kyfbcio0VokBC9TA=
@@ -132,7 +130,6 @@ github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8 h1:JRquW4uqIU+eSilDhuo9
 github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe h1:pni13lAFm1g4cjHU6c3n4qGvvJGZQK4VvKRKMseQ42E=
 github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe/go.mod h1:Oqz4IonmMNc2N7GqfTL2xkhCQx0yS6nR+HrOZJnmKIk=
-github.com/docker/docker v1.13.1 h1:IkZjBSIc8hBjLpqeAbeE5mca5mNgeatLHBy3GO78BWo=
 github.com/docker/docker v17.12.0-ce-rc1.0.20200309214505-aa6a9891b09c+incompatible h1:G2hY8RD7jB9QaSmcb8mYEIg8QbEvVAB7se8+lXHZHfg=
 github.com/docker/docker v17.12.0-ce-rc1.0.20200309214505-aa6a9891b09c+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.6.3 h1:zI2p9+1NQYdnG6sMU26EX4aVGlqbInSQxQXLvzJ4RPQ=
@@ -534,8 +531,6 @@ gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 h1:YR8cESwS4TdDjEe65xsg0ogR
 gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/fsnotify.v1 v1.4.7 h1:xOHLXZwVvI9hhs+cLKq5+I5onOuwQLhQwiu63xxlHs4=
 gopkg.in/fsnotify.v1 v1.4.7/go.mod h1:Tz8NjZHkW78fSQdbUxIjBTcgA1z1m8ZHf0WmKUhAMys=
-gopkg.in/ini.v1 v1.58.0 h1:VdDvTzv/005R8vEFyQ56bpEnOKTNPbpJhL0VCohxlQw=
-gopkg.in/ini.v1 v1.58.0/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
 gopkg.in/ini.v1 v1.60.0 h1:P5ZzC7RJO04094NJYlEnBdFK2wwmnCAy/+7sAzvWs60=
 gopkg.in/ini.v1 v1.60.0/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
 gopkg.in/resty.v1 v1.12.0/go.mod h1:mDo4pnntr5jdWRML875a/NmxYqAlA73dVijT2AXvQQo=

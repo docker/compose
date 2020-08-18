@@ -1,3 +1,19 @@
+/*
+   Copyright 2020 Docker, Inc.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package ecs
 
 import (
@@ -312,6 +328,7 @@ type StackResource struct {
 	ARN       string
 	Status    string
 }
+
 func (s sdk) ListStackResources(ctx context.Context, name string) ([]StackResource, error) {
 	// FIXME handle pagination
 	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
@@ -488,7 +505,7 @@ func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string
 	return status, nil
 }
 
-func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.LoadBalancer, error) {
+func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error) {
 	if len(targetGroupArns) == 0 {
 		return nil, nil
 	}
@@ -522,14 +539,14 @@ func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string
 		}
 		return nil
 	}
-	loadBalancers := []compose.LoadBalancer{}
+	loadBalancers := []compose.PortPublisher{}
 	for _, tg := range groups.TargetGroups {
 		for _, lbarn := range tg.LoadBalancerArns {
 			lb := filterLB(lbarn, lbs.LoadBalancers)
 			if lb == nil {
 				continue
 			}
-			loadBalancers = append(loadBalancers, compose.LoadBalancer{
+			loadBalancers = append(loadBalancers, compose.PortPublisher{
 				URL:           aws.StringValue(lb.DNSName),
 				TargetPort:    int(aws.Int64Value(tg.Port)),
 				PublishedPort: int(aws.Int64Value(tg.Port)),
@@ -573,7 +590,7 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 }
 
 func (s sdk) LoadBalancerExists(ctx context.Context, arn string) (bool, error) {
-	logrus.Debug("CheckRequirements if LoadBalancer exists: ", arn)
+	logrus.Debug("CheckRequirements if PortPublisher exists: ", arn)
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
 		LoadBalancerArns: []*string{aws.String(arn)},
 	})

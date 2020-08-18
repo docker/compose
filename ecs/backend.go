@@ -18,8 +18,10 @@ package ecs
 
 import (
 	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+
 	"github.com/docker/api/secrets"
 
 	"github.com/docker/api/backend"

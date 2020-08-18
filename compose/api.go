@@ -37,8 +37,7 @@ type Service interface {
 	Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error)
 }
 
-
-type LoadBalancer struct {
+type PortPublisher struct {
 	URL           string
 	TargetPort    int
 	PublishedPort int
@@ -51,5 +50,5 @@ type ServiceStatus struct {
 	Replicas      int
 	Desired       int
 	Ports         []string
-	LoadBalancers []LoadBalancer
+	LoadBalancers []PortPublisher
 }
