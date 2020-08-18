@@ -69,16 +69,16 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 	}
 
 	return &ecsAPIService{
-		ctx: ecsCtx,
+		ctx:    ecsCtx,
 		Region: ecsCtx.Region,
-		SDK: NewSDK(sess),
+		SDK:    NewSDK(sess),
 	}, nil
 }
 
 type ecsAPIService struct {
-	ctx store.EcsContext
+	ctx    store.EcsContext
 	Region string
-	SDK sdk
+	SDK    sdk
 }
 
 func (a *ecsAPIService) ContainerService() containers.Service {

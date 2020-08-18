@@ -31,6 +31,7 @@ import (
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/errdefs"
+	"github.com/docker/api/secrets"
 )
 
 type apiService struct {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
@@ -28,11 +27,11 @@ import (
 )
 
 func upCommand() *cobra.Command {
-	opts := cli.ProjectOptions{}
+	opts := composeOptions{}
 	upCmd := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUp(cmd.Context(), &opts)
+			return runUp(cmd.Context(), opts)
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -44,7 +43,7 @@ func upCommand() *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts *cli.ProjectOptions) error {
+func runUp(ctx context.Context, opts composeOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
@@ -56,6 +55,10 @@ func runUp(ctx context.Context, opts *cli.ProjectOptions) error {
 	}
 
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return composeService.Up(ctx, opts)
+		options, err := opts.toProjectOptions()
+		if err != nil {
+			return err
+		}
+		return composeService.Up(ctx, options)
 	})
 }

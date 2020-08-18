@@ -19,7 +19,6 @@ package aci
 import (
 	"context"
 	"fmt"
-	"github.com/docker/api/secrets"
 	"io"
 	"net/http"
 	"strconv"
@@ -42,6 +41,7 @@ import (
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
+	"github.com/docker/api/secrets"
 )
 
 const (

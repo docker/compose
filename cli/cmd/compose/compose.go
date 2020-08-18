@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"github.com/compose-spec/compose-go/cli"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -27,6 +28,21 @@ import (
 	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
 )
+
+type composeOptions struct {
+	Name        string
+	WorkingDir  string
+	ConfigPaths []string
+	Environment []string
+}
+
+func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
+	return cli.NewProjectOptions(o.ConfigPaths,
+		cli.WithOsEnv,
+		cli.WithEnv(o.Environment),
+		cli.WithWorkingDirectory(o.WorkingDir),
+		cli.WithName(o.Name))
+}
 
 // Command returns the compose command with its child commands
 func Command() *cobra.Command {
