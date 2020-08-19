@@ -590,6 +590,9 @@ func azureLogin(t *testing.T, c *E2eCLI) {
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 	tenantID := os.Getenv("AZURE_TENANT_ID")
+	assert.Check(t, clientID != "", "AZURE_CLIENT_ID must not be empty")
+	assert.Check(t, clientSecret != "", "AZURE_CLIENT_SECRET must not be empty")
+	assert.Check(t, tenantID != "", "AZURE_TENANT_ID must not be empty")
 	res := c.RunDockerCmd("login", "azure", "--client-id", clientID, "--client-secret", clientSecret, "--tenant-id", tenantID)
 	res.Assert(t, icmd.Success)
 }
