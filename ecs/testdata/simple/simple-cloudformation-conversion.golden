@@ -1,0 +1,378 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": {
+    "CreateCluster": {
+      "Fn::Equals": [
+        "",
+        {
+          "Ref": "ParameterClusterName"
+        }
+      ]
+    },
+    "CreateLoadBalancer": {
+      "Fn::Equals": [
+        "",
+        {
+          "Ref": "ParameterLoadBalancerARN"
+        }
+      ]
+    }
+  },
+  "Description": "CloudFormation template created by Docker for deploying applications on Amazon ECS",
+  "Parameters": {
+    "ParameterClusterName": {
+      "Description": "Name of the ECS cluster to deploy to (optional)",
+      "Type": "String"
+    },
+    "ParameterLoadBalancerARN": {
+      "Description": "Name of the LoadBalancer to connect to (optional)",
+      "Type": "String"
+    },
+    "ParameterSubnet1Id": {
+      "Description": "SubnetId, for Availability Zone 1 in the region in your VPC",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "ParameterSubnet2Id": {
+      "Description": "SubnetId, for Availability Zone 2 in the region in your VPC",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "ParameterVPCId": {
+      "Description": "ID of the VPC",
+      "Type": "AWS::EC2::VPC::Id"
+    }
+  },
+  "Resources": {
+    "CloudMap": {
+      "Properties": {
+        "Description": "Service Map for Docker Compose project TestSimpleConvert",
+        "Name": "TestSimpleConvert.local",
+        "Vpc": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace"
+    },
+    "Cluster": {
+      "Condition": "CreateCluster",
+      "Properties": {
+        "ClusterName": "TestSimpleConvert",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ]
+      },
+      "Type": "AWS::ECS::Cluster"
+    },
+    "LogGroup": {
+      "Properties": {
+        "LogGroupName": "/docker-compose/TestSimpleConvert"
+      },
+      "Type": "AWS::Logs::LogGroup"
+    },
+    "SimpleService": {
+      "DependsOn": [
+        "SimpleTCP80Listener"
+      ],
+      "Properties": {
+        "Cluster": {
+          "Fn::If": [
+            "CreateCluster",
+            {
+              "Ref": "Cluster"
+            },
+            {
+              "Ref": "ParameterClusterName"
+            }
+          ]
+        },
+        "DeploymentConfiguration": {
+          "MaximumPercent": 200,
+          "MinimumHealthyPercent": 100
+        },
+        "DeploymentController": {
+          "Type": "ECS"
+        },
+        "DesiredCount": 1,
+        "LaunchType": "FARGATE",
+        "LoadBalancers": [
+          {
+            "ContainerName": "simple",
+            "ContainerPort": 80,
+            "TargetGroupArn": {
+              "Ref": "SimpleTCP80TargetGroup"
+            }
+          }
+        ],
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "SecurityGroups": [
+              {
+                "Ref": "TestSimpleConvertDefaultNetwork"
+              }
+            ],
+            "Subnets": [
+              {
+                "Ref": "ParameterSubnet1Id"
+              },
+              {
+                "Ref": "ParameterSubnet2Id"
+              }
+            ]
+          }
+        },
+        "PropagateTags": "SERVICE",
+        "SchedulingStrategy": "REPLICA",
+        "ServiceRegistries": [
+          {
+            "RegistryArn": {
+              "Fn::GetAtt": [
+                "SimpleServiceDiscoveryEntry",
+                "Arn"
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          },
+          {
+            "Key": "com.docker.compose.service",
+            "Value": "simple"
+          }
+        ],
+        "TaskDefinition": {
+          "Ref": "SimpleTaskDefinition"
+        }
+      },
+      "Type": "AWS::ECS::Service"
+    },
+    "SimpleServiceDiscoveryEntry": {
+      "Properties": {
+        "Description": "\"simple\" service discovery entry in Cloud Map",
+        "DnsConfig": {
+          "DnsRecords": [
+            {
+              "TTL": 60,
+              "Type": "A"
+            }
+          ],
+          "RoutingPolicy": "MULTIVALUE"
+        },
+        "HealthCheckCustomConfig": {
+          "FailureThreshold": 1
+        },
+        "Name": "simple",
+        "NamespaceId": {
+          "Ref": "CloudMap"
+        }
+      },
+      "Type": "AWS::ServiceDiscovery::Service"
+    },
+    "SimpleTCP80Listener": {
+      "Properties": {
+        "DefaultActions": [
+          {
+            "ForwardConfig": {
+              "TargetGroups": [
+                {
+                  "TargetGroupArn": {
+                    "Ref": "SimpleTCP80TargetGroup"
+                  }
+                }
+              ]
+            },
+            "Type": "forward"
+          }
+        ],
+        "LoadBalancerArn": {
+          "Fn::If": [
+            "CreateLoadBalancer",
+            {
+              "Ref": "TestSimpleConvertLoadBalancer"
+            },
+            {
+              "Ref": "ParameterLoadBalancerARN"
+            }
+          ]
+        },
+        "Port": 80,
+        "Protocol": "HTTP"
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::Listener"
+    },
+    "SimpleTCP80TargetGroup": {
+      "Properties": {
+        "Port": 80,
+        "Protocol": "HTTP",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ],
+        "TargetType": "ip",
+        "VpcId": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
+    },
+    "SimpleTaskDefinition": {
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Environment": [
+              {
+                "Name": "LOCALDOMAIN",
+                "Value": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      ".compute.internal",
+                      " TestSimpleConvert.local"
+                    ]
+                  ]
+                }
+              }
+            ],
+            "Essential": true,
+            "Image": "nginx",
+            "LinuxParameters": {},
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "LogGroup"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "TestSimpleConvert"
+              }
+            },
+            "Name": "simple",
+            "PortMappings": [
+              {
+                "ContainerPort": 80,
+                "HostPort": 80,
+                "Protocol": "tcp"
+              }
+            ]
+          }
+        ],
+        "Cpu": "256",
+        "ExecutionRoleArn": {
+          "Ref": "SimpleTaskExecutionRole"
+        },
+        "Family": "TestSimpleConvert-simple",
+        "Memory": "512",
+        "NetworkMode": "awsvpc",
+        "RequiresCompatibilities": [
+          "FARGATE"
+        ]
+      },
+      "Type": "AWS::ECS::TaskDefinition"
+    },
+    "SimpleTaskExecutionRole": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "sts:AssumeRole"
+              ],
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        ]
+      },
+      "Type": "AWS::IAM::Role"
+    },
+    "TestSimpleConvertDefaultNetwork": {
+      "Properties": {
+        "GroupDescription": "TestSimpleConvert default Security Group",
+        "GroupName": "TestSimpleConvertDefaultNetwork",
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "simple:80/tcp",
+            "FromPort": 80,
+            "IpProtocol": "TCP",
+            "ToPort": 80
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          },
+          {
+            "Key": "com.docker.compose.network",
+            "Value": "default"
+          }
+        ],
+        "VpcId": {
+          "Ref": "ParameterVPCId"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "TestSimpleConvertDefaultNetworkIngress": {
+      "Properties": {
+        "Description": "Allow communication within network default",
+        "GroupId": {
+          "Ref": "TestSimpleConvertDefaultNetwork"
+        },
+        "IpProtocol": "-1",
+        "SourceSecurityGroupId": {
+          "Ref": "TestSimpleConvertDefaultNetwork"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "TestSimpleConvertLoadBalancer": {
+      "Condition": "CreateLoadBalancer",
+      "Properties": {
+        "Name": "TestSimpleConvertLoadBalancer",
+        "Scheme": "internet-facing",
+        "SecurityGroups": [
+          {
+            "Ref": "TestSimpleConvertDefaultNetwork"
+          }
+        ],
+        "Subnets": [
+          {
+            "Ref": "ParameterSubnet1Id"
+          },
+          {
+            "Ref": "ParameterSubnet2Id"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ],
+        "Type": "application"
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    }
+  }
+}

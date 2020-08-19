@@ -1,5 +1,3 @@
-// +build ecs
-
 /*
    Copyright 2020 Docker, Inc.
 
@@ -105,7 +103,7 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	p := credentials.SharedCredentialsProvider{Profile: profile}
 	_, err := p.Retrieve()
 	if err == nil {
-		return fmt.Errorf("credentials already exists!")
+		return fmt.Errorf("credentials already exist")
 	}
 
 	if err.(awserr.Error).Code() == "SharedCredsLoad" && err.(awserr.Error).Message() == "failed to load shared credentials file" {

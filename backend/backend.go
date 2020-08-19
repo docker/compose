@@ -26,6 +26,7 @@ import (
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	"github.com/docker/api/context/cloud"
+	"github.com/docker/api/secrets"
 )
 
 var (
@@ -51,6 +52,7 @@ var backends = struct {
 // Service aggregates the service interfaces
 type Service interface {
 	ContainerService() containers.Service
+	SecretsService() secrets.Service
 	ComposeService() compose.Service
 }
 

@@ -20,14 +20,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
 )
 
 func downCommand() *cobra.Command {
-	opts := cli.ProjectOptions{}
+	opts := composeOptions{}
 	downCmd := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +40,7 @@ func downCommand() *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, opts cli.ProjectOptions) error {
+func runDown(ctx context.Context, opts composeOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
@@ -52,5 +51,9 @@ func runDown(ctx context.Context, opts cli.ProjectOptions) error {
 		return errors.New("compose not implemented in current context")
 	}
 
-	return composeService.Down(ctx, opts)
+	options, err := opts.toProjectOptions()
+	if err != nil {
+		return err
+	}
+	return composeService.Down(ctx, options)
 }

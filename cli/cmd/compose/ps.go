@@ -25,14 +25,13 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
 )
 
 func psCommand() *cobra.Command {
-	opts := cli.ProjectOptions{}
+	opts := composeOptions{}
 	psCmd := &cobra.Command{
 		Use: "ps",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -46,7 +45,7 @@ func psCommand() *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, opts cli.ProjectOptions) error {
+func runPs(ctx context.Context, opts composeOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
@@ -57,7 +56,11 @@ func runPs(ctx context.Context, opts cli.ProjectOptions) error {
 		return errors.New("compose not implemented in current context")
 	}
 
-	serviceList, err := composeService.Ps(ctx, opts)
+	options, err := opts.toProjectOptions()
+	if err != nil {
+		return err
+	}
+	serviceList, err := composeService.Ps(ctx, options)
 	if err != nil {
 		return err
 	}
