@@ -150,10 +150,10 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 	}
 
 	data := url.Values{
-		"grant_type":    {"access_token"},
-		"service":       {registry},
-		"tenant":        {tenantID},
-		"access_token":  {token.AccessToken},
+		"grant_type":   {"access_token"},
+		"service":      {registry},
+		"tenant":       {tenantID},
+		"access_token": {token.AccessToken},
 	}
 	repoAuthURL := fmt.Sprintf("https://%s/oauth2/exchange", registry)
 	res, err := http.Post(repoAuthURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
