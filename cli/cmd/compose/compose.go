@@ -82,6 +82,10 @@ func checkComposeSupport(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if cc.Type() == store.AwsContextType {
+			return errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
+$ docker context create %s <name>`, cc.Type(), store.EcsContextType)
+		}
 		return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
 	}
 	return err
