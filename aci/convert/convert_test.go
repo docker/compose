@@ -99,8 +99,7 @@ func TestContainerGroupToContainer(t *testing.T) {
 		RestartPolicyCondition: "any",
 	}
 
-	container, err := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
-	assert.NilError(t, err)
+	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
 	assert.DeepEqual(t, container, expectedContainer)
 }
 
@@ -407,4 +406,44 @@ func TestConvertToDockerRestartPolicyCondition(t *testing.T) {
 	assert.Equal(t, toContainerRestartPolicy(containerinstance.Always), "any")
 	assert.Equal(t, toContainerRestartPolicy(containerinstance.OnFailure), "on-failure")
 	assert.Equal(t, toContainerRestartPolicy(""), "any")
+}
+
+func TestConvertContainerGroupStatus(t *testing.T) {
+	assert.Equal(t, "Running", GetStatus(container(to.StringPtr("Running")), group(to.StringPtr("Started"))))
+	assert.Equal(t, "Terminated", GetStatus(container(to.StringPtr("Terminated")), group(to.StringPtr("Stopped"))))
+	assert.Equal(t, "Node Stopped", GetStatus(container(nil), group(to.StringPtr("Stopped"))))
+	assert.Equal(t, "Node Started", GetStatus(container(nil), group(to.StringPtr("Started"))))
+
+	assert.Equal(t, "Running", GetStatus(container(to.StringPtr("Running")), group(nil)))
+	assert.Equal(t, "Unknown", GetStatus(container(nil), group(nil)))
+}
+
+func container(status *string) containerinstance.Container {
+	var state *containerinstance.ContainerState = nil
+	if status != nil {
+		state = &containerinstance.ContainerState{
+			State: status,
+		}
+	}
+	return containerinstance.Container{
+		ContainerProperties: &containerinstance.ContainerProperties{
+			InstanceView: &containerinstance.ContainerPropertiesInstanceView{
+				CurrentState: state,
+			},
+		},
+	}
+}
+
+func group(status *string) containerinstance.ContainerGroup {
+	var view *containerinstance.ContainerGroupPropertiesInstanceView = nil
+	if status != nil {
+		view = &containerinstance.ContainerGroupPropertiesInstanceView{
+			State: status,
+		}
+	}
+	return containerinstance.ContainerGroup{
+		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{
+			InstanceView: view,
+		},
+	}
 }

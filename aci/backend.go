@@ -49,7 +49,6 @@ const (
 	singleContainerTag        = "docker-single-container"
 	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
-	statusUnknown             = "Unknown"
 	statusRunning             = "Running"
 )
 
@@ -170,36 +169,18 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 			if *container.Name == convert.ComposeDNSSidecarName {
 				continue
 			}
-			if !all && getStatus(container) != statusRunning {
+			if !all && convert.GetStatus(container, group) != statusRunning {
 				continue
 			}
 			containerID := *containerGroup.Name + composeContainerSeparator + *container.Name
 			if _, ok := group.Tags[singleContainerTag]; ok {
 				containerID = *containerGroup.Name
 			}
-			c := getContainer(containerID, group.IPAddress, container)
+			c := convert.ContainerGroupToContainer(containerID, group, container)
 			res = append(res, c)
 		}
 	}
 	return res, nil
-}
-
-func getContainer(containerID string, ipAddress *containerinstance.IPAddress, container containerinstance.Container) containers.Container {
-	status := getStatus(container)
-	return containers.Container{
-		ID:     containerID,
-		Image:  *container.Image,
-		Status: status,
-		Ports:  convert.ToPorts(ipAddress, *container.Ports),
-	}
-}
-
-func getStatus(container containerinstance.Container) string {
-	status := statusUnknown
-	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
-		status = *container.InstanceView.CurrentState.State
-	}
-	return status
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
@@ -354,10 +335,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 		}
 
 		for _, container := range *cg.Containers {
-			status := statusUnknown
-			if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
-				status = *container.InstanceView.CurrentState.State
-			}
+			status := convert.GetStatus(container, cg)
 
 			if status == statusRunning {
 				return errdefs.ErrForbidden
@@ -401,7 +379,7 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		return containers.Container{}, errdefs.ErrNotFound
 	}
 
-	return convert.ContainerGroupToContainer(containerID, cg, cc)
+	return convert.ContainerGroupToContainer(containerID, cg, cc), nil
 }
 
 type aciComposeService struct {

@@ -59,6 +59,9 @@ lint:
 check-license-headers:
 	./scripts/validate/fileheader
 
+check-go-mod:
+	./scripts/validate/check-go-mod
+
 FORCE:
 
 .PHONY: all protos cli cross test lint
