@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
+	"github.com/docker/api/progress"
 )
 
 func downCommand() *cobra.Command {
@@ -51,9 +52,11 @@ func runDown(ctx context.Context, opts composeOptions) error {
 		return errors.New("compose not implemented in current context")
 	}
 
-	options, err := opts.toProjectOptions()
-	if err != nil {
-		return err
-	}
-	return composeService.Down(ctx, options)
+	return progress.Run(ctx, func(ctx context.Context) error {
+		options, err := opts.toProjectOptions()
+		if err != nil {
+			return err
+		}
+		return composeService.Down(ctx, options)
+	})
 }
