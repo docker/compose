@@ -6,7 +6,6 @@ from . import errors
 from .. import config
 from .. import parallel
 from ..config.environment import Environment
-from ..const import API_VERSIONS
 from ..const import LABEL_CONFIG_FILES
 from ..const import LABEL_ENVIRONMENT_FILE
 from ..const import LABEL_WORKING_DIR
@@ -127,9 +126,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
     )
     config_data = config.load(config_details, interpolate)
 
-    api_version = environment.get(
-        'COMPOSE_API_VERSION',
-        API_VERSIONS[config_data.version])
+    api_version = environment.get('COMPOSE_API_VERSION')
 
     client = get_client(
         verbose=verbose, version=api_version, context=context, environment=environment
