@@ -56,6 +56,9 @@ test:
 lint:
 	golangci-lint run --timeout 10m0s ./...
 
+import-restrictions:
+	import-restrictions --configuration import-restrictions.yaml
+
 check-license-headers:
 	./scripts/validate/fileheader
 

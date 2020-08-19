@@ -21,6 +21,9 @@ jobs:
       - name: Validate go-mod is up-to-date and license headers
         run: make validate
 
+      - name: Validate imports
+        run: make import-restrictions
+
       - name: Run golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b . v1.30.0
