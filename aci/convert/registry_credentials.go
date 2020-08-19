@@ -150,10 +150,9 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 	}
 
 	data := url.Values{
-		"grant_type":    {"access_token_refresh_token"},
+		"grant_type":    {"access_token"},
 		"service":       {registry},
 		"tenant":        {tenantID},
-		"refresh_token": {token.RefreshToken},
 		"access_token":  {token.AccessToken},
 	}
 	repoAuthURL := fmt.Sprintf("https://%s/oauth2/exchange", registry)
@@ -162,7 +161,7 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 		return err
 	}
 	if res.StatusCode != 200 {
-		return errors.Errorf("error while renewing access token, status : %s", res.Status)
+		return errors.Errorf("error while accessing ACR token from Azure login, status : %s", res.Status)
 	}
 	bits, err := ioutil.ReadAll(res.Body)
 	if err != nil {
