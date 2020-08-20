@@ -20,7 +20,7 @@ jobs:
 
       # https://github.com/dependabot/dependabot-core/issues/1995
       - name: Update dependabot PR
-        if: github.event.pusher.name == 'dependabot-preview'
+        if: startWith(github.event.pusher.name,'dependabot-preview')
         run: |
           git config --local user.email "compose-cli-ci@docker.com"
           git config --local user.name "CI GitHub Action"
@@ -29,7 +29,7 @@ jobs:
           git commit -sm'Update go.sum after dependabot PR'
 
       - name: Update dependabot PR if needed
-        if: github.event.pusher.name == 'dependabot-preview'
+        if: startWith(github.event.pusher.name,'dependabot-preview')
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
