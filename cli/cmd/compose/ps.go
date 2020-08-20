@@ -39,7 +39,7 @@ func psCommand() *cobra.Command {
 		},
 	}
 	psCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	psCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
+	psCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	psCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 
 	return psCmd

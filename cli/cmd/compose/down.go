@@ -35,7 +35,7 @@ func downCommand() *cobra.Command {
 		},
 	}
 	downCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	downCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
+	downCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	downCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 
 	return downCmd

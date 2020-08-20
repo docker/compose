@@ -35,7 +35,7 @@ func logsCommand() *cobra.Command {
 		},
 	}
 	logsCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	logsCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
+	logsCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	logsCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 
 	return logsCmd

@@ -35,7 +35,7 @@ func upCommand() *cobra.Command {
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
+	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")

@@ -21,8 +21,9 @@ import (
 	"fmt"
 
 	"github.com/compose-spec/compose-go/cli"
-	"github.com/docker/api/client"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/api/client"
 )
 
 func convertCommand() *cobra.Command {
@@ -39,7 +40,7 @@ func convertCommand() *cobra.Command {
 		},
 	}
 	convertCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", ".", "Work dir")
+	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 
 	return convertCmd
