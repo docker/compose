@@ -64,6 +64,7 @@ var (
 		"context": {},
 		"login":   {},
 		"logout":  {},
+		"secret":  {},
 		"serve":   {},
 		"version": {},
 	}
@@ -126,6 +127,7 @@ func main() {
 		logout.Command(),
 		cmd.VersionCommand(version),
 		cmd.StopCommand(),
+		cmd.SecretCommand(),
 	)
 
 	helpFunc := root.HelpFunc()
