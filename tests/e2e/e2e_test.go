@@ -54,7 +54,7 @@ func TestComposeNotImplemented(t *testing.T) {
 	res = c.RunDockerCmd("compose", "up")
 	res.Assert(t, icmd.Expected{
 		ExitCode: 1,
-		Err:      `compose command not supported on context type "moby": not implemented`,
+		Err:      `Command "compose up" not available in current context (default)`,
 	})
 }
 

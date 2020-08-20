@@ -19,14 +19,13 @@ package client
 import (
 	"context"
 
-	"github.com/docker/api/secrets"
-
 	"github.com/docker/api/backend"
 	"github.com/docker/api/compose"
 	"github.com/docker/api/containers"
 	apicontext "github.com/docker/api/context"
 	"github.com/docker/api/context/cloud"
 	"github.com/docker/api/context/store"
+	"github.com/docker/api/secrets"
 )
 
 // New returns a backend client associated with current context
@@ -63,15 +62,27 @@ type Client struct {
 
 // ContainerService returns the backend service for the current context
 func (c *Client) ContainerService() containers.Service {
-	return c.bs.ContainerService()
+	if cs := c.bs.ContainerService(); cs != nil {
+		return cs
+	}
+
+	return &containerService{}
 }
 
 // ComposeService returns the backend service for the current context
 func (c *Client) ComposeService() compose.Service {
-	return c.bs.ComposeService()
+	if cs := c.bs.ComposeService(); cs != nil {
+		return cs
+	}
+
+	return &composeService{}
 }
 
 // SecretsService returns the backend service for the current context
 func (c *Client) SecretsService() secrets.Service {
-	return c.bs.SecretsService()
+	if ss := c.bs.SecretsService(); ss != nil {
+		return ss
+	}
+
+	return &secretsService{}
 }

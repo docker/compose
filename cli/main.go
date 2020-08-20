@@ -175,6 +175,11 @@ func main() {
 		ctype = cc.Type()
 	}
 
+	if ctype == store.AwsContextType {
+		exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
+$ docker context create %s <name>`, cc.Type(), store.EcsContextType))
+	}
+
 	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
 
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
@@ -189,21 +194,32 @@ func main() {
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isOwnCommand(requiredCmd) {
-			exit(err)
+			exit(root, currentContext, err)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx)
 
 		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
 
-		exit(err)
+		exit(root, currentContext, err)
 	}
 }
 
-func exit(err error) {
+func exit(cmd *cobra.Command, ctx string, err error) {
 	if errors.Is(err, errdefs.ErrLoginRequired) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
+	if errors.Is(err, errdefs.ErrNotImplemented) {
+		cmd, _, _ := cmd.Traverse(os.Args[1:])
+		name := cmd.Name()
+		parent := cmd.Parent()
+		if parent != nil && parent.Parent() != nil {
+			name = parent.Name() + " " + name
+		}
+		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
+		os.Exit(1)
+	}
+
 	fatal(err)
 }
 
