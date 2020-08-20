@@ -48,6 +48,7 @@ make e2e-local
 ```
 This requires a local Docker Engine running
 
+Local ACI E2E tests: 
 ```
 AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make e2e-aci
 ```
@@ -64,6 +65,13 @@ You can also run a single ACI test from the test suite:
 ```
 AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make E2E_TEST=TestContainerRun e2e-aci
 ```
+
+Local ECS E2E tests: 
+```
+TEST_AWS_PROFILE=myProfile TEST_AWS_REGION=eu-west-3 make e2e-ecs
+```
+
+This requires a valid AWS profile defined in ~/.aws/credentials.
 
 ## Release
 

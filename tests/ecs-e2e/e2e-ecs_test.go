@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"gotest.tools/v3/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -26,6 +25,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"gotest.tools/v3/assert"
 
 	. "github.com/docker/api/tests/framework"
 	"gotest.tools/v3/icmd"
@@ -52,12 +53,24 @@ func TestCompose(t *testing.T) {
 	stack := contextName
 
 	t.Run("create context", func(t *testing.T) {
-		profile := contextName
-		region := os.Getenv("AWS_DEFAULT_REGION")
-		secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-		keyID := os.Getenv("AWS_ACCESS_KEY_ID")
-		res := c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
-		res.Assert(t, icmd.Success)
+		localTestProfile := os.Getenv("TEST_AWS_PROFILE")
+		var res *icmd.Result
+		if localTestProfile != "" {
+			region := os.Getenv("TEST_AWS_REGION")
+			assert.Check(t, region != "")
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
+			res.Assert(t, icmd.Success)
+		} else {
+			profile := contextName
+			region := os.Getenv("AWS_DEFAULT_REGION")
+			secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+			keyID := os.Getenv("AWS_ACCESS_KEY_ID")
+			assert.Check(t, keyID != "")
+			assert.Check(t, secretKey != "")
+			assert.Check(t, region != "")
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
+			res.Assert(t, icmd.Success)
+		}
 		res = c.RunDockerCmd("context", "use", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})
 		res = c.RunDockerCmd("context", "ls")
@@ -69,21 +82,23 @@ func TestCompose(t *testing.T) {
 		res.Assert(t, icmd.Success)
 	})
 
-
+	var url string
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
 		res.Assert(t, icmd.Success)
 		lines := strings.Split(res.Stdout(), "\n")
 
-		assert.Equal(t,3,  len(lines))
+		assert.Equal(t, 3, len(lines))
 		fields := strings.Fields(lines[1])
 		assert.Equal(t, 4, len(fields))
 		assert.Check(t, strings.Contains(fields[0], stack))
 		assert.Equal(t, "nginx", fields[1])
 		assert.Equal(t, "1/1", fields[2])
 		assert.Check(t, strings.Contains(fields[3], "->80/http"))
-		url := "http://" + strings.Replace(fields[3], "->80/http", "", 1)
+		url = "http://" + strings.Replace(fields[3], "->80/http", "", 1)
+	})
 
+	t.Run("nginx GET", func(t *testing.T) {
 		r, err := http.Get(url)
 		assert.NilError(t, err)
 		assert.Equal(t, r.StatusCode, http.StatusOK)
