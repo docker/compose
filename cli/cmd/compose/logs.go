@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -47,14 +46,9 @@ func runLogs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	composeService := c.ComposeService()
-	if composeService == nil {
-		return errors.New("compose not implemented in current context")
-	}
-
 	options, err := opts.toProjectOptions()
 	if err != nil {
 		return err
 	}
-	return composeService.Logs(ctx, options, os.Stdout)
+	return c.ComposeService().Logs(ctx, options, os.Stdout)
 }

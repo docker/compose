@@ -20,13 +20,10 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/cli"
-	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/api/client"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
 	"github.com/docker/api/errdefs"
 )
 
@@ -67,26 +64,10 @@ func Command() *cobra.Command {
 }
 
 func checkComposeSupport(ctx context.Context) error {
-	c, err := client.New(ctx)
-	if err == nil {
-		composeService := c.ComposeService()
-		if composeService == nil {
-			return errors.New("compose not implemented in current context")
-		}
-		return nil
-	}
+	_, err := client.New(ctx)
 	if errdefs.IsNotFoundError(err) {
-		currentContext := apicontext.CurrentContext(ctx)
-		s := store.ContextStore(ctx)
-		cc, err := s.Get(currentContext)
-		if err != nil {
-			return err
-		}
-		if cc.Type() == store.AwsContextType {
-			return errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
-$ docker context create %s <name>`, cc.Type(), store.EcsContextType)
-		}
-		return errors.Wrapf(errdefs.ErrNotImplemented, "compose command not supported on context type %q", cc.Type())
+		return errdefs.ErrNotImplemented
 	}
+
 	return err
 }

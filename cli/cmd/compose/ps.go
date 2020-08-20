@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -51,16 +50,11 @@ func runPs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	composeService := c.ComposeService()
-	if composeService == nil {
-		return errors.New("compose not implemented in current context")
-	}
-
 	options, err := opts.toProjectOptions()
 	if err != nil {
 		return err
 	}
-	serviceList, err := composeService.Ps(ctx, options)
+	serviceList, err := c.ComposeService().Ps(ctx, options)
 	if err != nil {
 		return err
 	}
