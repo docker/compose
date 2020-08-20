@@ -89,8 +89,6 @@ jobs:
           key: go-${{ hashFiles('**/go.sum') }}
 
       - name: Build for ECS e2e tests
-        env:
-          BUILD_TAGS: ecs
         run: make -f builder.Makefile cli
 
       - name: create aws config folder

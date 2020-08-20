@@ -1,5 +1,3 @@
-// +build ecs
-
 /*
    Copyright 2020 Docker, Inc.
 
