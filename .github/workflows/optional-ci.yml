@@ -20,19 +20,19 @@ jobs:
         if: github.event_name == 'pull_request'
         id: runacitest
         with:
-          trigger: '@test-aci'
+          trigger: '/test-aci'
       - uses: khan/pull-request-comment-trigger@master
         name: Check if test Windows
         if: github.event_name == 'pull_request'
         id: runwindowstest
         with:
-          trigger: '@test-windows'
+          trigger: '/test-windows'
       - uses: khan/pull-request-comment-trigger@master
         name: Check if test ECS
         if: github.event_name == 'pull_request'
         id: runecstest
         with:
-          trigger: '@test-ecs'
+          trigger: '/test-ecs'
 
   aci-tests:
     name: ACI e2e tests
