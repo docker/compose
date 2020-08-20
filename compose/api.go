@@ -20,21 +20,21 @@ import (
 	"context"
 	"io"
 
-	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 )
 
 // Service manages a compose project
 type Service interface {
 	// Up executes the equivalent to a `compose up`
-	Up(ctx context.Context, opts *cli.ProjectOptions) error
+	Up(ctx context.Context, project *types.Project) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, opts *cli.ProjectOptions) error
+	Down(ctx context.Context, projectName string) error
 	// Logs executes the equivalent to a `compose logs`
-	Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error
+	Logs(ctx context.Context, projectName string, w io.Writer) error
 	// Ps executes the equivalent to a `compose ps`
-	Ps(ctx context.Context, opts *cli.ProjectOptions) ([]ServiceStatus, error)
+	Ps(ctx context.Context, projectName string) ([]ServiceStatus, error)
 	// Convert translate compose model into backend's native format
-	Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error)
+	Convert(ctx context.Context, project *types.Project) ([]byte, error)
 }
 
 // PortPublisher hold status about published port

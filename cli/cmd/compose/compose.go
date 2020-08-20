@@ -34,6 +34,23 @@ type composeOptions struct {
 	Environment []string
 }
 
+func (o *composeOptions) toProjectName() (string, error) {
+	if o.Name != "" {
+		return o.Name, nil
+	}
+
+	options, err := o.toProjectOptions()
+	if err != nil {
+		return "", err
+	}
+
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return "", err
+	}
+	return project.Name, nil
+}
+
 func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		cli.WithOsEnv,

@@ -23,17 +23,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) Up(ctx context.Context, options *cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(options)
-	if err != nil {
-		return err
-	}
-
-	err = b.SDK.CheckRequirements(ctx, b.Region)
+func (b *ecsAPIService) Up(ctx context.Context, project *types.Project) error {
+	err := b.SDK.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
 	}
@@ -101,7 +95,7 @@ func (b *ecsAPIService) Up(ctx context.Context, options *cli.ProjectOptions) err
 	go func() {
 		<-signalChan
 		fmt.Println("user interrupted deployment. Deleting stack...")
-		b.Down(ctx, options) // nolint:errcheck
+		b.Down(ctx, project.Name) // nolint:errcheck
 	}()
 
 	err = b.WaitStackCompletion(ctx, project.Name, operation)

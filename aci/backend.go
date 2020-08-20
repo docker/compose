@@ -27,7 +27,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -386,11 +385,7 @@ type aciComposeService struct {
 	ctx store.AciContext
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, opts *cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(opts)
-	if err != nil {
-		return err
-	}
+func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) error {
 	logrus.Debugf("Up on project with name %q\n", project.Name)
 	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project)
 	addTag(&groupDefinition, composeContainerTag)
@@ -401,21 +396,10 @@ func (cs *aciComposeService) Up(ctx context.Context, opts *cli.ProjectOptions) e
 	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func (cs *aciComposeService) Down(ctx context.Context, opts *cli.ProjectOptions) error {
-	var project types.Project
+func (cs *aciComposeService) Down(ctx context.Context, project string) error {
+	logrus.Debugf("Down on project with name %q\n", project)
 
-	if opts.Name != "" {
-		project = types.Project{Name: opts.Name}
-	} else {
-		fullProject, err := cli.ProjectFromOptions(opts)
-		if err != nil {
-			return err
-		}
-		project = *fullProject
-	}
-	logrus.Debugf("Down on project with name %q\n", project.Name)
-
-	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project.Name)
+	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project)
 	if err != nil {
 		return err
 	}
@@ -426,15 +410,15 @@ func (cs *aciComposeService) Down(ctx context.Context, opts *cli.ProjectOptions)
 	return err
 }
 
-func (cs *aciComposeService) Ps(ctx context.Context, opts *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
+func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error {
+func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 

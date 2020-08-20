@@ -46,9 +46,9 @@ func runLogs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	options, err := opts.toProjectOptions()
+	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	return c.ComposeService().Logs(ctx, options, os.Stdout)
+	return c.ComposeService().Logs(ctx, projectName, os.Stdout)
 }

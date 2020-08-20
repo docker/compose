@@ -23,26 +23,15 @@ import (
 	"io"
 	"strconv"
 	"strings"
-
-	"github.com/compose-spec/compose-go/cli"
 )
 
-func (b *ecsAPIService) Logs(ctx context.Context, options *cli.ProjectOptions, writer io.Writer) error {
-	name := options.Name
-	if name == "" {
-		project, err := cli.ProjectFromOptions(options)
-		if err != nil {
-			return err
-		}
-		name = project.Name
-	}
-
+func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
 	consumer := logConsumer{
 		colors: map[string]colorFunc{},
 		width:  0,
-		writer: writer,
+		writer: w,
 	}
-	err := b.SDK.GetLogs(ctx, name, consumer.Log)
+	err := b.SDK.GetLogs(ctx, project, consumer.Log)
 	return err
 }
 

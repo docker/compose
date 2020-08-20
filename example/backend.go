@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/compose"
@@ -122,32 +122,24 @@ func (cs *containerService) Delete(ctx context.Context, id string, request conta
 
 type composeService struct{}
 
-func (cs *composeService) Up(ctx context.Context, opts *cli.ProjectOptions) error {
-	prj, err := cli.ProjectFromOptions(opts)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Up command on project %q", prj.Name)
+func (cs *composeService) Up(ctx context.Context, project *types.Project) error {
+	fmt.Printf("Up command on project %q", project.Name)
 	return nil
 }
 
-func (cs *composeService) Down(ctx context.Context, opts *cli.ProjectOptions) error {
-	prj, err := cli.ProjectFromOptions(opts)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Down command on project %q", prj.Name)
+func (cs *composeService) Down(ctx context.Context, project string) error {
+	fmt.Printf("Down command on project %q", project)
 	return nil
 }
 
-func (cs *composeService) Ps(ctx context.Context, opts *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
+func (cs *composeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Logs(ctx context.Context, opts *cli.ProjectOptions, w io.Writer) error {
+func (cs *composeService) Logs(ctx context.Context, project string, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
+func (cs *composeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

@@ -50,14 +50,15 @@ func runPs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	options, err := opts.toProjectOptions()
+	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	serviceList, err := c.ComposeService().Ps(ctx, options)
+	serviceList, err := c.ComposeService().Ps(ctx, projectName)
 	if err != nil {
 		return err
 	}
+
 	err = printSection(os.Stdout, func(w io.Writer) {
 		for _, service := range serviceList {
 			fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))

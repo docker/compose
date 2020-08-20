@@ -22,22 +22,16 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/compose"
-
-	"github.com/compose-spec/compose-go/cli"
 )
 
-func (b *ecsAPIService) Ps(ctx context.Context, options *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
-	projectName, err := b.projectName(options)
-	if err != nil {
-		return nil, err
-	}
-	parameters, err := b.SDK.ListStackParameters(ctx, projectName)
+func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
+	parameters, err := b.SDK.ListStackParameters(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 	cluster := parameters[parameterClusterName]
 
-	resources, err := b.SDK.ListStackResources(ctx, projectName)
+	resources, err := b.SDK.ListStackResources(ctx, project)
 	if err != nil {
 		return nil, err
 	}
