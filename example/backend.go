@@ -51,7 +51,6 @@ func (a *apiService) SecretsService() secrets.Service {
 	return nil
 }
 
-
 func init() {
 	backend.Register("example", "example", service, cloud.NotImplementedCloudService)
 }
