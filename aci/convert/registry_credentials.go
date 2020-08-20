@@ -70,7 +70,8 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 	for _, registry := range acrRegistries {
 		err := helper.autoLoginAcr(registry)
 		if err != nil {
-			fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
+			return nil, err
+			//fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
 		}
 	}
 
@@ -79,6 +80,13 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 		return nil, err
 	}
 	var registryCreds []containerinstance.ImageRegistryCredential
+	b, err := json.MarshalIndent(allCreds, "", "  ")
+	if err != nil {
+		fmt.Println("ERROR WHILE GETTING ALL CREDS")
+		fmt.Println(err)
+	}
+	fmt.Println("** ALL CREDS " + string(b))
+
 	for name, oneCred := range allCreds {
 		parsedURL, err := url.Parse(name)
 		// Credentials can contain some garbage, we don't return the error here
@@ -136,6 +144,7 @@ func getUsedRegistries(project compose.Project) (map[string]bool, []string) {
 }
 
 func (c cliRegistryHelper) autoLoginAcr(registry string) error {
+	fmt.Println("Fetching ACR login for " + registry)
 	loginService, err := login.NewAzureLoginService()
 	if err != nil {
 		return err
@@ -172,6 +181,10 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 	if err := json.Unmarshal(bits, &newToken); err != nil {
 		return err
 	}
+	fmt.Println("docker login for " + registry)
+	fmt.Println(newToken.RefreshToken)
 	cmd := exec.Command("docker", "login", "-p", newToken.RefreshToken, "-u", tokenUsername, registry)
-	return cmd.Run()
+	loginResult, err := cmd.CombinedOutput()
+	fmt.Println("docker login : " + string(loginResult))
+	return err
 }
