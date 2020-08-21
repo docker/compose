@@ -20,6 +20,7 @@ from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
+from compose.config.environment import Environment
 
 
 class CLITestCase(unittest.TestCase):
@@ -77,7 +78,9 @@ class CLITestCase(unittest.TestCase):
 
     def test_get_project(self):
         base_dir = 'tests/fixtures/longer-filename-composefile'
-        project = get_project(base_dir)
+        env = Environment.from_env_file(base_dir)
+        env['COMPOSE_API_VERSION'] = DEFAULT_DOCKER_API_VERSION
+        project = get_project(base_dir, environment=env)
         assert project.name == 'longer-filename-composefile'
         assert project.client
         assert project.services
