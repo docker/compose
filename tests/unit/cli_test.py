@@ -16,11 +16,11 @@ from compose.cli.command import get_project_name
 from compose.cli.docopt_command import NoSuchCommand
 from compose.cli.errors import UserError
 from compose.cli.main import TopLevelCommand
+from compose.config.environment import Environment
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.const import LABEL_SERVICE
 from compose.container import Container
 from compose.project import Project
-from compose.config.environment import Environment
 
 
 class CLITestCase(unittest.TestCase):
