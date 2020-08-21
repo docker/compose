@@ -64,7 +64,6 @@ var (
 		"context": {},
 		"login":   {},
 		"logout":  {},
-		"secret":  {},
 		"serve":   {},
 		"version": {},
 	}
