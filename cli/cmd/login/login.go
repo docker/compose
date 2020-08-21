@@ -42,8 +42,8 @@ func Command() *cobra.Command {
 	}
 	// define flags for backward compatibility with com.docker.cli
 	flags := cmd.Flags()
-	flags.StringP("username", "u", "", "Username")
-	flags.StringP("password", "p", "", "Password")
+	flags.StringP("username", "u", "", "username")
+	flags.StringP("password", "p", "", "password")
 	flags.BoolP("password-stdin", "", false, "Take the password from stdin")
 	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 

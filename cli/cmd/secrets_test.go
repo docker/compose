@@ -1,5 +1,3 @@
-// +build !ecs
-
 /*
    Copyright 2020 Docker, Inc.
 
@@ -16,10 +14,26 @@
    limitations under the License.
 */
 
-package mobycli
+package cmd
 
-import "github.com/docker/api/context/store"
+import (
+	"bytes"
+	"testing"
 
-func init() {
-	delegatedContextTypes = append(delegatedContextTypes, store.AwsContextType, store.EcsContextType)
+	"gotest.tools/v3/golden"
+
+	"github.com/docker/api/secrets"
+)
+
+func TestPrintList(t *testing.T) {
+	secrets := []secrets.Secret{
+		{
+			ID:          "123",
+			Name:        "secret123",
+			Description: "secret 1,2,3",
+		},
+	}
+	out := &bytes.Buffer{}
+	printList(out, secrets)
+	golden.Assert(t, out.String(), "secrets-out.golden")
 }

@@ -126,6 +126,7 @@ func main() {
 		logout.Command(),
 		cmd.VersionCommand(version),
 		cmd.StopCommand(),
+		cmd.SecretCommand(),
 	)
 
 	helpFunc := root.HelpFunc()
