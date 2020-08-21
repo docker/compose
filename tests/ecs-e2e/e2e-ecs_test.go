@@ -27,9 +27,11 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/poll"
+
+	"gotest.tools/v3/icmd"
 
 	. "github.com/docker/api/tests/framework"
-	"gotest.tools/v3/icmd"
 )
 
 var binDir string
@@ -99,12 +101,20 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("nginx GET", func(t *testing.T) {
-		r, err := http.Get(url)
-		assert.NilError(t, err)
-		assert.Equal(t, r.StatusCode, http.StatusOK)
-		b, err := ioutil.ReadAll(r.Body)
-		assert.NilError(t, err)
-		assert.Assert(t, strings.Contains(string(b), "Welcome to nginx!"))
+		checkUp := func(t poll.LogT) poll.Result {
+			r, err := http.Get(url)
+			if err != nil {
+				return poll.Continue("Err while getting %s : %v", url, err)
+			} else if r.StatusCode != http.StatusOK {
+				return poll.Continue("status %s while getting %s", r.Status, url)
+			}
+			b, err := ioutil.ReadAll(r.Body)
+			if err == nil && strings.Contains(string(b), "Welcome to nginx!") {
+				return poll.Success()
+			}
+			return poll.Error(fmt.Errorf("No nginx welcome page received at %s: \n%s", url, string(b)))
+		}
+		poll.WaitOn(t, checkUp, poll.WithDelay(2*time.Second), poll.WithTimeout(60*time.Second))
 	})
 
 	t.Run("compose down", func(t *testing.T) {
