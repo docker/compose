@@ -49,35 +49,30 @@ func TestMain(m *testing.M) {
 }
 
 func TestSecrets(t *testing.T) {
-	c, testID := setupTest(t)
+	cmd, testID := setupTest(t)
 	secretName := "secret" + testID
 	description := "description " + testID
 
 	t.Run("create secret", func(t *testing.T) {
-		res := c.RunDockerCmd("secret", "create", secretName, "-u", "user1", "-p", "pass1", "-d", description)
-		res.Assert(t, icmd.Success)
+		res := cmd.RunDocker("secret", "create", secretName, "-u", "user1", "-p", "pass1", "-d", description)
 		assert.Check(t, strings.Contains(res.Stdout(), "secret:"+secretName))
 	})
 
 	t.Run("list secrets", func(t *testing.T) {
-		res := c.RunDockerCmd("secret", "list")
-		res.Assert(t, icmd.Success)
+		res := cmd.RunDocker("secret", "list")
 		assert.Check(t, strings.Contains(res.Stdout(), secretName))
 		assert.Check(t, strings.Contains(res.Stdout(), description))
 	})
 
 	t.Run("inspect secret", func(t *testing.T) {
-		res := c.RunDockerCmd("secret", "inspect", secretName)
-		res.Assert(t, icmd.Success)
+		res := cmd.RunDocker("secret", "inspect", secretName)
 		assert.Check(t, strings.Contains(res.Stdout(), `"Name": "`+secretName+`"`))
 		assert.Check(t, strings.Contains(res.Stdout(), `"Description": "`+description+`"`))
 	})
 
 	t.Run("rm secret", func(t *testing.T) {
-		res := c.RunDockerCmd("secret", "rm", secretName)
-		res.Assert(t, icmd.Success)
-		res = c.RunDockerCmd("secret", "list")
-		res.Assert(t, icmd.Success)
+		res := cmd.RunDocker("secret", "rm", secretName)
+		res = cmd.RunDocker("secret", "list")
 		assert.Check(t, !strings.Contains(res.Stdout(), secretName))
 	})
 }
@@ -86,14 +81,12 @@ func TestCompose(t *testing.T) {
 	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
-		res.Assert(t, icmd.Success)
+		c.RunDocker("compose", "up", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
 	})
 
 	var url string
 	t.Run("compose ps", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("compose", "ps", "--project-name", stack)
 		lines := strings.Split(res.Stdout(), "\n")
 
 		assert.Equal(t, 3, len(lines))
@@ -124,8 +117,7 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("compose down", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "down", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
-		res.Assert(t, icmd.Success)
+		c.RunDocker("compose", "down", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
 	})
 }
 
@@ -140,8 +132,7 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 		if localTestProfile != "" {
 			region := os.Getenv("TEST_AWS_REGION")
 			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
-			res.Assert(t, icmd.Success)
+			res = c.RunDocker("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
 		} else {
 			profile := contextName
 			region := os.Getenv("AWS_DEFAULT_REGION")
@@ -150,12 +141,11 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 			assert.Check(t, keyID != "")
 			assert.Check(t, secretKey != "")
 			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
-			res.Assert(t, icmd.Success)
+			res = c.RunDocker("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
 		}
-		res = c.RunDockerCmd("context", "use", contextName)
+		res = c.RunDocker("context", "use", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})
-		res = c.RunDockerCmd("context", "ls")
+		res = c.RunDocker("context", "ls")
 		res.Assert(t, icmd.Expected{Out: contextName + " *"})
 	})
 	return c, stack

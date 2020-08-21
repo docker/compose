@@ -87,26 +87,25 @@ func TestLoginLogout(t *testing.T) {
 			_ = deleteResourceGroup(rg)
 		})
 
-		res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
-		res.Assert(t, icmd.Success)
-		res = c.RunDockerCmd("context", "use", contextName)
+		res := c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
+		res = c.RunDocker("context", "use", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})
-		res = c.RunDockerCmd("context", "ls")
+		res = c.RunDocker("context", "ls")
 		res.Assert(t, icmd.Expected{Out: contextName + " *"})
 	})
 
 	t.Run("delete context", func(t *testing.T) {
-		res := c.RunDockerCmd("context", "use", "default")
+		res := c.RunDocker("context", "use", "default")
 		res.Assert(t, icmd.Expected{Out: "default"})
 
-		res = c.RunDockerCmd("context", "rm", contextName)
+		res = c.RunDocker("context", "rm", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})
 	})
 
 	t.Run("logout", func(t *testing.T) {
 		_, err := os.Stat(login.GetTokenStorePath())
 		assert.NilError(t, err)
-		res := c.RunDockerCmd("logout", "azure")
+		res := c.RunDocker("logout", "azure")
 		res.Assert(t, icmd.Expected{Out: "Removing login credentials for Azure"})
 		_, err = os.Stat(login.GetTokenStorePath())
 		errMsg := "no such file or directory"
@@ -117,7 +116,7 @@ func TestLoginLogout(t *testing.T) {
 	})
 
 	t.Run("create context fail", func(t *testing.T) {
-		res := c.RunDockerCmd("context", "create", "aci", "fail-context")
+		res := c.RunDockerOrFail("context", "create", "aci", "fail-context")
 		res.Assert(t, icmd.Expected{
 			ExitCode: errdefs.ExitCodeLoginRequired,
 			Err:      `not logged in to azure, you need to run "docker login azure" first`,
@@ -163,20 +162,18 @@ func TestContainerRun(t *testing.T) {
 
 	t.Run("run", func(t *testing.T) {
 		mountTarget := "/usr/share/nginx/html"
-		res := c.RunDockerCmd(
+		res := c.RunDocker(
 			"run", "-d",
 			"-v", fmt.Sprintf("%s@%s:%s", saName, testShareName, mountTarget),
 			"-p", "80:80",
 			"nginx",
 		)
-		res.Assert(t, icmd.Success)
 		container = getContainerName(res.Stdout())
 		t.Logf("Container name: %q", container)
 	})
 
 	t.Run("inspect", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", container)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("inspect", container)
 
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
@@ -191,8 +188,7 @@ func TestContainerRun(t *testing.T) {
 	})
 
 	t.Run("ps", func(t *testing.T) {
-		res := c.RunDockerCmd("ps")
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		l := out[len(out)-1]
 		assert.Assert(t, strings.Contains(l, container), "Looking for %q in line: %s", container, l)
@@ -211,15 +207,15 @@ func TestContainerRun(t *testing.T) {
 	})
 
 	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerCmd("logs", container)
+		res := c.RunDocker("logs", container)
 		res.Assert(t, icmd.Expected{Out: "GET"})
 	})
 
 	t.Run("exec", func(t *testing.T) {
-		res := c.RunDockerCmd("exec", container, "pwd")
+		res := c.RunDocker("exec", container, "pwd")
 		res.Assert(t, icmd.Expected{Out: "/"})
 
-		res = c.RunDockerCmd("exec", container, "echo", "fail_with_argument")
+		res = c.RunDockerOrFail("exec", container, "echo", "fail_with_argument")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "ACI exec command does not accept arguments to the command. Only the binary should be specified",
@@ -266,7 +262,7 @@ func TestContainerRun(t *testing.T) {
 	})
 
 	t.Run("rm a running container", func(t *testing.T) {
-		res := c.RunDockerCmd("rm", container)
+		res := c.RunDockerOrFail("rm", container)
 		res.Assert(t, icmd.Expected{
 			Err:      fmt.Sprintf("Error: you cannot remove a running container %s. Stop the container before attempting removal or force remove", container),
 			ExitCode: 1,
@@ -274,14 +270,11 @@ func TestContainerRun(t *testing.T) {
 	})
 
 	t.Run("force rm", func(t *testing.T) {
-		res := c.RunDockerCmd("rm", "-f", container)
-		res.Assert(t, icmd.Expected{
-			Out:      container,
-			ExitCode: 0,
-		})
+		res := c.RunDocker("rm", "-f", container)
+		res.Assert(t, icmd.Expected{Out: container})
 
 		checkStopped := func(t poll.LogT) poll.Result {
-			res := c.RunDockerCmd("inspect", container)
+			res := c.RunDockerOrFail("inspect", container)
 			if res.ExitCode == 1 {
 				return poll.Success()
 			}
@@ -315,7 +308,7 @@ func TestContainerRunAttached(t *testing.T) {
 		runRes := icmd.StartCmd(cmd)
 
 		checkRunning := func(t poll.LogT) poll.Result {
-			res := c.RunDockerCmd("inspect", container)
+			res := c.RunDockerOrFail("inspect", container)
 			if res.ExitCode == 0 {
 				return poll.Success()
 			}
@@ -323,8 +316,7 @@ func TestContainerRunAttached(t *testing.T) {
 		}
 		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 
-		inspectRes := c.RunDockerCmd("inspect", container)
-		inspectRes.Assert(t, icmd.Success)
+		inspectRes := c.RunDocker("inspect", container)
 
 		containerInspect, err := ParseContainerInspect(inspectRes.Stdout())
 		assert.NilError(t, err)
@@ -361,7 +353,7 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 
 	t.Run("stop wrong container", func(t *testing.T) {
-		res := c.RunDockerCmd("stop", "unknown-container")
+		res := c.RunDockerOrFail("stop", "unknown-container")
 		res.Assert(t, icmd.Expected{
 			Err:      "Error: container unknown-container not found",
 			ExitCode: 1,
@@ -369,34 +361,32 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 
 	t.Run("stop container", func(t *testing.T) {
-		res := c.RunDockerCmd("stop", container)
+		res := c.RunDocker("stop", container)
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 
 	t.Run("ps stopped container with --all", func(t *testing.T) {
-		res := c.RunDockerCmd("ps", container)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("ps", container)
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		assert.Assert(t, is.Len(out, 1))
 
-		res = c.RunDockerCmd("ps", "--all", container)
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("ps", "--all", container)
 		out = strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		assert.Assert(t, is.Len(out, 2))
 	})
 
 	t.Run("start container", func(t *testing.T) {
-		res := c.RunDockerCmd("start", container)
+		res := c.RunDocker("start", container)
 		res.Assert(t, icmd.Expected{Out: container})
 		waitForStatus(t, c, container, "Running")
 	})
 
 	t.Run("rm stopped container", func(t *testing.T) {
-		res := c.RunDockerCmd("stop", container)
+		res := c.RunDocker("stop", container)
 		res.Assert(t, icmd.Expected{Out: container})
 		waitForStatus(t, c, container, "Terminated", "Node Stopped")
 
-		res = c.RunDockerCmd("rm", container)
+		res = c.RunDocker("rm", container)
 		res.Assert(t, icmd.Expected{Out: container})
 	})
 }
@@ -415,11 +405,9 @@ func TestCompose(t *testing.T) {
 
 	t.Run("compose up", func(t *testing.T) {
 		// Name of Compose project is taken from current folder "acie2e"
-		res := c.RunDockerCmd("compose", "up", "-f", composeFile)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("compose", "up", "-f", composeFile)
 
-		res = c.RunDockerCmd("ps")
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
@@ -432,8 +420,7 @@ func TestCompose(t *testing.T) {
 		}
 		assert.Assert(t, webRunning, "web container not running")
 
-		res = c.RunDockerCmd("inspect", serverContainer)
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("inspect", serverContainer)
 
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
@@ -450,23 +437,20 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("logs web", func(t *testing.T) {
-		res := c.RunDockerCmd("logs", serverContainer)
+		res := c.RunDocker("logs", serverContainer)
 		res.Assert(t, icmd.Expected{Out: "Listening on port 80"})
 	})
 
 	t.Run("update", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
 
-		res = c.RunDockerCmd("ps")
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 
 		for _, cName := range []string{serverContainer, wordsContainer} {
-			res = c.RunDockerCmd("inspect", cName)
-			res.Assert(t, icmd.Success)
+			res = c.RunDocker("inspect", cName)
 
 			containerInspect, err := ParseContainerInspect(res.Stdout())
 			assert.NilError(t, err)
@@ -493,7 +477,7 @@ func TestCompose(t *testing.T) {
 			}
 			poll.WaitOn(t, checkUp, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
 
-			res = c.RunDockerCmd("ps")
+			res = c.RunDocker("ps")
 			p := containerInspect.Ports[0]
 			res.Assert(t, icmd.Expected{
 				Out: fmt.Sprintf("%s:%d->%d/tcp", p.HostIP, p.HostPort, p.ContainerPort),
@@ -502,11 +486,9 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
-		res.Assert(t, icmd.Success)
+		res := c.RunDocker("compose", "down", "--project-name", composeProjectName)
 
-		res = c.RunDockerCmd("ps")
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		assert.Equal(t, len(out), 1)
 	})
@@ -532,15 +514,14 @@ func TestRunEnvVars(t *testing.T) {
 		container := strings.TrimSpace(out[len(out)-1])
 		t.Logf("Container name: %q", container)
 
-		res = c.RunDockerCmd("inspect", container)
-		res.Assert(t, icmd.Success)
+		res = c.RunDocker("inspect", container)
 
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Image, "mysql:5.7")
 
 		check := func(t poll.LogT) poll.Result {
-			res := c.RunDockerCmd("logs", container)
+			res := c.RunDockerOrFail("logs", container)
 			if strings.Contains(res.Stdout(), "Giving user user1 access to schema mytestdb") {
 				return poll.Success()
 			}
@@ -565,8 +546,7 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, stri
 	})
 	createAciContextAndUseIt(t, c, sID, rg)
 	// Check nothing is running
-	res := c.RunDockerCmd("ps")
-	res.Assert(t, icmd.Success)
+	res := c.RunDocker("ps")
 	assert.Assert(t, is.Len(strings.Split(strings.TrimSpace(res.Stdout()), "\n"), 1))
 	return sID, rg
 }
@@ -593,8 +573,7 @@ func azureLogin(t *testing.T, c *E2eCLI) {
 	assert.Check(t, clientID != "", "AZURE_CLIENT_ID must not be empty")
 	assert.Check(t, clientSecret != "", "AZURE_CLIENT_SECRET must not be empty")
 	assert.Check(t, tenantID != "", "AZURE_TENANT_ID must not be empty")
-	res := c.RunDockerCmd("login", "azure", "--client-id", clientID, "--client-secret", clientSecret, "--tenant-id", tenantID)
-	res.Assert(t, icmd.Success)
+	c.RunDocker("login", "azure", "--client-id", clientID, "--client-secret", clientSecret, "--tenant-id", tenantID)
 }
 
 func getSubscriptionID(t *testing.T) string {
@@ -614,11 +593,10 @@ func createResourceGroup(sID, rgName string) error {
 
 func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
 	t.Log("Create ACI context")
-	res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
-	res.Assert(t, icmd.Success)
-	res = c.RunDockerCmd("context", "use", contextName)
+	res := c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
+	res = c.RunDocker("context", "use", contextName)
 	res.Assert(t, icmd.Expected{Out: contextName})
-	res = c.RunDockerCmd("context", "ls")
+	res = c.RunDocker("context", "ls")
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})
 }
 
@@ -669,7 +647,7 @@ func getContainerName(stdout string) string {
 
 func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...string) {
 	checkStopped := func(logt poll.LogT) poll.Result {
-		res := c.RunDockerCmd("inspect", containerID)
+		res := c.RunDocker("inspect", containerID)
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		for _, status := range statuses {

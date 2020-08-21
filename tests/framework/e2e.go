@@ -51,6 +51,7 @@ func init() {
 type E2eCLI struct {
 	BinDir    string
 	ConfigDir string
+	test 	  *testing.T
 }
 
 // NewParallelE2eCLI returns a configured TestE2eCLI with t.Parallel() set
@@ -80,7 +81,7 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 		_ = os.RemoveAll(d)
 	})
 
-	return &E2eCLI{binDir, d}
+	return &E2eCLI{binDir, d, t}
 }
 
 func dirContents(dir string) []string {
@@ -158,9 +159,16 @@ func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
 	return c.NewCmd(filepath.Join(c.BinDir, DockerExecutableName), args...)
 }
 
-// RunDockerCmd runs a docker command and returns a result
-func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
+// RunDockerOrFail runs a docker command and returns a result
+func (c *E2eCLI) RunDockerOrFail(args ...string) *icmd.Result {
 	return icmd.RunCmd(c.NewDockerCmd(args...))
+}
+
+// RunDocker runs a docker command, expects no error and returns a result
+func (c *E2eCLI) RunDocker(args ...string) *icmd.Result {
+	res := c.RunDockerOrFail(args...)
+	res.Assert(c.test, icmd.Success)
+	return res
 }
 
 // GoldenFile golden file specific to platform
