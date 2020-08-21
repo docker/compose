@@ -48,36 +48,42 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestCompose(t *testing.T) {
-	startTime := strconv.Itoa(int(time.Now().UnixNano()))
-	c := NewE2eCLI(t, binDir)
-	contextName := "teste2e" + startTime
-	stack := contextName
+func TestSecrets(t *testing.T) {
+	c, testID := setupTest(t)
+	secretName := "secret" + testID
+	description := "description " + testID
 
-	t.Run("create context", func(t *testing.T) {
-		localTestProfile := os.Getenv("TEST_AWS_PROFILE")
-		var res *icmd.Result
-		if localTestProfile != "" {
-			region := os.Getenv("TEST_AWS_REGION")
-			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
-			res.Assert(t, icmd.Success)
-		} else {
-			profile := contextName
-			region := os.Getenv("AWS_DEFAULT_REGION")
-			secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-			keyID := os.Getenv("AWS_ACCESS_KEY_ID")
-			assert.Check(t, keyID != "")
-			assert.Check(t, secretKey != "")
-			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
-			res.Assert(t, icmd.Success)
-		}
-		res = c.RunDockerCmd("context", "use", contextName)
-		res.Assert(t, icmd.Expected{Out: contextName})
-		res = c.RunDockerCmd("context", "ls")
-		res.Assert(t, icmd.Expected{Out: contextName + " *"})
+	t.Run("create secret", func(t *testing.T) {
+		res := c.RunDockerCmd("secret", "create", secretName, "-u", "user1", "-p", "pass1", "-d", description)
+		res.Assert(t, icmd.Success)
+		assert.Check(t, strings.Contains(res.Stdout(), "secret:"+secretName))
 	})
+
+	t.Run("list secrets", func(t *testing.T) {
+		res := c.RunDockerCmd("secret", "list")
+		res.Assert(t, icmd.Success)
+		assert.Check(t, strings.Contains(res.Stdout(), secretName))
+		assert.Check(t, strings.Contains(res.Stdout(), description))
+	})
+
+	t.Run("inspect secret", func(t *testing.T) {
+		res := c.RunDockerCmd("secret", "inspect", secretName)
+		res.Assert(t, icmd.Success)
+		assert.Check(t, strings.Contains(res.Stdout(), `"Name": "`+secretName+`"`))
+		assert.Check(t, strings.Contains(res.Stdout(), `"Description": "`+description+`"`))
+	})
+
+	t.Run("rm secret", func(t *testing.T) {
+		res := c.RunDockerCmd("secret", "rm", secretName)
+		res.Assert(t, icmd.Success)
+		res = c.RunDockerCmd("secret", "list")
+		res.Assert(t, icmd.Success)
+		assert.Check(t, !strings.Contains(res.Stdout(), secretName))
+	})
+}
+
+func TestCompose(t *testing.T) {
+	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
@@ -121,4 +127,36 @@ func TestCompose(t *testing.T) {
 		res := c.RunDockerCmd("compose", "down", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
 		res.Assert(t, icmd.Success)
 	})
+}
+
+func setupTest(t *testing.T) (*E2eCLI, string) {
+	startTime := strconv.Itoa(int(time.Now().UnixNano()))
+	c := NewParallelE2eCLI(t, binDir)
+	contextName := "e2e" + t.Name() + startTime
+	stack := contextName
+	t.Run("create context", func(t *testing.T) {
+		localTestProfile := os.Getenv("TEST_AWS_PROFILE")
+		var res *icmd.Result
+		if localTestProfile != "" {
+			region := os.Getenv("TEST_AWS_REGION")
+			assert.Check(t, region != "")
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
+			res.Assert(t, icmd.Success)
+		} else {
+			profile := contextName
+			region := os.Getenv("AWS_DEFAULT_REGION")
+			secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+			keyID := os.Getenv("AWS_ACCESS_KEY_ID")
+			assert.Check(t, keyID != "")
+			assert.Check(t, secretKey != "")
+			assert.Check(t, region != "")
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
+			res.Assert(t, icmd.Success)
+		}
+		res = c.RunDockerCmd("context", "use", contextName)
+		res.Assert(t, icmd.Expected{Out: contextName})
+		res = c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Expected{Out: contextName + " *"})
+	})
+	return c, stack
 }
