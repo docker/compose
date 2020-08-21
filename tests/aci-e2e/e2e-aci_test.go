@@ -550,24 +550,6 @@ func TestRunEnvVars(t *testing.T) {
 	})
 }
 
-func TestDeployACRImage(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c, "runAcr")
-
-	t.Run("run", func(t *testing.T) {
-		cmd := c.NewDockerCmd("run", "-d", "dockerregistrygta.azurecr.io/hello-aci")
-		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Success)
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
-		container := strings.TrimSpace(out[len(out)-1])
-		t.Logf("Container name: %q", container)
-		waitForStatus(t, c, container, "Terminated")
-
-		res = c.RunDockerCmd("logs", container)
-		assert.Assert(t, strings.Contains(res.Stdout(), "Hello from Docker!"))
-	})
-}
-
 func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
 	rg := "E2E-" + tName + "-" + startTime
