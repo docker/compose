@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
+	"github.com/docker/compose-cli/client"
 )
 
 func logsCommand() *cobra.Command {

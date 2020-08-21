@@ -22,8 +22,8 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 
-	"github.com/docker/api/compose"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 type composeService struct {

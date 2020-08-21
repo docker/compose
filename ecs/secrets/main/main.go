@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/api/ecs/secrets"
+	"github.com/docker/compose-cli/ecs/secrets"
 )
 
 const secretsFolder = "/run/secrets"

@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/api/cli/cmd/mobyflags"
+	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/mobycli"
-	"github.com/docker/api/client"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/cli/mobycli"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 // Command returns the login command

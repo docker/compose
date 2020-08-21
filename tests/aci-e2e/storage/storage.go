@@ -24,8 +24,8 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"github.com/docker/api/aci/login"
-	"github.com/docker/api/context/store"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/context/store"
 )
 
 // CreateStorageAccount creates a new storage account.

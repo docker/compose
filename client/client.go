@@ -19,13 +19,13 @@ package client
 import (
 	"context"
 
-	"github.com/docker/api/backend"
-	"github.com/docker/api/compose"
-	"github.com/docker/api/containers"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/backend"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/containers"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/secrets"
 )
 
 // New returns a backend client associated with current context

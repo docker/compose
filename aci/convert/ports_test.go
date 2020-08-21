@@ -23,7 +23,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/api/containers"
+	"github.com/docker/compose-cli/containers"
 )
 
 func TestPortConvert(t *testing.T) {

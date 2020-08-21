@@ -25,7 +25,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 func testStore(t *testing.T) Store {

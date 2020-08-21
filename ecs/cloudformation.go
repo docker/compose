@@ -25,7 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 
-	"github.com/docker/api/compose"
+	"github.com/docker/compose-cli/compose"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"

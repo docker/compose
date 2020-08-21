@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/cmd/mobyflags"
-	"github.com/docker/api/cli/mobycli"
+	"github.com/docker/compose-cli/cli/cmd/mobyflags"
+	"github.com/docker/compose-cli/cli/mobycli"
 )
 
 // VersionCommand command to display version

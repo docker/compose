@@ -33,7 +33,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff

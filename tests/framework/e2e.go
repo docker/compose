@@ -31,7 +31,7 @@ import (
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 
-	"github.com/docker/api/containers"
+	"github.com/docker/compose-cli/containers"
 )
 
 var (

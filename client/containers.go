@@ -19,8 +19,8 @@ package client
 import (
 	"context"
 
-	"github.com/docker/api/containers"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 type containerService struct {

@@ -20,12 +20,12 @@ import (
 	"context"
 	"sync"
 
-	"github.com/docker/api/client"
-	"github.com/docker/api/config"
-	containersv1 "github.com/docker/api/protos/containers/v1"
-	contextsv1 "github.com/docker/api/protos/contexts/v1"
-	streamsv1 "github.com/docker/api/protos/streams/v1"
-	"github.com/docker/api/server/proxy/streams"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/config"
+	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
+	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
+	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	"github.com/docker/compose-cli/server/proxy/streams"
 )
 
 type clientKey struct{}

@@ -27,31 +27,31 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/docker/api/cli/cmd/logout"
+	"github.com/docker/compose-cli/cli/cmd/logout"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	// Backend registrations
-	_ "github.com/docker/api/aci"
-	_ "github.com/docker/api/ecs"
-	_ "github.com/docker/api/example"
-	_ "github.com/docker/api/local"
-	"github.com/docker/api/metrics"
+	_ "github.com/docker/compose-cli/aci"
+	_ "github.com/docker/compose-cli/ecs"
+	_ "github.com/docker/compose-cli/example"
+	_ "github.com/docker/compose-cli/local"
+	"github.com/docker/compose-cli/metrics"
 
-	"github.com/docker/api/cli/cmd"
-	"github.com/docker/api/cli/cmd/compose"
-	contextcmd "github.com/docker/api/cli/cmd/context"
-	"github.com/docker/api/cli/cmd/login"
-	"github.com/docker/api/cli/cmd/run"
-	"github.com/docker/api/cli/mobycli"
-	cliopts "github.com/docker/api/cli/options"
-	"github.com/docker/api/config"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
+	"github.com/docker/compose-cli/cli/cmd"
+	"github.com/docker/compose-cli/cli/cmd/compose"
+	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
+	"github.com/docker/compose-cli/cli/cmd/login"
+	"github.com/docker/compose-cli/cli/cmd/run"
+	"github.com/docker/compose-cli/cli/mobycli"
+	cliopts "github.com/docker/compose-cli/cli/options"
+	"github.com/docker/compose-cli/config"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/store"
 )
 
 var (

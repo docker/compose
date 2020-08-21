@@ -22,7 +22,7 @@ import (
 
 	"gotest.tools/v3/golden"
 
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/secrets"
 )
 
 func TestPrintList(t *testing.T) {

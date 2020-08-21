@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/store"
 )
 
 func showCommand() *cobra.Command {

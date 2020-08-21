@@ -18,7 +18,7 @@ ARG GO_VERSION=1.15.0-alpine
 ARG GOLANGCI_LINT_VERSION=v1.30.0-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
-WORKDIR /api
+WORKDIR /compose-cli
 ENV GO111MODULE=on
 RUN apk add --no-cache \
     git \
@@ -77,7 +77,7 @@ RUN --mount=target=. \
     make BINARY=/out/docker  -f builder.Makefile cross
 
 FROM scratch AS protos
-COPY --from=make-protos /api/protos .
+COPY --from=make-protos /compose-cli/protos .
 
 FROM scratch AS cli
 COPY --from=make-cli /out/* .
@@ -96,7 +96,7 @@ RUN --mount=target=. \
     make -f builder.Makefile test
 
 FROM base as check-license-headers
-RUN go get -u github.com/kunalkushwaha/ltag 
+RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile check-license-headers

@@ -27,8 +27,8 @@ import (
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
-	"github.com/docker/api/containers"
-	"github.com/docker/api/context/store"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/context/store"
 )
 
 var convertCtx = store.AciContext{

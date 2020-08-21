@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/docker/api/client"
+	"github.com/docker/compose-cli/client"
 )
 
 type stopOpts struct {

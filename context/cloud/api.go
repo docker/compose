@@ -19,7 +19,7 @@ package cloud
 import (
 	"context"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 // Service cloud specific services

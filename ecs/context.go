@@ -29,8 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"gopkg.in/ini.v1"
 
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/prompt"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/prompt"
 )
 
 type contextCreateAWSHelper struct {

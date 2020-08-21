@@ -31,9 +31,9 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 
-	"github.com/docker/api/aci/login"
-	"github.com/docker/api/containers"
-	"github.com/docker/api/context/store"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/context/store"
 )
 
 const (

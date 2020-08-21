@@ -21,7 +21,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"github.com/docker/api/utils"
+	"github.com/docker/compose-cli/utils"
 )
 
 var managementCommands = []string{

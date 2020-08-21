@@ -34,7 +34,7 @@ import (
 	"github.com/docker/cli/opts"
 	"github.com/joho/godotenv"
 
-	"github.com/docker/api/ecs/secrets"
+	"github.com/docker/compose-cli/ecs/secrets"
 )
 
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"

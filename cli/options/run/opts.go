@@ -21,13 +21,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/api/utils"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
-	"github.com/docker/api/containers"
-	"github.com/docker/api/formatter"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/formatter"
 )
 
 // Opts contain run command options

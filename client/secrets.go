@@ -19,8 +19,8 @@ package client
 import (
 	"context"
 
-	"github.com/docker/api/errdefs"
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/secrets"
 )
 
 type secretsService struct {

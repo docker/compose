@@ -21,9 +21,9 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/api/containers"
-	"github.com/docker/api/formatter"
-	containersv1 "github.com/docker/api/protos/containers/v1"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/formatter"
+	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 )
 
 func TestGrpcContainerToContainerConfig(t *testing.T) {

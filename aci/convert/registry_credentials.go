@@ -36,7 +36,7 @@ import (
 	"github.com/docker/cli/cli/config/types"
 	"github.com/pkg/errors"
 
-	"github.com/docker/api/aci/login"
+	"github.com/docker/compose-cli/aci/login"
 )
 
 // Specific username from ACR docs : https://github.com/Azure/acr/blob/master/docs/AAD-OAuth.md#getting-credentials-programatically

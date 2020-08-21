@@ -19,7 +19,7 @@ package com.docker.api.protos.streams.v1;
 
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/docker/api/protos/streams/v1;v1";
+option go_package = "github.com/docker/compose-cli/protos/streams/v1;v1";
 
 service Streaming {
 	rpc NewStream(stream google.protobuf.Any) returns (stream google.protobuf.Any);

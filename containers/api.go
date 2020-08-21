@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/api/formatter"
+	"github.com/docker/compose-cli/formatter"
 )
 
 const (
