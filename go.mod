@@ -20,7 +20,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 	github.com/Microsoft/hcsshim v0.8.9 // indirect
 	github.com/aws/aws-sdk-go v1.34.8
-	github.com/awslabs/goformation/v4 v4.14.0
+	github.com/awslabs/goformation/v4 v4.15.0
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/compose-spec/compose-go v0.0.0-20200818070525-eb1188aae4a2
 	github.com/containerd/console v1.0.0
