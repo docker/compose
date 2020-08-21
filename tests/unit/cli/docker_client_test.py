@@ -4,6 +4,7 @@ import ssl
 
 import docker
 import pytest
+from docker.constants import DEFAULT_DOCKER_API_VERSION
 
 import compose
 from compose import const
@@ -24,18 +25,18 @@ class DockerClientTestCase(unittest.TestCase):
                 del os.environ['HOME']
             except KeyError:
                 pass
-            docker_client(os.environ, version=const.API_VERSIONS[const.COMPOSE_SPEC])
+            docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
 
     @mock.patch.dict(os.environ)
     def test_docker_client_with_custom_timeout(self):
         os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
-        client = docker_client(os.environ, version=const.API_VERSIONS[const.COMPOSE_SPEC])
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
         assert client.timeout == 123
 
     @mock.patch.dict(os.environ)
     def test_custom_timeout_error(self):
         os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
-        client = docker_client(os.environ, version=const.API_VERSIONS[const.COMPOSE_SPEC])
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
 
         with mock.patch('compose.cli.errors.log') as fake_log:
             with pytest.raises(errors.ConnectionError):
@@ -55,7 +56,7 @@ class DockerClientTestCase(unittest.TestCase):
         assert '123' in fake_log.error.call_args[0][0]
 
     def test_user_agent(self):
-        client = docker_client(os.environ, version=const.API_VERSIONS[const.COMPOSE_SPEC])
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
         expected = "docker-compose/{} docker-py/{} {}/{}".format(
             compose.__version__,
             docker.__version__,
