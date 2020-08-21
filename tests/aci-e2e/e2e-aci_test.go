@@ -408,7 +408,7 @@ func TestCompose(t *testing.T) {
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
 		composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
-		composeProjectName       = "acie2e"
+		composeProjectName       = "acidemo"
 		serverContainer          = composeProjectName + "_web"
 		wordsContainer           = composeProjectName + "_words"
 	)
