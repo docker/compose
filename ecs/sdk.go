@@ -436,27 +436,32 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service, co
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
-		var hasMore = true
-		var token *string
-		for hasMore {
-			events, err := s.CW.FilterLogEvents(&cloudwatchlogs.FilterLogEventsInput{
-				LogGroupName: aws.String(logGroup),
-				NextToken:    token,
-				StartTime:    aws.Int64(startTime),
-			})
-			if err != nil {
-				return err
-			}
-			if events.NextToken == nil {
-				hasMore = false
-			} else {
-				token = events.NextToken
-			}
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			var hasMore = true
+			var token *string
+			for hasMore {
+				events, err := s.CW.FilterLogEvents(&cloudwatchlogs.FilterLogEventsInput{
+					LogGroupName: aws.String(logGroup),
+					NextToken:    token,
+					StartTime:    aws.Int64(startTime),
+				})
+				if err != nil {
+					return err
+				}
+				if events.NextToken == nil {
+					hasMore = false
+				} else {
+					token = events.NextToken
+				}
 
-			for _, event := range events.Events {
-				p := strings.Split(aws.StringValue(event.LogStreamName), "/")
-				consumer(p[1], p[2], aws.StringValue(event.Message))
-				startTime = *event.IngestionTime
+				for _, event := range events.Events {
+					p := strings.Split(aws.StringValue(event.LogStreamName), "/")
+					consumer(p[1], p[2], aws.StringValue(event.Message))
+					startTime = *event.IngestionTime
+				}
 			}
 		}
 		time.Sleep(500 * time.Millisecond)

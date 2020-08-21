@@ -21,8 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 
@@ -45,14 +43,7 @@ func (b *ecsAPIService) Logs(ctx context.Context, options *cli.ProjectOptions, w
 		writer: writer,
 	}
 	err := b.SDK.GetLogs(ctx, name, consumer.Log)
-	if err != nil {
-		return err
-	}
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	return nil
+	return err
 }
 
 func (l *logConsumer) Log(service, container, message string) {
