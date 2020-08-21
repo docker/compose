@@ -7,7 +7,6 @@ import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
 
 import compose
-from compose import const
 from compose.cli import errors
 from compose.cli.docker_client import docker_client
 from compose.cli.docker_client import get_tls_version
