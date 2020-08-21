@@ -43,11 +43,11 @@ func TestMain(m *testing.M) {
 
 func TestLocalBackend(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	c.RunDocker( "context", "create", "local", "test-context").Assert(t, icmd.Success)
+	c.RunDocker("context", "create", "local", "test-context").Assert(t, icmd.Success)
 	c.RunDocker("context", "use", "test-context").Assert(t, icmd.Success)
 
 	t.Run("run", func(t *testing.T) {
-		res := c.RunDocker( "run", "-d", "nginx")
+		res := c.RunDocker("run", "-d", "nginx")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrFail("rm", "-f", containerName)
@@ -57,14 +57,14 @@ func TestLocalBackend(t *testing.T) {
 	})
 
 	t.Run("run with ports", func(t *testing.T) {
-		res := c.RunDocker( "run", "-d", "-p", "8080:80", "nginx")
+		res := c.RunDocker("run", "-d", "-p", "8080:80", "nginx")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrFail("rm", "-f", containerName)
 		})
-		res = c.RunDocker( "inspect", containerName)
+		res = c.RunDocker("inspect", containerName)
 		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
-		res = c.RunDocker( "ps")
+		res = c.RunDocker("ps")
 		res.Assert(t, icmd.Expected{Out: "0.0.0.0:8080->80/tcp"})
 	})
 

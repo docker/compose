@@ -71,8 +71,8 @@ func TestSecrets(t *testing.T) {
 	})
 
 	t.Run("rm secret", func(t *testing.T) {
-		res := cmd.RunDocker("secret", "rm", secretName)
-		res = cmd.RunDocker("secret", "list")
+		cmd.RunDocker("secret", "rm", secretName)
+		res := cmd.RunDocker("secret", "list")
 		assert.Check(t, !strings.Contains(res.Stdout(), secretName))
 	})
 }
@@ -132,7 +132,7 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 		if localTestProfile != "" {
 			region := os.Getenv("TEST_AWS_REGION")
 			assert.Check(t, region != "")
-			res = c.RunDocker("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
+			c.RunDocker("context", "create", "ecs", contextName, "--profile", localTestProfile, "--region", region)
 		} else {
 			profile := contextName
 			region := os.Getenv("AWS_DEFAULT_REGION")
@@ -141,7 +141,7 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 			assert.Check(t, keyID != "")
 			assert.Check(t, secretKey != "")
 			assert.Check(t, region != "")
-			res = c.RunDocker("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
+			c.RunDocker("context", "create", "ecs", contextName, "--profile", profile, "--region", region, "--secret-key", secretKey, "--key-id", keyID)
 		}
 		res = c.RunDocker("context", "use", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})

@@ -53,7 +53,7 @@ func init() {
 type E2eCLI struct {
 	BinDir    string
 	ConfigDir string
-	test 	  *testing.T
+	test      *testing.T
 }
 
 // NewParallelE2eCLI returns a configured TestE2eCLI with t.Parallel() set
@@ -163,7 +163,7 @@ func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
 
 // RunDockerOrFail runs a docker command and returns a result
 func (c *E2eCLI) RunDockerOrFail(args ...string) *icmd.Result {
-	fmt.Printf("	[%s] docker %s\n", c.test.Name() , strings.Join(args, " ") )
+	fmt.Printf("	[%s] docker %s\n", c.test.Name(), strings.Join(args, " "))
 	return icmd.RunCmd(c.NewDockerCmd(args...))
 }
 

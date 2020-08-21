@@ -87,8 +87,8 @@ func TestLoginLogout(t *testing.T) {
 			_ = deleteResourceGroup(rg)
 		})
 
-		res := c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
-		res = c.RunDocker("context", "use", contextName)
+		c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
+		res := c.RunDocker("context", "use", contextName)
 		res.Assert(t, icmd.Expected{Out: contextName})
 		res = c.RunDocker("context", "ls")
 		res.Assert(t, icmd.Expected{Out: contextName + " *"})
@@ -402,9 +402,8 @@ func TestCompose(t *testing.T) {
 
 	t.Run("compose up", func(t *testing.T) {
 		// Name of Compose project is taken from current folder "acie2e"
-		res := c.RunDocker("compose", "up", "-f", composeFile)
-
-		res = c.RunDocker("ps")
+		c.RunDocker("compose", "up", "-f", composeFile)
+		res := c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
@@ -438,9 +437,8 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		res := c.RunDocker("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
-
-		res = c.RunDocker("ps")
+		c.RunDocker("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
+		res := c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
@@ -481,9 +479,8 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		res := c.RunDocker("compose", "down", "--project-name", composeProjectName)
-
-		res = c.RunDocker("ps")
+		c.RunDocker("compose", "down", "--project-name", composeProjectName)
+		res := c.RunDocker("ps")
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		assert.Equal(t, len(out), 1)
 	})
@@ -584,8 +581,8 @@ func createResourceGroup(sID, rgName string) error {
 }
 
 func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
-	res := c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
-	res = c.RunDocker("context", "use", contextName)
+	c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
+	res := c.RunDocker("context", "use", contextName)
 	res.Assert(t, icmd.Expected{Out: contextName})
 	res = c.RunDocker("context", "ls")
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})

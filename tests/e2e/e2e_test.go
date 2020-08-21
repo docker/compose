@@ -357,8 +357,8 @@ func TestLegacyLogin(t *testing.T) {
 func TestUnsupportedCommand(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	res := c.RunDocker("context", "create", "example", "test-example")
-	res = c.RunDockerOrFail("--context", "test-example", "images")
+	c.RunDocker("context", "create", "example", "test-example")
+	res := c.RunDockerOrFail("--context", "test-example", "images")
 	res.Assert(t, icmd.Expected{
 		ExitCode: 1,
 		Err:      `Command "images" not available in current context (test-example), you can use the "default" context to run this command`,
