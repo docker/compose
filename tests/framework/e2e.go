@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"gotest.tools/v3/assert"
@@ -161,6 +163,7 @@ func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
 
 // RunDockerOrFail runs a docker command and returns a result
 func (c *E2eCLI) RunDockerOrFail(args ...string) *icmd.Result {
+	fmt.Printf("	[%s] docker %s\n", c.test.Name() , strings.Join(args, " ") )
 	return icmd.RunCmd(c.NewDockerCmd(args...))
 }
 

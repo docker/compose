@@ -169,7 +169,6 @@ func TestContainerRun(t *testing.T) {
 			"nginx",
 		)
 		container = getContainerName(res.Stdout())
-		t.Logf("Container name: %q", container)
 	})
 
 	t.Run("inspect", func(t *testing.T) {
@@ -184,7 +183,6 @@ func TestContainerRun(t *testing.T) {
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		hostIP = containerInspect.Ports[0].HostIP
 		endpoint = fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
-		t.Logf("Endpoint: %s", endpoint)
 	})
 
 	t.Run("ps", func(t *testing.T) {
@@ -331,7 +329,6 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Equal(t, port.ContainerPort, uint32(80))
 		assert.Equal(t, port.HostPort, uint32(80))
 		endpoint = fmt.Sprintf("http://%s:%d", port.HostIP, port.HostPort)
-		t.Logf("Endpoint: %s", endpoint)
 
 		assert.Assert(t, !strings.Contains(runRes.Stdout(), "/test"))
 		checkRequest := func(t poll.LogT) poll.Result {
@@ -426,7 +423,6 @@ func TestCompose(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
-		t.Logf("Endpoint: %s", endpoint)
 
 		r, err := http.Get(endpoint + "/words/noun")
 		assert.NilError(t, err)
@@ -456,7 +452,6 @@ func TestCompose(t *testing.T) {
 			assert.NilError(t, err)
 			assert.Assert(t, is.Len(containerInspect.Ports, 1))
 			endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
-			t.Logf("Endpoint: %s", endpoint)
 			var route string
 			switch cName {
 			case serverContainer:
@@ -512,7 +507,6 @@ func TestRunEnvVars(t *testing.T) {
 		res.Assert(t, icmd.Success)
 		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 		container := strings.TrimSpace(out[len(out)-1])
-		t.Logf("Container name: %q", container)
 
 		res = c.RunDocker("inspect", container)
 
@@ -536,7 +530,6 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, stri
 	rg := "E2E-" + tName + "-" + startTime
 	azureLogin(t, c)
 	sID := getSubscriptionID(t)
-	t.Logf("Create resource group %q", rg)
 	err := createResourceGroup(sID, rg)
 	assert.Check(t, is.Nil(err))
 	t.Cleanup(func() {
@@ -565,7 +558,6 @@ func deleteResourceGroup(rgName string) error {
 }
 
 func azureLogin(t *testing.T, c *E2eCLI) {
-	t.Log("Log in to Azure")
 	// in order to create new service principal and get these 3 values : `az ad sp create-for-rbac --name 'TestServicePrincipal' --sdk-auth`
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
@@ -592,7 +584,6 @@ func createResourceGroup(sID, rgName string) error {
 }
 
 func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
-	t.Log("Create ACI context")
 	res := c.RunDocker("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
 	res = c.RunDocker("context", "use", contextName)
 	res.Assert(t, icmd.Expected{Out: contextName})
@@ -601,7 +592,6 @@ func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
 }
 
 func createStorageAccount(t *testing.T, aciContext store.AciContext, name string) (azure_storage.Account, func() error) {
-	t.Logf("Create storage account %q", name)
 	account, err := storage.CreateStorageAccount(context.TODO(), aciContext, name)
 	assert.Check(t, is.Nil(err))
 	assert.Check(t, is.Equal(*(account.Name), name))
