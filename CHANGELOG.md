@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.27.0 (2020-08-11)
+1.27.0 (2020-08-21)
 -------------------
 
 ### Features
@@ -10,17 +10,27 @@ Change log
 
 - Implement service mode for ipc
 
-- Pass COMPOSE_PROJECT_NAME environment variable in container mode
+- Pass `COMPOSE_PROJECT_NAME` environment variable in container mode
 
 - Make run behave in the same way as up
+
+- Use `docker build` on `docker-compose run` when `COMPOSE_DOCKER_CLI_BUILD` environment variable is set
+
+- Use docker-py default API version for engine queries (`auto`)
+
+- Parse `network_mode` on build
 
 ### Bugs
 
 - Ignore build context path validation when building is not required
 
+- Fix float to bytes conversion via docker-py bump to 4.3.1
+
+- Fix scale bug when deploy section is set
+
 ### Miscellaneous
 
-- Bump `docker-py` to 4.3.0
+- Bump `docker-py` to 4.3.1
 
 - Bump `tox` to 3.19.0
 
