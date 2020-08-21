@@ -126,7 +126,7 @@ func TestLoginLogout(t *testing.T) {
 
 func TestContainerRun(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	sID, rg := setupTestResourceGroup(t, c, "run")
+	sID, rg := setupTestResourceGroup(t, c)
 
 	const (
 		testShareName   = "dockertestshare"
@@ -284,7 +284,7 @@ func TestContainerRun(t *testing.T) {
 
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c, "runA")
+	_, _ = setupTestResourceGroup(t, c)
 
 	// Used in subtests
 	var (
@@ -390,7 +390,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 func TestCompose(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c, "compose")
+	_, _ = setupTestResourceGroup(t, c)
 
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -491,7 +491,7 @@ func TestCompose(t *testing.T) {
 
 func TestRunEnvVars(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c, "runEnv")
+	_, _ = setupTestResourceGroup(t, c)
 
 	t.Run("run", func(t *testing.T) {
 		cmd := c.NewDockerCmd(
@@ -525,9 +525,9 @@ func TestRunEnvVars(t *testing.T) {
 	})
 }
 
-func setupTestResourceGroup(t *testing.T, c *E2eCLI, tName string) (string, string) {
+func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
-	rg := "E2E-" + tName + "-" + startTime
+	rg := "E2E-" + t.Name() + "-" + startTime
 	azureLogin(t, c)
 	sID := getSubscriptionID(t)
 	err := createResourceGroup(sID, rg)
