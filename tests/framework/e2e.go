@@ -161,15 +161,15 @@ func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
 	return c.NewCmd(filepath.Join(c.BinDir, DockerExecutableName), args...)
 }
 
-// RunDockerOrFail runs a docker command and returns a result
-func (c *E2eCLI) RunDockerOrFail(args ...string) *icmd.Result {
+// RunDockerOrExitError runs a docker command and returns a result
+func (c *E2eCLI) RunDockerOrExitError(args ...string) *icmd.Result {
 	fmt.Printf("	[%s] docker %s\n", c.test.Name(), strings.Join(args, " "))
 	return icmd.RunCmd(c.NewDockerCmd(args...))
 }
 
-// RunDocker runs a docker command, expects no error and returns a result
-func (c *E2eCLI) RunDocker(args ...string) *icmd.Result {
-	res := c.RunDockerOrFail(args...)
+// RunDockerCmd runs a docker command, expects no error and returns a result
+func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
+	res := c.RunDockerOrExitError(args...)
 	res.Assert(c.test, icmd.Success)
 	return res
 }
