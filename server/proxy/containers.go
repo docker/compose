@@ -153,6 +153,7 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 	return containers.ContainerConfig{
 		ID:                     request.GetId(),
 		Image:                  request.GetImage(),
+		Command:                request.GetCommand(),
 		Ports:                  ports,
 		Labels:                 request.GetLabels(),
 		Volumes:                request.GetVolumes(),

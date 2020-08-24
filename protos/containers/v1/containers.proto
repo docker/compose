@@ -103,6 +103,7 @@ message RunRequest {
 	uint64 memory_limit = 6;
 	uint64 cpu_limit = 7;
 	string restart_policy_condition = 8;
+	repeated string command = 9;
 }
 
 message RunResponse {

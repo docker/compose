@@ -79,6 +79,8 @@ type ContainerConfig struct {
 	ID string
 	// Image specifies the iamge reference used for a container
 	Image string
+	// Command are the arguments passed to the container's entrypoint
+	Command []string
 	// Ports provide a list of published ports
 	Ports []Port
 	// Labels set labels to the container
