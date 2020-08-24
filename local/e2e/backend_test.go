@@ -47,24 +47,20 @@ func TestLocalBackend(t *testing.T) {
 	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
 
 	t.Run("run", func(t *testing.T) {
-		t.Parallel()
 		res := c.RunDockerCmd("run", "-d", "nginx")
-		res.Assert(t, icmd.Success)
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
-			_ = c.RunDockerCmd("rm", "-f", containerName)
+			_ = c.RunDockerOrExitError("rm", "-f", containerName)
 		})
 		res = c.RunDockerCmd("inspect", containerName)
 		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
 	})
 
 	t.Run("run with ports", func(t *testing.T) {
-		t.Parallel()
 		res := c.RunDockerCmd("run", "-d", "-p", "8080:80", "nginx")
-		res.Assert(t, icmd.Success)
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
-			_ = c.RunDockerCmd("rm", "-f", containerName)
+			_ = c.RunDockerOrExitError("rm", "-f", containerName)
 		})
 		res = c.RunDockerCmd("inspect", containerName)
 		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
@@ -73,8 +69,7 @@ func TestLocalBackend(t *testing.T) {
 	})
 
 	t.Run("inspect not found", func(t *testing.T) {
-		t.Parallel()
-		res := c.RunDockerCmd("inspect", "nonexistentcontainer")
+		res := c.RunDockerOrExitError("inspect", "nonexistentcontainer")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "Error: No such container: nonexistentcontainer",
