@@ -22,7 +22,7 @@ require (
 	github.com/aws/aws-sdk-go v1.34.8
 	github.com/awslabs/goformation/v4 v4.14.0
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/compose-spec/compose-go v0.0.0-20200818070525-eb1188aae4a2
+	github.com/compose-spec/compose-go v0.0.0-20200824075806-a70cd5945c25
 	github.com/containerd/console v1.0.0
 	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
@@ -46,6 +46,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/sanathkr/go-yaml v0.0.0-20170819195128-ed9d249f429b
 	github.com/sirupsen/logrus v1.6.0
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/cobra v1.0.0

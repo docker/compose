@@ -35,6 +35,8 @@ type Service interface {
 	Ps(ctx context.Context, projectName string) ([]ServiceStatus, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project) ([]byte, error)
+	// Emulate executes the equivalent to a `compose up` in platform emulation mode
+	Emulate(ctx context.Context, options *cli.ProjectOptions) error	
 }
 
 // PortPublisher hold status about published port

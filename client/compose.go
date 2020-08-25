@@ -34,6 +34,11 @@ func (c *composeService) Up(context.Context, *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
 
+// Emulate executes the equivalent to a `compose up` in platform emulation mode
+func (c *composeService) Emulate(context.Context, *cli.ProjectOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 // Down executes the equivalent to a `compose down`
 func (c *composeService) Down(context.Context, string) error {
 	return errdefs.ErrNotImplemented

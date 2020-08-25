@@ -121,7 +121,6 @@ func main() {
 		cmd.RmCommand(),
 		cmd.StartCommand(),
 		cmd.InspectCommand(),
-		compose.Command(),
 		login.Command(),
 		logout.Command(),
 		cmd.VersionCommand(version),
@@ -183,6 +182,8 @@ func main() {
 		exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
 $ docker context create %s <name>`, cc.Type(), store.EcsContextType))
 	}
+
+	root.AddCommand(compose.Command(ctype))
 
 	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
 
