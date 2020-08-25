@@ -428,3 +428,18 @@ func TestMockBackend(t *testing.T) {
 		})
 	})
 }
+
+func TestFailOnEcsUsageAsPlugin(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	res := c.RunDockerCmd("context", "create", "local", "local")
+	res.Assert(t, icmd.Expected{})
+
+	t.Run("fail on ecs usage as plugin", func(t *testing.T) {
+		res := c.RunDockerOrExitError("--context", "local", "ecs", "compose", "up")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Out:      "",
+			Err:      "The ECS integration is now part of the CLI. Use `docker compose` with an ECS context.",
+		})
+	})
+}
