@@ -23,7 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/api/containers"
+	"github.com/docker/compose-cli/containers"
 )
 
 func TestConvertContainerEnvironment(t *testing.T) {

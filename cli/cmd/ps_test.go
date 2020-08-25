@@ -22,8 +22,8 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 
-	_ "github.com/docker/api/example"
-	"github.com/docker/api/tests/framework"
+	_ "github.com/docker/compose-cli/example"
+	"github.com/docker/compose-cli/tests/framework"
 )
 
 func TestPs(t *testing.T) {

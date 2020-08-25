@@ -19,7 +19,7 @@ package logout
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/mobycli"
+	"github.com/docker/compose-cli/cli/mobycli"
 )
 
 // Command returns the login command

@@ -24,8 +24,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/client"
 
-	"github.com/docker/api/compose"
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudformation"

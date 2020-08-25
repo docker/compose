@@ -24,11 +24,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/docker/api/client"
-	"github.com/docker/api/config"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/server/proxy"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/config"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/server/proxy"
 )
 
 // key is the key where the current docker context is stored in the metadata

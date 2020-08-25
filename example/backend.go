@@ -26,12 +26,12 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 
-	"github.com/docker/api/backend"
-	"github.com/docker/api/compose"
-	"github.com/docker/api/containers"
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/errdefs"
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/backend"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/secrets"
 )
 
 type apiService struct {

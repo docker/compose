@@ -41,13 +41,13 @@ import (
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"github.com/docker/api/aci"
-	"github.com/docker/api/aci/login"
-	"github.com/docker/api/containers"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/errdefs"
-	"github.com/docker/api/tests/aci-e2e/storage"
-	. "github.com/docker/api/tests/framework"
+	"github.com/docker/compose-cli/aci"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/tests/aci-e2e/storage"
+	. "github.com/docker/compose-cli/tests/framework"
 )
 
 const (

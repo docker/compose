@@ -24,7 +24,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
-	v1 "github.com/docker/api/protos/containers/v1"
+	v1 "github.com/docker/compose-cli/protos/containers/v1"
 )
 
 type logServer struct {

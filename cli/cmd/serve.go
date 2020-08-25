@@ -23,11 +23,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	containersv1 "github.com/docker/api/protos/containers/v1"
-	contextsv1 "github.com/docker/api/protos/contexts/v1"
-	streamsv1 "github.com/docker/api/protos/streams/v1"
-	"github.com/docker/api/server"
-	"github.com/docker/api/server/proxy"
+	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
+	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
+	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	"github.com/docker/compose-cli/server"
+	"github.com/docker/compose-cli/server/proxy"
 )
 
 type serveOpts struct {

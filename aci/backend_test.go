@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/api/containers"
+	"github.com/docker/compose-cli/containers"
 )
 
 func TestGetContainerName(t *testing.T) {

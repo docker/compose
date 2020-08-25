@@ -22,10 +22,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/ecs"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/ecs"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 func init() {

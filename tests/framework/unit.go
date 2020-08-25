@@ -25,8 +25,8 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/store"
 )
 
 // TestCLI is a helper struct for CLI tests.

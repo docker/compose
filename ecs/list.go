@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/api/compose"
+	"github.com/docker/compose-cli/compose"
 
 	"github.com/compose-spec/compose-go/cli"
 )

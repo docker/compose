@@ -23,8 +23,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 type composeOptions struct {

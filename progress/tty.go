@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/api/utils"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/buger/goterm"
 	"github.com/morikuni/aec"

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/api/progress"
+	"github.com/docker/compose-cli/progress"
 
 	"github.com/aws/aws-sdk-go/aws"
 )

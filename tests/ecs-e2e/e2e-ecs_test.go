@@ -27,11 +27,10 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
-	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/api/tests/framework"
+	. "github.com/docker/compose-cli/tests/framework"
 )
 
 var binDir string

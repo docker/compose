@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"strings"
 
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/store"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/store"
 )
 
 var delegatedContextTypes = []string{store.DefaultContextType, store.AwsContextType}

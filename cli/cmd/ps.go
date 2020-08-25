@@ -25,9 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/cli/formatter"
-	"github.com/docker/api/client"
-	formatter2 "github.com/docker/api/formatter"
+	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/client"
+	formatter2 "github.com/docker/compose-cli/formatter"
 )
 
 type psOpts struct {

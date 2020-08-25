@@ -21,8 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/api/client"
-	"github.com/docker/api/progress"
+	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/progress"
 )
 
 func downCommand() *cobra.Command {

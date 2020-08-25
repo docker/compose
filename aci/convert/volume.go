@@ -24,7 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 // GetRunVolumes return volume configurations for a project and a single service

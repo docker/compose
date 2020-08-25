@@ -22,15 +22,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/secrets"
 
-	"github.com/docker/api/backend"
-	"github.com/docker/api/compose"
-	"github.com/docker/api/containers"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/errdefs"
+	"github.com/docker/compose-cli/backend"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/containers"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 const backendType = store.EcsContextType

@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/api/compose"
+	"github.com/docker/compose-cli/compose"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"

@@ -29,7 +29,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
-	streamsv1 "github.com/docker/api/protos/streams/v1"
+	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
 )
 
 type byteStream struct {

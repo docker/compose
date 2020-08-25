@@ -1,33 +1,33 @@
 # Backends shouldn't depend on other backends or the cli
 - path: ./aci
   forbiddenImports:
-    - github.com/docker/api/cli
-    - github.com/docker/api/ecs
-    - github.com/docker/api/example
-    - github.com/docker/api/local
-    - github.com/docker/api/metrics
-    - github.com/docker/api/server
+    - github.com/docker/compose-cli/cli
+    - github.com/docker/compose-cli/ecs
+    - github.com/docker/compose-cli/example
+    - github.com/docker/compose-cli/local
+    - github.com/docker/compose-cli/metrics
+    - github.com/docker/compose-cli/server
 - path: ./ecs
   forbiddenImports:
-    - github.com/docker/api/aci
-    - github.com/docker/api/cli
-    - github.com/docker/api/example
-    - github.com/docker/api/local
-    - github.com/docker/api/metrics
-    - github.com/docker/api/server
+    - github.com/docker/compose-cli/aci
+    - github.com/docker/compose-cli/cli
+    - github.com/docker/compose-cli/example
+    - github.com/docker/compose-cli/local
+    - github.com/docker/compose-cli/metrics
+    - github.com/docker/compose-cli/server
 - path: ./example
   forbiddenImports:
-    - github.com/docker/api/aci
-    - github.com/docker/api/cli
-    - github.com/docker/api/ecs
-    - github.com/docker/api/local
-    - github.com/docker/api/metrics
-    - github.com/docker/api/server
+    - github.com/docker/compose-cli/aci
+    - github.com/docker/compose-cli/cli
+    - github.com/docker/compose-cli/ecs
+    - github.com/docker/compose-cli/local
+    - github.com/docker/compose-cli/metrics
+    - github.com/docker/compose-cli/server
 - path: ./local
   forbiddenImports:
-    - github.com/docker/api/aci
-    - github.com/docker/api/cli
-    - github.com/docker/api/ecs
-    - github.com/docker/api/example
-    - github.com/docker/api/metrics
-    - github.com/docker/api/server
+    - github.com/docker/compose-cli/aci
+    - github.com/docker/compose-cli/cli
+    - github.com/docker/compose-cli/ecs
+    - github.com/docker/compose-cli/example
+    - github.com/docker/compose-cli/metrics
+    - github.com/docker/compose-cli/server

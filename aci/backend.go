@@ -32,16 +32,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/api/aci/convert"
-	"github.com/docker/api/aci/login"
-	"github.com/docker/api/backend"
-	"github.com/docker/api/compose"
-	"github.com/docker/api/containers"
-	apicontext "github.com/docker/api/context"
-	"github.com/docker/api/context/cloud"
-	"github.com/docker/api/context/store"
-	"github.com/docker/api/errdefs"
-	"github.com/docker/api/secrets"
+	"github.com/docker/compose-cli/aci/convert"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/backend"
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/containers"
+	apicontext "github.com/docker/compose-cli/context"
+	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/secrets"
 )
 
 const (

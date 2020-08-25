@@ -1,4 +1,4 @@
-module github.com/docker/api
+module github.com/docker/compose-cli
 
 go 1.15
 
