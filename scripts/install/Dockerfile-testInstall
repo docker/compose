@@ -1,0 +1,14 @@
+FROM ubuntu:latest
+
+RUN apt-get update
+RUN apt-get -y install curl grep
+RUN curl https://get.docker.com | sh
+
+COPY install_linux.sh /scripts/install_linux.sh
+RUN chmod +x /scripts/install_linux.sh
+RUN /scripts/install_linux.sh
+RUN docker version | grep Azure
+
+# check we can update
+RUN /scripts/install_linux.sh
+RUN docker version | grep Azure
