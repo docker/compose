@@ -17,6 +17,8 @@
 package ecs
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -25,10 +27,11 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/compose-spec/compose-go/types"
-	"github.com/sanathkr/go-yaml"
-
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
+	"github.com/sanathkr/go-yaml"
+	"golang.org/x/mod/semver"
 )
 
 func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions) error {
@@ -104,7 +107,23 @@ func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions
 		return err
 	}
 
-	cmd := exec.Command("docker-compose", "--context", "default", "--project-directory", project.WorkingDir, "--project-name", project.Name, "-f", "-", "up")
+	cmd := exec.Command("docker-compose", "version", "--short")
+	b := bytes.Buffer{}
+	b.WriteString("v")
+	cmd.Stdout = bufio.NewWriter(&b)
+	err = cmd.Run()
+	if err != nil {
+		return errors.Wrap(err, "ECS simulation mode require Docker-compose 1.27")
+	}
+	version := semver.MajorMinor(strings.TrimSpace(b.String()))
+	if version == "" {
+		return fmt.Errorf("can't parse docker-compose version: %s", b.String())
+	}
+	if semver.Compare(version, "v1.27") < 0 {
+		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
+	}
+
+	cmd = exec.Command("docker-compose", "--context", "default", "--project-directory", project.WorkingDir, "--project-name", project.Name, "-f", "-", "up")
 	cmd.Stdin = strings.NewReader(string(marshal))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
