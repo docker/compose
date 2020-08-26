@@ -70,6 +70,7 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 	for _, registry := range acrRegistries {
 		err := helper.autoLoginAcr(registry)
 		if err != nil {
+			fmt.Printf("WARNING : %v\n", err)
 			fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
 		}
 	}
@@ -158,20 +159,24 @@ func (c cliRegistryHelper) autoLoginAcr(registry string) error {
 	repoAuthURL := fmt.Sprintf("https://%s/oauth2/exchange", registry)
 	res, err := http.Post(repoAuthURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
-		return err
-	}
-	if res.StatusCode != 200 {
-		return errors.Errorf("error while accessing ACR token from Azure login, status : %s", res.Status)
+		return errors.Wrap(err, "could not query ACR token")
 	}
 	bits, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not read response body")
+	}
+	if res.StatusCode != 200 {
+		return errors.Errorf("could not obtain ACR token from Azure login, status : %s, response: %s", res.Status, string(bits))
 	}
 
 	newToken := oauth2.Token{}
 	if err := json.Unmarshal(bits, &newToken); err != nil {
-		return err
+		return errors.Wrap(err, "could not read ACR token")
 	}
-	cmd := exec.Command("docker", "login", "-p", newToken.RefreshToken, "-u", tokenUsername, registry)
-	return cmd.Run()
+	cmd := exec.Command("docker", "login", "-u", tokenUsername, "-p", newToken.RefreshToken, registry)
+	bytes, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("could not 'docker login' to %s :\n%s\n", registry, string(bytes)))
+	}
+	return nil
 }
