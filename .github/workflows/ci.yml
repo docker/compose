@@ -18,24 +18,6 @@ jobs:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
-      # https://github.com/dependabot/dependabot-core/issues/1995
-      - name: Update dependabot PR
-        if: github.event.pusher.name == 'dependabot-preview[bot]'
-        run: |
-          git config --local user.email "compose-cli-ci@docker.com"
-          git config --local user.name "CI GitHub Action"
-          go mod tidy -v
-          git add .
-          git commit -sm'Update go.sum after dependabot PR'
-
-      - name: Update dependabot PR if needed
-        if: github.event.pusher.name == 'dependabot-preview[bot]'
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-          force: false
-
       - name: Validate go-mod is up-to-date and license headers
         run: make validate
 
