@@ -75,6 +75,9 @@ lint: ## run linter(s)
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
+check-dependencies: ## check dependency updates
+	go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.}}{{end}}{{end}}' all
+
 import-restrictions: ## run import-restrictions script
 	@docker build . \
 	--target import-restrictions
@@ -99,4 +102,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all validate protos cli e2e-local cross test cache-clear lint serve classic-link help
+.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help
