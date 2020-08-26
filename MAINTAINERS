@@ -1,6 +1,6 @@
 # Docker maintainers file
 #
-# This file describes who runs the docker/app project and how.
+# This file describes who runs the docker/compose-cli project and how.
 # This is a living document - if you see something out of date or missing, speak up!
 #
 # It is structured to be consumable by both humans and programs.
@@ -24,34 +24,7 @@
 		people = [
 			"rumpl",
 			"gtardif",
-			"chris-chrone"
-		]
-
-	[Org."Docs maintainers"]
-
-	# TODO Describe the docs maintainers role.
-
-		people = [
-			"rumpl",
-			"gtardif",
-			"chris-chrone"
-		]
-
-	[Org.Curators]
-
-	# The curators help ensure that incoming issues and pull requests are properly triaged and
-	# that our various contribution and reviewing processes are respected. With their knowledge of
-	# the repository activity, they can also guide contributors to relevant material or
-	# discussions.
-	#
-	# They are neither code nor docs reviewers, so they are never expected to merge. They can
-	# however:
-	# - close an issue or pull request when it's an exact duplicate
-	# - close an issue or pull request when it's inappropriate or off-topic
-
-		people = [
-			"rumpl",
-			"gtardif",
+			"ndeloof"
 			"chris-chrone"
 		]
 
@@ -63,18 +36,22 @@
 
 	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
 
-	[people.rumpl]
-	Name = "Djordje Lukic"
-	Email = "djordje.lukic@docker.com"
-	GitHub = "rumpl"
+	[people.chris-crone]
+	Name = "Christopher Crone"
+	Email = "christopher.crone@docker.com"
+	GitHub = "chris-crone"
 
 	[people.gtardif]
 	Name = "Guillaume Tardif"
 	Email = "guillaume.tardif@docker.com"
 	GitHub = "gtardif"
 
-	[people.chris-crone]
-	Name = "Christopher Crone"
-	Email = "christopher.crone@docker.com"
-	GitHub = "chris-crone"
+	[people.ndeloof]
+	Name = "Nicolas Deloof"
+	Email = "nicolas.deloof@docker.com"
+	GitHub = "ndeloof"
 
+	[people.rumpl]
+	Name = "Djordje Lukic"
+	Email = "djordje.lukic@docker.com"
+	GitHub = "rumpl"
