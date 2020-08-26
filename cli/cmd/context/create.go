@@ -135,6 +135,7 @@ func createDockerContext(ctx context.Context, name string, contextType string, d
 		description,
 		data,
 	)
+	fmt.Printf("Successfully created %s context %q\n", contextType, name)
 	return result
 }
 
