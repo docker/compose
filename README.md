@@ -1,85 +1,35 @@
-# Docker API
+# Docker Compose CLI
 
 [![Actions Status](https://github.com/docker/compose-cli/workflows/Continuous%20integration/badge.svg)](https://github.com/docker/compose-cli/actions)
 
-## Dev Setup
+This CLI tool makes it easy to run containers in the cloud using either Amazon
+Elastic Container Service
+([ECS](https://aws.amazon.com/ecs))
+or Microsoft Azure Container Instances
+([ACI](https://azure.microsoft.com/services/container-instances))
+using the Docker commands you already know.
 
-The recommended way is to use the main `Makefile` that runs everything inside a container.
+To get started, all you need is:
+* An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
+  account
+* Windows: Edge release of
+  [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
+* macOS: The Edge release of
+  [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
+* Linux:
+  [Install script](INSTALL.md)
 
-If you don't have or want to use Docker for building you need to make sure you have all the needed tools installed locally:
+:warning: *This CLI is currently in beta please create*
+*[issues](https://github.com/docker/compose-cli/issues) to leave feedback*
 
-* go 1.15
-* [protoc](https://github.com/protocolbuffers/protobuf)
-* `go get github.com/golang/protobuf/protoc-gen-go@v1.4.1`
-* `go get golang.org/x/tools/cmd/goimports`
-* `go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.30.0`
+## Examples
 
-And then you can call the same make targets but you need to pass it the `builder.Makefile` (`make -f builder.Makefile`).
+* ECS: [Deploying Wordpress to the cloud](https://www.docker.com/blog/deploying-wordpress-to-the-cloud/)
+* ACI: [Deploying a Minecraft server to the cloud](https://www.docker.com/blog/deploying-a-minecraft-docker-server-to-the-cloud/)
 
-The new CLI delegates to the classic docker for default contexts ; delegation is done to `com.docker.cli`.
-* `make moby-cli-link` will create a `com.docker.cli` link in `/usr/local/bin` if you don't already have it from Docker Desktop
+## Developing
 
-## Building the project
+See [Instructions](BUILDING.MD) on building the cli, running tests locally and against Azure Container Instances (ACI) or Amazon ECS, and releasing it.
+Also Check [contribution guidelines](CONTRIBUTING.md) on conventions used in this project. 
 
-```bash
-$ make
-```
 
-This will make the cli with all backends enabled. `make cross` on the other hand will cross-compile the cli without the
-example and local backend. We use `make cross` to build for our release, hence the exclusion of those backends. You can
-still cross-compile with all backends enabled: `BUILD_TAGS=example,local make cross`.
-
-If you make changes to the `.proto` files, make sure to `make protos` to generate go code.
-
-## Tests
-
-### Unit tests
-
-```
-make test
-```
-
-If you need to update a golden file simply do `go test ./... -test.update-golden`.
-
-### e2e tests
-
-```
-make e2e-local
-```
-This requires a local Docker Engine running
-
-Local ACI E2E tests:
-```
-AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make e2e-aci
-```
-
-This requires azure service principal credentials to login to azure.
-To get the values to be set in local environment variables, you can create a new service principal once you're logged in azure (with `docker login azure`)
-```
-az ad sp create-for-rbac --name 'MyTestServicePrincipal' --sdk-auth
-```
-Running the ACI e2e tests will override your local login, the service principal credentials use a token that cannot be refreshed automatically.
-You might need to run again `docker login azure` to properly use the command line after running ACI e2e tests.
-
-You can also run a single ACI test from the test suite:
-```
-AZURE_TENANT_ID="xxx" AZURE_CLIENT_ID="yyy" AZURE_CLIENT_SECRET="yyy" make E2E_TEST=TestContainerRun e2e-aci
-```
-
-Local ECS E2E tests:
-```
-TEST_AWS_PROFILE=myProfile TEST_AWS_REGION=eu-west-3 make e2e-ecs
-```
-
-This requires a valid AWS profile defined in ~/.aws/credentials.
-
-## Release
-
-To create a new release:
-* check that the CI is green on the main branch's commit you want to release
-* simply create a new tag of the form vx.y.z, following existing tags, and push the tag
-
-Pushing the tag will automatically create a new release and make binaries (mac, win, linux) available for download.
-
-Note: Linux binaries are not automatically copied to /docker/aci-integration-beta, if you want to make the linux binary publicly available, you'll need to manually create a release in aci-integration-beta and upload the binary.
-For Desktop integration, you need to make a PR in /docker/pinata and update the cli release number [here](https://github.com/docker/pinata/blob/master/build.json#L25)
