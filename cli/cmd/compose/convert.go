@@ -32,27 +32,35 @@ func convertCommand() *cobra.Command {
 		Use:   "convert",
 		Short: "Converts the compose file to a cloud format (default: cloudformation)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			options, err := opts.toProjectOptions()
-			if err != nil {
-				return err
-			}
-			return runConvert(cmd.Context(), options)
+			return runConvert(cmd.Context(), opts)
 		},
 	}
 	convertCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
 	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
+	convertCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 
 	return convertCmd
 }
 
-func runConvert(ctx context.Context, opts *cli.ProjectOptions) error {
+func runConvert(ctx context.Context, opts composeOptions) error {
 	var json []byte
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}
-	json, err = c.ComposeService().Convert(ctx, opts)
+
+	options, err := opts.toProjectOptions()
+	if err != nil {
+		return err
+	}
+
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return err
+	}
+
+	json, err = c.ComposeService().Convert(ctx, project)
 	if err != nil {
 		return err
 	}

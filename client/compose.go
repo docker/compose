@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/compose"
 	"github.com/docker/compose-cli/errdefs"
@@ -30,26 +30,26 @@ type composeService struct {
 }
 
 // Up executes the equivalent to a `compose up`
-func (c *composeService) Up(context.Context, *cli.ProjectOptions) error {
+func (c *composeService) Up(context.Context, *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
 
 // Down executes the equivalent to a `compose down`
-func (c *composeService) Down(context.Context, *cli.ProjectOptions) error {
+func (c *composeService) Down(context.Context, string) error {
 	return errdefs.ErrNotImplemented
 }
 
 // Logs executes the equivalent to a `compose logs`
-func (c *composeService) Logs(context.Context, *cli.ProjectOptions, io.Writer) error {
+func (c *composeService) Logs(context.Context, string, io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 
 // Ps executes the equivalent to a `compose ps`
-func (c *composeService) Ps(context.Context, *cli.ProjectOptions) ([]compose.ServiceStatus, error) {
+func (c *composeService) Ps(context.Context, string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
 // Convert translate compose model into backend's native format
-func (c *composeService) Convert(context.Context, *cli.ProjectOptions) ([]byte, error) {
+func (c *composeService) Convert(context.Context, *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

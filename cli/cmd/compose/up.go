@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/cli"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/client"
@@ -53,6 +55,11 @@ func runUp(ctx context.Context, opts composeOptions) error {
 		if err != nil {
 			return err
 		}
-		return c.ComposeService().Up(ctx, options)
+		project, err := cli.ProjectFromOptions(options)
+		if err != nil {
+			return err
+		}
+
+		return c.ComposeService().Up(ctx, project)
 	})
 }

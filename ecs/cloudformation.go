@@ -23,8 +23,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/compose-spec/compose-go/cli"
-
 	"github.com/docker/compose-cli/compose"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -53,11 +51,7 @@ const (
 	parameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
-func (b *ecsAPIService) Convert(ctx context.Context, opts *cli.ProjectOptions) ([]byte, error) {
-	project, err := cli.ProjectFromOptions(opts)
-	if err != nil {
-		return nil, err
-	}
+func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	template, err := b.convert(project)
 	if err != nil {
 		return nil, err
