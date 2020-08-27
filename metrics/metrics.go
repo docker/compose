@@ -95,6 +95,7 @@ func Track(context string, args []string, flags *flag.FlagSet) {
 			c.Send(Command{
 				Command: command,
 				Context: context,
+				Source:  CLISource,
 			})
 		}
 	}()

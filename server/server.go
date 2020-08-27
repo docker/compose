@@ -29,7 +29,10 @@ import (
 // New returns a new GRPC server.
 func New(ctx context.Context) *grpc.Server {
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(unaryServerInterceptor(ctx)),
+		grpc.ChainUnaryInterceptor(
+			unaryServerInterceptor(ctx),
+			metricsServerInterceptor(ctx),
+		),
 		grpc.StreamInterceptor(streamServerInterceptor(ctx)),
 	)
 	hs := health.NewServer()

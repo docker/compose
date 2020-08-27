@@ -32,7 +32,15 @@ type client struct {
 type Command struct {
 	Command string `json:"command"`
 	Context string `json:"context"`
+	Source  string `json:"source"`
 }
+
+const (
+	// CLISource is sent for cli metrics
+	CLISource = "cli"
+	// APISource is sent for API metrics
+	APISource = "api"
+)
 
 // Client sends metrics to Docker Desktopn
 type Client interface {
