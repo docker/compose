@@ -124,7 +124,7 @@ func TestLoginLogout(t *testing.T) {
 	})
 }
 
-func TestContainerRun(t *testing.T) {
+func TestContainerRunVolume(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	sID, rg := setupTestResourceGroup(t, c)
 
@@ -581,8 +581,9 @@ func createResourceGroup(sID, rgName string) error {
 }
 
 func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
-	c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
-	res := c.RunDockerCmd("context", "use", contextName)
+	res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
+	res.Assert(t, icmd.Expected{Out: "Successfully created aci context \"" + contextName + "\""})
+	res = c.RunDockerCmd("context", "use", contextName)
 	res.Assert(t, icmd.Expected{Out: contextName})
 	res = c.RunDockerCmd("context", "ls")
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})
