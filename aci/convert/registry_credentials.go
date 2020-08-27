@@ -70,7 +70,7 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 	for _, registry := range acrRegistries {
 		err := helper.autoLoginAcr(registry)
 		if err != nil {
-			fmt.Printf("WARNING : %v\n", err)
+			fmt.Printf("WARNING: %v\n", err)
 			fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
 		}
 	}
