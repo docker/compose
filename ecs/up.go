@@ -103,23 +103,23 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project) error {
 }
 
 func (b ecsAPIService) GetVPC(ctx context.Context, project *types.Project) (string, error) {
+	var vpcID string
 	//check compose file for custom VPC selected
 	if vpc, ok := project.Extensions[extensionVPC]; ok {
-		vpcID := vpc.(string)
-		ok, err := b.SDK.VpcExists(ctx, vpcID)
+		vpcID = vpc.(string)
+	} else {
+		defaultVPC, err := b.SDK.GetDefaultVPC(ctx)
 		if err != nil {
 			return "", err
 		}
-		if !ok {
-			return "", fmt.Errorf("VPC does not exist: %s", vpc)
-		}
-		return vpcID, nil
+		vpcID = defaultVPC
 	}
-	defaultVPC, err := b.SDK.GetDefaultVPC(ctx)
+
+	err := b.SDK.CheckVPC(ctx, vpcID)
 	if err != nil {
 		return "", err
 	}
-	return defaultVPC, nil
+	return vpcID, nil
 }
 
 func (b ecsAPIService) GetLoadBalancer(ctx context.Context, project *types.Project) (string, error) {

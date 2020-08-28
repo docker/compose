@@ -105,10 +105,19 @@ func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
 	return *response.Cluster.Status, nil
 }
 
-func (s sdk) VpcExists(ctx context.Context, vpcID string) (bool, error) {
-	logrus.Debug("CheckRequirements if VPC exists: ", vpcID)
-	_, err := s.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{VpcIds: []*string{&vpcID}})
-	return err == nil, err
+func (s sdk) CheckVPC(ctx context.Context, vpcID string) error {
+	logrus.Debug("CheckRequirements on VPC : ", vpcID)
+	output, err := s.EC2.DescribeVpcAttributeWithContext(ctx, &ec2.DescribeVpcAttributeInput{
+		VpcId:     aws.String(vpcID),
+		Attribute: aws.String("enableDnsSupport"),
+	})
+	if err != nil {
+		return err
+	}
+	if !*output.EnableDnsSupport.Value {
+		return fmt.Errorf("VPC %q doesn't have DNS resolution enabled", vpcID)
+	}
+	return err
 }
 
 func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
