@@ -164,22 +164,26 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 		}
 
 		for _, container := range *group.Containers {
-			// don't list sidecar container
-			if *container.Name == convert.ComposeDNSSidecarName {
+			if isContainerVisible(container, group, all) {
 				continue
 			}
-			if !all && convert.GetStatus(container, group) != statusRunning {
-				continue
-			}
-			containerID := *containerGroup.Name + composeContainerSeparator + *container.Name
-			if _, ok := group.Tags[singleContainerTag]; ok {
-				containerID = *containerGroup.Name
-			}
-			c := convert.ContainerGroupToContainer(containerID, group, container)
+			c := convert.ContainerGroupToContainer(getContainerID(group, container), group, container)
 			res = append(res, c)
 		}
 	}
 	return res, nil
+}
+
+func getContainerID(group containerinstance.ContainerGroup, container containerinstance.Container) string {
+	containerID := *group.Name + composeContainerSeparator + *container.Name
+	if _, ok := group.Tags[singleContainerTag]; ok {
+		containerID = *group.Name
+	}
+	return containerID
+}
+
+func isContainerVisible(container containerinstance.Container, group containerinstance.ContainerGroup, showAll bool) bool {
+	return *container.Name == convert.ComposeDNSSidecarName || (!showAll && convert.GetStatus(container, group) != statusRunning)
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
@@ -411,7 +415,28 @@ func (cs *aciComposeService) Down(ctx context.Context, project string) error {
 }
 
 func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
-	return nil, errdefs.ErrNotImplemented
+	groupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, project)
+	if err != nil {
+		return []compose.ServiceStatus{}, err
+	}
+
+	if group.Containers == nil || len(*group.Containers) < 1 {
+		return []compose.ServiceStatus{}, fmt.Errorf("no containers found in ACI container group %s", project)
+	}
+
+	res := []compose.ServiceStatus{}
+	for _, container := range *group.Containers {
+		if isContainerVisible(container, group, false) {
+			continue
+		}
+		res = append(res, convert.ContainerGroupToServiceStatus(getContainerID(group, container), group, container))
+	}
+	return res, nil
 }
 
 func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writer) error {

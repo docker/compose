@@ -28,37 +28,37 @@ func TestDisplayPorts(t *testing.T) {
 	testCases := []struct {
 		name     string
 		in       []string
-		expected string
+		expected []string
 	}{
 		{
 			name:     "simple",
 			in:       []string{"80"},
-			expected: "0.0.0.0:80->80/tcp",
+			expected: []string{"0.0.0.0:80->80/tcp"},
 		},
 		{
 			name:     "different ports",
 			in:       []string{"80:90"},
-			expected: "0.0.0.0:80->90/tcp",
+			expected: []string{"0.0.0.0:80->90/tcp"},
 		},
 		{
 			name:     "host ip",
 			in:       []string{"192.168.0.1:80:90"},
-			expected: "192.168.0.1:80->90/tcp",
+			expected: []string{"192.168.0.1:80->90/tcp"},
 		},
 		{
 			name:     "port range",
 			in:       []string{"80-90:80-90"},
-			expected: "0.0.0.0:80-90->80-90/tcp",
+			expected: []string{"0.0.0.0:80-90->80-90/tcp"},
 		},
 		{
 			name:     "grouping",
 			in:       []string{"80:80", "81:81"},
-			expected: "0.0.0.0:80-81->80-81/tcp",
+			expected: []string{"0.0.0.0:80-81->80-81/tcp"},
 		},
 		{
 			name:     "groups",
 			in:       []string{"80:80", "82:82"},
-			expected: "0.0.0.0:80->80/tcp, 0.0.0.0:82->82/tcp",
+			expected: []string{"0.0.0.0:80->80/tcp", "0.0.0.0:82->82/tcp"},
 		},
 	}
 
@@ -70,8 +70,8 @@ func TestDisplayPorts(t *testing.T) {
 			containerConfig, err := runOpts.ToContainerConfig("test")
 			assert.NilError(t, err)
 
-			out := PortsString(containerConfig.Ports)
-			assert.Equal(t, testCase.expected, out)
+			out := PortsToStrings(containerConfig.Ports)
+			assert.DeepEqual(t, testCase.expected, out)
 		})
 	}
 }

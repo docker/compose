@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/docker/compose-cli/compose"
+
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
@@ -101,6 +103,44 @@ func TestContainerGroupToContainer(t *testing.T) {
 
 	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
 	assert.DeepEqual(t, container, expectedContainer)
+}
+
+func TestContainerGroupToServiceStatus(t *testing.T) {
+	myContainerGroup := containerinstance.ContainerGroup{
+		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{
+			IPAddress: &containerinstance.IPAddress{
+				Ports: &[]containerinstance.Port{{
+					Port: to.Int32Ptr(80),
+				}},
+				IP: to.StringPtr("42.42.42.42"),
+			},
+		},
+	}
+	myContainer := containerinstance.Container{
+		Name: to.StringPtr("myContainerID"),
+		ContainerProperties: &containerinstance.ContainerProperties{
+			Ports: &[]containerinstance.ContainerPort{{
+				Port: to.Int32Ptr(80),
+			}},
+			InstanceView: &containerinstance.ContainerPropertiesInstanceView{
+				RestartCount: nil,
+				CurrentState: &containerinstance.ContainerState{
+					State: to.StringPtr("Running"),
+				},
+			},
+		},
+	}
+
+	var expectedService = compose.ServiceStatus{
+		ID:       "myContainerID",
+		Name:     "myContainerID",
+		Ports:    []string{"42.42.42.42:80->80/tcp"},
+		Replicas: 1,
+		Desired:  1,
+	}
+
+	container := ContainerGroupToServiceStatus("myContainerID", myContainerGroup, myContainer)
+	assert.DeepEqual(t, container, expectedService)
 }
 
 func TestComposeContainerGroupToContainerWithDnsSideCarSide(t *testing.T) {
