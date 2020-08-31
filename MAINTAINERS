@@ -11,6 +11,7 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
+			"aiordache",
 			"ndeloof",
 			"rumpl",
 			"ulyssessouza",
@@ -52,6 +53,11 @@
 	Name = "Aanand Prasad"
 	Email = "aanand.prasad@gmail.com"
 	GitHub = "aanand"
+
+	[people.aiordache]
+	Name = "Anca Iordache"
+	Email = "anca.iordache@docker.com"
+	GitHub = "aiordache"
 
 	[people.bfirsh]
 	Name = "Ben Firshman"
