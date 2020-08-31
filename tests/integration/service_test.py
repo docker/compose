@@ -1002,11 +1002,8 @@ class ServiceTest(DockerClientTestCase):
                                           'context': base_dir,
                                           'labels': {'com.docker.compose.test': 'true'}},
                                       )
-        with pytest.raises(BuildError) as excinfo:
+        with pytest.raises(BuildError):
             service.build(cli=True)
-
-        reason = excinfo.value.reason
-        assert "The command '/bin/sh -c exit 2' returned a non-zero code: 2" == reason
 
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()

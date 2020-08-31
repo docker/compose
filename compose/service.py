@@ -1857,7 +1857,6 @@ class _CLIBuilder:
         magic_word = "Successfully built "
         appear = False
         with subprocess.Popen(args, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE,
                               universal_newlines=True) as p:
             while True:
                 line = p.stdout.readline()
@@ -1867,9 +1866,9 @@ class _CLIBuilder:
                     appear = True
                 yield json.dumps({"stream": line})
 
-            err = p.stderr.readline().strip()
-            if err:
-                raise StreamOutputError(err)
+            p.communicate()
+            if p.returncode != 0:
+                raise StreamOutputError()
 
         with open(iidfile) as f:
             line = f.readline()
