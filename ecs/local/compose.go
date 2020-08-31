@@ -14,31 +14,59 @@
    limitations under the License.
 */
 
-package ecs
+package local
 
 import (
 	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/errdefs"
+
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 	"golang.org/x/mod/semver"
 )
 
-func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions) error {
-	project, err := cli.ProjectFromOptions(options)
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project) error {
+	cmd := exec.Command("docker-compose", "version", "--short")
+	b := bytes.Buffer{}
+	b.WriteString("v")
+	cmd.Stdout = bufio.NewWriter(&b)
+	err := cmd.Run()
+	if err != nil {
+		return errors.Wrap(err, "ECS simulation mode require Docker-compose 1.27")
+	}
+	version := semver.MajorMinor(strings.TrimSpace(b.String()))
+	if version == "" {
+		return fmt.Errorf("can't parse docker-compose version: %s", b.String())
+	}
+	if semver.Compare(version, "v1.27") < 0 {
+		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
+	}
+
+	converted, err := e.Convert(ctx, project)
 	if err != nil {
 		return err
 	}
+
+	cmd = exec.Command("docker-compose", "--context", "default", "--project-directory", project.WorkingDir, "--project-name", project.Name, "-f", "-", "up")
+	cmd.Stdin = strings.NewReader(string(converted))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	project.Networks["credentials_network"] = types.NetworkConfig{
 		Driver: "bridge",
 		Ipam: types.IPAMConfig{
@@ -54,7 +82,7 @@ func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions
 	// On Windows, this directory can be found at "%UserProfile%\.aws"
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for i, service := range project.Services {
@@ -62,7 +90,6 @@ func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions
 			Ipv4Address: fmt.Sprintf("169.254.170.%d", i+3),
 		}
 		service.DependsOn = append(service.DependsOn, "ecs-local-endpoints")
-		service.Environment["AWS_DEFAULT_REGION"] = aws.String(c.ctx.Region)
 		service.Environment["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"] = aws.String("/creds")
 		service.Environment["ECS_CONTAINER_METADATA_URI"] = aws.String("http://169.254.170.2/v3")
 		project.Services[i] = service
@@ -102,30 +129,17 @@ func (c *ecsAPIService) Emulate(ctx context.Context, options *cli.ProjectOptions
 		"secrets":  project.Secrets,
 		"configs":  project.Configs,
 	}
-	marshal, err := yaml.Marshal(config)
-	if err != nil {
-		return err
-	}
+	return yaml.Marshal(config)
+}
 
-	cmd := exec.Command("docker-compose", "version", "--short")
-	b := bytes.Buffer{}
-	b.WriteString("v")
-	cmd.Stdout = bufio.NewWriter(&b)
-	err = cmd.Run()
-	if err != nil {
-		return errors.Wrap(err, "ECS simulation mode require Docker-compose 1.27")
-	}
-	version := semver.MajorMinor(strings.TrimSpace(b.String()))
-	if version == "" {
-		return fmt.Errorf("can't parse docker-compose version: %s", b.String())
-	}
-	if semver.Compare(version, "v1.27") < 0 {
-		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
-	}
+func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
+	return errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose down")
+}
 
-	cmd = exec.Command("docker-compose", "--context", "default", "--project-directory", project.WorkingDir, "--project-name", project.Name, "-f", "-", "up")
-	cmd.Stdin = strings.NewReader(string(marshal))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, w io.Writer) error {
+	return errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose logs")
+}
+
+func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
+	return nil, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose ps")
 }

@@ -24,17 +24,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/client"
-	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/progress"
 )
 
-func upCommand(contextType string) *cobra.Command {
+func upCommand() *cobra.Command {
 	opts := composeOptions{}
-	var simulation bool
 	upCmd := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUp(cmd.Context(), opts, simulation)
+			return runUp(cmd.Context(), opts)
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -42,14 +40,10 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")
-	if contextType == store.EcsContextType {
-		upCmd.Flags().BoolVar(&simulation, "simulate", false, " Simulation mode: run compose app with ECS local container endpoints")
-	}
-
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts composeOptions, simulation bool) error {
+func runUp(ctx context.Context, opts composeOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
@@ -65,9 +59,6 @@ func runUp(ctx context.Context, opts composeOptions, simulation bool) error {
 			return err
 		}
 
-        if simulation {
-			return c.ComposeService().Emulate(ctx, options)
-		}		
 		return c.ComposeService().Up(ctx, project)
 	})
 }

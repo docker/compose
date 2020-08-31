@@ -44,6 +44,11 @@ const (
 	// EcsContextType is the endpoint key in the context endpoints for an ECS
 	// backend
 	EcsContextType = "ecs"
+
+	// EcsLocalSimulationContextType is the endpoint key in the context endpoints for an ECS backend
+	// running local simulation endpoints
+	EcsLocalSimulationContextType = "ecs-local"
+
 	// AciContextType is the endpoint key in the context endpoints for an ACI
 	// backend
 	AciContextType = "aci"

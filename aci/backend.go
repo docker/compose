@@ -396,10 +396,6 @@ func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) err
 	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
 }
 
-func (cs *aciComposeService) Emulate(context.Context, *cli.ProjectOptions) error {
-	return errdefs.ErrNotImplemented
-}
-
 func (cs *aciComposeService) Down(ctx context.Context, project string) error {
 	logrus.Debugf("Down on project with name %q\n", project)
 

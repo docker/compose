@@ -132,10 +132,6 @@ func (cs *composeService) Down(ctx context.Context, project string) error {
 	return nil
 }
 
-func (cs *composeService) Emulate(context.Context, *cli.ProjectOptions) error {
-	return errdefs.ErrNotImplemented
-}
-
 func (cs *composeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }

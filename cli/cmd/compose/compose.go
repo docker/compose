@@ -60,7 +60,7 @@ func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 }
 
 // Command returns the compose command with its child commands
-func Command(contextType string) *cobra.Command {
+func Command() *cobra.Command {
 	command := &cobra.Command{
 		Short: "Docker Compose",
 		Use:   "compose",
@@ -70,7 +70,7 @@ func Command(contextType string) *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(contextType),
+		upCommand(),
 		downCommand(),
 		psCommand(),
 		logsCommand(),
