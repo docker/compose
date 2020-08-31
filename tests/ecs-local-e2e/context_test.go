@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package ecs_local_e2e
+package main
 
 import (
 	"fmt"

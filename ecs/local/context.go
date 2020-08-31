@@ -36,5 +36,8 @@ func (e ecsLocalSimulation) Logout(ctx context.Context) error {
 
 func (e ecsLocalSimulation) CreateContextData(ctx context.Context, params interface{}) (contextData interface{}, description string, err error) {
 	opts := params.(ecs.ContextParams)
+	if opts.Description == "" {
+		opts.Description = "ECS local endpoints"
+	}
 	return struct{}{}, opts.Description, nil
 }
