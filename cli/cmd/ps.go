@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
+
+	"github.com/docker/compose-cli/utils/formatter"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/client"
 	formatter2 "github.com/docker/compose-cli/formatter"
 )
@@ -97,7 +99,7 @@ func runPs(ctx context.Context, opts psOpts) error {
 	fmt.Fprintf(w, "CONTAINER ID\tIMAGE\tCOMMAND\tSTATUS\tPORTS\n")
 	format := "%s\t%s\t%s\t%s\t%s\n"
 	for _, c := range containers {
-		fmt.Fprintf(w, format, c.ID, c.Image, c.Command, c.Status, formatter.PortsString(c.Ports))
+		fmt.Fprintf(w, format, c.ID, c.Image, c.Command, c.Status, strings.Join(formatter.PortsToStrings(c.Ports), ", "))
 	}
 
 	return w.Flush()

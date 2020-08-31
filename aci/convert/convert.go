@@ -26,6 +26,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/utils/formatter"
+
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
@@ -383,6 +386,21 @@ func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.En
 func bytesToGb(b types.UnitBytes) float64 {
 	f := float64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
 	return math.Round(f*100) / 100
+}
+
+// ContainerGroupToServiceStatus convert from an ACI container definition to service status
+func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container) compose.ServiceStatus {
+	var replicas = 1
+	if GetStatus(container, group) != "Running" {
+		replicas = 0
+	}
+	return compose.ServiceStatus{
+		ID:       containerID,
+		Name:     *container.Name,
+		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports)),
+		Replicas: replicas,
+		Desired:  1,
+	}
 }
 
 // ContainerGroupToContainer composes a Container from an ACI container definition

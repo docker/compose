@@ -81,10 +81,10 @@ func TestLoginLogout(t *testing.T) {
 
 	t.Run("create context", func(t *testing.T) {
 		sID := getSubscriptionID(t)
-		err := createResourceGroup(sID, rg)
+		err := createResourceGroup(t, sID, rg)
 		assert.Check(t, is.Nil(err))
 		t.Cleanup(func() {
-			_ = deleteResourceGroup(rg)
+			_ = deleteResourceGroup(t, rg)
 		})
 
 		c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rg, "--location", location)
@@ -388,7 +388,7 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 }
 
-func TestCompose(t *testing.T) {
+func TestComposeUpUpdate(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	_, _ = setupTestResourceGroup(t, c)
 
@@ -398,6 +398,7 @@ func TestCompose(t *testing.T) {
 		composeProjectName       = "acidemo"
 		serverContainer          = composeProjectName + "_web"
 		wordsContainer           = composeProjectName + "_words"
+		dbContainer              = composeProjectName + "_db"
 	)
 
 	t.Run("compose up", func(t *testing.T) {
@@ -429,6 +430,30 @@ func TestCompose(t *testing.T) {
 		b, err := ioutil.ReadAll(r.Body)
 		assert.NilError(t, err)
 		assert.Assert(t, strings.Contains(string(b), `"word":`))
+	})
+
+	t.Run("compose ps", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
+		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		assert.Assert(t, is.Len(lines, 4))
+		var wordsDisplayed, webDisplayed, dbDisplayed bool
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			containerID := fields[0]
+			switch containerID {
+			case wordsContainer:
+				wordsDisplayed = true
+				assert.DeepEqual(t, fields, []string{containerID, "words", "1/1"})
+			case dbContainer:
+				dbDisplayed = true
+				assert.DeepEqual(t, fields, []string{containerID, "db", "1/1"})
+			case serverContainer:
+				webDisplayed = true
+				assert.Equal(t, fields[1], "web")
+				assert.Check(t, strings.Contains(fields[3], ":80->80/tcp"))
+			}
+		}
+		assert.Check(t, webDisplayed && wordsDisplayed && dbDisplayed, "\n%s\n", res.Stdout())
 	})
 
 	t.Run("logs web", func(t *testing.T) {
@@ -527,10 +552,10 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
 	rg := "E2E-" + t.Name() + "-" + startTime
 	azureLogin(t, c)
 	sID := getSubscriptionID(t)
-	err := createResourceGroup(sID, rg)
+	err := createResourceGroup(t, sID, rg)
 	assert.Check(t, is.Nil(err))
 	t.Cleanup(func() {
-		if err := deleteResourceGroup(rg); err != nil {
+		if err := deleteResourceGroup(t, rg); err != nil {
 			t.Error(err)
 		}
 	})
@@ -541,7 +566,8 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
 	return sID, rg
 }
 
-func deleteResourceGroup(rgName string) error {
+func deleteResourceGroup(t *testing.T, rgName string) error {
+	fmt.Printf("	[%s] deleting resource group %s\n", t.Name(), rgName)
 	ctx := context.TODO()
 	helper := aci.NewACIResourceGroupHelper()
 	models, err := helper.GetSubscriptionIDs(ctx)
@@ -574,7 +600,8 @@ func getSubscriptionID(t *testing.T) string {
 	return *models[0].SubscriptionID
 }
 
-func createResourceGroup(sID, rgName string) error {
+func createResourceGroup(t *testing.T, sID, rgName string) error {
+	fmt.Printf("	[%s] creating resource group %s\n", t.Name(), rgName)
 	helper := aci.NewACIResourceGroupHelper()
 	_, err := helper.CreateOrUpdate(context.TODO(), sID, rgName, resources.Group{Location: to.StringPtr(location)})
 	return err

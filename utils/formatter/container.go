@@ -30,8 +30,8 @@ type portGroup struct {
 	last  uint32
 }
 
-// PortsString returns a human readable published ports
-func PortsString(ports []containers.Port) string {
+// PortsToStrings returns a human readable published ports
+func PortsToStrings(ports []containers.Port) []string {
 	groupMap := make(map[string]*portGroup)
 	var (
 		result       []string
@@ -82,7 +82,7 @@ func PortsString(ports []containers.Port) string {
 
 	result = append(result, hostMappings...)
 
-	return strings.Join(result, ", ")
+	return result
 }
 
 func formGroup(key string, start uint32, last uint32) string {
