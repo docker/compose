@@ -133,7 +133,15 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project)
 }
 
 func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
-	return errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose down")
+	cmd := exec.Command("docker-compose", "--context", "default", "--project-name", projectName, "-f", "-", "down", "--remove-orphans")
+	cmd.Stdin = strings.NewReader(string(`
+services:
+   ecs-local-endpoints:
+      image: "amazon/amazon-ecs-local-container-endpoints"
+`))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, w io.Writer) error {
