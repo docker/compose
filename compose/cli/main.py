@@ -1439,6 +1439,7 @@ def call_docker(args, dockeropts, environment):
     key = dockeropts.get('--tlskey')
     verify = dockeropts.get('--tlsverify')
     host = dockeropts.get('--host')
+    context = dockeropts.get('--context')
     tls_options = []
     if tls:
         tls_options.append('--tls')
@@ -1453,6 +1454,10 @@ def call_docker(args, dockeropts, environment):
     if host:
         tls_options.extend(
             ['--host', re.sub(r'^https?://', 'tcp://', host.lstrip('='))]
+        )
+    if context:
+        tls_options.extend(
+            ['--context', context]
         )
 
     args = [executable_path] + tls_options + args
