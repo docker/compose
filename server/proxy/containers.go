@@ -65,6 +65,11 @@ func (p *proxy) Stop(ctx context.Context, request *containersv1.StopRequest) (*c
 	return &containersv1.StopResponse{}, Client(ctx).ContainerService().Stop(ctx, request.Id, &timeoutValue)
 }
 
+func (p *proxy) Kill(ctx context.Context, request *containersv1.KillRequest) (*containersv1.KillResponse, error) {
+	signal := request.GetSignal()
+	return &containersv1.KillResponse{}, Client(ctx).ContainerService().Kill(ctx, request.Id, signal)
+}
+
 func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*containersv1.RunResponse, error) {
 	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, grpcContainerToContainerConfig(request))
 }

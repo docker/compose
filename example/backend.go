@@ -105,6 +105,10 @@ func (cs *containerService) Stop(ctx context.Context, containerName string, time
 	return errors.New("not implemented")
 }
 
+func (cs *containerService) Kill(ctx context.Context, containerName string, signal string) error {
+	return errors.New("not implemented")
+}
+
 func (cs *containerService) Exec(ctx context.Context, name string, request containers.ExecRequest) error {
 	fmt.Printf("Executing command %q on container %q", request.Command, name)
 	return nil

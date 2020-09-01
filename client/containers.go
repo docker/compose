@@ -41,6 +41,10 @@ func (c *containerService) Stop(context.Context, string, *uint32) error {
 	return errdefs.ErrNotImplemented
 }
 
+func (c *containerService) Kill(ctx context.Context, containerID string, signal string) error {
+	return errdefs.ErrNotImplemented
+}
+
 // Run creates and starts a container
 func (c *containerService) Run(context.Context, containers.ContainerConfig) error {
 	return errdefs.ErrNotImplemented

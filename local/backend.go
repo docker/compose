@@ -188,6 +188,10 @@ func (ms *local) Stop(ctx context.Context, containerID string, timeout *uint32) 
 	return ms.apiClient.ContainerStop(ctx, containerID, t)
 }
 
+func (ms *local) Kill(ctx context.Context, containerID string, signal string) error {
+	return ms.apiClient.ContainerKill(ctx, containerID, signal)
+}
+
 func (ms *local) Exec(ctx context.Context, name string, request containers.ExecRequest) error {
 	cec, err := ms.apiClient.ContainerExecCreate(ctx, name, types.ExecConfig{
 		Cmd:          []string{request.Command},
