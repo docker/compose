@@ -38,22 +38,42 @@ $ docker context create ecs CONTEXT [flags]
 }
 
 func createEcsCommand() *cobra.Command {
+	var localSimulation bool
 	var opts ecs.ContextParams
 	cmd := &cobra.Command{
 		Use:   "ecs CONTEXT [flags]",
 		Short: "Create a context for Amazon ECS",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if localSimulation {
+				return runCreateLocalSimulation(cmd.Context(), args[0], opts)
+			}
 			return runCreateEcs(cmd.Context(), args[0], opts)
 		},
 	}
 
 	addDescriptionFlag(cmd, &opts.Description)
+	cmd.Flags().BoolVar(&localSimulation, "local-simulation", false, "Create context for ECS local simulation endpoints")
 	cmd.Flags().StringVar(&opts.Profile, "profile", "", "Profile")
 	cmd.Flags().StringVar(&opts.Region, "region", "", "Region")
 	cmd.Flags().StringVar(&opts.AwsID, "key-id", "", "AWS Access Key ID")
 	cmd.Flags().StringVar(&opts.AwsSecret, "secret-key", "", "AWS Secret Access Key")
 	return cmd
+}
+
+func runCreateLocalSimulation(ctx context.Context, contextName string, opts ecs.ContextParams) error {
+	if contextExists(ctx, contextName) {
+		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
+	}
+	cs, err := client.GetCloudService(ctx, store.EcsLocalSimulationContextType)
+	if err != nil {
+		return errors.Wrap(err, "cannot connect to ECS backend")
+	}
+	data, description, err := cs.CreateContextData(ctx, opts)
+	if err != nil {
+		return err
+	}
+	return createDockerContext(ctx, contextName, store.EcsLocalSimulationContextType, description, data)
 }
 
 func runCreateEcs(ctx context.Context, contextName string, opts ecs.ContextParams) error {
@@ -71,7 +91,7 @@ func runCreateEcs(ctx context.Context, contextName string, opts ecs.ContextParam
 func getEcsContextData(ctx context.Context, opts ecs.ContextParams) (interface{}, string, error) {
 	cs, err := client.GetCloudService(ctx, store.EcsContextType)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "cannot connect to AWS backend")
+		return nil, "", errors.Wrap(err, "cannot connect to ECS backend")
 	}
 	return cs.CreateContextData(ctx, opts)
 }

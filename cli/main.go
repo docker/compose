@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/compose-cli/cli/cmd/compose"
+
 	"github.com/docker/compose-cli/cli/cmd/logout"
 
 	"github.com/docker/compose-cli/errdefs"
@@ -38,12 +40,12 @@ import (
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
 	_ "github.com/docker/compose-cli/ecs"
+	_ "github.com/docker/compose-cli/ecs/local"
 	_ "github.com/docker/compose-cli/example"
 	_ "github.com/docker/compose-cli/local"
 	"github.com/docker/compose-cli/metrics"
 
 	"github.com/docker/compose-cli/cli/cmd"
-	"github.com/docker/compose-cli/cli/cmd/compose"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/run"
@@ -121,12 +123,12 @@ func main() {
 		cmd.RmCommand(),
 		cmd.StartCommand(),
 		cmd.InspectCommand(),
-		compose.Command(),
 		login.Command(),
 		logout.Command(),
 		cmd.VersionCommand(version),
 		cmd.StopCommand(),
 		cmd.SecretCommand(),
+		compose.Command(),
 
 		// Place holders
 		cmd.EcsCommand(),

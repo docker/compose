@@ -22,8 +22,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 
-	"github.com/docker/compose-cli/secrets"
-
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/compose"
 	"github.com/docker/compose-cli/containers"
@@ -31,6 +29,7 @@ import (
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/secrets"
 )
 
 const backendType = store.EcsContextType

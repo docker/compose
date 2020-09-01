@@ -40,7 +40,6 @@ func upCommand() *cobra.Command {
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")
-
 	return upCmd
 }
 
