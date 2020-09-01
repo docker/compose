@@ -116,7 +116,17 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("compose down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "down", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
+		cmd := c.NewDockerCmd("compose", "down", "--project-name", stack)
+		res := icmd.StartCmd(cmd)
+
+		checkUp := func(t poll.LogT) poll.Result {
+			out := res.Stdout()
+			if !strings.Contains(out, "DELETE_COMPLETE") {
+				return poll.Continue("current status \n%s\n", out)
+			}
+			return poll.Success()
+		}
+		poll.WaitOn(t, checkUp, poll.WithDelay(2*time.Second), poll.WithTimeout(60*time.Second))
 	})
 }
 
