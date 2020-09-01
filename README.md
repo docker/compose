@@ -12,7 +12,7 @@ using the Docker commands you already know.
 To get started, all you need is:
 * An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
   account
-* Windows: Edge release of
+* Windows: The Edge release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
 * macOS: The Edge release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
@@ -27,9 +27,12 @@ To get started, all you need is:
 * ECS: [Deploying Wordpress to the cloud](https://www.docker.com/blog/deploying-wordpress-to-the-cloud/)
 * ACI: [Deploying a Minecraft server to the cloud](https://www.docker.com/blog/deploying-a-minecraft-docker-server-to-the-cloud/)
 
-## Developing
+## Development
 
-See [Instructions](BUILDING.MD) on building the cli, running tests locally and against Azure Container Instances (ACI) or Amazon ECS, and releasing it.
-Also Check [contribution guidelines](CONTRIBUTING.md) on conventions used in this project. 
+See the instructions in [BUILDING.md](BUILDING.md) for how to build the CLI and
+run its tests; including the end to end tests for local containers, ACI, and
+ECS.
+The guide also includes instructions for releasing the CLI.
 
-
+Before contributing, please read the [contribution guidelines](CONTRIBUTING.md)
+which includes conventions used in this project.
