@@ -28,7 +28,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
-	auth2 "github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -38,9 +38,9 @@ import (
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
 const (
-	authorizeFormat  = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
-	tokenEndpoint    = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
-	authorizationURL = "https://management.azure.com/tenants?api-version=2019-11-01"
+	authorizeFormat = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
+	tokenEndpoint   = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
+	getTenantURL    = "https://management.azure.com/tenants?api-version=2019-11-01"
 	// scopes for a multi-tenant app works for openid, email, other common scopes, but fails when trying to add a token
 	// v1 scope like "https://management.azure.com/.default" for ARM access
 	scopes   = "offline_access https://management.azure.com/.default"
@@ -101,7 +101,7 @@ func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (*Azu
 // The resulting token does not include a refresh token
 func (login *AzureLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error {
 	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
-	creds := auth2.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
+	creds := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 
 	spToken, err := creds.ServicePrincipalToken()
 	if err != nil {
@@ -132,6 +132,35 @@ func (login *AzureLoginService) Logout(ctx context.Context) error {
 	return err
 }
 
+func (login *AzureLoginService) getTenantAndValidateLogin(accessToken string, refreshToken string, requestedTenantID string) error {
+	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
+	if err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
+	}
+
+	if statusCode != http.StatusOK {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
+	}
+	var t tenantResult
+	if err := json.Unmarshal(bits, &t); err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
+	}
+	tenantID, err := getTenantID(t.Value, requestedTenantID)
+	if err != nil {
+		return errors.Wrap(errdefs.ErrLoginFailed, err.Error())
+	}
+	tToken, err := login.refreshToken(refreshToken, tenantID)
+	if err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
+	}
+	loginInfo := TokenInfo{TenantID: tenantID, Token: tToken}
+
+	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
+		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
+	}
+	return nil
+}
+
 // Login performs an Azure login through a web browser
 func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID string) error {
 	queryCh := make(chan localResponse, 1)
@@ -148,7 +177,12 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 	}
 
 	if err = login.apiHelper.openAzureLoginPage(redirectURL); err != nil {
-		return err
+		fmt.Println("Could not automatically open a browser, falling back to Azure device code flow authentication")
+		token, err := login.apiHelper.getDeviceCodeFlowToken()
+		if err != nil {
+			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
+		}
+		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
 	}
 
 	select {
@@ -173,36 +207,8 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 		if err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
-
-		bits, statusCode, err := login.apiHelper.queryAuthorizationAPI(authorizationURL, fmt.Sprintf("Bearer %s", token.AccessToken))
-		if err != nil {
-			return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
-		}
-
-		switch statusCode {
-		case http.StatusOK:
-			var t tenantResult
-			if err := json.Unmarshal(bits, &t); err != nil {
-				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
-			}
-			tenantID, err := getTenantID(t.Value, requestedTenantID)
-			if err != nil {
-				return errors.Wrap(errdefs.ErrLoginFailed, err.Error())
-			}
-			tToken, err := login.refreshToken(token.RefreshToken, tenantID)
-			if err != nil {
-				return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
-			}
-			loginInfo := TokenInfo{TenantID: tenantID, Token: tToken}
-
-			if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
-				return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
-			}
-		default:
-			return errors.Wrapf(errdefs.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
-		}
+		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
 	}
-	return nil
 }
 
 func getTenantID(tenantValues []tenantValue, requestedTenantID string) (string, error) {
