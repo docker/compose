@@ -214,6 +214,12 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 	}
 
 	if _, ok := d.notifyList[path]; ok {
+		// We generally don't care when directories change at the root of an ADD
+		stat, err := os.Lstat(path)
+		isDir := err == nil && stat.IsDir()
+		if isDir {
+			return false
+		}
 		return true
 	}
 	// TODO(dmiller): maybe use a prefix tree here?
