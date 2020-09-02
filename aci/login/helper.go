@@ -102,13 +102,13 @@ func openbrowser(address string) error {
 	switch runtime.GOOS {
 	case "linux":
 		if isWsl() {
-			return exec.Command("wslview", address).Start()
+			return exec.Command("wslview", address).Run()
 		}
-		return exec.Command("xdg-open", address).Start()
+		return exec.Command("xdg-open", address).Run()
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", address).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", address).Run()
 	case "darwin":
-		return exec.Command("open", address).Start()
+		return exec.Command("open", address).Run()
 	default:
 		return fmt.Errorf("unsupported platform")
 	}
