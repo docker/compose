@@ -421,9 +421,6 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
 
-	ignore, _ := dockerignore.NewDockerPatternMatcher(f.paths[0], []string{"./"})
-	f.setIgnore(ignore)
-
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
 	if err != nil {
@@ -441,12 +438,9 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if runtime.GOOS == "darwin" {
-		// for directories that were the root of an Add, we don't report creation, cf. watcher_darwin.go
-		f.assertEvents()
-	} else {
-		f.assertEvents(parent)
-	}
+	// for directories that were the root of an Add, we don't report creation, cf. watcher_darwin.go
+	f.assertEvents()
+
 	f.events = nil
 	f.WriteFile(file, "hello")
 
@@ -456,9 +450,6 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
 	defer f.tearDown()
-
-	ignore, _ := dockerignore.NewDockerPatternMatcher(f.paths[0], []string{"./"})
-	f.setIgnore(ignore)
 
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
