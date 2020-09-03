@@ -36,6 +36,7 @@ from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.project import Project
 from compose.service import BuildAction
+from compose.service import BuildError
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
 from compose.service import IpcMode
@@ -986,6 +987,23 @@ class ServiceTest(DockerClientTestCase):
         self.addCleanup(self.client.remove_image, service.image_name)
         image = self.client.inspect_image('composetest_web')
         assert image['Config']['Labels']['com.docker.compose.test']
+
+    def test_build_cli_with_build_error(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('\n'.join([
+                "FROM busybox",
+                "RUN exit 2",
+            ]))
+        service = self.create_service('web',
+                                      build={
+                                          'context': base_dir,
+                                          'labels': {'com.docker.compose.test': 'true'}},
+                                      )
+        with pytest.raises(BuildError):
+            service.build(cli=True)
 
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()

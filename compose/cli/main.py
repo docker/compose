@@ -73,13 +73,16 @@ def main():
         log.error(e.msg)
         sys.exit(1)
     except BuildError as e:
-        log.error("Service '{}' failed to build: {}".format(e.service.name, e.reason))
+        reason = ""
+        if e.reason:
+            reason = " : " + e.reason
+        log.error("Service '{}' failed to build{}".format(e.service.name, reason))
         sys.exit(1)
     except StreamOutputError as e:
         log.error(e)
         sys.exit(1)
     except NeedsBuildError as e:
-        log.error("Service '%s' needs to be built, but --no-build was passed." % e.service.name)
+        log.error("Service '{}' needs to be built, but --no-build was passed.".format(e.service.name))
         sys.exit(1)
     except NoSuchCommand as e:
         commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
@@ -1436,6 +1439,7 @@ def call_docker(args, dockeropts, environment):
     key = dockeropts.get('--tlskey')
     verify = dockeropts.get('--tlsverify')
     host = dockeropts.get('--host')
+    context = dockeropts.get('--context')
     tls_options = []
     if tls:
         tls_options.append('--tls')
@@ -1450,6 +1454,10 @@ def call_docker(args, dockeropts, environment):
     if host:
         tls_options.extend(
             ['--host', re.sub(r'^https?://', 'tcp://', host.lstrip('='))]
+        )
+    if context:
+        tls_options.extend(
+            ['--context', context]
         )
 
     args = [executable_path] + tls_options + args
