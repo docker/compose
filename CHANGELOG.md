@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.27.0 (2020-08-21)
+1.27.0 (2020-09-03)
 -------------------
 
 ### Features
@@ -27,6 +27,12 @@ Change log
 - Fix float to bytes conversion via docker-py bump to 4.3.1
 
 - Fix scale bug when deploy section is set
+
+- Fix `docker-py` bump in `setup.py`
+
+- Fix experimental build failure detection
+
+- Fix context propagation to docker cli
 
 ### Miscellaneous
 
