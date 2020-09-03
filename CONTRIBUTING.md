@@ -2,7 +2,7 @@
 
 Want to hack on Docker? Awesome!  We have a contributor's guide that explains
 [setting up a Docker development environment and the contribution
-process](https://docs.docker.com/opensource/project/who-written-for/). 
+process](https://docs.docker.com/opensource/project/who-written-for/).
 
 This page contains information about reporting issues as well as some tips and
 guidelines useful to experienced open source contributors. Finally, make sure
@@ -53,9 +53,10 @@ When reporting issues, always include:
 
 Also include the steps required to reproduce the problem if possible and
 applicable. This information will help us review and fix your issue faster.
-When sending lengthy log-files, consider posting them as a gist (https://gist.github.com).
-Don't forget to remove sensitive data from your logfiles before posting (you can
-replace those parts with "REDACTED").
+When sending lengthy log files, consider posting them as a gist
+(https://gist.github.com).
+Don't forget to remove sensitive data from your log files before posting (you
+can replace those parts with "REDACTED").
 
 ## Quick contribution tips and guidelines
 
@@ -64,14 +65,15 @@ This section gives the experienced contributor some tips and guidelines.
 ### Pull requests are always welcome
 
 Not sure if that typo is worth a pull request? Found a bug and know how to fix
-it? Do it! We will appreciate it. Any significant improvement should be
-documented as [a GitHub issue](https://github.com/docker/compose-cli/issues) before
-anybody starts working on it.
+it? Do it! We will appreciate it. Any significant change, like adding a backend,
+should be documented as
+[a GitHub issue](https://github.com/docker/compose-cli/issues)
+before anybody starts working on it.
 
 We are always thrilled to receive pull requests. We do our best to process them
 quickly. If your pull request is not accepted on the first try,
-don't get discouraged! Our contributor's guide explains [the review process we
-use for simple changes](https://docs.docker.com/opensource/workflow/make-a-contribution/).
+don't get discouraged! Our contributor's guide explains
+[the review process we use for simple changes](https://docs.docker.com/opensource/workflow/make-a-contribution/).
 
 ### Talking to other Docker users and contributors
 
@@ -79,17 +81,17 @@ use for simple changes](https://docs.docker.com/opensource/workflow/make-a-contr
   <col width="45%">
   <col width="65%">
   <tr>
+    <td>Community Slack</td>
+    <td>
+      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://community.docker.com/registrations/groups/4316" target="_blank">with this link</a>.
+    </td>
+  </tr>
+  <tr>
     <td>Forums</td>
     <td>
       A public forum for users to discuss questions and explore current design patterns and
       best practices about Docker and related projects in the Docker Ecosystem. To participate,
       just log in with your Docker Hub account on <a href="https://forums.docker.com" target="_blank">https://forums.docker.com</a>.
-    </td>
-  </tr>
-  <tr>
-    <td>Community Slack</td>
-    <td>
-      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://community.docker.com/registrations/groups/4316" target="_blank">with this link</a>.
     </td>
   </tr>
   <tr>
@@ -116,7 +118,7 @@ use for simple changes](https://docs.docker.com/opensource/workflow/make-a-contr
 Fork the repository and make changes on your fork in a feature branch:
 
 - If it's a bug fix branch, name it XXXX-something where XXXX is the number of
-    the issue. 
+    the issue.
 - If it's a feature branch, create an enhancement issue to announce
     your intentions, and name it XXXX-something where XXXX is the number of the
     issue.
@@ -161,9 +163,9 @@ After every commit, make sure the test suite passes. Include documentation
 changes in the same pull request so that a revert would remove all traces of
 the feature or fix.
 
-Include an issue reference like `Closes #XXXX` or `Fixes #XXXX` in the pull request
-description that close an issue. Including references automatically closes the issue
-on a merge.
+Include an issue reference like `Closes #XXXX` or `Fixes #XXXX` in the pull
+request description that close an issue. Including references automatically
+closes the issue on a merge.
 
 Please do not add yourself to the `AUTHORS` file, as it is regenerated regularly
 from the Git history.
@@ -236,9 +238,10 @@ commit automatically with `git commit -s`.
 
 ### How can I become a maintainer?
 
-The procedures for adding new maintainers are explained in the 
-global [MAINTAINERS](https://github.com/docker/opensource/blob/master/MAINTAINERS)
-file in the [https://github.com/docker/opensource/](https://github.com/docker/opensource/)
+The procedures for adding new maintainers are explained in the global
+[MAINTAINERS](https://github.com/docker/opensource/blob/master/MAINTAINERS)
+file in the
+[https://github.com/docker/opensource/](https://github.com/docker/opensource/)
 repository.
 
 Don't forget: being a maintainer is a time investment. Make sure you
