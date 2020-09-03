@@ -27,6 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	types2 "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+
 	"github.com/docker/compose-cli/compose"
 	"github.com/docker/compose-cli/errdefs"
 
@@ -133,11 +136,42 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project)
 }
 
 func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
-	return errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose down")
+	cmd := exec.Command("docker-compose", "--context", "default", "--project-name", projectName, "-f", "-", "down", "--remove-orphans")
+	cmd.Stdin = strings.NewReader(string(`
+services:
+   ecs-local-endpoints:
+      image: "amazon/amazon-ecs-local-container-endpoints"
+`))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, w io.Writer) error {
-	return errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose logs")
+	list, err := e.moby.ContainerList(ctx, types2.ContainerListOptions{
+		Filters: filters.NewArgs(filters.Arg("label", "com.docker.compose.project="+projectName)),
+	})
+	if err != nil {
+		return err
+	}
+	services := map[string]types.ServiceConfig{}
+	for _, c := range list {
+		services[c.Labels["com.docker.compose.service"]] = types.ServiceConfig{
+			Image: "unused",
+		}
+	}
+
+	marshal, err := yaml.Marshal(map[string]interface{}{
+		"services": services,
+	})
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("docker-compose", "--context", "default", "--project-name", projectName, "-f", "-", "logs", "-f")
+	cmd.Stdin = strings.NewReader(string(marshal))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
