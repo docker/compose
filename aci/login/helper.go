@@ -27,6 +27,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
+
 	"github.com/pkg/errors"
 )
 
@@ -37,10 +40,21 @@ var (
 type apiHelper interface {
 	queryToken(data url.Values, tenantID string) (azureToken, error)
 	openAzureLoginPage(redirectURL string) error
-	queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error)
+	queryAPIWithHeader(authorizationURL string, authorizationHeader string) ([]byte, int, error)
+	getDeviceCodeFlowToken() (adal.Token, error)
 }
 
 type azureAPIHelper struct{}
+
+func (helper azureAPIHelper) getDeviceCodeFlowToken() (adal.Token, error) {
+	deviceconfig := auth.NewDeviceFlowConfig(clientID, "common")
+	deviceconfig.Resource = "https://management.core.windows.net/"
+	spToken, err := deviceconfig.ServicePrincipalToken()
+	if err != nil {
+		return adal.Token{}, err
+	}
+	return spToken.Token(), err
+}
 
 func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
 	state := randomString("", 10)
@@ -48,7 +62,7 @@ func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
 	return openbrowser(authURL)
 }
 
-func (helper azureAPIHelper) queryAuthorizationAPI(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
+func (helper azureAPIHelper) queryAPIWithHeader(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
 	req, err := http.NewRequest(http.MethodGet, authorizationURL, nil)
 	if err != nil {
 		return nil, 0, err
@@ -88,13 +102,13 @@ func openbrowser(address string) error {
 	switch runtime.GOOS {
 	case "linux":
 		if isWsl() {
-			return exec.Command("wslview", address).Start()
+			return exec.Command("wslview", address).Run()
 		}
-		return exec.Command("xdg-open", address).Start()
+		return exec.Command("xdg-open", address).Run()
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", address).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", address).Run()
 	case "darwin":
-		return exec.Command("open", address).Start()
+		return exec.Command("open", address).Run()
 	default:
 		return fmt.Errorf("unsupported platform")
 	}
