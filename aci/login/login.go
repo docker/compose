@@ -132,8 +132,8 @@ func (login *AzureLoginService) Logout(ctx context.Context) error {
 	return err
 }
 
-func (login *AzureLoginService) getTenantAndValidateLogin(accessToken string, refreshToken string, requestedTenantID string) error {
-	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
+func (login *AzureLoginService) getTenantAndValidateLogin(ctx context.Context, accessToken string, refreshToken string, requestedTenantID string) error {
+	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(ctx, getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
 	if err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
 	}
@@ -189,7 +189,7 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
 		}
 		token := dcft.token
-		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
 	case q := <-queryCh:
 		if q.err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
@@ -209,7 +209,7 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 		if err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
-		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
 	}
 }
 
