@@ -18,53 +18,11 @@ package ecs
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/docker/compose-cli/compose"
 )
 
-func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
-	parameters, err := b.SDK.ListStackParameters(ctx, project)
-	if err != nil {
-		return nil, err
-	}
-	cluster := parameters[parameterClusterName]
+func (b *ecsAPIService) List(ctx context.Context, project string) ([]compose.Stack, error) {
+	return b.SDK.ListStacks(ctx, project)
 
-	resources, err := b.SDK.ListStackResources(ctx, project)
-	if err != nil {
-		return nil, err
-	}
-
-	servicesARN := []string{}
-	for _, r := range resources {
-		switch r.Type {
-		case "AWS::ECS::Service":
-			servicesARN = append(servicesARN, r.ARN)
-		case "AWS::ECS::Cluster":
-			cluster = r.ARN
-		}
-	}
-	if len(servicesARN) == 0 {
-		return nil, nil
-	}
-	status, err := b.SDK.DescribeServices(ctx, cluster, servicesARN)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, state := range status {
-		ports := []string{}
-		for _, lb := range state.Publishers {
-			ports = append(ports, fmt.Sprintf(
-				"%s:%d->%d/%s",
-				lb.URL,
-				lb.PublishedPort,
-				lb.TargetPort,
-				strings.ToLower(lb.Protocol)))
-		}
-		state.Ports = ports
-		status[i] = state
-	}
-	return status, nil
 }

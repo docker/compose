@@ -438,6 +438,9 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 	}
 	return res, nil
 }
+func (cs *aciComposeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
+	return nil, errdefs.ErrNotImplemented
+}
 
 func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writer) error {
 	return errdefs.ErrNotImplemented

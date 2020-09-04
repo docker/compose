@@ -33,6 +33,8 @@ type Service interface {
 	Logs(ctx context.Context, projectName string, w io.Writer) error
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string) ([]ServiceStatus, error)
+	// List executes the equivalent to a `docker stack ls`
+	List(ctx context.Context, projectName string) ([]Stack, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project) ([]byte, error)
 }
@@ -53,4 +55,23 @@ type ServiceStatus struct {
 	Desired    int
 	Ports      []string
 	Publishers []PortPublisher
+}
+type State string
+
+const (
+	// Starting indicates that stack is being deployed
+	STARTING State = "starting"
+	// Runnning indicates that stack is deployed and services are running
+	RUNNING State = "running"
+	// Updating indicates that some stack resources are being recreated
+	UPDATING State = "updating"
+	// Removing indicates that stack is being deleted
+	REMOVING State = "removing"
+)
+
+// StackStatus hold status about a compose application/stack
+type Stack struct {
+	ID     string
+	Name   string
+	Status State
 }

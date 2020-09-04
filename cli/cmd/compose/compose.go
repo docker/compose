@@ -73,6 +73,7 @@ func Command() *cobra.Command {
 		upCommand(),
 		downCommand(),
 		psCommand(),
+		listCommand(),
 		logsCommand(),
 		convertCommand(),
 	)
