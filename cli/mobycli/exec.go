@@ -28,7 +28,7 @@ import (
 	"github.com/docker/compose-cli/context/store"
 )
 
-var delegatedContextTypes = []string{store.DefaultContextType, store.AwsContextType}
+var delegatedContextTypes = []string{store.DefaultContextType}
 
 // ComDockerCli name of the classic cli binary
 const ComDockerCli = "com.docker.cli"
