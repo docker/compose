@@ -38,10 +38,9 @@ type rmOpts struct {
 func RmCommand() *cobra.Command {
 	var opts rmOpts
 	cmd := &cobra.Command{
-		Use:     "rm",
-		Aliases: []string{"delete"},
-		Short:   "Remove containers",
-		Args:    cobra.MinimumNArgs(1),
+		Use:   "rm",
+		Short: "Remove containers",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRm(cmd.Context(), args, opts)
 		},
