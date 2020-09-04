@@ -127,6 +127,7 @@ func TestInvalidLogin(t *testing.T) {
 
 func TestValidLogin(t *testing.T) {
 	var redirectURL string
+	ctx := context.TODO()
 	m := &MockAzureHelper{}
 	m.On("openAzureLoginPage", mock.AnythingOfType("string")).Run(func(args mock.Arguments) {
 		redirectURL = args.Get(0).(string)
@@ -152,7 +153,7 @@ func TestValidLogin(t *testing.T) {
 
 	authBody := `{"value":[{"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
 
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 	data := refreshTokenData("firstRefreshToken")
 	m.On("queryToken", data, "12345a7c-c56d-43e8-9549-dd230ce8a038").Return(azureToken{
 		RefreshToken: "newRefreshToken",
@@ -163,7 +164,7 @@ func TestValidLogin(t *testing.T) {
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "")
+	err = azureLogin.Login(ctx, "")
 	assert.NilError(t, err)
 
 	loginToken, err := azureLogin.tokenStore.readToken()
@@ -203,7 +204,8 @@ func TestValidLoginRequestedTenant(t *testing.T) {
 	authBody := `{"value":[{"id":"/tenants/00000000-c56d-43e8-9549-dd230ce8a038","tenantId":"00000000-c56d-43e8-9549-dd230ce8a038"},
 						   {"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
 
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	ctx := context.TODO()
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 	data := refreshTokenData("firstRefreshToken")
 	m.On("queryToken", data, "12345a7c-c56d-43e8-9549-dd230ce8a038").Return(azureToken{
 		RefreshToken: "newRefreshToken",
@@ -214,7 +216,7 @@ func TestValidLoginRequestedTenant(t *testing.T) {
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "12345a7c-c56d-43e8-9549-dd230ce8a038")
+	err = azureLogin.Login(ctx, "12345a7c-c56d-43e8-9549-dd230ce8a038")
 	assert.NilError(t, err)
 
 	loginToken, err := azureLogin.tokenStore.readToken()
@@ -251,13 +253,14 @@ func TestLoginNoTenant(t *testing.T) {
 		Foci:         "1",
 	}, nil)
 
+	ctx := context.TODO()
 	authBody := `{"value":[{"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "00000000-c56d-43e8-9549-dd230ce8a038")
+	err = azureLogin.Login(ctx, "00000000-c56d-43e8-9549-dd230ce8a038")
 	assert.Error(t, err, "could not find requested azure tenant 00000000-c56d-43e8-9549-dd230ce8a038: login failed")
 }
 
@@ -286,13 +289,14 @@ func TestLoginRequestedTenantNotFound(t *testing.T) {
 		Foci:         "1",
 	}, nil)
 
+	ctx := context.TODO()
 	authBody := `{"value":[]}`
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "")
+	err = azureLogin.Login(ctx, "")
 	assert.Error(t, err, "could not find azure tenant: login failed")
 }
 
@@ -323,12 +327,13 @@ func TestLoginAuthorizationFailed(t *testing.T) {
 
 	authBody := `[access denied]`
 
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 400, nil)
+	ctx := context.TODO()
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 400, nil)
 
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "")
+	err = azureLogin.Login(ctx, "")
 	assert.Error(t, err, "unable to login status code 400: [access denied]: login failed")
 }
 
@@ -339,7 +344,8 @@ func TestValidThroughDeviceCodeFlow(t *testing.T) {
 
 	authBody := `{"value":[{"id":"/tenants/12345a7c-c56d-43e8-9549-dd230ce8a038","tenantId":"12345a7c-c56d-43e8-9549-dd230ce8a038"}]}`
 
-	m.On("queryAPIWithHeader", getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
+	ctx := context.TODO()
+	m.On("queryAPIWithHeader", ctx, getTenantURL, "Bearer firstAccessToken").Return([]byte(authBody), 200, nil)
 	data := refreshTokenData("firstRefreshToken")
 	m.On("queryToken", data, "12345a7c-c56d-43e8-9549-dd230ce8a038").Return(azureToken{
 		RefreshToken: "newRefreshToken",
@@ -350,7 +356,7 @@ func TestValidThroughDeviceCodeFlow(t *testing.T) {
 	azureLogin, err := testLoginService(t, m)
 	assert.NilError(t, err)
 
-	err = azureLogin.Login(context.TODO(), "")
+	err = azureLogin.Login(ctx, "")
 	assert.NilError(t, err)
 
 	loginToken, err := azureLogin.tokenStore.readToken()
@@ -398,8 +404,8 @@ func (s *MockAzureHelper) queryToken(data url.Values, tenantID string) (token az
 	return args.Get(0).(azureToken), args.Error(1)
 }
 
-func (s *MockAzureHelper) queryAPIWithHeader(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
-	args := s.Called(authorizationURL, authorizationHeader)
+func (s *MockAzureHelper) queryAPIWithHeader(ctx context.Context, authorizationURL string, authorizationHeader string) ([]byte, int, error) {
+	args := s.Called(ctx, authorizationURL, authorizationHeader)
 	return args.Get(0).([]byte), args.Int(1), args.Error(2)
 }
 

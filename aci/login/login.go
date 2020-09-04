@@ -132,8 +132,8 @@ func (login *AzureLoginService) Logout(ctx context.Context) error {
 	return err
 }
 
-func (login *AzureLoginService) getTenantAndValidateLogin(accessToken string, refreshToken string, requestedTenantID string) error {
-	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
+func (login *AzureLoginService) getTenantAndValidateLogin(ctx context.Context, accessToken string, refreshToken string, requestedTenantID string) error {
+	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(ctx, getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
 	if err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
 	}
@@ -176,18 +176,20 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
 	}
 
+	deviceCodeFlowCh := make(chan deviceCodeFlowResponse, 1)
 	if err = login.apiHelper.openAzureLoginPage(redirectURL); err != nil {
-		fmt.Println("Could not automatically open a browser, falling back to Azure device code flow authentication")
-		token, err := login.apiHelper.getDeviceCodeFlowToken()
-		if err != nil {
-			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
-		}
-		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
+		login.startDeviceCodeFlow(deviceCodeFlowCh)
 	}
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case dcft := <-deviceCodeFlowCh:
+		if dcft.err != nil {
+			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
+		}
+		token := dcft.token
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
 	case q := <-queryCh:
 		if q.err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
@@ -207,8 +209,24 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 		if err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
-		return login.getTenantAndValidateLogin(token.AccessToken, token.RefreshToken, requestedTenantID)
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
 	}
+}
+
+type deviceCodeFlowResponse struct {
+	token adal.Token
+	err   error
+}
+
+func (login *AzureLoginService) startDeviceCodeFlow(deviceCodeFlowCh chan deviceCodeFlowResponse) {
+	fmt.Println("Could not automatically open a browser, falling back to Azure device code flow authentication")
+	go func() {
+		token, err := login.apiHelper.getDeviceCodeFlowToken()
+		if err != nil {
+			deviceCodeFlowCh <- deviceCodeFlowResponse{err: err}
+		}
+		deviceCodeFlowCh <- deviceCodeFlowResponse{token: token}
+	}()
 }
 
 func getTenantID(tenantValues []tenantValue, requestedTenantID string) (string, error) {

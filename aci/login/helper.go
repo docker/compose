@@ -17,6 +17,7 @@
 package login
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -40,7 +41,7 @@ var (
 type apiHelper interface {
 	queryToken(data url.Values, tenantID string) (azureToken, error)
 	openAzureLoginPage(redirectURL string) error
-	queryAPIWithHeader(authorizationURL string, authorizationHeader string) ([]byte, int, error)
+	queryAPIWithHeader(ctx context.Context, authorizationURL string, authorizationHeader string) ([]byte, int, error)
 	getDeviceCodeFlowToken() (adal.Token, error)
 }
 
@@ -62,11 +63,12 @@ func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
 	return openbrowser(authURL)
 }
 
-func (helper azureAPIHelper) queryAPIWithHeader(authorizationURL string, authorizationHeader string) ([]byte, int, error) {
+func (helper azureAPIHelper) queryAPIWithHeader(ctx context.Context, authorizationURL string, authorizationHeader string) ([]byte, int, error) {
 	req, err := http.NewRequest(http.MethodGet, authorizationURL, nil)
 	if err != nil {
 		return nil, 0, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Add("Authorization", authorizationHeader)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
