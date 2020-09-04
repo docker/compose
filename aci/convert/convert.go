@@ -40,6 +40,8 @@ import (
 )
 
 const (
+	// StatusRunning name of the ACI running status
+	StatusRunning = "Running"
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
 	dnsSidecarImage       = "busybox:1.31.1"
@@ -391,7 +393,7 @@ func bytesToGb(b types.UnitBytes) float64 {
 // ContainerGroupToServiceStatus convert from an ACI container definition to service status
 func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container) compose.ServiceStatus {
 	var replicas = 1
-	if GetStatus(container, group) != "Running" {
+	if GetStatus(container, group) != StatusRunning {
 		replicas = 0
 	}
 	return compose.ServiceStatus{

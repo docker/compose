@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/compose-cli/aci/convert"
+
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -294,6 +296,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 	container = "test-container"
 
+	var followLogsProcess *icmd.Result
 	t.Run("run attached limits", func(t *testing.T) {
 		cmd := c.NewDockerCmd(
 			"run",
@@ -303,7 +306,7 @@ func TestContainerRunAttached(t *testing.T) {
 			"-p", "80:80",
 			"nginx",
 		)
-		runRes := icmd.StartCmd(cmd)
+		followLogsProcess = icmd.StartCmd(cmd)
 
 		checkRunning := func(t poll.LogT) poll.Result {
 			res := c.RunDockerOrExitError("inspect", container)
@@ -330,7 +333,7 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Equal(t, port.HostPort, uint32(80))
 		endpoint = fmt.Sprintf("http://%s:%d", port.HostIP, port.HostPort)
 
-		assert.Assert(t, !strings.Contains(runRes.Stdout(), "/test"))
+		assert.Assert(t, !strings.Contains(followLogsProcess.Stdout(), "/test"))
 		checkRequest := func(t poll.LogT) poll.Result {
 			r, _ := http.Get(endpoint + "/test")
 			if r != nil && r.StatusCode == http.StatusNotFound {
@@ -341,7 +344,7 @@ func TestContainerRunAttached(t *testing.T) {
 		poll.WaitOn(t, checkRequest, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
 
 		checkLog := func(t poll.LogT) poll.Result {
-			if strings.Contains(runRes.Stdout(), "/test") {
+			if strings.Contains(followLogsProcess.Stdout(), "/test") {
 				return poll.Success()
 			}
 			return poll.Continue("waiting for logs to contain /test")
@@ -360,6 +363,13 @@ func TestContainerRunAttached(t *testing.T) {
 	t.Run("stop container", func(t *testing.T) {
 		res := c.RunDockerCmd("stop", container)
 		res.Assert(t, icmd.Expected{Out: container})
+		waitForStatus(t, c, container, "Terminated", "Node Stopped")
+	})
+
+	t.Run("check we stoppped following logs", func(t *testing.T) {
+		// nolint errcheck
+		followLogsStopped := waitWithTimeout(func() { followLogsProcess.Cmd.Process.Wait() }, 10*time.Second)
+		assert.NilError(t, followLogsStopped, "Follow logs process did not stop after container is stopped")
 	})
 
 	t.Run("ps stopped container with --all", func(t *testing.T) {
@@ -372,14 +382,14 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Assert(t, is.Len(out, 2))
 	})
 
-	t.Run("start container", func(t *testing.T) {
+	t.Run("restart container", func(t *testing.T) {
 		res := c.RunDockerCmd("start", container)
 		res.Assert(t, icmd.Expected{Out: container})
-		waitForStatus(t, c, container, "Running")
+		waitForStatus(t, c, container, convert.StatusRunning)
 	})
 
-	t.Run("rm stopped container", func(t *testing.T) {
-		res := c.RunDockerCmd("stop", container)
+	t.Run("kill & rm stopped container", func(t *testing.T) {
+		res := c.RunDockerCmd("kill", container)
 		res.Assert(t, icmd.Expected{Out: container})
 		waitForStatus(t, c, container, "Terminated", "Node Stopped")
 
@@ -674,4 +684,18 @@ func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...stri
 	}
 
 	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
+}
+
+func waitWithTimeout(blockingCall func(), timeout time.Duration) error {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		blockingCall()
+	}()
+	select {
+	case <-c:
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("Timed out after %s", timeout)
+	}
 }
