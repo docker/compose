@@ -127,6 +127,7 @@ func main() {
 		logout.Command(),
 		cmd.VersionCommand(version),
 		cmd.StopCommand(),
+		cmd.KillCommand(),
 		cmd.SecretCommand(),
 		compose.Command(),
 

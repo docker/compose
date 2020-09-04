@@ -23,6 +23,7 @@ service Containers {
 	rpc List(ListRequest) returns (ListResponse);
 	rpc Start(StartRequest) returns (StartResponse);
 	rpc Stop(StopRequest) returns (StopResponse);
+	rpc Kill(KillRequest) returns (KillResponse);
 	rpc Run(RunRequest) returns (RunResponse);
 	rpc Exec(ExecRequest) returns (ExecResponse);
 	rpc Logs(LogsRequest) returns (stream LogsResponse);
@@ -85,6 +86,14 @@ message StopRequest {
 message StopResponse {
 }
 
+message KillRequest {
+	string id = 1;
+	string signal = 2;
+}
+
+message KillResponse {
+}
+
 message RunRequest {
 	string id = 1;
 	string image = 2;
@@ -93,7 +102,7 @@ message RunRequest {
 	repeated string volumes = 5;
 	uint64 memory_limit = 6;
 	uint64 cpu_limit = 7;
-	string restart_policy_condition= 8;
+	string restart_policy_condition = 8;
 }
 
 message RunResponse {

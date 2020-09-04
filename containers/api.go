@@ -118,6 +118,8 @@ type Service interface {
 	Start(ctx context.Context, containerID string) error
 	// Stop stops the running container
 	Stop(ctx context.Context, containerID string, timeout *uint32) error
+	// Kill stops the running container
+	Kill(ctx context.Context, containerID string, signal string) error
 	// Run creates and starts a container
 	Run(ctx context.Context, config ContainerConfig) error
 	// Exec executes a command inside a running container

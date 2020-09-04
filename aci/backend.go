@@ -251,6 +251,15 @@ func (cs *aciContainerService) Stop(ctx context.Context, containerID string, tim
 	return stopACIContainerGroup(ctx, cs.ctx, groupName)
 }
 
+func (cs *aciContainerService) Kill(ctx context.Context, containerID string, _ string) error {
+	groupName, containerName := getGroupAndContainerName(containerID)
+	if groupName != containerID {
+		msg := "cannot kill service %q from compose application %q, you can kill the entire compose app with docker kill %s"
+		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+	}
+	return stopACIContainerGroup(ctx, cs.ctx, groupName) // As ACI doesn't have a kill command, we are using the stop implementation instead
+}
+
 func getGroupAndContainerName(containerID string) (string, string) {
 	tokens := strings.Split(containerID, composeContainerSeparator)
 	groupName := tokens[0]
