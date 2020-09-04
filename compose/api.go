@@ -56,20 +56,22 @@ type ServiceStatus struct {
 	Ports      []string
 	Publishers []PortPublisher
 }
+
+// State of a compose stack
 type State string
 
 const (
-	// Starting indicates that stack is being deployed
+	// STARTING indicates that stack is being deployed
 	STARTING State = "starting"
-	// Runnning indicates that stack is deployed and services are running
+	// RUNNING indicates that stack is deployed and services are running
 	RUNNING State = "running"
-	// Updating indicates that some stack resources are being recreated
+	// UPDATING indicates that some stack resources are being recreated
 	UPDATING State = "updating"
-	// Removing indicates that stack is being deleted
+	// REMOVING indicates that stack is being deleted
 	REMOVING State = "removing"
 )
 
-// StackStatus hold status about a compose application/stack
+// Stack holds the name and state of a compose application/stack
 type Stack struct {
 	ID     string
 	Name   string
