@@ -61,11 +61,11 @@ func TestDetermineCurrentContext(t *testing.T) {
 }
 
 func TestCheckOwnCommand(t *testing.T) {
-	assert.Assert(t, isOwnCommand(login.Command()))
-	assert.Assert(t, isOwnCommand(context.Command()))
-	assert.Assert(t, isOwnCommand(cmd.ServeCommand()))
-	assert.Assert(t, !isOwnCommand(run.Command()))
-	assert.Assert(t, !isOwnCommand(cmd.ExecCommand()))
-	assert.Assert(t, !isOwnCommand(cmd.LogsCommand()))
-	assert.Assert(t, !isOwnCommand(cmd.PsCommand()))
+	assert.Assert(t, isContextAgnosticCommand(login.Command()))
+	assert.Assert(t, isContextAgnosticCommand(context.Command()))
+	assert.Assert(t, isContextAgnosticCommand(cmd.ServeCommand()))
+	assert.Assert(t, !isContextAgnosticCommand(run.Command()))
+	assert.Assert(t, !isContextAgnosticCommand(cmd.ExecCommand()))
+	assert.Assert(t, !isContextAgnosticCommand(cmd.LogsCommand()))
+	assert.Assert(t, !isContextAgnosticCommand(cmd.PsCommand()))
 }

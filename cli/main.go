@@ -61,7 +61,7 @@ var (
 )
 
 var (
-	ownCommands = map[string]struct{}{
+	contextAgnosticCommands = map[string]struct{}{
 		"compose": {},
 		"context": {},
 		"login":   {},
@@ -86,14 +86,14 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func isOwnCommand(cmd *cobra.Command) bool {
+func isContextAgnosticCommand(cmd *cobra.Command) bool {
 	if cmd == nil {
 		return false
 	}
-	if _, ok := ownCommands[cmd.Name()]; ok {
+	if _, ok := contextAgnosticCommands[cmd.Name()]; ok {
 		return true
 	}
-	return isOwnCommand(cmd.Parent())
+	return isContextAgnosticCommand(cmd.Parent())
 }
 
 func main() {
@@ -103,7 +103,7 @@ func main() {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if !isOwnCommand(cmd) {
+			if !isContextAgnosticCommand(cmd) {
 				mobycli.ExecIfDefaultCtxType(cmd.Context())
 			}
 			return nil
@@ -136,7 +136,7 @@ func main() {
 
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if !isOwnCommand(cmd) {
+		if !isContextAgnosticCommand(cmd) {
 			mobycli.ExecIfDefaultCtxType(cmd.Context())
 		}
 		helpFunc(cmd, args)
@@ -181,11 +181,6 @@ func main() {
 		ctype = cc.Type()
 	}
 
-	if ctype == store.AwsContextType {
-		exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
-$ docker context create %s <name>`, cc.Type(), store.EcsContextType))
-	}
-
 	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
 
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
@@ -196,10 +191,14 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType))
 		if errors.Is(ctx.Err(), context.Canceled) {
 			os.Exit(130)
 		}
+		if ctype == store.AwsContextType {
+			exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
+$ docker context create %s <name>`, cc.Type(), store.EcsContextType))
+		}
 
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
-		if requiredCmd != nil && isOwnCommand(requiredCmd) {
+		if requiredCmd != nil && isContextAgnosticCommand(requiredCmd) {
 			exit(root, currentContext, err)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx)
