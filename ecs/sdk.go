@@ -208,6 +208,12 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
 		},
+		Tags: []*cloudformation.Tag{
+			{
+				Key:   aws.String(compose.ProjectTag),
+				Value: aws.String(name),
+			},
+		},
 	})
 	return err
 }
@@ -294,6 +300,36 @@ func (s sdk) GetStackID(ctx context.Context, name string) (string, error) {
 		return "", err
 	}
 	return *stacks.Stacks[0].StackId, nil
+}
+
+func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, error) {
+	cfStacks, err := s.CF.DescribeStacksWithContext(ctx, &cloudformation.DescribeStacksInput{})
+	if err != nil {
+		return nil, err
+	}
+	stacks := []compose.Stack{}
+	for _, stack := range cfStacks.Stacks {
+		for _, t := range stack.Tags {
+			if *t.Key == compose.ProjectTag {
+				status := compose.RUNNING
+				switch aws.StringValue(stack.StackStatus) {
+				case "CREATE_IN_PROGRESS":
+					status = compose.STARTING
+				case "DELETE_IN_PROGRESS":
+					status = compose.REMOVING
+				case "UPDATE_IN_PROGRESS":
+					status = compose.UPDATING
+				}
+				stacks = append(stacks, compose.Stack{
+					ID:     aws.StringValue(stack.StackId),
+					Name:   aws.StringValue(stack.StackName),
+					Status: status,
+				})
+				continue
+			}
+		}
+	}
+	return stacks, nil
 }
 
 func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error) {

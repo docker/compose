@@ -139,7 +139,9 @@ func (cs *composeService) Down(ctx context.Context, project string) error {
 func (cs *composeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
-
+func (cs *composeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
+	return nil, errdefs.ErrNotImplemented
+}
 func (cs *composeService) Logs(ctx context.Context, project string, w io.Writer) error {
 	return errdefs.ErrNotImplemented
 }

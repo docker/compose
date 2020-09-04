@@ -49,6 +49,11 @@ func (c *composeService) Ps(context.Context, string) ([]compose.ServiceStatus, e
 	return nil, errdefs.ErrNotImplemented
 }
 
+// List executes the equivalent to a `docker stack ls`
+func (c *composeService) List(context.Context, string) ([]compose.Stack, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
 // Convert translate compose model into backend's native format
 func (c *composeService) Convert(context.Context, *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
