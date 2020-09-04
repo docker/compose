@@ -325,7 +325,7 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 					Name:   aws.StringValue(stack.StackName),
 					Status: status,
 				})
-				continue
+				break
 			}
 		}
 	}
