@@ -206,7 +206,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			desiredCount = int(*service.Deploy.Replicas)
 		}
 
-		for _, dependency := range service.DependsOn {
+		for dependency := range service.DependsOn {
 			dependsOn = append(dependsOn, serviceResourceName(dependency))
 		}
 
@@ -312,6 +312,14 @@ func computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
 func getLoadBalancerType(project *types.Project) string {
 	for _, service := range project.Services {
 		for _, port := range service.Ports {
+			protocol := port.Protocol
+			v, ok := port.Extensions[extensionProtocol]
+			if ok {
+				protocol = v.(string)
+			}
+			if protocol == "http" || protocol == "https" {
+				continue
+			}
 			if port.Published != 80 && port.Published != 443 {
 				return elbv2.LoadBalancerTypeEnumNetwork
 			}
