@@ -1,0 +1,24 @@
+aci:
+  - aci/**/*
+
+ecs:
+  - ecs/**/*
+
+cli:
+  - cli/**/*
+
+api:
+  - containers/**/*
+  - compose/**/*
+  - secrets/**/*
+  - server/**/*
+  - protos/**/*
+
+ci:
+  - .github/**/*
+
+documentation:
+  - docs/**/*
+
+metrics:
+  - metrics/**/*
