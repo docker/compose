@@ -198,7 +198,7 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("http get", func(t *testing.T) {
-		r, err := http.Get(endpoint)
+		r, err := HTTPGetWithRetry(endpoint, 3)
 		assert.NilError(t, err)
 		assert.Equal(t, r.StatusCode, http.StatusOK)
 		b, err := ioutil.ReadAll(r.Body)
@@ -434,7 +434,7 @@ func TestComposeUpUpdate(t *testing.T) {
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
 
-		r, err := http.Get(endpoint + "/words/noun")
+		r, err := HTTPGetWithRetry(endpoint+"/words/noun", 3)
 		assert.NilError(t, err)
 		assert.Equal(t, r.StatusCode, http.StatusOK)
 		b, err := ioutil.ReadAll(r.Body)
