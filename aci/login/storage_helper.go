@@ -19,6 +19,7 @@ package login
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
 	"github.com/pkg/errors"
 
@@ -48,3 +49,62 @@ func (helper StorageAccountHelper) GetAzureStorageAccountKey(ctx context.Context
 	key := (*result.Keys)[0]
 	return *key.Value, nil
 }
+
+func (helper StorageAccountHelper) ListFileShare(ctx context.Context) ([]string, error) {
+	aciContext := helper.AciContext
+	accountClient, err := NewStorageAccountsClient(aciContext.SubscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	result, err := accountClient.ListByResourceGroup(ctx, aciContext.ResourceGroup)
+	accounts := result.Value
+	fileShareClient, err := NewFileShareClient(aciContext.SubscriptionID)
+	fileShares := []string{}
+	for _, account := range *accounts {
+		fileSharePage, err := fileShareClient.List(ctx, aciContext.ResourceGroup, *account.Name, "", "", "")
+		if err != nil {
+			return nil, err
+		}
+		for ; fileSharePage.NotDone() ; fileSharePage.NextWithContext(ctx) {
+			values := fileSharePage.Values()
+			for _, fileShare := range values {
+				fileShares = append(fileShares, *fileShare.Name)
+			}
+		}
+	}
+	return fileShares, nil
+}
+
+func (helper StorageAccountHelper) CreateFileShare(ctx context.Context, accountName string, fileShareName string) (storage.FileShare, error) {
+	aciContext := helper.AciContext
+	accountClient, err := NewStorageAccountsClient(aciContext.SubscriptionID)
+	if err != nil {
+		return storage.FileShare{}, err
+	}
+	account, err := accountClient.GetProperties(ctx, aciContext.ResourceGroup, accountName, "")
+	if err != nil {
+		//TODO check err not found
+		parameters := storage.AccountCreateParameters{
+			Location: &aciContext.Location,
+			Sku:&storage.Sku{
+				Name: storage.StandardLRS,
+				Tier: storage.Standard,
+			},
+		}
+		// TODO progress account creation
+		future, err := accountClient.Create(ctx, aciContext.ResourceGroup, accountName, parameters)
+		if err != nil {
+			return storage.FileShare{}, err
+		}
+		account, err = future.Result(accountClient)
+	}
+	fileShareClient, err := NewFileShareClient(aciContext.SubscriptionID)
+	fileShare, err := fileShareClient.Get(ctx, aciContext.ResourceGroup, *account.Name, fileShareName, "")
+	if err != nil {
+		// TODO check err not found
+		fileShare, err = fileShareClient.Create(ctx, aciContext.ResourceGroup, *account.Name, fileShareName, storage.FileShare{})
+	}
+
+	return fileShare, nil
+}
+

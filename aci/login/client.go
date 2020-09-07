@@ -67,6 +67,20 @@ func NewStorageAccountsClient(subscriptionID string) (storage.AccountsClient, er
 	return containerGroupsClient, nil
 }
 
+// NewStorageAccountsClient get client to manipulate storage accounts
+func NewFileShareClient(subscriptionID string) (storage.FileSharesClient, error) {
+	containerGroupsClient := storage.NewFileSharesClient(subscriptionID)
+	err := setupClient(&containerGroupsClient.Client)
+	if err != nil {
+		return storage.FileSharesClient{}, err
+	}
+	containerGroupsClient.PollingDelay = 5 * time.Second
+	containerGroupsClient.RetryAttempts = 30
+	containerGroupsClient.RetryDuration = 1 * time.Second
+	return containerGroupsClient, nil
+}
+
+
 // NewSubscriptionsClient get subscription client
 func NewSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	subc := subscription.NewSubscriptionsClient()
