@@ -20,7 +20,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/config"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"

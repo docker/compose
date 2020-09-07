@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/config"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
