@@ -26,7 +26,7 @@ import (
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
 )
 

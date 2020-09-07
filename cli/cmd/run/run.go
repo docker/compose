@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 
 	"github.com/docker/compose-cli/cli/options/run"
 	"github.com/docker/compose-cli/client"

@@ -30,7 +30,7 @@ import (
 	types2 "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
-	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/aws/aws-sdk-go/aws"

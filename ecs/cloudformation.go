@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/api/compose"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"

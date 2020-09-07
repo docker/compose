@@ -21,7 +21,7 @@ import (
 
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 )

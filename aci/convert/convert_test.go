@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -29,7 +29,7 @@ import (
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 )
 

@@ -25,8 +25,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/client"
-	"github.com/docker/compose-cli/containers"
 )
 
 type logsOpts struct {

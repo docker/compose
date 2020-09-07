@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/api/compose"
 )
 
 func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {

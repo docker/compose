@@ -22,7 +22,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 )
 
 // ContainerToComposeProject convert container config to compose project
