@@ -172,7 +172,15 @@ func getContainerGroups(ctx context.Context, subscriptionID string, resourceGrou
 			return []containerinstance.ContainerGroup{}, err
 		}
 	}
-	return containerGroups, nil
+	var groups []containerinstance.ContainerGroup
+	for _, group := range containerGroups {
+		group, err := groupsClient.Get(ctx, resourceGroup, *group.Name)
+		if err != nil {
+			return []containerinstance.ContainerGroup{}, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, nil
 }
 
 func getContainerID(group containerinstance.ContainerGroup, container containerinstance.Container) string {
