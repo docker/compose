@@ -310,14 +310,14 @@ class TopLevelCommand:
 
         Options:
             --resolve-image-digests  Pin image tags to digests.
-            --no-interpolate         Don't interpolate environment variables
+            --no-interpolate         Don't interpolate environment variables.
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
             --hash="*"               Print the service config hash, one per line.
                                      Set "service1,service2" for a list of specified services
-                                     or use the wildcard symbol to display all services
+                                     or use the wildcard symbol to display all services.
         """
 
         additional_options = {'--no-interpolate': options.get('--no-interpolate')}
@@ -1005,7 +1005,7 @@ class TopLevelCommand:
             --build                    Build images before starting containers.
             --abort-on-container-exit  Stops all containers if any container was
                                        stopped. Incompatible with -d.
-            --attach-dependencies      Attach to dependent containers
+            --attach-dependencies      Attach to dependent containers.
             -t, --timeout TIMEOUT      Use this timeout in seconds for container
                                        shutdown when attached or when containers are
                                        already running. (default: 10)
