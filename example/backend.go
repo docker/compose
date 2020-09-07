@@ -29,6 +29,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/errdefs"
@@ -48,6 +49,10 @@ func (a *apiService) ComposeService() compose.Service {
 }
 
 func (a *apiService) SecretsService() secrets.Service {
+	return nil
+}
+
+func (a *apiService) VolumeService() volumes.Service {
 	return nil
 }
 

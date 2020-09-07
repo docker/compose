@@ -18,6 +18,7 @@ package ecs
 
 import (
 	"context"
+	"github.com/docker/compose-cli/api/volumes"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -95,6 +96,10 @@ func (a *ecsAPIService) ComposeService() compose.Service {
 
 func (a *ecsAPIService) SecretsService() secrets.Service {
 	return a
+}
+
+func (a *ecsAPIService) VolumeService() volumes.Service {
+	return nil
 }
 
 func getCloudService() (cloud.Service, error) {

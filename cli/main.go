@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	volume "github.com/docker/compose-cli/cli/cmd/volume"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -133,6 +134,7 @@ func main() {
 
 		// Place holders
 		cmd.EcsCommand(),
+		volume.VolumeCommand(),
 	)
 
 	helpFunc := root.HelpFunc()

@@ -35,6 +35,7 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/backend"
 	apicontext "github.com/docker/compose-cli/context"
@@ -115,6 +116,7 @@ func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
 type aciAPIService struct {
 	*aciContainerService
 	*aciComposeService
+	*aciVolumeService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
@@ -127,6 +129,10 @@ func (a *aciAPIService) ComposeService() compose.Service {
 
 func (a *aciAPIService) SecretsService() secrets.Service {
 	return nil
+}
+
+func (a *aciAPIService) VolumeService() volumes.Service {
+	return a.aciVolumeService
 }
 
 type aciContainerService struct {
@@ -494,6 +500,18 @@ func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writ
 
 func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
+}
+
+type aciVolumeService struct {
+	ctx store.AciContext
+}
+
+func (cs *aciVolumeService) List(ctx context.Context) ([]volumes.Volume, error) {
+	return nil, nil
+}
+
+func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
+	return volumes.Volume{}, nil
 }
 
 type aciCloudService struct {
