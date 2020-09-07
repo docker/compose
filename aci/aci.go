@@ -259,6 +259,8 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 
 func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string, req containers.LogsRequest) error {
 	numLines := 0
+	previousLogLines := ""
+	firstDisplay := true // optimization to exit sooner in cases like docker run hello-world, do not wait another 2 secs.
 	for {
 		select {
 		case <-ctx.Done():
@@ -285,6 +287,12 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 				fmt.Fprintln(req.Writer, logLines[i])
 			}
 
+			if (firstDisplay || previousLogLines == logs) && !isContainerRunning(ctx, aciContext, containerGroupName, containerName) {
+				return nil
+			}
+			firstDisplay = false
+			previousLogLines = logs
+
 			select {
 			case <-ctx.Done():
 				return nil
@@ -292,6 +300,21 @@ func streamLogs(ctx context.Context, aciContext store.AciContext, containerGroup
 			}
 		}
 	}
+}
+
+func isContainerRunning(ctx context.Context, aciContext store.AciContext, containerGroupName, containerName string) bool {
+	group, err := getACIContainerGroup(ctx, aciContext, containerGroupName)
+	if err != nil {
+		return false // group has disappeared
+	}
+	for _, container := range *group.Containers {
+		if *container.Name == containerName {
+			if convert.GetStatus(container, group) == convert.StatusRunning {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getBacktrackLines(lines []string, terminalWidth int) int {

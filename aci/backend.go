@@ -48,7 +48,6 @@ const (
 	singleContainerTag        = "docker-single-container"
 	composeContainerTag       = "docker-compose-application"
 	composeContainerSeparator = "_"
-	statusRunning             = "Running"
 )
 
 // ContextParams options for creating ACI context
@@ -183,7 +182,7 @@ func getContainerID(group containerinstance.ContainerGroup, container containeri
 }
 
 func isContainerVisible(container containerinstance.Container, group containerinstance.ContainerGroup, showAll bool) bool {
-	return *container.Name == convert.ComposeDNSSidecarName || (!showAll && convert.GetStatus(container, group) != statusRunning)
+	return *container.Name == convert.ComposeDNSSidecarName || (!showAll && convert.GetStatus(container, group) != convert.StatusRunning)
 }
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
@@ -349,7 +348,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 		for _, container := range *cg.Containers {
 			status := convert.GetStatus(container, cg)
 
-			if status == statusRunning {
+			if status == convert.StatusRunning {
 				return errdefs.ErrForbidden
 			}
 		}
