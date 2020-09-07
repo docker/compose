@@ -18,9 +18,13 @@ package ecs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/secrets"
@@ -56,6 +60,7 @@ type sdk struct {
 	IAM iamiface.IAMAPI
 	CF  cloudformationiface.CloudFormationAPI
 	SM  secretsmanageriface.SecretsManagerAPI
+	SSM ssmiface.SSMAPI
 }
 
 func newSDK(sess *session.Session) sdk {
@@ -71,6 +76,7 @@ func newSDK(sess *session.Session) sdk {
 		IAM: iam.New(sess),
 		CF:  cloudformation.New(sess),
 		SM:  secretsmanager.New(sess),
+		SSM: ssm.New(sess),
 	}
 }
 
@@ -86,7 +92,7 @@ func (s sdk) CheckRequirements(ctx context.Context, region string) error {
 	if *serviceLongArnFormat != "enabled" {
 		return fmt.Errorf("this tool requires the \"new ARN resource ID format\".\n"+
 			"Check https://%s.console.aws.amazon.com/ecs/home#/settings\n"+
-			"Learn more: https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2", region)
+			"Learn more: https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-ID-format-2", region)
 	}
 	return nil
 }
@@ -182,7 +188,7 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 		StackName: aws.String(name),
 	})
 	if err != nil {
-		if strings.HasPrefix(err.Error(), fmt.Sprintf("ValidationError: Stack with id %s does not exist", name)) {
+		if strings.HasPrefix(err.Error(), fmt.Sprintf("ValidationError: Stack with ID %s does not exist", name)) {
 			return false, nil
 		}
 		return false, nil
@@ -687,4 +693,29 @@ func (s sdk) WithVolumeSecurityGroups(ctx context.Context, id string, fn func(se
 		}
 	}
 	return nil
+}
+
+func (s sdk) GetParameter(ctx context.Context, name string) (string, error) {
+	parameter, err := s.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{
+		Name: aws.String(name),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	value := *parameter.Parameter.Value
+	var ami struct {
+		SchemaVersion     int    `json:"schema_version"`
+		ImageName         string `json:"image_name"`
+		ImageID           string `json:"image_id"`
+		OS                string `json:"os"`
+		ECSRuntimeVersion string `json:"ecs_runtime_verion"`
+		ECSAgentVersion   string `json:"ecs_agent_version"`
+	}
+	err = json.Unmarshal([]byte(value), &ami)
+	if err != nil {
+		return "", err
+	}
+
+	return ami.ImageID, nil
 }

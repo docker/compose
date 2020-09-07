@@ -290,7 +290,7 @@ services:
           memory: 2043248M
 `)
 	backend := &ecsAPIService{}
-	_, err := backend.convert(model)
+	_, _, err := backend.convert(model)
 	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
@@ -374,7 +374,7 @@ services:
 
 func convertResultAsString(t *testing.T, project *types.Project) string {
 	backend := &ecsAPIService{}
-	template, err := backend.convert(project)
+	template, _, err := backend.convert(project)
 	assert.NilError(t, err)
 	resultAsJSON, err := marshall(template)
 	assert.NilError(t, err)
@@ -394,7 +394,7 @@ func load(t *testing.T, paths ...string) *types.Project {
 func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	backend := &ecsAPIService{}
-	template, err := backend.convert(project)
+	template, _, err := backend.convert(project)
 	assert.NilError(t, err)
 	return template
 }

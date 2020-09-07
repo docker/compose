@@ -23,8 +23,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
-
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
@@ -36,7 +34,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
-	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/compatibility"
 	"github.com/compose-spec/compose-go/errdefs"
 	"github.com/compose-spec/compose-go/types"
@@ -52,7 +49,7 @@ const (
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
-	template, err := b.convert(project)
+	template, networks, err := b.convert(project)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +94,16 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		}
 	}
 
+	err = b.createCapacityProvider(ctx, project, networks, template)
+	if err != nil {
+		return nil, err
+	}
+
 	return marshall(template)
 }
 
 // Convert a compose project into a CloudFormation template
-func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) { //nolint:gocyclo
+func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, map[string]string, error) { //nolint:gocyclo
 	var checker compatibility.Checker = &fargateCompatibilityChecker{
 		compatibility.AllowList{
 			Supported: compatibleComposeAttributes,
@@ -116,7 +118,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		}
 	}
 	if !compatibility.IsCompatible(checker) {
-		return nil, fmt.Errorf("compose file is incompatible with Amazon ECS")
+		return nil, nil, fmt.Errorf("compose file is incompatible with Amazon ECS")
 	}
 
 	template := cloudformation.NewTemplate()
@@ -152,7 +154,6 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		Description: "Name of the LoadBalancer to connect to (optional)",
 	}
 
-	// Createmount.nfs4: Connection timed out : unsuccessful EFS utils command execution; code: 32 Cluster is `ParameterClusterName` parameter is not set
 	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(parameterClusterName))
 
 	cluster := createCluster(project, template)
@@ -168,19 +169,14 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		}
 		secret, err := ioutil.ReadFile(s.File)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		name := fmt.Sprintf("%sSecret", normalizeResourceName(s.Name))
 		template.Resources[name] = &secretsmanager.Secret{
 			Description:  "",
 			SecretString: string(secret),
-			Tags: []tags.Tag{
-				{
-					Key:   compose.ProjectTag,
-					Value: project.Name,
-				},
-			},
+			Tags:         projectTags(project),
 		}
 		s.Name = cloudformation.Ref(name)
 		project.Secrets[i] = s
@@ -197,7 +193,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 		definition, err := convert(project, service)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		taskExecutionRole := createTaskExecutionRole(service, definition, template)
@@ -255,7 +251,14 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 		minPercent, maxPercent, err := computeRollingUpdateLimits(service)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+
+		launchType := ecsapi.LaunchTypeFargate
+		platformVersion := "1.4.0" // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
+		if requireEC2(service) {
+			launchType = ecsapi.LaunchTypeEc2
+			platformVersion = "" // The platform version must be null when specifying an EC2 launch type
 		}
 
 		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
@@ -269,11 +272,12 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 				MaximumPercent:        maxPercent,
 				MinimumHealthyPercent: minPercent,
 			},
-			LaunchType:    ecsapi.LaunchTypeFargate,
+			LaunchType: launchType,
+			// TODO we miss support for https://github.com/aws/containers-roadmap/issues/631 to select a capacity provider
 			LoadBalancers: serviceLB,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
-					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
+					AssignPublicIp: ecsapi.AssignPublicIpDisabled,
 					SecurityGroups: serviceSecurityGroups,
 					Subnets: []string{
 						cloudformation.Ref(parameterSubnet1Id),
@@ -281,24 +285,15 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 					},
 				},
 			},
-			PlatformVersion:    "1.4.0", // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
+			PlatformVersion:    platformVersion,
 			PropagateTags:      ecsapi.PropagateTagsService,
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
-			Tags: []tags.Tag{
-				{
-					Key:   compose.ProjectTag,
-					Value: project.Name,
-				},
-				{
-					Key:   compose.ServiceTag,
-					Value: service.Name,
-				},
-			},
-			TaskDefinition: cloudformation.Ref(normalizeResourceName(taskDefinition)),
+			Tags:               serviceTags(project, service),
+			TaskDefinition:     cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
 	}
-	return template, nil
+	return template, networks, nil
 }
 
 func createLogGroup(project *types.Project, template *cloudformation.Template) {
@@ -413,12 +408,7 @@ func createLoadBalancer(project *types.Project, template *cloudformation.Templat
 			cloudformation.Ref(parameterSubnet1Id),
 			cloudformation.Ref(parameterSubnet2Id),
 		},
-		Tags: []tags.Tag{
-			{
-				Key:   compose.ProjectTag,
-				Value: project.Name,
-			},
-		},
+		Tags:                       projectTags(project),
 		Type:                       loadBalancerType,
 		AWSCloudFormationCondition: "CreateLoadBalancer",
 	}
@@ -462,14 +452,9 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 		port.Published,
 	)
 	template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
-		Port:     int(port.Target),
-		Protocol: protocol,
-		Tags: []tags.Tag{
-			{
-				Key:   compose.ProjectTag,
-				Value: project.Name,
-			},
-		},
+		Port:       int(port.Target),
+		Protocol:   protocol,
+		Tags:       projectTags(project),
 		VpcId:      cloudformation.Ref(parameterVPCId),
 		TargetType: elbv2.TargetTypeEnumIp,
 	}
@@ -507,7 +492,7 @@ func createTaskExecutionRole(service types.ServiceConfig, definition *ecs.TaskDe
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
 	policies := createPolicies(service, definition)
 	template.Resources[taskExecutionRole] = &iam.Role{
-		AssumeRolePolicyDocument: assumeRolePolicyDocument,
+		AssumeRolePolicyDocument: ecsTaskAssumeRolePolicyDocument,
 		Policies:                 policies,
 		ManagedPolicyArns: []string{
 			ecsTaskExecutionPolicy,
@@ -535,7 +520,7 @@ func createTaskRole(service types.ServiceConfig, template *cloudformation.Templa
 		return ""
 	}
 	template.Resources[taskRole] = &iam.Role{
-		AssumeRolePolicyDocument: assumeRolePolicyDocument,
+		AssumeRolePolicyDocument: ecsTaskAssumeRolePolicyDocument,
 		Policies:                 rolePolicies,
 		ManagedPolicyArns:        managedPolicies,
 	}
@@ -544,13 +529,8 @@ func createTaskRole(service types.ServiceConfig, template *cloudformation.Templa
 
 func createCluster(project *types.Project, template *cloudformation.Template) string {
 	template.Resources["Cluster"] = &ecs.Cluster{
-		ClusterName: project.Name,
-		Tags: []tags.Tag{
-			{
-				Key:   compose.ProjectTag,
-				Value: project.Name,
-			},
-		},
+		ClusterName:                project.Name,
+		Tags:                       projectTags(project),
 		AWSCloudFormationCondition: "CreateCluster",
 	}
 	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(parameterClusterName))
@@ -598,16 +578,7 @@ func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string,
 		GroupName:            securityGroup,
 		SecurityGroupIngress: ingresses,
 		VpcId:                vpc,
-		Tags: []tags.Tag{
-			{
-				Key:   compose.ProjectTag,
-				Value: project.Name,
-			},
-			{
-				Key:   compose.NetworkTag,
-				Value: net.Name,
-			},
-		},
+		Tags:                 networkTags(project, net),
 	}
 
 	ingress := securityGroup + "Ingress"
