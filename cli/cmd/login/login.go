@@ -26,8 +26,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/cli/mobycli"
-	"github.com/docker/compose-cli/client"
 	"github.com/docker/compose-cli/errdefs"
 )
 

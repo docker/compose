@@ -19,9 +19,9 @@ package local
 import (
 	"context"
 
-	"github.com/docker/compose-cli/compose"
-	"github.com/docker/compose-cli/containers"
-	"github.com/docker/compose-cli/secrets"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/backend"

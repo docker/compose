@@ -19,7 +19,7 @@ package client
 import (
 	"context"
 
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/errdefs"
 )
 

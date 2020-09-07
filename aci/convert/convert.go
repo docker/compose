@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/compose-cli/compose"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/utils/formatter"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
@@ -35,7 +35,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/aci/login"
-	"github.com/docker/compose-cli/containers"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 )
 

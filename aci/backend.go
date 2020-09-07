@@ -33,14 +33,14 @@ import (
 
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/backend"
-	"github.com/docker/compose-cli/compose"
-	"github.com/docker/compose-cli/containers"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/secrets"
 )
 
 const (

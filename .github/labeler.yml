@@ -8,11 +8,7 @@ cli:
   - cli/**/*
 
 api:
-  - containers/**/*
-  - compose/**/*
-  - secrets/**/*
-  - server/**/*
-  - protos/**/*
+  - api/**/*
 
 ci:
   - .github/**/*

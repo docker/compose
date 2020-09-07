@@ -23,7 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/client"
+	"github.com/docker/compose-cli/api/client"
 )
 
 func convertCommand() *cobra.Command {
