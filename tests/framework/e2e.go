@@ -22,12 +22,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
@@ -191,4 +193,22 @@ func ParseContainerInspect(stdout string) (*containers.Container, error) {
 		return nil, err
 	}
 	return &res, nil
+}
+
+// HTTPGetWithRetry performs an HTTP GET on an `endpoint`.
+// In the case of an error it retries the same request after a 5 second sleep,
+// returning the error if count of `tries` is reached
+func HTTPGetWithRetry(endpoint string, tries int) (*http.Response, error) {
+	var (
+		r   *http.Response
+		err error
+	)
+	for t := 0; t < tries; t++ {
+		r, err = http.Get(endpoint)
+		if err == nil || t == tries-1 {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return r, err
 }
