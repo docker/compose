@@ -1,7 +1,7 @@
 Change log
 ==========
 
-1.27.0 (2020-09-03)
+1.27.0 (2020-09-07)
 -------------------
 
 ### Features
@@ -41,6 +41,8 @@ Change log
 - Bump `tox` to 3.19.0
 
 - Bump `virtualenv` to 20.0.30
+
+- Add script for docs syncronization
 
 1.26.1 (2020-06-30)
 -------------------
