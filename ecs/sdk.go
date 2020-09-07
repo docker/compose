@@ -303,7 +303,11 @@ func (s sdk) GetStackID(ctx context.Context, name string) (string, error) {
 }
 
 func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, error) {
-	cfStacks, err := s.CF.DescribeStacksWithContext(ctx, &cloudformation.DescribeStacksInput{})
+	params := cloudformation.DescribeStacksInput{}
+	if name != "" {
+		params.StackName = &name
+	}
+	cfStacks, err := s.CF.DescribeStacksWithContext(ctx, &params)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +329,7 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 					Name:   aws.StringValue(stack.StackName),
 					Status: status,
 				})
-				continue
+				break
 			}
 		}
 	}

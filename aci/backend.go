@@ -134,32 +134,14 @@ type aciContainerService struct {
 }
 
 func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
-	groupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
-	if err != nil {
-		return nil, err
-	}
-	var containerGroups []containerinstance.ContainerGroup
-	result, err := groupsClient.ListByResourceGroup(ctx, cs.ctx.ResourceGroup)
+	containerGroups, err := getContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
 	if err != nil {
 		return []containers.Container{}, err
 	}
-
-	for result.NotDone() {
-		containerGroups = append(containerGroups, result.Values()...)
-		if err := result.NextWithContext(ctx); err != nil {
-			return []containers.Container{}, err
-		}
-	}
-
 	var res []containers.Container
-	for _, containerGroup := range containerGroups {
-		group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, *containerGroup.Name)
-		if err != nil {
-			return []containers.Container{}, err
-		}
-
+	for _, group := range containerGroups {
 		if group.Containers == nil || len(*group.Containers) < 1 {
-			return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *containerGroup.Name)
+			return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *group.Name)
 		}
 
 		for _, container := range *group.Containers {
@@ -171,6 +153,34 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 		}
 	}
 	return res, nil
+}
+
+func getContainerGroups(ctx context.Context, subscriptionID string, resourceGroup string) ([]containerinstance.ContainerGroup, error) {
+	groupsClient, err := login.NewContainerGroupsClient(subscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	var containerGroups []containerinstance.ContainerGroup
+	result, err := groupsClient.ListByResourceGroup(ctx, resourceGroup)
+	if err != nil {
+		return []containerinstance.ContainerGroup{}, err
+	}
+
+	for result.NotDone() {
+		containerGroups = append(containerGroups, result.Values()...)
+		if err := result.NextWithContext(ctx); err != nil {
+			return []containerinstance.ContainerGroup{}, err
+		}
+	}
+	var groups []containerinstance.ContainerGroup
+	for _, group := range containerGroups {
+		group, err := groupsClient.Get(ctx, resourceGroup, *group.Name)
+		if err != nil {
+			return []containerinstance.ContainerGroup{}, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, nil
 }
 
 func getContainerID(group containerinstance.ContainerGroup, container containerinstance.Container) string {
@@ -446,8 +456,36 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 	}
 	return res, nil
 }
+
 func (cs *aciComposeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
-	return nil, errdefs.ErrNotImplemented
+	containerGroups, err := getContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
+	if err != nil {
+		return []compose.Stack{}, err
+	}
+
+	stacks := []compose.Stack{}
+	for _, group := range containerGroups {
+		if _, found := group.Tags[composeContainerTag]; !found {
+			continue
+		}
+		if project != "" && *group.Name != project {
+			continue
+		}
+		state := compose.RUNNING
+		for _, container := range *group.ContainerGroupProperties.Containers {
+			containerState := convert.GetStatus(container, group)
+			if containerState != compose.RUNNING {
+				state = containerState
+				break
+			}
+		}
+		stacks = append(stacks, compose.Stack{
+			ID:     *group.ID,
+			Name:   *group.Name,
+			Status: state,
+		})
+	}
+	return stacks, nil
 }
 
 func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writer) error {
