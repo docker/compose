@@ -460,6 +460,9 @@ func (cs *aciComposeService) List(ctx context.Context, project string) ([]compos
 		if _, found := group.Tags[composeContainerTag]; !found {
 			continue
 		}
+		if project != "" && *group.Name != project {
+			continue
+		}
 		state := compose.RUNNING
 		for _, container := range *group.ContainerGroupProperties.Containers {
 			containerState := convert.GetStatus(container, group)
