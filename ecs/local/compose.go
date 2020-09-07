@@ -92,7 +92,9 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project)
 		service.Networks["credentials_network"] = &types.ServiceNetworkConfig{
 			Ipv4Address: fmt.Sprintf("169.254.170.%d", i+3),
 		}
-		service.DependsOn = append(service.DependsOn, "ecs-local-endpoints")
+		service.DependsOn["ecs-local-endpoints"] = types.ServiceDependency{
+			Condition: types.ServiceConditionStarted,
+		}
 		service.Environment["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"] = aws.String("/creds")
 		service.Environment["ECS_CONTAINER_METADATA_URI"] = aws.String("http://169.254.170.2/v3")
 		project.Services[i] = service

@@ -181,19 +181,37 @@ networks:
 }
 
 func TestLoadBalancerTypeApplication(t *testing.T) {
-	template := convertYaml(t, `
-services:
+	cases := []string{
+		`services:
   test:
     image: nginx
     ports:
       - 80:80
-`)
-	lb := template.Resources["TestLoadBalancer"]
-	assert.Check(t, lb != nil)
-	loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
-	assert.Check(t, len(loadBalancer.Name) <= 32)
-	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumApplication)
-	assert.Check(t, len(loadBalancer.SecurityGroups) > 0)
+`,
+		`services:
+  test:
+    image: nginx
+    ports:
+      - target: 8080
+        protocol: http
+`,
+		`services:
+  test:
+    image: nginx
+    ports:
+      - target: 8080
+        x-aws-protocol: http
+`,
+	}
+	for _, y := range cases {
+		template := convertYaml(t, y)
+		lb := template.Resources["TestLoadBalancer"]
+		assert.Check(t, lb != nil)
+		loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
+		assert.Check(t, len(loadBalancer.Name) <= 32)
+		assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumApplication)
+		assert.Check(t, len(loadBalancer.SecurityGroups) > 0)
+	}
 }
 
 func TestNoLoadBalancerIfNoPortExposed(t *testing.T) {

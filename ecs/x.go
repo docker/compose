@@ -21,6 +21,7 @@ const (
 	extensionVPC             = "x-aws-vpc"
 	extensionPullCredentials = "x-aws-pull_credentials"
 	extensionLB              = "x-aws-loadbalancer"
+	extensionProtocol        = "x-aws-protocol"
 	extensionCluster         = "x-aws-cluster"
 	extensionKeys            = "x-aws-keys"
 	extensionMinPercent      = "x-aws-min_percent"
