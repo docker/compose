@@ -98,6 +98,17 @@ func TestCompose(t *testing.T) {
 		url = "http://" + strings.Replace(fields[3], "->80/http", "", 1)
 	})
 
+	t.Run("compose ls", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "ls", "--project-name", stack)
+		lines := strings.Split(res.Stdout(), "\n")
+
+		assert.Equal(t, 2, len(lines))
+		fields := strings.Fields(lines[1])
+		assert.Equal(t, 2, len(fields))
+		assert.Check(t, strings.Contains(fields[0], stack))
+		assert.Equal(t, "Running", fields[1])
+	})
+
 	t.Run("nginx GET", func(t *testing.T) {
 		checkUp := func(t poll.LogT) poll.Result {
 			r, err := http.Get(url)
