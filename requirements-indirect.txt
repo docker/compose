@@ -1,6 +1,6 @@
 altgraph==0.17
 appdirs==1.4.4
-attrs==20.1.0
+attrs==20.2.0
 bcrypt==3.1.7
 cffi==1.14.1
 cryptography==3.0
