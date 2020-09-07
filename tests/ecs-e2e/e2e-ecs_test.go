@@ -105,7 +105,7 @@ func TestCompose(t *testing.T) {
 		assert.Equal(t, 2, len(lines))
 		fields := strings.Fields(lines[1])
 		assert.Equal(t, 2, len(fields))
-		assert.Check(t, strings.Contains(fields[0], stack))
+		assert.Equal(t, fields[0], stack)
 		assert.Equal(t, "Running", fields[1])
 	})
 
