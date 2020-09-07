@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/errdefs"
 )
@@ -31,6 +32,6 @@ func (c *volumeService) List(ctx context.Context) ([]volumes.Volume, error) {
 }
 
 // Create creates a volume
-func (c *volumeService) Create(ctx context.Context, options interface {}) (volumes.Volume, error) {
+func (c *volumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
 	return volumes.Volume{}, errdefs.ErrNotImplemented
 }

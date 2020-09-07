@@ -20,13 +20,11 @@ import (
 	"context"
 )
 
+// Volume volume info
 type Volume struct {
-	Name string
-}
-
-type VolumeCreateOptions struct {
-	account string
-	fileshare string
+	ID          string
+	Name        string
+	Description string
 }
 
 // Service interacts with the underlying container backend

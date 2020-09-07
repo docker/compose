@@ -35,8 +35,8 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/cloud"
@@ -110,6 +110,9 @@ func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
 		aciComposeService: &aciComposeService{
 			ctx: aciCtx,
 		},
+		aciVolumeService: &aciVolumeService{
+			ctx: aciCtx,
+		},
 	}
 }
 
@@ -169,20 +172,20 @@ func getContainerGroups(ctx context.Context, subscriptionID string, resourceGrou
 	var containerGroups []containerinstance.ContainerGroup
 	result, err := groupsClient.ListByResourceGroup(ctx, resourceGroup)
 	if err != nil {
-		return []containerinstance.ContainerGroup{}, err
+		return nil, err
 	}
 
 	for result.NotDone() {
 		containerGroups = append(containerGroups, result.Values()...)
 		if err := result.NextWithContext(ctx); err != nil {
-			return []containerinstance.ContainerGroup{}, err
+			return nil, err
 		}
 	}
 	var groups []containerinstance.ContainerGroup
 	for _, group := range containerGroups {
 		group, err := groupsClient.Get(ctx, resourceGroup, *group.Name)
 		if err != nil {
-			return []containerinstance.ContainerGroup{}, err
+			return nil, err
 		}
 		groups = append(groups, group)
 	}
@@ -507,11 +510,23 @@ type aciVolumeService struct {
 }
 
 func (cs *aciVolumeService) List(ctx context.Context) ([]volumes.Volume, error) {
-	return nil, nil
+	storageHelper := login.StorageAccountHelper{AciContext: cs.ctx}
+	return storageHelper.ListFileShare(ctx)
+}
+
+//VolumeCreateOptions options to create a new ACI volume
+type VolumeCreateOptions struct {
+	Account   string
+	Fileshare string
 }
 
 func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
-	return volumes.Volume{}, nil
+	opts, ok := options.(VolumeCreateOptions)
+	if !ok {
+		return volumes.Volume{}, errors.New("Could not read azure LoginParams struct from generic parameter")
+	}
+	storageHelper := login.StorageAccountHelper{AciContext: cs.ctx}
+	return storageHelper.CreateFileShare(ctx, opts.Account, opts.Fileshare)
 }
 
 type aciCloudService struct {

@@ -18,12 +18,14 @@ package local
 
 import (
 	"context"
+
 	"github.com/docker/compose-cli/api/volumes"
+
+	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/context/cloud"

@@ -18,6 +18,7 @@ package ecs
 
 import (
 	"context"
+
 	"github.com/docker/compose-cli/api/volumes"
 
 	"github.com/aws/aws-sdk-go/aws"

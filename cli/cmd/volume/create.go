@@ -18,17 +18,21 @@ package volume
 
 import (
 	"fmt"
-	"github.com/docker/compose-cli/api/client"
+	"io"
+	"os"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/docker/compose-cli/aci"
+
 	"github.com/spf13/cobra"
+
+	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/volumes"
 )
 
-type createVolumeOptions struct {
-	Account string
-	Fileshare    string
-}
-
-// SecretCommand manage secrets
-func VolumeCommand() *cobra.Command {
+// Command manage volumes
+func Command() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "volume",
 		Short: "Manages volumes",
@@ -36,16 +40,17 @@ func VolumeCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		createVolume(),
+		listVolume(),
 	)
 	return cmd
 }
 
 func createVolume() *cobra.Command {
-	opts := createVolumeOptions{}
+	opts := aci.VolumeCreateOptions{}
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Creates an Azure file share to use as ACI volume.",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client.New(cmd.Context())
 			if err != nil {
@@ -60,7 +65,43 @@ func createVolume() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Account, "storage-account",  "", "Storage account name")
+	cmd.Flags().StringVar(&opts.Account, "storage-account", "", "Storage account name")
 	cmd.Flags().StringVar(&opts.Fileshare, "fileshare", "", "Fileshare name")
 	return cmd
+}
+
+func listVolume() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ls",
+		Short: "list Azure file shares usable as ACI volumes.",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(cmd.Context())
+			if err != nil {
+				return err
+			}
+			vols, err := c.VolumeService().List(cmd.Context())
+			if err != nil {
+				return err
+			}
+			printList(os.Stdout, vols)
+			return nil
+		},
+	}
+	return cmd
+}
+
+func printList(out io.Writer, volumes []volumes.Volume) {
+	printSection(out, func(w io.Writer) {
+		for _, vol := range volumes {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", vol.ID, vol.Name, vol.Description) // nolint:errcheck
+		}
+	}, "ID", "NAME", "DESCRIPTION")
+}
+
+func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
+	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
+	fmt.Fprintln(w, strings.Join(headers, "\t")) // nolint:errcheck
+	printer(w)
+	w.Flush() // nolint:errcheck
 }
