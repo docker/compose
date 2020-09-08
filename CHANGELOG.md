@@ -44,6 +44,13 @@ Change log
 
 - Add script for docs syncronization
 
+1.26.2 (2020-07-02)
+-------------------
+
+### Bugs
+
+- Enforce `docker-py` 4.2.2 as minimum version when installing with pip
+
 1.26.1 (2020-06-30)
 -------------------
 
