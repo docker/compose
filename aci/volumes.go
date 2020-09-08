@@ -19,6 +19,7 @@ package aci
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/docker/compose-cli/aci/login"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
@@ -96,6 +97,10 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		if err != nil {
 			return volumes.Volume{}, err
 		}
+		err = future.WaitForCompletionRef(ctx, accountClient.Client)
+		if err != nil {
+			return volumes.Volume{}, err
+		}
 		account, err = future.Result(accountClient)
 		if err != nil {
 			return volumes.Volume{}, err
@@ -130,10 +135,11 @@ func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 
 func defaultStorageAccountParams(aciContext store.AciContext) storage.AccountCreateParameters {
 	return storage.AccountCreateParameters{
-		Location: &aciContext.Location,
+		Location: to.StringPtr(aciContext.Location),
 		Sku: &storage.Sku{
 			Name: storage.StandardLRS,
-			Tier: storage.Standard,
 		},
+		Kind:storage.StorageV2,
+		AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
 	}
 }

@@ -39,7 +39,6 @@ import (
 	"gotest.tools/v3/poll"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
-	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -131,7 +130,7 @@ func TestContainerRunVolume(t *testing.T) {
 	sID, rg := setupTestResourceGroup(t, c)
 
 	const (
-		testShareName   = "dockertestshare"
+		fileshareName   = "dockertestshare"
 		testFileContent = "Volume mounted successfully!"
 		testFileName    = "index.html"
 	)
@@ -142,31 +141,56 @@ func TestContainerRunVolume(t *testing.T) {
 		Location:       location,
 		ResourceGroup:  rg,
 	}
-	saName := "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
-	_, cleanupSa := createStorageAccount(t, aciContext, saName)
-	t.Cleanup(func() {
-		if err := cleanupSa(); err != nil {
-			t.Error(err)
-		}
-	})
-	keys := getStorageKeys(t, aciContext, saName)
-	assert.Assert(t, len(keys) > 0)
-	k := *keys[0].Value
-	cred, u := createFileShare(t, k, testShareName, saName)
-	uploadFile(t, *cred, u.String(), testFileName, testFileContent)
 
 	// Used in subtests
 	var (
-		container string
-		hostIP    string
-		endpoint  string
+		container   string
+		hostIP      string
+		endpoint    string
+		volumeID    string
+		accountName = "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
 	)
+
+	t.Run("Create volumes", func(t *testing.T) {
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
+	})
+	t.Cleanup(func() { deleteStorageAccount(t, aciContext, accountName) })
+
+	t.Run("Create second fileshare", func(t *testing.T) {
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
+	})
+
+	t.Run("list volumes", func(t *testing.T) {
+		res := c.RunDockerCmd("volume", "ls")
+		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		firstAccount := out[1]
+		fields := strings.Fields(firstAccount)
+		volumeID = accountName + "@" + fileshareName
+		assert.Equal(t, fields[0], volumeID)
+		assert.Equal(t, fields[1], fileshareName)
+		secondAccount := out[2]
+		fields = strings.Fields(secondAccount)
+		assert.Equal(t, fields[0], accountName + "@dockertestshare2")
+		assert.Equal(t, fields[1], "dockertestshare2")
+		//assert.Assert(t, fields[2], strings.Contains(firstAccount, fmt.Sprintf("Fileshare %s in %s storage account", fileshareName, accountName)))
+	})
+
+	t.Run("upload file", func(t *testing.T) {
+		storageLogin := login.StorageLogin{AciContext: aciContext}
+
+		key, err := storageLogin.GetAzureStorageAccountKey(context.TODO(), accountName)
+		assert.NilError(t, err)
+		cred, err := azfile.NewSharedKeyCredential(accountName, key)
+		assert.NilError(t, err)
+		u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", accountName, fileshareName))
+		uploadFile(t, *cred, u.String(), testFileName, testFileContent)
+	})
 
 	t.Run("run", func(t *testing.T) {
 		mountTarget := "/usr/share/nginx/html"
 		res := c.RunDockerCmd(
 			"run", "-d",
-			"-v", fmt.Sprintf("%s@%s:%s", saName, testShareName, mountTarget),
+			"-v", fmt.Sprintf("%s:%s", volumeID, mountTarget),
 			"-p", "80:80",
 			"nginx",
 		)
@@ -637,35 +661,12 @@ func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})
 }
 
-func createStorageAccount(t *testing.T, aciContext store.AciContext, name string) (azure_storage.Account, func() error) {
-	account, err := storage.CreateStorageAccount(context.TODO(), aciContext, name)
-	assert.Check(t, is.Nil(err))
-	assert.Check(t, is.Equal(*(account.Name), name))
-	return account, func() error { return deleteStorageAccount(aciContext, name) }
-}
-
-func deleteStorageAccount(aciContext store.AciContext, name string) error {
+func deleteStorageAccount(t *testing.T, aciContext store.AciContext, name string) {
+	fmt.Printf("	[%s] deleting storage account %s\n", t.Name(), name)
 	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, name)
-	return err
-}
-
-func getStorageKeys(t *testing.T, aciContext store.AciContext, saName string) []azure_storage.AccountKey {
-	l, err := storage.ListKeys(context.TODO(), aciContext, saName)
-	assert.NilError(t, err)
-	assert.Assert(t, l.Keys != nil)
-	return *l.Keys
-}
-
-func createFileShare(t *testing.T, key, share, storageAccount string) (*azfile.SharedKeyCredential, *url.URL) {
-	// Create a ShareURL object that wraps a soon-to-be-created share's URL and a default pipeline.
-	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", storageAccount, share))
-	cred, err := azfile.NewSharedKeyCredential(storageAccount, key)
-	assert.NilError(t, err)
-
-	shareURL := azfile.NewShareURL(*u, azfile.NewPipeline(cred, azfile.PipelineOptions{}))
-	_, err = shareURL.Create(context.TODO(), azfile.Metadata{}, 0)
-	assert.NilError(t, err)
-	return cred, u
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName, content string) {
