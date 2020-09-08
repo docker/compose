@@ -92,6 +92,9 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project)
 		service.Networks["credentials_network"] = &types.ServiceNetworkConfig{
 			Ipv4Address: fmt.Sprintf("169.254.170.%d", i+3),
 		}
+		if service.DependsOn == nil {
+			service.DependsOn = types.DependsOnConfig{}
+		}
 		service.DependsOn["ecs-local-endpoints"] = types.ServiceDependency{
 			Condition: types.ServiceConditionStarted,
 		}
