@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/compose-cli/progress"
+
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"github.com/docker/compose-cli/aci/login"
@@ -90,12 +92,16 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 	if !ok {
 		return volumes.Volume{}, errors.New("Could not read azure LoginParams struct from generic parameter")
 	}
+	w := progress.ContextWriter(ctx)
+	w.Event(event(opts.Account, progress.Working, "Validating"))
 	accountClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
 	if err != nil {
 		return volumes.Volume{}, err
 	}
 	account, err := accountClient.GetProperties(ctx, cs.aciContext.ResourceGroup, opts.Account, "")
-	if err != nil {
+	if err == nil {
+		w.Event(event(opts.Account, progress.Done, "Use existing"))
+	} else {
 		if account.StatusCode != 404 {
 			return volumes.Volume{}, err
 		}
@@ -111,20 +117,27 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 			return volumes.Volume{}, errors.New("error: " + *result.Message)
 		}
 		parameters := defaultStorageAccountParams(cs.aciContext)
-		// TODO progress account creation
+
+		w.Event(event(opts.Account, progress.Working, "Creating"))
+
 		future, err := accountClient.Create(ctx, cs.aciContext.ResourceGroup, opts.Account, parameters)
 		if err != nil {
+			w.Event(errorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		err = future.WaitForCompletionRef(ctx, accountClient.Client)
 		if err != nil {
+			w.Event(errorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		account, err = future.Result(accountClient)
 		if err != nil {
+			w.Event(errorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
+		w.Event(event(opts.Account, progress.Done, "Created"))
 	}
+	w.Event(event(opts.Fileshare, progress.Working, "Creating"))
 	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
 	if err != nil {
 		return volumes.Volume{}, err
@@ -132,16 +145,37 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 
 	fileShare, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, *account.Name, opts.Fileshare, "")
 	if err == nil {
+		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", opts.Fileshare)
 	}
 	if fileShare.StatusCode != 404 {
+		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, err
 	}
+	//TODO tag fileshare
 	fileShare, err = fileShareClient.Create(ctx, cs.aciContext.ResourceGroup, *account.Name, opts.Fileshare, storage.FileShare{})
 	if err != nil {
+		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, err
 	}
+	w.Event(event(opts.Fileshare, progress.Done, "Created"))
 	return toVolume(account, *fileShare.Name), nil
+}
+
+func event(resource string, status progress.EventStatus, text string) progress.Event {
+	return progress.Event{
+		ID:         resource,
+		Status:     status,
+		StatusText: text,
+	}
+}
+
+func errorEvent(resource string) progress.Event {
+	return progress.Event{
+		ID:         resource,
+		Status:     progress.Error,
+		StatusText: "Error",
+	}
 }
 
 func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) error {
@@ -150,8 +184,9 @@ func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) err
 		return errors.New("Could not read azure VolumeDeleteOptions struct from generic parameter")
 	}
 	if opts.DeleteAccount {
-		//TODO check if there are other shares on this account
-		//TODO flag account and only delete ours
+		//TODO check if there are other fileshares on this account
+		//TODO flag account and only delete ours?
+		//TODO error when not found
 		storageAccountsClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
 		if err != nil {
 			return err

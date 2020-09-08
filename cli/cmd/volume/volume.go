@@ -17,12 +17,13 @@
 package volume
 
 import (
+	"context"
 	"fmt"
-
-	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/progress"
+	"github.com/spf13/cobra"
 )
 
 // Command manage volumes
@@ -47,16 +48,23 @@ func createVolume() *cobra.Command {
 		Short: "Creates an Azure file share to use as ACI volume.",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := client.New(cmd.Context())
+			ctx := cmd.Context()
+			c, err := client.New(ctx)
 			if err != nil {
 				return err
 			}
-			id, err := c.VolumeService().Create(cmd.Context(), opts)
+			err = progress.Run(ctx, func(ctx context.Context) error {
+				_, err := c.VolumeService().Create(ctx, opts)
+				if err != nil {
+					return err
+				}
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			fmt.Println(id)
-			return nil
+			fmt.Printf("volume successfully created\n")
+			return err
 		},
 	}
 
