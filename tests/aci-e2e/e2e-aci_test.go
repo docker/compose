@@ -466,6 +466,17 @@ func TestComposeUpUpdate(t *testing.T) {
 		assert.Check(t, webDisplayed && wordsDisplayed && dbDisplayed, "\n%s\n", res.Stdout())
 	})
 
+	t.Run("compose ls", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "ls", "--project-name", composeProjectName)
+		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+
+		assert.Equal(t, 2, len(lines))
+		fields := strings.Fields(lines[1])
+		assert.Equal(t, 2, len(fields))
+		assert.Equal(t, fields[0], composeProjectName)
+		assert.Equal(t, "Running", fields[1])
+	})
+
 	t.Run("logs web", func(t *testing.T) {
 		res := c.RunDockerCmd("logs", serverContainer)
 		res.Assert(t, icmd.Expected{Out: "Listening on port 80"})
