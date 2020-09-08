@@ -1,6 +1,49 @@
 Change log
 ==========
 
+1.27.0 (2020-09-07)
+-------------------
+
+### Features
+
+- Merge 2.x and 3.x compose formats and align with COMPOSE_SPEC schema
+
+- Implement service mode for ipc
+
+- Pass `COMPOSE_PROJECT_NAME` environment variable in container mode
+
+- Make run behave in the same way as up
+
+- Use `docker build` on `docker-compose run` when `COMPOSE_DOCKER_CLI_BUILD` environment variable is set
+
+- Use docker-py default API version for engine queries (`auto`)
+
+- Parse `network_mode` on build
+
+### Bugs
+
+- Ignore build context path validation when building is not required
+
+- Fix float to bytes conversion via docker-py bump to 4.3.1
+
+- Fix scale bug when deploy section is set
+
+- Fix `docker-py` bump in `setup.py`
+
+- Fix experimental build failure detection
+
+- Fix context propagation to docker cli
+
+### Miscellaneous
+
+- Bump `docker-py` to 4.3.1
+
+- Bump `tox` to 3.19.0
+
+- Bump `virtualenv` to 20.0.30
+
+- Add script for docs syncronization
+
 1.26.1 (2020-06-30)
 -------------------
 
