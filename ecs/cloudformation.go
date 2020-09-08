@@ -56,6 +56,47 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 	if err != nil {
 		return nil, err
 	}
+
+	// Create a NFS inbound rule on each mount target for volumes
+	// as "source security group" use an arbitrary network attached to service(s) who mounts target volume
+	for n, vol := range project.Volumes {
+		err := b.SDK.WithVolumeSecurityGroups(ctx, vol.Name, func(securityGroups []string) error {
+			target := securityGroups[0]
+			for _, s := range project.Services {
+				for _, v := range s.Volumes {
+					if v.Source != n {
+						continue
+					}
+					var source string
+					for net := range s.Networks {
+						network := project.Networks[net]
+						if ext, ok := network.Extensions[extensionSecurityGroup]; ok {
+							source = ext.(string)
+						} else {
+							source = networkResourceName(project, net)
+						}
+						break
+					}
+					name := fmt.Sprintf("%sNFSMount%s", s.Name, n)
+					template.Resources[name] = &ec2.SecurityGroupIngress{
+						Description:           fmt.Sprintf("Allow NFS mount for %s on %s", s.Name, n),
+						GroupId:               target,
+						SourceSecurityGroupId: cloudformation.Ref(source),
+						IpProtocol:            "tcp",
+						FromPort:              2049,
+						ToPort:                2049,
+					}
+					service := template.Resources[serviceResourceName(s.Name)].(*ecs.Service)
+					service.AWSCloudFormationDependsOn = append(service.AWSCloudFormationDependsOn, name)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return marshall(template)
 }
 
@@ -111,7 +152,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		Description: "Name of the LoadBalancer to connect to (optional)",
 	}
 
-	// Create Cluster is `ParameterClusterName` parameter is not set
+	// Createmount.nfs4: Connection timed out : unsuccessful EFS utils command execution; code: 32 Cluster is `ParameterClusterName` parameter is not set
 	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(parameterClusterName))
 
 	cluster := createCluster(project, template)
@@ -240,6 +281,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 					},
 				},
 			},
+			PlatformVersion:    "1.4.0", // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
 			PropagateTags:      ecsapi.PropagateTagsService,
 			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
 			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
@@ -579,8 +621,8 @@ func networkResourceName(project *types.Project, network string) string {
 	return fmt.Sprintf("%s%sNetwork", normalizeResourceName(project.Name), normalizeResourceName(network))
 }
 
-func serviceResourceName(dependency string) string {
-	return fmt.Sprintf("%sService", normalizeResourceName(dependency))
+func serviceResourceName(service string) string {
+	return fmt.Sprintf("%sService", normalizeResourceName(service))
 }
 
 func normalizeResourceName(s string) string {

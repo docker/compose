@@ -81,6 +81,22 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		})
 	}
 
+	for _, v := range service.Volumes {
+		source := project.Volumes[v.Source]
+		volumes = append(volumes, ecs.TaskDefinition_Volume{
+			EFSVolumeConfiguration: &ecs.TaskDefinition_EFSVolumeConfiguration{
+				FilesystemId:  source.Name,
+				RootDirectory: source.DriverOpts["root_directory"],
+			},
+			Name: v.Source,
+		})
+		mounts = append(mounts, ecs.TaskDefinition_MountPoint{
+			ContainerPath: v.Target,
+			ReadOnly:      v.ReadOnly,
+			SourceVolume:  v.Source,
+		})
+	}
+
 	pairs, err := createEnvironment(project, service)
 	if err != nil {
 		return nil, err

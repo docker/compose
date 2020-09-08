@@ -36,19 +36,21 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/ecs/ecsiface"
+	"github.com/aws/aws-sdk-go/service/efs"
+	"github.com/aws/aws-sdk-go/service/efs/efsiface"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	cf "github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/sirupsen/logrus"
 )
 
 type sdk struct {
 	ECS ecsiface.ECSAPI
 	EC2 ec2iface.EC2API
+	EFS efsiface.EFSAPI
 	ELB elbv2iface.ELBV2API
 	CW  cloudwatchlogsiface.CloudWatchLogsAPI
 	IAM iamiface.IAMAPI
@@ -63,6 +65,7 @@ func newSDK(sess *session.Session) sdk {
 	return sdk{
 		ECS: ecs.New(sess),
 		EC2: ec2.New(sess),
+		EFS: efs.New(sess),
 		ELB: elbv2.New(sess),
 		CW:  cloudwatchlogs.New(sess),
 		IAM: iam.New(sess),
@@ -187,12 +190,8 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 	return len(stacks.Stacks) > 0, nil
 }
 
-func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template, parameters map[string]string) error {
+func (s sdk) CreateStack(ctx context.Context, name string, template []byte, parameters map[string]string) error {
 	logrus.Debug("Create CloudFormation stack")
-	json, err := marshall(template)
-	if err != nil {
-		return err
-	}
 
 	param := []*cloudformation.Parameter{}
 	for name, value := range parameters {
@@ -202,10 +201,10 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 		})
 	}
 
-	_, err = s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
+	_, err := s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 		OnFailure:        aws.String("DELETE"),
 		StackName:        aws.String(name),
-		TemplateBody:     aws.String(string(json)),
+		TemplateBody:     aws.String(string(template)),
 		Parameters:       param,
 		TimeoutInMinutes: nil,
 		Capabilities: []*string{
@@ -221,12 +220,8 @@ func (s sdk) CreateStack(ctx context.Context, name string, template *cf.Template
 	return err
 }
 
-func (s sdk) CreateChangeSet(ctx context.Context, name string, template *cf.Template, parameters map[string]string) (string, error) {
+func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte, parameters map[string]string) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
-	json, err := marshall(template)
-	if err != nil {
-		return "", err
-	}
 
 	param := []*cloudformation.Parameter{}
 	for name := range parameters {
@@ -241,7 +236,7 @@ func (s sdk) CreateChangeSet(ctx context.Context, name string, template *cf.Temp
 		ChangeSetName: aws.String(update),
 		ChangeSetType: aws.String(cloudformation.ChangeSetTypeUpdate),
 		StackName:     aws.String(name),
-		TemplateBody:  aws.String(string(json)),
+		TemplateBody:  aws.String(string(template)),
 		Parameters:    param,
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
@@ -670,4 +665,26 @@ func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
 		return "", fmt.Errorf("Load balancer %s doesn't have a dns name", aws.StringValue(lbs.LoadBalancers[0].LoadBalancerArn))
 	}
 	return dnsName, nil
+}
+
+func (s sdk) WithVolumeSecurityGroups(ctx context.Context, id string, fn func(securityGroups []string) error) error {
+	mounts, err := s.EFS.DescribeMountTargetsWithContext(ctx, &efs.DescribeMountTargetsInput{
+		FileSystemId: aws.String(id),
+	})
+	if err != nil {
+		return err
+	}
+	for _, mount := range mounts.MountTargets {
+		groups, err := s.EFS.DescribeMountTargetSecurityGroupsWithContext(ctx, &efs.DescribeMountTargetSecurityGroupsInput{
+			MountTargetId: mount.MountTargetId,
+		})
+		if err != nil {
+			return err
+		}
+		err = fn(aws.StringValueSlice(groups.SecurityGroups))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

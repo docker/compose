@@ -62,10 +62,16 @@ var compatibleComposeAttributes = []string{
 	"services.secrets.source",
 	"services.secrets.target",
 	"services.user",
+	"services.volumes",
+	"services.volumes.read_only",
+	"services.volumes.source",
+	"services.volumes.target",
 	"services.working_dir",
 	"secrets.external",
 	"secrets.name",
 	"secrets.file",
+	"volumes",
+	"volumes.external",
 }
 
 func (c *fargateCompatibilityChecker) CheckImage(service *types.ServiceConfig) {
@@ -99,5 +105,11 @@ func (c *fargateCompatibilityChecker) CheckCapAdd(service *types.ServiceConfig) 
 func (c *fargateCompatibilityChecker) CheckLoggingDriver(config *types.LoggingConfig) {
 	if config.Driver != "" && config.Driver != "awslogs" {
 		c.Unsupported("services.logging.driver %s is not supported", config.Driver)
+	}
+}
+
+func (c *fargateCompatibilityChecker) CheckVolumeConfigExternal(config *types.VolumeConfig) {
+	if !config.External.External {
+		c.Unsupported("non-external volumes are not supported")
 	}
 }

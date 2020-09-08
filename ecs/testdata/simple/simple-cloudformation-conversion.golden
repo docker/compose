@@ -123,6 +123,7 @@
             ]
           }
         },
+        "PlatformVersion": "1.4.0",
         "PropagateTags": "SERVICE",
         "SchedulingStrategy": "REPLICA",
         "ServiceRegistries": [
