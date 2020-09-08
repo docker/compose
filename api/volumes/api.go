@@ -31,5 +31,8 @@ type Volume struct {
 type Service interface {
 	// List returns all available volumes
 	List(ctx context.Context) ([]Volume, error)
+	// Create creates a new volume
 	Create(ctx context.Context, options interface{}) (Volume, error)
+	// Delete deletes an existing volume
+	Delete(ctx context.Context, options interface{}) error
 }

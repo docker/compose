@@ -35,5 +35,5 @@ func TestPrintList(t *testing.T) {
 	}
 	out := &bytes.Buffer{}
 	printList(out, secrets)
-	golden.Assert(t, out.String(), "volumes-out.golden")
+	golden.Assert(t, out.String(), "secrets-out.golden")
 }

@@ -18,7 +18,9 @@ package aci
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
+
 	"github.com/docker/compose-cli/aci/login"
 )
 

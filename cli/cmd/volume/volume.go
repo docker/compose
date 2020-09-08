@@ -1,5 +1,3 @@
-package volume
-
 /*
    Copyright 2020 Docker, Inc.
 
@@ -16,9 +14,13 @@ package volume
    limitations under the License.
 */
 
+package volume
+
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 )
@@ -33,6 +35,7 @@ func Command() *cobra.Command {
 	cmd.AddCommand(
 		createVolume(),
 		listVolume(),
+		rmVolume(),
 	)
 	return cmd
 }
@@ -59,5 +62,26 @@ func createVolume() *cobra.Command {
 
 	cmd.Flags().StringVar(&opts.Account, "storage-account", "", "Storage account name")
 	cmd.Flags().StringVar(&opts.Fileshare, "fileshare", "", "Fileshare name")
+	return cmd
+}
+
+func rmVolume() *cobra.Command {
+	opts := aci.VolumeDeleteOptions{}
+	cmd := &cobra.Command{
+		Use:   "rm",
+		Short: "Deletes an Azure file share and/or the Azure storage account.",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return c.VolumeService().Delete(cmd.Context(), opts)
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.Account, "storage-account", "", "Storage account name")
+	cmd.Flags().StringVar(&opts.Fileshare, "fileshare", "", "Fileshare name")
+	cmd.Flags().BoolVar(&opts.DeleteAccount, "delete-storage-account", false, "Also delete storage account")
 	return cmd
 }

@@ -40,6 +40,7 @@ const (
 	backendType               = store.AciContextType
 	singleContainerTag        = "docker-single-container"
 	composeContainerTag       = "docker-compose-application"
+	dockerVolumeTag           = "docker-volume"
 	composeContainerSeparator = "_"
 )
 
@@ -149,7 +150,6 @@ func addTag(groupDefinition *containerinstance.ContainerGroup, tagName string) {
 	groupDefinition.Tags[tagName] = to.StringPtr(tagName)
 }
 
-
 func getGroupAndContainerName(containerID string) (string, string) {
 	tokens := strings.Split(containerID, composeContainerSeparator)
 	groupName := tokens[0]
@@ -160,4 +160,3 @@ func getGroupAndContainerName(containerID string) (string, string) {
 	}
 	return groupName, containerName
 }
-

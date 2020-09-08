@@ -26,12 +26,14 @@ import (
 type volumeService struct {
 }
 
-// List list volumes
 func (c *volumeService) List(ctx context.Context) ([]volumes.Volume, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-// Create creates a volume
 func (c *volumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
 	return volumes.Volume{}, errdefs.ErrNotImplemented
+}
+
+func (c *volumeService) Delete(ctx context.Context, options interface{}) error {
+	return errdefs.ErrNotImplemented
 }

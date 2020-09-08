@@ -1,5 +1,3 @@
-package volume
-
 /*
    Copyright 2020 Docker, Inc.
 
@@ -16,13 +14,17 @@ package volume
    limitations under the License.
 */
 
+package volume
+
 import (
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
+
 	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/volumes"
 )

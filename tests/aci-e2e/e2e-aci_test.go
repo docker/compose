@@ -47,7 +47,6 @@ import (
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/tests/aci-e2e/storage"
 	. "github.com/docker/compose-cli/tests/framework"
 )
 
@@ -151,28 +150,52 @@ func TestContainerRunVolume(t *testing.T) {
 		accountName = "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
 	)
 
-	t.Run("Create volumes", func(t *testing.T) {
+	t.Run("check volume name validity", func(t *testing.T) {
+		invalidName := "some-storage-123"
+		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "some-storage-123 is not a valid storage account name. Storage account name must be between 3 and 24 characters in length and use numbers and lower-case letters only.",
+		})
+	})
+
+	t.Run("create volumes", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
 	})
-	t.Cleanup(func() { deleteStorageAccount(t, aciContext, accountName) })
 
-	t.Run("Create second fileshare", func(t *testing.T) {
+	t.Cleanup(func() {
+		c.RunDockerCmd("volume", "rm", "--storage-account", accountName, "--delete-storage-account")
+		res := c.RunDockerCmd("volume", "ls")
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 1)
+	})
+
+	t.Run("create second fileshare", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
 	})
 
 	t.Run("list volumes", func(t *testing.T) {
 		res := c.RunDockerCmd("volume", "ls")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
-		firstAccount := out[1]
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 3)
+		firstAccount := lines[1]
 		fields := strings.Fields(firstAccount)
 		volumeID = accountName + "@" + fileshareName
 		assert.Equal(t, fields[0], volumeID)
 		assert.Equal(t, fields[1], fileshareName)
-		secondAccount := out[2]
+		secondAccount := lines[2]
 		fields = strings.Fields(secondAccount)
-		assert.Equal(t, fields[0], accountName + "@dockertestshare2")
+		assert.Equal(t, fields[0], accountName+"@dockertestshare2")
 		assert.Equal(t, fields[1], "dockertestshare2")
 		//assert.Assert(t, fields[2], strings.Contains(firstAccount, fmt.Sprintf("Fileshare %s in %s storage account", fileshareName, accountName)))
+	})
+
+	t.Run("delete only fileshare", func(t *testing.T) {
+		c.RunDockerCmd("volume", "rm", "--storage-account", accountName, "--fileshare", "dockertestshare2")
+		res := c.RunDockerCmd("volume", "ls")
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 2)
+		assert.Assert(t, !strings.Contains(res.Stdout(), "dockertestshare2"), "second fileshare still visible after rm")
 	})
 
 	t.Run("upload file", func(t *testing.T) {
@@ -213,7 +236,7 @@ func TestContainerRunVolume(t *testing.T) {
 
 	t.Run("ps", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		l := out[len(out)-1]
 		assert.Assert(t, strings.Contains(l, container), "Looking for %q in line: %s", container, l)
 		assert.Assert(t, strings.Contains(l, "nginx"))
@@ -308,6 +331,10 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 }
 
+func lines(output string) []string {
+	return strings.Split(strings.TrimSpace(output), "\n")
+}
+
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	_, _ = setupTestResourceGroup(t, c)
@@ -398,11 +425,11 @@ func TestContainerRunAttached(t *testing.T) {
 
 	t.Run("ps stopped container with --all", func(t *testing.T) {
 		res := c.RunDockerCmd("ps", container)
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 1))
 
 		res = c.RunDockerCmd("ps", "--all", container)
-		out = strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out = lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 2))
 	})
 
@@ -439,7 +466,7 @@ func TestComposeUpUpdate(t *testing.T) {
 		// Name of Compose project is taken from current folder "acie2e"
 		c.RunDockerCmd("compose", "up", "-f", composeFile)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 		webRunning := false
@@ -468,7 +495,7 @@ func TestComposeUpUpdate(t *testing.T) {
 
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
-		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		lines := lines(res.Stdout())
 		assert.Assert(t, is.Len(lines, 4))
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
 		for _, line := range lines {
@@ -492,7 +519,7 @@ func TestComposeUpUpdate(t *testing.T) {
 
 	t.Run("compose ls", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ls")
-		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		lines := lines(res.Stdout())
 
 		assert.Equal(t, 2, len(lines))
 		fields := strings.Fields(lines[1])
@@ -509,7 +536,7 @@ func TestComposeUpUpdate(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 
@@ -551,7 +578,7 @@ func TestComposeUpUpdate(t *testing.T) {
 	t.Run("down", func(t *testing.T) {
 		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
 	})
 }
@@ -572,7 +599,7 @@ func TestRunEnvVars(t *testing.T) {
 		cmd.Env = append(cmd.Env, "MYSQL_USER=user1")
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Success)
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		container := strings.TrimSpace(out[len(out)-1])
 
 		res = c.RunDockerCmd("inspect", container)
@@ -607,7 +634,7 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
 	createAciContextAndUseIt(t, c, sID, rg)
 	// Check nothing is running
 	res := c.RunDockerCmd("ps")
-	assert.Assert(t, is.Len(strings.Split(strings.TrimSpace(res.Stdout()), "\n"), 1))
+	assert.Assert(t, is.Len(lines(res.Stdout()), 1))
 	return sID, rg
 }
 
@@ -661,14 +688,6 @@ func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})
 }
 
-func deleteStorageAccount(t *testing.T, aciContext store.AciContext, name string) {
-	fmt.Printf("	[%s] deleting storage account %s\n", t.Name(), name)
-	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, name)
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName, content string) {
 	fURL, err := url.Parse(baseURL + "/" + fileName)
 	assert.NilError(t, err)
@@ -678,7 +697,7 @@ func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName
 }
 
 func getContainerName(stdout string) string {
-	out := strings.Split(strings.TrimSpace(stdout), "\n")
+	out := lines(stdout)
 	return strings.TrimSpace(out[len(out)-1])
 }
 

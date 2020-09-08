@@ -124,5 +124,3 @@ func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writ
 func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
-
-

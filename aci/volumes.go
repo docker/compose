@@ -19,7 +19,9 @@ package aci
 import (
 	"context"
 	"fmt"
+
 	"github.com/Azure/go-autorest/autorest/to"
+
 	"github.com/docker/compose-cli/aci/login"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
@@ -76,6 +78,13 @@ type VolumeCreateOptions struct {
 	Fileshare string
 }
 
+//VolumeDeleteOptions options to create a new ACI volume
+type VolumeDeleteOptions struct {
+	Account       string
+	Fileshare     string
+	DeleteAccount bool
+}
+
 func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
 	opts, ok := options.(VolumeCreateOptions)
 	if !ok {
@@ -91,6 +100,16 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 			return volumes.Volume{}, err
 		}
 		//TODO confirm storage account creation
+		result, err := accountClient.CheckNameAvailability(ctx, storage.AccountCheckNameAvailabilityParameters{
+			Name: to.StringPtr(opts.Account),
+			Type: to.StringPtr("Microsoft.Storage/storageAccounts"),
+		})
+		if err != nil {
+			return volumes.Volume{}, err
+		}
+		if !*result.NameAvailable {
+			return volumes.Volume{}, errors.New("error: " + *result.Message)
+		}
 		parameters := defaultStorageAccountParams(cs.aciContext)
 		// TODO progress account creation
 		future, err := accountClient.Create(ctx, cs.aciContext.ResourceGroup, opts.Account, parameters)
@@ -125,6 +144,32 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 	return toVolume(account, *fileShare.Name), nil
 }
 
+func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) error {
+	opts, ok := options.(VolumeDeleteOptions)
+	if !ok {
+		return errors.New("Could not read azure VolumeDeleteOptions struct from generic parameter")
+	}
+	if opts.DeleteAccount {
+		//TODO check if there are other shares on this account
+		//TODO flag account and only delete ours
+		storageAccountsClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
+		if err != nil {
+			return err
+		}
+
+		_, err = storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account)
+		return err
+	}
+
+	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
+	if err != nil {
+		return err
+	}
+
+	_, err = fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account, opts.Fileshare)
+	return err
+}
+
 func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 	return volumes.Volume{
 		ID:          fmt.Sprintf("%s@%s", *account.Name, fileShareName),
@@ -134,12 +179,12 @@ func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 }
 
 func defaultStorageAccountParams(aciContext store.AciContext) storage.AccountCreateParameters {
+	tags := map[string]*string{dockerVolumeTag: to.StringPtr(dockerVolumeTag)}
 	return storage.AccountCreateParameters{
 		Location: to.StringPtr(aciContext.Location),
 		Sku: &storage.Sku{
 			Name: storage.StandardLRS,
 		},
-		Kind:storage.StorageV2,
-		AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{},
+		Tags: tags,
 	}
 }

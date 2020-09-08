@@ -62,7 +62,6 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 	return res, nil
 }
 
-
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
 	if strings.Contains(r.ID, composeContainerSeparator) {
 		return errors.New(fmt.Sprintf("invalid container name. ACI container name cannot include %q", composeContainerSeparator))
