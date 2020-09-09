@@ -24,7 +24,7 @@ SECRETS_PATH = '/run/secrets'
 WINDOWS_LONGPATH_PREFIX = '\\\\?\\'
 
 COMPOSEFILE_V1 = ComposeVersion('1')
-COMPOSE_SPEC = ComposeVersion('3')
+COMPOSE_SPEC = ComposeVersion('3.9')
 
 # minimum DOCKER ENGINE API version needed to support
 # features for each compose schema version
