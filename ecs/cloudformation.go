@@ -159,11 +159,13 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			return nil, err
 		}
 
-		taskExecutionRole, err := createTaskExecutionRole(service, err, definition, template)
-		if err != nil {
-			return template, err
-		}
+		taskExecutionRole := createTaskExecutionRole(service, definition, template)
 		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
+
+		taskRole := createTaskRole(service, template)
+		if taskRole != "" {
+			definition.TaskRoleArn = cloudformation.Ref(taskRole)
+		}
 
 		taskDefinition := fmt.Sprintf("%sTaskDefinition", normalizeResourceName(service.Name))
 		template.Resources[taskDefinition] = definition
@@ -459,40 +461,43 @@ func createServiceRegistry(service types.ServiceConfig, template *cloudformation
 	return serviceRegistry
 }
 
-func createTaskExecutionRole(service types.ServiceConfig, err error, definition *ecs.TaskDefinition, template *cloudformation.Template) (string, error) {
+func createTaskExecutionRole(service types.ServiceConfig, definition *ecs.TaskDefinition, template *cloudformation.Template) string {
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
-	policy := getPolicy(definition)
-	if err != nil {
-		return taskExecutionRole, err
+	policies := createPolicies(service, definition)
+	template.Resources[taskExecutionRole] = &iam.Role{
+		AssumeRolePolicyDocument: assumeRolePolicyDocument,
+		Policies:                 policies,
+		ManagedPolicyArns: []string{
+			ecsTaskExecutionPolicy,
+			ecrReadOnlyPolicy,
+		},
 	}
-	rolePolicies := []iam.Role_Policy{}
-	if policy != nil {
-		rolePolicies = append(rolePolicies, iam.Role_Policy{
-			PolicyDocument: policy,
-			PolicyName:     fmt.Sprintf("%sGrantAccessToSecrets", service.Name),
-		})
-	}
+	return taskExecutionRole
+}
 
+func createTaskRole(service types.ServiceConfig, template *cloudformation.Template) string {
+	taskRole := fmt.Sprintf("%sTaskRole", normalizeResourceName(service.Name))
+	rolePolicies := []iam.Role_Policy{}
 	if roles, ok := service.Extensions[extensionRole]; ok {
 		rolePolicies = append(rolePolicies, iam.Role_Policy{
 			PolicyDocument: roles,
 		})
 	}
-	managedPolicies := []string{
-		ecsTaskExecutionPolicy,
-		ecrReadOnlyPolicy,
-	}
+	managedPolicies := []string{}
 	if v, ok := service.Extensions[extensionManagedPolicies]; ok {
 		for _, s := range v.([]interface{}) {
 			managedPolicies = append(managedPolicies, s.(string))
 		}
 	}
-	template.Resources[taskExecutionRole] = &iam.Role{
+	if len(rolePolicies) == 0 && len(managedPolicies) == 0 {
+		return ""
+	}
+	template.Resources[taskRole] = &iam.Role{
 		AssumeRolePolicyDocument: assumeRolePolicyDocument,
 		Policies:                 rolePolicies,
 		ManagedPolicyArns:        managedPolicies,
 	}
-	return taskExecutionRole, nil
+	return taskRole
 }
 
 func createCluster(project *types.Project, template *cloudformation.Template) string {
@@ -582,7 +587,7 @@ func normalizeResourceName(s string) string {
 	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }
 
-func getPolicy(taskDef *ecs.TaskDefinition) *PolicyDocument {
+func createPolicies(service types.ServiceConfig, taskDef *ecs.TaskDefinition) []iam.Role_Policy {
 	arns := []string{}
 	for _, container := range taskDef.ContainerDefinitions {
 		if container.RepositoryCredentials != nil {
@@ -596,13 +601,19 @@ func getPolicy(taskDef *ecs.TaskDefinition) *PolicyDocument {
 
 	}
 	if len(arns) > 0 {
-		return &PolicyDocument{
-			Statement: []PolicyStatement{
-				{
-					Effect:   "Allow",
-					Action:   []string{actionGetSecretValue, actionGetParameters, actionDecrypt},
-					Resource: arns,
-				}},
+		return []iam.Role_Policy{
+			{
+				PolicyDocument: &PolicyDocument{
+					Statement: []PolicyStatement{
+						{
+							Effect:   "Allow",
+							Action:   []string{actionGetSecretValue, actionGetParameters, actionDecrypt},
+							Resource: arns,
+						},
+					},
+				},
+				PolicyName: fmt.Sprintf("%sGrantAccessToSecrets", service.Name),
+			},
 		}
 	}
 	return nil
