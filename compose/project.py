@@ -311,12 +311,12 @@ class Project:
             return 1 if scale is None else scale
 
         replicas = deploy_dict.get('replicas', None)
-        if scale and replicas:
+        if scale is not None and replicas is not None:
             raise ConfigurationError(
                 "Both service.scale and service.deploy.replicas are set."
                 " Only one of them must be set."
             )
-        if replicas:
+        if replicas is not None:
             scale = replicas
         if scale is None:
             return 1
