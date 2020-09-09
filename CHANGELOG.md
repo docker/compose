@@ -36,6 +36,8 @@ Change log
 
 ### Miscellaneous
 
+- Drop support for Python 2.7
+
 - Bump `docker-py` to 4.3.1
 
 - Bump `tox` to 3.19.0
