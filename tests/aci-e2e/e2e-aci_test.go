@@ -162,9 +162,10 @@ func TestContainerRunVolume(t *testing.T) {
 	t.Run("create volumes", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
 	})
+	volumeID = accountName + "@" + fileshareName
 
 	t.Cleanup(func() {
-		c.RunDockerCmd("volume", "rm", "--storage-account", accountName, "--delete-storage-account")
+		c.RunDockerCmd("volume", "rm", volumeID)
 		res := c.RunDockerCmd("volume", "ls")
 		lines := lines(res.Stdout())
 		assert.Equal(t, len(lines), 1)
@@ -173,6 +174,7 @@ func TestContainerRunVolume(t *testing.T) {
 	t.Run("create second fileshare", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
 	})
+	volumeID2 := accountName + "@dockertestshare2"
 
 	t.Run("list volumes", func(t *testing.T) {
 		res := c.RunDockerCmd("volume", "ls")
@@ -180,18 +182,14 @@ func TestContainerRunVolume(t *testing.T) {
 		assert.Equal(t, len(lines), 3)
 		firstAccount := lines[1]
 		fields := strings.Fields(firstAccount)
-		volumeID = accountName + "@" + fileshareName
 		assert.Equal(t, fields[0], volumeID)
-		assert.Equal(t, fields[1], fileshareName)
 		secondAccount := lines[2]
 		fields = strings.Fields(secondAccount)
-		assert.Equal(t, fields[0], accountName+"@dockertestshare2")
-		assert.Equal(t, fields[1], "dockertestshare2")
-		//assert.Assert(t, fields[2], strings.Contains(firstAccount, fmt.Sprintf("Fileshare %s in %s storage account", fileshareName, accountName)))
+		assert.Equal(t, fields[0], volumeID2)
 	})
 
 	t.Run("delete only fileshare", func(t *testing.T) {
-		c.RunDockerCmd("volume", "rm", "--storage-account", accountName, "--fileshare", "dockertestshare2")
+		c.RunDockerCmd("volume", "rm", volumeID2)
 		res := c.RunDockerCmd("volume", "ls")
 		lines := lines(res.Stdout())
 		assert.Equal(t, len(lines), 2)

@@ -19,6 +19,7 @@ package aci
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/docker/compose-cli/progress"
 
@@ -80,17 +81,10 @@ type VolumeCreateOptions struct {
 	Fileshare string
 }
 
-//VolumeDeleteOptions options to create a new ACI volume
-type VolumeDeleteOptions struct {
-	Account       string
-	Fileshare     string
-	DeleteAccount bool
-}
-
 func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
 	opts, ok := options.(VolumeCreateOptions)
 	if !ok {
-		return volumes.Volume{}, errors.New("Could not read azure LoginParams struct from generic parameter")
+		return volumes.Volume{}, errors.New("Could not read azure VolumeCreateOptions struct from generic parameter")
 	}
 	w := progress.ContextWriter(ctx)
 	w.Event(event(opts.Account, progress.Working, "Validating"))
@@ -105,7 +99,6 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		if account.StatusCode != 404 {
 			return volumes.Volume{}, err
 		}
-		//TODO confirm storage account creation
 		result, err := accountClient.CheckNameAvailability(ctx, storage.AccountCheckNameAvailabilityParameters{
 			Name: to.StringPtr(opts.Account),
 			Type: to.StringPtr("Microsoft.Storage/storageAccounts"),
@@ -177,47 +170,60 @@ func errorEvent(resource string) progress.Event {
 	}
 }
 
-func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) error {
-	opts, ok := options.(VolumeDeleteOptions)
-	if !ok {
-		return errors.New("Could not read azure VolumeDeleteOptions struct from generic parameter")
+func (cs *aciVolumeService) Delete(ctx context.Context, id string, options interface{}) error {
+	tokens := strings.Split(id, "@")
+	if len(tokens) != 2 {
+		return errors.New("wrong format for volume ID : should be storageaccount@fileshare")
 	}
-	if opts.DeleteAccount {
-		//TODO check if there are other fileshares on this account
-		storageAccountsClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
-		if err != nil {
-			return err
-		}
-
-		result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account)
-		if result.StatusCode == 204 {
-			return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", opts.Account)
-		}
-
-		return err
-	}
+	storageAccount := tokens[0]
+	fileshare := tokens[1]
 
 	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
 	if err != nil {
 		return err
 	}
-
-	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account, opts.Fileshare)
-	if result.StatusCode == 204 {
-		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %s does not exist", opts.Fileshare)
+	fileShareItemsPage, err := fileShareClient.List(ctx, cs.aciContext.ResourceGroup, storageAccount, "", "", "")
+	if err != nil {
+		return err
 	}
-	if result.StatusCode == 404 {
-		return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", opts.Account)
+	fileshares := fileShareItemsPage.Values()
+	if len(fileshares) == 1 && *fileshares[0].Name == fileshare {
+		storageAccountsClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
+		if err != nil {
+			return err
+		}
+		account, err := storageAccountsClient.GetProperties(ctx, cs.aciContext.ResourceGroup, storageAccount, "")
+		if err != nil {
+			return err
+		}
+		if err == nil {
+			if _, ok := account.Tags[dockerVolumeTag]; ok {
+				result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount)
+				if result.StatusCode == 204 {
+					return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", storageAccount)
+				}
+				return err
+			}
+		}
+	}
+
+	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshare)
+	if result.StatusCode == 204 {
+		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %s does not exist", fileshare)
 	}
 	return err
 }
 
 func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 	return volumes.Volume{
-		ID:          fmt.Sprintf("%s@%s", *account.Name, fileShareName),
-		Name:        fileShareName,
+		ID:          VolumeID(*account.Name, fileShareName),
 		Description: fmt.Sprintf("Fileshare %s in %s storage account", fileShareName, *account.Name),
 	}
+}
+
+// VolumeID generate volume ID from azure storage accoun & fileshare
+func VolumeID(storageAccount string, fileShareName string) string {
+	return fmt.Sprintf("%s@%s", storageAccount, fileShareName)
 }
 
 func defaultStorageAccountParams(aciContext store.AciContext) storage.AccountCreateParameters {

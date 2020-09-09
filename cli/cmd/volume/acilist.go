@@ -53,9 +53,9 @@ func listVolume() *cobra.Command {
 func printList(out io.Writer, volumes []volumes.Volume) {
 	printSection(out, func(w io.Writer) {
 		for _, vol := range volumes {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", vol.ID, vol.Name, vol.Description) // nolint:errcheck
+			fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description) // nolint:errcheck
 		}
-	}, "ID", "NAME", "DESCRIPTION")
+	}, "ID", "DESCRIPTION")
 }
 
 func printSection(out io.Writer, printer func(io.Writer), headers ...string) {

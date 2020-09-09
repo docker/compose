@@ -29,7 +29,6 @@ func TestPrintList(t *testing.T) {
 	secrets := []volumes.Volume{
 		{
 			ID:          "volume@123",
-			Name:        "123",
 			Description: "volume 123",
 		},
 	}

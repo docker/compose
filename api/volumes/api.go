@@ -23,7 +23,6 @@ import (
 // Volume volume info
 type Volume struct {
 	ID          string
-	Name        string
 	Description string
 }
 
@@ -34,5 +33,5 @@ type Service interface {
 	// Create creates a new volume
 	Create(ctx context.Context, options interface{}) (Volume, error)
 	// Delete deletes an existing volume
-	Delete(ctx context.Context, options interface{}) error
+	Delete(ctx context.Context, volumeID string, options interface{}) error
 }

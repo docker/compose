@@ -19,6 +19,9 @@ package volume
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/spf13/cobra"
 
@@ -64,8 +67,8 @@ func createVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("volume successfully created\n")
-			return err
+			fmt.Println(aci.VolumeID(aciOpts.Account, aciOpts.Fileshare))
+			return nil
 		},
 	}
 
@@ -75,22 +78,37 @@ func createVolume() *cobra.Command {
 }
 
 func rmVolume() *cobra.Command {
-	aciOpts := aci.VolumeDeleteOptions{}
 	cmd := &cobra.Command{
-		Use:   "rm",
-		Short: "Deletes an Azure file share and/or the Azure storage account.",
-		Args:  cobra.ExactArgs(0),
+		Use:   "rm [OPTIONS] VOLUME [VOLUME...]",
+		Short: "Remove one or more volumes.",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client.New(cmd.Context())
 			if err != nil {
 				return err
 			}
-			return c.VolumeService().Delete(cmd.Context(), aciOpts)
+			var errs *multierror.Error
+			for _, id := range args {
+				err = c.VolumeService().Delete(cmd.Context(), id, nil)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+					continue
+				}
+				fmt.Println(id)
+			}
+			if errs != nil {
+				errs.ErrorFormat = formatErrors
+			}
+			return errs.ErrorOrNil()
 		},
 	}
-
-	cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
-	cmd.Flags().StringVar(&aciOpts.Fileshare, "fileshare", "", "Fileshare name")
-	cmd.Flags().BoolVar(&aciOpts.DeleteAccount, "delete-storage-account", false, "Also delete storage account")
 	return cmd
+}
+
+func formatErrors(errs []error) string {
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = "Error: " + err.Error()
+	}
+	return strings.Join(messages, "\n")
 }
