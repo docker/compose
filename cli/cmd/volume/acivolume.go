@@ -20,14 +20,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/progress"
-	"github.com/spf13/cobra"
 )
 
-// Command manage volumes
-func Command() *cobra.Command {
+// ACICommand manage volumes
+func ACICommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "volume",
 		Short: "Manages volumes",
@@ -42,7 +43,7 @@ func Command() *cobra.Command {
 }
 
 func createVolume() *cobra.Command {
-	opts := aci.VolumeCreateOptions{}
+	aciOpts := aci.VolumeCreateOptions{}
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Creates an Azure file share to use as ACI volume.",
@@ -54,7 +55,7 @@ func createVolume() *cobra.Command {
 				return err
 			}
 			err = progress.Run(ctx, func(ctx context.Context) error {
-				_, err := c.VolumeService().Create(ctx, opts)
+				_, err := c.VolumeService().Create(ctx, aciOpts)
 				if err != nil {
 					return err
 				}
@@ -68,13 +69,13 @@ func createVolume() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Account, "storage-account", "", "Storage account name")
-	cmd.Flags().StringVar(&opts.Fileshare, "fileshare", "", "Fileshare name")
+	cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
+	cmd.Flags().StringVar(&aciOpts.Fileshare, "fileshare", "", "Fileshare name")
 	return cmd
 }
 
 func rmVolume() *cobra.Command {
-	opts := aci.VolumeDeleteOptions{}
+	aciOpts := aci.VolumeDeleteOptions{}
 	cmd := &cobra.Command{
 		Use:   "rm",
 		Short: "Deletes an Azure file share and/or the Azure storage account.",
@@ -84,12 +85,12 @@ func rmVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return c.VolumeService().Delete(cmd.Context(), opts)
+			return c.VolumeService().Delete(cmd.Context(), aciOpts)
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Account, "storage-account", "", "Storage account name")
-	cmd.Flags().StringVar(&opts.Fileshare, "fileshare", "", "Fileshare name")
-	cmd.Flags().BoolVar(&opts.DeleteAccount, "delete-storage-account", false, "Also delete storage account")
+	cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
+	cmd.Flags().StringVar(&aciOpts.Fileshare, "fileshare", "", "Fileshare name")
+	cmd.Flags().BoolVar(&aciOpts.DeleteAccount, "delete-storage-account", false, "Also delete storage account")
 	return cmd
 }

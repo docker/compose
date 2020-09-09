@@ -135,7 +135,6 @@ func main() {
 
 		// Place holders
 		cmd.EcsCommand(),
-		volume.Command(),
 	)
 
 	helpFunc := root.HelpFunc()
@@ -183,6 +182,11 @@ func main() {
 	cc, _ := s.Get(currentContext)
 	if cc != nil {
 		ctype = cc.Type()
+	}
+
+	if ctype == store.AciContextType {
+		// we can also pass ctype as a parameter to the volume command and customize subcommands, flags, etc. when we have other backend implementations
+		root.AddCommand(volume.ACICommand())
 	}
 
 	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
