@@ -152,7 +152,6 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, err
 	}
-	//TODO tag fileshare
 	fileShare, err = fileShareClient.Create(ctx, cs.aciContext.ResourceGroup, *account.Name, opts.Fileshare, storage.FileShare{})
 	if err != nil {
 		w.Event(errorEvent(opts.Fileshare))
@@ -185,14 +184,16 @@ func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) err
 	}
 	if opts.DeleteAccount {
 		//TODO check if there are other fileshares on this account
-		//TODO flag account and only delete ours?
-		//TODO error when not found
 		storageAccountsClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
 		if err != nil {
 			return err
 		}
 
-		_, err = storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account)
+		result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account)
+		if result.StatusCode == 204 {
+			return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", opts.Account)
+		}
+
 		return err
 	}
 
@@ -201,7 +202,13 @@ func (cs *aciVolumeService) Delete(ctx context.Context, options interface{}) err
 		return err
 	}
 
-	_, err = fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account, opts.Fileshare)
+	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, opts.Account, opts.Fileshare)
+	if result.StatusCode == 204 {
+		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %s does not exist", opts.Fileshare)
+	}
+	if result.StatusCode == 404 {
+		return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", opts.Account)
+	}
 	return err
 }
 
