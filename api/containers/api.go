@@ -47,10 +47,16 @@ type Container struct {
 	MemoryLimit            uint64
 	PidsCurrent            uint64
 	PidsLimit              uint64
-	Labels                 []string
-	Ports                  []Port
+	Config                 *RuntimeConfig `json:",omitempty"`
+	Labels                 []string       `json:",omitempty"`
+	Ports                  []Port         `json:",omitempty"`
 	Platform               string
 	RestartPolicyCondition string
+}
+
+// RuntimeConfig config of a created container
+type RuntimeConfig struct {
+	Env map[string]string `json:",omitempty"`
 }
 
 // Port represents a published port of a container

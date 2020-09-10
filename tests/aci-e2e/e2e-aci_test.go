@@ -543,6 +543,7 @@ func TestRunEnvVars(t *testing.T) {
 			"-e", "MYSQL_DATABASE=mytestdb",
 			"-e", "MYSQL_USER",
 			"-e", "MYSQL_PASSWORD=userpwd",
+			"-e", "DATASOURCE_URL=jdbc:mysql://mydb.mysql.database.azure.com/db1?useSSL=true&requireSSL=false&serverTimezone=America/Recife",
 			"mysql:5.7",
 		)
 		cmd.Env = append(cmd.Env, "MYSQL_USER=user1")
@@ -555,7 +556,16 @@ func TestRunEnvVars(t *testing.T) {
 
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
+		assert.Assert(t, containerInspect.Config != nil, "nil container config")
+		assert.Assert(t, containerInspect.Config.Env != nil, "nil container env variables")
 		assert.Equal(t, containerInspect.Image, "mysql:5.7")
+		envVars := containerInspect.Config.Env
+		assert.Equal(t, len(envVars), 5)
+		assert.Equal(t, envVars["MYSQL_ROOT_PASSWORD"], "rootpwd")
+		assert.Equal(t, envVars["MYSQL_DATABASE"], "mytestdb")
+		assert.Equal(t, envVars["MYSQL_USER"], "user1")
+		assert.Equal(t, envVars["MYSQL_PASSWORD"], "userpwd")
+		assert.Equal(t, envVars["DATASOURCE_URL"], "jdbc:mysql://mydb.mysql.database.azure.com/db1?useSSL=true&requireSSL=false&serverTimezone=America/Recife")
 
 		check := func(t poll.LogT) poll.Result {
 			res := c.RunDockerOrExitError("logs", container)

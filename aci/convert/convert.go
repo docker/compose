@@ -429,6 +429,18 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 	status := GetStatus(cc, cg)
 	platform := string(cg.OsType)
 
+	var envVars map[string]string = nil
+	if cc.EnvironmentVariables != nil && len(*cc.EnvironmentVariables) != 0 {
+		envVars = map[string]string{}
+		for _, envVar := range *cc.EnvironmentVariables {
+			envVars[*envVar.Name] = *envVar.Value
+		}
+	}
+
+	var config *containers.RuntimeConfig = nil
+	if envVars != nil {
+		config = &containers.RuntimeConfig{Env: envVars}
+	}
 	c := containers.Container{
 		ID:                     containerID,
 		Status:                 status,
@@ -444,6 +456,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		Ports:                  ToPorts(cg.IPAddress, *cc.Ports),
 		Platform:               platform,
 		RestartPolicyCondition: toContainerRestartPolicy(cg.RestartPolicy),
+		Config:                 config,
 	}
 
 	return c
