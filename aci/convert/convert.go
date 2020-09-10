@@ -207,7 +207,7 @@ func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.St
 		if v.Driver == azureFileDriverName {
 			shareName, ok := v.DriverOpts[volumeDriveroptsShareNameKey]
 			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve share name for Azurefile")
+				return nil, nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
 			}
 			accountName, ok := v.DriverOpts[volumeDriveroptsAccountNameKey]
 			if !ok {

@@ -167,7 +167,7 @@ func errorEvent(resource string) progress.Event {
 }
 
 func (cs *aciVolumeService) Delete(ctx context.Context, id string, options interface{}) error {
-	tokens := strings.Split(id, "@")
+	tokens := strings.Split(id, "/")
 	if len(tokens) != 2 {
 		return errors.New("wrong format for volume ID : should be storageaccount@fileshare")
 	}
@@ -219,7 +219,7 @@ func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 
 // VolumeID generate volume ID from azure storage accoun & fileshare
 func VolumeID(storageAccount string, fileShareName string) string {
-	return fmt.Sprintf("%s@%s", storageAccount, fileShareName)
+	return fmt.Sprintf("%s/%s", storageAccount, fileShareName)
 }
 
 func defaultStorageAccountParams(aciContext store.AciContext) storage.AccountCreateParameters {
