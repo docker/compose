@@ -2543,6 +2543,7 @@ web:
                 'labels': ['com.docker.compose.a=1', 'com.docker.compose.b=2'],
                 'mode': 'replicated',
                 'placement': {
+                    'max_replicas_per_node': 1,
                     'constraints': [
                         'node.role == manager', 'engine.labels.aws == true'
                     ],
@@ -2599,6 +2600,7 @@ web:
                 'com.docker.compose.c': '3'
             },
             'placement': {
+                'max_replicas_per_node': 1,
                 'constraints': [
                     'engine.labels.aws == true', 'engine.labels.dev == true',
                     'node.role == manager', 'node.role == worker'

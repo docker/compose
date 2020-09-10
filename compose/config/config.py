@@ -1114,6 +1114,7 @@ def merge_deploy(base, override):
         md['resources'] = dict(resources_md)
     if md.needs_merge('placement'):
         placement_md = MergeDict(md.base.get('placement') or {}, md.override.get('placement') or {})
+        placement_md.merge_scalar('max_replicas_per_node')
         placement_md.merge_field('constraints', merge_unique_items_lists, default=[])
         placement_md.merge_field('preferences', merge_unique_objects_lists, default=[])
         md['placement'] = dict(placement_md)
