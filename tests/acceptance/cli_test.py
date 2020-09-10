@@ -284,7 +284,7 @@ services:
 
         output = yaml.safe_load(result.stdout)
         expected = {
-            'version': str(VERSION),
+            'version': '2',
             'volumes': {'data': {'driver': 'local'}},
             'networks': {'front': {}},
             'services': {
@@ -308,7 +308,7 @@ services:
         self.base_dir = 'tests/fixtures/restart'
         result = self.dispatch(['config'])
         assert yaml.safe_load(result.stdout) == {
-            'version': str(VERSION),
+            'version': '2',
             'services': {
                 'never': {
                     'image': 'busybox',
@@ -354,12 +354,12 @@ services:
         result = self.dispatch(['config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
-            'version': str(VERSION),
+            'version': '2.4',
             'services': {
                 'web': {
                     'command': 'true',
                     'image': 'alpine:latest',
-                    'ports': [{'target': 5643}, {'target': 9999}]
+                    'ports': ['5643/tcp', '9999/tcp']
                 }
             }
         }
@@ -369,12 +369,12 @@ services:
         result = self.dispatch(['--env-file', '.env2', 'config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
-            'version': str(VERSION),
+            'version': '2.4',
             'services': {
                 'web': {
                     'command': 'false',
                     'image': 'alpine:latest',
-                    'ports': [{'target': 5644}, {'target': 9998}]
+                    'ports': ['5644/tcp', '9998/tcp']
                 }
             }
         }
@@ -384,12 +384,12 @@ services:
         result = self.dispatch(['--project-directory', 'alt/', 'config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
-            'version': str(VERSION),
+            'version': '2.4',
             'services': {
                 'web': {
                     'command': 'echo uwu',
                     'image': 'alpine:3.10.1',
-                    'ports': [{'target': 3341}, {'target': 4449}]
+                    'ports': ['3341/tcp', '4449/tcp']
                 }
             }
         }
@@ -501,7 +501,7 @@ services:
         self.base_dir = 'tests/fixtures/v3-full'
         result = self.dispatch(['config'])
         assert yaml.safe_load(result.stdout) == {
-            'version': str(VERSION),
+            'version': '3.5',
             'volumes': {
                 'foobar': {
                     'labels': {

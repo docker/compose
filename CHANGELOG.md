@@ -36,6 +36,8 @@ Change log
 
 ### Miscellaneous
 
+- Drop support for Python 2.7
+
 - Bump `docker-py` to 4.3.1
 
 - Bump `tox` to 3.19.0
@@ -43,6 +45,13 @@ Change log
 - Bump `virtualenv` to 20.0.30
 
 - Add script for docs syncronization
+
+1.26.2 (2020-07-02)
+-------------------
+
+### Bugs
+
+- Enforce `docker-py` 4.2.2 as minimum version when installing with pip
 
 1.26.1 (2020-06-30)
 -------------------
