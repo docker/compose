@@ -30,9 +30,9 @@ const (
 
 func TestGetRunVolumes(t *testing.T) {
 	volumeStrings := []string{
-		"myuser1@myshare1:/my/path/to/target1",
-		"myuser2@myshare2:/my/path/to/target2",
-		"myuser3@mydefaultsharename", // Use default placement at '/run/volumes/<share_name>'
+		"myuser1/myshare1:/my/path/to/target1",
+		"myuser2/myshare2:/my/path/to/target2",
+		"myuser3/mydefaultsharename", // Use default placement at '/run/volumes/<share_name>'
 	}
 	var goldenVolumeConfigs = map[string]types.VolumeConfig{
 		"volume-0": {
@@ -89,16 +89,16 @@ func TestGetRunVolumes(t *testing.T) {
 }
 
 func TestGetRunVolumesMissingFileShare(t *testing.T) {
-	_, _, err := GetRunVolumes([]string{"myaccount@"})
-	assert.ErrorContains(t, err, "does not include a storage file share after '@'")
+	_, _, err := GetRunVolumes([]string{"myaccount/"})
+	assert.ErrorContains(t, err, "does not include a storage file fileshare after '/'")
 }
 
 func TestGetRunVolumesMissingUser(t *testing.T) {
-	_, _, err := GetRunVolumes([]string{"@myshare"})
-	assert.ErrorContains(t, err, "does not include a storage account before '@'")
+	_, _, err := GetRunVolumes([]string{"/myshare"})
+	assert.ErrorContains(t, err, "does not include a storage account before '/'")
 }
 
 func TestGetRunVolumesNoShare(t *testing.T) {
 	_, _, err := GetRunVolumes([]string{"noshare"})
-	assert.ErrorContains(t, err, "does not include a storage account before '@'")
+	assert.ErrorContains(t, err, "does not include a storage account before '/'")
 }

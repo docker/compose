@@ -42,8 +42,8 @@ func GetRunVolumes(volumes []string) (map[string]types.VolumeConfig, []types.Ser
 			Name:   vi.name,
 			Driver: azureFileDriverName,
 			DriverOpts: map[string]string{
-				volumeDriveroptsAccountNameKey: vi.username,
-				volumeDriveroptsShareNameKey:   vi.share,
+				volumeDriveroptsAccountNameKey: vi.storageAccount,
+				volumeDriveroptsShareNameKey:   vi.fileshare,
 			},
 		}
 		sv := types.ServiceVolumeConfig{
@@ -58,29 +58,30 @@ func GetRunVolumes(volumes []string) (map[string]types.VolumeConfig, []types.Ser
 }
 
 type volumeInput struct {
-	name     string
-	username string
-	share    string
-	target   string
+	name           string
+	storageAccount string
+	fileshare      string
+	target         string
 }
 
 func (v *volumeInput) parse(name string, s string) error {
 	v.name = name
-	tokens := strings.Split(s, "@")
-	if len(tokens) < 2 || tokens[0] == "" {
-		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage account before '@'", v)
+	tokens := strings.Split(s, ":")
+	source := tokens[0]
+	sourceTokens := strings.Split(source, "/")
+	if len(sourceTokens) < 2 || sourceTokens[0] == "" {
+		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage account before '/'", v)
 	}
-	v.username = tokens[0]
-	remaining := tokens[1]
-	tokens = strings.Split(remaining, ":")
-	if tokens[0] == "" {
-		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage file share after '@'", v)
+	v.storageAccount = sourceTokens[0]
+	if sourceTokens[1] == "" {
+		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage file fileshare after '/'", v)
 	}
-	v.share = tokens[0]
+	v.fileshare = sourceTokens[1]
+
 	if len(tokens) > 1 {
 		v.target = tokens[1]
 	} else {
-		v.target = "/run/volumes/" + v.share
+		v.target = "/run/volumes/" + v.fileshare
 	}
 	return nil
 }

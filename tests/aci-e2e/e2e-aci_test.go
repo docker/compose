@@ -162,7 +162,7 @@ func TestContainerRunVolume(t *testing.T) {
 	t.Run("create volumes", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
 	})
-	volumeID = accountName + "@" + fileshareName
+	volumeID = accountName + "/" + fileshareName
 
 	t.Cleanup(func() {
 		c.RunDockerCmd("volume", "rm", volumeID)
@@ -174,7 +174,7 @@ func TestContainerRunVolume(t *testing.T) {
 	t.Run("create second fileshare", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
 	})
-	volumeID2 := accountName + "@dockertestshare2"
+	volumeID2 := accountName + "/dockertestshare2"
 
 	t.Run("list volumes", func(t *testing.T) {
 		res := c.RunDockerCmd("volume", "ls")
