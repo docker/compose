@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-
 	"github.com/docker/compose-cli/api/containers"
 )
 
@@ -71,7 +70,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 func toComposeEnvs(opts []string) types.MappingWithEquals {
 	result := map[string]*string{}
 	for _, env := range opts {
-		tokens := strings.Split(env, "=")
+		tokens := strings.SplitN(env, "=", 2)
 		if len(tokens) > 1 {
 			result[tokens[0]] = &tokens[1]
 		} else {

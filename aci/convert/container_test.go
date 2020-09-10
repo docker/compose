@@ -53,3 +53,21 @@ func TestConvertRestartPolicy(t *testing.T) {
 	assert.Equal(t, service1.Name, container.ID)
 	assert.Equal(t, service1.Deploy.RestartPolicy.Condition, "none")
 }
+
+func TestConvertEnvVariables(t *testing.T) {
+	container := containers.ContainerConfig{
+		ID: "container1",
+		Environment: []string{
+			"key=value",
+			"key2=value=with=equal",
+		},
+	}
+	project, err := ContainerToComposeProject(container)
+	assert.NilError(t, err)
+	service1 := project.Services[0]
+	assert.Equal(t, service1.Name, container.ID)
+	assert.DeepEqual(t, service1.Environment, types.MappingWithEquals{
+		"key":  to.StringPtr("value"),
+		"key2": to.StringPtr("value=with=equal"),
+	})
+}
