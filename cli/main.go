@@ -28,23 +28,15 @@ import (
 	"time"
 
 	"github.com/docker/compose-cli/cli/cmd/compose"
-
 	"github.com/docker/compose-cli/cli/cmd/logout"
-
+	volume "github.com/docker/compose-cli/cli/cmd/volume"
 	"github.com/docker/compose-cli/errdefs"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
-	_ "github.com/docker/compose-cli/ecs"
-	_ "github.com/docker/compose-cli/ecs/local"
-	_ "github.com/docker/compose-cli/example"
-	_ "github.com/docker/compose-cli/local"
-	"github.com/docker/compose-cli/metrics"
-
 	"github.com/docker/compose-cli/cli/cmd"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
@@ -54,6 +46,11 @@ import (
 	"github.com/docker/compose-cli/config"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
+	_ "github.com/docker/compose-cli/ecs"
+	_ "github.com/docker/compose-cli/ecs/local"
+	_ "github.com/docker/compose-cli/example"
+	_ "github.com/docker/compose-cli/local"
+	"github.com/docker/compose-cli/metrics"
 )
 
 var (
@@ -180,6 +177,11 @@ func main() {
 	cc, _ := s.Get(currentContext)
 	if cc != nil {
 		ctype = cc.Type()
+	}
+
+	if ctype == store.AciContextType {
+		// we can also pass ctype as a parameter to the volume command and customize subcommands, flags, etc. when we have other backend implementations
+		root.AddCommand(volume.ACICommand())
 	}
 
 	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())

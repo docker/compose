@@ -25,14 +25,13 @@ import (
 	"github.com/docker/compose-cli/context/store"
 )
 
-// StorageAccountHelper helper for Azure Storage Account
-type StorageAccountHelper struct {
-	LoginService AzureLoginService
-	AciContext   store.AciContext
+// StorageLogin helper for Azure Storage Login
+type StorageLogin struct {
+	AciContext store.AciContext
 }
 
 // GetAzureStorageAccountKey retrieves the storage account ket from the current azure login
-func (helper StorageAccountHelper) GetAzureStorageAccountKey(ctx context.Context, accountName string) (string, error) {
+func (helper StorageLogin) GetAzureStorageAccountKey(ctx context.Context, accountName string) (string, error) {
 	client, err := NewStorageAccountsClient(helper.AciContext.SubscriptionID)
 	if err != nil {
 		return "", err

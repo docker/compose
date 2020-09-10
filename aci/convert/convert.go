@@ -56,13 +56,8 @@ const (
 func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
-	loginService, err := login.NewAzureLoginService()
-	if err != nil {
-		return containerinstance.ContainerGroup{}, err
-	}
-	storageHelper := login.StorageAccountHelper{
-		LoginService: *loginService,
-		AciContext:   aciContext,
+	storageHelper := login.StorageLogin{
+		AciContext: aciContext,
 	}
 	volumesCache, volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
 	if err != nil {
@@ -205,7 +200,7 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 	return secretVolumes, nil
 }
 
-func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageAccountHelper) (map[string]bool, []containerinstance.Volume, error) {
+func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) (map[string]bool, []containerinstance.Volume, error) {
 	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
 	var azureFileVolumesSlice []containerinstance.Volume
 	for name, v := range p.Volumes {

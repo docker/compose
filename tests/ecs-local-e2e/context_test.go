@@ -21,8 +21,9 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/docker/compose-cli/tests/framework"
 	"gotest.tools/v3/icmd"
+
+	. "github.com/docker/compose-cli/tests/framework"
 )
 
 const (

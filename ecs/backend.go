@@ -21,10 +21,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/cloud"
@@ -95,6 +95,10 @@ func (a *ecsAPIService) ComposeService() compose.Service {
 
 func (a *ecsAPIService) SecretsService() secrets.Service {
 	return a
+}
+
+func (a *ecsAPIService) VolumeService() volumes.Service {
+	return nil
 }
 
 func getCloudService() (cloud.Service, error) {

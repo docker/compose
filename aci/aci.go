@@ -129,6 +129,34 @@ func getACIContainerGroup(ctx context.Context, aciContext store.AciContext, cont
 	return containerGroupsClient.Get(ctx, aciContext.ResourceGroup, containerGroupName)
 }
 
+func getACIContainerGroups(ctx context.Context, subscriptionID string, resourceGroup string) ([]containerinstance.ContainerGroup, error) {
+	groupsClient, err := login.NewContainerGroupsClient(subscriptionID)
+	if err != nil {
+		return nil, err
+	}
+	var containerGroups []containerinstance.ContainerGroup
+	result, err := groupsClient.ListByResourceGroup(ctx, resourceGroup)
+	if err != nil {
+		return nil, err
+	}
+
+	for result.NotDone() {
+		containerGroups = append(containerGroups, result.Values()...)
+		if err := result.NextWithContext(ctx); err != nil {
+			return nil, err
+		}
+	}
+	var groups []containerinstance.ContainerGroup
+	for _, group := range containerGroups {
+		group, err := groupsClient.Get(ctx, resourceGroup, *group.Name)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+	return groups, nil
+}
+
 func deleteACIContainerGroup(ctx context.Context, aciContext store.AciContext, containerGroupName string) (containerinstance.ContainerGroup, error) {
 	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {

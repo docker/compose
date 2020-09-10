@@ -39,7 +39,6 @@ import (
 	"gotest.tools/v3/poll"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
-	azure_storage "github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/storage/mgmt/storage"
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -48,7 +47,6 @@ import (
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/tests/aci-e2e/storage"
 	. "github.com/docker/compose-cli/tests/framework"
 )
 
@@ -131,7 +129,7 @@ func TestContainerRunVolume(t *testing.T) {
 	sID, rg := setupTestResourceGroup(t, c)
 
 	const (
-		testShareName   = "dockertestshare"
+		fileshareName   = "dockertestshare"
 		testFileContent = "Volume mounted successfully!"
 		testFileName    = "index.html"
 	)
@@ -142,31 +140,78 @@ func TestContainerRunVolume(t *testing.T) {
 		Location:       location,
 		ResourceGroup:  rg,
 	}
-	saName := "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
-	_, cleanupSa := createStorageAccount(t, aciContext, saName)
-	t.Cleanup(func() {
-		if err := cleanupSa(); err != nil {
-			t.Error(err)
-		}
-	})
-	keys := getStorageKeys(t, aciContext, saName)
-	assert.Assert(t, len(keys) > 0)
-	k := *keys[0].Value
-	cred, u := createFileShare(t, k, testShareName, saName)
-	uploadFile(t, *cred, u.String(), testFileName, testFileContent)
 
 	// Used in subtests
 	var (
-		container string
-		hostIP    string
-		endpoint  string
+		container   string
+		hostIP      string
+		endpoint    string
+		volumeID    string
+		accountName = "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
 	)
+
+	t.Run("check volume name validity", func(t *testing.T) {
+		invalidName := "some-storage-123"
+		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "some-storage-123 is not a valid storage account name. Storage account name must be between 3 and 24 characters in length and use numbers and lower-case letters only.",
+		})
+	})
+
+	t.Run("create volumes", func(t *testing.T) {
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
+	})
+	volumeID = accountName + "@" + fileshareName
+
+	t.Cleanup(func() {
+		c.RunDockerCmd("volume", "rm", volumeID)
+		res := c.RunDockerCmd("volume", "ls")
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 1)
+	})
+
+	t.Run("create second fileshare", func(t *testing.T) {
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
+	})
+	volumeID2 := accountName + "@dockertestshare2"
+
+	t.Run("list volumes", func(t *testing.T) {
+		res := c.RunDockerCmd("volume", "ls")
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 3)
+		firstAccount := lines[1]
+		fields := strings.Fields(firstAccount)
+		assert.Equal(t, fields[0], volumeID)
+		secondAccount := lines[2]
+		fields = strings.Fields(secondAccount)
+		assert.Equal(t, fields[0], volumeID2)
+	})
+
+	t.Run("delete only fileshare", func(t *testing.T) {
+		c.RunDockerCmd("volume", "rm", volumeID2)
+		res := c.RunDockerCmd("volume", "ls")
+		lines := lines(res.Stdout())
+		assert.Equal(t, len(lines), 2)
+		assert.Assert(t, !strings.Contains(res.Stdout(), "dockertestshare2"), "second fileshare still visible after rm")
+	})
+
+	t.Run("upload file", func(t *testing.T) {
+		storageLogin := login.StorageLogin{AciContext: aciContext}
+
+		key, err := storageLogin.GetAzureStorageAccountKey(context.TODO(), accountName)
+		assert.NilError(t, err)
+		cred, err := azfile.NewSharedKeyCredential(accountName, key)
+		assert.NilError(t, err)
+		u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", accountName, fileshareName))
+		uploadFile(t, *cred, u.String(), testFileName, testFileContent)
+	})
 
 	t.Run("run", func(t *testing.T) {
 		mountTarget := "/usr/share/nginx/html"
 		res := c.RunDockerCmd(
 			"run", "-d",
-			"-v", fmt.Sprintf("%s@%s:%s", saName, testShareName, mountTarget),
+			"-v", fmt.Sprintf("%s:%s", volumeID, mountTarget),
 			"-p", "80:80",
 			"nginx",
 		)
@@ -189,7 +234,7 @@ func TestContainerRunVolume(t *testing.T) {
 
 	t.Run("ps", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		l := out[len(out)-1]
 		assert.Assert(t, strings.Contains(l, container), "Looking for %q in line: %s", container, l)
 		assert.Assert(t, strings.Contains(l, "nginx"))
@@ -284,6 +329,10 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 }
 
+func lines(output string) []string {
+	return strings.Split(strings.TrimSpace(output), "\n")
+}
+
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	_, _ = setupTestResourceGroup(t, c)
@@ -374,11 +423,11 @@ func TestContainerRunAttached(t *testing.T) {
 
 	t.Run("ps stopped container with --all", func(t *testing.T) {
 		res := c.RunDockerCmd("ps", container)
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 1))
 
 		res = c.RunDockerCmd("ps", "--all", container)
-		out = strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out = lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 2))
 	})
 
@@ -415,7 +464,7 @@ func TestComposeUpUpdate(t *testing.T) {
 		// Name of Compose project is taken from current folder "acie2e"
 		c.RunDockerCmd("compose", "up", "-f", composeFile)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 		webRunning := false
@@ -444,7 +493,7 @@ func TestComposeUpUpdate(t *testing.T) {
 
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
-		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		lines := lines(res.Stdout())
 		assert.Assert(t, is.Len(lines, 4))
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
 		for _, line := range lines {
@@ -468,7 +517,7 @@ func TestComposeUpUpdate(t *testing.T) {
 
 	t.Run("compose ls", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ls")
-		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		lines := lines(res.Stdout())
 
 		assert.Equal(t, 2, len(lines))
 		fields := strings.Fields(lines[1])
@@ -485,7 +534,7 @@ func TestComposeUpUpdate(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 
@@ -527,7 +576,7 @@ func TestComposeUpUpdate(t *testing.T) {
 	t.Run("down", func(t *testing.T) {
 		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
 	})
 }
@@ -548,7 +597,7 @@ func TestRunEnvVars(t *testing.T) {
 		cmd.Env = append(cmd.Env, "MYSQL_USER=user1")
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Success)
-		out := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
+		out := lines(res.Stdout())
 		container := strings.TrimSpace(out[len(out)-1])
 
 		res = c.RunDockerCmd("inspect", container)
@@ -583,7 +632,7 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
 	createAciContextAndUseIt(t, c, sID, rg)
 	// Check nothing is running
 	res := c.RunDockerCmd("ps")
-	assert.Assert(t, is.Len(strings.Split(strings.TrimSpace(res.Stdout()), "\n"), 1))
+	assert.Assert(t, is.Len(lines(res.Stdout()), 1))
 	return sID, rg
 }
 
@@ -637,37 +686,6 @@ func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
 	res.Assert(t, icmd.Expected{Out: contextName + " *"})
 }
 
-func createStorageAccount(t *testing.T, aciContext store.AciContext, name string) (azure_storage.Account, func() error) {
-	account, err := storage.CreateStorageAccount(context.TODO(), aciContext, name)
-	assert.Check(t, is.Nil(err))
-	assert.Check(t, is.Equal(*(account.Name), name))
-	return account, func() error { return deleteStorageAccount(aciContext, name) }
-}
-
-func deleteStorageAccount(aciContext store.AciContext, name string) error {
-	_, err := storage.DeleteStorageAccount(context.TODO(), aciContext, name)
-	return err
-}
-
-func getStorageKeys(t *testing.T, aciContext store.AciContext, saName string) []azure_storage.AccountKey {
-	l, err := storage.ListKeys(context.TODO(), aciContext, saName)
-	assert.NilError(t, err)
-	assert.Assert(t, l.Keys != nil)
-	return *l.Keys
-}
-
-func createFileShare(t *testing.T, key, share, storageAccount string) (*azfile.SharedKeyCredential, *url.URL) {
-	// Create a ShareURL object that wraps a soon-to-be-created share's URL and a default pipeline.
-	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", storageAccount, share))
-	cred, err := azfile.NewSharedKeyCredential(storageAccount, key)
-	assert.NilError(t, err)
-
-	shareURL := azfile.NewShareURL(*u, azfile.NewPipeline(cred, azfile.PipelineOptions{}))
-	_, err = shareURL.Create(context.TODO(), azfile.Metadata{}, 0)
-	assert.NilError(t, err)
-	return cred, u
-}
-
 func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName, content string) {
 	fURL, err := url.Parse(baseURL + "/" + fileName)
 	assert.NilError(t, err)
@@ -677,7 +695,7 @@ func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName
 }
 
 func getContainerName(stdout string) string {
-	out := strings.Split(strings.TrimSpace(stdout), "\n")
+	out := lines(stdout)
 	return strings.TrimSpace(out[len(out)-1])
 }
 

@@ -22,11 +22,11 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/docker/client"
-
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/docker/client"
 )
 
 const backendType = store.EcsLocalSimulationContextType
@@ -55,6 +55,10 @@ func getCloudService() (cloud.Service, error) {
 }
 
 func (e ecsLocalSimulation) ContainerService() containers.Service {
+	return nil
+}
+
+func (e ecsLocalSimulation) VolumeService() volumes.Service {
 	return nil
 }
 

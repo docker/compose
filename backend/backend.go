@@ -26,6 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/errdefs"
 )
@@ -53,8 +54,9 @@ var backends = struct {
 // Service aggregates the service interfaces
 type Service interface {
 	ContainerService() containers.Service
-	SecretsService() secrets.Service
 	ComposeService() compose.Service
+	SecretsService() secrets.Service
+	VolumeService() volumes.Service
 }
 
 // Register adds a typed backend to the registry
