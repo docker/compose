@@ -37,7 +37,7 @@ type aciComposeService struct {
 }
 
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) error {
-	logrus.Debugf("Up on project with name %q\n", project.Name)
+	logrus.Debugf("Up on project with name %q", project.Name)
 	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project)
 	addTag(&groupDefinition, composeContainerTag)
 
@@ -48,7 +48,7 @@ func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) err
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, project string) error {
-	logrus.Debugf("Down on project with name %q\n", project)
+	logrus.Debugf("Down on project with name %q", project)
 
 	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project)
 	if err != nil {
@@ -69,11 +69,11 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 
 	group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, project)
 	if err != nil {
-		return []compose.ServiceStatus{}, err
+		return nil, err
 	}
 
-	if group.Containers == nil || len(*group.Containers) < 1 {
-		return []compose.ServiceStatus{}, fmt.Errorf("no containers found in ACI container group %s", project)
+	if group.Containers == nil || len(*group.Containers) == 0 {
+		return nil, fmt.Errorf("no containers found in ACI container group %s", project)
 	}
 
 	res := []compose.ServiceStatus{}
@@ -89,7 +89,7 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 func (cs *aciComposeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
 	containerGroups, err := getACIContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
 	if err != nil {
-		return []compose.Stack{}, err
+		return nil, err
 	}
 
 	stacks := []compose.Stack{}

@@ -19,22 +19,19 @@ package aci
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
-
-	"github.com/docker/compose-cli/progress"
-
-	"github.com/Azure/go-autorest/autorest/to"
-
-	"github.com/docker/compose-cli/aci/login"
-
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-
-	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/pkg/errors"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/Azure/go-autorest/autorest/to"
+
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/progress"
 )
 
 type aciVolumeService struct {
@@ -75,7 +72,7 @@ func (cs *aciVolumeService) List(ctx context.Context) ([]volumes.Volume, error) 
 	return fileShares, nil
 }
 
-//VolumeCreateOptions options to create a new ACI volume
+// VolumeCreateOptions options to create a new ACI volume
 type VolumeCreateOptions struct {
 	Account   string
 	Fileshare string
@@ -84,7 +81,7 @@ type VolumeCreateOptions struct {
 func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
 	opts, ok := options.(VolumeCreateOptions)
 	if !ok {
-		return volumes.Volume{}, errors.New("Could not read azure VolumeCreateOptions struct from generic parameter")
+		return volumes.Volume{}, errors.New("could not read Azure VolumeCreateOptions struct from generic parameter")
 	}
 	w := progress.ContextWriter(ctx)
 	w.Event(event(opts.Account, progress.Working, "Validating"))
@@ -96,7 +93,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 	if err == nil {
 		w.Event(event(opts.Account, progress.Done, "Use existing"))
 	} else {
-		if account.StatusCode != 404 {
+		if account.StatusCode != http.StatusNotFound {
 			return volumes.Volume{}, err
 		}
 		result, err := accountClient.CheckNameAvailability(ctx, storage.AccountCheckNameAvailabilityParameters{
@@ -118,8 +115,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 			w.Event(errorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
-		err = future.WaitForCompletionRef(ctx, accountClient.Client)
-		if err != nil {
+		if err := future.WaitForCompletionRef(ctx, accountClient.Client); err != nil {
 			w.Event(errorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
@@ -141,7 +137,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", opts.Fileshare)
 	}
-	if fileShare.StatusCode != 404 {
+	if fileShare.StatusCode != http.StatusNotFound {
 		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, err
 	}
@@ -199,7 +195,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 		if err == nil {
 			if _, ok := account.Tags[dockerVolumeTag]; ok {
 				result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount)
-				if result.StatusCode == 204 {
+				if result.StatusCode == http.StatusNoContent {
 					return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", storageAccount)
 				}
 				return err
@@ -209,7 +205,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 
 	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshare)
 	if result.StatusCode == 204 {
-		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %s does not exist", fileshare)
+		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %q", fileshare)
 	}
 	return err
 }

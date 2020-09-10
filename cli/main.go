@@ -27,26 +27,16 @@ import (
 	"syscall"
 	"time"
 
-	volume "github.com/docker/compose-cli/cli/cmd/volume"
-
 	"github.com/docker/compose-cli/cli/cmd/compose"
-
 	"github.com/docker/compose-cli/cli/cmd/logout"
-
+	volume "github.com/docker/compose-cli/cli/cmd/volume"
 	"github.com/docker/compose-cli/errdefs"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
-	_ "github.com/docker/compose-cli/ecs"
-	_ "github.com/docker/compose-cli/ecs/local"
-	_ "github.com/docker/compose-cli/example"
-	_ "github.com/docker/compose-cli/local"
-	"github.com/docker/compose-cli/metrics"
-
 	"github.com/docker/compose-cli/cli/cmd"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
@@ -56,6 +46,11 @@ import (
 	"github.com/docker/compose-cli/config"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
+	_ "github.com/docker/compose-cli/ecs"
+	_ "github.com/docker/compose-cli/ecs/local"
+	_ "github.com/docker/compose-cli/example"
+	_ "github.com/docker/compose-cli/local"
+	"github.com/docker/compose-cli/metrics"
 )
 
 var (

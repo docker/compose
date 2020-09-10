@@ -43,12 +43,12 @@ type aciContainerService struct {
 func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
 	containerGroups, err := getACIContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
 	if err != nil {
-		return []containers.Container{}, err
+		return nil, err
 	}
 	var res []containers.Container
 	for _, group := range containerGroups {
-		if group.Containers == nil || len(*group.Containers) < 1 {
-			return []containers.Container{}, fmt.Errorf("no containers found in ACI container group %s", *group.Name)
+		if group.Containers == nil || len(*group.Containers) == 0 {
+			return nil, fmt.Errorf("no containers found in ACI container group %s", *group.Name)
 		}
 
 		for _, container := range *group.Containers {
@@ -64,7 +64,7 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 
 func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerConfig) error {
 	if strings.Contains(r.ID, composeContainerSeparator) {
-		return errors.New(fmt.Sprintf("invalid container name. ACI container name cannot include %q", composeContainerSeparator))
+		return fmt.Errorf("invalid container name. ACI container name cannot include %q", composeContainerSeparator)
 	}
 
 	project, err := convert.ContainerToComposeProject(r)
@@ -72,7 +72,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return err
 	}
 
-	logrus.Debugf("Running container %q with name %q\n", r.Image, r.ID)
+	logrus.Debugf("Running container %q with name %q", r.Image, r.ID)
 	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, project)
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (cs *aciContainerService) Start(ctx context.Context, containerID string) er
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
 		msg := "cannot start specified service %q from compose application %q, you can update and restart the entire compose app with docker compose up --project-name %s"
-		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+		return fmt.Errorf(msg, containerName, groupName, groupName)
 	}
 
 	containerGroupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
@@ -110,12 +110,12 @@ func (cs *aciContainerService) Start(ctx context.Context, containerID string) er
 
 func (cs *aciContainerService) Stop(ctx context.Context, containerID string, timeout *uint32) error {
 	if timeout != nil && *timeout != uint32(0) {
-		return errors.Errorf("ACI integration does not support setting a timeout to stop a container before killing it.")
+		return fmt.Errorf("the ACI integration does not support setting a timeout to stop a container before killing it")
 	}
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
 		msg := "cannot stop service %q from compose application %q, you can stop the entire compose app with docker stop %s"
-		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+		return fmt.Errorf(msg, containerName, groupName, groupName)
 	}
 	return stopACIContainerGroup(ctx, cs.ctx, groupName)
 }
@@ -124,7 +124,7 @@ func (cs *aciContainerService) Kill(ctx context.Context, containerID string, _ s
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
 		msg := "cannot kill service %q from compose application %q, you can kill the entire compose app with docker kill %s"
-		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+		return fmt.Errorf(msg, containerName, groupName, groupName)
 	}
 	return stopACIContainerGroup(ctx, cs.ctx, groupName) // As ACI doesn't have a kill command, we are using the stop implementation instead
 }
@@ -187,7 +187,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 	groupName, containerName := getGroupAndContainerName(containerID)
 	if groupName != containerID {
 		msg := "cannot delete service %q from compose application %q, you can delete the entire compose app with docker compose down --project-name %s"
-		return errors.New(fmt.Sprintf(msg, containerName, groupName, groupName))
+		return fmt.Errorf(msg, containerName, groupName, groupName)
 	}
 
 	if !request.Force {

@@ -32,7 +32,7 @@ import (
 func listVolume() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ls",
-		Short: "list Azure file shares usable as ACI volumes.",
+		Short: "list available volumes in context.",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client.New(cmd.Context())
@@ -53,14 +53,14 @@ func listVolume() *cobra.Command {
 func printList(out io.Writer, volumes []volumes.Volume) {
 	printSection(out, func(w io.Writer) {
 		for _, vol := range volumes {
-			fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description) // nolint:errcheck
+			_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
 		}
 	}, "ID", "DESCRIPTION")
 }
 
 func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
 	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t")) // nolint:errcheck
+	_, _ = fmt.Fprintln(w, strings.Join(headers, "\t"))
 	printer(w)
-	w.Flush() // nolint:errcheck
+	_ = w.Flush()
 }

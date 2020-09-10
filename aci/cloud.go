@@ -31,7 +31,7 @@ type aciCloudService struct {
 func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
 	opts, ok := params.(LoginParams)
 	if !ok {
-		return errors.New("Could not read azure LoginParams struct from generic parameter")
+		return errors.New("could not read Azure LoginParams struct from generic parameter")
 	}
 	if opts.ClientID != "" {
 		return cs.loginService.LoginServicePrincipal(opts.ClientID, opts.ClientSecret, opts.TenantID)
