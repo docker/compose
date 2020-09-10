@@ -160,25 +160,20 @@ class ConfigTest(unittest.TestCase):
         }
 
     def test_valid_versions(self):
-        for version in ['2', '2.0']:
+        cfg = config.load(
+            build_config_details({
+                'services': {
+                    'foo': {'image': 'busybox'},
+                    'bar': {'image': 'busybox', 'environment': ['FOO=1']},
+                }
+            })
+        )
+        assert cfg.version == VERSION
+
+        for version in ['2', '2.0', '2.1', '2.2', '2.3',
+                        '3', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8']:
             cfg = config.load(build_config_details({'version': version}))
-            assert cfg.version == VERSION
-
-        cfg = config.load(build_config_details({'version': '2.1'}))
-        assert cfg.version == VERSION
-
-        cfg = config.load(build_config_details({'version': '2.2'}))
-        assert cfg.version == VERSION
-
-        cfg = config.load(build_config_details({'version': '2.3'}))
-        assert cfg.version == VERSION
-
-        for version in ['3', '3.0']:
-            cfg = config.load(build_config_details({'version': version}))
-            assert cfg.version == VERSION
-
-        cfg = config.load(build_config_details({'version': '3.1'}))
-        assert cfg.version == VERSION
+            assert cfg.version == version
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
