@@ -1309,7 +1309,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
         service_names=[service.name],
         start_deps=not options['--no-deps'],
         strategy=ConvergenceStrategy.never,
-        detached=detach,
+        detached=True,
         rescale=False,
         cli=native_builder,
         one_off=True,
