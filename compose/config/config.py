@@ -224,8 +224,6 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
             if version.startswith("1"):
                 version = V1
-            else:
-                version = VERSION
 
         if version == V1:
             raise ConfigurationError(
