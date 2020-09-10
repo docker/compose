@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/client"
-
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/secrets"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudformation/cloudformationiface"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -56,7 +56,10 @@ type sdk struct {
 	SM  secretsmanageriface.SecretsManagerAPI
 }
 
-func newSDK(sess client.ConfigProvider) sdk {
+func newSDK(sess *session.Session) sdk {
+	sess.Handlers.Build.PushBack(func(r *request.Request) {
+		request.AddToUserAgent(r, "Docker CLI")
+	})
 	return sdk{
 		ECS: ecs.New(sess),
 		EC2: ec2.New(sess),
