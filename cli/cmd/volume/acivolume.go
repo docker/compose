@@ -48,7 +48,7 @@ func ACICommand() *cobra.Command {
 func createVolume() *cobra.Command {
 	aciOpts := aci.VolumeCreateOptions{}
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create --storage-account ACCOUNT --fileshare FILESHARE",
 		Short: "Creates an Azure file share to use as ACI volume.",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,6 +73,8 @@ func createVolume() *cobra.Command {
 
 	cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
 	cmd.Flags().StringVar(&aciOpts.Fileshare, "fileshare", "", "Fileshare name")
+	_ = cmd.MarkFlagRequired("fileshare")
+	_ = cmd.MarkFlagRequired("storage-account")
 	return cmd
 }
 
