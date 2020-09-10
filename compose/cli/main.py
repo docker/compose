@@ -1304,6 +1304,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
     native_builder = toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
     detach = options.get('--detach')
     use_network_aliases = options.get('--use-aliases')
+    service.scale_num = 1
     containers = project.up(
         service_names=[service.name],
         start_deps=not options['--no-deps'],
