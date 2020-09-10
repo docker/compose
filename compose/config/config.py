@@ -441,6 +441,8 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
 
 def validate_external(entity_type, name, config, version):
     for k in config.keys():
+        if entity_type == 'Network' and k == 'driver':
+            continue
         if k not in ['external', 'name']:
             raise ConfigurationError(
                 "{} {} declared as external but specifies additional attributes "
