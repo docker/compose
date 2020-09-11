@@ -55,6 +55,6 @@ func runVersion(cmd *cobra.Command, version string) error {
 		return nil
 	}
 	var s string = string(versionResult)
-	fmt.Print(strings.Replace(s, "\n Version:", "\n Azure integration  "+displayedVersion+"\n Version:", 1))
+	fmt.Print(strings.Replace(s, "\n Version:", "\n Cloud integration  "+displayedVersion+"\n Version:", 1))
 	return nil
 }
