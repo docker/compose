@@ -20,14 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose-cli/errdefs"
-
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 type stopOpts struct {
@@ -70,8 +69,6 @@ func runStop(ctx context.Context, args []string, opts stopOpts) error {
 		}
 		fmt.Println(id)
 	}
-	if errs != nil {
-		errs.ErrorFormat = formatErrors
-	}
+	formatter.SetMultiErrorFormat(errs)
 	return errs.ErrorOrNil()
 }

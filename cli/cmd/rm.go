@@ -19,7 +19,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/errdefs"
 )
 
@@ -75,16 +75,6 @@ func runRm(ctx context.Context, args []string, opts rmOpts) error {
 
 		fmt.Println(id)
 	}
-	if errs != nil {
-		errs.ErrorFormat = formatErrors
-	}
+	formatter.SetMultiErrorFormat(errs)
 	return errs.ErrorOrNil()
-}
-
-func formatErrors(errs []error) string {
-	messages := make([]string, len(errs))
-	for i, err := range errs {
-		messages[i] = "Error: " + err.Error()
-	}
-	return strings.Join(messages, "\n")
 }

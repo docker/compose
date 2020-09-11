@@ -27,13 +27,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/cli/cmd/compose"
 	"github.com/docker/compose-cli/cli/cmd/logout"
 	volume "github.com/docker/compose-cli/cli/cmd/volume"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
