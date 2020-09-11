@@ -411,7 +411,7 @@ class Service:
         stopped = [c for c in containers if not c.is_running]
 
         if stopped:
-            return ConvergencePlan('start', stopped)
+            return ConvergencePlan('start', containers)
 
         return ConvergencePlan('noop', containers)
 
@@ -514,8 +514,9 @@ class Service:
             self._downscale(containers[scale:], timeout)
             containers = containers[:scale]
         if start:
+            stopped = [c for c in containers if not c.is_running]
             _, errors = parallel_execute(
-                containers,
+                stopped,
                 lambda c: self.start_container_if_stopped(c, attach_logs=not detached, quiet=True),
                 lambda c: c.name,
                 "Starting",
