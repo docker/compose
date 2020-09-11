@@ -375,7 +375,7 @@ class ServiceStateTest(DockerClientTestCase):
 
         assert [c.is_running for c in containers] == [False, True]
 
-        assert ('start', containers[0:1]) == web.convergence_plan()
+        assert ('start', containers) == web.convergence_plan()
 
     def test_trigger_recreate_with_config_change(self):
         web = self.create_service('web', command=["top"])
