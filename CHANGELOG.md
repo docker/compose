@@ -1,6 +1,26 @@
 Change log
 ==========
 
+1.27.2 (2020-09-10)
+-------------------
+
+### Bugs
+
+- Fix bug on `docker-compose run` container attach
+
+1.27.1 (2020-09-10)
+-------------------
+
+### Bugs
+
+- Fix `docker-compose run` when `service.scale` is specified
+
+- Allow `driver` property for external networks as temporary workaround for swarm network propagation issue
+
+- Pin new internal schema version to `3.9` as the default
+
+- Preserve the version when configured in the compose file
+
 1.27.0 (2020-09-07)
 -------------------
 
