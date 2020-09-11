@@ -169,7 +169,7 @@ func errorEvent(resource string) progress.Event {
 func (cs *aciVolumeService) Delete(ctx context.Context, id string, options interface{}) error {
 	tokens := strings.Split(id, "/")
 	if len(tokens) != 2 {
-		return errors.New("wrong format for volume ID : should be storageaccount@fileshare")
+		return errors.New("invalid format for volume ID, expected storageaccount/fileshare")
 	}
 	storageAccount := tokens[0]
 	fileshare := tokens[1]
