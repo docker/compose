@@ -82,7 +82,7 @@ $ which docker
 /usr/local/bin/docker
 $ docker version
 ...
- Azure integration  0.1.4
+ Cloud integration  0.1.6
 ...
 ```
 

@@ -370,7 +370,7 @@ func TestVersion(t *testing.T) {
 
 	t.Run("azure version", func(t *testing.T) {
 		res := c.RunDockerCmd("version")
-		res.Assert(t, icmd.Expected{Out: "Azure integration"})
+		res.Assert(t, icmd.Expected{Out: "Cloud integration"})
 	})
 
 	t.Run("format", func(t *testing.T) {
