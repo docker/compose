@@ -47,7 +47,7 @@ func Command() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
-	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: user:key@my_share:/absolute/path/to/target")
+	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: storageaccount/my_share[:/absolute/path/to/target][:ro]")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	cmd.Flags().Float64Var(&opts.Cpus, "cpus", 1., "Number of CPUs")
 	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
