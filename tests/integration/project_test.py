@@ -1347,6 +1347,36 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         assert len(project.containers()) == 3
 
+    def test_project_up_scale_with_stopped_containers(self):
+        config_data = build_config(
+            services=[{
+                'name': 'web',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
+                'command': 'top',
+                'scale': 2
+            }]
+        )
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+
+        project.up()
+        containers = project.containers()
+        assert len(containers) == 2
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 2})
+        containers = project.containers()
+        assert len(containers) == 2
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 3})
+        assert len(project.containers()) == 3
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 1})
+        assert len(project.containers()) == 1
+
     def test_initialize_volumes(self):
         vol_name = '{:x}'.format(random.getrandbits(32))
         full_vol_name = 'composetest_{}'.format(vol_name)
