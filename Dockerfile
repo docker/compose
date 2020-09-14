@@ -14,8 +14,8 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-ARG GO_VERSION=1.15.1-alpine
-ARG GOLANGCI_LINT_VERSION=v1.30.0-alpine
+ARG GO_VERSION=1.15.2-alpine
+ARG GOLANGCI_LINT_VERSION=v1.31.0-alpine
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
