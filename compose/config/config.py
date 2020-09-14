@@ -433,22 +433,27 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
                 config['driver_opts'] = build_string_dict(
                     config['driver_opts']
                 )
-                if entity_type != 'Volume':
-                    continue
-                # default driver is 'local'
-                driver = config.get('driver', 'local')
-                if driver != 'local':
-                    continue
-                o = config['driver_opts'].get('o')
-                device = config['driver_opts'].get('device')
-                if o and o == 'bind' and device:
-                    fullpath = os.path.abspath(os.path.expanduser(device))
-                    if not os.path.exists(fullpath):
-                        raise ConfigurationError(
-                            "Device path {} does not exist.".format(fullpath))
-                    config['driver_opts']['device'] = fullpath
-
+                device = format_device_option(entity_type, config)
+                if device:
+                    config['driver_opts']['device'] = device
     return mapping
+
+
+def format_device_option(entity_type, config):
+    if entity_type != 'Volume':
+        return
+    # default driver is 'local'
+    driver = config.get('driver', 'local')
+    if driver != 'local':
+        return
+    o = config['driver_opts'].get('o')
+    device = config['driver_opts'].get('device')
+    if o and o == 'bind' and device:
+        fullpath = os.path.abspath(os.path.expanduser(device))
+        if not os.path.exists(fullpath):
+            raise ConfigurationError(
+                "Device path {} does not exist.".format(fullpath))
+        return fullpath
 
 
 def validate_external(entity_type, name, config, version):
