@@ -49,16 +49,17 @@ func runUp(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	return progress.Run(ctx, func(ctx context.Context) error {
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		options, err := opts.toProjectOptions()
 		if err != nil {
-			return err
+			return "", err
 		}
 		project, err := cli.ProjectFromOptions(options)
 		if err != nil {
-			return err
+			return "", err
 		}
 
-		return c.ComposeService().Up(ctx, project)
+		return "", c.ComposeService().Up(ctx, project)
 	})
+	return err
 }

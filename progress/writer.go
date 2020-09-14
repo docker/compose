@@ -77,15 +77,16 @@ func ContextWriter(ctx context.Context) Writer {
 	return s
 }
 
-type progressFunc func(context.Context) error
+type progressFunc func(context.Context) (string, error)
 
 // Run will run a writer and the progress function
 // in parallel
-func Run(ctx context.Context, pf progressFunc) error {
+func Run(ctx context.Context, pf progressFunc) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	w, err := NewWriter(os.Stderr)
+	var result string
 	if err != nil {
-		return err
+		return "", err
 	}
 	eg.Go(func() error {
 		return w.Start(context.Background())
@@ -95,10 +96,15 @@ func Run(ctx context.Context, pf progressFunc) error {
 
 	eg.Go(func() error {
 		defer w.Stop()
-		return pf(ctx)
+		s, err := pf(ctx)
+		if err == nil {
+			result = s
+		}
+		return err
 	})
 
-	return eg.Wait()
+	err = eg.Wait()
+	return result, err
 }
 
 // NewWriter returns a new multi-progress writer
