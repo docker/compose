@@ -423,16 +423,30 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
                 elif not config.get('name'):
                     config['name'] = name
 
-            if 'driver_opts' in config:
-                config['driver_opts'] = build_string_dict(
-                    config['driver_opts']
-                )
-
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
 
             if 'file' in config:
                 config['file'] = expand_path(working_dir, config['file'])
+
+            if 'driver_opts' in config:
+                config['driver_opts'] = build_string_dict(
+                    config['driver_opts']
+                )
+                if entity_type != 'Volume':
+                    continue
+                # default driver is 'local'
+                driver = config.get('driver', 'local')
+                if driver != 'local':
+                    continue
+                o = config['driver_opts'].get('o')
+                device = config['driver_opts'].get('device')
+                if o and o == 'bind' and device:
+                    fullpath = os.path.abspath(os.path.expanduser(device))
+                    if not os.path.exists(fullpath):
+                        raise ConfigurationError(
+                            "Device path {} does not exist.".format(fullpath))
+                    config['driver_opts']['device'] = fullpath
 
     return mapping
 
