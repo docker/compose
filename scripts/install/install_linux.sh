@@ -33,10 +33,14 @@ manual_install() {
 }
 
 is_new_cli() {
-	azure_version_str="$($1 version 2>/dev/null | grep 'Azure' || true)"
-	if [ -n "$azure_version_str" ]; then
+	cloud_version_str="$($1 version 2>/dev/null | grep 'Cloud integration' || true)"
+	if [ -n "$cloud_version_str" ]; then
 		echo 1
 	else
+        azure_version_str="$($1 version 2>/dev/null | grep 'Azure' || true)"
+	    if [ -n "$azure_version_str" ]; then
+		    echo 1
+        fi
 		echo 0
 	fi
 }
