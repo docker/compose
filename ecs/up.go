@@ -37,7 +37,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project) error {
 		return err
 	}
 
-	template, err := b.convert(project)
+	template, err := b.Convert(ctx, project)
 	if err != nil {
 		return err
 	}

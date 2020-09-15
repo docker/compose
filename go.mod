@@ -6,6 +6,8 @@ go 1.15
 // we need to create a new release tag for docker/distribution
 replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
 
+replace github.com/awslabs/goformation/v4 => github.com/ndeloof/goformation/v4 v4.8.1-0.20200827081523-b7a7ac375adf
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.1.1
 	github.com/Azure/azure-sdk-for-go v43.3.0+incompatible
