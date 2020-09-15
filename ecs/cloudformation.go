@@ -524,7 +524,11 @@ func createCloudMap(project *types.Project, template *cloudformation.Template) {
 }
 
 func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
+	if net.External.External {
+		return net.Name
+	}
 	if sg, ok := net.Extensions[extensionSecurityGroup]; ok {
+		logrus.Warn("to use an existing security-group, set `network.external` and `network.name` in your compose file")
 		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
 		return sg.(string)
 	}
