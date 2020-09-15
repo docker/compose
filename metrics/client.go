@@ -64,10 +64,24 @@ func NewClient() Client {
 }
 
 func (c *client) Send(command Command) {
-	req, err := json.Marshal(command)
-	if err != nil {
-		return
-	}
+	wasIn := make(chan bool)
 
-	_, _ = c.httpClient.Post("http://localhost/usage", "application/json", bytes.NewBuffer(req))
+	// Fire and forget, we don't want to slow down the user waiting for DD
+	// metrics endpoint to respond. We could lose some events but that's ok.
+	go func() {
+		defer func() {
+			_ = recover()
+		}()
+
+		wasIn <- true
+
+		req, err := json.Marshal(command)
+		if err != nil {
+			return
+		}
+
+		_, _ = c.httpClient.Post("http://localhost/usage", "application/json", bytes.NewBuffer(req))
+	}()
+	<-wasIn
+
 }
