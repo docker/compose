@@ -1,4 +1,4 @@
-name: Continuous integration
+name: Cloud integration tests
 
 on:
   push:
