@@ -57,16 +57,17 @@ func createVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			err = progress.Run(ctx, func(ctx context.Context) error {
-				if _, err := c.VolumeService().Create(ctx, aciOpts); err != nil {
-					return err
+			result, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+				volume, err := c.VolumeService().Create(ctx, aciOpts)
+				if err != nil {
+					return "", err
 				}
-				return nil
+				return volume.ID, nil
 			})
 			if err != nil {
 				return err
 			}
-			fmt.Println(aci.VolumeID(aciOpts.Account, aciOpts.Fileshare))
+			fmt.Println(result)
 			return nil
 		},
 	}

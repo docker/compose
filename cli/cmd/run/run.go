@@ -68,8 +68,8 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 		return err
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
-		return c.ContainerService().Run(ctx, containerConfig)
+	result, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return containerConfig.ID, c.ContainerService().Run(ctx, containerConfig)
 	})
 	if err != nil {
 		return err
@@ -94,7 +94,6 @@ func runRun(ctx context.Context, image string, opts run.Opts) error {
 		return c.ContainerService().Logs(ctx, opts.Name, req)
 	}
 
-	fmt.Println(opts.Name)
-
+	fmt.Println(result)
 	return nil
 }

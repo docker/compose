@@ -212,13 +212,12 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 
 func toVolume(account storage.Account, fileShareName string) volumes.Volume {
 	return volumes.Volume{
-		ID:          VolumeID(*account.Name, fileShareName),
+		ID:          volumeID(*account.Name, fileShareName),
 		Description: fmt.Sprintf("Fileshare %s in %s storage account", fileShareName, *account.Name),
 	}
 }
 
-// VolumeID generate volume ID from azure storage accoun & fileshare
-func VolumeID(storageAccount string, fileShareName string) string {
+func volumeID(storageAccount string, fileShareName string) string {
 	return fmt.Sprintf("%s/%s", storageAccount, fileShareName)
 }
 
