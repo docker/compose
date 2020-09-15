@@ -121,11 +121,6 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
 
-    if 'depends_on' in service_dict:
-        service_dict['depends_on'] = sorted([
-            svc for svc in service_dict['depends_on'].keys()
-        ])
-
     if 'healthcheck' in service_dict:
         if 'interval' in service_dict['healthcheck']:
             service_dict['healthcheck']['interval'] = serialize_ns_time_value(
