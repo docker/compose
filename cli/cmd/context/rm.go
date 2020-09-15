@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/cli/formatter"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
 )
@@ -69,18 +69,8 @@ func runRemove(ctx context.Context, args []string, force bool) error {
 			errs = removeContext(s, contextName, errs)
 		}
 	}
-	if errs != nil {
-		errs.ErrorFormat = formatErrors
-	}
+	formatter.SetMultiErrorFormat(errs)
 	return errs.ErrorOrNil()
-}
-
-func formatErrors(errs []error) string {
-	messages := make([]string, len(errs))
-	for i, err := range errs {
-		messages[i] = "Error: " + err.Error()
-	}
-	return strings.Join(messages, "\n")
 }
 
 func removeContext(s store.Store, n string, errs *multierror.Error) *multierror.Error {

@@ -19,14 +19,13 @@ package volume
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/go-multierror"
-
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -98,19 +97,9 @@ func rmVolume() *cobra.Command {
 				}
 				fmt.Println(id)
 			}
-			if errs != nil {
-				errs.ErrorFormat = formatErrors
-			}
+			formatter.SetMultiErrorFormat(errs)
 			return errs.ErrorOrNil()
 		},
 	}
 	return cmd
-}
-
-func formatErrors(errs []error) string {
-	messages := make([]string, len(errs))
-	for i, err := range errs {
-		messages[i] = "Error: " + err.Error()
-	}
-	return strings.Join(messages, "\n")
 }
