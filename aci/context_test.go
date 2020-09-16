@@ -51,6 +51,7 @@ func TestCreateSpecifiedSubscriptionAndGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "myResourceGroup")
 	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
 	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
 
 	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
@@ -64,6 +65,7 @@ func TestErrorOnNonExistentResourceGroup(t *testing.T) {
 	opts := options("1234", "myResourceGroup")
 	notFoundError := errors.New(`Not Found: "myResourceGroup"`)
 	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
 	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(resources.Group{}, notFoundError)
 
 	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
@@ -72,10 +74,23 @@ func TestErrorOnNonExistentResourceGroup(t *testing.T) {
 	assert.Error(t, err, "Could not find resource group \"myResourceGroup\": Not Found: \"myResourceGroup\"")
 }
 
+func TestErrorOnNonExistentSubscriptionID(t *testing.T) {
+	ctx := context.TODO()
+	opts := options("otherSubscription", "myResourceGroup")
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
+
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.Assert(t, cmp.Nil(data))
+	assert.Equal(t, description, "")
+	assert.Assert(t, err == ErrSubscriptionNotFound)
+}
+
 func TestCreateNewResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "")
 	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
 	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
 
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
@@ -97,6 +112,7 @@ func TestSelectExistingResourceGroup(t *testing.T) {
 	opts := options("1234", "")
 	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
 	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
 	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(2, nil)
 	m.resourceGroupHelper.On("ListGroups", ctx, "1234").Return([]resources.Group{
 		group("group1", "eastus"),

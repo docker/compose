@@ -62,6 +62,9 @@ func runCreateAci(ctx context.Context, contextName string, opts aci.ContextParam
 	}
 	contextData, description, err := getAciContextData(ctx, opts)
 	if err != nil {
+		if aci.IsSubscriptionNotFoundError(err) {
+			return errors.New("could not find the requested subscription from your Azure login. You might need to specify a tenant ID with docker login azure --tenant-id xxx")
+		}
 		return err
 	}
 	return createDockerContext(ctx, contextName, store.AciContextType, description, contextData)

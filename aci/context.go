@@ -31,6 +31,22 @@ import (
 	"github.com/docker/compose-cli/prompt"
 )
 
+// ContextParams options for creating ACI context
+type ContextParams struct {
+	Description    string
+	Location       string
+	SubscriptionID string
+	ResourceGroup  string
+}
+
+// ErrSubscriptionNotFound is returned when a required subscription is not found
+var ErrSubscriptionNotFound = errors.New("subscription not found")
+
+// IsSubscriptionNotFoundError returns true if the unwrapped error is IsSubscriptionNotFoundError
+func IsSubscriptionNotFoundError(err error) bool {
+	return errors.Is(err, ErrSubscriptionNotFound)
+}
+
 type contextCreateACIHelper struct {
 	selector            prompt.UI
 	resourceGroupHelper ResourceGroupHelper
@@ -44,14 +60,21 @@ func newContextCreateHelper() contextCreateACIHelper {
 }
 
 func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts ContextParams) (interface{}, string, error) {
-	var subscriptionID string
+	subs, err := helper.resourceGroupHelper.GetSubscriptionIDs(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	subscriptionID := ""
 	if opts.SubscriptionID != "" {
-		subscriptionID = opts.SubscriptionID
-	} else {
-		subs, err := helper.resourceGroupHelper.GetSubscriptionIDs(ctx)
-		if err != nil {
-			return nil, "", err
+		for _, sub := range subs {
+			if *sub.SubscriptionID == opts.SubscriptionID {
+				subscriptionID = opts.SubscriptionID
+			}
 		}
+		if subscriptionID == "" {
+			return nil, "", ErrSubscriptionNotFound
+		}
+	} else {
 		subscriptionID, err = helper.chooseSub(subs)
 		if err != nil {
 			return nil, "", err
@@ -59,8 +82,6 @@ func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts
 	}
 
 	var group resources.Group
-	var err error
-
 	if opts.ResourceGroup != "" {
 		group, err = helper.resourceGroupHelper.GetGroup(ctx, subscriptionID, opts.ResourceGroup)
 		if err != nil {
