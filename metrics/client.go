@@ -33,6 +33,7 @@ type Command struct {
 	Command string `json:"command"`
 	Context string `json:"context"`
 	Source  string `json:"source"`
+	Status  string `json:"status"`
 }
 
 const (
@@ -40,6 +41,12 @@ const (
 	CLISource = "cli"
 	// APISource is sent for API metrics
 	APISource = "api"
+	// SuccessStatus is sent for API metrics
+	SuccessStatus = "success"
+	// FailureStatus is sent for API metrics
+	FailureStatus = "failure"
+	// CancelledStatus is sent for API metrics
+	CancelledStatus = "cancelled"
 )
 
 // Client sends metrics to Docker Desktopn
@@ -83,5 +90,4 @@ func (c *client) Send(command Command) {
 		_, _ = c.httpClient.Post("http://localhost/usage", "application/json", bytes.NewBuffer(req))
 	}()
 	<-wasIn
-
 }

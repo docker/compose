@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/docker/docker/errdefs"
+
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -155,7 +157,7 @@ func (h contextCreateAWSHelper) chooseProfile(section map[string]ini.Section) (s
 	selected, err := h.user.Select("Select AWS Profile", profiles)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			os.Exit(-1)
+			return "", errdefs.Cancelled(err)
 		}
 		return "", err
 	}

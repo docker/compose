@@ -24,6 +24,10 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/spf13/cobra"
+
+	"github.com/docker/compose-cli/metrics"
+
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
 )
@@ -33,8 +37,8 @@ var delegatedContextTypes = []string{store.DefaultContextType}
 // ComDockerCli name of the classic cli binary
 const ComDockerCli = "com.docker.cli"
 
-// ExecIfDefaultCtxType delegates to com.docker.cli if on moby or AWS context (until there is an AWS backend)
-func ExecIfDefaultCtxType(ctx context.Context) {
+// ExecIfDefaultCtxType delegates to com.docker.cli if on moby context
+func ExecIfDefaultCtxType(ctx context.Context, root *cobra.Command) {
 	currentContext := apicontext.CurrentContext(ctx)
 
 	s := store.ContextStore(ctx)
@@ -42,7 +46,7 @@ func ExecIfDefaultCtxType(ctx context.Context) {
 	currentCtx, err := s.Get(currentContext)
 	// Only run original docker command if the current context is not ours.
 	if err != nil || mustDelegateToMoby(currentCtx.Type()) {
-		Exec()
+		Exec(root)
 	}
 }
 
@@ -56,7 +60,7 @@ func mustDelegateToMoby(ctxType string) bool {
 }
 
 // Exec delegates to com.docker.cli if on moby context
-func Exec() {
+func Exec(root *cobra.Command) {
 	cmd := exec.Command(ComDockerCli, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -83,12 +87,16 @@ func Exec() {
 	err := cmd.Run()
 	childExit <- true
 	if err != nil {
+		metrics.Track(store.DefaultContextName, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exiterr.ExitCode())
 		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	metrics.Track(store.DefaultContextName, os.Args[1:], root.PersistentFlags(), metrics.SuccessStatus)
+
 	os.Exit(0)
 }
 

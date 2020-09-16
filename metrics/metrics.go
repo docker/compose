@@ -77,7 +77,7 @@ const (
 )
 
 // Track sends the tracking analytics to Docker Desktop
-func Track(context string, args []string, flags *flag.FlagSet) {
+func Track(context string, args []string, flags *flag.FlagSet, status string) {
 	command := getCommand(args, flags)
 	if command != "" {
 		c := NewClient()
@@ -85,6 +85,7 @@ func Track(context string, args []string, flags *flag.FlagSet) {
 			Command: command,
 			Context: context,
 			Source:  CLISource,
+			Status:  status,
 		})
 	}
 }

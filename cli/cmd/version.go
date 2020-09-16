@@ -51,7 +51,7 @@ func runVersion(cmd *cobra.Command, version string) error {
 	// we don't want to fail on error, there is an error if the engine is not available but it displays client version info
 	// Still, technically the [] byte versionResult could be nil, just let the original command display what it has to display
 	if versionResult == nil {
-		mobycli.Exec()
+		mobycli.Exec(cmd.Root())
 		return nil
 	}
 	var s string = string(versionResult)

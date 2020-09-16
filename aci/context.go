@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/docker/docker/errdefs"
+
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
@@ -138,7 +140,7 @@ func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscripti
 	group, err := helper.selector.Select("Select a resource group", groupNames)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			os.Exit(0)
+			return resources.Group{}, errdefs.Cancelled(err)
 		}
 
 		return resources.Group{}, err

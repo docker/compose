@@ -31,6 +31,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	dockererrdef "github.com/docker/docker/errdefs"
+
 	"github.com/docker/compose-cli/cli/cmd/compose"
 	"github.com/docker/compose-cli/cli/cmd/logout"
 	volume "github.com/docker/compose-cli/cli/cmd/volume"
@@ -102,7 +104,7 @@ func main() {
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isContextAgnosticCommand(cmd) {
-				mobycli.ExecIfDefaultCtxType(cmd.Context())
+				mobycli.ExecIfDefaultCtxType(cmd.Context(), cmd.Root())
 			}
 			return nil
 		},
@@ -136,7 +138,7 @@ func main() {
 	helpFunc := root.HelpFunc()
 	root.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !isContextAgnosticCommand(cmd) {
-			mobycli.ExecIfDefaultCtxType(cmd.Context())
+			mobycli.ExecIfDefaultCtxType(cmd.Context(), cmd.Root())
 		}
 		helpFunc(cmd, args)
 	})
@@ -158,7 +160,7 @@ func main() {
 
 	// --host and --version should immediately be forwarded to the original cli
 	if opts.Host != "" || opts.Version {
-		mobycli.Exec()
+		mobycli.Exec(root)
 	}
 
 	if opts.Config == "" {
@@ -171,7 +173,7 @@ func main() {
 
 	s, err := store.New(configDir)
 	if err != nil {
-		mobycli.Exec()
+		mobycli.Exec(root)
 	}
 
 	ctype := store.DefaultContextType
@@ -185,41 +187,43 @@ func main() {
 		root.AddCommand(volume.ACICommand())
 	}
 
-	metrics.Track(ctype, os.Args[1:], root.PersistentFlags())
-
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		// if user canceled request, simply exit without any error message
-		if errors.Is(ctx.Err(), context.Canceled) {
+		if dockererrdef.IsCancelled(err) || errors.Is(ctx.Err(), context.Canceled) {
+			metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.CancelledStatus)
 			os.Exit(130)
 		}
 		if ctype == store.AwsContextType {
 			exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
-$ docker context create %s <name>`, cc.Type(), store.EcsContextType))
+$ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 		}
 
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isContextAgnosticCommand(requiredCmd) {
-			exit(root, currentContext, err)
+			exit(root, currentContext, err, ctype)
 		}
-		mobycli.ExecIfDefaultCtxType(ctx)
+		mobycli.ExecIfDefaultCtxType(ctx, root)
 
-		checkIfUnknownCommandExistInDefaultContext(err, currentContext)
+		checkIfUnknownCommandExistInDefaultContext(err, currentContext, root)
 
-		exit(root, currentContext, err)
+		exit(root, currentContext, err, ctype)
 	}
+	metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.SuccessStatus)
 }
 
-func exit(cmd *cobra.Command, ctx string, err error) {
+func exit(root *cobra.Command, ctx string, err error, ctype string) {
+	metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+
 	if errors.Is(err, errdefs.ErrLoginRequired) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
 	if errors.Is(err, errdefs.ErrNotImplemented) {
-		cmd, _, _ := cmd.Traverse(os.Args[1:])
+		cmd, _, _ := root.Traverse(os.Args[1:])
 		name := cmd.Name()
 		parent := cmd.Parent()
 		if parent != nil && parent.Parent() != nil {
@@ -237,13 +241,14 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
-func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string) {
+func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string, root *cobra.Command) {
 	submatch := unknownCommandRegexp.FindSubmatch([]byte(err.Error()))
 	if len(submatch) == 2 {
 		dockerCommand := string(submatch[1])
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
+			metrics.Track(currentContext, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
 			os.Exit(1)
 		}
 	}
