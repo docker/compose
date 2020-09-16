@@ -153,7 +153,7 @@
         "cpu_period": {"type": ["number", "string"]},
         "cpu_rt_period": {"type": ["number", "string"]},
         "cpu_rt_runtime": {"type": ["number", "string"]},
-        "cpus": {"type": "number", "minimum": 0},
+        "cpus": {"type": ["number", "string"]},
         "cpuset": {"type": "string"},
         "credential_spec": {
           "type": "object",
@@ -503,7 +503,7 @@
             "limits": {
               "type": "object",
               "properties": {
-                "cpus": {"type": "number", "minimum": 0},
+                "cpus": {"type": ["number", "string"]},
                 "memory": {"type": "string"}
               },
               "additionalProperties": false,
@@ -512,7 +512,7 @@
             "reservations": {
               "type": "object",
               "properties": {
-                "cpus": {"type": "number", "minimum": 0},
+                "cpus": {"type": ["number", "string"]},
                 "memory": {"type": "string"},
                 "generic_resources": {"$ref": "#/definitions/generic_resources"}
               },
