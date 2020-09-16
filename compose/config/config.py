@@ -423,18 +423,37 @@ def load_mapping(config_files, get_func, entity_type, working_dir=None):
                 elif not config.get('name'):
                     config['name'] = name
 
-            if 'driver_opts' in config:
-                config['driver_opts'] = build_string_dict(
-                    config['driver_opts']
-                )
-
             if 'labels' in config:
                 config['labels'] = parse_labels(config['labels'])
 
             if 'file' in config:
                 config['file'] = expand_path(working_dir, config['file'])
 
+            if 'driver_opts' in config:
+                config['driver_opts'] = build_string_dict(
+                    config['driver_opts']
+                )
+                device = format_device_option(entity_type, config)
+                if device:
+                    config['driver_opts']['device'] = device
     return mapping
+
+
+def format_device_option(entity_type, config):
+    if entity_type != 'Volume':
+        return
+    # default driver is 'local'
+    driver = config.get('driver', 'local')
+    if driver != 'local':
+        return
+    o = config['driver_opts'].get('o')
+    device = config['driver_opts'].get('device')
+    if o and o == 'bind' and device:
+        fullpath = os.path.abspath(os.path.expanduser(device))
+        if not os.path.exists(fullpath):
+            raise ConfigurationError(
+                "Device path {} does not exist.".format(fullpath))
+        return fullpath
 
 
 def validate_external(entity_type, name, config, version):
@@ -1114,6 +1133,7 @@ def merge_deploy(base, override):
         md['resources'] = dict(resources_md)
     if md.needs_merge('placement'):
         placement_md = MergeDict(md.base.get('placement') or {}, md.override.get('placement') or {})
+        placement_md.merge_scalar('max_replicas_per_node')
         placement_md.merge_field('constraints', merge_unique_items_lists, default=[])
         placement_md.merge_field('preferences', merge_unique_objects_lists, default=[])
         md['placement'] = dict(placement_md)

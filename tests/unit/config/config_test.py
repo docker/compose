@@ -2543,6 +2543,7 @@ web:
                 'labels': ['com.docker.compose.a=1', 'com.docker.compose.b=2'],
                 'mode': 'replicated',
                 'placement': {
+                    'max_replicas_per_node': 1,
                     'constraints': [
                         'node.role == manager', 'engine.labels.aws == true'
                     ],
@@ -2599,6 +2600,7 @@ web:
                 'com.docker.compose.c': '3'
             },
             'placement': {
+                'max_replicas_per_node': 1,
                 'constraints': [
                     'engine.labels.aws == true', 'engine.labels.dev == true',
                     'node.role == manager', 'node.role == worker'
@@ -5267,7 +5269,7 @@ def get_config_filename_for_files(filenames, subdir=None):
 
 
 class SerializeTest(unittest.TestCase):
-    def test_denormalize_depends_on_v3(self):
+    def test_denormalize_depends(self):
         service_dict = {
             'image': 'busybox',
             'command': 'true',
@@ -5277,27 +5279,7 @@ class SerializeTest(unittest.TestCase):
             }
         }
 
-        assert denormalize_service_dict(service_dict, VERSION) == {
-            'image': 'busybox',
-            'command': 'true',
-            'depends_on': ['service2', 'service3']
-        }
-
-    def test_denormalize_depends_on_v2_1(self):
-        service_dict = {
-            'image': 'busybox',
-            'command': 'true',
-            'depends_on': {
-                'service2': {'condition': 'service_started'},
-                'service3': {'condition': 'service_started'},
-            }
-        }
-
-        assert denormalize_service_dict(service_dict, VERSION) == {
-            'image': 'busybox',
-            'command': 'true',
-            'depends_on': ['service2', 'service3']
-        }
+        assert denormalize_service_dict(service_dict, VERSION) == service_dict
 
     def test_serialize_time(self):
         data = {
