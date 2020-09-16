@@ -36,7 +36,7 @@ func testStore(t *testing.T) Store {
 		_ = os.RemoveAll(d)
 	})
 
-	s, err := New(WithRoot(d))
+	s, err := New(d)
 	assert.NilError(t, err)
 
 	return s

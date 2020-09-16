@@ -48,9 +48,7 @@ func NewTestCLI(t *testing.T) *TestCLI {
 		_ = os.RemoveAll(dir)
 	})
 
-	s, err := store.New(
-		store.WithRoot(dir),
-	)
+	s, err := store.New(dir)
 	assert.Check(t, cmp.Nil(err))
 	err = s.Create("example", "example", "", store.ContextMetadata{})
 	assert.Check(t, cmp.Nil(err))

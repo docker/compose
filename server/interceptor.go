@@ -117,7 +117,7 @@ func configureContext(ctx context.Context, currentContext string, method string)
 		}
 	}
 
-	s, err := store.New(store.WithRoot(configDir))
+	s, err := store.New(configDir)
 	if err != nil {
 		return nil, err
 	}

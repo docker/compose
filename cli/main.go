@@ -169,9 +169,9 @@ func main() {
 
 	currentContext := determineCurrentContext(opts.Context, configDir)
 
-	s, err := store.New(store.WithRoot(configDir))
+	s, err := store.New(configDir)
 	if err != nil {
-		fatal(errors.Wrap(err, "unable to create context store"))
+		mobycli.Exec()
 	}
 
 	ctype := store.DefaultContextType

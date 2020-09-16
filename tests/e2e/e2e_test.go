@@ -293,6 +293,27 @@ func TestLegacy(t *testing.T) {
 		})
 	})
 
+	t.Run("run without HOME defined", func(t *testing.T) {
+		cmd := c.NewDockerCmd("ps")
+		cmd.Env = []string{"PATH=" + c.BinDir}
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 0,
+			Out:      "CONTAINER ID",
+		})
+		assert.Equal(t, res.Stderr(), "")
+	})
+
+	t.Run("run without write access to context store", func(t *testing.T) {
+		cmd := c.NewDockerCmd("ps")
+		cmd.Env = []string{"PATH=" + c.BinDir, "HOME=/doesnotexist/"}
+		res := icmd.RunCmd(cmd)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 0,
+			Out:      "CONTAINER ID",
+		})
+	})
+
 	t.Run("host flag", func(t *testing.T) {
 		stderr := "Cannot connect to the Docker daemon at tcp://localhost:123"
 		if runtime.GOOS == "windows" {
