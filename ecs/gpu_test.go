@@ -28,63 +28,63 @@ func TestGuessMachineType(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "1-gpu",
+			name: "1-gpus",
 			yaml: `
 services:
     learning:
-        image: tensorflow/tensorflow:latest-gpu
+        image: tensorflow/tensorflow:latest-gpus
         deploy:
             resources:
                 reservations:
                    generic_resources:
                      - discrete_resource_spec:
-                         kind: gpu
+                         kind: gpus
                          value: 1
 `,
 			want:    "p3.2xlarge",
 			wantErr: false,
 		},
 		{
-			name: "4-gpu",
+			name: "4-gpus",
 			yaml: `
 services:
     learning:
-        image: tensorflow/tensorflow:latest-gpu
+        image: tensorflow/tensorflow:latest-gpus
         deploy:
             resources:
                 reservations:
                    generic_resources: 
                      - discrete_resource_spec:
-                         kind: gpu
+                         kind: gpus
                          value: 4
 `,
 			want:    "p3.8xlarge",
 			wantErr: false,
 		},
 		{
-			name: "1-gpu, high-memory",
+			name: "1-gpus, high-memory",
 			yaml: `
 services:
     learning:
-        image: tensorflow/tensorflow:latest-gpu
+        image: tensorflow/tensorflow:latest-gpus
         deploy:
             resources:
                 reservations: 
                    memory: 300Gb
                    generic_resources: 
                      - discrete_resource_spec:
-                         kind: gpu
+                         kind: gpus
                          value: 2
 `,
 			want:    "p3.16xlarge",
 			wantErr: false,
 		},
 		{
-			name: "1-gpu, high-cpu",
+			name: "1-gpus, high-cpu",
 			yaml: `
 services:
     learning:
-        image: tensorflow/tensorflow:latest-gpu
+        image: tensorflow/tensorflow:latest-gpus
         deploy:
             resources:
                 reservations: 
@@ -92,7 +92,7 @@ services:
                    cpus: "32"
                    generic_resources: 
                      - discrete_resource_spec:
-                         kind: gpu
+                         kind: gpus
                          value: 2
 `,
 			want:    "p3.8xlarge",
