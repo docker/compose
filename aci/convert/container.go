@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/api/containers"
 )
 

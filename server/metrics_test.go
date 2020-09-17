@@ -21,9 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"gotest.tools/v3/assert"
-
 	"google.golang.org/grpc"
+	"gotest.tools/v3/assert"
 
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
