@@ -295,7 +295,7 @@ func TestLegacy(t *testing.T) {
 
 	t.Run("run without HOME defined", func(t *testing.T) {
 		cmd := c.NewDockerCmd("ps")
-		cmd.Env = []string{"PATH=" + c.BinDir}
+		cmd.Env = []string{"PATH=" + c.PathEnvVar()}
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Expected{
 			ExitCode: 0,
@@ -306,7 +306,7 @@ func TestLegacy(t *testing.T) {
 
 	t.Run("run without write access to context store", func(t *testing.T) {
 		cmd := c.NewDockerCmd("ps")
-		cmd.Env = []string{"PATH=" + c.BinDir, "HOME=/doesnotexist/"}
+		cmd.Env = []string{"PATH=" + c.PathEnvVar(), "HOME=/doesnotexist/"}
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Expected{
 			ExitCode: 0,

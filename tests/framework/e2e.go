@@ -143,14 +143,10 @@ func CopyFile(sourceFile string, destinationFile string) error {
 
 // NewCmd creates a cmd object configured with the test environment set
 func (c *E2eCLI) NewCmd(command string, args ...string) icmd.Cmd {
-	path := c.BinDir + ":" + os.Getenv("PATH")
-	if runtime.GOOS == "windows" {
-		path = c.BinDir + ";" + os.Getenv("PATH")
-	}
 	env := append(os.Environ(),
 		"DOCKER_CONFIG="+c.ConfigDir,
 		"KUBECONFIG=invalid",
-		"PATH="+path,
+		"PATH="+c.PathEnvVar(),
 	)
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
@@ -174,6 +170,15 @@ func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 	res := c.RunDockerOrExitError(args...)
 	res.Assert(c.test, icmd.Success)
 	return res
+}
+
+// PathEnvVar returns path (os sensitive) for running test
+func (c *E2eCLI) PathEnvVar() string {
+	path := c.BinDir + ":" + os.Getenv("PATH")
+	if runtime.GOOS == "windows" {
+		path = c.BinDir + ";" + os.Getenv("PATH")
+	}
+	return path
 }
 
 // GoldenFile golden file specific to platform
