@@ -62,7 +62,6 @@ const (
 
 const (
 	dockerEndpointKey = "docker"
-	configDir         = ".docker"
 	contextsDir       = "contexts"
 	metadataDir       = "meta"
 	metaFile          = "meta.json"
@@ -111,34 +110,10 @@ type store struct {
 	root string
 }
 
-// Opt is a functional option for the store
-type Opt func(*store)
-
-// WithRoot sets a new root to the store
-func WithRoot(root string) Opt {
-	return func(s *store) {
-		s.root = root
-	}
-}
-
-// New returns a configured context store with $HOME/.docker as root
-func New(opts ...Opt) (Store, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	root := filepath.Join(home, configDir)
-	if err := createDirIfNotExist(root); err != nil {
-		return nil, err
-	}
-
+// New returns a configured context store with specified root dir (eg. $HOME/.docker) as root
+func New(rootDir string) (Store, error) {
 	s := &store{
-		root: root,
-	}
-
-	for _, opt := range opts {
-		opt(s)
+		root: rootDir,
 	}
 
 	m := filepath.Join(s.root, contextsDir, metadataDir)
