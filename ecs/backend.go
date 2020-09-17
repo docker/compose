@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/secrets"
