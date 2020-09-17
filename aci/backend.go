@@ -44,14 +44,6 @@ const (
 	composeContainerSeparator = "_"
 )
 
-// ContextParams options for creating ACI context
-type ContextParams struct {
-	Description    string
-	Location       string
-	SubscriptionID string
-	ResourceGroup  string
-}
-
 // LoginParams azure login options
 type LoginParams struct {
 	TenantID     string
