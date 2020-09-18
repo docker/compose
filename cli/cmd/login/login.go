@@ -56,7 +56,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		backend := args[0]
 		return errors.New("unknown backend type for cloud login: " + backend)
 	}
-	mobycli.Exec()
+	mobycli.Exec(cmd.Root())
 	return nil
 }
 

@@ -70,7 +70,7 @@ $ docker context create my-context --description "some description" --docker "ho
 		Use:   "create CONTEXT",
 		Short: "Create new context",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mobycli.Exec()
+			mobycli.Exec(cmd.Root())
 			return nil
 		},
 		Long: longHelp,

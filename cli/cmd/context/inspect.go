@@ -27,7 +27,7 @@ func inspectCommand() *cobra.Command {
 		Use:   "inspect",
 		Short: "Display detailed information on one or more contexts",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			mobycli.Exec()
+			mobycli.Exec(cmd.Root())
 			return nil
 		},
 	}

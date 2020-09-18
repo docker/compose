@@ -30,6 +30,7 @@ import (
 	"gopkg.in/ini.v1"
 
 	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/prompt"
 )
 
@@ -155,7 +156,7 @@ func (h contextCreateAWSHelper) chooseProfile(section map[string]ini.Section) (s
 	selected, err := h.user.Select("Select AWS Profile", profiles)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			os.Exit(-1)
+			return "", errdefs.ErrCanceled
 		}
 		return "", err
 	}
