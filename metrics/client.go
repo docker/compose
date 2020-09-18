@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"time"
 )
 
 type client struct {
@@ -71,23 +72,23 @@ func NewClient() Client {
 }
 
 func (c *client) Send(command Command) {
-	wasIn := make(chan bool)
-
-	// Fire and forget, we don't want to slow down the user waiting for DD
-	// metrics endpoint to respond. We could lose some events but that's ok.
+	result := make(chan bool, 1)
 	go func() {
-		defer func() {
-			_ = recover()
-		}()
-
-		wasIn <- true
-
-		req, err := json.Marshal(command)
-		if err != nil {
-			return
-		}
-
-		_, _ = c.httpClient.Post("http://localhost/usage", "application/json", bytes.NewBuffer(req))
+		postMetrics(command, c)
+		result <- true
 	}()
-	<-wasIn
+
+	// wait for the post finished, or timeout in case anything freezes.
+	// Posting metrics without Desktop listening returns in less than a ms, and a handful of ms (often <2ms) when Desktop is listening
+	select {
+	case <-result:
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func postMetrics(command Command, c *client) {
+	req, err := json.Marshal(command)
+	if err == nil {
+		_, _ = c.httpClient.Post("http://localhost/usage", "application/json", bytes.NewBuffer(req))
+	}
 }
