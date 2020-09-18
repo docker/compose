@@ -31,8 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	dockererrdef "github.com/docker/docker/errdefs"
-
 	"github.com/docker/compose-cli/cli/cmd/compose"
 	"github.com/docker/compose-cli/cli/cmd/logout"
 	volume "github.com/docker/compose-cli/cli/cmd/volume"
@@ -192,8 +190,8 @@ func main() {
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		// if user canceled request, simply exit without any error message
-		if dockererrdef.IsCancelled(err) || errors.Is(ctx.Err(), context.Canceled) {
-			metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.CancelledStatus)
+		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+			metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.CanceledStatus)
 			os.Exit(130)
 		}
 		if ctype == store.AwsContextType {

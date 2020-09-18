@@ -21,9 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/metrics"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
@@ -48,6 +52,44 @@ func TestAllMethodsHaveCorrespondingCliCommand(t *testing.T) {
 	}
 }
 
+func TestTrackSuccess(t *testing.T) {
+	var mockMetrics = &mockMetricsClient{}
+	mockMetrics.On("Send", metrics.Command{Command: "ps", Context: "aci", Status: "success", Source: "api"}).Return()
+	interceptor := metricsServerInterceptor(context.TODO(), mockMetrics)
+
+	_, err := interceptor(incomingContext("aci"), nil, containerMethodRoute("List"), mockHandler(nil))
+	assert.NilError(t, err)
+}
+
+func TestTrackSFailures(t *testing.T) {
+	var mockMetrics = &mockMetricsClient{}
+	mockMetrics.On("Send", metrics.Command{Command: "ps", Context: "default", Status: "failure", Source: "api"}).Return()
+	interceptor := metricsServerInterceptor(context.TODO(), mockMetrics)
+
+	_, err := interceptor(incomingContext("default"), nil, containerMethodRoute("Create"), mockHandler(errdefs.ErrLoginRequired))
+	assert.Assert(t, err == errdefs.ErrLoginRequired)
+}
+
+func containerMethodRoute(action string) *grpc.UnaryServerInfo {
+	var info = &grpc.UnaryServerInfo{
+		FullMethod: "/com.docker.api.protos.containers.v1.Containers/" + action,
+	}
+	return info
+}
+
+func mockHandler(err error) func(ctx context.Context, req interface{}) (interface{}, error) {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return nil, err
+	}
+}
+
+func incomingContext(status string) context.Context {
+	ctx := metadata.NewIncomingContext(context.TODO(), metadata.MD{
+		(key): []string{status},
+	})
+	return ctx
+}
+
 func setupServer() *grpc.Server {
 	ctx := context.TODO()
 	s := New(ctx)
@@ -56,4 +98,12 @@ func setupServer() *grpc.Server {
 	streamsv1.RegisterStreamingServer(s, p)
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
 	return s
+}
+
+type mockMetricsClient struct {
+	mock.Mock
+}
+
+func (s *mockMetricsClient) Send(command metrics.Command) {
+	s.Called(command)
 }

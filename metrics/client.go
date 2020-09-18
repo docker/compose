@@ -45,8 +45,8 @@ const (
 	SuccessStatus = "success"
 	// FailureStatus is sent for API metrics
 	FailureStatus = "failure"
-	// CancelledStatus is sent for API metrics
-	CancelledStatus = "cancelled"
+	// CanceledStatus is sent for API metrics
+	CanceledStatus = "canceled"
 )
 
 // Client sends metrics to Docker Desktopn

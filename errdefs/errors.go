@@ -42,6 +42,8 @@ var (
 	// ErrNotImplemented is returned when a backend doesn't implement
 	// an action
 	ErrNotImplemented = errors.New("not implemented")
+	// ErrCanceled is returned when the command was canceled by user
+	ErrCanceled = errors.New("canceled")
 	// ErrParsingFailed is returned when a string cannot be parsed
 	ErrParsingFailed = errors.New("parsing failed")
 	// ErrWrongContextType is returned when the caller tries to get a context
@@ -77,4 +79,9 @@ func IsErrNotImplemented(err error) bool {
 // IsErrParsingFailed returns true if the unwrapped error is ErrParsingFailed
 func IsErrParsingFailed(err error) bool {
 	return errors.Is(err, ErrParsingFailed)
+}
+
+// IsErrCanceled returns true if the unwrapped error is ErrCanceled
+func IsErrCanceled(err error) bool {
+	return errors.Is(err, ErrCanceled)
 }

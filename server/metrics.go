@@ -41,9 +41,7 @@ var (
 	}
 )
 
-func metricsServerInterceptor(clictx context.Context) grpc.UnaryServerInterceptor {
-	client := metrics.NewClient()
-
+func metricsServerInterceptor(clictx context.Context, client metrics.Client) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		currentContext, err := getIncomingContext(ctx)
 		if err != nil {
@@ -53,15 +51,21 @@ func metricsServerInterceptor(clictx context.Context) grpc.UnaryServerIntercepto
 			}
 		}
 
+		data, err := handler(ctx, req)
+
+		status := metrics.SuccessStatus
+		if err != nil {
+			status = metrics.FailureStatus
+		}
 		command := methodMapping[info.FullMethod]
 		if command != "" {
 			client.Send(metrics.Command{
 				Command: command,
 				Context: currentContext,
 				Source:  metrics.APISource,
+				Status:  status,
 			})
 		}
-
-		return handler(ctx, req)
+		return data, err
 	}
 }
