@@ -92,7 +92,7 @@ func guessMachineType(project *types.Project) (string, error) {
 		filter(func(m machine) bool {
 			return m.gpus >= requirements.gpus
 		}).
-		firstOrError("none of the AWS p3 machines match requirement for memory:%d cpu:%f gpus:%d", requirements.memory, requirements.cpus, requirements.gpus)
+		firstOrError("none of the Amazon EC2 P3 instance types meet the requirements for memory:%d cpu:%f gpus:%d", requirements.memory, requirements.cpus, requirements.gpus)
 	if err != nil {
 		return "", err
 	}
