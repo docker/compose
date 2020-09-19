@@ -241,7 +241,7 @@ class ConversionMap:
         service_path('healthcheck', 'disable'): to_boolean,
         service_path('deploy', 'labels', PATH_JOKER): to_str,
         service_path('deploy', 'replicas'): to_int,
-        service_path('deploy', 'resources', 'limits', "cpus"): to_float,
+        service_path('deploy', 'resources', 'limits', "cpus"): to_str,
         service_path('deploy', 'update_config', 'parallelism'): to_int,
         service_path('deploy', 'update_config', 'max_failure_ratio'): to_float,
         service_path('deploy', 'rollback_config', 'parallelism'): to_int,
