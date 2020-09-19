@@ -529,7 +529,7 @@ services:
                                 'memory': '50M',
                             },
                             'reservations': {
-                                'cpus': 0.01,
+                                'cpus': '0.01',
                                 'memory': '20M',
                             },
                         },
