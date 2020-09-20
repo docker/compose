@@ -95,26 +95,30 @@ class TemplateWithDefaults(Template):
         """.format(
         delim=re.escape('$'),
         id=r'[_a-z][_a-z0-9]*',
-        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])(.*}|[^}]*))?',
     )
 
     @staticmethod
     def process_braced_group(braced, sep, mapping):
         if ':-' == sep:
             var, _, default = braced.partition(':-')
+            default = Interpolator(TemplateWithDefaults, mapping).interpolate(default)
             return mapping.get(var) or default
         elif '-' == sep:
             var, _, default = braced.partition('-')
+            default = Interpolator(TemplateWithDefaults, mapping).interpolate(default)
             return mapping.get(var, default)
 
         elif ':?' == sep:
             var, _, err = braced.partition(':?')
+            err = Interpolator(TemplateWithDefaults, mapping).interpolate(err)
             result = mapping.get(var)
             if not result:
                 raise UnsetRequiredSubstitution(err)
             return result
         elif '?' == sep:
             var, _, err = braced.partition('?')
+            err = Interpolator(TemplateWithDefaults, mapping).interpolate(err)
             if var in mapping:
                 return mapping.get(var)
             raise UnsetRequiredSubstitution(err)

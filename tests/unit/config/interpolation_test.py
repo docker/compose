@@ -398,6 +398,15 @@ def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
 
 
+def test_interpolate_with_nested_expansion(defaults_interpolator):
+    assert defaults_interpolator("ok ${missing-$FOO}") == "ok first"
+    assert defaults_interpolator("ok ${missing-${FOO}}") == "ok first"
+    assert defaults_interpolator("ok ${missing-${FOO} ${FOO}}") == "ok first first"
+    assert defaults_interpolator("ok ${BAR:-$FOO}") == "ok first"
+    assert defaults_interpolator("ok ${BAR:-${FOO}}") == "ok first"
+    assert defaults_interpolator("ok ${BAR:-${FOO} ${FOO}}") == "ok first first"
+
+
 def test_interpolate_mandatory_values(defaults_interpolator):
     assert defaults_interpolator("ok ${FOO:?bar}") == "ok first"
     assert defaults_interpolator("ok ${FOO?bar}") == "ok first"
@@ -410,6 +419,17 @@ def test_interpolate_mandatory_values(defaults_interpolator):
     with pytest.raises(UnsetRequiredSubstitution) as e:
         defaults_interpolator("not ok ${BAZ?dropped the bazz}")
     assert e.value.err == 'dropped the bazz'
+
+
+def test_interpolate_mandatory_values_with_nested_expansion(defaults_interpolator):
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAR:?$FOO}")
+    assert e.value.err == 'first'
+
+    with pytest.raises(UnsetRequiredSubstitution) as e:
+        defaults_interpolator("not ok ${BAZ?dropped the $FOO}")
+
+    assert e.value.err == 'dropped the first'
 
 
 def test_interpolate_mandatory_no_err_msg(defaults_interpolator):
