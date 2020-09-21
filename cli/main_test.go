@@ -64,7 +64,7 @@ func TestCheckOwnCommand(t *testing.T) {
 	assert.Assert(t, isContextAgnosticCommand(login.Command()))
 	assert.Assert(t, isContextAgnosticCommand(context.Command()))
 	assert.Assert(t, isContextAgnosticCommand(cmd.ServeCommand()))
-	assert.Assert(t, !isContextAgnosticCommand(run.Command()))
+	assert.Assert(t, !isContextAgnosticCommand(run.Command("default")))
 	assert.Assert(t, !isContextAgnosticCommand(cmd.ExecCommand()))
 	assert.Assert(t, !isContextAgnosticCommand(cmd.LogsCommand()))
 	assert.Assert(t, !isContextAgnosticCommand(cmd.PsCommand()))

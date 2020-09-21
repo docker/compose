@@ -25,15 +25,15 @@ import (
 	"github.com/containerd/console"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/containers"
-
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/cli/options/run"
+	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/progress"
 )
 
 // Command runs a container
-func Command() *cobra.Command {
+func Command(contextType string) *cobra.Command {
 	var opts run.Opts
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -46,7 +46,6 @@ func Command() *cobra.Command {
 
 	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
-	cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	cmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
 	cmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: storageaccount/my_share[:/absolute/path/to/target][:ro]")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
@@ -54,6 +53,10 @@ func Command() *cobra.Command {
 	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
 	cmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", containers.RestartPolicyNone, "Restart policy to apply when a container exits")
+
+	if contextType == store.AciContextType {
+		cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
+	}
 
 	return cmd
 }
