@@ -20,14 +20,15 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/cli"
-
 	"github.com/spf13/cobra"
 
+	aciconvert "github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/progress"
 )
 
-func upCommand() *cobra.Command {
+func upCommand(contextType string) *cobra.Command {
 	opts := composeOptions{}
 	upCmd := &cobra.Command{
 		Use: "up",
@@ -40,6 +41,11 @@ func upCommand() *cobra.Command {
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")
+
+	if contextType == store.AciContextType {
+		upCmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
+	}
+
 	return upCmd
 }
 
@@ -55,6 +61,9 @@ func runUp(ctx context.Context, opts composeOptions) error {
 			return "", err
 		}
 		project, err := cli.ProjectFromOptions(options)
+		if opts.DomainName != "" {
+			project.Extensions = map[string]interface{}{aciconvert.ExtensionDomainName: opts.DomainName}
+		}
 		if err != nil {
 			return "", err
 		}

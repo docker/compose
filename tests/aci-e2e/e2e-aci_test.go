@@ -453,7 +453,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 func TestComposeUpUpdate(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, groupID := setupTestResourceGroup(t, c)
 
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -465,8 +465,11 @@ func TestComposeUpUpdate(t *testing.T) {
 	)
 
 	t.Run("compose up", func(t *testing.T) {
+		dnsLabelName := "nginx-" + groupID
+		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
 		// Name of Compose project is taken from current folder "acie2e"
-		c.RunDockerCmd("compose", "up", "-f", composeFile)
+		c.RunDockerCmd("compose", "up", "-f", composeFile, "--domainname", dnsLabelName)
+
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
 		// Check three containers are running
@@ -493,6 +496,11 @@ func TestComposeUpUpdate(t *testing.T) {
 		b, err := ioutil.ReadAll(r.Body)
 		assert.NilError(t, err)
 		assert.Assert(t, strings.Contains(string(b), `"word":`))
+
+		endpoint = fmt.Sprintf("http://%s:%d", fqdn, containerInspect.Ports[0].HostPort)
+		r, err = HTTPGetWithRetry(endpoint+"/words/noun", 3)
+		assert.NilError(t, err)
+		assert.Equal(t, r.StatusCode, http.StatusOK)
 	})
 
 	t.Run("compose ps", func(t *testing.T) {

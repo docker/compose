@@ -43,8 +43,10 @@ const (
 	StatusRunning = "Running"
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
-	dnsSidecarImage       = "busybox:1.31.1"
+	// ExtensionDomainName compose extension to set ACI DNS label name
+	ExtensionDomainName = "x-aci-domain-name"
 
+	dnsSidecarImage                = "busybox:1.31.1"
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
@@ -103,26 +105,16 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 			return containerinstance.ContainerGroup{}, errors.New("ACI integration does not support labels in compose applications")
 		}
 		if service.Ports != nil {
-			var containerPorts []containerinstance.ContainerPort
-			for _, portConfig := range service.Ports {
-				if portConfig.Published != 0 && portConfig.Published != portConfig.Target {
-					msg := fmt.Sprintf("Port mapping is not supported with ACI, cannot map port %d to %d for container %s",
-						portConfig.Published, portConfig.Target, service.Name)
-					return groupDefinition, errors.New(msg)
-				}
-				portNumber := int32(portConfig.Target)
-				containerPorts = append(containerPorts, containerinstance.ContainerPort{
-					Port: to.Int32Ptr(portNumber),
-				})
-				groupPorts = append(groupPorts, containerinstance.Port{
-					Port:     to.Int32Ptr(portNumber),
-					Protocol: containerinstance.TCP,
-				})
+			containerPorts, serviceGroupPorts, dnsLabelName, err := convertPortsToAci(service, p)
+			if err != nil {
+				return groupDefinition, err
 			}
 			containerDefinition.ContainerProperties.Ports = &containerPorts
+			groupPorts = append(groupPorts, serviceGroupPorts...)
 			groupDefinition.ContainerGroupProperties.IPAddress = &containerinstance.IPAddress{
-				Type:  containerinstance.Public,
-				Ports: &groupPorts,
+				Type:         containerinstance.Public,
+				Ports:        &groupPorts,
+				DNSNameLabel: dnsLabelName,
 			}
 		}
 
@@ -135,6 +127,35 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	groupDefinition.ContainerGroupProperties.Containers = &containers
 
 	return groupDefinition, nil
+}
+
+func convertPortsToAci(service serviceConfigAciHelper, p types.Project) ([]containerinstance.ContainerPort, []containerinstance.Port, *string, error) {
+	var groupPorts []containerinstance.Port
+	var containerPorts []containerinstance.ContainerPort
+	for _, portConfig := range service.Ports {
+		if portConfig.Published != 0 && portConfig.Published != portConfig.Target {
+			msg := fmt.Sprintf("Port mapping is not supported with ACI, cannot map port %d to %d for container %s",
+				portConfig.Published, portConfig.Target, service.Name)
+			return nil, nil, nil, errors.New(msg)
+		}
+		portNumber := int32(portConfig.Target)
+		containerPorts = append(containerPorts, containerinstance.ContainerPort{
+			Port: to.Int32Ptr(portNumber),
+		})
+		groupPorts = append(groupPorts, containerinstance.Port{
+			Port:     to.Int32Ptr(portNumber),
+			Protocol: containerinstance.TCP,
+		})
+	}
+	var dnsLabelName *string = nil
+	if extension, ok := p.Extensions[ExtensionDomainName]; ok {
+		domain, ok := extension.(string)
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("could not read %s compose extension as string", ExtensionDomainName)
+		}
+		dnsLabelName = &domain
+	}
+	return containerPorts, groupPorts, dnsLabelName, nil
 }
 
 func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
