@@ -37,6 +37,11 @@ ifdef BUILD_TAGS
   TAGS=-tags $(BUILD_TAGS)
 endif
 
+TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/
+ifneq ($(findstring bsd,$(shell tar --version)),)
+  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/
+endif
+
 all: cli
 
 .PHONY: protos
@@ -73,3 +78,9 @@ check-license-headers:
 check-go-mod:
 	./scripts/validate/check-go-mod
 
+.PHONY: package
+package: cross
+	mkdir -p dist
+	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64
+	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64
+	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(BINARY)-windows-amd64.exe

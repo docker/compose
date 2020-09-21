@@ -25,10 +25,10 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build
-        run: make -f builder.Makefile cross
+        run: make -f builder.Makefile package
 
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "bin/*"
+          artifacts: "dist/*"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
