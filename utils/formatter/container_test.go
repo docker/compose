@@ -24,7 +24,7 @@ import (
 	"github.com/docker/compose-cli/cli/options/run"
 )
 
-func TestDisplayPorts(t *testing.T) {
+func TestDisplayPortsNoDomainname(t *testing.T) {
 	testCases := []struct {
 		name     string
 		in       []string
@@ -70,8 +70,19 @@ func TestDisplayPorts(t *testing.T) {
 			containerConfig, err := runOpts.ToContainerConfig("test")
 			assert.NilError(t, err)
 
-			out := PortsToStrings(containerConfig.Ports)
+			out := PortsToStrings(containerConfig.Ports, "")
 			assert.DeepEqual(t, testCase.expected, out)
 		})
 	}
+}
+
+func TestDisplayPortsWithDomainname(t *testing.T) {
+	runOpts := run.Opts{
+		Publish: []string{"80"},
+	}
+	containerConfig, err := runOpts.ToContainerConfig("test")
+	assert.NilError(t, err)
+
+	out := PortsToStrings(containerConfig.Ports, "mydomain.westus.azurecontainner.io")
+	assert.DeepEqual(t, []string{"mydomain.westus.azurecontainner.io:80->80/tcp"}, out)
 }

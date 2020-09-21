@@ -335,18 +335,19 @@ func lines(output string) []string {
 
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, groupID := setupTestResourceGroup(t, c)
 
 	// Used in subtests
 	var (
-		container string
-		endpoint  string
+		container         string = "test-container"
+		endpoint          string
+		followLogsProcess *icmd.Result
 	)
 
-	container = "test-container"
-
-	var followLogsProcess *icmd.Result
 	t.Run("run attached limits", func(t *testing.T) {
+		dnsLabelName := "nginx-" + groupID
+		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
+
 		cmd := c.NewDockerCmd(
 			"run",
 			"--name", container,
@@ -354,15 +355,17 @@ func TestContainerRunAttached(t *testing.T) {
 			"--memory", "0.1G", "--cpus", "0.1",
 			"-p", "80:80",
 			"nginx",
+			"--domainname",
+			dnsLabelName,
 		)
 		followLogsProcess = icmd.StartCmd(cmd)
 
 		checkRunning := func(t poll.LogT) poll.Result {
 			res := c.RunDockerOrExitError("inspect", container)
-			if res.ExitCode == 0 {
+			if res.ExitCode == 0 && strings.Contains(res.Stdout(), `"Status": "Running"`) {
 				return poll.Success()
 			}
-			return poll.Continue("waiting for container to be running")
+			return poll.Continue("waiting for container to be running, current inspect result: \n%s", res.Combined())
 		}
 		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 
@@ -380,7 +383,8 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Assert(t, len(port.HostIP) > 0)
 		assert.Equal(t, port.ContainerPort, uint32(80))
 		assert.Equal(t, port.HostPort, uint32(80))
-		endpoint = fmt.Sprintf("http://%s:%d", port.HostIP, port.HostPort)
+		assert.Equal(t, containerInspect.Config.FQDN, fqdn)
+		endpoint = fmt.Sprintf("http://%s:%d", fqdn, port.HostPort)
 
 		assert.Assert(t, !strings.Contains(followLogsProcess.Stdout(), "/test"))
 		checkRequest := func(t poll.LogT) poll.Result {

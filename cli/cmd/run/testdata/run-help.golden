@@ -6,6 +6,7 @@ Usage:
 Flags:
       --cpus float            Number of CPUs (default 1)
   -d, --detach                Run container in background and print container ID
+      --domainname string     Container NIS domain name
   -e, --env stringArray       Set environment variables
   -l, --label stringArray     Set meta data on a container
   -m, --memory bytes          Memory limit

@@ -390,7 +390,7 @@ func bytesToGb(b types.UnitBytes) float64 {
 }
 
 // ContainerGroupToServiceStatus convert from an ACI container definition to service status
-func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container) compose.ServiceStatus {
+func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container, region string) compose.ServiceStatus {
 	var replicas = 1
 	if GetStatus(container, group) != StatusRunning {
 		replicas = 0
@@ -398,14 +398,22 @@ func ContainerGroupToServiceStatus(containerID string, group containerinstance.C
 	return compose.ServiceStatus{
 		ID:       containerID,
 		Name:     *container.Name,
-		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports)),
+		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports), fqdn(group, region)),
 		Replicas: replicas,
 		Desired:  1,
 	}
 }
 
+func fqdn(group containerinstance.ContainerGroup, region string) string {
+	fqdn := ""
+	if group.IPAddress != nil && group.IPAddress.DNSNameLabel != nil && *group.IPAddress.DNSNameLabel != "" {
+		fqdn = *group.IPAddress.DNSNameLabel + "." + region + ".azurecontainer.io"
+	}
+	return fqdn
+}
+
 // ContainerGroupToContainer composes a Container from an ACI container definition
-func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container) containers.Container {
+func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container, region string) containers.Container {
 	memLimits := 0.
 	if cc.Resources != nil &&
 		cc.Resources.Limits != nil &&
@@ -436,9 +444,9 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		}
 	}
 
-	var config *containers.RuntimeConfig = nil
+	var config *containers.RuntimeConfig = &containers.RuntimeConfig{FQDN: fqdn(cg, region)}
 	if envVars != nil {
-		config = &containers.RuntimeConfig{Env: envVars}
+		config.Env = envVars
 	}
 	c := containers.Container{
 		ID:                     containerID,

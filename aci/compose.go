@@ -89,7 +89,7 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 		if isContainerVisible(container, group, false) {
 			continue
 		}
-		res = append(res, convert.ContainerGroupToServiceStatus(getContainerID(group, container), group, container))
+		res = append(res, convert.ContainerGroupToServiceStatus(getContainerID(group, container), group, container, cs.ctx.Location))
 	}
 	return res, nil
 }

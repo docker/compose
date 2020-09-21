@@ -23,13 +23,13 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/docker/compose-cli/utils/formatter"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/containers"
 	formatter2 "github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/utils/formatter"
 )
 
 type psOpts struct {
@@ -98,9 +98,17 @@ func runPs(ctx context.Context, opts psOpts) error {
 	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
 	fmt.Fprintf(w, "CONTAINER ID\tIMAGE\tCOMMAND\tSTATUS\tPORTS\n")
 	format := "%s\t%s\t%s\t%s\t%s\n"
-	for _, c := range containers {
-		fmt.Fprintf(w, format, c.ID, c.Image, c.Command, c.Status, strings.Join(formatter.PortsToStrings(c.Ports), ", "))
+	for _, container := range containers {
+		fmt.Fprintf(w, format, container.ID, container.Image, container.Command, container.Status, strings.Join(formatter.PortsToStrings(container.Ports, fqdn(container)), ", "))
 	}
 
 	return w.Flush()
+}
+
+func fqdn(container containers.Container) string {
+	fqdn := ""
+	if container.Config != nil {
+		fqdn = container.Config.FQDN
+	}
+	return fqdn
 }

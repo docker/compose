@@ -59,7 +59,8 @@ func TestContainerGroupToContainer(t *testing.T) {
 				Ports: &[]containerinstance.Port{{
 					Port: to.Int32Ptr(80),
 				}},
-				IP: to.StringPtr("42.42.42.42"),
+				IP:           to.StringPtr("42.42.42.42"),
+				DNSNameLabel: to.StringPtr("myapp"),
 			},
 			OsType: "Linux",
 		},
@@ -102,10 +103,13 @@ func TestContainerGroupToContainer(t *testing.T) {
 			Protocol:      "tcp",
 			HostIP:        "42.42.42.42",
 		}},
+		Config: &containers.RuntimeConfig{
+			FQDN: "myapp.eastus.azurecontainer.io",
+		},
 		RestartPolicyCondition: "any",
 	}
 
-	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
+	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer, "eastus")
 	assert.DeepEqual(t, container, expectedContainer)
 }
 
@@ -143,7 +147,7 @@ func TestContainerGroupToServiceStatus(t *testing.T) {
 		Desired:  1,
 	}
 
-	container := ContainerGroupToServiceStatus("myContainerID", myContainerGroup, myContainer)
+	container := ContainerGroupToServiceStatus("myContainerID", myContainerGroup, myContainer, "eastus")
 	assert.DeepEqual(t, container, expectedService)
 }
 
