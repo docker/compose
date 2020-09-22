@@ -86,9 +86,6 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 		return err
 	}
 	addTag(&groupDefinition, singleContainerTag)
-	if r.DomainName != "" {
-		groupDefinition.ContainerGroupProperties.IPAddress.DNSNameLabel = &r.DomainName
-	}
 
 	return createACIContainers(ctx, cs.ctx, groupDefinition)
 }

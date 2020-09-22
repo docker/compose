@@ -19,10 +19,10 @@ package compose
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
-	aciconvert "github.com/docker/compose-cli/aci/convert"
+	"github.com/compose-spec/compose-go/cli"
+
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/progress"
@@ -62,7 +62,8 @@ func runUp(ctx context.Context, opts composeOptions) error {
 		}
 		project, err := cli.ProjectFromOptions(options)
 		if opts.DomainName != "" {
-			project.Extensions = map[string]interface{}{aciconvert.ExtensionDomainName: opts.DomainName}
+			//arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
+			project.Services[0].DomainName = opts.DomainName
 		}
 		if err != nil {
 			return "", err

@@ -43,8 +43,6 @@ const (
 	StatusRunning = "Running"
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
-	// ExtensionDomainName compose extension to set ACI DNS label name
-	ExtensionDomainName = "x-aci-domain-name"
 
 	dnsSidecarImage                = "busybox:1.31.1"
 	azureFileDriverName            = "azure_file"
@@ -95,6 +93,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	}
 
 	var groupPorts []containerinstance.Port
+	var dnsLabelName *string
 	for _, s := range project.Services {
 		service := serviceConfigAciHelper(s)
 		containerDefinition, err := service.getAciContainer(volumesCache)
@@ -104,21 +103,28 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 		if service.Labels != nil && len(service.Labels) > 0 {
 			return containerinstance.ContainerGroup{}, errors.New("ACI integration does not support labels in compose applications")
 		}
-		if service.Ports != nil {
-			containerPorts, serviceGroupPorts, dnsLabelName, err := convertPortsToAci(service, p)
-			if err != nil {
-				return groupDefinition, err
+
+		containerPorts, serviceGroupPorts, serviceDomainName, err := convertPortsToAci(service)
+		if err != nil {
+			return groupDefinition, err
+		}
+		containerDefinition.ContainerProperties.Ports = &containerPorts
+		groupPorts = append(groupPorts, serviceGroupPorts...)
+		if serviceDomainName != nil {
+			if dnsLabelName != nil && *serviceDomainName != *dnsLabelName {
+				return containerinstance.ContainerGroup{}, fmt.Errorf("ACI integration does not support specifying different domain names on services in the same compose application")
 			}
-			containerDefinition.ContainerProperties.Ports = &containerPorts
-			groupPorts = append(groupPorts, serviceGroupPorts...)
-			groupDefinition.ContainerGroupProperties.IPAddress = &containerinstance.IPAddress{
-				Type:         containerinstance.Public,
-				Ports:        &groupPorts,
-				DNSNameLabel: dnsLabelName,
-			}
+			dnsLabelName = serviceDomainName
 		}
 
 		containers = append(containers, containerDefinition)
+	}
+	if len(groupPorts) > 0 {
+		groupDefinition.ContainerGroupProperties.IPAddress = &containerinstance.IPAddress{
+			Type:         containerinstance.Public,
+			Ports:        &groupPorts,
+			DNSNameLabel: dnsLabelName,
+		}
 	}
 	if len(containers) > 1 {
 		dnsSideCar := getDNSSidecar(containers)
@@ -129,7 +135,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	return groupDefinition, nil
 }
 
-func convertPortsToAci(service serviceConfigAciHelper, p types.Project) ([]containerinstance.ContainerPort, []containerinstance.Port, *string, error) {
+func convertPortsToAci(service serviceConfigAciHelper) ([]containerinstance.ContainerPort, []containerinstance.Port, *string, error) {
 	var groupPorts []containerinstance.Port
 	var containerPorts []containerinstance.ContainerPort
 	for _, portConfig := range service.Ports {
@@ -148,12 +154,8 @@ func convertPortsToAci(service serviceConfigAciHelper, p types.Project) ([]conta
 		})
 	}
 	var dnsLabelName *string = nil
-	if extension, ok := p.Extensions[ExtensionDomainName]; ok {
-		domain, ok := extension.(string)
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("could not read %s compose extension as string", ExtensionDomainName)
-		}
-		dnsLabelName = &domain
+	if service.DomainName != "" {
+		dnsLabelName = &service.DomainName
 	}
 	return containerPorts, groupPorts, dnsLabelName, nil
 }
@@ -270,7 +272,7 @@ func (p projectAciHelper) getRestartPolicy() (containerinstance.ContainerGroupRe
 					restartPolicyCondition = toAciRestartPolicy(service.Deploy.RestartPolicy.Condition)
 				}
 				if alreadySpecified && restartPolicyCondition != toAciRestartPolicy(service.Deploy.RestartPolicy.Condition) {
-					return "", errors.New("ACI integration does not support specifying different restart policies on containers in the same compose application")
+					return "", errors.New("ACI integration does not support specifying different restart policies on services in the same compose application")
 				}
 
 			}
