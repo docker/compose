@@ -41,6 +41,7 @@ type Opts struct {
 	Detach                 bool
 	Environment            []string
 	RestartPolicyCondition string
+	DomainName             string
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -74,6 +75,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		CPULimit:               r.Cpus,
 		Environment:            r.Environment,
 		RestartPolicyCondition: restartPolicy,
+		DomainName:             r.DomainName,
 	}, nil
 }
 

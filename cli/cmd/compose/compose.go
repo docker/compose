@@ -29,6 +29,7 @@ import (
 
 type composeOptions struct {
 	Name        string
+	DomainName  string
 	WorkingDir  string
 	ConfigPaths []string
 	Environment []string
@@ -60,7 +61,7 @@ func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 }
 
 // Command returns the compose command with its child commands
-func Command() *cobra.Command {
+func Command(contextType string) *cobra.Command {
 	command := &cobra.Command{
 		Short: "Docker Compose",
 		Use:   "compose",
@@ -70,7 +71,7 @@ func Command() *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(),
+		upCommand(contextType),
 		downCommand(),
 		psCommand(),
 		listCommand(),

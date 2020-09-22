@@ -335,18 +335,19 @@ func lines(output string) []string {
 
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, groupID := setupTestResourceGroup(t, c)
 
 	// Used in subtests
 	var (
-		container string
-		endpoint  string
+		container         string = "test-container"
+		endpoint          string
+		followLogsProcess *icmd.Result
 	)
 
-	container = "test-container"
-
-	var followLogsProcess *icmd.Result
 	t.Run("run attached limits", func(t *testing.T) {
+		dnsLabelName := "nginx-" + groupID
+		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
+
 		cmd := c.NewDockerCmd(
 			"run",
 			"--name", container,
@@ -354,15 +355,17 @@ func TestContainerRunAttached(t *testing.T) {
 			"--memory", "0.1G", "--cpus", "0.1",
 			"-p", "80:80",
 			"nginx",
+			"--domainname",
+			dnsLabelName,
 		)
 		followLogsProcess = icmd.StartCmd(cmd)
 
 		checkRunning := func(t poll.LogT) poll.Result {
 			res := c.RunDockerOrExitError("inspect", container)
-			if res.ExitCode == 0 {
+			if res.ExitCode == 0 && strings.Contains(res.Stdout(), `"Status": "Running"`) {
 				return poll.Success()
 			}
-			return poll.Continue("waiting for container to be running")
+			return poll.Continue("waiting for container to be running, current inspect result: \n%s", res.Combined())
 		}
 		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 
@@ -380,7 +383,8 @@ func TestContainerRunAttached(t *testing.T) {
 		assert.Assert(t, len(port.HostIP) > 0)
 		assert.Equal(t, port.ContainerPort, uint32(80))
 		assert.Equal(t, port.HostPort, uint32(80))
-		endpoint = fmt.Sprintf("http://%s:%d", port.HostIP, port.HostPort)
+		assert.Equal(t, containerInspect.Config.FQDN, fqdn)
+		endpoint = fmt.Sprintf("http://%s:%d", fqdn, port.HostPort)
 
 		assert.Assert(t, !strings.Contains(followLogsProcess.Stdout(), "/test"))
 		checkRequest := func(t poll.LogT) poll.Result {
@@ -449,7 +453,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 func TestComposeUpUpdate(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, groupID := setupTestResourceGroup(t, c)
 
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -461,8 +465,11 @@ func TestComposeUpUpdate(t *testing.T) {
 	)
 
 	t.Run("compose up", func(t *testing.T) {
+		dnsLabelName := "nginx-" + groupID
+		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
 		// Name of Compose project is taken from current folder "acie2e"
-		c.RunDockerCmd("compose", "up", "-f", composeFile)
+		c.RunDockerCmd("compose", "up", "-f", composeFile, "--domainname", dnsLabelName)
+
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
 		// Check three containers are running
@@ -489,6 +496,11 @@ func TestComposeUpUpdate(t *testing.T) {
 		b, err := ioutil.ReadAll(r.Body)
 		assert.NilError(t, err)
 		assert.Assert(t, strings.Contains(string(b), `"word":`))
+
+		endpoint = fmt.Sprintf("http://%s:%d", fqdn, containerInspect.Ports[0].HostPort)
+		r, err = HTTPGetWithRetry(endpoint+"/words/noun", 3)
+		assert.NilError(t, err)
+		assert.Equal(t, r.StatusCode, http.StatusOK)
 	})
 
 	t.Run("compose ps", func(t *testing.T) {

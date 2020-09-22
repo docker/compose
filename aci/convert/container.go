@@ -49,6 +49,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 				Ports:       ports,
 				Labels:      r.Labels,
 				Volumes:     serviceConfigVolumes,
+				DomainName:  r.DomainName,
 				Environment: toComposeEnvs(r.Environment),
 				Deploy: &types.DeployConfig{
 					Resources: types.Resources{

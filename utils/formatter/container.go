@@ -31,7 +31,7 @@ type portGroup struct {
 }
 
 // PortsToStrings returns a human readable published ports
-func PortsToStrings(ports []containers.Port) []string {
+func PortsToStrings(ports []containers.Port, fqdn string) []string {
 	groupMap := make(map[string]*portGroup)
 	var (
 		result       []string
@@ -48,6 +48,9 @@ func PortsToStrings(ports []containers.Port) []string {
 		hostIP := "0.0.0.0"
 		if port.HostIP != "" {
 			hostIP = port.HostIP
+		}
+		if fqdn != "" {
+			hostIP = fqdn
 		}
 
 		if port.HostPort != port.ContainerPort {

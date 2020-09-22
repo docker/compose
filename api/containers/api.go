@@ -57,6 +57,8 @@ type Container struct {
 // RuntimeConfig config of a created container
 type RuntimeConfig struct {
 	Env map[string]string `json:",omitempty"`
+	// FQDN is the fqdn to use
+	FQDN string `json:"fqdn,omitempty"`
 }
 
 // Port represents a published port of a container
@@ -91,6 +93,8 @@ type ContainerConfig struct {
 	Environment []string
 	// Restart policy condition
 	RestartPolicyCondition string
+	// DomainName Container NIS domain name
+	DomainName string
 }
 
 // ExecRequest contaiens configuration about an exec request

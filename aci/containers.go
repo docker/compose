@@ -63,7 +63,7 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 			if isContainerVisible(container, group, all) {
 				continue
 			}
-			c := convert.ContainerGroupToContainer(getContainerID(group, container), group, container)
+			c := convert.ContainerGroupToContainer(getContainerID(group, container), group, container, cs.ctx.Location)
 			res = append(res, c)
 		}
 	}
@@ -257,5 +257,5 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		return containers.Container{}, errdefs.ErrNotFound
 	}
 
-	return convert.ContainerGroupToContainer(containerID, cg, cc), nil
+	return convert.ContainerGroupToContainer(containerID, cg, cc, cs.ctx.Location), nil
 }

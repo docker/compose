@@ -59,7 +59,8 @@ func TestContainerGroupToContainer(t *testing.T) {
 				Ports: &[]containerinstance.Port{{
 					Port: to.Int32Ptr(80),
 				}},
-				IP: to.StringPtr("42.42.42.42"),
+				IP:           to.StringPtr("42.42.42.42"),
+				DNSNameLabel: to.StringPtr("myapp"),
 			},
 			OsType: "Linux",
 		},
@@ -102,10 +103,13 @@ func TestContainerGroupToContainer(t *testing.T) {
 			Protocol:      "tcp",
 			HostIP:        "42.42.42.42",
 		}},
+		Config: &containers.RuntimeConfig{
+			FQDN: "myapp.eastus.azurecontainer.io",
+		},
 		RestartPolicyCondition: "any",
 	}
 
-	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer)
+	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer, "eastus")
 	assert.DeepEqual(t, container, expectedContainer)
 }
 
@@ -143,7 +147,7 @@ func TestContainerGroupToServiceStatus(t *testing.T) {
 		Desired:  1,
 	}
 
-	container := ContainerGroupToServiceStatus("myContainerID", myContainerGroup, myContainer)
+	container := ContainerGroupToServiceStatus("myContainerID", myContainerGroup, myContainer, "eastus")
 	assert.DeepEqual(t, container, expectedService)
 }
 
@@ -366,7 +370,7 @@ func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
 	}
 
 	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.Error(t, err, "ACI integration does not support specifying different restart policies on containers in the same compose application")
+	assert.Error(t, err, "ACI integration does not support specifying different restart policies on services in the same compose application")
 }
 
 func TestLabelsErrorMessage(t *testing.T) {
@@ -448,6 +452,88 @@ func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
 	assert.Assert(t, is.Len(groupPorts, 2))
 	assert.Equal(t, *groupPorts[0].Port, int32(80))
 	assert.Equal(t, *groupPorts[1].Port, int32(8080))
+	assert.Assert(t, group.IPAddress.DNSNameLabel == nil)
+}
+
+func TestComposeContainerGroupToContainerWithDomainName(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 80,
+						Target:    80,
+					},
+				},
+				DomainName: "myApp",
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 8080,
+						Target:    8080,
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+	assert.Assert(t, is.Len(*group.Containers, 3))
+
+	groupPorts := *group.IPAddress.Ports
+	assert.Assert(t, is.Len(groupPorts, 2))
+	assert.Equal(t, *groupPorts[0].Port, int32(80))
+	assert.Equal(t, *groupPorts[1].Port, int32(8080))
+	assert.Equal(t, *group.IPAddress.DNSNameLabel, "myApp")
+}
+
+func TestComposeContainerGroupToContainerErrorWhenSeveralDomainNames(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:       "service1",
+				Image:      "image1",
+				DomainName: "myApp",
+			},
+			{
+				Name:       "service2",
+				Image:      "image2",
+				DomainName: "myApp2",
+			},
+		},
+	}
+
+	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.Error(t, err, "ACI integration does not support specifying different domain names on services in the same compose application")
+}
+
+// ACI fails if group definition IPAddress has no ports
+func TestComposeContainerGroupToContainerIgnoreDomainNameWithoutPorts(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:       "service1",
+				Image:      "image1",
+				DomainName: "myApp",
+			},
+			{
+				Name:       "service2",
+				Image:      "image2",
+				DomainName: "myApp",
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+	assert.Assert(t, is.Len(*group.Containers, 3))
+	assert.Assert(t, group.IPAddress == nil)
 }
 
 func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {

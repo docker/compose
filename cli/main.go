@@ -115,7 +115,6 @@ func main() {
 		contextcmd.Command(),
 		cmd.PsCommand(),
 		cmd.ServeCommand(),
-		run.Command(),
 		cmd.ExecCommand(),
 		cmd.LogsCommand(),
 		cmd.RmCommand(),
@@ -127,7 +126,6 @@ func main() {
 		cmd.StopCommand(),
 		cmd.KillCommand(),
 		cmd.SecretCommand(),
-		compose.Command(),
 
 		// Place holders
 		cmd.EcsCommand(),
@@ -179,6 +177,11 @@ func main() {
 	if cc != nil {
 		ctype = cc.Type()
 	}
+
+	root.AddCommand(
+		run.Command(ctype),
+		compose.Command(ctype),
+	)
 
 	if ctype == store.AciContextType {
 		// we can also pass ctype as a parameter to the volume command and customize subcommands, flags, etc. when we have other backend implementations

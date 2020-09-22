@@ -18,15 +18,25 @@ package run
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
 
 func TestHelp(t *testing.T) {
 	var b bytes.Buffer
-	c := Command()
+	c := Command("aci")
 	c.SetOutput(&b)
 	_ = c.Help()
 	golden.Assert(t, b.String(), "run-help.golden")
+}
+
+func TestHelpNoDomainFlag(t *testing.T) {
+	var b bytes.Buffer
+	c := Command("default")
+	c.SetOutput(&b)
+	_ = c.Help()
+	assert.Assert(t, !strings.Contains(b.String(), "domainname"))
 }
