@@ -115,7 +115,7 @@ if [ $(is_new_cli "docker") -eq 1 ]; then
 		download_dir=$($sh_c 'mktemp -d')
 		$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
 		$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
-		$sudo_sh_c "install -m 775 ${download_dir}/docker-linux-amd64 /usr/local/bin/docker"
+		$sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
 		exit 0
 	fi
 	echo "You already have the Docker Compose CLI installed, in a different location."
