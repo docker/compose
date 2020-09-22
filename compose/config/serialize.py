@@ -44,7 +44,7 @@ yaml.SafeDumper.add_representer(types.ServicePort, serialize_dict_type)
 
 
 def denormalize_config(config, image_digests=None):
-    result = {'version': str(config.version)}
+    result = {'version': str(config.config_version)}
     denormalized_services = [
         denormalize_service_dict(
             service_dict,

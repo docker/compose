@@ -168,12 +168,14 @@ class ConfigTest(unittest.TestCase):
                 }
             })
         )
+        assert cfg.config_version == VERSION
         assert cfg.version == VERSION
 
         for version in ['2', '2.0', '2.1', '2.2', '2.3',
                         '3', '3.0', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8']:
             cfg = config.load(build_config_details({'version': version}))
-            assert cfg.version == version
+            assert cfg.config_version == version
+            assert cfg.version == VERSION
 
     def test_v1_file_version(self):
         cfg = config.load(build_config_details({'web': {'image': 'busybox'}}))
@@ -5387,7 +5389,7 @@ class SerializeTest(unittest.TestCase):
         assert serialized_config['secrets']['two'] == {'external': True, 'name': 'two'}
 
     def test_serialize_ports(self):
-        config_dict = config.Config(version=VERSION, services=[
+        config_dict = config.Config(config_version=VERSION, version=VERSION, services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, None)],
                 'image': 'alpine',
@@ -5398,8 +5400,20 @@ class SerializeTest(unittest.TestCase):
         serialized_config = yaml.safe_load(serialize_config(config_dict))
         assert [{'published': 8080, 'target': 80}] == serialized_config['services']['web']['ports']
 
+    def test_serialize_ports_v1(self):
+        config_dict = config.Config(config_version=V1, version=V1, services=[
+            {
+                'ports': [types.ServicePort('80', '8080', None, None, None)],
+                'image': 'alpine',
+                'name': 'web'
+            }
+        ], volumes={}, networks={}, secrets={}, configs={})
+
+        serialized_config = yaml.safe_load(serialize_config(config_dict))
+        assert ['8080:80/tcp'] == serialized_config['services']['web']['ports']
+
     def test_serialize_ports_with_ext_ip(self):
-        config_dict = config.Config(version=VERSION, services=[
+        config_dict = config.Config(config_version=VERSION, version=VERSION, services=[
             {
                 'ports': [types.ServicePort('80', '8080', None, None, '127.0.0.1')],
                 'image': 'alpine',

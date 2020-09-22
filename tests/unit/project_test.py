@@ -28,6 +28,7 @@ from compose.service import Service
 
 def build_config(**kwargs):
     return Config(
+        config_version=kwargs.get('config_version', VERSION),
         version=kwargs.get('version', VERSION),
         services=kwargs.get('services'),
         volumes=kwargs.get('volumes'),
