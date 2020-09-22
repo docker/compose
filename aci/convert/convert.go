@@ -49,6 +49,7 @@ const (
 	azureFileDriverName            = "azure_file"
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
+	volumeReadOnly                 = "read_only"
 	secretInlineMark               = "inline:"
 )
 
@@ -69,9 +70,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	}
 	allVolumes := append(volumesSlice, secretVolumes...)
 	var volumes *[]containerinstance.Volume
-	if len(allVolumes) == 0 {
-		volumes = nil
-	} else {
+	if len(allVolumes) > 0 {
 		volumes = &allVolumes
 	}
 
@@ -213,6 +212,14 @@ func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.St
 			if !ok {
 				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
 			}
+			readOnly, ok := v.DriverOpts[volumeReadOnly]
+			if !ok {
+				readOnly = "false"
+			}
+			ro, err := strconv.ParseBool(readOnly)
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid mode %q for volume", readOnly)
+			}
 			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
 			if err != nil {
 				return nil, nil, err
@@ -223,6 +230,7 @@ func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.St
 					ShareName:          to.StringPtr(shareName),
 					StorageAccountName: to.StringPtr(accountName),
 					StorageAccountKey:  to.StringPtr(accountKey),
+					ReadOnly:           &ro,
 				},
 			}
 			azureFileVolumesMap[name] = true
