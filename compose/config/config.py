@@ -457,9 +457,6 @@ def format_device_option(entity_type, config):
     device = config['driver_opts'].get('device')
     if o and o == 'bind' and device:
         fullpath = os.path.abspath(os.path.expanduser(device))
-        if not os.path.exists(fullpath):
-            raise ConfigurationError(
-                "Device path {} does not exist.".format(fullpath))
         return fullpath
 
 
