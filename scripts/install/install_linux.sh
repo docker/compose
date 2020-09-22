@@ -14,7 +14,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# Script to install the Docker ACI integration CLI on Ubuntu (Beta).
+# Script to install the Docker Compose CLI on Ubuntu (Beta).
 
 set -eu
 
@@ -106,18 +106,19 @@ if ! [ "$(command -v curl)" ]; then
 	exit 1
 fi
 
-DOWNLOAD_URL=$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64" | cut -d : -f 2,3)
+DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64.tar.gz" | cut -d : -f 2,3)}
 
-# Check if the ACI CLI is already installed
+# Check if the Compose CLI is already installed
 if [ $(is_new_cli "docker") -eq 1 ]; then
 	if [ $(is_new_cli "/usr/local/bin/docker") -eq 1 ]; then
-		echo "You already have the Docker ACI Integration CLI installed, overriding with latest version"
+		echo "You already have the Docker Compose CLI installed, overriding with latest version"
 		download_dir=$($sh_c 'mktemp -d')
-		$sh_c "${download_cmd} ${download_dir}/docker-aci ${DOWNLOAD_URL}"
-		$sudo_sh_c "install -m 775 ${download_dir}/docker-aci /usr/local/bin/docker"
+		$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
+		$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
+		$sudo_sh_c "install -m 775 ${download_dir}/docker-linux-amd64 /usr/local/bin/docker"
 		exit 0
 	fi
-	echo "You already have the Docker ACI Integration CLI installed, in a different location."
+	echo "You already have the Docker Compose CLI installed, in a different location."
 	exit 1
 fi
 
@@ -169,7 +170,8 @@ echo "Downloading CLI..."
 
 # Download CLI to temporary directory
 download_dir=$($sh_c 'mktemp -d')
-$sh_c "${download_cmd} ${download_dir}/docker-aci ${DOWNLOAD_URL}"
+$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
+$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
 
 echo "Downloaded CLI!"
 echo "Installing CLI..."
@@ -178,7 +180,7 @@ echo "Installing CLI..."
 $sudo_sh_c "ln -s ${existing_cli_path} ${link_path}"
 
 # Install downloaded CLI
-$sudo_sh_c "install -m 775 ${download_dir}/docker-aci /usr/local/bin/docker"
+$sudo_sh_c "install -m 775 ${download_dir}/docker-linux-amd64 /usr/local/bin/docker"
 
 # Clear cache
 cleared_cache=1
@@ -196,12 +198,12 @@ if [ -n "$DRY_RUN" ]; then
 fi
 
 if [ -n "$cleared_cache" ]; then
-	# Check ACI CLI is working
+	# Check Compose CLI is working
 	if [ $(is_new_cli "docker") -eq 0 ]; then
-		echo "Error: Docker ACI Integration CLI installation error"
+		echo "Error: Docker Compose CLI installation error"
 		exit 1
 	fi
 	echo "Done!"
 else
-	echo "Please log out and in again to use the Docker ACI integration CLI"
+	echo "Please log out and in again to use the Docker Compose CLI"
 fi
