@@ -12,19 +12,24 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM ubuntu:20.04 AS base
+# Distro options: ubuntu, centos
+ARG DISTRO=ubuntu
+
+FROM ubuntu:20.04 AS base-ubuntu
 RUN apt-get update && apt-get install -y \
     curl
 RUN curl https://get.docker.com | sh
 
-FROM base AS install
+FROM centos:7 AS base-centos
+RUN curl https://get.docker.com | sh
+
+FROM base-${DISTRO} AS install
 COPY install_linux.sh /scripts/install_linux.sh
 RUN chmod +x /scripts/install_linux.sh
 ARG DOWNLOAD_URL=
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
 
-# check we can update
 FROM install AS upgrade
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
@@ -33,3 +38,5 @@ RUN docker version | grep Cloud
 # then run a docker build passing the DOWNLOAD_URL as a build arg:
 # $ cd dist/ && python3 -m http.server &
 # $ docker build -f test.Dockerfile --build-arg DOWNLOAD_URL=http://192.168.0.22:8000/docker-linux-amd64.tar.gz .
+#
+# You can specify centos or ubuntu as distros using the DISTRO build arg.
