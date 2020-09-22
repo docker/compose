@@ -532,11 +532,8 @@ func toHostEntryPtr(hosts types.HostsList) []ecs.TaskDefinition_HostEntry {
 }
 
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
-	// extract registry and namespace string from image name
-	for key, value := range service.Extensions {
-		if key == extensionPullCredentials {
-			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
-		}
+	if value, ok := service.Extensions[extensionPullCredentials]; ok {
+		return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 	}
 	return nil
 }

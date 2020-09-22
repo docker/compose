@@ -196,7 +196,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			return nil, nil, err
 		}
 
-		taskExecutionRole := createTaskExecutionRole(service, definition, template)
+		taskExecutionRole := createTaskExecutionRole(project, service, template)
 		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
 
 		taskRole := createTaskRole(service, template)
@@ -489,9 +489,9 @@ func createServiceRegistry(service types.ServiceConfig, template *cloudformation
 	return serviceRegistry
 }
 
-func createTaskExecutionRole(service types.ServiceConfig, definition *ecs.TaskDefinition, template *cloudformation.Template) string {
+func createTaskExecutionRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template) string {
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
-	policies := createPolicies(service, definition)
+	policies := createPolicies(project, service)
 	template.Resources[taskExecutionRole] = &iam.Role{
 		AssumeRolePolicyDocument: ecsTaskAssumeRolePolicyDocument,
 		Policies:                 policies,
@@ -609,18 +609,13 @@ func normalizeResourceName(s string) string {
 	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }
 
-func createPolicies(service types.ServiceConfig, taskDef *ecs.TaskDefinition) []iam.Role_Policy {
-	arns := []string{}
-	for _, container := range taskDef.ContainerDefinitions {
-		if container.RepositoryCredentials != nil {
-			arns = append(arns, container.RepositoryCredentials.CredentialsParameter)
-		}
-		if len(container.Secrets) > 0 {
-			for _, s := range container.Secrets {
-				arns = append(arns, s.ValueFrom)
-			}
-		}
-
+func createPolicies(project *types.Project, service types.ServiceConfig) []iam.Role_Policy {
+	var arns []string
+	if value, ok := service.Extensions[extensionPullCredentials]; ok {
+		arns = append(arns, value.(string))
+	}
+	for _, secret := range service.Secrets {
+		arns = append(arns, project.Secrets[secret.Source].Name)
 	}
 	if len(arns) > 0 {
 		return []iam.Role_Policy{
