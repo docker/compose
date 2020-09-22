@@ -107,7 +107,7 @@
         ],
         "NetworkConfiguration": {
           "AwsvpcConfiguration": {
-            "AssignPublicIp": "DISABLED",
+            "AssignPublicIp": "ENABLED",
             "SecurityGroups": [
               {
                 "Ref": "TestSimpleConvertDefaultNetwork"

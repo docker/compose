@@ -92,7 +92,7 @@ func (s sdk) CheckRequirements(ctx context.Context, region string) error {
 	if *serviceLongArnFormat != "enabled" {
 		return fmt.Errorf("this tool requires the \"new ARN resource ID format\".\n"+
 			"Check https://%s.console.aws.amazon.com/ecs/home#/settings\n"+
-			"Learn more: https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-ID-format-2", region)
+			"Learn more: https://aws.amazon.com/blogs/compute/migrating-your-amazon-ecs-deployment-to-the-new-arn-and-resource-id-format-2", region)
 	}
 	return nil
 }

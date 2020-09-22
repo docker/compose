@@ -323,8 +323,17 @@ func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl 
 const miB = 1024 * 1024
 
 func toLimits(service types.ServiceConfig) (string, string, error) {
-	// All possible CPU/mem values for Fargate
-	cpuToMem := map[int64][]types.UnitBytes{
+	mem, cpu, err := getConfiguredLimits(service)
+	if err != nil {
+		return "", "", err
+	}
+	if requireEC2(service) {
+		// just return configured limits expressed in Mb and CPU units
+		return fmt.Sprint(cpu), fmt.Sprint(mem / miB), nil
+	}
+
+	// All possible cpu/mem values for Fargate
+	fargateCPUToMem := map[int64][]types.UnitBytes{
 		256:  {512, 1024, 2048},
 		512:  {1024, 2048, 3072, 4096},
 		1024: {2048, 3072, 4096, 5120, 6144, 7168, 8192},
@@ -333,37 +342,22 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	}
 	cpuLimit := "256"
 	memLimit := "512"
-
-	if service.Deploy == nil {
+	if mem == 0 && cpu == 0 {
 		return cpuLimit, memLimit, nil
-	}
-
-	limits := service.Deploy.Resources.Limits
-	if limits == nil {
-		return cpuLimit, memLimit, nil
-	}
-
-	if limits.NanoCPUs == "" {
-		return cpuLimit, memLimit, nil
-	}
-
-	v, err := opts.ParseCPUs(limits.NanoCPUs)
-	if err != nil {
-		return "", "", err
 	}
 
 	var cpus []int64
-	for k := range cpuToMem {
+	for k := range fargateCPUToMem {
 		cpus = append(cpus, k)
 	}
 	sort.Slice(cpus, func(i, j int) bool { return cpus[i] < cpus[j] })
 
-	for _, cpu := range cpus {
-		mem := cpuToMem[cpu]
-		if v <= cpu*miB {
-			for _, m := range mem {
-				if limits.MemoryBytes <= m*miB {
-					cpuLimit = strconv.FormatInt(cpu, 10)
+	for _, fargateCPU := range cpus {
+		options := fargateCPUToMem[fargateCPU]
+		if cpu <= fargateCPU {
+			for _, m := range options {
+				if mem <= m*miB {
+					cpuLimit = strconv.FormatInt(fargateCPU, 10)
 					memLimit = strconv.FormatInt(int64(m), 10)
 					return cpuLimit, memLimit, nil
 				}
@@ -371,6 +365,27 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 		}
 	}
 	return "", "", fmt.Errorf("the resources requested are not supported by ECS/Fargate")
+}
+
+func getConfiguredLimits(service types.ServiceConfig) (types.UnitBytes, int64, error) {
+	if service.Deploy == nil {
+		return 0, 0, nil
+	}
+
+	limits := service.Deploy.Resources.Limits
+	if limits == nil {
+		return 0, 0, nil
+	}
+
+	if limits.NanoCPUs == "" {
+		return limits.MemoryBytes, 0, nil
+	}
+	v, err := opts.ParseCPUs(limits.NanoCPUs)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return limits.MemoryBytes, v / 1e6, nil
 }
 
 func toContainerReservation(service types.ServiceConfig) (string, int) {

@@ -277,7 +277,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			LoadBalancers: serviceLB,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
-					AssignPublicIp: ecsapi.AssignPublicIpDisabled,
+					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
 					SecurityGroups: serviceSecurityGroups,
 					Subnets: []string{
 						cloudformation.Ref(parameterSubnet1Id),
