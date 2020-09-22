@@ -88,13 +88,11 @@ func getCloudService() (cloud.Service, error) {
 }
 
 func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
+	containerService := newContainerService(aciCtx)
+	composeService := newComposeService(aciCtx)
 	return &aciAPIService{
-		aciContainerService: &aciContainerService{
-			ctx: aciCtx,
-		},
-		aciComposeService: &aciComposeService{
-			ctx: aciCtx,
-		},
+		aciContainerService: &containerService,
+		aciComposeService:   &composeService,
 		aciVolumeService: &aciVolumeService{
 			aciContext: aciCtx,
 		},

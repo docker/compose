@@ -21,29 +21,33 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/stretchr/testify/mock"
 
-	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
+	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 )
 
-var convertCtx = store.AciContext{
-	SubscriptionID: "subID",
-	ResourceGroup:  "rg",
-	Location:       "eu",
-}
+var (
+	convertCtx = store.AciContext{
+		SubscriptionID: "subID",
+		ResourceGroup:  "rg",
+		Location:       "eu",
+	}
+	mockStorageHelper = &mockStorageLogin{}
+)
 
 func TestProjectName(t *testing.T) {
 	project := types.Project{
 		Name: "TEST",
 	}
-	containerGroup, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	containerGroup, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 	assert.Equal(t, *containerGroup.Name, "test")
 }
@@ -157,7 +161,7 @@ func TestComposeContainerGroupToContainerWithDnsSideCarSide(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 	assert.Assert(t, is.Len(*group.Containers, 3))
 
@@ -182,12 +186,102 @@ func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
 	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
 	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
+}
+
+func TestComposeVolumes(t *testing.T) {
+	ctx := context.TODO()
+	accountName := "myAccount"
+	mockStorageHelper.On("GetAzureStorageAccountKey", ctx, accountName).Return("123456", nil)
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+			},
+		},
+		Volumes: types.Volumes{
+			"vol1": types.VolumeConfig{
+				Driver: "azure_file",
+				DriverOpts: map[string]string{
+					"share_name":           "myFileshare",
+					"storage_account_name": accountName,
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(ctx, convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+
+	assert.Assert(t, is.Len(*group.Containers, 1))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	expectedGroupVolume := containerinstance.Volume{
+		Name: to.StringPtr("vol1"),
+		AzureFile: &containerinstance.AzureFileVolume{
+			ShareName:          to.StringPtr("myFileshare"),
+			StorageAccountName: &accountName,
+			StorageAccountKey:  to.StringPtr("123456"),
+			ReadOnly:           to.BoolPtr(false),
+		},
+	}
+	assert.Equal(t, len(*group.Volumes), 1)
+	assert.DeepEqual(t, (*group.Volumes)[0], expectedGroupVolume)
+}
+
+func TestComposeVolumesRO(t *testing.T) {
+	ctx := context.TODO()
+	accountName := "myAccount"
+	mockStorageHelper.On("GetAzureStorageAccountKey", ctx, accountName).Return("123456", nil)
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+			},
+		},
+		Volumes: types.Volumes{
+			"vol1": types.VolumeConfig{
+				Driver: "azure_file",
+				DriverOpts: map[string]string{
+					"share_name":           "myFileshare",
+					"storage_account_name": accountName,
+					"read_only":            "true",
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(ctx, convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+
+	assert.Assert(t, is.Len(*group.Containers, 1))
+	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
+	expectedGroupVolume := containerinstance.Volume{
+		Name: to.StringPtr("vol1"),
+		AzureFile: &containerinstance.AzureFileVolume{
+			ShareName:          to.StringPtr("myFileshare"),
+			StorageAccountName: &accountName,
+			StorageAccountKey:  to.StringPtr("123456"),
+			ReadOnly:           to.BoolPtr(true),
+		},
+	}
+	assert.Equal(t, len(*group.Volumes), 1)
+	assert.DeepEqual(t, (*group.Volumes)[0], expectedGroupVolume)
+}
+
+type mockStorageLogin struct {
+	mock.Mock
+}
+
+func (s *mockStorageLogin) GetAzureStorageAccountKey(ctx context.Context, accountName string) (string, error) {
+	args := s.Called(ctx, accountName)
+	return args.String(0), args.Error(1)
 }
 
 func TestComposeSingleContainerRestartPolicy(t *testing.T) {
@@ -205,7 +299,7 @@ func TestComposeSingleContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
@@ -237,7 +331,7 @@ func TestComposeMultiContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 3))
@@ -271,7 +365,7 @@ func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
 		},
 	}
 
-	_, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.Error(t, err, "ACI integration does not support specifying different restart policies on containers in the same compose application")
 }
 
@@ -288,7 +382,7 @@ func TestLabelsErrorMessage(t *testing.T) {
 		},
 	}
 
-	_, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.Error(t, err, "ACI integration does not support labels in compose applications")
 }
 
@@ -302,7 +396,7 @@ func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	assert.Assert(t, is.Len(*group.Containers, 1))
@@ -336,7 +430,7 @@ func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 	assert.Assert(t, is.Len(*group.Containers, 3))
 
@@ -375,7 +469,7 @@ func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	limits := *((*group.Containers)[0]).Resources.Limits
@@ -401,7 +495,7 @@ func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	limits := *((*group.Containers)[0]).Resources.Limits
@@ -425,7 +519,7 @@ func TestComposeContainerGroupToContainerenvVar(t *testing.T) {
 		},
 	}
 
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project)
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
 	envVars := *((*group.Containers)[0]).EnvironmentVariables

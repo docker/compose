@@ -33,12 +33,20 @@ import (
 )
 
 type aciComposeService struct {
-	ctx store.AciContext
+	ctx          store.AciContext
+	storageLogin login.StorageLoginImpl
+}
+
+func newComposeService(ctx store.AciContext) aciComposeService {
+	return aciComposeService{
+		ctx:          ctx,
+		storageLogin: login.StorageLoginImpl{AciContext: ctx},
+	}
 }
 
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
-	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project, cs.storageLogin)
 	addTag(&groupDefinition, composeContainerTag)
 
 	if err != nil {
