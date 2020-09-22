@@ -37,7 +37,15 @@ import (
 )
 
 type aciContainerService struct {
-	ctx store.AciContext
+	ctx          store.AciContext
+	storageLogin login.StorageLoginImpl
+}
+
+func newContainerService(ctx store.AciContext) aciContainerService {
+	return aciContainerService{
+		ctx:          ctx,
+		storageLogin: login.StorageLoginImpl{AciContext: ctx},
+	}
 }
 
 func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers.Container, error) {
@@ -73,7 +81,7 @@ func (cs *aciContainerService) Run(ctx context.Context, r containers.ContainerCo
 	}
 
 	logrus.Debugf("Running container %q with name %q", r.Image, r.ID)
-	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, project)
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, project, cs.storageLogin)
 	if err != nil {
 		return err
 	}

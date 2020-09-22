@@ -197,7 +197,7 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("upload file", func(t *testing.T) {
-		storageLogin := login.StorageLogin{AciContext: aciContext}
+		storageLogin := login.StorageLoginImpl{AciContext: aciContext}
 
 		key, err := storageLogin.GetAzureStorageAccountKey(context.TODO(), accountName)
 		assert.NilError(t, err)

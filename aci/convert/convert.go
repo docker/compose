@@ -26,17 +26,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/utils/formatter"
-
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/utils/formatter"
 )
 
 const (
@@ -54,12 +53,9 @@ const (
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
-func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project) (containerinstance.ContainerGroup, error) {
+func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project, storageHelper login.StorageLogin) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
-	storageHelper := login.StorageLogin{
-		AciContext: aciContext,
-	}
 	volumesCache, volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, err
