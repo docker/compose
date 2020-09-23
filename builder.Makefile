@@ -32,39 +32,59 @@ GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 BINARY?=bin/docker
 BINARY_WITH_EXTENSION=$(BINARY)$(EXTENSION)
 
+WORK_DIR:=$(shell mktemp -d)
+
 TAGS:=
 ifdef BUILD_TAGS
   TAGS=-tags $(BUILD_TAGS)
 endif
 
+TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ --transform s/docker-linux-amd64/docker/ --transform s/docker-darwin-amd64/docker/
+ifneq ($(findstring bsd,$(shell tar --version)),)
+  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ -s /docker-linux-amd64/docker/ -s /docker-darwin-amd64/docker/
+endif
+
 all: cli
 
+.PHONY: protos
 protos:
 	protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
+.PHONY: cli
 cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(BINARY_WITH_EXTENSION) ./cli
 
+.PHONY: cross
 cross:
 	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
 	GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
 	GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
 
+.PHONY: test
 test:
 	go test $(TAGS) -cover $(shell go list ./... | grep -vE 'e2e')
 
+.PHONY: lint
 lint:
 	golangci-lint run --timeout 10m0s ./...
 
+.PHONY: import-restrictions
 import-restrictions:
 	import-restrictions --configuration import-restrictions.yaml
 
+.PHONY: check-licese-headers
 check-license-headers:
 	./scripts/validate/fileheader
 
+.PHONY: check-go-mod
 check-go-mod:
 	./scripts/validate/check-go-mod
 
-FORCE:
-
-.PHONY: all protos cli cross test lint
+.PHONY: package
+package: cross
+	mkdir -p dist
+	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64
+	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64
+	cp $(BINARY)-windows-amd64.exe $(WORK_DIR)/docker.exe
+	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe
+	rm -r $(WORK_DIR)
