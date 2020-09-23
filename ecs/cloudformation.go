@@ -222,10 +222,8 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			for _, port := range service.Ports {
 				protocol := strings.ToUpper(port.Protocol)
 				if getLoadBalancerType(project) == elbv2.LoadBalancerTypeEnumApplication {
-					protocol = elbv2.ProtocolEnumHttps
-					if port.Published == 80 {
-						protocol = elbv2.ProtocolEnumHttp
-					}
+					// we don't set Https as a certificate must be specified for HTTPS listeners
+					protocol = elbv2.ProtocolEnumHttp
 				}
 				if loadBalancerARN != "" {
 					targetGroupName := createTargetGroup(project, service, port, template, protocol)
@@ -254,9 +252,11 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			return nil, nil, err
 		}
 
+		assignPublicIP := ecsapi.AssignPublicIpEnabled
 		launchType := ecsapi.LaunchTypeFargate
 		platformVersion := "1.4.0" // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
 		if requireEC2(service) {
+			assignPublicIP = ecsapi.AssignPublicIpDisabled
 			launchType = ecsapi.LaunchTypeEc2
 			platformVersion = "" // The platform version must be null when specifying an EC2 launch type
 		}
@@ -277,7 +277,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			LoadBalancers: serviceLB,
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
-					AssignPublicIp: ecsapi.AssignPublicIpEnabled,
+					AssignPublicIp: assignPublicIP,
 					SecurityGroups: serviceSecurityGroups,
 					Subnets: []string{
 						cloudformation.Ref(parameterSubnet1Id),
@@ -560,11 +560,15 @@ func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string,
 		for _, service := range project.Services {
 			if _, ok := service.Networks[net.Name]; ok {
 				for _, port := range service.Ports {
+					protocol := strings.ToUpper(port.Protocol)
+					if protocol == "" {
+						protocol = "-1"
+					}
 					ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
 						CidrIp:      "0.0.0.0/0",
 						Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
 						FromPort:    int(port.Target),
-						IpProtocol:  strings.ToUpper(port.Protocol),
+						IpProtocol:  protocol,
 						ToPort:      int(port.Target),
 					})
 				}

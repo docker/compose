@@ -329,7 +329,14 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	}
 	if requireEC2(service) {
 		// just return configured limits expressed in Mb and CPU units
-		return fmt.Sprint(cpu), fmt.Sprint(mem / miB), nil
+		var cpuLimit, memLimit string
+		if cpu > 0 {
+			cpuLimit = fmt.Sprint(cpu)
+		}
+		if mem > 0 {
+			memLimit = fmt.Sprint(mem / miB)
+		}
+		return cpuLimit, memLimit, nil
 	}
 
 	// All possible cpu/mem values for Fargate

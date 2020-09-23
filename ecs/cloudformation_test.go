@@ -299,6 +299,22 @@ services:
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "4000")
 	assert.Equal(t, def.Memory, "792")
+
+	template = convertYaml(t, `
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        reservations:
+          generic_resources: 
+            - discrete_resource_spec:
+                kind: gpus
+                value: 2
+`)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "")
+	assert.Equal(t, def.Memory, "")
 }
 func TestTaskSizeConvertFailure(t *testing.T) {
 	model := loadConfig(t, `
