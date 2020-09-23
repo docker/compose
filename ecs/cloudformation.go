@@ -452,11 +452,12 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 		port.Published,
 	)
 	template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
-		Port:       int(port.Target),
-		Protocol:   protocol,
-		Tags:       projectTags(project),
-		VpcId:      cloudformation.Ref(parameterVPCId),
-		TargetType: elbv2.TargetTypeEnumIp,
+		HealthCheckEnabled: false,
+		Port:               int(port.Target),
+		Protocol:           protocol,
+		Tags:               projectTags(project),
+		TargetType:         elbv2.TargetTypeEnumIp,
+		VpcId:              cloudformation.Ref(parameterVPCId),
 	}
 	return targetGroupName
 }
