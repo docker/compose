@@ -25,6 +25,7 @@ import (
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	volumesv1 "github.com/docker/compose-cli/protos/volumes/v1"
 	"github.com/docker/compose-cli/server/proxy/streams"
 )
 
@@ -46,6 +47,7 @@ func Client(ctx context.Context) *client.Client {
 type Proxy interface {
 	containersv1.ContainersServer
 	streamsv1.StreamingServer
+	volumesv1.VolumesServer
 	ContextsProxy() contextsv1.ContextsServer
 }
 
