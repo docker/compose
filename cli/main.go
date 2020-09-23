@@ -209,7 +209,7 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx, root)
 
-		checkIfUnknownCommandExistInDefaultContext(err, currentContext, root)
+		checkIfUnknownCommandExistInDefaultContext(err, currentContext, root, ctype)
 
 		exit(root, currentContext, err, ctype)
 	}
@@ -242,14 +242,14 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
-func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string, root *cobra.Command) {
+func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string, root *cobra.Command, contextType string) {
 	submatch := unknownCommandRegexp.FindSubmatch([]byte(err.Error()))
 	if len(submatch) == 2 {
 		dockerCommand := string(submatch[1])
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
-			metrics.Track(currentContext, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+			metrics.Track(contextType, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
 			os.Exit(1)
 		}
 	}
