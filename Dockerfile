@@ -105,10 +105,8 @@ RUN --mount=target=. \
 FROM base as check-license-headers
 RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile check-license-headers
 
 FROM base as check-go-mod
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    make -f builder.Makefile check-go-mod
+RUN make -f builder.Makefile check-go-mod
