@@ -108,7 +108,7 @@ func guessMachineType(project *types.Project) (string, error) {
 
 	instanceType, err := gpufamily.
 		filter(func(m machine) bool {
-			return m.memory >= requirements.memory
+			return m.memory > requirements.memory // actual memory available for ECS tasks < total machine memory
 		}).
 		filter(func(m machine) bool {
 			return m.cpus >= requirements.cpus

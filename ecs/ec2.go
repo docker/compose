@@ -46,7 +46,10 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		return err
 	}
 
-	machineType := "g4dn.xlarge" // FIXME https://github.com/docker/compose-cli/pull/628
+	machineType, err := guessMachineType(project)
+	if err != nil {
+		return err
+	}
 
 	var securityGroups []string
 	for _, r := range networks {
