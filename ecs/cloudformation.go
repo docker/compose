@@ -34,8 +34,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
-	"github.com/compose-spec/compose-go/compatibility"
-	"github.com/compose-spec/compose-go/errdefs"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/sirupsen/logrus"
 )
@@ -49,6 +47,11 @@ const (
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+	err := b.checkCompatibility(project)
+	if err != nil {
+		return nil, err
+	}
+
 	template, networks, err := b.convert(project)
 	if err != nil {
 		return nil, err
@@ -58,36 +61,7 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 	// as "source security group" use an arbitrary network attached to service(s) who mounts target volume
 	for n, vol := range project.Volumes {
 		err := b.SDK.WithVolumeSecurityGroups(ctx, vol.Name, func(securityGroups []string) error {
-			target := securityGroups[0]
-			for _, s := range project.Services {
-				for _, v := range s.Volumes {
-					if v.Source != n {
-						continue
-					}
-					var source string
-					for net := range s.Networks {
-						network := project.Networks[net]
-						if ext, ok := network.Extensions[extensionSecurityGroup]; ok {
-							source = ext.(string)
-						} else {
-							source = networkResourceName(project, net)
-						}
-						break
-					}
-					name := fmt.Sprintf("%sNFSMount%s", s.Name, n)
-					template.Resources[name] = &ec2.SecurityGroupIngress{
-						Description:           fmt.Sprintf("Allow NFS mount for %s on %s", s.Name, n),
-						GroupId:               target,
-						SourceSecurityGroupId: cloudformation.Ref(source),
-						IpProtocol:            "tcp",
-						FromPort:              2049,
-						ToPort:                2049,
-					}
-					service := template.Resources[serviceResourceName(s.Name)].(*ecs.Service)
-					service.AWSCloudFormationDependsOn = append(service.AWSCloudFormationDependsOn, name)
-				}
-			}
-			return nil
+			return b.createNFSmountIngress(securityGroups, project, n, template)
 		})
 		if err != nil {
 			return nil, err
@@ -104,23 +78,6 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 
 // Convert a compose project into a CloudFormation template
 func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, map[string]string, error) { //nolint:gocyclo
-	var checker compatibility.Checker = &fargateCompatibilityChecker{
-		compatibility.AllowList{
-			Supported: compatibleComposeAttributes,
-		},
-	}
-	compatibility.Check(project, checker)
-	for _, err := range checker.Errors() {
-		if errdefs.IsIncompatibleError(err) {
-			logrus.Error(err.Error())
-		} else {
-			logrus.Warn(err.Error())
-		}
-	}
-	if !compatibility.IsCompatible(checker) {
-		return nil, nil, fmt.Errorf("compose file is incompatible with Amazon ECS")
-	}
-
 	template := cloudformation.NewTemplate()
 	template.Description = "CloudFormation template created by Docker for deploying applications on Amazon ECS"
 	template.Parameters[parameterClusterName] = cloudformation.Parameter{
