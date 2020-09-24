@@ -28,7 +28,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *types.Project, networks map[string]string, template *cloudformation.Template) error {
+func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *types.Project, template *cloudformation.Template) error {
 	var ec2 bool
 	for _, s := range project.Services {
 		if requireEC2(s) {
@@ -51,11 +51,6 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		return err
 	}
 
-	var securityGroups []string
-	for _, r := range networks {
-		securityGroups = append(securityGroups, r)
-	}
-
 	template.Resources["CapacityProvider"] = &ecs.CapacityProvider{
 		AutoScalingGroupProvider: &ecs.CapacityProvider_AutoScalingGroupProvider{
 			AutoScalingGroupArn: cloudformation.Ref("AutoscalingGroup"),
@@ -63,36 +58,29 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 				TargetCapacity: 100,
 			},
 		},
-		Tags:                       projectTags(project),
-		AWSCloudFormationCondition: "CreateCluster",
+		Tags: projectTags(project),
 	}
 
 	template.Resources["AutoscalingGroup"] = &autoscaling.AutoScalingGroup{
 		LaunchConfigurationName: cloudformation.Ref("LaunchConfiguration"),
 		MaxSize:                 "10", //TODO
 		MinSize:                 "1",
-		VPCZoneIdentifier: []string{
-			cloudformation.Ref(parameterSubnet1Id),
-			cloudformation.Ref(parameterSubnet2Id),
-		},
-		AWSCloudFormationCondition: "CreateCluster",
+		VPCZoneIdentifier:       b.resources.subnets,
 	}
 
 	userData := base64.StdEncoding.EncodeToString([]byte(
 		fmt.Sprintf("#!/bin/bash\necho ECS_CLUSTER=%s >> /etc/ecs/ecs.config", project.Name)))
 
 	template.Resources["LaunchConfiguration"] = &autoscaling.LaunchConfiguration{
-		ImageId:                    ami,
-		InstanceType:               machineType,
-		SecurityGroups:             securityGroups,
-		IamInstanceProfile:         cloudformation.Ref("EC2InstanceProfile"),
-		UserData:                   userData,
-		AWSCloudFormationCondition: "CreateCluster",
+		ImageId:            ami,
+		InstanceType:       machineType,
+		SecurityGroups:     b.resources.allSecurityGroups(),
+		IamInstanceProfile: cloudformation.Ref("EC2InstanceProfile"),
+		UserData:           userData,
 	}
 
 	template.Resources["EC2InstanceProfile"] = &iam.InstanceProfile{
-		Roles:                      []string{cloudformation.Ref("EC2InstanceRole")},
-		AWSCloudFormationCondition: "CreateCluster",
+		Roles: []string{cloudformation.Ref("EC2InstanceRole")},
 	}
 
 	template.Resources["EC2InstanceRole"] = &iam.Role{
@@ -100,8 +88,7 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		ManagedPolicyArns: []string{
 			ecsEC2InstanceRole,
 		},
-		Tags:                       projectTags(project),
-		AWSCloudFormationCondition: "CreateCluster",
+		Tags: projectTags(project),
 	}
 
 	cluster := template.Resources["Cluster"].(*ecs.Cluster)

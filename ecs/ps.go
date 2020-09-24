@@ -25,18 +25,15 @@ import (
 )
 
 func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
-	parameters, err := b.SDK.ListStackParameters(ctx, project)
-	if err != nil {
-		return nil, err
-	}
-	cluster := parameters[parameterClusterName]
-
 	resources, err := b.SDK.ListStackResources(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
-	servicesARN := []string{}
+	var (
+		cluster     = project
+		servicesARN []string
+	)
 	for _, r := range resources {
 		switch r.Type {
 		case "AWS::ECS::Service":
@@ -45,6 +42,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.Servi
 			cluster = r.ARN
 		}
 	}
+
 	if len(servicesARN) == 0 {
 		return nil, nil
 	}

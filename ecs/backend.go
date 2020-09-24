@@ -73,17 +73,20 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 		return nil, err
 	}
 
+	sdk := newSDK(sess)
 	return &ecsAPIService{
-		ctx:    ecsCtx,
-		Region: ecsCtx.Region,
-		SDK:    newSDK(sess),
+		ctx:       ecsCtx,
+		Region:    ecsCtx.Region,
+		SDK:       sdk,
+		resources: awsResources{sdk: sdk},
 	}, nil
 }
 
 type ecsAPIService struct {
-	ctx    store.EcsContext
-	Region string
-	SDK    sdk
+	ctx       store.EcsContext
+	Region    string
+	SDK       sdk
+	resources awsResources
 }
 
 func (a *ecsAPIService) ContainerService() containers.Service {

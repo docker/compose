@@ -35,15 +35,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/sirupsen/logrus"
-)
-
-const (
-	parameterClusterName     = "ParameterClusterName"
-	parameterVPCId           = "ParameterVPCId"
-	parameterSubnet1Id       = "ParameterSubnet1Id"
-	parameterSubnet2Id       = "ParameterSubnet2Id"
-	parameterLoadBalancerARN = "ParameterLoadBalancerARN"
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
@@ -52,7 +43,12 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		return nil, err
 	}
 
-	template, networks, err := b.convert(project)
+	err = b.resources.parse(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+
+	template, err := b.convert(project)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +64,7 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		}
 	}
 
-	err = b.createCapacityProvider(ctx, project, networks, template)
+	err = b.createCapacityProvider(ctx, project, template)
 	if err != nil {
 		return nil, err
 	}
@@ -77,86 +73,31 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 }
 
 // Convert a compose project into a CloudFormation template
-func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, map[string]string, error) { //nolint:gocyclo
+func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) { //nolint:gocyclo
 	template := cloudformation.NewTemplate()
-	template.Description = "CloudFormation template created by Docker for deploying applications on Amazon ECS"
-	template.Parameters[parameterClusterName] = cloudformation.Parameter{
-		Type:        "String",
-		Description: "Name of the ECS cluster to deploy to (optional)",
-	}
+	b.resources.ensure(project, template)
 
-	template.Parameters[parameterVPCId] = cloudformation.Parameter{
-		Type:        "AWS::EC2::VPC::Id",
-		Description: "ID of the VPC",
-	}
-
-	/*
-		FIXME can't set subnets: Ref("SubnetIds") see https://github.com/awslabs/goformation/issues/282
-		template.Parameters["SubnetIds"] = cloudformation.Parameter{
-			Type:        "List<AWS::EC2::Subnet::Id>",
-			Description: "The list of SubnetIds, for at least two Availability Zones in the region in your VPC",
-		}
-	*/
-	template.Parameters[parameterSubnet1Id] = cloudformation.Parameter{
-		Type:        "AWS::EC2::Subnet::Id",
-		Description: "SubnetId, for Availability Zone 1 in the region in your VPC",
-	}
-	template.Parameters[parameterSubnet2Id] = cloudformation.Parameter{
-		Type:        "AWS::EC2::Subnet::Id",
-		Description: "SubnetId, for Availability Zone 2 in the region in your VPC",
-	}
-
-	template.Parameters[parameterLoadBalancerARN] = cloudformation.Parameter{
-		Type:        "String",
-		Description: "Name of the LoadBalancer to connect to (optional)",
-	}
-
-	template.Conditions["CreateCluster"] = cloudformation.Equals("", cloudformation.Ref(parameterClusterName))
-
-	cluster := createCluster(project, template)
-
-	networks := map[string]string{}
-	for _, net := range project.Networks {
-		networks[net.Name] = convertNetwork(project, net, cloudformation.Ref(parameterVPCId), template)
-	}
-
-	for i, s := range project.Secrets {
-		if s.External.External {
-			continue
-		}
-		secret, err := ioutil.ReadFile(s.File)
+	for name, secret := range project.Secrets {
+		err := b.createSecret(project, name, secret, template)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-
-		name := fmt.Sprintf("%sSecret", normalizeResourceName(s.Name))
-		template.Resources[name] = &secretsmanager.Secret{
-			Description:  "",
-			SecretString: string(secret),
-			Tags:         projectTags(project),
-		}
-		s.Name = cloudformation.Ref(name)
-		project.Secrets[i] = s
 	}
 
-	createLogGroup(project, template)
+	b.createLogGroup(project, template)
 
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
-	createCloudMap(project, template)
-
-	loadBalancerARN := createLoadBalancer(project, template)
+	b.createCloudMap(project, template)
 
 	for _, service := range project.Services {
+		taskExecutionRole := b.createTaskExecutionRole(project, service, template)
+		taskRole := b.createTaskRole(service, template)
 
-		definition, err := convert(project, service)
+		definition, err := b.createTaskExecution(project, service)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-
-		taskExecutionRole := createTaskExecutionRole(project, service, template)
 		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
-
-		taskRole := createTaskRole(service, template)
 		if taskRole != "" {
 			definition.TaskRoleArn = cloudformation.Ref(taskRole)
 		}
@@ -165,34 +106,30 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		template.Resources[taskDefinition] = definition
 
 		var healthCheck *cloudmap.Service_HealthCheckConfig
+		serviceRegistry := b.createServiceRegistry(service, template, healthCheck)
 
-		serviceRegistry := createServiceRegistry(service, template, healthCheck)
-
-		serviceSecurityGroups := []string{}
-		for net := range service.Networks {
-			serviceSecurityGroups = append(serviceSecurityGroups, networks[net])
-		}
-
-		dependsOn := []string{}
-		serviceLB := []ecs.Service_LoadBalancer{}
-		if len(service.Ports) > 0 {
-			for _, port := range service.Ports {
-				protocol := strings.ToUpper(port.Protocol)
-				if getLoadBalancerType(project) == elbv2.LoadBalancerTypeEnumApplication {
-					// we don't set Https as a certificate must be specified for HTTPS listeners
-					protocol = elbv2.ProtocolEnumHttp
-				}
-				if loadBalancerARN != "" {
-					targetGroupName := createTargetGroup(project, service, port, template, protocol)
-					listenerName := createListener(service, port, template, targetGroupName, loadBalancerARN, protocol)
-					dependsOn = append(dependsOn, listenerName)
-					serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
-						ContainerName:  service.Name,
-						ContainerPort:  int(port.Target),
-						TargetGroupArn: cloudformation.Ref(targetGroupName),
-					})
-				}
+		var (
+			dependsOn []string
+			serviceLB []ecs.Service_LoadBalancer
+		)
+		for _, port := range service.Ports {
+			for net := range service.Networks {
+				b.createIngress(service, net, port, template)
 			}
+
+			protocol := strings.ToUpper(port.Protocol)
+			if b.resources.loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
+				// we don't set Https as a certificate must be specified for HTTPS listeners
+				protocol = elbv2.ProtocolEnumHttp
+			}
+			targetGroupName := b.createTargetGroup(project, service, port, template, protocol)
+			listenerName := b.createListener(service, port, template, targetGroupName, b.resources.loadBalancer, protocol)
+			dependsOn = append(dependsOn, listenerName)
+			serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
+				ContainerName:  service.Name,
+				ContainerPort:  int(port.Target),
+				TargetGroupArn: cloudformation.Ref(targetGroupName),
+			})
 		}
 
 		desiredCount := 1
@@ -206,7 +143,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 		minPercent, maxPercent, err := computeRollingUpdateLimits(service)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		assignPublicIP := ecsapi.AssignPublicIpEnabled
@@ -220,7 +157,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
 			AWSCloudFormationDependsOn: dependsOn,
-			Cluster:                    cluster,
+			Cluster:                    b.resources.cluster,
 			DesiredCount:               desiredCount,
 			DeploymentController: &ecs.Service_DeploymentController{
 				Type: ecsapi.DeploymentControllerTypeEcs,
@@ -235,11 +172,8 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: assignPublicIP,
-					SecurityGroups: serviceSecurityGroups,
-					Subnets: []string{
-						cloudformation.Ref(parameterSubnet1Id),
-						cloudformation.Ref(parameterSubnet2Id),
-					},
+					SecurityGroups: b.resources.serviceSecurityGroups(service),
+					Subnets:        b.resources.subnets,
 				},
 			},
 			PlatformVersion:    platformVersion,
@@ -250,10 +184,46 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			TaskDefinition:     cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
 	}
-	return template, networks, nil
+	return template, nil
 }
 
-func createLogGroup(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) createIngress(service types.ServiceConfig, net string, port types.ServicePortConfig, template *cloudformation.Template) {
+	protocol := strings.ToUpper(port.Protocol)
+	if protocol == "" {
+		protocol = "-1"
+	}
+	ingress := fmt.Sprintf("%s%dIngress", normalizeResourceName(net), port.Target)
+	template.Resources[ingress] = &ec2.SecurityGroupIngress{
+		CidrIp:      "0.0.0.0/0",
+		Description: fmt.Sprintf("%s:%d/%s on %s nextwork", service.Name, port.Target, port.Protocol, net),
+		GroupId:     b.resources.securityGroups[net],
+		FromPort:    int(port.Target),
+		IpProtocol:  protocol,
+		ToPort:      int(port.Target),
+	}
+}
+
+func (b *ecsAPIService) createSecret(project *types.Project, name string, s types.SecretConfig, template *cloudformation.Template) error {
+	if s.External.External {
+		return nil
+	}
+	sensitiveData, err := ioutil.ReadFile(s.File)
+	if err != nil {
+		return err
+	}
+
+	resource := fmt.Sprintf("%sSecret", normalizeResourceName(s.Name))
+	template.Resources[resource] = &secretsmanager.Secret{
+		Description:  fmt.Sprintf("Secret %s", s.Name),
+		SecretString: string(sensitiveData),
+		Tags:         projectTags(project),
+	}
+	s.Name = cloudformation.Ref(resource)
+	project.Secrets[name] = s
+	return nil
+}
+
+func (b *ecsAPIService) createLogGroup(project *types.Project, template *cloudformation.Template) {
 	retention := 0
 	if v, ok := project.Extensions[extensionRetention]; ok {
 		retention = v.(int)
@@ -305,74 +275,9 @@ func computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
 	return minPercent, maxPercent, nil
 }
 
-func getLoadBalancerType(project *types.Project) string {
-	for _, service := range project.Services {
-		for _, port := range service.Ports {
-			protocol := port.Protocol
-			v, ok := port.Extensions[extensionProtocol]
-			if ok {
-				protocol = v.(string)
-			}
-			if protocol == "http" || protocol == "https" {
-				continue
-			}
-			if port.Published != 80 && port.Published != 443 {
-				return elbv2.LoadBalancerTypeEnumNetwork
-			}
-		}
-	}
-	return elbv2.LoadBalancerTypeEnumApplication
-}
-
-func getLoadBalancerSecurityGroups(project *types.Project, template *cloudformation.Template) []string {
-	securityGroups := []string{}
-	for _, network := range project.Networks {
-		if !network.Internal {
-			net := convertNetwork(project, network, cloudformation.Ref(parameterVPCId), template)
-			securityGroups = append(securityGroups, net)
-		}
-	}
-	return uniqueStrings(securityGroups)
-}
-
-func createLoadBalancer(project *types.Project, template *cloudformation.Template) string {
-	ports := 0
-	for _, service := range project.Services {
-		ports += len(service.Ports)
-	}
-	if ports == 0 {
-		// Project do not expose any port (batch jobs?)
-		// So no need to create a PortPublisher
-		return ""
-	}
-
-	// load balancer names are limited to 32 characters total
-	loadBalancerName := fmt.Sprintf("%.32s", fmt.Sprintf("%sLoadBalancer", strings.Title(project.Name)))
-	// Create PortPublisher if `ParameterLoadBalancerName` is not set
-	template.Conditions["CreateLoadBalancer"] = cloudformation.Equals("", cloudformation.Ref(parameterLoadBalancerARN))
-
-	loadBalancerType := getLoadBalancerType(project)
-	securityGroups := []string{}
-	if loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
-		securityGroups = getLoadBalancerSecurityGroups(project, template)
-	}
-
-	template.Resources[loadBalancerName] = &elasticloadbalancingv2.LoadBalancer{
-		Name:           loadBalancerName,
-		Scheme:         elbv2.LoadBalancerSchemeEnumInternetFacing,
-		SecurityGroups: securityGroups,
-		Subnets: []string{
-			cloudformation.Ref(parameterSubnet1Id),
-			cloudformation.Ref(parameterSubnet2Id),
-		},
-		Tags:                       projectTags(project),
-		Type:                       loadBalancerType,
-		AWSCloudFormationCondition: "CreateLoadBalancer",
-	}
-	return cloudformation.If("CreateLoadBalancer", cloudformation.Ref(loadBalancerName), cloudformation.Ref(parameterLoadBalancerARN))
-}
-
-func createListener(service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, targetGroupName string, loadBalancerARN string, protocol string) string {
+func (b *ecsAPIService) createListener(service types.ServiceConfig, port types.ServicePortConfig,
+	template *cloudformation.Template,
+	targetGroupName string, loadBalancerARN string, protocol string) string {
 	listenerName := fmt.Sprintf(
 		"%s%s%dListener",
 		normalizeResourceName(service.Name),
@@ -401,7 +306,7 @@ func createListener(service types.ServiceConfig, port types.ServicePortConfig, t
 	return listenerName
 }
 
-func createTargetGroup(project *types.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
+func (b *ecsAPIService) createTargetGroup(project *types.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
 	targetGroupName := fmt.Sprintf(
 		"%s%s%dTargetGroup",
 		normalizeResourceName(service.Name),
@@ -414,12 +319,12 @@ func createTargetGroup(project *types.Project, service types.ServiceConfig, port
 		Protocol:           protocol,
 		Tags:               projectTags(project),
 		TargetType:         elbv2.TargetTypeEnumIp,
-		VpcId:              cloudformation.Ref(parameterVPCId),
+		VpcId:              b.resources.vpc,
 	}
 	return targetGroupName
 }
 
-func createServiceRegistry(service types.ServiceConfig, template *cloudformation.Template, healthCheck *cloudmap.Service_HealthCheckConfig) ecs.Service_ServiceRegistry {
+func (b *ecsAPIService) createServiceRegistry(service types.ServiceConfig, template *cloudformation.Template, healthCheck *cloudmap.Service_HealthCheckConfig) ecs.Service_ServiceRegistry {
 	serviceRegistration := fmt.Sprintf("%sServiceDiscoveryEntry", normalizeResourceName(service.Name))
 	serviceRegistry := ecs.Service_ServiceRegistry{
 		RegistryArn: cloudformation.GetAtt(serviceRegistration, "Arn"),
@@ -446,9 +351,9 @@ func createServiceRegistry(service types.ServiceConfig, template *cloudformation
 	return serviceRegistry
 }
 
-func createTaskExecutionRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template) string {
+func (b *ecsAPIService) createTaskExecutionRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template) string {
 	taskExecutionRole := fmt.Sprintf("%sTaskExecutionRole", normalizeResourceName(service.Name))
-	policies := createPolicies(project, service)
+	policies := b.createPolicies(project, service)
 	template.Resources[taskExecutionRole] = &iam.Role{
 		AssumeRolePolicyDocument: ecsTaskAssumeRolePolicyDocument,
 		Policies:                 policies,
@@ -460,7 +365,7 @@ func createTaskExecutionRole(project *types.Project, service types.ServiceConfig
 	return taskExecutionRole
 }
 
-func createTaskRole(service types.ServiceConfig, template *cloudformation.Template) string {
+func (b *ecsAPIService) createTaskRole(service types.ServiceConfig, template *cloudformation.Template) string {
 	taskRole := fmt.Sprintf("%sTaskRole", normalizeResourceName(service.Name))
 	rolePolicies := []iam.Role_Policy{}
 	if roles, ok := service.Extensions[extensionRole]; ok {
@@ -485,88 +390,15 @@ func createTaskRole(service types.ServiceConfig, template *cloudformation.Templa
 	return taskRole
 }
 
-func createCluster(project *types.Project, template *cloudformation.Template) string {
-	template.Resources["Cluster"] = &ecs.Cluster{
-		ClusterName:                project.Name,
-		Tags:                       projectTags(project),
-		AWSCloudFormationCondition: "CreateCluster",
-	}
-	cluster := cloudformation.If("CreateCluster", cloudformation.Ref("Cluster"), cloudformation.Ref(parameterClusterName))
-	return cluster
-}
-
-func createCloudMap(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) createCloudMap(project *types.Project, template *cloudformation.Template) {
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
-		Vpc:         cloudformation.Ref(parameterVPCId),
+		Vpc:         b.resources.vpc,
 	}
 }
 
-func convertNetwork(project *types.Project, net types.NetworkConfig, vpc string, template *cloudformation.Template) string {
-	if net.External.External {
-		return net.Name
-	}
-	if sg, ok := net.Extensions[extensionSecurityGroup]; ok {
-		logrus.Warn("to use an existing security-group, set `network.external` and `network.name` in your compose file")
-		logrus.Debugf("Security Group for network %q set by user to %q", net.Name, sg)
-		return sg.(string)
-	}
-
-	var ingresses []ec2.SecurityGroup_Ingress
-	if !net.Internal {
-		for _, service := range project.Services {
-			if _, ok := service.Networks[net.Name]; ok {
-				for _, port := range service.Ports {
-					protocol := strings.ToUpper(port.Protocol)
-					if protocol == "" {
-						protocol = "-1"
-					}
-					ingresses = append(ingresses, ec2.SecurityGroup_Ingress{
-						CidrIp:      "0.0.0.0/0",
-						Description: fmt.Sprintf("%s:%d/%s", service.Name, port.Target, port.Protocol),
-						FromPort:    int(port.Target),
-						IpProtocol:  protocol,
-						ToPort:      int(port.Target),
-					})
-				}
-			}
-		}
-	}
-
-	securityGroup := networkResourceName(project, net.Name)
-	template.Resources[securityGroup] = &ec2.SecurityGroup{
-		GroupDescription:     fmt.Sprintf("%s %s Security Group", project.Name, net.Name),
-		GroupName:            securityGroup,
-		SecurityGroupIngress: ingresses,
-		VpcId:                vpc,
-		Tags:                 networkTags(project, net),
-	}
-
-	ingress := securityGroup + "Ingress"
-	template.Resources[ingress] = &ec2.SecurityGroupIngress{
-		Description:           fmt.Sprintf("Allow communication within network %s", net.Name),
-		IpProtocol:            "-1", // all protocols
-		GroupId:               cloudformation.Ref(securityGroup),
-		SourceSecurityGroupId: cloudformation.Ref(securityGroup),
-	}
-
-	return cloudformation.Ref(securityGroup)
-}
-
-func networkResourceName(project *types.Project, network string) string {
-	return fmt.Sprintf("%s%sNetwork", normalizeResourceName(project.Name), normalizeResourceName(network))
-}
-
-func serviceResourceName(service string) string {
-	return fmt.Sprintf("%sService", normalizeResourceName(service))
-}
-
-func normalizeResourceName(s string) string {
-	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
-}
-
-func createPolicies(project *types.Project, service types.ServiceConfig) []iam.Role_Policy {
+func (b *ecsAPIService) createPolicies(project *types.Project, service types.ServiceConfig) []iam.Role_Policy {
 	var arns []string
 	if value, ok := service.Extensions[extensionPullCredentials]; ok {
 		arns = append(arns, value.(string))
@@ -593,14 +425,14 @@ func createPolicies(project *types.Project, service types.ServiceConfig) []iam.R
 	return nil
 }
 
-func uniqueStrings(items []string) []string {
-	keys := make(map[string]bool)
-	unique := []string{}
-	for _, item := range items {
-		if _, val := keys[item]; !val {
-			keys[item] = true
-			unique = append(unique, item)
-		}
-	}
-	return unique
+func networkResourceName(network string) string {
+	return fmt.Sprintf("%sNetwork", normalizeResourceName(network))
+}
+
+func serviceResourceName(service string) string {
+	return fmt.Sprintf("%sService", normalizeResourceName(service))
+}
+
+func normalizeResourceName(s string) string {
+	return strings.Title(regexp.MustCompile("[^a-zA-Z0-9]+").ReplaceAllString(s, ""))
 }

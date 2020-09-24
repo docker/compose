@@ -196,22 +196,13 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 	return len(stacks.Stacks) > 0, nil
 }
 
-func (s sdk) CreateStack(ctx context.Context, name string, template []byte, parameters map[string]string) error {
+func (s sdk) CreateStack(ctx context.Context, name string, template []byte) error {
 	logrus.Debug("Create CloudFormation stack")
-
-	param := []*cloudformation.Parameter{}
-	for name, value := range parameters {
-		param = append(param, &cloudformation.Parameter{
-			ParameterKey:   aws.String(name),
-			ParameterValue: aws.String(value),
-		})
-	}
 
 	_, err := s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 		OnFailure:        aws.String("DELETE"),
 		StackName:        aws.String(name),
 		TemplateBody:     aws.String(string(template)),
-		Parameters:       param,
 		TimeoutInMinutes: nil,
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
@@ -226,16 +217,8 @@ func (s sdk) CreateStack(ctx context.Context, name string, template []byte, para
 	return err
 }
 
-func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte, parameters map[string]string) (string, error) {
+func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
-
-	param := []*cloudformation.Parameter{}
-	for name := range parameters {
-		param = append(param, &cloudformation.Parameter{
-			ParameterKey:     aws.String(name),
-			UsePreviousValue: aws.Bool(true),
-		})
-	}
 
 	update := fmt.Sprintf("Update%s", time.Now().Format("2006-01-02-15-04-05"))
 	changeset, err := s.CF.CreateChangeSetWithContext(ctx, &cloudformation.CreateChangeSetInput{
@@ -243,7 +226,6 @@ func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte, 
 		ChangeSetType: aws.String(cloudformation.ChangeSetTypeUpdate),
 		StackName:     aws.String(name),
 		TemplateBody:  aws.String(string(template)),
-		Parameters:    param,
 		Capabilities: []*string{
 			aws.String(cloudformation.CapabilityCapabilityIam),
 		},
@@ -647,15 +629,18 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	return publicIPs, nil
 }
 
-func (s sdk) LoadBalancerExists(ctx context.Context, arn string) (bool, error) {
-	logrus.Debug("CheckRequirements if PortPublisher exists: ", arn)
+func (s sdk) LoadBalancerType(ctx context.Context, arn string) (string, error) {
+	logrus.Debug("Check if LoadBalancer exists: ", arn)
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
 		LoadBalancerArns: []*string{aws.String(arn)},
 	})
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	return len(lbs.LoadBalancers) > 0, nil
+	if len(lbs.LoadBalancers) == 0 {
+		return "", fmt.Errorf("load balancer does not exist: %s", arn)
+	}
+	return aws.StringValue(lbs.LoadBalancers[0].Type), nil
 }
 
 func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error) {

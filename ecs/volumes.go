@@ -38,7 +38,7 @@ func (b *ecsAPIService) createNFSmountIngress(securityGroups []string, project *
 				if ext, ok := network.Extensions[extensionSecurityGroup]; ok {
 					source = ext.(string)
 				} else {
-					source = networkResourceName(project, net)
+					source = networkResourceName(net)
 				}
 				break
 			}

@@ -170,13 +170,13 @@ networks:
   back-tier:
     internal: true
 `)
-	assert.Check(t, template.Resources["TestPublicNetwork"] != nil)
-	assert.Check(t, template.Resources["TestBacktierNetwork"] != nil)
-	assert.Check(t, template.Resources["TestBacktierNetworkIngress"] != nil)
-	i := template.Resources["TestPublicNetworkIngress"]
+	assert.Check(t, template.Resources["FronttierNetwork"] != nil)
+	assert.Check(t, template.Resources["BacktierNetwork"] != nil)
+	assert.Check(t, template.Resources["BacktierNetworkIngress"] != nil)
+	i := template.Resources["FronttierNetworkIngress"]
 	assert.Check(t, i != nil)
 	ingress := *i.(*ec2.SecurityGroupIngress)
-	assert.Check(t, ingress.SourceSecurityGroupId == cloudformation.Ref("TestPublicNetwork"))
+	assert.Check(t, ingress.SourceSecurityGroupId == cloudformation.Ref("FronttierNetwork"))
 
 }
 
@@ -193,19 +193,12 @@ func TestLoadBalancerTypeApplication(t *testing.T) {
     image: nginx
     ports:
       - target: 8080
-        protocol: http
-`,
-		`services:
-  test:
-    image: nginx
-    ports:
-      - target: 8080
         x-aws-protocol: http
 `,
 	}
 	for _, y := range cases {
 		template := convertYaml(t, y)
-		lb := template.Resources["TestLoadBalancer"]
+		lb := template.Resources["LoadBalancer"]
 		assert.Check(t, lb != nil)
 		loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
 		assert.Check(t, len(loadBalancer.Name) <= 32)
@@ -328,7 +321,7 @@ services:
           memory: 2043248M
 `)
 	backend := &ecsAPIService{}
-	_, _, err := backend.convert(model)
+	_, err := backend.convert(model)
 	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
@@ -341,7 +334,7 @@ services:
       - 80:80
       - 88:88
 `)
-	lb := template.Resources["TestLoadBalancer"]
+	lb := template.Resources["LoadBalancer"]
 	assert.Check(t, lb != nil)
 	loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
 	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumNetwork)
@@ -411,8 +404,13 @@ services:
 }
 
 func convertResultAsString(t *testing.T, project *types.Project) string {
-	backend := &ecsAPIService{}
-	template, _, err := backend.convert(project)
+	backend := &ecsAPIService{
+		resources: awsResources{
+			vpc:     "vpcID",
+			subnets: []string{"subnet1", "subnet2"},
+		},
+	}
+	template, err := backend.convert(project)
 	assert.NilError(t, err)
 	resultAsJSON, err := marshall(template)
 	assert.NilError(t, err)
@@ -432,7 +430,7 @@ func load(t *testing.T, paths ...string) *types.Project {
 func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	backend := &ecsAPIService{}
-	template, _, err := backend.convert(project)
+	template, err := backend.convert(project)
 	assert.NilError(t, err)
 	return template
 }
