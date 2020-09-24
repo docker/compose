@@ -13,9 +13,9 @@ using the Docker commands you already know.
 To get started, all you need is:
 * An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
   account
-* Windows: The Edge release of
+* Windows: The Stable or Edge release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
-* macOS: The Edge release of
+* macOS: The Stable or Edge release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
 * Linux:
   [Install script](INSTALL.md)
