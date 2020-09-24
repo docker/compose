@@ -1,6 +1,21 @@
 Change log
 ==========
 
+1.27.3 (2020-09-16)
+-------------------
+
+### Bugs
+
+- Merge `max_replicas_per_node` on `docker-compose config`
+
+- Fix `depends_on` serialization on `docker-compose config`
+
+- Fix scaling when some containers are not running on `docker-compose up`
+
+- Enable relative paths for `driver_opts.device` for `local` driver
+
+- Allow strings for `cpus` fields
+
 1.27.2 (2020-09-10)
 -------------------
 
