@@ -1,6 +1,6 @@
 # Mac and Windows installation
 
-The ACI integration is built into Docker Desktop **Edge**.
+The Compose CLI is built into Docker Desktop Edge and Stable.
 You can download it from these links:
 - [macOS](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
 - [Windows](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
@@ -16,7 +16,7 @@ with a fresh install of Ubuntu 20.04.
 
 ## Install script
 
-You can install the new CLI using the install script:
+You can install the Compose CLI using the install script:
 
 ```console
 curl -L https://raw.githubusercontent.com/docker/compose-cli/main/scripts/install_linux.sh | sh
@@ -24,12 +24,13 @@ curl -L https://raw.githubusercontent.com/docker/compose-cli/main/scripts/instal
 
 ## Manual install
 
-You can download the Docker ACI Integration CLI from [latest release](https://github.com/docker/compose-cli/releases/latest).
+You can download the Compose CLI from [latest release](https://github.com/docker/compose-cli/releases/latest).
 
-You will then need to make it executable:
+You will then need to extract it and make it executable:
 
 ```console
-chmod +x docker-aci
+$ tar xzf docker-linux-amd64.tar.gz
+$ chmod +x docker/docker
 ```
 
 To enable using the local Docker Engine and to use existing Docker contexts, you
@@ -61,14 +62,14 @@ You can verify that this is working by checking that the new CLI works with the
 default context:
 
 ```console
-$ ./docker-aci --context default ps
+$ ./docker/docker --context default ps
 CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
 $ echo $?
 0
 ```
 
-To make this CLI with ACI integration your default Docker CLI, you must move it
-to a directory in your `PATH` with higher priority than the existing Docker CLI.
+To make the Compose CLI your default Docker CLI, you must move it to a directory
+in your `PATH` with higher priority than the existing Docker CLI.
 
 Again on a fresh Ubuntu 20.04:
 
@@ -77,7 +78,7 @@ $ which docker
 /usr/bin/docker
 $ echo $PATH
 /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
-$ sudo mv docker-aci /usr/local/bin/docker
+$ sudo mv docker/docker /usr/local/bin/docker
 $ which docker
 /usr/local/bin/docker
 $ docker version
