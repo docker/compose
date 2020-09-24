@@ -28,7 +28,8 @@ RUN apk add --no-cache \
     protoc \
     protobuf-dev
 COPY go.* .
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 FROM base AS make-protos
 RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1
@@ -42,6 +43,7 @@ ENV CGO_ENABLED=0
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG GIT_TAG
 RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/.cache/golangci-lint \
     GIT_TAG=${GIT_TAG} \
@@ -52,6 +54,7 @@ RUN go get github.com/docker/import-restrictions
 
 FROM import-restrictions-base AS import-restrictions
 RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
     make -f builder.Makefile import-restrictions
 
 FROM base AS make-cli
@@ -61,6 +64,7 @@ ARG TARGETARCH
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} \
     GOARCH=${TARGETARCH} \
@@ -72,6 +76,7 @@ FROM base AS make-cross
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
@@ -91,6 +96,7 @@ ENV CGO_ENABLED=0
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
@@ -99,10 +105,8 @@ RUN --mount=target=. \
 FROM base as check-license-headers
 RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile check-license-headers
 
 FROM base as check-go-mod
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    make -f builder.Makefile check-go-mod
+RUN make -f builder.Makefile check-go-mod
