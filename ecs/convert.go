@@ -102,6 +102,11 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		return nil, err
 	}
 
+	var reservations *types.Resource
+	if service.Deploy != nil && service.Deploy.Resources.Reservations != nil {
+		reservations = service.Deploy.Resources.Reservations
+	}
+
 	containers := append(initContainers, ecs.TaskDefinition_ContainerDefinition{
 		Command:                service.Command,
 		DisableNetworking:      service.NetworkMode == "none",
@@ -129,7 +134,7 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		PseudoTerminal:         service.Tty,
 		ReadonlyRootFilesystem: service.ReadOnly,
 		RepositoryCredentials:  credential,
-		ResourceRequirements:   nil,
+		ResourceRequirements:   toTaskResourceRequirements(reservations),
 		StartTimeout:           0,
 		StopTimeout:            durationToInt(service.StopGracePeriod),
 		SystemControls:         toSystemControls(service.Sysctls),
@@ -139,19 +144,42 @@ func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefi
 		WorkingDirectory:       service.WorkingDir,
 	})
 
+	launchType := ecsapi.LaunchTypeFargate
+	if requireEC2(service) {
+		launchType = ecsapi.LaunchTypeEc2
+	}
+
 	return &ecs.TaskDefinition{
-		ContainerDefinitions:    containers,
-		Cpu:                     cpu,
-		Family:                  fmt.Sprintf("%s-%s", project.Name, service.Name),
-		IpcMode:                 service.Ipc,
-		Memory:                  mem,
-		NetworkMode:             ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
-		PidMode:                 service.Pid,
-		PlacementConstraints:    toPlacementConstraints(service.Deploy),
-		ProxyConfiguration:      nil,
-		RequiresCompatibilities: []string{ecsapi.LaunchTypeFargate},
-		Volumes:                 volumes,
+		ContainerDefinitions: containers,
+		Cpu:                  cpu,
+		Family:               fmt.Sprintf("%s-%s", project.Name, service.Name),
+		IpcMode:              service.Ipc,
+		Memory:               mem,
+		NetworkMode:          ecsapi.NetworkModeAwsvpc, // FIXME could be set by service.NetworkMode, Fargate only supports network mode ‘awsvpc’.
+		PidMode:              service.Pid,
+		PlacementConstraints: toPlacementConstraints(service.Deploy),
+		ProxyConfiguration:   nil,
+		RequiresCompatibilities: []string{
+			launchType,
+		},
+		Volumes: volumes,
 	}, nil
+}
+
+func toTaskResourceRequirements(reservations *types.Resource) []ecs.TaskDefinition_ResourceRequirement {
+	if reservations == nil {
+		return nil
+	}
+	var requirements []ecs.TaskDefinition_ResourceRequirement
+	for _, r := range reservations.GenericResources {
+		if r.DiscreteResourceSpec.Kind == "gpus" {
+			requirements = append(requirements, ecs.TaskDefinition_ResourceRequirement{
+				Type:  ecsapi.ResourceTypeGpu,
+				Value: fmt.Sprint(r.DiscreteResourceSpec.Value),
+			})
+		}
+	}
+	return requirements
 }
 
 func createSecretsSideCar(project *types.Project, service types.ServiceConfig, logConfiguration *ecs.TaskDefinition_LogConfiguration) (
@@ -295,8 +323,24 @@ func toSystemControls(sysctls types.Mapping) []ecs.TaskDefinition_SystemControl 
 const miB = 1024 * 1024
 
 func toLimits(service types.ServiceConfig) (string, string, error) {
+	mem, cpu, err := getConfiguredLimits(service)
+	if err != nil {
+		return "", "", err
+	}
+	if requireEC2(service) {
+		// just return configured limits expressed in Mb and CPU units
+		var cpuLimit, memLimit string
+		if cpu > 0 {
+			cpuLimit = fmt.Sprint(cpu)
+		}
+		if mem > 0 {
+			memLimit = fmt.Sprint(mem / miB)
+		}
+		return cpuLimit, memLimit, nil
+	}
+
 	// All possible cpu/mem values for Fargate
-	cpuToMem := map[int64][]types.UnitBytes{
+	fargateCPUToMem := map[int64][]types.UnitBytes{
 		256:  {512, 1024, 2048},
 		512:  {1024, 2048, 3072, 4096},
 		1024: {2048, 3072, 4096, 5120, 6144, 7168, 8192},
@@ -305,37 +349,22 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 	}
 	cpuLimit := "256"
 	memLimit := "512"
-
-	if service.Deploy == nil {
+	if mem == 0 && cpu == 0 {
 		return cpuLimit, memLimit, nil
-	}
-
-	limits := service.Deploy.Resources.Limits
-	if limits == nil {
-		return cpuLimit, memLimit, nil
-	}
-
-	if limits.NanoCPUs == "" {
-		return cpuLimit, memLimit, nil
-	}
-
-	v, err := opts.ParseCPUs(limits.NanoCPUs)
-	if err != nil {
-		return "", "", err
 	}
 
 	var cpus []int64
-	for k := range cpuToMem {
+	for k := range fargateCPUToMem {
 		cpus = append(cpus, k)
 	}
 	sort.Slice(cpus, func(i, j int) bool { return cpus[i] < cpus[j] })
 
-	for _, cpu := range cpus {
-		mem := cpuToMem[cpu]
-		if v <= cpu*miB {
-			for _, m := range mem {
-				if limits.MemoryBytes <= m*miB {
-					cpuLimit = strconv.FormatInt(cpu, 10)
+	for _, fargateCPU := range cpus {
+		options := fargateCPUToMem[fargateCPU]
+		if cpu <= fargateCPU {
+			for _, m := range options {
+				if mem <= m*miB {
+					cpuLimit = strconv.FormatInt(fargateCPU, 10)
 					memLimit = strconv.FormatInt(int64(m), 10)
 					return cpuLimit, memLimit, nil
 				}
@@ -343,6 +372,27 @@ func toLimits(service types.ServiceConfig) (string, string, error) {
 		}
 	}
 	return "", "", fmt.Errorf("the resources requested are not supported by ECS/Fargate")
+}
+
+func getConfiguredLimits(service types.ServiceConfig) (types.UnitBytes, int64, error) {
+	if service.Deploy == nil {
+		return 0, 0, nil
+	}
+
+	limits := service.Deploy.Resources.Limits
+	if limits == nil {
+		return 0, 0, nil
+	}
+
+	if limits.NanoCPUs == "" {
+		return limits.MemoryBytes, 0, nil
+	}
+	v, err := opts.ParseCPUs(limits.NanoCPUs)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return limits.MemoryBytes, v / 1e6, nil
 }
 
 func toContainerReservation(service types.ServiceConfig) (string, int) {
@@ -489,4 +539,21 @@ func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_Reposit
 		}
 	}
 	return nil
+}
+
+func requireEC2(s types.ServiceConfig) bool {
+	return gpuRequirements(s) > 0
+}
+
+func gpuRequirements(s types.ServiceConfig) int64 {
+	if deploy := s.Deploy; deploy != nil {
+		if reservations := deploy.Resources.Reservations; reservations != nil {
+			for _, resource := range reservations.GenericResources {
+				if resource.DiscreteResourceSpec.Kind == "gpus" {
+					return resource.DiscreteResourceSpec.Value
+				}
+			}
+		}
+	}
+	return 0
 }

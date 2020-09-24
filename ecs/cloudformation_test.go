@@ -248,16 +248,22 @@ func TestTaskSizeConvert(t *testing.T) {
 services:
   test:
     image: nginx
+`)
+	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "256")
+	assert.Equal(t, def.Memory, "512")
+
+	template = convertYaml(t, `
+services:
+  test:
+    image: nginx
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 2048M
-        reservations:
-          cpus: '0.5'
-          memory: 2048M
 `)
-	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "512")
 	assert.Equal(t, def.Memory, "2048")
 
@@ -270,13 +276,45 @@ services:
         limits:
           cpus: '4'
           memory: 8192M
-        reservations:
-          cpus: '4'
-          memory: 8192M
 `)
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "4096")
 	assert.Equal(t, def.Memory, "8192")
+
+	template = convertYaml(t, `
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 792Mb
+        reservations:
+          generic_resources: 
+            - discrete_resource_spec:
+                kind: gpus
+                value: 2
+`)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "4000")
+	assert.Equal(t, def.Memory, "792")
+
+	template = convertYaml(t, `
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        reservations:
+          generic_resources: 
+            - discrete_resource_spec:
+                kind: gpus
+                value: 2
+`)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "")
+	assert.Equal(t, def.Memory, "")
 }
 func TestTaskSizeConvertFailure(t *testing.T) {
 	model := loadConfig(t, `
@@ -290,7 +328,7 @@ services:
           memory: 2043248M
 `)
 	backend := &ecsAPIService{}
-	_, err := backend.convert(model)
+	_, _, err := backend.convert(model)
 	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
@@ -374,7 +412,7 @@ services:
 
 func convertResultAsString(t *testing.T, project *types.Project) string {
 	backend := &ecsAPIService{}
-	template, err := backend.convert(project)
+	template, _, err := backend.convert(project)
 	assert.NilError(t, err)
 	resultAsJSON, err := marshall(template)
 	assert.NilError(t, err)
@@ -394,7 +432,7 @@ func load(t *testing.T, paths ...string) *types.Project {
 func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	backend := &ecsAPIService{}
-	template, err := backend.convert(project)
+	template, _, err := backend.convert(project)
 	assert.NilError(t, err)
 	return template
 }

@@ -34,23 +34,47 @@ type machine struct {
 
 type family []machine
 
-var p3family = family{
+var gpufamily = family{
 	{
-		id:     "p3.2xlarge",
-		cpus:   8,
-		memory: 64 * units.GiB,
-		gpus:   2,
+		id:     "g4dn.xlarge",
+		cpus:   4,
+		memory: 16 * units.GiB,
+		gpus:   1,
 	},
 	{
-		id:     "p3.8xlarge",
+		id:     "g4dn.2xlarge",
+		cpus:   8,
+		memory: 32 * units.GiB,
+		gpus:   1,
+	},
+	{
+		id:     "g4dn.4xlarge",
+		cpus:   16,
+		memory: 64 * units.GiB,
+		gpus:   1,
+	},
+	{
+		id:     "g4dn.8xlarge",
 		cpus:   32,
-		memory: 244 * units.GiB,
+		memory: 128 * units.GiB,
+		gpus:   1,
+	},
+	{
+		id:     "g4dn.12xlarge",
+		cpus:   48,
+		memory: 192 * units.GiB,
 		gpus:   4,
 	},
 	{
-		id:     "p3.16xlarge",
+		id:     "g4dn.16xlarge",
 		cpus:   64,
-		memory: 488 * units.GiB,
+		memory: 256 * units.GiB,
+		gpus:   1,
+	},
+	{
+		id:     "g4dn.metal",
+		cpus:   96,
+		memory: 384 * units.GiB,
 		gpus:   8,
 	},
 }
@@ -82,9 +106,9 @@ func guessMachineType(project *types.Project) (string, error) {
 		return "", err
 	}
 
-	instanceType, err := p3family.
+	instanceType, err := gpufamily.
 		filter(func(m machine) bool {
-			return m.memory >= requirements.memory
+			return m.memory > requirements.memory // actual memory available for ECS tasks < total machine memory
 		}).
 		filter(func(m machine) bool {
 			return m.cpus >= requirements.cpus
@@ -92,7 +116,7 @@ func guessMachineType(project *types.Project) (string, error) {
 		filter(func(m machine) bool {
 			return m.gpus >= requirements.gpus
 		}).
-		firstOrError("none of the Amazon EC2 P3 instance types meet the requirements for memory:%d cpu:%f gpus:%d", requirements.memory, requirements.cpus, requirements.gpus)
+		firstOrError("none of the Amazon EC2 G4 instance types meet the requirements for memory:%d cpu:%f gpus:%d", requirements.memory, requirements.cpus, requirements.gpus)
 	if err != nil {
 		return "", err
 	}

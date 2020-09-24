@@ -41,7 +41,7 @@ services:
                          kind: gpus
                          value: 1
 `,
-			want:    "p3.2xlarge",
+			want:    "g4dn.xlarge",
 			wantErr: false,
 		},
 		{
@@ -58,7 +58,7 @@ services:
                          kind: gpus
                          value: 4
 `,
-			want:    "p3.8xlarge",
+			want:    "g4dn.12xlarge",
 			wantErr: false,
 		},
 		{
@@ -76,7 +76,7 @@ services:
                          kind: gpus
                          value: 2
 `,
-			want:    "p3.16xlarge",
+			want:    "g4dn.metal",
 			wantErr: false,
 		},
 		{
@@ -95,7 +95,7 @@ services:
                          kind: gpus
                          value: 2
 `,
-			want:    "p3.8xlarge",
+			want:    "g4dn.12xlarge",
 			wantErr: false,
 		},
 	}

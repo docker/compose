@@ -19,19 +19,33 @@ package ecs
 const (
 	ecsTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 	ecrReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+	ecsEC2InstanceRole     = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
 
 	actionGetSecretValue = "secretsmanager:GetSecretValue"
 	actionGetParameters  = "ssm:GetParameters"
 	actionDecrypt        = "kms:Decrypt"
 )
 
-var assumeRolePolicyDocument = PolicyDocument{
+var ecsTaskAssumeRolePolicyDocument = PolicyDocument{
 	Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
 	Statement: []PolicyStatement{
 		{
 			Effect: "Allow",
 			Principal: PolicyPrincipal{
 				Service: "ecs-tasks.amazonaws.com",
+			},
+			Action: []string{"sts:AssumeRole"},
+		},
+	},
+}
+
+var ec2InstanceAssumeRolePolicyDocument = PolicyDocument{
+	Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
+	Statement: []PolicyStatement{
+		{
+			Effect: "Allow",
+			Principal: PolicyPrincipal{
+				Service: "ec2.amazonaws.com",
 			},
 			Action: []string{"sts:AssumeRole"},
 		},
