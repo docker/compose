@@ -74,11 +74,10 @@ func (cs *aciVolumeService) List(ctx context.Context) ([]volumes.Volume, error) 
 
 // VolumeCreateOptions options to create a new ACI volume
 type VolumeCreateOptions struct {
-	Account   string
-	Fileshare string
+	Account string
 }
 
-func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (volumes.Volume, error) {
+func (cs *aciVolumeService) Create(ctx context.Context, name string, options interface{}) (volumes.Volume, error) {
 	opts, ok := options.(VolumeCreateOptions)
 	if !ok {
 		return volumes.Volume{}, errors.New("could not read Azure VolumeCreateOptions struct from generic parameter")
@@ -125,27 +124,27 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		}
 		w.Event(event(opts.Account, progress.Done, "Created"))
 	}
-	w.Event(event(opts.Fileshare, progress.Working, "Creating"))
+	w.Event(event(name, progress.Working, "Creating"))
 	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
 	if err != nil {
 		return volumes.Volume{}, err
 	}
 
-	fileShare, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, *account.Name, opts.Fileshare, "")
+	fileShare, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, *account.Name, name, "")
 	if err == nil {
-		w.Event(errorEvent(opts.Fileshare))
-		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", opts.Fileshare)
+		w.Event(errorEvent(name))
+		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", name)
 	}
 	if !fileShare.HasHTTPStatus(http.StatusNotFound) {
-		w.Event(errorEvent(opts.Fileshare))
+		w.Event(errorEvent(name))
 		return volumes.Volume{}, err
 	}
-	fileShare, err = fileShareClient.Create(ctx, cs.aciContext.ResourceGroup, *account.Name, opts.Fileshare, storage.FileShare{})
+	fileShare, err = fileShareClient.Create(ctx, cs.aciContext.ResourceGroup, *account.Name, name, storage.FileShare{})
 	if err != nil {
-		w.Event(errorEvent(opts.Fileshare))
+		w.Event(errorEvent(name))
 		return volumes.Volume{}, err
 	}
-	w.Event(event(opts.Fileshare, progress.Done, "Created"))
+	w.Event(event(name, progress.Done, "Created"))
 	return toVolume(account, *fileShare.Name), nil
 }
 
