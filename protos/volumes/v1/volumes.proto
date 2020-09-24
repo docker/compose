@@ -1,5 +1,5 @@
 //
-//  Copyright 2020 Docker, Inc.
+//  Copyright 2020 Docker Compose CLI authors
 
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -32,8 +32,15 @@ message Volume {
 	string description = 2;
 }
 
+message AciVolumeCreateOptions {
+	string storage_account = 1;
+}
+
 message VolumesCreateRequest {
-	repeated google.protobuf.Any options = 1;
+	string name = 1;
+	oneof options {
+		AciVolumeCreateOptions aci_option = 2;
+	}
 }
 
 message VolumesCreateResponse {
@@ -49,7 +56,6 @@ message VolumesListResponse {
 
 message VolumesDeleteRequest {
 	string id = 1;
-	repeated google.protobuf.Any options = 2;
 }
 
 message VolumesDeleteResponse {

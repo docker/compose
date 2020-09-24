@@ -1,15 +1,41 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
 package proxy
 
 import (
 	"context"
 
+	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/volumes"
 	volumesv1 "github.com/docker/compose-cli/protos/volumes/v1"
 )
 
 // VolumesCreate creates a volume.
 func (p *proxy) VolumesCreate(ctx context.Context, req *volumesv1.VolumesCreateRequest) (*volumesv1.VolumesCreateResponse, error) {
-	v, err := Client(ctx).VolumeService().Create(ctx, req.Options)
+	storageAccount := ""
+	aciReq := req.GetAciOption()
+	if aciReq != nil {
+		storageAccount = aciReq.StorageAccount
+	}
+	aciOpts := aci.VolumeCreateOptions{
+		Account: storageAccount,
+	}
+
+	v, err := Client(ctx).VolumeService().Create(ctx, req.Name, aciOpts)
 	if err != nil {
 		return &volumesv1.VolumesCreateResponse{}, err
 	}
@@ -33,7 +59,7 @@ func (p *proxy) VolumesList(ctx context.Context, req *volumesv1.VolumesListReque
 
 // VolumesDelete deletes a volume.
 func (p *proxy) VolumesDelete(ctx context.Context, req *volumesv1.VolumesDeleteRequest) (*volumesv1.VolumesDeleteResponse, error) {
-	err := Client(ctx).VolumeService().Delete(ctx, req.Id, req.Options)
+	err := Client(ctx).VolumeService().Delete(ctx, req.Id, nil)
 	return &volumesv1.VolumesDeleteResponse{}, err
 }
 
