@@ -92,10 +92,9 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 	account, err := accountClient.GetProperties(ctx, cs.aciContext.ResourceGroup, opts.Account, "")
 	if err == nil {
 		w.Event(event(opts.Account, progress.Done, "Use existing"))
+	} else if !account.HasHTTPStatus(http.StatusNotFound) {
+		return volumes.Volume{}, err
 	} else {
-		if account.StatusCode != http.StatusNotFound {
-			return volumes.Volume{}, err
-		}
 		result, err := accountClient.CheckNameAvailability(ctx, storage.AccountCheckNameAvailabilityParameters{
 			Name: to.StringPtr(opts.Account),
 			Type: to.StringPtr("Microsoft.Storage/storageAccounts"),
@@ -137,7 +136,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, options interface{}) (vo
 		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", opts.Fileshare)
 	}
-	if fileShare.StatusCode != http.StatusNotFound {
+	if !fileShare.HasHTTPStatus(http.StatusNotFound) {
 		w.Event(errorEvent(opts.Fileshare))
 		return volumes.Volume{}, err
 	}

@@ -73,7 +73,10 @@ func WithContextWriter(ctx context.Context, writer Writer) context.Context {
 
 // ContextWriter returns the writer from the context
 func ContextWriter(ctx context.Context) Writer {
-	s, _ := ctx.Value(writerKey{}).(Writer)
+	s, ok := ctx.Value(writerKey{}).(Writer)
+	if !ok {
+		return &noopWriter{}
+	}
 	return s
 }
 

@@ -150,6 +150,15 @@ func TestContainerRunVolume(t *testing.T) {
 		accountName = "e2e" + strconv.Itoa(int(time.Now().UnixNano()))
 	)
 
+	t.Run("check empty volume name validity", func(t *testing.T) {
+		invalidName := ""
+		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      `parameter=accountName constraint=MinLength value="" details: value length must be greater than or equal to 3`,
+		})
+	})
+
 	t.Run("check volume name validity", func(t *testing.T) {
 		invalidName := "some-storage-123"
 		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
