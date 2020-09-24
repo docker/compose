@@ -20,6 +20,7 @@ from ..utils import json_hash
 from ..utils import parse_bytes
 from ..utils import parse_nanoseconds_int
 from ..utils import splitdrive
+from ..version import ComposeVersion
 from .environment import env_vars_from_file
 from .environment import Environment
 from .environment import split_env
@@ -185,6 +186,13 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return cls(filename, load_yaml(filename))
 
     @cached_property
+    def config_version(self):
+        version = self.config.get('version', None)
+        if isinstance(version, dict):
+            return V1
+        return ComposeVersion(version) if version else self.version
+
+    @cached_property
     def version(self):
         version = self.config.get('version', None)
         if not version:
@@ -222,15 +230,13 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
                     'Version "{}" in "{}" is invalid.'
                     .format(version, self.filename))
 
-            if version.startswith("1"):
-                version = V1
-
-        if version == V1:
+        if version.startswith("1"):
             raise ConfigurationError(
                 'Version in "{}" is invalid. {}'
                 .format(self.filename, VERSION_EXPLANATION)
             )
-        return version
+
+        return VERSION
 
     def get_service(self, name):
         return self.get_service_dicts()[name]
@@ -253,8 +259,10 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
         return {} if self.version == V1 else self.config.get('configs', {})
 
 
-class Config(namedtuple('_Config', 'version services volumes networks secrets configs')):
+class Config(namedtuple('_Config', 'config_version version services volumes networks secrets configs')):
     """
+    :param config_version: configuration file version
+    :type  config_version: int
     :param version: configuration version
     :type  version: int
     :param services: List of service description dictionaries
@@ -401,9 +409,8 @@ def load(config_details, interpolate=True):
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
 
-    version = main_file.version
-
-    return Config(version, service_dicts, volumes, networks, secrets, configs)
+    return Config(main_file.config_version, main_file.version,
+                  service_dicts, volumes, networks, secrets, configs)
 
 
 def load_mapping(config_files, get_func, entity_type, working_dir=None):
@@ -450,9 +457,6 @@ def format_device_option(entity_type, config):
     device = config['driver_opts'].get('device')
     if o and o == 'bind' and device:
         fullpath = os.path.abspath(os.path.expanduser(device))
-        if not os.path.exists(fullpath):
-            raise ConfigurationError(
-                "Device path {} does not exist.".format(fullpath))
         return fullpath
 
 

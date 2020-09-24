@@ -37,6 +37,7 @@ from tests.integration.testcases import no_cluster
 
 def build_config(**kwargs):
     return config.Config(
+        config_version=kwargs.get('version', VERSION),
         version=kwargs.get('version', VERSION),
         services=kwargs.get('services'),
         volumes=kwargs.get('volumes'),

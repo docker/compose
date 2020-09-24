@@ -21,10 +21,10 @@ IMAGE="docker/compose:$VERSION"
 
 # Setup options for connecting to docker host
 if [ -z "$DOCKER_HOST" ]; then
-    DOCKER_HOST="/var/run/docker.sock"
+    DOCKER_HOST='unix:///var/run/docker.sock'
 fi
-if [ -S "$DOCKER_HOST" ]; then
-    DOCKER_ADDR="-v $DOCKER_HOST:$DOCKER_HOST -e DOCKER_HOST"
+if [ -S "${DOCKER_HOST#unix://}" ]; then
+    DOCKER_ADDR="-v ${DOCKER_HOST#unix://}:${DOCKER_HOST#unix://} -e DOCKER_HOST"
 else
     DOCKER_ADDR="-e DOCKER_HOST -e DOCKER_TLS_VERIFY -e DOCKER_CERT_PATH"
 fi

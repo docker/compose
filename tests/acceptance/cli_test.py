@@ -359,7 +359,7 @@ services:
                 'web': {
                     'command': 'true',
                     'image': 'alpine:latest',
-                    'ports': ['5643/tcp', '9999/tcp']
+                    'ports': [{'target': 5643}, {'target': 9999}]
                 }
             }
         }
@@ -374,7 +374,7 @@ services:
                 'web': {
                     'command': 'false',
                     'image': 'alpine:latest',
-                    'ports': ['5644/tcp', '9998/tcp']
+                    'ports': [{'target': 5644}, {'target': 9998}]
                 }
             }
         }
@@ -389,7 +389,7 @@ services:
                 'web': {
                     'command': 'echo uwu',
                     'image': 'alpine:3.10.1',
-                    'ports': ['3341/tcp', '4449/tcp']
+                    'ports': [{'target': 3341}, {'target': 4449}]
                 }
             }
         }
