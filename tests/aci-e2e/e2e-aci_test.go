@@ -152,7 +152,7 @@ func TestContainerRunVolume(t *testing.T) {
 
 	t.Run("check empty volume name validity", func(t *testing.T) {
 		invalidName := ""
-		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
+		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, fileshareName)
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      `parameter=accountName constraint=MinLength value="" details: value length must be greater than or equal to 3`,
@@ -161,7 +161,7 @@ func TestContainerRunVolume(t *testing.T) {
 
 	t.Run("check volume name validity", func(t *testing.T) {
 		invalidName := "some-storage-123"
-		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, "--fileshare", fileshareName)
+		res := c.RunDockerOrExitError("volume", "create", "--storage-account", invalidName, fileshareName)
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "some-storage-123 is not a valid storage account name. Storage account name must be between 3 and 24 characters in length and use numbers and lower-case letters only.",
@@ -169,7 +169,7 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("create volumes", func(t *testing.T) {
-		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", fileshareName)
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, fileshareName)
 	})
 	volumeID = accountName + "/" + fileshareName
 
@@ -181,7 +181,7 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("create second fileshare", func(t *testing.T) {
-		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "--fileshare", "dockertestshare2")
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "dockertestshare2")
 	})
 	volumeID2 := accountName + "/dockertestshare2"
 
