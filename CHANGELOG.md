@@ -1,6 +1,17 @@
 Change log
 ==========
 
+1.27.4 (2020-09-24)
+-------------------
+
+### Bugs
+
+- Remove path checks for bind mounts
+
+- Fix port rendering to output long form syntax for non-v1
+
+- Add protocol to the docker socket address
+
 1.27.3 (2020-09-16)
 -------------------
 
