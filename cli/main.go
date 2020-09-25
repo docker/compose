@@ -31,27 +31,27 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/cmd/compose"
-	"github.com/docker/compose-cli/cli/cmd/logout"
-	volume "github.com/docker/compose-cli/cli/cmd/volume"
-	"github.com/docker/compose-cli/errdefs"
-
-	// Backend registrations
-	_ "github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/cli/cmd"
+	"github.com/docker/compose-cli/cli/cmd/compose"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
+	"github.com/docker/compose-cli/cli/cmd/logout"
 	"github.com/docker/compose-cli/cli/cmd/run"
+	volume "github.com/docker/compose-cli/cli/cmd/volume"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 	"github.com/docker/compose-cli/config"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/metrics"
+
+	// Backend registrations
+	_ "github.com/docker/compose-cli/aci"
 	_ "github.com/docker/compose-cli/ecs"
 	_ "github.com/docker/compose-cli/ecs/local"
 	_ "github.com/docker/compose-cli/example"
 	_ "github.com/docker/compose-cli/local"
-	"github.com/docker/compose-cli/metrics"
 )
 
 var (
@@ -198,7 +198,7 @@ func main() {
 			os.Exit(130)
 		}
 		if ctype == store.AwsContextType {
-			exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running: 
+			exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running:
 $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 		}
 
