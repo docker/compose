@@ -19,7 +19,7 @@ with a fresh install of Ubuntu 20.04.
 You can install the Compose CLI using the install script:
 
 ```console
-curl -L https://raw.githubusercontent.com/docker/compose-cli/main/scripts/install_linux.sh | sh
+curl -L https://raw.githubusercontent.com/docker/compose-cli/main/scripts/install/install_linux.sh | sh
 ```
 
 ## Manual install

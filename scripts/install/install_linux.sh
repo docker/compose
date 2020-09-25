@@ -180,7 +180,7 @@ echo "Installing CLI..."
 $sudo_sh_c "ln -s ${existing_cli_path} ${link_path}"
 
 # Install downloaded CLI
-$sudo_sh_c "install -m 775 ${download_dir}/docker-linux-amd64 /usr/local/bin/docker"
+$sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
 
 # Clear cache
 cleared_cache=1
