@@ -44,10 +44,16 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{
-		backendType: cc.Type(),
+	client := NewClient(cc.Type(), service)
+	return &client, nil
+}
+
+// NewClient returns new client
+func NewClient(backendType string, service backend.Service) Client {
+	return Client{
+		backendType: backendType,
 		bs:          service,
-	}, nil
+	}
 }
 
 // GetCloudService returns a backend CloudService (typically login, create context)
@@ -59,6 +65,11 @@ func GetCloudService(ctx context.Context, backendType string) (cloud.Service, er
 type Client struct {
 	backendType string
 	bs          backend.Service
+}
+
+// ContextType the context type associated with backend
+func (c *Client) ContextType() string {
+	return c.backendType
 }
 
 // ContainerService returns the backend service for the current context

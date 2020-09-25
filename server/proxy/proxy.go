@@ -31,8 +31,8 @@ import (
 type clientKey struct{}
 
 // WithClient adds the client to the context
-func WithClient(ctx context.Context, c *client.Client) (context.Context, error) {
-	return context.WithValue(ctx, clientKey{}, c), nil
+func WithClient(ctx context.Context, c *client.Client) context.Context {
+	return context.WithValue(ctx, clientKey{}, c)
 }
 
 // Client returns the client from the context

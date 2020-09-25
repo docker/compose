@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/docker/compose-cli/metrics"
+	"github.com/docker/compose-cli/server/proxy"
 )
 
 var (
@@ -41,14 +42,12 @@ var (
 	}
 )
 
-func metricsServerInterceptor(clictx context.Context, client metrics.Client) grpc.UnaryServerInterceptor {
+func metricsServerInterceptor(client metrics.Client) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		currentContext, err := getIncomingContext(ctx)
-		if err != nil {
-			currentContext, err = getConfigContext(clictx)
-			if err != nil {
-				return nil, err
-			}
+		backendClient := proxy.Client(ctx)
+		contextType := ""
+		if backendClient != nil {
+			contextType = backendClient.ContextType()
 		}
 
 		data, err := handler(ctx, req)
@@ -61,7 +60,7 @@ func metricsServerInterceptor(clictx context.Context, client metrics.Client) grp
 		if command != "" {
 			client.Send(metrics.Command{
 				Command: command,
-				Context: currentContext,
+				Context: contextType,
 				Source:  metrics.APISource,
 				Status:  status,
 			})

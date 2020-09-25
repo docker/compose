@@ -33,7 +33,7 @@ func New(ctx context.Context) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			unaryServerInterceptor(ctx),
-			metricsServerInterceptor(ctx, metrics.NewClient()),
+			metricsServerInterceptor(metrics.NewClient()),
 		),
 		grpc.StreamInterceptor(streamServerInterceptor(ctx)),
 	)
