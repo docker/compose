@@ -95,7 +95,7 @@ class TemplateWithDefaults(Template):
         """.format(
         delim=re.escape('$'),
         id=r'[_a-z][_a-z0-9]*',
-        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?+])[^}]*)?',
     )
 
     @staticmethod
@@ -118,6 +118,16 @@ class TemplateWithDefaults(Template):
             if var in mapping:
                 return mapping.get(var)
             raise UnsetRequiredSubstitution(err)
+
+        elif ':+' == sep:
+            var, _, alternate = braced.partition(':+')
+            return mapping.get(var) and alternate
+        elif '+' == sep:
+            var, _, alternate = braced.partition('+')
+            if var not in mapping:
+                return None
+            else:
+                return alternate
 
     # Modified from python2.7/string.py
     def substitute(self, mapping):

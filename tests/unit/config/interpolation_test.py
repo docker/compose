@@ -398,6 +398,21 @@ def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
 
 
+def test_interpolate_with_alternate(defaults_interpolator):
+    assert defaults_interpolator("ok ${FOO:+def}") == "ok def"
+    assert defaults_interpolator("ok ${FOO+def}") == "ok def"
+
+
+def test_interpolate_missing_with_alternate(defaults_interpolator):
+    assert defaults_interpolator("ok ${missing:+def}") == "ok "
+    assert defaults_interpolator("ok ${missing+def}") == "ok "
+
+
+def test_interpolate_with_empty_and_alternate_value(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:+def}") == "ok "
+    assert defaults_interpolator("ok ${BAR+def}") == "ok def"
+
+
 def test_interpolate_mandatory_values(defaults_interpolator):
     assert defaults_interpolator("ok ${FOO:?bar}") == "ok first"
     assert defaults_interpolator("ok ${FOO?bar}") == "ok first"
