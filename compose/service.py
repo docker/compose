@@ -82,6 +82,7 @@ HOST_CONFIG_KEYS = [
     'dns_opt',
     'env_file',
     'extra_hosts',
+    'flags',
     'group_add',
     'init',
     'ipc',
@@ -1123,6 +1124,7 @@ class Service:
             gzip=gzip,
             isolation=build_opts.get('isolation', self.options.get('isolation', None)),
             platform=self.platform,
+            flags=build_opts.get('flags'),
         )
 
         try:
@@ -1781,7 +1783,7 @@ class _CLIBuilder:
               decode=False, buildargs=None, gzip=False, shmsize=None,
               labels=None, cache_from=None, target=None, network_mode=None,
               squash=None, extra_hosts=None, platform=None, isolation=None,
-              use_config_proxy=True):
+              use_config_proxy=True, flags=None):
         """
         Args:
             path (str): Path to the directory containing the Dockerfile
@@ -1853,6 +1855,7 @@ class _CLIBuilder:
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
+        command_builder.add_manual_args(flags)
         args = command_builder.build([path])
 
         magic_word = "Successfully built "
@@ -1895,6 +1898,10 @@ class _CommandBuilder:
     def add_flag(self, name, flag):
         if flag:
             self._args.extend([name])
+
+    def add_manual_args(self, flags):
+        if (flags != '') and (flags is not None):
+            self._args.extend([flag for flag in flags.split(' ') if flag != ''])
 
     def add_params(self, name, params):
         if params:

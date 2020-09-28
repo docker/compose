@@ -83,6 +83,7 @@ DOCKER_CONFIG_KEYS = [
     'env_file',
     'environment',
     'extra_hosts',
+    'flags',
     'group_add',
     'hostname',
     'healthcheck',

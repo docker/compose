@@ -74,6 +74,7 @@
               "type": "object",
               "properties": {
                 "context": {"type": "string"},
+                "flags": {"type": "string"},
                 "dockerfile": {"type": "string"},
                 "args": {"$ref": "#/definitions/list_or_dict"},
                 "labels": {"$ref": "#/definitions/list_or_dict"},
