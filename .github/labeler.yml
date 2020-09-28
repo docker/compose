@@ -9,6 +9,7 @@ cli:
 
 api:
   - api/**/*
+  - protos/**/*
 
 ci:
   - .github/**/*
