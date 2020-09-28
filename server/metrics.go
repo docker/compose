@@ -36,9 +36,12 @@ var (
 		"/com.docker.api.protos.containers.v1.Containers/Kill":    "kill",
 		"/com.docker.api.protos.containers.v1.Containers/Inspect": "inspect",
 		"/com.docker.api.protos.containers.v1.Containers/Logs":    "logs",
-		"/com.docker.api.protos.streams.v1.Streaming/NewStream":   "",
+		"/com.docker.api.protos.streams.v1.Streaming/NewStream":   "streaming",
 		"/com.docker.api.protos.context.v1.Contexts/List":         "context ls",
 		"/com.docker.api.protos.context.v1.Contexts/SetCurrent":   "context use",
+		"/com.docker.api.protos.volumes.v1.Volumes/VolumesList":   "volume ls",
+		"/com.docker.api.protos.volumes.v1.Volumes/VolumesDelete": "volume rm",
+		"/com.docker.api.protos.volumes.v1.Volumes/VolumesCreate": "volume create",
 	}
 )
 

@@ -36,6 +36,7 @@ import (
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	volumesv1 "github.com/docker/compose-cli/protos/volumes/v1"
 	"github.com/docker/compose-cli/server/proxy"
 )
 
@@ -104,6 +105,7 @@ func setupServer() *grpc.Server {
 	p := proxy.New(ctx)
 	containersv1.RegisterContainersServer(s, p)
 	streamsv1.RegisterStreamingServer(s, p)
+	volumesv1.RegisterVolumesServer(s, p)
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
 	return s
 }

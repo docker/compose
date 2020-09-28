@@ -26,6 +26,7 @@ import (
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	volumesv1 "github.com/docker/compose-cli/protos/volumes/v1"
 	"github.com/docker/compose-cli/server"
 	"github.com/docker/compose-cli/server/proxy"
 )
@@ -64,8 +65,9 @@ func runServe(ctx context.Context, opts serveOpts) error {
 	p := proxy.New(ctx)
 
 	containersv1.RegisterContainersServer(s, p)
-	streamsv1.RegisterStreamingServer(s, p)
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
+	streamsv1.RegisterStreamingServer(s, p)
+	volumesv1.RegisterVolumesServer(s, p)
 
 	go func() {
 		<-ctx.Done()
