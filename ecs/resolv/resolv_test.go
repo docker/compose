@@ -36,11 +36,13 @@ func TestSetDomain(t *testing.T) {
 	assert.NilError(t, err)
 
 	got, err := ioutil.ReadFile(f)
+	assert.NilError(t, err)
 	golden.Assert(t, string(got), "resolv.conf.golden")
 }
 
 func touch(t *testing.T, f string) {
 	file, err := os.Create(f)
 	assert.NilError(t, err)
-	defer file.Close()
+	err = file.Close()
+	assert.NilError(t, err)
 }

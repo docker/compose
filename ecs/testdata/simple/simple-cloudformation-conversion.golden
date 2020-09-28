@@ -227,21 +227,31 @@
       "Properties": {
         "ContainerDefinitions": [
           {
-            "Environment": [
+            "Command": [
+              ".compute.internal",
+              "TestSimpleConvert.local"
+            ],
+            "Essential": "false",
+            "Image": "docker/ecs-searchdomain-sidecar",
+            "LogConfiguration": {
+              "LogDriver": "awslogs",
+              "Options": {
+                "awslogs-group": {
+                  "Ref": "LogGroup"
+                },
+                "awslogs-region": {
+                  "Ref": "AWS::Region"
+                },
+                "awslogs-stream-prefix": "TestSimpleConvert"
+              }
+            },
+            "Name": "Simple_ResolvConf_InitContainer"
+          },
+          {
+            "DependsOn": [
               {
-                "Name": "LOCALDOMAIN",
-                "Value": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      {
-                        "Ref": "AWS::Region"
-                      },
-                      ".compute.internal",
-                      " TestSimpleConvert.local"
-                    ]
-                  ]
-                }
+                "Condition": "SUCCESS",
+                "ContainerName": "Simple_ResolvConf_InitContainer"
               }
             ],
             "Essential": true,

@@ -21,6 +21,7 @@ import (
 	"strings"
 )
 
+// SetSearchDomains appends a `search` directive to resolv.conf file for domains
 func SetSearchDomains(file string, domains ...string) error {
 	search := strings.Join(domains, " ")
 
@@ -28,7 +29,7 @@ func SetSearchDomains(file string, domains ...string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	_, err = f.WriteString("\nsearch " + search)
 	return err
 }
