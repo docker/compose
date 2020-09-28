@@ -111,10 +111,7 @@ func configureContext(ctx context.Context, currentContext string, method string)
 			return nil, err
 		}
 
-		ctx, err = proxy.WithClient(ctx, c)
-		if err != nil {
-			return nil, err
-		}
+		ctx = proxy.WithClient(ctx, c)
 	}
 
 	s, err := store.New(configDir)

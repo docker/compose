@@ -26,6 +26,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/metrics"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
@@ -55,18 +60,21 @@ func TestAllMethodsHaveCorrespondingCliCommand(t *testing.T) {
 func TestTrackSuccess(t *testing.T) {
 	var mockMetrics = &mockMetricsClient{}
 	mockMetrics.On("Send", metrics.Command{Command: "ps", Context: "aci", Status: "success", Source: "api"}).Return()
-	interceptor := metricsServerInterceptor(context.TODO(), mockMetrics)
+	newClient := client.NewClient("aci", noopService{})
+	interceptor := metricsServerInterceptor(mockMetrics)
 
-	_, err := interceptor(incomingContext("aci"), nil, containerMethodRoute("List"), mockHandler(nil))
+	ctx := proxy.WithClient(incomingContext("acicontext"), &newClient)
+	_, err := interceptor(ctx, nil, containerMethodRoute("List"), mockHandler(nil))
 	assert.NilError(t, err)
 }
 
 func TestTrackSFailures(t *testing.T) {
 	var mockMetrics = &mockMetricsClient{}
-	mockMetrics.On("Send", metrics.Command{Command: "ps", Context: "default", Status: "failure", Source: "api"}).Return()
-	interceptor := metricsServerInterceptor(context.TODO(), mockMetrics)
+	newClient := client.NewClient("moby", noopService{})
+	interceptor := metricsServerInterceptor(mockMetrics)
 
-	_, err := interceptor(incomingContext("default"), nil, containerMethodRoute("Create"), mockHandler(errdefs.ErrLoginRequired))
+	ctx := proxy.WithClient(incomingContext("default"), &newClient)
+	_, err := interceptor(ctx, nil, containerMethodRoute("Create"), mockHandler(errdefs.ErrLoginRequired))
 	assert.Assert(t, err == errdefs.ErrLoginRequired)
 }
 
@@ -99,6 +107,13 @@ func setupServer() *grpc.Server {
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
 	return s
 }
+
+type noopService struct{}
+
+func (noopService) ContainerService() containers.Service { return nil }
+func (noopService) ComposeService() compose.Service      { return nil }
+func (noopService) SecretsService() secrets.Service      { return nil }
+func (noopService) VolumeService() volumes.Service       { return nil }
 
 type mockMetricsClient struct {
 	mock.Mock
