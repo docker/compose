@@ -14,32 +14,19 @@
    limitations under the License.
 */
 
-package volume
+package formatter
 
 import (
-	"bytes"
-	"testing"
-
-	"gotest.tools/assert"
-	"gotest.tools/v3/golden"
-
-	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/formatter"
+	"fmt"
+	"io"
+	"strings"
+	"text/tabwriter"
 )
 
-func TestPrintList(t *testing.T) {
-	secrets := []volumes.Volume{
-		{
-			ID:          "volume/123",
-			Description: "volume 123",
-		},
-	}
-	out := &bytes.Buffer{}
-	assert.NilError(t, printList(formatter.PRETTY, out, secrets))
-	golden.Assert(t, out.String(), "volumes-out.golden")
-
-	out.Reset()
-	assert.NilError(t, printList(formatter.JSON, out, secrets))
-	golden.Assert(t, out.String(), "volumes-out-json.golden")
-
+// PrintPrettySection prints a tabbed section on the writer parameter
+func PrintPrettySection(out io.Writer, printer func(writer io.Writer), headers ...string) error {
+	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
+	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	printer(w)
+	return w.Flush()
 }

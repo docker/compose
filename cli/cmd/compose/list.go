@@ -21,10 +21,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/formatter"
 )
 
 func listCommand() *cobra.Command {
@@ -35,8 +41,13 @@ func listCommand() *cobra.Command {
 			return runList(cmd.Context(), opts)
 		},
 	}
-	lsCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	addComposeCommonFlags(lsCmd.Flags(), &opts)
 	return lsCmd
+}
+
+func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
+	f.StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 }
 
 func runList(ctx context.Context, opts composeOptions) error {
@@ -49,10 +60,26 @@ func runList(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	err = printSection(os.Stdout, func(w io.Writer) {
-		for _, stack := range stackList {
-			fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
+	return printListFormatted(opts.Format, os.Stdout, stackList)
+}
+
+func printListFormatted(format string, out io.Writer, stackList []compose.Stack) error {
+	var err error
+	switch strings.ToLower(format) {
+	case formatter.PRETTY, "":
+		err = formatter.PrintPrettySection(out, func(w io.Writer) {
+			for _, stack := range stackList {
+				fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
+			}
+		}, "NAME", "STATUS")
+	case formatter.JSON:
+		outJSON, err := formatter.ToStandardJSON(stackList)
+		if err != nil {
+			return err
 		}
-	}, "NAME", "STATUS")
+		_, _ = fmt.Fprint(out, outJSON)
+	default:
+		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
+	}
 	return err
 }

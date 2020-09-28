@@ -112,7 +112,10 @@ func IsDefaultContextCommand(dockerCommand string) bool {
 }
 
 // ExecSilent executes a command and do redirect output to stdOut, return output
-func ExecSilent(ctx context.Context) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, ComDockerCli, os.Args[1:]...)
+func ExecSilent(ctx context.Context, args ...string) ([]byte, error) {
+	if len(args) == 0 {
+		args = os.Args[1:]
+	}
+	cmd := exec.CommandContext(ctx, ComDockerCli, args...)
 	return cmd.CombinedOutput()
 }

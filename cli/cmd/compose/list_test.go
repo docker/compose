@@ -14,32 +14,32 @@
    limitations under the License.
 */
 
-package volume
+package compose
 
 import (
 	"bytes"
 	"testing"
 
 	"gotest.tools/assert"
-	"gotest.tools/v3/golden"
+	"gotest.tools/golden"
 
-	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
 )
 
-func TestPrintList(t *testing.T) {
-	secrets := []volumes.Volume{
+func TestPrintComposeList(t *testing.T) {
+	secretList := []compose.Stack{
 		{
-			ID:          "volume/123",
-			Description: "volume 123",
+			ID:     "123",
+			Name:   "myName123",
+			Status: "Running",
 		},
 	}
 	out := &bytes.Buffer{}
-	assert.NilError(t, printList(formatter.PRETTY, out, secrets))
-	golden.Assert(t, out.String(), "volumes-out.golden")
+	assert.NilError(t, printListFormatted(formatter.PRETTY, out, secretList))
+	golden.Assert(t, out.String(), "compose-list-out.golden")
 
 	out.Reset()
-	assert.NilError(t, printList(formatter.JSON, out, secrets))
-	golden.Assert(t, out.String(), "volumes-out-json.golden")
-
+	assert.NilError(t, printListFormatted(formatter.JSON, out, secretList))
+	golden.Assert(t, out.String(), "compose-list-out-json.golden")
 }

@@ -21,12 +21,14 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/formatter"
 )
 
 type createSecretOptions struct {
@@ -105,7 +107,12 @@ func inspectSecret() *cobra.Command {
 	return cmd
 }
 
+type listSecretsOpts struct {
+	format string
+}
+
 func listSecrets() *cobra.Command {
+	var opts listSecretsOpts
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -119,10 +126,10 @@ func listSecrets() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			printList(os.Stdout, list)
-			return nil
+			return printSecretList(opts.format, os.Stdout, list)
 		},
 	}
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
 }
 
@@ -149,17 +156,23 @@ func deleteSecret() *cobra.Command {
 	return cmd
 }
 
-func printList(out io.Writer, secrets []secrets.Secret) {
-	printSection(out, func(w io.Writer) {
-		for _, secret := range secrets {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description) // nolint:errcheck
+func printSecretList(format string, out io.Writer, secrets []secrets.Secret) error {
+	var err error
+	switch strings.ToLower(format) {
+	case formatter.PRETTY, "":
+		err = formatter.PrintPrettySection(out, func(w io.Writer) {
+			for _, secret := range secrets {
+				fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description) // nolint:errcheck
+			}
+		}, "ID", "NAME", "DESCRIPTION")
+	case formatter.JSON:
+		outJSON, err := formatter.ToStandardJSON(secrets)
+		if err != nil {
+			return err
 		}
-	}, "ID", "NAME", "DESCRIPTION")
-}
-
-func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
-	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t")) // nolint:errcheck
-	printer(w)
-	w.Flush() // nolint:errcheck
+		_, _ = fmt.Fprint(out, outJSON)
+	default:
+		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
+	}
+	return err
 }

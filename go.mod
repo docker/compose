@@ -62,5 +62,6 @@ require (
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/ini.v1 v1.61.0
+	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2
 )

@@ -1,0 +1,30 @@
+[
+    {
+        "ID": "id",
+        "Status": "",
+        "Image": "nginx",
+        "Command": "",
+        "CPUTime": 0,
+        "CPULimit": 0,
+        "MemoryUsage": 0,
+        "MemoryLimit": 0,
+        "PidsCurrent": 0,
+        "PidsLimit": 0,
+        "Platform": "",
+        "RestartPolicyCondition": ""
+    },
+    {
+        "ID": "1234",
+        "Status": "",
+        "Image": "alpine",
+        "Command": "",
+        "CPUTime": 0,
+        "CPULimit": 0,
+        "MemoryUsage": 0,
+        "MemoryLimit": 0,
+        "PidsCurrent": 0,
+        "PidsLimit": 0,
+        "Platform": "",
+        "RestartPolicyCondition": ""
+    }
+]
