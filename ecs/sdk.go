@@ -704,3 +704,13 @@ func (s sdk) GetParameter(ctx context.Context, name string) (string, error) {
 
 	return ami.ImageID, nil
 }
+
+func (s sdk) SecurityGroupExists(ctx context.Context, sg string) (bool, error) {
+	desc, err := s.EC2.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{
+		GroupIds: aws.StringSlice([]string{sg}),
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(desc.SecurityGroups) > 0, nil
+}

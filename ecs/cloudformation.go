@@ -43,12 +43,12 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		return nil, err
 	}
 
-	err = b.resources.parse(ctx, project)
+	resources, err := b.parse(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
-	template, err := b.convert(project)
+	template, err := b.convert(project, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		}
 	}
 
-	err = b.createCapacityProvider(ctx, project, template)
+	err = b.createCapacityProvider(ctx, project, template, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,9 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 }
 
 // Convert a compose project into a CloudFormation template
-func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Template, error) { //nolint:gocyclo
+func (b *ecsAPIService) convert(project *types.Project, resources awsResources) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
-	b.resources.ensure(project, template)
+	b.ensureResources(&resources, project, template)
 
 	for name, secret := range project.Secrets {
 		err := b.createSecret(project, name, secret, template)
@@ -87,7 +87,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 	b.createLogGroup(project, template)
 
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
-	b.createCloudMap(project, template)
+	b.createCloudMap(project, template, resources.vpc)
 
 	for _, service := range project.Services {
 		taskExecutionRole := b.createTaskExecutionRole(project, service, template)
@@ -114,16 +114,16 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 		)
 		for _, port := range service.Ports {
 			for net := range service.Networks {
-				b.createIngress(service, net, port, template)
+				b.createIngress(service, net, port, template, resources)
 			}
 
 			protocol := strings.ToUpper(port.Protocol)
-			if b.resources.loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
+			if resources.loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
 				// we don't set Https as a certificate must be specified for HTTPS listeners
 				protocol = elbv2.ProtocolEnumHttp
 			}
-			targetGroupName := b.createTargetGroup(project, service, port, template, protocol)
-			listenerName := b.createListener(service, port, template, targetGroupName, b.resources.loadBalancer, protocol)
+			targetGroupName := b.createTargetGroup(project, service, port, template, protocol, resources.vpc)
+			listenerName := b.createListener(service, port, template, targetGroupName, resources.loadBalancer, protocol)
 			dependsOn = append(dependsOn, listenerName)
 			serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
 				ContainerName:  service.Name,
@@ -157,7 +157,7 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 
 		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
 			AWSCloudFormationDependsOn: dependsOn,
-			Cluster:                    b.resources.cluster,
+			Cluster:                    resources.cluster,
 			DesiredCount:               desiredCount,
 			DeploymentController: &ecs.Service_DeploymentController{
 				Type: ecsapi.DeploymentControllerTypeEcs,
@@ -172,8 +172,8 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
 				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 					AssignPublicIp: assignPublicIP,
-					SecurityGroups: b.resources.serviceSecurityGroups(service),
-					Subnets:        b.resources.subnets,
+					SecurityGroups: resources.serviceSecurityGroups(service),
+					Subnets:        resources.subnets,
 				},
 			},
 			PlatformVersion:    platformVersion,
@@ -187,16 +187,18 @@ func (b *ecsAPIService) convert(project *types.Project) (*cloudformation.Templat
 	return template, nil
 }
 
-func (b *ecsAPIService) createIngress(service types.ServiceConfig, net string, port types.ServicePortConfig, template *cloudformation.Template) {
+const allProtocols = "-1"
+
+func (b *ecsAPIService) createIngress(service types.ServiceConfig, net string, port types.ServicePortConfig, template *cloudformation.Template, resources awsResources) {
 	protocol := strings.ToUpper(port.Protocol)
 	if protocol == "" {
-		protocol = "-1"
+		protocol = allProtocols
 	}
 	ingress := fmt.Sprintf("%s%dIngress", normalizeResourceName(net), port.Target)
 	template.Resources[ingress] = &ec2.SecurityGroupIngress{
 		CidrIp:      "0.0.0.0/0",
 		Description: fmt.Sprintf("%s:%d/%s on %s nextwork", service.Name, port.Target, port.Protocol, net),
-		GroupId:     b.resources.securityGroups[net],
+		GroupId:     resources.securityGroups[net],
 		FromPort:    int(port.Target),
 		IpProtocol:  protocol,
 		ToPort:      int(port.Target),
@@ -306,7 +308,7 @@ func (b *ecsAPIService) createListener(service types.ServiceConfig, port types.S
 	return listenerName
 }
 
-func (b *ecsAPIService) createTargetGroup(project *types.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string) string {
+func (b *ecsAPIService) createTargetGroup(project *types.Project, service types.ServiceConfig, port types.ServicePortConfig, template *cloudformation.Template, protocol string, vpc string) string {
 	targetGroupName := fmt.Sprintf(
 		"%s%s%dTargetGroup",
 		normalizeResourceName(service.Name),
@@ -319,7 +321,7 @@ func (b *ecsAPIService) createTargetGroup(project *types.Project, service types.
 		Protocol:           protocol,
 		Tags:               projectTags(project),
 		TargetType:         elbv2.TargetTypeEnumIp,
-		VpcId:              b.resources.vpc,
+		VpcId:              vpc,
 	}
 	return targetGroupName
 }
@@ -390,11 +392,11 @@ func (b *ecsAPIService) createTaskRole(service types.ServiceConfig, template *cl
 	return taskRole
 }
 
-func (b *ecsAPIService) createCloudMap(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) createCloudMap(project *types.Project, template *cloudformation.Template, vpc string) {
 	template.Resources["CloudMap"] = &cloudmap.PrivateDnsNamespace{
 		Description: fmt.Sprintf("Service Map for Docker Compose project %s", project.Name),
 		Name:        fmt.Sprintf("%s.local", project.Name),
-		Vpc:         b.resources.vpc,
+		Vpc:         vpc,
 	}
 }
 

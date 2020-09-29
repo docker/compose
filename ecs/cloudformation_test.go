@@ -321,7 +321,7 @@ services:
           memory: 2043248M
 `)
 	backend := &ecsAPIService{}
-	_, err := backend.convert(model)
+	_, err := backend.convert(model, awsResources{})
 	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
@@ -404,13 +404,11 @@ services:
 }
 
 func convertResultAsString(t *testing.T, project *types.Project) string {
-	backend := &ecsAPIService{
-		resources: awsResources{
-			vpc:     "vpcID",
-			subnets: []string{"subnet1", "subnet2"},
-		},
-	}
-	template, err := backend.convert(project)
+	backend := &ecsAPIService{}
+	template, err := backend.convert(project, awsResources{
+		vpc:     "vpcID",
+		subnets: []string{"subnet1", "subnet2"},
+	})
 	assert.NilError(t, err)
 	resultAsJSON, err := marshall(template)
 	assert.NilError(t, err)
@@ -430,7 +428,7 @@ func load(t *testing.T, paths ...string) *types.Project {
 func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	backend := &ecsAPIService{}
-	template, err := backend.convert(project)
+	template, err := backend.convert(project, awsResources{})
 	assert.NilError(t, err)
 	return template
 }

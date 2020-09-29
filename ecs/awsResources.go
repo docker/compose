@@ -32,7 +32,6 @@ import (
 
 // awsResources hold the AWS component being used or created to support services definition
 type awsResources struct {
-	sdk              sdk
 	vpc              string
 	subnets          []string
 	cluster          string
@@ -58,101 +57,120 @@ func (r *awsResources) allSecurityGroups() []string {
 }
 
 // parse look into compose project for configured resource to use, and check they are valid
-func (r *awsResources) parse(ctx context.Context, project *types.Project) error {
-	return findProjectFnError(ctx, project,
-		r.parseClusterExtension,
-		r.parseVPCExtension,
-		r.parseLoadBalancerExtension,
-		r.parseSecurityGroupExtension,
-	)
+func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsResources, error) {
+	r := awsResources{}
+	var err error
+	r.cluster, err = b.parseClusterExtension(ctx, project)
+	if err != nil {
+		return r, err
+	}
+	r.vpc, r.subnets, err = b.parseVPCExtension(ctx, project)
+	if err != nil {
+		return r, err
+	}
+	r.loadBalancer, r.loadBalancerType, err = b.parseLoadBalancerExtension(ctx, project)
+	if err != nil {
+		return r, err
+	}
+	r.securityGroups, err = b.parseSecurityGroupExtension(ctx, project)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
 }
 
-func (r *awsResources) parseClusterExtension(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project) (string, error) {
 	if x, ok := project.Extensions[extensionCluster]; ok {
 		cluster := x.(string)
-		ok, err := r.sdk.ClusterExists(ctx, cluster)
+		ok, err := b.SDK.ClusterExists(ctx, cluster)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if !ok {
-			return fmt.Errorf("cluster does not exist: %s", cluster)
+			return "", fmt.Errorf("cluster does not exist: %s", cluster)
 		}
-		r.cluster = cluster
+		return cluster, nil
 	}
-	return nil
+	return "", nil
 }
 
-func (r *awsResources) parseVPCExtension(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project) (string, []string, error) {
+	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
-		vpc := x.(string)
-		err := r.sdk.CheckVPC(ctx, vpc)
+		vpc = x.(string)
+		err := b.SDK.CheckVPC(ctx, vpc)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
-		r.vpc = vpc
+
 	} else {
-		defaultVPC, err := r.sdk.GetDefaultVPC(ctx)
+		defaultVPC, err := b.SDK.GetDefaultVPC(ctx)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
-		r.vpc = defaultVPC
+		vpc = defaultVPC
 	}
 
-	subNets, err := r.sdk.GetSubNets(ctx, r.vpc)
+	subNets, err := b.SDK.GetSubNets(ctx, vpc)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	if len(subNets) < 2 {
-		return fmt.Errorf("VPC %s should have at least 2 associated subnets in different availability zones", r.vpc)
+		return "", nil, fmt.Errorf("VPC %s should have at least 2 associated subnets in different availability zones", vpc)
 	}
-	r.subnets = subNets
-	return nil
+	return vpc, subNets, nil
 }
 
-func (r *awsResources) parseLoadBalancerExtension(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (string, string, error) {
 	if x, ok := project.Extensions[extensionLoadBalancer]; ok {
 		loadBalancer := x.(string)
-		loadBalancerType, err := r.sdk.LoadBalancerType(ctx, loadBalancer)
+		loadBalancerType, err := b.SDK.LoadBalancerType(ctx, loadBalancer)
 		if err != nil {
-			return err
+			return "", "", err
 		}
 
 		required := getRequiredLoadBalancerType(project)
 		if loadBalancerType != required {
-			return fmt.Errorf("load balancer %s is of type %s, project require a %s", loadBalancer, loadBalancerType, required)
+			return "", "", fmt.Errorf("load balancer %s is of type %s, project require a %s", loadBalancer, loadBalancerType, required)
 		}
 
-		r.loadBalancer = loadBalancer
-		r.loadBalancerType = loadBalancerType
+		return loadBalancer, loadBalancerType, nil
 	}
-	return nil
+	return "", "", nil
 }
 
-func (r *awsResources) parseSecurityGroupExtension(ctx context.Context, project *types.Project) error {
-	if r.securityGroups == nil {
-		r.securityGroups = make(map[string]string, len(project.Networks))
-	}
+func (b *ecsAPIService) parseSecurityGroupExtension(ctx context.Context, project *types.Project) (map[string]string, error) {
+	securityGroups := make(map[string]string, len(project.Networks))
 	for name, net := range project.Networks {
+		var sg string
 		if net.External.External {
-			r.securityGroups[name] = net.Name
+			sg = net.Name
 		}
 		if x, ok := net.Extensions[extensionSecurityGroup]; ok {
 			logrus.Warn("to use an existing security-group, use `network.external` and `network.name` in your compose file")
 			logrus.Debugf("Security Group for network %q set by user to %q", net.Name, x)
-			r.securityGroups[name] = x.(string)
+			sg = x.(string)
 		}
+		exists, err := b.SDK.SecurityGroupExists(ctx, sg)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("security group %s doesn't exist", sg)
+		}
+		securityGroups[name] = sg
 	}
-	return nil
+	return securityGroups, nil
 }
 
-// ensure all required resources pre-exists or are defined as cloudformation resources
-func (r *awsResources) ensure(project *types.Project, template *cloudformation.Template) {
-	r.ensureCluster(project, template)
-	r.ensureNetworks(project, template)
-	r.ensureLoadBalancer(project, template)
+// ensureResources create required resources in template if not yet defined
+func (b *ecsAPIService) ensureResources(resources *awsResources, project *types.Project, template *cloudformation.Template) {
+	b.ensureCluster(resources, project, template)
+	b.ensureNetworks(resources, project, template)
+	b.ensureLoadBalancer(resources, project, template)
 }
 
-func (r *awsResources) ensureCluster(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) ensureCluster(r *awsResources, project *types.Project, template *cloudformation.Template) {
 	if r.cluster != "" {
 		return
 	}
@@ -163,7 +181,7 @@ func (r *awsResources) ensureCluster(project *types.Project, template *cloudform
 	r.cluster = cloudformation.Ref("Cluster")
 }
 
-func (r *awsResources) ensureNetworks(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, template *cloudformation.Template) {
 	if r.securityGroups == nil {
 		r.securityGroups = make(map[string]string, len(project.Networks))
 	}
@@ -179,7 +197,7 @@ func (r *awsResources) ensureNetworks(project *types.Project, template *cloudfor
 		ingress := securityGroup + "Ingress"
 		template.Resources[ingress] = &ec2.SecurityGroupIngress{
 			Description:           fmt.Sprintf("Allow communication within network %s", name),
-			IpProtocol:            "-1", // all protocols
+			IpProtocol:            allProtocols,
 			GroupId:               cloudformation.Ref(securityGroup),
 			SourceSecurityGroupId: cloudformation.Ref(securityGroup),
 		}
@@ -188,7 +206,7 @@ func (r *awsResources) ensureNetworks(project *types.Project, template *cloudfor
 	}
 }
 
-func (r *awsResources) ensureLoadBalancer(project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Project, template *cloudformation.Template) {
 	if r.loadBalancer != "" {
 		return
 	}
@@ -237,18 +255,6 @@ func portIsHTTP(it types.ServicePortConfig) bool {
 		return protocol == "http" || protocol == "https"
 	}
 	return it.Target == 80 || it.Target == 443
-}
-
-type projectFn func(ctx context.Context, project *types.Project) error
-
-func findProjectFnError(ctx context.Context, project *types.Project, funcs ...projectFn) error {
-	for _, fn := range funcs {
-		err := fn(ctx, project)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // predicate[types.ServiceConfig]

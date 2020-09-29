@@ -28,7 +28,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *types.Project, template *cloudformation.Template) error {
+func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *types.Project, template *cloudformation.Template, resources awsResources) error {
 	var ec2 bool
 	for _, s := range project.Services {
 		if requireEC2(s) {
@@ -65,7 +65,7 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		LaunchConfigurationName: cloudformation.Ref("LaunchConfiguration"),
 		MaxSize:                 "10", //TODO
 		MinSize:                 "1",
-		VPCZoneIdentifier:       b.resources.subnets,
+		VPCZoneIdentifier:       resources.subnets,
 	}
 
 	userData := base64.StdEncoding.EncodeToString([]byte(
@@ -74,7 +74,7 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 	template.Resources["LaunchConfiguration"] = &autoscaling.LaunchConfiguration{
 		ImageId:            ami,
 		InstanceType:       machineType,
-		SecurityGroups:     b.resources.allSecurityGroups(),
+		SecurityGroups:     resources.allSecurityGroups(),
 		IamInstanceProfile: cloudformation.Ref("EC2InstanceProfile"),
 		UserData:           userData,
 	}
