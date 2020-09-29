@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
@@ -39,7 +40,7 @@ import (
 
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
 
-func convert(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
+func (b *ecsAPIService) createTaskExecution(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err
@@ -532,11 +533,8 @@ func toHostEntryPtr(hosts types.HostsList) []ecs.TaskDefinition_HostEntry {
 }
 
 func getRepoCredentials(service types.ServiceConfig) *ecs.TaskDefinition_RepositoryCredentials {
-	// extract registry and namespace string from image name
-	for key, value := range service.Extensions {
-		if key == extensionPullCredentials {
-			return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
-		}
+	if value, ok := service.Extensions[extensionPullCredentials]; ok {
+		return &ecs.TaskDefinition_RepositoryCredentials{CredentialsParameter: value.(string)}
 	}
 	return nil
 }

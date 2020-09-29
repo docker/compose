@@ -1,59 +1,15 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Conditions": {
-    "CreateCluster": {
-      "Fn::Equals": [
-        "",
-        {
-          "Ref": "ParameterClusterName"
-        }
-      ]
-    },
-    "CreateLoadBalancer": {
-      "Fn::Equals": [
-        "",
-        {
-          "Ref": "ParameterLoadBalancerARN"
-        }
-      ]
-    }
-  },
-  "Description": "CloudFormation template created by Docker for deploying applications on Amazon ECS",
-  "Parameters": {
-    "ParameterClusterName": {
-      "Description": "Name of the ECS cluster to deploy to (optional)",
-      "Type": "String"
-    },
-    "ParameterLoadBalancerARN": {
-      "Description": "Name of the LoadBalancer to connect to (optional)",
-      "Type": "String"
-    },
-    "ParameterSubnet1Id": {
-      "Description": "SubnetId, for Availability Zone 1 in the region in your VPC",
-      "Type": "AWS::EC2::Subnet::Id"
-    },
-    "ParameterSubnet2Id": {
-      "Description": "SubnetId, for Availability Zone 2 in the region in your VPC",
-      "Type": "AWS::EC2::Subnet::Id"
-    },
-    "ParameterVPCId": {
-      "Description": "ID of the VPC",
-      "Type": "AWS::EC2::VPC::Id"
-    }
-  },
   "Resources": {
     "CloudMap": {
       "Properties": {
         "Description": "Service Map for Docker Compose project TestSimpleConvert",
         "Name": "TestSimpleConvert.local",
-        "Vpc": {
-          "Ref": "ParameterVPCId"
-        }
+        "Vpc": "vpcID"
       },
       "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace"
     },
     "Cluster": {
-      "Condition": "CreateCluster",
       "Properties": {
         "ClusterName": "TestSimpleConvert",
         "Tags": [
@@ -64,6 +20,72 @@
         ]
       },
       "Type": "AWS::ECS::Cluster"
+    },
+    "Default80Ingress": {
+      "Properties": {
+        "CidrIp": "0.0.0.0/0",
+        "Description": "simple:80/tcp on default nextwork",
+        "FromPort": 80,
+        "GroupId": {
+          "Ref": "DefaultNetwork"
+        },
+        "IpProtocol": "TCP",
+        "ToPort": 80
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "DefaultNetwork": {
+      "Properties": {
+        "GroupDescription": "TestSimpleConvert Security Group for default network",
+        "GroupName": "DefaultNetwork",
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          },
+          {
+            "Key": "com.docker.compose.network",
+            "Value": "default"
+          }
+        ],
+        "VpcId": "vpcID"
+      },
+      "Type": "AWS::EC2::SecurityGroup"
+    },
+    "DefaultNetworkIngress": {
+      "Properties": {
+        "Description": "Allow communication within network default",
+        "GroupId": {
+          "Ref": "DefaultNetwork"
+        },
+        "IpProtocol": "-1",
+        "SourceSecurityGroupId": {
+          "Ref": "DefaultNetwork"
+        }
+      },
+      "Type": "AWS::EC2::SecurityGroupIngress"
+    },
+    "LoadBalancer": {
+      "Properties": {
+        "Scheme": "internet-facing",
+        "SecurityGroups": [
+          {
+            "Ref": "DefaultNetwork"
+          }
+        ],
+        "Subnets": [
+          "subnet1",
+          "subnet2"
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          }
+        ],
+        "Type": "application"
+      },
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
     },
     "LogGroup": {
       "Properties": {
@@ -77,15 +99,7 @@
       ],
       "Properties": {
         "Cluster": {
-          "Fn::If": [
-            "CreateCluster",
-            {
-              "Ref": "Cluster"
-            },
-            {
-              "Ref": "ParameterClusterName"
-            }
-          ]
+          "Ref": "Cluster"
         },
         "DeploymentConfiguration": {
           "MaximumPercent": 200,
@@ -110,16 +124,12 @@
             "AssignPublicIp": "ENABLED",
             "SecurityGroups": [
               {
-                "Ref": "TestSimpleConvertDefaultNetwork"
+                "Ref": "DefaultNetwork"
               }
             ],
             "Subnets": [
-              {
-                "Ref": "ParameterSubnet1Id"
-              },
-              {
-                "Ref": "ParameterSubnet2Id"
-              }
+              "subnet1",
+              "subnet2"
             ]
           }
         },
@@ -191,15 +201,7 @@
           }
         ],
         "LoadBalancerArn": {
-          "Fn::If": [
-            "CreateLoadBalancer",
-            {
-              "Ref": "TestSimpleConvertLoadBalancer"
-            },
-            {
-              "Ref": "ParameterLoadBalancerARN"
-            }
-          ]
+          "Ref": "LoadBalancer"
         },
         "Port": 80,
         "Protocol": "HTTP"
@@ -217,9 +219,7 @@
           }
         ],
         "TargetType": "ip",
-        "VpcId": {
-          "Ref": "ParameterVPCId"
-        }
+        "VpcId": "vpcID"
       },
       "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
     },
@@ -304,76 +304,6 @@
         ]
       },
       "Type": "AWS::IAM::Role"
-    },
-    "TestSimpleConvertDefaultNetwork": {
-      "Properties": {
-        "GroupDescription": "TestSimpleConvert default Security Group",
-        "GroupName": "TestSimpleConvertDefaultNetwork",
-        "SecurityGroupIngress": [
-          {
-            "CidrIp": "0.0.0.0/0",
-            "Description": "simple:80/tcp",
-            "FromPort": 80,
-            "IpProtocol": "TCP",
-            "ToPort": 80
-          }
-        ],
-        "Tags": [
-          {
-            "Key": "com.docker.compose.project",
-            "Value": "TestSimpleConvert"
-          },
-          {
-            "Key": "com.docker.compose.network",
-            "Value": "default"
-          }
-        ],
-        "VpcId": {
-          "Ref": "ParameterVPCId"
-        }
-      },
-      "Type": "AWS::EC2::SecurityGroup"
-    },
-    "TestSimpleConvertDefaultNetworkIngress": {
-      "Properties": {
-        "Description": "Allow communication within network default",
-        "GroupId": {
-          "Ref": "TestSimpleConvertDefaultNetwork"
-        },
-        "IpProtocol": "-1",
-        "SourceSecurityGroupId": {
-          "Ref": "TestSimpleConvertDefaultNetwork"
-        }
-      },
-      "Type": "AWS::EC2::SecurityGroupIngress"
-    },
-    "TestSimpleConvertLoadBalancer": {
-      "Condition": "CreateLoadBalancer",
-      "Properties": {
-        "Name": "TestSimpleConvertLoadBalancer",
-        "Scheme": "internet-facing",
-        "SecurityGroups": [
-          {
-            "Ref": "TestSimpleConvertDefaultNetwork"
-          }
-        ],
-        "Subnets": [
-          {
-            "Ref": "ParameterSubnet1Id"
-          },
-          {
-            "Ref": "ParameterSubnet2Id"
-          }
-        ],
-        "Tags": [
-          {
-            "Key": "com.docker.compose.project",
-            "Value": "TestSimpleConvert"
-          }
-        ],
-        "Type": "application"
-      },
-      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer"
     }
   }
 }

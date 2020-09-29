@@ -20,7 +20,7 @@ const (
 	extensionSecurityGroup   = "x-aws-securitygroup"
 	extensionVPC             = "x-aws-vpc"
 	extensionPullCredentials = "x-aws-pull_credentials"
-	extensionLB              = "x-aws-loadbalancer"
+	extensionLoadBalancer    = "x-aws-loadbalancer"
 	extensionProtocol        = "x-aws-protocol"
 	extensionCluster         = "x-aws-cluster"
 	extensionKeys            = "x-aws-keys"

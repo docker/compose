@@ -17,9 +17,32 @@
 package ecs
 
 import (
+	"fmt"
+
 	"github.com/compose-spec/compose-go/compatibility"
+	"github.com/compose-spec/compose-go/errdefs"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/sirupsen/logrus"
 )
+
+func (b *ecsAPIService) checkCompatibility(project *types.Project) error {
+	var checker compatibility.Checker = &fargateCompatibilityChecker{
+		compatibility.AllowList{
+			Supported: compatibleComposeAttributes,
+		},
+	}
+	compatibility.Check(project, checker)
+	for _, err := range checker.Errors() {
+		if errdefs.IsIncompatibleError(err) {
+			return err
+		}
+		logrus.Warn(err.Error())
+	}
+	if !compatibility.IsCompatible(checker) {
+		return fmt.Errorf("compose file is incompatible with Amazon ECS")
+	}
+	return nil
+}
 
 type fargateCompatibilityChecker struct {
 	compatibility.AllowList
