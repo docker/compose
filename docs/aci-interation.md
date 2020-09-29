@@ -2,20 +2,20 @@
 
 ## Login
 
-You can login into Azure with `docker login azure`. This will prompt for user info in a browser. If the docker CLI cannot open a browser, it will switch back to [Azure device code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code) and let you connect yourself.
-Note that the login form the [Azure command line](https://docs.microsoft.com/en-us/cli/azure/) is separated from the Docker CLI azure login.
+You can login into Azure with `docker login azure`. This will open a Web browser and prompt the user to login to Azure. If the Docker CLI cannot open a browser, it will fall back to the [Azure device code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code) and let you connect yourself.
+Note that the [Azure command line](https://docs.microsoft.com/en-us/cli/azure/) login is separated from the Docker CLI Azure login.
 
 ## Docker contexts
 
-The Docker ACI integration is performed through the use of Docker contexts. You can create an ACI context, and the using this context you will be able to run classic Docker commands agains ACI. 
-Creating a context will require an Azure subscription, a resource group and a region. 
+The Docker ACI integration is performed through the use of Docker contexts. You can create a context of type ACI, and then using this context you will be able to run classic Docker commands (like `docker run`) against ACI.
+Creating an ACI context requires an Azure subscription, a resource group and a region. 
 
-You need to `docker login azure` first, so that the Docker CLI can find your azure subscription based on your login. 
+Before creating a context, you will need to `docker login azure` first so that the Docker CLI can find your Azure subscription.
 
-To create an ACI context, `docker context create aci` will prompt you for the relevant information, and either create a new resource group or use an existing one.
+To create an ACI context, `docker context create aci` will prompt you for the relevant information, with the option to either create a new resource group or use an existing one.
 With a context created, you can either issue single commands against ACI, specifying the context name in the command line, like `docker --context acicontext run nginx`, or switch context so that all subsequent commands will be issued to ACI: `docker context use acicontext`.
 
-**Note** You can have several ACI context, associated with several resource groups. This can be useful as it will act as namespaces for your containers. Actions on your containers will be restricted to your current context and resource group.
+**Note:** You can have multiple ACI contexts associated each with different resource groups. This can be useful as it will act as namespaces for your containers. Actions on your containers will be restricted to your current context and resource group.
 
 ## Single container
 
