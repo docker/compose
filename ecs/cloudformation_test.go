@@ -23,21 +23,19 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/awslabs/goformation/v4/cloudformation/efs"
-
-	"github.com/golang/mock/gomock"
-
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )
