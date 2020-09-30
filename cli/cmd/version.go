@@ -42,8 +42,7 @@ func VersionCommand(version string) *cobra.Command {
 	}
 	// define flags for backward compatibility with com.docker.cli
 	flags := cmd.Flags()
-	flags.StringP(formatOpt, "f", "", "Format the output using the given Go template")
-	// flags.String(&opts.format, "format", "", "Format the output. Values: [pretty | json | go template]. (Default: pretty)")
+	flags.StringP(formatOpt, "f", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	flags.String("kubeconfig", "", "Kubernetes config file")
 	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 

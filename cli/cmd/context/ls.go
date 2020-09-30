@@ -58,7 +58,7 @@ func listCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
-	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json | go template]. (Default: pretty)")
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	_ = cmd.Flags().MarkHidden("json")
 
 	return cmd
@@ -104,7 +104,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 				if c.Name == currentContext {
 					contextName += " *"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 					contextName,
 					c.Type(),
 					c.Metadata.Description,
