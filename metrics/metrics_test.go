@@ -133,11 +133,21 @@ func TestFlag(t *testing.T) {
 			args:     []string{"create", "--rm", "test"},
 			expected: "create",
 		},
+		{
+			name:     "compose up -f xxx",
+			args:     []string{"compose", "up", "-f", "titi.yaml"},
+			expected: "compose up",
+		},
+		{
+			name:     "compose -f xxx up",
+			args:     []string{"compose", "-f", "titi.yaml", "up"},
+			expected: "compose up",
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
@@ -210,7 +220,7 @@ func TestEcs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
@@ -258,7 +268,7 @@ func TestScan(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}

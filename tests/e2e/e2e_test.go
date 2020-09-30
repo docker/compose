@@ -56,6 +56,12 @@ func TestComposeNotImplemented(t *testing.T) {
 		ExitCode: 1,
 		Err:      `Command "compose up" not available in current context (default)`,
 	})
+
+	res = c.RunDockerOrExitError("compose", "-f", "titi.yaml", "up")
+	res.Assert(t, icmd.Expected{
+		ExitCode: 1,
+		Err:      `Command "compose up" not available in current context (default)`,
+	})
 }
 
 func TestContextDefault(t *testing.T) {
