@@ -25,7 +25,7 @@ import (
 
 func TestFlag(t *testing.T) {
 	root := &cobra.Command{}
-	root.PersistentFlags().BoolP("debug", "d", false, "debug")
+	root.PersistentFlags().BoolP("debug", "D", false, "debug")
 	root.PersistentFlags().String("str", "str", "str")
 
 	testCases := []struct {
@@ -40,7 +40,7 @@ func TestFlag(t *testing.T) {
 		},
 		{
 			name:     "with short flags",
-			args:     []string{"-d", "run"},
+			args:     []string{"-D", "run"},
 			expected: "run",
 		},
 		{
@@ -141,6 +141,11 @@ func TestFlag(t *testing.T) {
 		{
 			name:     "compose -f xxx up",
 			args:     []string{"compose", "-f", "titi.yaml", "up"},
+			expected: "compose up",
+		},
+		{
+			name:     "-D compose -f xxx up",
+			args:     []string{"--debug", "compose", "-f", "titi.yaml", "up"},
 			expected: "compose up",
 		},
 	}
