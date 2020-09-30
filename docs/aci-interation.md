@@ -49,6 +49,8 @@ Single containers and Compose applications can optionally expose ports. For sing
  
 **Note:** ACI does not allow port mapping (i.e.: changing port number while exposing port), so the source and target ports must be the same when deploying to ACI.
 
+**Note:** All containers in the same Compose application are deployed on the same ACI container group. Several containers in the same Compose application cannot expose the same port when deployed to ACI.
+
 By default, when exposing ports for your application, a random public IP address is associated with the container group supporting the deployed application (single container or Compose application).
 This IP address can be obtained when listing containers with `docker ps` or using `docker inspect`.    
 
@@ -64,7 +66,7 @@ Single containers and Compose applications can use volumes. In ACI, volumes are 
 To use a volume when running a single container, specify a storage account and file share name like this: 
 
 ```console
-docker run -v <storageaccount>/<fileshare>:/target/path[:ro]
+docker run -v <STORAGE_ACCOUNT>/<FILE_SHARE>:/target/path[:ro]
 ```
   
 To specify more than one volume, just use the `-v` option as many times as required.
@@ -115,10 +117,12 @@ services:
           memory: 50M
 ```
 
+In this general example, the redis service is constrained to use no more than 50M of memory and 0.50 (50% of a single core) of available processing time (CPU)
+
 ## Environment variables
 
 When using `docker run`, environment variables can be passed to ACI containers using the `--env` flag.
-Form compose applications, environment variables can be specified with the `--env-file` flag, or in the compose file with the `environment` service field. 
+Form compose applications, environment variables can be specified in the compose file with the `environment` or `env-file` service field, or with the `--environment` command line flag.
 
 ## Private Docker Hub images and using the Azure Container Registry
 
