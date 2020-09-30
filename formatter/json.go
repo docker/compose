@@ -18,16 +18,12 @@ package formatter
 
 import (
 	"encoding/json"
-	"reflect"
 )
 
 const standardIndentation = "    "
 
 // ToStandardJSON return a string with the JSON representation of the interface{}
 func ToStandardJSON(i interface{}) (string, error) {
-	if reflect.ValueOf(i).IsNil() {
-		return "{}", nil
-	}
 	b, err := json.MarshalIndent(i, "", standardIndentation)
 	if err != nil {
 		return "", err

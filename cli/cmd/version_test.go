@@ -31,7 +31,7 @@ func TestVersionFormat(t *testing.T) {
 	jsonCases := []caze{
 		{
 			Actual:   fixedJSONArgs([]string{}),
-			Expected: nil,
+			Expected: []string{},
 		},
 		{
 			Actual: fixedJSONArgs([]string{
@@ -103,7 +103,7 @@ func TestVersionFormat(t *testing.T) {
 	prettyCases := []caze{
 		{
 			Actual:   fixedPrettyArgs([]string{}),
-			Expected: nil,
+			Expected: []string{},
 		},
 		{
 			Actual: fixedPrettyArgs([]string{
@@ -172,7 +172,7 @@ func TestVersionFormat(t *testing.T) {
 				"--format",
 				"pretty",
 			}),
-			Expected: nil,
+			Expected: []string{},
 		},
 	}
 
