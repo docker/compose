@@ -17,11 +17,11 @@
 package formatter
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"testing"
 
-	"go.uber.org/zap/buffer"
 	"gotest.tools/assert"
 )
 
@@ -39,7 +39,7 @@ func TestPrint(t *testing.T) {
 		},
 	}
 
-	b := &buffer.Buffer{}
+	b := &bytes.Buffer{}
 	assert.NilError(t, Print(testList, PRETTY, b, func(w io.Writer) {
 		for _, t := range testList {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
