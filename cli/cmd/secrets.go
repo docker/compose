@@ -20,14 +20,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -122,11 +119,15 @@ func listSecrets() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			list, err := c.SecretsService().ListSecrets(cmd.Context())
+			secretsList, err := c.SecretsService().ListSecrets(cmd.Context())
 			if err != nil {
 				return err
 			}
-			return printSecretList(opts.format, os.Stdout, list)
+			return formatter.Print(secretsList, opts.format, os.Stdout, func(w io.Writer) {
+				for _, secret := range secretsList {
+					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)
+				}
+			}, "ID", "NAME", "DESCRIPTION")
 		},
 	}
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
@@ -154,25 +155,4 @@ func deleteSecret() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&opts.recover, "recover", false, "Enable recovery.")
 	return cmd
-}
-
-func printSecretList(format string, out io.Writer, secrets []secrets.Secret) error {
-	var err error
-	switch strings.ToLower(format) {
-	case formatter.PRETTY, "":
-		err = formatter.PrintPrettySection(out, func(w io.Writer) {
-			for _, secret := range secrets {
-				fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description) // nolint:errcheck
-			}
-		}, "ID", "NAME", "DESCRIPTION")
-	case formatter.JSON:
-		outJSON, err := formatter.ToStandardJSON(secrets)
-		if err != nil {
-			return err
-		}
-		_, _ = fmt.Fprint(out, outJSON)
-	default:
-		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
-	}
-	return err
 }

@@ -29,7 +29,6 @@ import (
 	"github.com/docker/compose-cli/cli/mobycli"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -98,17 +97,11 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		opts.format = formatter.JSON
 	}
 
-	return printContextLsFormatted(opts.format, currentContext, os.Stdout, contexts)
-}
-
-func printContextLsFormatted(format string, currContext string, out io.Writer, contexts []*store.DockerContext) error {
-	var err error
-	switch strings.ToLower(format) {
-	case formatter.PRETTY, "":
-		err = formatter.PrintPrettySection(out, func(w io.Writer) {
+	return formatter.Print(contexts, opts.format, os.Stdout,
+		func(w io.Writer) {
 			for _, c := range contexts {
 				contextName := c.Name
-				if c.Name == currContext {
+				if c.Name == currentContext {
 					contextName += " *"
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -119,17 +112,8 @@ func printContextLsFormatted(format string, currContext string, out io.Writer, c
 					getEndpoint("kubernetes", c.Endpoints),
 					c.Metadata.StackOrchestrator)
 			}
-		}, "NAME", "TYPE", "DESCRIPTION", "DOCKER ENDPOINT", "KUBERNETES ENDPOINT", "ORCHESTRATOR")
-	case formatter.JSON:
-		out, err := formatter.ToStandardJSON(contexts)
-		if err != nil {
-			return err
-		}
-		fmt.Println(out)
-	default:
-		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
-	}
-	return err
+		},
+		"NAME", "TYPE", "DESCRIPTION", "DOCKER ENDPOINT", "KUBERNETES ENDPOINT", "ORCHESTRATOR")
 }
 
 func getEndpoint(name string, meta map[string]interface{}) string {

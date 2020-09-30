@@ -23,12 +23,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -61,26 +58,11 @@ func runPs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	return printPsFormatted(opts.Format, os.Stdout, serviceList)
-}
-
-func printPsFormatted(format string, out io.Writer, serviceList []compose.ServiceStatus) error {
-	var err error
-	switch strings.ToLower(format) {
-	case formatter.PRETTY, "":
-		err = formatter.PrintPrettySection(out, func(w io.Writer) {
+	return formatter.Print(serviceList, opts.Format, os.Stdout,
+		func(w io.Writer) {
 			for _, service := range serviceList {
 				fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
 			}
-		}, "ID", "NAME", "REPLICAS", "PORTS")
-	case formatter.JSON:
-		outJSON, err := formatter.ToStandardJSON(serviceList)
-		if err != nil {
-			return err
-		}
-		_, _ = fmt.Fprint(out, outJSON)
-	default:
-		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
-	}
-	return err
+		},
+		"ID", "NAME", "REPLICAS", "PORTS")
 }

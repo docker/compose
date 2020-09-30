@@ -52,14 +52,14 @@ func VersionCommand(version string) *cobra.Command {
 
 func runVersion(cmd *cobra.Command, version string) {
 	var versionString string
-	format := strings.TrimSpace(cmd.Flag(formatOpt).Value.String())
+	format := strings.ToLower(strings.ReplaceAll(cmd.Flag(formatOpt).Value.String(), " ", ""))
 	displayedVersion := strings.TrimPrefix(version, "v")
 	// Replace is preferred in this case to keep the order.
 	switch format {
 	case formatter.PRETTY, "":
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...),
 			"\n Version:", "\n Cloud integration:  "+displayedVersion+"\n Version:", 1)
-	case formatter.JSON, "{{json .}}", "{{json . }}", "{{ json .}}", "{{ json . }}": // Try to catch full JSON formats
+	case formatter.JSON, "{{json.}}": // Try to catch full JSON formats
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...),
 			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
 	}
@@ -78,7 +78,7 @@ func getOutFromMoby(cmd *cobra.Command, args ...string) string {
 }
 
 func fixedPrettyArgs(oArgs []string) []string {
-	var args []string
+	args := make([]string, 0)
 	for i := 0; i < len(oArgs); i++ {
 		if isFormatOpt(oArgs[i]) &&
 			len(oArgs) > i &&
@@ -92,7 +92,7 @@ func fixedPrettyArgs(oArgs []string) []string {
 }
 
 func fixedJSONArgs(oArgs []string) []string {
-	var args []string
+	args := make([]string, 0)
 	for i := 0; i < len(oArgs); i++ {
 		if isFormatOpt(oArgs[i]) &&
 			len(oArgs) > i &&

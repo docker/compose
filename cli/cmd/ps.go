@@ -28,7 +28,6 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/errdefs"
 	formatter2 "github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/utils/formatter"
 )
@@ -79,7 +78,7 @@ func runPs(ctx context.Context, opts psOpts) error {
 
 	containerList, err := c.ContainerService().List(ctx, opts.all)
 	if err != nil {
-		return errors.Wrap(err, "fetch containerList")
+		return errors.Wrap(err, "fetch containers")
 	}
 
 	if opts.quiet {
@@ -93,30 +92,12 @@ func runPs(ctx context.Context, opts psOpts) error {
 		opts.format = formatter2.JSON
 	}
 
-	return printPsFormatted(opts.format, os.Stdout, containerList)
-}
-
-func printPsFormatted(format string, out io.Writer, containers []containers.Container) error {
-	var err error
-	switch strings.ToLower(format) {
-	case formatter2.PRETTY, "":
-		err = formatter2.PrintPrettySection(out, func(w io.Writer) {
-			for _, c := range containers {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Image, c.Command, c.Status,
-					strings.Join(formatter.PortsToStrings(c.Ports, fqdn(c)), ", "))
-			}
-		}, "CONTAINER ID", "IMAGE", "COMMAND", "STATUS", "PORTS")
-	case formatter2.JSON:
-		out, err := formatter2.ToStandardJSON(containers)
-		if err != nil {
-			return err
+	return formatter2.Print(containerList, opts.format, os.Stdout, func(w io.Writer) {
+		for _, c := range containerList {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Image, c.Command, c.Status,
+				strings.Join(formatter.PortsToStrings(c.Ports, fqdn(c)), ", "))
 		}
-		fmt.Println(out)
-
-	default:
-		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
-	}
-	return err
+	}, "CONTAINER ID", "IMAGE", "COMMAND", "STATUS", "PORTS")
 }
 
 func fqdn(container containers.Container) string {

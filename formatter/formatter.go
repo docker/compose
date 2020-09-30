@@ -17,20 +17,28 @@
 package formatter
 
 import (
-	"encoding/json"
-	"reflect"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/pkg/errors"
+
+	"github.com/docker/compose-cli/errdefs"
 )
 
-const standardIndentation = "    "
-
-// ToStandardJSON return a string with the JSON representation of the interface{}
-func ToStandardJSON(i interface{}) (string, error) {
-	if reflect.ValueOf(i).IsNil() {
-		return "{}", nil
+// Print prints formatted lists in different formats
+func Print(list interface{}, format string, outWriter io.Writer, writerFn func(w io.Writer), headers ...string) error {
+	switch strings.ToLower(format) {
+	case PRETTY, "":
+		return PrintPrettySection(outWriter, writerFn, headers...)
+	case JSON:
+		outJSON, err := ToStandardJSON(list)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprint(outWriter, outJSON)
+	default:
+		return errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
 	}
-	b, err := json.MarshalIndent(i, "", standardIndentation)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return nil
 }

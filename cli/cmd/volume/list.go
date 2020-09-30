@@ -20,14 +20,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -50,30 +46,13 @@ func listVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printList(opts.format, os.Stdout, vols)
+			return formatter.Print(vols, opts.format, os.Stdout, func(w io.Writer) {
+				for _, vol := range vols {
+					_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
+				}
+			}, "ID", "DESCRIPTION")
 		},
 	}
 	cmd.Flags().StringVar(&opts.format, "format", formatter.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
-}
-
-func printList(format string, out io.Writer, volumes []volumes.Volume) error {
-	var err error
-	switch strings.ToLower(format) {
-	case formatter.PRETTY, "":
-		_ = formatter.PrintPrettySection(out, func(w io.Writer) {
-			for _, vol := range volumes {
-				_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
-			}
-		}, "ID", "DESCRIPTION")
-	case formatter.JSON:
-		outJSON, err := formatter.ToStandardJSON(volumes)
-		if err != nil {
-			return err
-		}
-		_, _ = fmt.Fprint(out, outJSON)
-	default:
-		err = errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
-	}
-	return err
 }
