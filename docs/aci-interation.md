@@ -2,7 +2,7 @@
 
 ## Login
 
-You can login into Azure with `docker login azure`. This will open a Web browser and prompt the user to login to Azure. If the Docker CLI cannot open a browser, it will fall back to the [Azure device code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code) and let you connect yourself.
+You can log into Azure with the `docker login azure` command. This will open a Web browser to complete the login process. If the Docker CLI cannot open a browser, it will fall back to the [Azure device code flow](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-device-code) and let you connect yourself.
 Note that the [Azure command line](https://docs.microsoft.com/en-us/cli/azure/) login is separated from the Docker CLI Azure login.
 
 ## Docker contexts
@@ -20,9 +20,9 @@ With a context created, you can either issue single commands against ACI, specif
 ## Single container
 
 You can start a single container on ACI with the `docker run` command. 
-The container is started on a container group, in the region and resource group associated with the ACI context.
+The container is started in a container group, in the region and resource group associated with the ACI context.
 
-You can then list existing containers with `docker ps`. This will show the status of the containers, if they expose ports, and the container's IP address or domain name.
+You can then list existing containers with `docker ps`. This will show the status of the container, if it exposes ports, and the container's public IP address or domain name.
 You can view a container's logs with the `docker logs` command.
 
 Running containers can be stopped with `docker stop` (`docker kill` will have the same effect). Stopped containers can be restarted with `docker start`.
@@ -35,7 +35,7 @@ Containers can be removed using `docker rm`. Removing a running container will r
 
 You can start Compose applications with the `docker compose up` command.
 All containers in the same Compose application are started in the same container group. Service discovery between the containers works using the service name specified in the Compose file.
-Name resolution is achieved by writing service names in an `/etc/hosts` file that is shared automatically by all containers in the container group.
+Name resolution is achieved by writing service names in the `/etc/hosts` file that is shared automatically by all containers in the container group.
 
 Containers started as part of Compose applications will be displayed along with single containers when using `docker ps`. 
 Their container ID will be of the format: `<COMPOSE-PROJECT>_<SERVICE>`. 
@@ -49,7 +49,7 @@ Single containers and Compose applications can optionally expose ports. For sing
  
 **Note:** ACI does not allow port mapping (i.e.: changing port number while exposing port), so the source and target ports must be the same when deploying to ACI.
 
-**Note:** All containers in the same Compose application are deployed on the same ACI container group. Several containers in the same Compose application cannot expose the same port when deployed to ACI.
+**Note:** All containers in the same Compose application are deployed in the same ACI container group. Containers in the same Compose application cannot expose the same port when deployed to ACI.
 
 By default, when exposing ports for your application, a random public IP address is associated with the container group supporting the deployed application (single container or Compose application).
 This IP address can be obtained when listing containers with `docker ps` or using `docker inspect`.    
@@ -66,7 +66,7 @@ Single containers and Compose applications can use volumes. In ACI, volumes are 
 To use a volume when running a single container, specify a storage account and file share name like this: 
 
 ```console
-docker run -v <STORAGE_ACCOUNT>/<FILE_SHARE>:/target/path[:ro]
+docker run -v <STORAGE-ACCOUNT>/<FILE-SHARE>:/target/path[:ro]
 ```
   
 To specify more than one volume, just use the `-v` option as many times as required.
@@ -117,7 +117,7 @@ services:
           memory: 50M
 ```
 
-In this general example, the redis service is constrained to use no more than 50M of memory and 0.50 (50% of a single core) of available processing time (CPU)
+In this general example, the _redis_ service is constrained to use no more than 50M of memory (50 MB) and 0.50 (50% of a single core) of available processing time (CPU).
 
 ## Environment variables
 
