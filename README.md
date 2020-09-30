@@ -4,9 +4,8 @@ Docker Compose
 
 Compose is a tool for defining and running multi-container Docker applications.
 With Compose, you use a Compose file to configure your application's services.
-Then, using a single command, you create and start all the services
-from your configuration. To learn more about all the features of Compose
-see [the list of features](https://github.com/docker/docker.github.io/blob/master/compose/index.md#features).
+Then, using a single command, you create and start all the services.
+From your configuration. To learn more about all the features of Compose see [the list of features](https://github.com/docker/docker.github.io/blob/master/compose/index.md#features).
 
 Compose is great for development, testing, and staging environments, as well as
 CI workflows. You can learn more about each case in
