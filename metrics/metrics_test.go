@@ -25,7 +25,7 @@ import (
 
 func TestFlag(t *testing.T) {
 	root := &cobra.Command{}
-	root.PersistentFlags().BoolP("debug", "d", false, "debug")
+	root.PersistentFlags().BoolP("debug", "D", false, "debug")
 	root.PersistentFlags().String("str", "str", "str")
 
 	testCases := []struct {
@@ -40,7 +40,7 @@ func TestFlag(t *testing.T) {
 		},
 		{
 			name:     "with short flags",
-			args:     []string{"-d", "run"},
+			args:     []string{"-D", "run"},
 			expected: "run",
 		},
 		{
@@ -133,11 +133,26 @@ func TestFlag(t *testing.T) {
 			args:     []string{"create", "--rm", "test"},
 			expected: "create",
 		},
+		{
+			name:     "compose up -f xxx",
+			args:     []string{"compose", "up", "-f", "titi.yaml"},
+			expected: "compose up",
+		},
+		{
+			name:     "compose -f xxx up",
+			args:     []string{"compose", "-f", "titi.yaml", "up"},
+			expected: "compose up",
+		},
+		{
+			name:     "-D compose -f xxx up",
+			args:     []string{"--debug", "compose", "-f", "titi.yaml", "up"},
+			expected: "compose up",
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
@@ -210,7 +225,7 @@ func TestEcs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
@@ -258,7 +273,7 @@ func TestScan(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := getCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args, root.PersistentFlags())
 			assert.Equal(t, testCase.expected, result)
 		})
 	}

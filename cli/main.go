@@ -224,13 +224,9 @@ func exit(root *cobra.Command, ctx string, err error, ctype string) {
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
 	if errors.Is(err, errdefs.ErrNotImplemented) {
-		cmd, _, _ := root.Traverse(os.Args[1:])
-		name := cmd.Name()
-		parent := cmd.Parent()
-		if parent != nil && parent.Parent() != nil {
-			name = parent.Name() + " " + name
-		}
+		name := metrics.GetCommand(os.Args[1:], root.PersistentFlags())
 		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
+
 		os.Exit(1)
 	}
 
