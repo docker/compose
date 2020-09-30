@@ -38,12 +38,18 @@ import (
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
 const (
-	authorizeFormat = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
-	tokenEndpoint   = "https://login.microsoftonline.com/%s/oauth2/v2.0/token"
-	getTenantURL    = "https://management.azure.com/tenants?api-version=2019-11-01"
+	// AcrRegistrySuffix suffix for ACR registry images
+	AcrRegistrySuffix         = ".azurecr.io"
+	activeDirectoryURL        = "https://login.microsoftonline.com"
+	azureManagementURL        = "https://management.core.windows.net/"
+	azureResouceManagementURL = "https://management.azure.com/"
+	authorizeFormat           = activeDirectoryURL + "/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
+	tokenEndpoint             = activeDirectoryURL + "/%s/oauth2/v2.0/token"
+	getTenantURL              = azureResouceManagementURL + "tenants?api-version=2019-11-01"
+
 	// scopes for a multi-tenant app works for openid, email, other common scopes, but fails when trying to add a token
 	// v1 scope like "https://management.azure.com/.default" for ARM access
-	scopes   = "offline_access https://management.azure.com/.default"
+	scopes   = "offline_access " + azureResouceManagementURL + ".default"
 	clientID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" // Azure CLI client id
 )
 
