@@ -21,35 +21,35 @@ const (
 	ecrReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 	ecsEC2InstanceRole     = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
 
-	actionGetSecretValue = "secretsmanager:GetSecretValue"
-	actionGetParameters  = "ssm:GetParameters"
-	actionDecrypt        = "kms:Decrypt"
+	actionGetSecretValue  = "secretsmanager:GetSecretValue"
+	actionGetParameters   = "ssm:GetParameters"
+	actionDecrypt         = "kms:Decrypt"
+	actionAutoScaling     = "application-autoscaling:*"
+	actionGetMetrics      = "cloudwatch:GetMetricStatistics"
+	actionDescribeService = "ecs:DescribeServices"
+	actionUpdateService   = "ecs:UpdateService"
 )
 
-var ecsTaskAssumeRolePolicyDocument = PolicyDocument{
-	Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
-	Statement: []PolicyStatement{
-		{
-			Effect: "Allow",
-			Principal: PolicyPrincipal{
-				Service: "ecs-tasks.amazonaws.com",
-			},
-			Action: []string{"sts:AssumeRole"},
-		},
-	},
-}
+var (
+	ecsTaskAssumeRolePolicyDocument     = policyDocument("ecs-tasks.amazonaws.com")
+	ec2InstanceAssumeRolePolicyDocument = policyDocument("ec2.amazonaws.com")
+	ausocalingAssumeRolePolicyDocument  = policyDocument("application-autoscaling.amazonaws.com")
+)
 
-var ec2InstanceAssumeRolePolicyDocument = PolicyDocument{
-	Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
-	Statement: []PolicyStatement{
-		{
-			Effect: "Allow",
-			Principal: PolicyPrincipal{
-				Service: "ec2.amazonaws.com",
+func policyDocument(service string) PolicyDocument {
+	return PolicyDocument{
+		Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
+		Statement: []PolicyStatement{
+			{
+				Effect: "Allow",
+				Principal: PolicyPrincipal{
+					Service: service,
+				},
+				Action: []string{"sts:AssumeRole"},
 			},
-			Action: []string{"sts:AssumeRole"},
 		},
-	},
+	}
+
 }
 
 // PolicyDocument describes an IAM policy document

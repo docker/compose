@@ -8,38 +8,49 @@ This document describes the mapping between compose application model and AWS co
 This diagram shows compose model and on same line AWS components that get created as equivalent resources
 
 ```
-+----------+                                +-------------+                          +-------------------+
-| Project  |                                | Cluster     |                          | LoadBalancer      |
-+-+--------+                                +-------------+                          +-------------------+
++----------+                                +-------------+                              +-------------------+
+| Project  |  . . . . . . . . . . . . . .   | Cluster     |    . . . . . . .             | LoadBalancer      |
++-+--------+                                +-------------+                              +-------------------+
   |
-  |    +----------+                         +-------------+ +----------------+       +-------------------+
-  +----+ Service  |                         | Service     | | TaskDefinition |       | TargetGroup       |
-  |    +--+-------+                         +-------------+ +----------------+       +-------------------+
-  |       |                                                 +----------------+
-  |       |  x-aws-role, x-aws-policies                     | TaskRole       |
-  |       |                                                 +----------------+
-  |       |  +---------+                    +-------------+                          +-------------------+
-  |       +--+ Ports   |                    | IngressRule |                          | Listener          |
-  |       |  +---------+                    +-------------+                          +-------------------+
+  |    +----------+                         +-------------++-------------------+         +-------------------+  
+  +----+ Service  |   . . . . . . . . . .   | Service     || TaskDefinition    |         | TargetGroup       |  
+  |    +--+-------+                         +-------------++-------------------+-+       +-------------------+  
+  |       |                                                  | TaskRole          |                          
+  |       |                                                  +-------------------+-+                         
+  |       |  x-aws-role, x-aws-policies     . . . . . . . .    | TaskExecutionRole |                        
+  |       |                                                    +-------------------+                        
+  |       |  +---------+
+  |       +--+ Deploy  |
+  |       |  +---------+                    +-------------------+
+  |       |  x-aws-autoscale  . . . . . .   | ScalableTarget    |
+  |       |                                 +-------------------+---+
+  |       |                                     | ScalingPolicy     |
+  |       |                                     +-------------------+-+
+  |       |                                       | AutoScalingRole   |
+  |       |                                       +-------------------+
   |       |
+  |       |  +---------+                    +-------------+                              +-------------------+
+  |       +--+ Ports   |   . . . . . . .    | IngressRule +-----+                        | Listener          |
+  |       |  +---------+                    +-------------+     |                        +-------------------+
+  |       |                                                     |
   |       |  +---------+                    +---------------+ +------------------+
-  |       +--+ Secrets |                    | InitContainer | |TaskExecutionRole |
+  |       +--+ Secrets |   . . . . . . .    | InitContainer | |TaskExecutionRole |
   |       |  +---------+                    +---------------+ +------------+-----+
-  |       |                                                                |
-  |       |  +---------+                                                   |
-  |       +--+ Volumes |                                                   |
-  |       |  +---------+                                                   |
-  |       |                                                                |
-  |       |  +---------------+                                             |         +------------------------------------------+
-  |       +--+ DeviceRequest |                                             |         | CapacityProvider  || AutoscalingGroup    |
-  |          +---------------+                                             |         +------------------------------------------+
-  |                                                                        |                              | LaunchConfiguration |
-  |   +------------+                        +---------------+              |                              +---------------------+
-  +---+ Networks   |                        | SecurityGroup |              |
-  |   +------------+                        +---------------+              |
+  |       |                                                     |          |
+  |       |  +---------+                                        |          |
+  |       +--+ Volumes |                                        |          |
+  |       |  +---------+                                        |          |
+  |       |                                                     |          |
+  |       |  +---------------+                                  |          |         +-------------------+
+  |       +--+ DeviceRequest |  . . . . . . . . . . . . .  . .  | . . . .  | . . .   | CapacityProvider  |
+  |          +---------------+                                  |          |         +-------------------+--------+
+  |                                                             |          |                | AutoscalingGroup    |
+  |   +------------+                        +---------------+   |          |                +---------------------+
+  +---+ Networks   |   . . . . . . . . .    | SecurityGroup +---+          |                | LaunchConfiguration |
+  |   +------------+                        +---------------+              |                +---------------------+
   |                                                                        |
   |   +------------+                        +---------------+              |
-  +---+ Secret     |                        | Secret        +--------------+
+  +---+ Secret     |   . . . . . . . . .    | Secret        +--------------+
       +------------+                        +---------------+
 ```
 
@@ -63,6 +74,6 @@ A `TaskExecutionRole` is also created per service, and is updated to grant acces
 Services using a GPU (`DeviceRequest`) get the `Cluster` extended with an EC2 `CapacityProvider`, using an `AutoscalingGroup` to manage
 EC2 resources allocation based on a `LaunchConfiguration`. The latter uses ECS recommended AMI and machine type for GPU.
 
-
+Service to declare `deploy.x-aws-autoscaling` get a `ScalingPolicy` created targeting specified the configured CPU usage metric
 
 

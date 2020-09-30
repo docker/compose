@@ -91,7 +91,7 @@ func (b *ecsAPIService) convert(project *types.Project, resources awsResources) 
 
 	for _, service := range project.Services {
 		taskExecutionRole := b.createTaskExecutionRole(project, service, template)
-		taskRole := b.createTaskRole(service, template)
+		taskRole := b.createTaskRole(project, service, template)
 
 		definition, err := b.createTaskExecution(project, service)
 		if err != nil {
@@ -183,6 +183,8 @@ func (b *ecsAPIService) convert(project *types.Project, resources awsResources) 
 			Tags:               serviceTags(project, service),
 			TaskDefinition:     cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
+
+		b.createAutoscalingPolicy(project, resources, template, service)
 	}
 	return template, nil
 }
@@ -363,11 +365,12 @@ func (b *ecsAPIService) createTaskExecutionRole(project *types.Project, service 
 			ecsTaskExecutionPolicy,
 			ecrReadOnlyPolicy,
 		},
+		Tags: serviceTags(project, service),
 	}
 	return taskExecutionRole
 }
 
-func (b *ecsAPIService) createTaskRole(service types.ServiceConfig, template *cloudformation.Template) string {
+func (b *ecsAPIService) createTaskRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template) string {
 	taskRole := fmt.Sprintf("%sTaskRole", normalizeResourceName(service.Name))
 	rolePolicies := []iam.Role_Policy{}
 	if roles, ok := service.Extensions[extensionRole]; ok {
@@ -388,6 +391,7 @@ func (b *ecsAPIService) createTaskRole(service types.ServiceConfig, template *cl
 		AssumeRolePolicyDocument: ecsTaskAssumeRolePolicyDocument,
 		Policies:                 rolePolicies,
 		ManagedPolicyArns:        managedPolicies,
+		Tags:                     serviceTags(project, service),
 	}
 	return taskRole
 }

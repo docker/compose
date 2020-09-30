@@ -29,4 +29,5 @@ const (
 	extensionRetention       = "x-aws-logs_retention"
 	extensionRole            = "x-aws-role"
 	extensionManagedPolicies = "x-aws-policies"
+	extensionAutoScaling     = "x-aws-autoscaling"
 )
