@@ -92,10 +92,11 @@ func runPs(ctx context.Context, opts psOpts) error {
 		opts.format = formatter2.JSON
 	}
 
-	return formatter2.Print(containerList, opts.format, os.Stdout, func(w io.Writer) {
-		for _, c := range containerList {
+	view := viewFromContainerList(containerList)
+	return formatter2.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+		for _, c := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Image, c.Command, c.Status,
-				strings.Join(formatter.PortsToStrings(c.Ports, fqdn(c)), ", "))
+				strings.Join(c.Ports, ", "))
 		}
 	}, "CONTAINER ID", "IMAGE", "COMMAND", "STATUS", "PORTS")
 }
@@ -106,4 +107,26 @@ func fqdn(container containers.Container) string {
 		fqdn = container.Config.FQDN
 	}
 	return fqdn
+}
+
+type containerView struct {
+	ID      string
+	Image   string
+	Command string
+	Status  string
+	Ports   []string
+}
+
+func viewFromContainerList(containerList []containers.Container) []containerView {
+	retList := make([]containerView, len(containerList))
+	for i, c := range containerList {
+		retList[i] = containerView{
+			ID:      c.ID,
+			Image:   c.Image,
+			Command: c.Command,
+			Status:  c.Status,
+			Ports:   formatter.PortsToStrings(c.Ports, fqdn(c)),
+		}
+	}
+	return retList
 }

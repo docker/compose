@@ -97,20 +97,17 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		opts.format = formatter.JSON
 	}
 
-	return formatter.Print(contexts, opts.format, os.Stdout,
+	view := viewFromContextList(contexts, currentContext)
+	return formatter.Print(view, opts.format, os.Stdout,
 		func(w io.Writer) {
-			for _, c := range contexts {
-				contextName := c.Name
-				if c.Name == currentContext {
-					contextName += " *"
-				}
+			for _, c := range view {
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					contextName,
-					c.Type(),
-					c.Metadata.Description,
-					getEndpoint("docker", c.Endpoints),
-					getEndpoint("kubernetes", c.Endpoints),
-					c.Metadata.StackOrchestrator)
+					c.Name,
+					c.Type,
+					c.Description,
+					c.DockerEndpoint,
+					c.KubernetesEndpoint,
+					c.Orchestrator)
 			}
 		},
 		"NAME", "TYPE", "DESCRIPTION", "DOCKER ENDPOINT", "KUBERNETES ENDPOINT", "ORCHESTRATOR")
@@ -132,4 +129,32 @@ func getEndpoint(name string, meta map[string]interface{}) string {
 	}
 
 	return result
+}
+
+type contextView struct {
+	Name               string
+	Type               string
+	Description        string
+	DockerEndpoint     string
+	KubernetesEndpoint string
+	Orchestrator       string
+}
+
+func viewFromContextList(contextList []*store.DockerContext, currentContext string) []contextView {
+	retList := make([]contextView, len(contextList))
+	for i, c := range contextList {
+		contextName := c.Name
+		if c.Name == currentContext {
+			contextName += " *"
+		}
+		retList[i] = contextView{
+			Name:               contextName,
+			Type:               c.Type(),
+			Description:        c.Metadata.Description,
+			DockerEndpoint:     getEndpoint("docker", c.Endpoints),
+			KubernetesEndpoint: getEndpoint("kubernetes", c.Endpoints),
+			Orchestrator:       c.Metadata.StackOrchestrator,
+		}
+	}
+	return retList
 }

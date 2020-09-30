@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -46,8 +47,9 @@ func listVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return formatter.Print(vols, opts.format, os.Stdout, func(w io.Writer) {
-				for _, vol := range vols {
+			view := viewFromVolumeList(vols)
+			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+				for _, vol := range view {
 					_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
 				}
 			}, "ID", "DESCRIPTION")
@@ -55,4 +57,20 @@ func listVolume() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.format, "format", formatter.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
+}
+
+type volumeView struct {
+	ID          string
+	Description string
+}
+
+func viewFromVolumeList(volumeList []volumes.Volume) []volumeView {
+	retList := make([]volumeView, len(volumeList))
+	for i, v := range volumeList {
+		retList[i] = volumeView{
+			ID:          v.ID,
+			Description: v.Description,
+		}
+	}
+	return retList
 }

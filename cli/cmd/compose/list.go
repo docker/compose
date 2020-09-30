@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -56,9 +57,26 @@ func runList(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	return formatter.Print(stackList, opts.Format, os.Stdout, func(w io.Writer) {
-		for _, stack := range stackList {
+	view := viewFromStackList(stackList)
+	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
+		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
 		}
 	}, "NAME", "STATUS")
+}
+
+type stackView struct {
+	Name   string
+	Status string
+}
+
+func viewFromStackList(stackList []compose.Stack) []stackView {
+	retList := make([]stackView, len(stackList))
+	for i, s := range stackList {
+		retList[i] = stackView{
+			Name:   s.Name,
+			Status: s.Status,
+		}
+	}
+	return retList
 }

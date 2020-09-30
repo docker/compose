@@ -123,8 +123,9 @@ func listSecrets() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return formatter.Print(secretsList, opts.format, os.Stdout, func(w io.Writer) {
-				for _, secret := range secretsList {
+			view := viewFromSecretList(secretsList)
+			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+				for _, secret := range view {
 					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)
 				}
 			}, "ID", "NAME", "DESCRIPTION")
@@ -132,6 +133,24 @@ func listSecrets() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
+}
+
+type secretView struct {
+	ID          string
+	Name        string
+	Description string
+}
+
+func viewFromSecretList(secretList []secrets.Secret) []secretView {
+	retList := make([]secretView, len(secretList))
+	for i, s := range secretList {
+		retList[i] = secretView{
+			ID:          s.ID,
+			Name:        s.Name,
+			Description: s.Description,
+		}
+	}
+	return retList
 }
 
 type deleteSecretOptions struct {

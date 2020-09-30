@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -58,11 +59,34 @@ func runPs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	return formatter.Print(serviceList, opts.Format, os.Stdout,
+	view := viewFromServiceStatusList(serviceList)
+	return formatter.Print(view, opts.Format, os.Stdout,
 		func(w io.Writer) {
-			for _, service := range serviceList {
-				fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
+			for _, service := range view {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
 			}
 		},
 		"ID", "NAME", "REPLICAS", "PORTS")
+}
+
+type serviceStatusView struct {
+	ID       string
+	Name     string
+	Replicas int
+	Desired  int
+	Ports    []string
+}
+
+func viewFromServiceStatusList(serviceStatusList []compose.ServiceStatus) []serviceStatusView {
+	retList := make([]serviceStatusView, len(serviceStatusList))
+	for i, s := range serviceStatusList {
+		retList[i] = serviceStatusView{
+			ID:       s.ID,
+			Name:     s.Name,
+			Replicas: s.Replicas,
+			Desired:  s.Desired,
+			Ports:    s.Ports,
+		}
+	}
+	return retList
 }
