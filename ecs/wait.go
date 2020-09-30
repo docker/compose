@@ -52,6 +52,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 
 	var completed bool
 	var stackErr error
+
 	for !completed {
 		select {
 		case <-done:
@@ -77,8 +78,8 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			reason := aws.StringValue(event.ResourceStatusReason)
 			status := aws.StringValue(event.ResourceStatus)
 			progressStatus := progress.Working
-
 			switch status {
+
 			case "CREATE_COMPLETE":
 				if operation == stackCreate {
 					progressStatus = progress.Done
@@ -100,12 +101,33 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 					}
 				}
 			}
+
 			w.Event(progress.Event{
 				ID:         resource,
 				Status:     progressStatus,
-				StatusText: status,
+				StatusText: reason,
 			})
 		}
+		if operation != stackCreate || stackErr != nil {
+			continue
+		}
+		if err := b.SDK.CheckStackState(ctx, name); err != nil {
+			stackErr = err
+			b.SDK.DeleteStack(ctx, name)
+			operation = stackDelete
+
+			reason := err.Error()
+			if len(reason) > 30 {
+				reason = reason[:30] + "..."
+			}
+			w.Event(progress.Event{
+				ID:         name,
+				Status:     progress.Error,
+				StatusText: reason,
+			})
+
+		}
+
 	}
 
 	return stackErr

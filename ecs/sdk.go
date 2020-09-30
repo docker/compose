@@ -304,27 +304,111 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 	}
 	stacks := []compose.Stack{}
 	for _, stack := range cfStacks.Stacks {
+		skip := true
 		for _, t := range stack.Tags {
 			if *t.Key == compose.ProjectTag {
-				status := compose.RUNNING
-				switch aws.StringValue(stack.StackStatus) {
-				case "CREATE_IN_PROGRESS":
-					status = compose.STARTING
-				case "DELETE_IN_PROGRESS":
-					status = compose.REMOVING
-				case "UPDATE_IN_PROGRESS":
-					status = compose.UPDATING
-				}
-				stacks = append(stacks, compose.Stack{
-					ID:     aws.StringValue(stack.StackId),
-					Name:   aws.StringValue(stack.StackName),
-					Status: status,
-				})
+				skip = false
 				break
 			}
 		}
+		if skip {
+			continue
+		}
+		status := compose.RUNNING
+		reason := ""
+		switch aws.StringValue(stack.StackStatus) {
+		case "CREATE_IN_PROGRESS":
+			status = compose.STARTING
+		case "DELETE_IN_PROGRESS":
+			status = compose.REMOVING
+		case "UPDATE_IN_PROGRESS":
+			status = compose.UPDATING
+		}
+		if status == compose.STARTING {
+			if err := s.CheckStackState(ctx, aws.StringValue(stack.StackName)); err != nil {
+				status = compose.FAILED
+				reason = err.Error()
+			}
+		}
+		stacks = append(stacks, compose.Stack{
+			ID:     aws.StringValue(stack.StackId),
+			Name:   aws.StringValue(stack.StackName),
+			Status: status,
+			Reason: reason,
+		})
+
 	}
 	return stacks, nil
+}
+
+func (s sdk) CheckStackState(ctx context.Context, name string) error {
+	resources, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
+		StackName: aws.String(name),
+	})
+	if err != nil {
+		return err
+	}
+	services := []*string{}
+	serviceNames := []string{}
+	var cluster *string
+	for _, r := range resources.StackResourceSummaries {
+		if aws.StringValue(r.ResourceType) == "AWS::ECS::Cluster" {
+			cluster = r.PhysicalResourceId
+			continue
+		}
+		if aws.StringValue(r.ResourceType) == "AWS::ECS::Service" {
+			if r.PhysicalResourceId == nil {
+				continue
+			}
+			services = append(services, r.PhysicalResourceId)
+			serviceNames = append(serviceNames, *r.LogicalResourceId)
+		}
+	}
+	for i, service := range services {
+		err := s.CheckTaskState(ctx, aws.StringValue(cluster), aws.StringValue(service))
+		if err != nil {
+			return fmt.Errorf("%s error: %s", serviceNames[i], err.Error())
+		}
+	}
+	return nil
+}
+
+func (s sdk) CheckTaskState(ctx context.Context, cluster string, serviceName string) error {
+	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
+		Cluster:     aws.String(cluster),
+		ServiceName: aws.String(serviceName),
+	})
+	if err != nil {
+		return err
+	}
+	if len(tasks.TaskArns) > 0 {
+		return nil
+	}
+	tasks, err = s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
+		Cluster:       aws.String(cluster),
+		ServiceName:   aws.String(serviceName),
+		DesiredStatus: aws.String("STOPPED"),
+	})
+	if err != nil {
+		return err
+	}
+	if len(tasks.TaskArns) > 0 {
+		taskDescriptions, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
+			Cluster: aws.String(cluster),
+			Tasks:   tasks.TaskArns,
+		})
+		if err != nil {
+			return err
+		}
+		if len(taskDescriptions.Tasks) > 0 {
+			recentTask := taskDescriptions.Tasks[0]
+			switch aws.StringValue(recentTask.StopCode) {
+			case "TaskFailedToStart":
+				return fmt.Errorf(aws.StringValue(recentTask.StoppedReason))
+			}
+		}
+	}
+	return nil
 }
 
 func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error) {
