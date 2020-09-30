@@ -54,7 +54,7 @@ func PsCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Show all containers (default shows just running)")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
-	_ = cmd.Flags().MarkHidden("json")
+	_ = cmd.Flags().MarkHidden("json") // Legacy. This is used by VSCode Docker extension
 
 	return cmd
 }
