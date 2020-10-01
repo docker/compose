@@ -112,10 +112,11 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			continue
 		}
 		if err := b.SDK.CheckStackState(ctx, name); err != nil {
+			if e := b.SDK.DeleteStack(ctx, name); e != nil {
+				return e
+			}
 			stackErr = err
-			b.SDK.DeleteStack(ctx, name)
 			operation = stackDelete
-
 			reason := err.Error()
 			if len(reason) > 30 {
 				reason = reason[:30] + "..."
