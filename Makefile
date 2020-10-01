@@ -96,6 +96,8 @@ validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 
 validate: validate-go-mod validate-headers ## Validate sources
 
+pre-commit: all lint validate test e2e-local
+
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
