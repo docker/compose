@@ -1,16 +1,2 @@
-[
-    {
-        "ID": "id",
-        "Image": "nginx",
-        "Status": "",
-        "Command": "",
-        "Ports": []
-    },
-    {
-        "ID": "1234",
-        "Image": "alpine",
-        "Status": "",
-        "Command": "",
-        "Ports": []
-    }
-]
+{"ID":"id","Image":"nginx","Status":"","Command":"","Ports":[]}
+{"ID":"1234","Image":"alpine","Status":"","Command":"","Ports":[]}

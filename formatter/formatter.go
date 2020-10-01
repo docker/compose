@@ -19,6 +19,7 @@ package formatter
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -27,16 +28,29 @@ import (
 )
 
 // Print prints formatted lists in different formats
-func Print(list interface{}, format string, outWriter io.Writer, writerFn func(w io.Writer), headers ...string) error {
+func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func(w io.Writer), headers ...string) error {
 	switch strings.ToLower(format) {
 	case PRETTY, "":
 		return PrintPrettySection(outWriter, writerFn, headers...)
 	case JSON:
-		outJSON, err := ToStandardJSON(list)
-		if err != nil {
-			return err
+		switch reflect.TypeOf(toJSON).Kind() {
+		case reflect.Slice:
+			s := reflect.ValueOf(toJSON)
+			for i := 0; i < s.Len(); i++ {
+				obj := s.Index(i).Interface()
+				jsonLine, err := ToCompressedJSON(obj)
+				if err != nil {
+					return err
+				}
+				_, _ = fmt.Fprintln(outWriter, jsonLine)
+			}
+		default:
+			outJSON, err := ToStandardJSON(toJSON)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintln(outWriter, outJSON)
 		}
-		_, _ = fmt.Fprint(outWriter, outJSON)
 	default:
 		return errors.Wrapf(errdefs.ErrParsingFailed, "format value %q could not be parsed", format)
 	}

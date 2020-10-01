@@ -93,20 +93,12 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return nil
 	}
 
-	view := viewFromContextList(contexts, currentContext)
-
-	if opts.json || opts.format == formatter.JSON {
-		for _, l := range view {
-			outJSON, err := formatter.ToCompressedJSON(l)
-			if err != nil {
-				return err
-			}
-			_, _ = fmt.Fprintln(os.Stdout, outJSON)
-		}
-		return nil
+	if opts.json {
+		opts.format = formatter.JSON
 	}
 
-	return formatter.Print(view, formatter.PRETTY, os.Stdout,
+	view := viewFromContextList(contexts, currentContext)
+	return formatter.Print(view, opts.format, os.Stdout,
 		func(w io.Writer) {
 			for _, c := range view {
 				contextName := c.Name

@@ -34,8 +34,12 @@ type testStruct struct {
 func TestPrint(t *testing.T) {
 	testList := []testStruct{
 		{
-			Name:   "myName",
-			Status: "myStatus",
+			Name:   "myName1",
+			Status: "myStatus1",
+		},
+		{
+			Name:   "myName2",
+			Status: "myStatus2",
 		},
 	}
 
@@ -45,7 +49,7 @@ func TestPrint(t *testing.T) {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
 		}
 	}, "NAME", "STATUS"))
-	assert.Equal(t, b.String(), "NAME                STATUS\nmyName              myStatus\n")
+	assert.Equal(t, b.String(), "NAME                STATUS\nmyName1             myStatus1\nmyName2             myStatus2\n")
 
 	b.Reset()
 	assert.NilError(t, Print(testList, JSON, b, func(w io.Writer) {
@@ -53,10 +57,7 @@ func TestPrint(t *testing.T) {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
 		}
 	}, "NAME", "STATUS"))
-	assert.Equal(t, b.String(), `[
-    {
-        "Name": "myName",
-        "Status": "myStatus"
-    }
-]`)
+	assert.Equal(t, b.String(), `{"Name":"myName1","Status":"myStatus1"}
+{"Name":"myName2","Status":"myStatus2"}
+`)
 }
