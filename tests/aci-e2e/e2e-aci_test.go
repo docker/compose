@@ -363,9 +363,9 @@ func TestContainerRunAttached(t *testing.T) {
 			"--restart", "on-failure",
 			"--memory", "0.1G", "--cpus", "0.1",
 			"-p", "80:80",
-			"nginx",
 			"--domainname",
 			dnsLabelName,
+			"nginx",
 		)
 		followLogsProcess = icmd.StartCmd(cmd)
 
