@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,8 +29,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/docker/compose-cli/aci/convert"
 
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
@@ -43,6 +40,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"github.com/docker/compose-cli/aci"
+	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
@@ -252,12 +250,8 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("http get", func(t *testing.T) {
-		r, err := HTTPGetWithRetry(endpoint, 3)
-		assert.NilError(t, err)
-		assert.Equal(t, r.StatusCode, http.StatusOK)
-		b, err := ioutil.ReadAll(r.Body)
-		assert.NilError(t, err)
-		assert.Assert(t, strings.Contains(string(b), testFileContent), "Actual content: "+string(b))
+		output := HTTPGetWithRetry(t, endpoint, http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Assert(t, strings.Contains(output, testFileContent), "Actual content: "+output)
 	})
 
 	t.Run("logs", func(t *testing.T) {
@@ -499,17 +493,12 @@ func TestComposeUpUpdate(t *testing.T) {
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
 
-		r, err := HTTPGetWithRetry(endpoint+"/words/noun", 3)
-		assert.NilError(t, err)
-		assert.Equal(t, r.StatusCode, http.StatusOK)
-		b, err := ioutil.ReadAll(r.Body)
-		assert.NilError(t, err)
-		assert.Assert(t, strings.Contains(string(b), `"word":`))
+		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
+
+		assert.Assert(t, strings.Contains(output, `"word":`))
 
 		endpoint = fmt.Sprintf("http://%s:%d", fqdn, containerInspect.Ports[0].HostPort)
-		r, err = HTTPGetWithRetry(endpoint+"/words/noun", 3)
-		assert.NilError(t, err)
-		assert.Equal(t, r.StatusCode, http.StatusOK)
+		HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 	})
 
 	t.Run("compose ps", func(t *testing.T) {
@@ -577,14 +566,7 @@ func TestComposeUpUpdate(t *testing.T) {
 				assert.Equal(t, containerInspect.Ports[0].HostPort, uint32(8080))
 				assert.Equal(t, containerInspect.Ports[0].ContainerPort, uint32(8080))
 			}
-			checkUp := func(t poll.LogT) poll.Result {
-				r, _ := http.Get(endpoint + route)
-				if r != nil && r.StatusCode == http.StatusOK {
-					return poll.Success()
-				}
-				return poll.Continue("Waiting for container to serve request")
-			}
-			poll.WaitOn(t, checkUp, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+			HTTPGetWithRetry(t, endpoint+route, http.StatusOK, 1*time.Second, 60*time.Second)
 
 			res = c.RunDockerCmd("ps")
 			p := containerInspect.Ports[0]
