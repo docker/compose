@@ -1,4 +1,4 @@
-// +build windows
+// +build e2e
 
 /*
    Copyright 2020 Docker Compose CLI authors
@@ -19,17 +19,13 @@
 package metrics
 
 import (
-	"net"
-	"time"
-
-	"github.com/Microsoft/go-winio"
+	"os"
 )
 
-var (
-	socket = `\\.\pipe\docker_cli`
-)
 
-func conn() (net.Conn, error) {
-	timeout := 200 * time.Millisecond
-	return winio.DialPipe(socket, &timeout)
+func init() {
+	testSocket, defined := os.LookupEnv("TEST_METRICS_SOCKET")
+	if defined {
+		socket = testSocket
+	}
 }

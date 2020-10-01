@@ -39,7 +39,7 @@ protos: ## Generate go code from .proto files
 cli: ## Compile the cli
 	@docker build . --target cli \
 	--platform local \
-	--build-arg BUILD_TAGS=example,local,ecs \
+	--build-arg BUILD_TAGS=example,local,e2e \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
@@ -63,7 +63,7 @@ cross: ## Compile the CLI for linux, darwin and windows
 
 test: ## Run unit tests
 	@docker build . \
-	--build-arg BUILD_TAGS=example,local,ecs \
+	--build-arg BUILD_TAGS=example,local \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target test
 

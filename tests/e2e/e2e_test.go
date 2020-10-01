@@ -158,6 +158,49 @@ func TestContextHelpACI(t *testing.T) {
 	})
 }
 
+func TestContextMetrics(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	s := NewMetricsServer(c.MetricsSocket())
+	s.Start()
+	defer s.Stop()
+
+	t.Run("metrics on default context", func(t *testing.T) {
+		s.ResetUsage()
+
+		c.RunDockerCmd("ps")
+		c.RunDockerCmd("version")
+		c.RunDockerOrExitError("version", "--xxx")
+
+		usage := s.GetUsage()
+		assert.Equal(t, 3, len(usage))
+		assert.Equal(t, `{"command":"ps","context":"moby","source":"cli","status":"success"}`, usage[0])
+		assert.Equal(t, `{"command":"version","context":"moby","source":"cli","status":"success"}`, usage[1])
+		assert.Equal(t, `{"command":"version","context":"moby","source":"cli","status":"failure"}`, usage[2])
+	})
+
+	t.Run("metrics on other context type", func(t *testing.T) {
+		s.ResetUsage()
+
+		c.RunDockerCmd("context", "create", "example", "test-example")
+		c.RunDockerCmd("ps")
+		c.RunDockerCmd("context", "use", "test-example")
+		c.RunDockerCmd("ps")
+		c.RunDockerOrExitError("error")
+		c.RunDockerCmd("context", "use", "default")
+		c.RunDockerCmd("--context", "test-example", "ps")
+
+		usage := s.GetUsage()
+		assert.Equal(t, 7, len(usage))
+		assert.Equal(t, `{"command":"context create","context":"moby","source":"cli","status":"success"}`, usage[0])
+		assert.Equal(t, `{"command":"ps","context":"moby","source":"cli","status":"success"}`, usage[1])
+		assert.Equal(t, `{"command":"context use","context":"moby","source":"cli","status":"success"}`, usage[2])
+		assert.Equal(t, `{"command":"ps","context":"example","source":"cli","status":"success"}`, usage[3])
+		assert.Equal(t, `{"command":"error","context":"example","source":"cli","status":"failure"}`, usage[4])
+		assert.Equal(t, `{"command":"context use","context":"example","source":"cli","status":"success"}`, usage[5])
+		assert.Equal(t, `{"command":"ps","context":"example","source":"cli","status":"success"}`, usage[6])
+	})
+}
+
 func TestContextDuplicateACI(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 

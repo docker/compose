@@ -130,7 +130,7 @@ jobs:
 
       - name: Build
         env:
-          BUILD_TAGS: example,local
+          BUILD_TAGS: example,local,e2e
         run: make -f builder.Makefile cli
 
       - name: E2E Test

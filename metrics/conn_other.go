@@ -20,7 +20,7 @@ package metrics
 
 import "net"
 
-const (
+var (
 	socket = "/var/run/docker-cli.sock"
 )
 
