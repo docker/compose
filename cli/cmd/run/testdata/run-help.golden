@@ -8,6 +8,7 @@ Flags:
   -d, --detach                Run container in background and print container ID
       --domainname string     Container NIS domain name
   -e, --env stringArray       Set environment variables
+      --envFile stringArray   Path to environment files to be translated as environment variables
   -l, --label stringArray     Set meta data on a container
   -m, --memory bytes          Memory limit
       --name string           Assign a name to the container
