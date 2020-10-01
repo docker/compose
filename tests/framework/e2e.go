@@ -142,7 +142,7 @@ func CopyFile(sourceFile string, destinationFile string) error {
 	return nil
 }
 
-// NewCmd creates a cmd object configured with the test environment set
+// NewCmd creates a cmd object configured with the Test environment set
 func (c *E2eCLI) NewCmd(command string, args ...string) icmd.Cmd {
 	env := append(os.Environ(),
 		"DOCKER_CONFIG="+c.ConfigDir,
@@ -173,7 +173,7 @@ func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 	return res
 }
 
-// PathEnvVar returns path (os sensitive) for running test
+// PathEnvVar returns path (os sensitive) for running Test
 func (c *E2eCLI) PathEnvVar() string {
 	path := c.BinDir + ":" + os.Getenv("PATH")
 	if runtime.GOOS == "windows" {

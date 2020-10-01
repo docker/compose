@@ -6,18 +6,11 @@ services:
   words:
     build: words
     image: gtardif/sentences-api
+    ports:
+      - "8080:8080"
 
   web:
     build: web
     image: gtardif/sentences-web
     ports:
       - "80:80"
-    volumes:
-      - mydata:/mount/testvolumes
-
-volumes:
-  mydata:
-    driver: azure_file
-    driver_opts:
-      share_name: minecraft-volume
-      storage_account_name: minecraftdocker

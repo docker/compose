@@ -1,0 +1,23 @@
+services:
+  db:
+    build: db
+    image: gtardif/sentences-db
+
+  words:
+    build: words
+    image: gtardif/sentences-api
+
+  web:
+    build: web
+    image: gtardif/sentences-web
+    ports:
+      - "80:80"
+    volumes:
+      - mydata:/static/volume_test
+
+volumes:
+  mydata:
+    driver: azure_file
+    driver_opts:
+      share_name: dockertestshare
+      storage_account_name: dockertestvolumeaccount
