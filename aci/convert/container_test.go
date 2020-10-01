@@ -29,12 +29,14 @@ import (
 func TestConvertContainerEnvironment(t *testing.T) {
 	container := containers.ContainerConfig{
 		ID:          "container1",
+		Command:     []string{"echo", "Hello!"},
 		Environment: []string{"key1=value1", "key2", "key3=value3"},
 	}
 	project, err := ContainerToComposeProject(container)
 	assert.NilError(t, err)
 	service1 := project.Services[0]
 	assert.Equal(t, service1.Name, container.ID)
+	assert.DeepEqual(t, []string(service1.Command), container.Command)
 	assert.DeepEqual(t, service1.Environment, types.MappingWithEquals{
 		"key1": to.StringPtr("value1"),
 		"key2": nil,

@@ -374,6 +374,7 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 		Name: to.StringPtr(s.Name),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image:                to.StringPtr(s.Image),
+			Command:              to.StringSlicePtr(s.Command),
 			EnvironmentVariables: getEnvVariables(s.Environment),
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{

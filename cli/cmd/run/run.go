@@ -38,11 +38,15 @@ func Command(contextType string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a container",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				opts.Command = args[1:]
+			}
 			return runRun(cmd.Context(), args[0], opts)
 		},
 	}
+	cmd.Flags().SetInterspersed(false)
 
 	cmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")

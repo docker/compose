@@ -46,6 +46,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 			{
 				Name:        r.ID,
 				Image:       r.Image,
+				Command:     r.Command,
 				Ports:       ports,
 				Labels:      r.Labels,
 				Volumes:     serviceConfigVolumes,

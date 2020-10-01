@@ -33,6 +33,7 @@ import (
 // Opts contain run command options
 type Opts struct {
 	Name                   string
+	Command                []string
 	Publish                []string
 	Labels                 []string
 	Volumes                []string
@@ -68,6 +69,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
+		Command:                r.Command,
 		Ports:                  publish,
 		Labels:                 labels,
 		Volumes:                r.Volumes,
