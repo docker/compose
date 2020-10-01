@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/cli/opts"
+
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/docker/docker/pkg/namesgenerator"
@@ -41,6 +43,7 @@ type Opts struct {
 	Memory                 formatter.MemBytes
 	Detach                 bool
 	Environment            []string
+	EnvironmentFiles       []string
 	RestartPolicyCondition string
 	DomainName             string
 }
@@ -66,6 +69,15 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		return containers.ContainerConfig{}, err
 	}
 
+	envVars := r.Environment
+	for _, f := range r.EnvironmentFiles {
+		vars, err := opts.ParseEnvFile(f)
+		if err != nil {
+			return containers.ContainerConfig{}, err
+		}
+		envVars = append(envVars, vars...)
+	}
+
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
@@ -75,7 +87,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		Volumes:                r.Volumes,
 		MemLimit:               r.Memory,
 		CPULimit:               r.Cpus,
-		Environment:            r.Environment,
+		Environment:            envVars,
 		RestartPolicyCondition: restartPolicy,
 		DomainName:             r.DomainName,
 	}, nil

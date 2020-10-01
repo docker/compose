@@ -23,6 +23,8 @@ import (
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
+
+	"github.com/docker/compose-cli/cli/options/run"
 )
 
 func TestHelp(t *testing.T) {
@@ -39,4 +41,25 @@ func TestHelpNoDomainFlag(t *testing.T) {
 	c.SetOutput(&b)
 	_ = c.Help()
 	assert.Assert(t, !strings.Contains(b.String(), "domainname"))
+}
+
+func TestRunEnvironmentFiles(t *testing.T) {
+	runOpts := run.Opts{
+		Environment: []string{
+			"VAR=1",
+		},
+		EnvironmentFiles: []string{
+			"testdata/runtest1.env",
+			"testdata/runtest2.env",
+		},
+	}
+	containerConfig, err := runOpts.ToContainerConfig("test")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, containerConfig.Environment, []string{
+		"VAR=1",
+		"FIRST_VAR=\"firstValue\"",
+		"SECOND_VAR=secondValue",
+		"THIRD_VAR=2",
+		"FOURTH_VAR=fourthValue",
+	})
 }
