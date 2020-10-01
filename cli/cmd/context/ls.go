@@ -93,21 +93,33 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return nil
 	}
 
-	if opts.json {
-		opts.format = formatter.JSON
+	view := viewFromContextList(contexts, currentContext)
+
+	if opts.json || opts.format == formatter.JSON {
+		for _, l := range view {
+			outJSON, err := formatter.ToCompressedJSON(l)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintln(os.Stdout, outJSON)
+		}
+		return nil
 	}
 
-	view := viewFromContextList(contexts, currentContext)
-	return formatter.Print(view, opts.format, os.Stdout,
+	return formatter.Print(view, formatter.PRETTY, os.Stdout,
 		func(w io.Writer) {
 			for _, c := range view {
+				contextName := c.Name
+				if c.Current {
+					contextName += " *"
+				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-					c.Name,
+					contextName,
 					c.Type,
 					c.Description,
 					c.DockerEndpoint,
 					c.KubernetesEndpoint,
-					c.Orchestrator)
+					c.StackOrchestrator)
 			}
 		},
 		"NAME", "TYPE", "DESCRIPTION", "DOCKER ENDPOINT", "KUBERNETES ENDPOINT", "ORCHESTRATOR")
@@ -132,28 +144,26 @@ func getEndpoint(name string, meta map[string]interface{}) string {
 }
 
 type contextView struct {
-	Name               string
-	Type               string
+	Current            bool
 	Description        string
 	DockerEndpoint     string
 	KubernetesEndpoint string
-	Orchestrator       string
+	Type               string
+	Name               string
+	StackOrchestrator  string
 }
 
 func viewFromContextList(contextList []*store.DockerContext, currentContext string) []contextView {
 	retList := make([]contextView, len(contextList))
 	for i, c := range contextList {
-		contextName := c.Name
-		if c.Name == currentContext {
-			contextName += " *"
-		}
 		retList[i] = contextView{
-			Name:               contextName,
-			Type:               c.Type(),
+			Current:            c.Name == currentContext,
 			Description:        c.Metadata.Description,
 			DockerEndpoint:     getEndpoint("docker", c.Endpoints),
 			KubernetesEndpoint: getEndpoint("kubernetes", c.Endpoints),
-			Orchestrator:       c.Metadata.StackOrchestrator,
+			Name:               c.Name,
+			Type:               c.Type(),
+			StackOrchestrator:  c.Metadata.StackOrchestrator,
 		}
 	}
 	return retList

@@ -30,3 +30,12 @@ func ToStandardJSON(i interface{}) (string, error) {
 	}
 	return string(b), nil
 }
+
+// ToCompressedJSON return a string with the JSON representation of the interface{}
+func ToCompressedJSON(i interface{}) (string, error) {
+	b, err := json.Marshal(i)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}

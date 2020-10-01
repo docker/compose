@@ -112,8 +112,8 @@ func fqdn(container containers.Container) string {
 type containerView struct {
 	ID      string
 	Image   string
-	Command string
 	Status  string
+	Command string
 	Ports   []string
 }
 
@@ -123,8 +123,8 @@ func viewFromContainerList(containerList []containers.Container) []containerView
 		retList[i] = containerView{
 			ID:      c.ID,
 			Image:   c.Image,
-			Command: c.Command,
 			Status:  c.Status,
+			Command: c.Command,
 			Ports:   formatter.PortsToStrings(c.Ports, fqdn(c)),
 		}
 	}

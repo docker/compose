@@ -1,16 +1,1 @@
-[
-    {
-        "Name": "default",
-        "Metadata": {
-            "Description": "Current DOCKER_HOST based configuration",
-            "StackOrchestrator": "swarm",
-            "Type": "moby"
-        },
-        "Endpoints": {
-            "docker": {
-                "Host": "unix:///var/run/docker.sock"
-            },
-            "kubernetes": {}
-        }
-    }
-]
+{"Current":true,"Description":"Current DOCKER_HOST based configuration","DockerEndpoint":"unix:///var/run/docker.sock","KubernetesEndpoint":"","Type":"moby","Name":"default","StackOrchestrator":"swarm"}
