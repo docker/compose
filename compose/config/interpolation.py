@@ -4,6 +4,7 @@ from string import Template
 
 from .errors import ConfigurationError
 from compose.const import COMPOSEFILE_V1 as V1
+from compose.utils import _exec_cmd
 from compose.utils import parse_bytes
 from compose.utils import parse_nanoseconds_int
 
@@ -95,7 +96,7 @@ class TemplateWithDefaults(Template):
         """.format(
         delim=re.escape('$'),
         id=r'[_a-z][_a-z0-9]*',
-        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?])[^}]*)?',
+        bid=r'[_a-z][_a-z0-9]*(?:(?P<sep>:?[-?~])[^}]*)?',
     )
 
     @staticmethod
@@ -118,6 +119,15 @@ class TemplateWithDefaults(Template):
             if var in mapping:
                 return mapping.get(var)
             raise UnsetRequiredSubstitution(err)
+
+        if ':~' == sep:
+            var, _, cmd = braced.partition(':~')
+            process, stdout, stderr = _exec_cmd(cmd)
+            return mapping.get(var) or stdout
+        elif '~' == sep:
+            var, _, cmd = braced.partition('~')
+            process, stdout, stderr = _exec_cmd(cmd)
+            return mapping.get(var) or stdout
 
     # Modified from python2.7/string.py
     def substitute(self, mapping):

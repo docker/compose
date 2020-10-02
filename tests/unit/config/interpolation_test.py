@@ -398,6 +398,27 @@ def test_interpolate_with_empty_and_default_value(defaults_interpolator):
     assert defaults_interpolator("ok ${BAR-def}") == "ok "
 
 
+def test_interpolate_with_value_and_command(defaults_interpolator):
+    assert defaults_interpolator("ok ${FOO:~(echo def)}") == "ok first"
+    assert defaults_interpolator("ok ${FOO:~echo def}") == "ok first"
+    assert defaults_interpolator("ok ${FOO~(echo def)}") == "ok first"
+    assert defaults_interpolator("ok ${FOO~echo def}") == "ok first"
+
+
+def test_interpolate_missing_with_command(defaults_interpolator):
+    assert defaults_interpolator("ok ${missing:~(echo def)}") == "ok def"
+    assert defaults_interpolator("ok ${missing:~echo def}") == "ok def"
+    assert defaults_interpolator("ok ${missing~(echo def)}") == "ok def"
+    assert defaults_interpolator("ok ${missing~echo def}") == "ok def"
+
+
+def test_interpolate_with_empty_and_command(defaults_interpolator):
+    assert defaults_interpolator("ok ${BAR:~(echo def)}") == "ok def"
+    assert defaults_interpolator("ok ${BAR:~echo def}") == "ok def"
+    assert defaults_interpolator("ok ${BAR~(echo def)}") == "ok def"
+    assert defaults_interpolator("ok ${BAR~echo def}") == "ok def"
+
+
 def test_interpolate_mandatory_values(defaults_interpolator):
     assert defaults_interpolator("ok ${FOO:?bar}") == "ok first"
     assert defaults_interpolator("ok ${FOO?bar}") == "ok first"

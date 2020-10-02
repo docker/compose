@@ -3,6 +3,8 @@ import json.decoder
 import logging
 import ntpath
 import random
+import re
+import subprocess
 
 from docker.errors import DockerException
 from docker.utils import parse_bytes as sdk_parse_bytes
@@ -174,3 +176,19 @@ def truncate_string(s, max_chars=35):
     if len(s) > max_chars:
         return s[:max_chars - 2] + '...'
     return s
+
+
+def remove_outermost_parenthesis(cmd):
+    if cmd[0] == '(' and cmd[-1] == ')':
+        regex = re.compile(r'(?<=\().*(?=\))')
+        cmd = regex.findall(cmd)[0].split()
+    else:
+        cmd = cmd.split()
+    return cmd
+
+
+def _exec_cmd(cmd):
+    cmd = remove_outermost_parenthesis(cmd)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = [std.decode() for std in process.communicate()]
+    return process, stdout.strip('\n'), stderr
