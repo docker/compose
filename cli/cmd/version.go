@@ -61,7 +61,10 @@ func runVersion(cmd *cobra.Command, version string) {
 	case formatter.JSON, "{{json.}}": // Try to catch full JSON formats
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...),
 			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
+	default:
+		versionString = getOutFromMoby(cmd)
 	}
+
 	fmt.Print(versionString)
 }
 
