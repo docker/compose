@@ -19,14 +19,12 @@ package login
 import (
 	"context"
 	"fmt"
-	"strings"
-
-	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 	"github.com/docker/compose-cli/cli/mobycli"
 	"github.com/docker/compose-cli/errdefs"
 )
@@ -52,10 +50,6 @@ func Command() *cobra.Command {
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
-	if len(args) == 1 && !strings.Contains(args[0], ".") {
-		backend := args[0]
-		return errors.New("unknown backend type for cloud login: " + backend)
-	}
 	mobycli.Exec(cmd.Root())
 	return nil
 }
