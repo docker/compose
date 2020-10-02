@@ -32,6 +32,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/cloudformation/cloudformationiface"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
@@ -48,6 +50,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,6 +64,7 @@ type sdk struct {
 	CF  cloudformationiface.CloudFormationAPI
 	SM  secretsmanageriface.SecretsManagerAPI
 	SSM ssmiface.SSMAPI
+	AG  autoscalingiface.AutoScalingAPI
 }
 
 func newSDK(sess *session.Session) sdk {
@@ -77,6 +81,7 @@ func newSDK(sess *session.Session) sdk {
 		CF:  cloudformation.New(sess),
 		SM:  secretsmanager.New(sess),
 		SSM: ssm.New(sess),
+		AG:  autoscaling.New(sess),
 	}
 }
 
@@ -364,7 +369,24 @@ type stackResource struct {
 	Status    string
 }
 
-func (s sdk) ListStackResources(ctx context.Context, name string) ([]stackResource, error) {
+type stackResourceFn func(r stackResource) error
+
+type stackResources []stackResource
+
+func (resources stackResources) apply(awsType string, fn stackResourceFn) error {
+	var errs *multierror.Error
+	for _, r := range resources {
+		if r.Type == awsType {
+			err := fn(r)
+			if err != nil {
+				errs = multierror.Append(err)
+			}
+		}
+	}
+	return errs.ErrorOrNil()
+}
+
+func (s sdk) ListStackResources(ctx context.Context, name string) (stackResources, error) {
 	// FIXME handle pagination
 	res, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
 		StackName: aws.String(name),
@@ -373,7 +395,7 @@ func (s sdk) ListStackResources(ctx context.Context, name string) ([]stackResour
 		return nil, err
 	}
 
-	resources := []stackResource{}
+	resources := stackResources{}
 	for _, r := range res.StackResourceSummaries {
 		resources = append(resources, stackResource{
 			LogicalID: aws.StringValue(r.LogicalResourceId),
@@ -713,4 +735,19 @@ func (s sdk) SecurityGroupExists(ctx context.Context, sg string) (bool, error) {
 		return false, err
 	}
 	return len(desc.SecurityGroups) > 0, nil
+}
+
+func (s sdk) DeleteCapacityProvider(ctx context.Context, arn string) error {
+	_, err := s.ECS.DeleteCapacityProvider(&ecs.DeleteCapacityProviderInput{
+		CapacityProvider: aws.String(arn),
+	})
+	return err
+}
+
+func (s sdk) DeleteAutoscalingGroup(ctx context.Context, arn string) error {
+	_, err := s.AG.DeleteAutoScalingGroup(&autoscaling.DeleteAutoScalingGroupInput{
+		AutoScalingGroupName: aws.String(arn),
+		ForceDelete:          aws.Bool(true),
+	})
+	return err
 }

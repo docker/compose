@@ -18,12 +18,58 @@ package ecs
 
 import (
 	"context"
+
+	"github.com/docker/compose-cli/progress"
 )
 
 func (b *ecsAPIService) Down(ctx context.Context, project string) error {
-	err := b.SDK.DeleteStack(ctx, project)
+	resources, err := b.SDK.ListStackResources(ctx, project)
 	if err != nil {
 		return err
 	}
-	return b.WaitStackCompletion(ctx, project, stackDelete)
+
+	err = resources.apply(awsTypeCapacityProvider, delete(ctx, b.SDK.DeleteCapacityProvider))
+	if err != nil {
+		return err
+	}
+
+	err = resources.apply(awsTypeAutoscalingGroup, delete(ctx, b.SDK.DeleteAutoscalingGroup))
+	if err != nil {
+		return err
+	}
+
+	previousEvents, err := b.previousStackEvents(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	err = b.SDK.DeleteStack(ctx, project)
+	if err != nil {
+		return err
+	}
+	return b.WaitStackCompletion(ctx, project, stackDelete, previousEvents...)
+}
+
+func (b *ecsAPIService) previousStackEvents(ctx context.Context, project string) ([]string, error) {
+	events, err := b.SDK.DescribeStackEvents(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	var previousEvents []string
+	for _, e := range events {
+		previousEvents = append(previousEvents, *e.EventId)
+	}
+	return previousEvents, nil
+}
+
+func delete(ctx context.Context, delete func(ctx context.Context, arn string) error) func(r stackResource) error {
+	return func(r stackResource) error {
+		w := progress.ContextWriter(ctx)
+		w.Event(progress.Event{
+			ID:         r.LogicalID,
+			Status:     progress.Working,
+			StatusText: "DELETE_IN_PROGRESS",
+		})
+		return delete(ctx, r.ARN)
+	}
 }

@@ -28,8 +28,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 )
 
-func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int) error { //nolint:gocyclo
+func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int, ignored ...string) error { //nolint:gocyclo
 	knownEvents := map[string]struct{}{}
+	for _, id := range ignored {
+		knownEvents[id] = struct{}{}
+	}
+
 	// progress writer
 	w := progress.ContextWriter(ctx)
 	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
@@ -78,7 +82,6 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			case "CREATE_COMPLETE":
 				if operation == stackCreate {
 					progressStatus = progress.Done
-
 				}
 			case "UPDATE_COMPLETE":
 				if operation == stackUpdate {
