@@ -56,7 +56,7 @@ func runInspect(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(j)
+	fmt.Print(j)
 
 	return nil
 }

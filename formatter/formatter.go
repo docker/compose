@@ -38,11 +38,11 @@ func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func
 			s := reflect.ValueOf(toJSON)
 			for i := 0; i < s.Len(); i++ {
 				obj := s.Index(i).Interface()
-				jsonLine, err := ToCompressedJSON(obj)
+				jsonLine, err := ToJSON(obj, "", "")
 				if err != nil {
 					return err
 				}
-				_, _ = fmt.Fprintln(outWriter, jsonLine)
+				_, _ = fmt.Fprint(outWriter, jsonLine)
 			}
 		default:
 			outJSON, err := ToStandardJSON(toJSON)
