@@ -46,6 +46,7 @@ func TestGrpcContainerToContainerConfig(t *testing.T) {
 		},
 		MemoryLimit: 41,
 		CpuLimit:    42,
+		Environment: []string{"PROTOVAR=VALUE"},
 	}
 
 	cc := grpcContainerToContainerConfig(r)
@@ -65,4 +66,5 @@ func TestGrpcContainerToContainerConfig(t *testing.T) {
 	assert.DeepEqual(t, cc.Labels, map[string]string{
 		"mykey": "mylabel",
 	})
+	assert.DeepEqual(t, cc.Environment, []string{"PROTOVAR=VALUE"})
 }
