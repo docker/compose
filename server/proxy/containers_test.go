@@ -46,7 +46,7 @@ func TestGrpcContainerToContainerConfig(t *testing.T) {
 		},
 		MemoryLimit: 41,
 		CpuLimit:    42,
-		EnvVars:     []string{"PROTOVAR=VALUE"},
+		Environment: []string{"PROTOVAR=VALUE"},
 	}
 
 	cc := grpcContainerToContainerConfig(r)

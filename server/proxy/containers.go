@@ -160,6 +160,6 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 		MemLimit:               formatter.MemBytes(request.GetMemoryLimit()),
 		CPULimit:               float64(request.GetCpuLimit()),
 		RestartPolicyCondition: request.RestartPolicyCondition,
-		Environment:            request.EnvVars,
+		Environment:            request.Environment,
 	}
 }

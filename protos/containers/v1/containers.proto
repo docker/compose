@@ -104,7 +104,7 @@ message RunRequest {
 	uint64 cpu_limit = 7;
 	string restart_policy_condition = 8;
 	repeated string command = 9;
-	repeated string env_vars = 10; 
+	repeated string environment = 10; 
 }
 
 message RunResponse {
