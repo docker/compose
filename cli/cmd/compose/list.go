@@ -61,8 +61,7 @@ func runList(ctx context.Context, opts composeOptions) error {
 	view := viewFromStackList(stackList)
 	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
 		for _, stack := range view {
-			_, _ = fmt.Fprintf(w, "%s\t%s\n", stack.Name, strings.TrimSpace(
-				fmt.Sprintf("%s %s", stack.Status, stack.Reason))
+			_, _ = fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
 		}
 	}, "NAME", "STATUS")
 }
@@ -77,7 +76,7 @@ func viewFromStackList(stackList []compose.Stack) []stackView {
 	for i, s := range stackList {
 		retList[i] = stackView{
 			Name:   s.Name,
-			Status: s.Status,
+			Status: strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
 		}
 	}
 	return retList

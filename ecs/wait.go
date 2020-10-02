@@ -52,7 +52,6 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 
 	var completed bool
 	var stackErr error
-
 	for !completed {
 		select {
 		case <-done:
@@ -75,11 +74,12 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			knownEvents[*event.EventId] = struct{}{}
 
 			resource := aws.StringValue(event.LogicalResourceId)
-			reason := aws.StringValue(event.ResourceStatusReason)
+			reason := shortenMessage(
+				aws.StringValue(event.ResourceStatusReason))
 			status := aws.StringValue(event.ResourceStatus)
 			progressStatus := progress.Working
-			switch status {
 
+			switch status {
 			case "CREATE_COMPLETE":
 				if operation == stackCreate {
 					progressStatus = progress.Done
@@ -101,7 +101,6 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 					}
 				}
 			}
-
 			w.Event(progress.Event{
 				ID:         resource,
 				Status:     progressStatus,
@@ -111,25 +110,27 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 		if operation != stackCreate || stackErr != nil {
 			continue
 		}
-		if err := b.SDK.CheckStackState(ctx, name); err != nil {
+		if err := b.checkStackState(ctx, name); err != nil {
 			if e := b.SDK.DeleteStack(ctx, name); e != nil {
 				return e
 			}
 			stackErr = err
 			operation = stackDelete
-			reason := err.Error()
-			if len(reason) > 30 {
-				reason = reason[:30] + "..."
-			}
+			reason := shortenMessage(err.Error())
 			w.Event(progress.Event{
 				ID:         name,
 				Status:     progress.Error,
 				StatusText: reason,
 			})
-
 		}
-
 	}
 
 	return stackErr
+}
+
+func shortenMessage(message string) string {
+	if len(message) < 30 {
+		return message
+	}
+	return message[:30] + "..."
 }

@@ -25,33 +25,25 @@ import (
 )
 
 func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
-	resources, err := b.SDK.ListStackResources(ctx, project)
+	cluster, err := b.SDK.GetStackClusterID(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-
-	var (
-		cluster     = project
-		servicesARN []string
-	)
-	for _, r := range resources {
-		switch r.Type {
-		case "AWS::ECS::Service":
-			servicesARN = append(servicesARN, r.ARN)
-		case "AWS::ECS::Cluster":
-			cluster = r.ARN
-		}
+	servicesARN, err := b.SDK.ListStackServices(ctx, project)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(servicesARN) == 0 {
 		return nil, nil
 	}
-	status, err := b.SDK.DescribeServices(ctx, cluster, servicesARN)
-	if err != nil {
-		return nil, err
-	}
 
-	for i, state := range status {
+	status := []compose.ServiceStatus{}
+	for _, arn := range servicesARN {
+		state, err := b.SDK.DescribeService(ctx, cluster, arn)
+		if err != nil {
+			return nil, err
+		}
 		ports := []string{}
 		for _, lb := range state.Publishers {
 			ports = append(ports, fmt.Sprintf(
@@ -62,7 +54,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.Servi
 				strings.ToLower(lb.Protocol)))
 		}
 		state.Ports = ports
-		status[i] = state
+		status = append(status, state)
 	}
 	return status, nil
 }
