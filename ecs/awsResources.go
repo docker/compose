@@ -189,7 +189,6 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 		securityGroup := networkResourceName(name)
 		template.Resources[securityGroup] = &ec2.SecurityGroup{
 			GroupDescription: fmt.Sprintf("%s Security Group for %s network", project.Name, name),
-			GroupName:        securityGroup,
 			VpcId:            r.vpc,
 			Tags:             networkTags(project, net),
 		}

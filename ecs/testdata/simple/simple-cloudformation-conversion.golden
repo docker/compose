@@ -37,7 +37,6 @@
     "DefaultNetwork": {
       "Properties": {
         "GroupDescription": "TestSimpleConvert Security Group for default network",
-        "GroupName": "DefaultNetwork",
         "Tags": [
           {
             "Key": "com.docker.compose.project",
@@ -301,6 +300,16 @@
         "ManagedPolicyArns": [
           "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
           "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        ],
+        "Tags": [
+          {
+            "Key": "com.docker.compose.project",
+            "Value": "TestSimpleConvert"
+          },
+          {
+            "Key": "com.docker.compose.service",
+            "Value": "simple"
+          }
         ]
       },
       "Type": "AWS::IAM::Role"
