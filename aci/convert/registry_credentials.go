@@ -39,11 +39,10 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 )
 
-// Specific username from ACR docs : https://github.com/Azure/acr/blob/master/docs/AAD-OAuth.md#getting-credentials-programatically
 const (
-	tokenUsername     = "00000000-0000-0000-0000-000000000000"
-	dockerHub         = "index.docker.io"
-	acrRegistrySuffix = ".azurecr.io"
+	// Specific username from ACR docs : https://github.com/Azure/acr/blob/master/docs/AAD-OAuth.md#getting-credentials-programatically
+	tokenUsername = "00000000-0000-0000-0000-000000000000"
+	dockerHub     = "index.docker.io"
 )
 
 type registryHelper interface {
@@ -128,7 +127,7 @@ func getUsedRegistries(project compose.Project) (map[string]bool, []string) {
 			registry = dockerHub
 		} else if !strings.Contains(registry, ".") {
 			registry = dockerHub
-		} else if strings.HasSuffix(registry, acrRegistrySuffix) {
+		} else if strings.HasSuffix(registry, login.AcrRegistrySuffix) {
 			acrRegistries = append(acrRegistries, registry)
 		}
 		usedRegistries[registry] = true

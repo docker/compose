@@ -49,7 +49,7 @@ type azureAPIHelper struct{}
 
 func (helper azureAPIHelper) getDeviceCodeFlowToken() (adal.Token, error) {
 	deviceconfig := auth.NewDeviceFlowConfig(clientID, "common")
-	deviceconfig.Resource = "https://management.core.windows.net/"
+	deviceconfig.Resource = azureManagementURL
 	spToken, err := deviceconfig.ServicePrincipalToken()
 	if err != nil {
 		return adal.Token{}, err
