@@ -34,6 +34,7 @@ import (
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 
 	"github.com/docker/compose-cli/api/containers"
 )
@@ -201,19 +202,28 @@ func ParseContainerInspect(stdout string) (*containers.Container, error) {
 }
 
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`.
-// In the case of an error it retries the same request after a 5 second sleep,
-// returning the error if count of `tries` is reached
-func HTTPGetWithRetry(endpoint string, tries int) (*http.Response, error) {
+// In the case of an error or the response status is not the expeted one, it retries the same request,
+// returning the response body as a string (empty if we could not reach it)
+func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDelay time.Duration, timeout time.Duration) string {
 	var (
 		r   *http.Response
 		err error
 	)
-	for t := 0; t < tries; t++ {
+	checkUp := func(t poll.LogT) poll.Result {
 		r, err = http.Get(endpoint)
-		if err == nil || t == tries-1 {
-			break
+		if err != nil {
+			return poll.Continue("reaching %q: Error %s", endpoint, err.Error())
 		}
-		time.Sleep(5 * time.Second)
+		if r.StatusCode == expectedStatus {
+			return poll.Success()
+		}
+		return poll.Continue("reaching %q: %d != %d", endpoint, r.StatusCode, expectedStatus)
 	}
-	return r, err
+	poll.WaitOn(t, checkUp, poll.WithDelay(retryDelay), poll.WithTimeout(timeout))
+	if r != nil {
+		b, err := ioutil.ReadAll(r.Body)
+		assert.NilError(t, err)
+		return string(b)
+	}
+	return ""
 }
