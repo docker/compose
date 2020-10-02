@@ -205,9 +205,30 @@ func TestLoginCommandDelegation(t *testing.T) {
 		})
 	})
 
+	t.Run("localhost registry interactive", func(t *testing.T) {
+		res := c.RunDockerOrExitError("login", "localhost:443")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Cannot perform an interactive login from a non TTY device",
+		})
+	})
+
+	t.Run("localhost registry", func(t *testing.T) {
+		res := c.RunDockerOrExitError("login", "localhost", "-u", "user", "-p", "password")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "http://localhost/v2/",
+		})
+	})
+
 	t.Run("logout", func(t *testing.T) {
 		res := c.RunDockerCmd("logout", "someregistry.docker.io")
-		res.Assert(t, icmd.Expected{Out: "someregistry.docker.io"})
+		res.Assert(t, icmd.Expected{Out: "Removing login credentials for someregistry.docker.io"})
+	})
+
+	t.Run("logout", func(t *testing.T) {
+		res := c.RunDockerCmd("logout", "localhost:443")
+		res.Assert(t, icmd.Expected{Out: "Removing login credentials for localhost:443"})
 	})
 
 	t.Run("existing context", func(t *testing.T) {
@@ -217,18 +238,6 @@ func TestLoginCommandDelegation(t *testing.T) {
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "unauthorized: incorrect username or password",
-		})
-	})
-}
-
-func TestCloudLogin(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-
-	t.Run("unknown backend", func(t *testing.T) {
-		res := c.RunDockerOrExitError("login", "mycloudbackend")
-		res.Assert(t, icmd.Expected{
-			ExitCode: 1,
-			Err:      "unknown backend type for cloud login: mycloudbackend",
 		})
 	})
 }
