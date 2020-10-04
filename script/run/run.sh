@@ -4,23 +4,23 @@
 #
 # This script will attempt to mirror the host paths by using volumes for the
 # following paths:
-#   * $(pwd)
-#   * $(dirname $COMPOSE_FILE) if it's set
-#   * $HOME if it's set
+#   * ${PWD}
+#   * $(dirname ${COMPOSE_FILE}) if it's set
+#   * ${HOME} if it's set
 #
 # You can add additional volumes (or any docker run options) using
-# the $COMPOSE_OPTIONS environment variable.
+# the ${COMPOSE_OPTIONS} environment variable.
 #
-
+# You can set a specific image tag from Docker Hub, such as "1.26.1", or "alpine-1.26.1"
+# using the $DOCKER_COMPOSE_IMAGE_TAG environment variable (defaults to "latest")
+#
 
 set -e
 
-VERSION="1.26.1"
-IMAGE="docker/compose:$VERSION"
-
+IMAGE="docker/compose:${DOCKER_COMPOSE_IMAGE_TAG:-latest}"
 
 # Setup options for connecting to docker host
-if [ -z "$DOCKER_HOST" ]; then
+if [ -z "${DOCKER_HOST}" ]; then
     DOCKER_HOST='unix:///var/run/docker.sock'
 fi
 if [ -S "${DOCKER_HOST#unix://}" ]; then
@@ -29,42 +29,39 @@ else
     DOCKER_ADDR="-e DOCKER_HOST -e DOCKER_TLS_VERIFY -e DOCKER_CERT_PATH"
 fi
 
-
 # Setup volume mounts for compose config and context
-if [ "$(pwd)" != '/' ]; then
-    VOLUMES="-v $(pwd):$(pwd)"
+if [ "${PWD}" != '/' ]; then
+    VOLUMES="-v ${PWD}:${PWD}"
 fi
-if [ -n "$COMPOSE_FILE" ]; then
-    COMPOSE_OPTIONS="$COMPOSE_OPTIONS -e COMPOSE_FILE=$COMPOSE_FILE"
-    compose_dir="$(dirname "$COMPOSE_FILE")"
+if [ -n "${COMPOSE_FILE}" ]; then
+    COMPOSE_OPTIONS="${COMPOSE_OPTIONS} -e COMPOSE_FILE=${COMPOSE_FILE}"
+    COMPOSE_DIR="$(dirname "${COMPOSE_FILE}")"
     # canonicalize dir, do not use realpath or readlink -f
     # since they are not available in some systems (e.g. macOS).
-    compose_dir="$(cd "$compose_dir" && pwd)"
+    COMPOSE_DIR="$(cd "${COMPOSE_DIR}" && pwd)"
 fi
-if [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    COMPOSE_OPTIONS="-e COMPOSE_PROJECT_NAME $COMPOSE_OPTIONS"
+if [ -n "${COMPOSE_PROJECT_NAME}" ]; then
+    COMPOSE_OPTIONS="-e COMPOSE_PROJECT_NAME ${COMPOSE_OPTIONS}"
 fi
 # TODO: also check --file argument
-if [ -n "$compose_dir" ]; then
-    VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
+if [ -n "${COMPOSE_DIR}" ]; then
+    VOLUMES="${VOLUMES} -v ${COMPOSE_DIR}:${COMPOSE_DIR}"
 fi
-if [ -n "$HOME" ]; then
-    VOLUMES="$VOLUMES -v $HOME:$HOME -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
+if [ -n "${HOME}" ]; then
+    VOLUMES="${VOLUMES} -v ${HOME}:${HOME} -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
 fi
 
 # Only allocate tty if we detect one
 if [ -t 0 ] && [ -t 1 ]; then
-    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -t"
+    DOCKER_RUN_OPTIONS="${DOCKER_RUN_OPTIONS} -t"
 fi
 
 # Always set -i to support piped and terminal input in run/exec
-DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS -i"
-
+DOCKER_RUN_OPTIONS="${DOCKER_RUN_OPTIONS} -i"
 
 # Handle userns security
-if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=userns'; then
-    DOCKER_RUN_OPTIONS="$DOCKER_RUN_OPTIONS --userns=host"
+if docker info --format '{{json .SecurityOptions}}' 2> /dev/null | grep -q 'name=userns'; then
+    DOCKER_RUN_OPTIONS="${DOCKER_RUN_OPTIONS} --userns=host"
 fi
 
-# shellcheck disable=SC2086
-exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"
+eval exec docker run --rm "${DOCKER_RUN_OPTIONS}" "${DOCKER_ADDR}" "${COMPOSE_OPTIONS}" "${VOLUMES}" -w "${PWD}" "${IMAGE}" "$@"
