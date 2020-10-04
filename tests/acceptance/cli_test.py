@@ -3034,3 +3034,8 @@ services:
         another = self.project.get_service('--log-service')
         assert len(service.containers()) == 1
         assert len(another.containers()) == 1
+
+    def test_run_with_quiet_pull(self):
+        self.base_dir = 'tests/fixtures/run-quiet-pull'
+        result = self.dispatch(['run', '--quiet-pull', 'simple'])
+        assert result.stdout.strip() == "Hello, World!"
