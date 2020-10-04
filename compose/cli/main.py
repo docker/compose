@@ -824,6 +824,7 @@ class TopLevelCommand:
             -d, --detach          Detached mode: Run container in the background, print
                                   new container name.
             --name NAME           Assign a name to the container
+            --quiet-pull          Pull without printing progress information
             --entrypoint CMD      Override the entrypoint of the image.
             -e KEY=VAL            Set an environment variable (can be used multiple times)
             -l, --label KEY=VAL   Add or override a label (can be used multiple times)
@@ -1314,6 +1315,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
         cli=native_builder,
         one_off=True,
         override_options=container_options,
+        silent=options.get('--quiet-pull')
     )
     try:
         container = next(c for c in containers if c.service == service.name)
