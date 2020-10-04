@@ -11,13 +11,13 @@
 # You can add additional volumes (or any docker run options) using
 # the ${COMPOSE_OPTIONS} environment variable.
 #
-# You can set a specific image tag from Docker Hub, such as "1.26.1", or "alpine-1.26.1"
-# using the $DOCKER_COMPOSE_IMAGE_TAG environment variable (defaults to "latest")
+# You can set a specific image tag from Docker Hub, such as "1.27.4", or "alpine-1.27.4"
+# using the $DOCKER_COMPOSE_IMAGE_TAG environment variable (defaults to "1.27.4")
 #
 
 set -e
 
-IMAGE="docker/compose:${DOCKER_COMPOSE_IMAGE_TAG:-latest}"
+IMAGE="docker/compose:${DOCKER_COMPOSE_IMAGE_TAG:-1.27.4}"
 
 # Setup options for connecting to docker host
 if [ -z "${DOCKER_HOST}" ]; then
