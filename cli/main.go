@@ -139,11 +139,15 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "enable debug output in the logs")
+	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
 	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
 	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
 	root.Flags().BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
+
+	walk(root, func(c *cobra.Command) {
+		c.Flags().BoolP("help", "h", false, "Help for "+c.Name())
+	})
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
@@ -276,4 +280,11 @@ func determineCurrentContext(flag string, configDir string) string {
 		res = "default"
 	}
 	return res
+}
+
+func walk(c *cobra.Command, f func(*cobra.Command)) {
+	f(c)
+	for _, c := range c.Commands() {
+		walk(c, f)
+	}
 }

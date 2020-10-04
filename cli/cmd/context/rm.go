@@ -44,7 +44,7 @@ func removeCommand() *cobra.Command {
 			return runRemove(cmd.Context(), args, opts.force)
 		},
 	}
-	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "force removing current context")
+	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force removing current context")
 
 	return cmd
 }
