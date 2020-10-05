@@ -42,7 +42,7 @@ func (b *ecsAPIService) createNFSmountIngress(securityGroups []string, project *
 				}
 				break
 			}
-			name := fmt.Sprintf("%sNFSMount%s", normalizeResourceName(s.Name), n)
+			name := fmt.Sprintf("%sNFSMount%s", normalizeResourceName(s.Name), normalizeResourceName(n))
 			template.Resources[name] = &ec2.SecurityGroupIngress{
 				Description:           fmt.Sprintf("Allow NFS mount for %s on %s", s.Name, n),
 				GroupId:               target,
