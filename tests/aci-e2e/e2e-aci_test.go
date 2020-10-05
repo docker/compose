@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,10 +51,14 @@ import (
 
 const (
 	contextName = "aci-test"
-	location    = "eastus2"
 )
 
-var binDir string
+var (
+	binDir string
+
+	location = []string{"westcentralus", "westus2", "northeurope", "southeastasia", "eastus2", "centralus", "australiaeast", "southcentralus",
+		"centralindia", "brazilsouth", "southindia", "northcentralus", "eastasia", "canadacentral", "japaneast", "koreacentral"}
+)
 
 func TestMain(m *testing.M) {
 	p, cleanup, err := SetupExistingCLI()
@@ -79,7 +84,8 @@ func TestLoginLogout(t *testing.T) {
 
 	t.Run("create context", func(t *testing.T) {
 		sID := getSubscriptionID(t)
-		err := createResourceGroup(t, sID, rg)
+		location := getTestLocation()
+		err := createResourceGroup(t, sID, rg, location)
 		assert.Check(t, is.Nil(err))
 		t.Cleanup(func() {
 			_ = deleteResourceGroup(t, rg)
@@ -122,9 +128,15 @@ func TestLoginLogout(t *testing.T) {
 	})
 }
 
+func getTestLocation() string {
+	rand.Seed(time.Now().Unix())
+	n := rand.Intn(len(location))
+	return location[n]
+}
+
 func TestContainerRunVolume(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	sID, rg := setupTestResourceGroup(t, c)
+	sID, rg, location := setupTestResourceGroup(t, c)
 
 	const (
 		fileshareName   = "dockertestshare"
@@ -338,7 +350,7 @@ func lines(output string) []string {
 
 func TestContainerRunAttached(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, groupID := setupTestResourceGroup(t, c)
+	_, groupID, location := setupTestResourceGroup(t, c)
 
 	// Used in subtests
 	var (
@@ -456,7 +468,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 func TestComposeUpUpdate(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, groupID := setupTestResourceGroup(t, c)
+	_, groupID, location := setupTestResourceGroup(t, c)
 
 	const (
 		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
@@ -586,7 +598,7 @@ func TestComposeUpUpdate(t *testing.T) {
 
 func TestRunEnvVars(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	_, _ = setupTestResourceGroup(t, c)
+	_, _, _ = setupTestResourceGroup(t, c)
 
 	t.Run("run", func(t *testing.T) {
 		cmd := c.NewDockerCmd(
@@ -630,23 +642,25 @@ func TestRunEnvVars(t *testing.T) {
 	})
 }
 
-func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string) {
+func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
 	rg := "E2E-" + t.Name() + "-" + startTime
 	azureLogin(t, c)
 	sID := getSubscriptionID(t)
-	err := createResourceGroup(t, sID, rg)
+	location := getTestLocation()
+	err := createResourceGroup(t, sID, rg, location)
 	assert.Check(t, is.Nil(err))
 	t.Cleanup(func() {
 		if err := deleteResourceGroup(t, rg); err != nil {
 			t.Error(err)
 		}
 	})
-	createAciContextAndUseIt(t, c, sID, rg)
+
+	createAciContextAndUseIt(t, c, sID, rg, location)
 	// Check nothing is running
 	res := c.RunDockerCmd("ps")
 	assert.Assert(t, is.Len(lines(res.Stdout()), 1))
-	return sID, rg
+	return sID, rg, location
 }
 
 func deleteResourceGroup(t *testing.T, rgName string) error {
@@ -683,14 +697,14 @@ func getSubscriptionID(t *testing.T) string {
 	return *models[0].SubscriptionID
 }
 
-func createResourceGroup(t *testing.T, sID, rgName string) error {
+func createResourceGroup(t *testing.T, sID, rgName string, location string) error {
 	fmt.Printf("	[%s] creating resource group %s\n", t.Name(), rgName)
 	helper := aci.NewACIResourceGroupHelper()
 	_, err := helper.CreateOrUpdate(context.TODO(), sID, rgName, resources.Group{Location: to.StringPtr(location)})
 	return err
 }
 
-func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string) {
+func createAciContextAndUseIt(t *testing.T, c *E2eCLI, sID, rgName string, location string) {
 	res := c.RunDockerCmd("context", "create", "aci", contextName, "--subscription-id", sID, "--resource-group", rgName, "--location", location)
 	res.Assert(t, icmd.Expected{Out: "Successfully created aci context \"" + contextName + "\""})
 	res = c.RunDockerCmd("context", "use", contextName)
