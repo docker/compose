@@ -561,6 +561,73 @@ func TestComposeContainerGroupToContainerResourceRequests(t *testing.T) {
 	request := *((*group.Containers)[0]).Resources.Requests
 	assert.Equal(t, *request.CPU, float64(0.1))
 	assert.Equal(t, *request.MemoryInGB, float64(0.1))
+	limits := *((*group.Containers)[0]).Resources.Limits
+	assert.Equal(t, *limits.CPU, float64(0.1))
+	assert.Equal(t, *limits.MemoryInGB, float64(0.1))
+}
+
+func TestComposeContainerGroupToContainerResourceRequestsAndLimits(t *testing.T) {
+	_0_1Gb := 0.1 * 1024 * 1024 * 1024
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Reservations: &types.Resource{
+							NanoCPUs:    "0.1",
+							MemoryBytes: types.UnitBytes(_0_1Gb),
+						},
+						Limits: &types.Resource{
+							NanoCPUs:    "0.3",
+							MemoryBytes: types.UnitBytes(2 * _0_1Gb),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+
+	request := *((*group.Containers)[0]).Resources.Requests
+	assert.Equal(t, *request.CPU, float64(0.1))
+	assert.Equal(t, *request.MemoryInGB, float64(0.1))
+	limits := *((*group.Containers)[0]).Resources.Limits
+	assert.Equal(t, *limits.CPU, float64(0.3))
+	assert.Equal(t, *limits.MemoryInGB, float64(0.2))
+}
+
+func TestComposeContainerGroupToContainerResourceLimitsOnly(t *testing.T) {
+	_0_1Gb := 0.1 * 1024 * 1024 * 1024
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Deploy: &types.DeployConfig{
+					Resources: types.Resources{
+						Limits: &types.Resource{
+							NanoCPUs:    "0.3",
+							MemoryBytes: types.UnitBytes(2 * _0_1Gb),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+
+	request := *((*group.Containers)[0]).Resources.Requests
+	assert.Equal(t, *request.CPU, float64(0.3))
+	assert.Equal(t, *request.MemoryInGB, float64(0.2))
+	limits := *((*group.Containers)[0]).Resources.Limits
+	assert.Equal(t, *limits.CPU, float64(0.3))
+	assert.Equal(t, *limits.MemoryInGB, float64(0.2))
 }
 
 func TestComposeContainerGroupToContainerResourceRequestsDefaults(t *testing.T) {

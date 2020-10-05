@@ -353,34 +353,73 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 		volumes = &allVolumes
 	}
 
-	memRequest := 1. // Default 1 Gb
-	var cpuRequest float64 = 1
-	if s.Deploy != nil && s.Deploy.Resources.Reservations != nil {
-		if s.Deploy.Resources.Reservations.MemoryBytes != 0 {
-			memRequest = bytesToGb(s.Deploy.Resources.Reservations.MemoryBytes)
-		}
-		if s.Deploy.Resources.Reservations.NanoCPUs != "" {
-			cpuRequest, err = strconv.ParseFloat(s.Deploy.Resources.Reservations.NanoCPUs, 0)
-			if err != nil {
-				return containerinstance.Container{}, err
-			}
-		}
+	resource, err := s.getResourceRequestsLimits()
+	if err != nil {
+		return containerinstance.Container{}, err
 	}
+
 	return containerinstance.Container{
 		Name: to.StringPtr(s.Name),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image:                to.StringPtr(s.Image),
 			Command:              to.StringSlicePtr(s.Command),
 			EnvironmentVariables: getEnvVariables(s.Environment),
-			Resources: &containerinstance.ResourceRequirements{
-				Requests: &containerinstance.ResourceRequests{
-					MemoryInGB: to.Float64Ptr(memRequest),
-					CPU:        to.Float64Ptr(cpuRequest),
-				},
-			},
-			VolumeMounts: volumes,
+			Resources:            resource,
+			VolumeMounts:         volumes,
 		},
 	}, nil
+}
+
+func (s serviceConfigAciHelper) getResourceRequestsLimits() (*containerinstance.ResourceRequirements, error) {
+	memRequest := 1. // Default 1 Gb
+	var cpuRequest float64 = 1
+	var err error
+	hasMemoryRequest := func() bool {
+		return s.Deploy != nil && s.Deploy.Resources.Reservations != nil && s.Deploy.Resources.Reservations.MemoryBytes != 0
+	}
+	hasCPURequest := func() bool {
+		return s.Deploy != nil && s.Deploy.Resources.Reservations != nil && s.Deploy.Resources.Reservations.NanoCPUs != ""
+	}
+	if hasMemoryRequest() {
+		memRequest = bytesToGb(s.Deploy.Resources.Reservations.MemoryBytes)
+	}
+
+	if hasCPURequest() {
+		cpuRequest, err = strconv.ParseFloat(s.Deploy.Resources.Reservations.NanoCPUs, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+	memLimit := memRequest
+	cpuLimit := cpuRequest
+	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
+		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
+			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
+			if !hasMemoryRequest() {
+				memRequest = memLimit
+			}
+		}
+		if s.Deploy.Resources.Limits.NanoCPUs != "" {
+			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
+			if err != nil {
+				return nil, err
+			}
+			if !hasCPURequest() {
+				cpuRequest = cpuLimit
+			}
+		}
+	}
+	resources := containerinstance.ResourceRequirements{
+		Requests: &containerinstance.ResourceRequests{
+			MemoryInGB: to.Float64Ptr(memRequest),
+			CPU:        to.Float64Ptr(cpuRequest),
+		},
+		Limits: &containerinstance.ResourceLimits{
+			MemoryInGB: to.Float64Ptr(memLimit),
+			CPU:        to.Float64Ptr(cpuLimit),
+		},
+	}
+	return &resources, nil
 }
 
 func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.EnvironmentVariable {
