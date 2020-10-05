@@ -69,7 +69,8 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 	if err != nil {
 		return err
 	}
-	if opts.format != "" && opts.format != formatter.JSON && opts.format != formatter.PRETTY {
+	format := strings.ToLower(strings.ReplaceAll(opts.format, " ", ""))
+	if format != "" && format != formatter.JSON && format != formatter.PRETTY && format != formatter.TemplateJSON {
 		mobycli.Exec(cmd.Root())
 		return nil
 	}
@@ -93,7 +94,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return nil
 	}
 
-	if opts.json {
+	if opts.json || format == formatter.JSON || format == formatter.TemplateJSON {
 		opts.format = formatter.JSON
 	}
 

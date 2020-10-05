@@ -81,6 +81,12 @@ func TestContextDefault(t *testing.T) {
 
 		res = c.RunDockerCmd("context", "ls", "--format", "json")
 		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
+
+		res = c.RunDockerCmd("context", "ls", "--json")
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
+
+		res = c.RunDockerCmd("context", "ls", "--format", "{{ json . }}")
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
 	})
 
 	t.Run("inspect", func(t *testing.T) {
@@ -420,6 +426,13 @@ func TestVersion(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"Client":`})
 		res = c.RunDockerCmd("version", "--format", "{{ json . }}")
 		res.Assert(t, icmd.Expected{Out: `"Client":`})
+	})
+
+	t.Run("format legacy", func(t *testing.T) {
+		res := c.RunDockerCmd("version", "-f", "{{ json .Client }}")
+		res.Assert(t, icmd.Expected{Out: `"DefaultAPIVersion":`})
+		res = c.RunDockerCmd("version", "--format", "{{ json .Server }}")
+		res.Assert(t, icmd.Expected{Out: `"KernelVersion":`})
 	})
 
 	t.Run("format cloud integration", func(t *testing.T) {

@@ -19,6 +19,8 @@ package formatter
 const (
 	// JSON is the constant for Json formats on list commands
 	JSON = "json"
+	// TemplateJSON the legacy json formatting value using go template
+	TemplateJSON = "{{json.}}"
 	// PRETTY is the constant for default formats on list commands
 	PRETTY = "pretty"
 )
