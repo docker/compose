@@ -56,8 +56,12 @@ services:
 x-aws-logs_retention: 10
 `)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
-	logging := def.ContainerDefinitions[0].LogConfiguration
-	assert.Equal(t, logging.Options["awslogs-datetime-pattern"], "FOO")
+	logging := getMainContainer(def, t).LogConfiguration
+	if logging != nil {
+		assert.Equal(t, logging.Options["awslogs-datetime-pattern"], "FOO")
+	} else {
+		t.Fatal("Logging not configured")
+	}
 
 	logGroup := template.Resources["LogGroup"].(*logs.LogGroup)
 	assert.Equal(t, logGroup.RetentionInDays, 10)
@@ -72,7 +76,7 @@ services:
       - testdata/input/envfile
 `)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
-	env := def.ContainerDefinitions[0].Environment
+	env := getMainContainer(def, t).Environment
 	var found bool
 	for _, pair := range env {
 		if pair.Name == "FOO" {
@@ -94,7 +98,7 @@ services:
       - "FOO=ZOT"
 `)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
-	env := def.ContainerDefinitions[0].Environment
+	env := getMainContainer(def, t).Environment
 	var found bool
 	for _, pair := range env {
 		if pair.Name == "FOO" {
@@ -358,7 +362,7 @@ services:
     working_dir: "working_dir"
 `)
 	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
-	container := def.ContainerDefinitions[0]
+	container := getMainContainer(def, t)
 	assert.Equal(t, container.Image, "image")
 	assert.Equal(t, container.Command[0], "command")
 	assert.Equal(t, container.EntryPoint[0], "entrypoint")
@@ -445,4 +449,14 @@ func loadConfig(t *testing.T, yaml string) *types.Project {
 	})
 	assert.NilError(t, err)
 	return model
+}
+
+func getMainContainer(def *ecs.TaskDefinition, t *testing.T) ecs.TaskDefinition_ContainerDefinition {
+	for _, c := range def.ContainerDefinitions {
+		if c.Essential {
+			return c
+		}
+	}
+	t.Fail()
+	return def.ContainerDefinitions[0]
 }

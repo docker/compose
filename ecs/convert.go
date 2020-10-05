@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/docker/compose-cli/ecs/secrets"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -34,28 +34,18 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
 	"github.com/joho/godotenv"
-
-	"github.com/docker/compose-cli/ecs/secrets"
 )
 
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
+const searchDomainInitContainerImage = "docker/ecs-searchdomain-sidecar"
 
-func (b *ecsAPIService) createTaskExecution(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
+func (b *ecsAPIService) createTaskDefinition(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err
 	}
 	_, memReservation := toContainerReservation(service)
 	credential := getRepoCredentials(service)
-
-	// override resolve.conf search directive to also search <project>.local
-	// TODO remove once ECS support hostname-only service discovery
-	service.Environment["LOCALDOMAIN"] = aws.String(
-		cloudformation.Join("", []string{
-			cloudformation.Ref("AWS::Region"),
-			".compute.internal",
-			fmt.Sprintf(" %s.local", project.Name),
-		}))
 
 	logConfiguration := getLogConfiguration(service, project)
 
@@ -73,6 +63,14 @@ func (b *ecsAPIService) createTaskExecution(project *types.Project, service type
 		volumes = append(volumes, secretsVolume)
 		mounts = append(mounts, secretsMount)
 	}
+
+	initContainers = append(initContainers, ecs.TaskDefinition_ContainerDefinition{
+		Name:             fmt.Sprintf("%s_ResolvConf_InitContainer", normalizeResourceName(service.Name)),
+		Image:            searchDomainInitContainerImage,
+		Essential:        false,
+		Command:          []string{b.Region + ".compute.internal", project.Name + ".local"},
+		LogConfiguration: logConfiguration,
+	})
 
 	var dependencies []ecs.TaskDefinition_ContainerDependency
 	for _, c := range initContainers {

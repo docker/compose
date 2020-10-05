@@ -93,7 +93,7 @@ func (b *ecsAPIService) convert(project *types.Project, resources awsResources) 
 		taskExecutionRole := b.createTaskExecutionRole(project, service, template)
 		taskRole := b.createTaskRole(project, service, template)
 
-		definition, err := b.createTaskExecution(project, service)
+		definition, err := b.createTaskDefinition(project, service)
 		if err != nil {
 			return nil, err
 		}
