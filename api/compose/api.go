@@ -77,4 +77,5 @@ type Stack struct {
 	ID     string
 	Name   string
 	Status string
+	Reason string
 }

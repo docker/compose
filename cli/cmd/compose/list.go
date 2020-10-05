@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -75,7 +76,7 @@ func viewFromStackList(stackList []compose.Stack) []stackView {
 	for i, s := range stackList {
 		retList[i] = stackView{
 			Name:   s.Name,
-			Status: s.Status,
+			Status: strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
 		}
 	}
 	return retList

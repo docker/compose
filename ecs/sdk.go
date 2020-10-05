@@ -314,6 +314,7 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 					status = compose.REMOVING
 				case "UPDATE_IN_PROGRESS":
 					status = compose.UPDATING
+				default:
 				}
 				stacks = append(stacks, compose.Stack{
 					ID:     aws.StringValue(stack.StackId),
@@ -325,6 +326,111 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 		}
 	}
 	return stacks, nil
+}
+
+func (s sdk) GetStackClusterID(ctx context.Context, stack string) (string, error) {
+	resources, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
+		StackName: aws.String(stack),
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, r := range resources.StackResourceSummaries {
+		if aws.StringValue(r.ResourceType) == "AWS::ECS::Cluster" {
+			return aws.StringValue(r.PhysicalResourceId), nil
+		}
+	}
+	return "", nil
+}
+
+func (s sdk) GetServiceTaskDefinition(ctx context.Context, cluster string, serviceArns []string) (map[string]string, error) {
+	defs := map[string]string{}
+	svc := []*string{}
+	for _, s := range serviceArns {
+		svc = append(svc, aws.String(s))
+	}
+	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
+		Cluster:  aws.String(cluster),
+		Services: svc,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range services.Services {
+		defs[aws.StringValue(s.ServiceArn)] = aws.StringValue(s.TaskDefinition)
+	}
+	return defs, nil
+}
+
+func (s sdk) ListStackServices(ctx context.Context, stack string) ([]string, error) {
+	arns := []string{}
+	var nextToken *string
+	for {
+		response, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
+			StackName: aws.String(stack),
+			NextToken: nextToken,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range response.StackResourceSummaries {
+			if aws.StringValue(r.ResourceType) == "AWS::ECS::Service" {
+				if r.PhysicalResourceId != nil {
+					arns = append(arns, aws.StringValue(r.PhysicalResourceId))
+				}
+			}
+		}
+		nextToken = response.NextToken
+		if nextToken == nil {
+			break
+		}
+	}
+	return arns, nil
+}
+
+func (s sdk) GetServiceTasks(ctx context.Context, cluster string, service string, stopped bool) ([]*ecs.Task, error) {
+	state := "RUNNING"
+	if stopped {
+		state = "STOPPED"
+	}
+	tasks, err := s.ECS.ListTasksWithContext(ctx, &ecs.ListTasksInput{
+		Cluster:       aws.String(cluster),
+		ServiceName:   aws.String(service),
+		DesiredStatus: aws.String(state),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(tasks.TaskArns) > 0 {
+		taskDescriptions, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
+			Cluster: aws.String(cluster),
+			Tasks:   tasks.TaskArns,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return taskDescriptions.Tasks, nil
+	}
+	return nil, nil
+}
+
+func (s sdk) GetTaskStoppedReason(ctx context.Context, cluster string, taskArn string) (string, error) {
+	taskDescriptions, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
+		Cluster: aws.String(cluster),
+		Tasks:   []*string{aws.String(taskArn)},
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(taskDescriptions.Tasks) == 0 {
+		return "", nil
+	}
+	task := taskDescriptions.Tasks[0]
+	return fmt.Sprintf(
+		"%s: %s",
+		aws.StringValue(task.StopCode),
+		aws.StringValue(task.StoppedReason)), nil
+
 }
 
 func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error) {
@@ -339,6 +445,7 @@ func (s sdk) DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudf
 		if err != nil {
 			return nil, err
 		}
+
 		events = append(events, resp.StackEvents...)
 		if resp.NextToken == nil {
 			return events, nil
@@ -525,46 +632,43 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service, co
 	}
 }
 
-func (s sdk) DescribeServices(ctx context.Context, cluster string, arns []string) ([]compose.ServiceStatus, error) {
+func (s sdk) DescribeService(ctx context.Context, cluster string, arn string) (compose.ServiceStatus, error) {
 	services, err := s.ECS.DescribeServicesWithContext(ctx, &ecs.DescribeServicesInput{
 		Cluster:  aws.String(cluster),
-		Services: aws.StringSlice(arns),
+		Services: []*string{aws.String(arn)},
 		Include:  aws.StringSlice([]string{"TAGS"}),
 	})
 	if err != nil {
-		return nil, err
+		return compose.ServiceStatus{}, err
 	}
 
-	status := []compose.ServiceStatus{}
-	for _, service := range services.Services {
-		var name string
-		for _, t := range service.Tags {
-			if *t.Key == compose.ServiceTag {
-				name = aws.StringValue(t.Value)
-			}
+	service := services.Services[0]
+	var name string
+	for _, t := range service.Tags {
+		if *t.Key == compose.ServiceTag {
+			name = aws.StringValue(t.Value)
 		}
-		if name == "" {
-			return nil, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceTag)
-		}
-		targetGroupArns := []string{}
-		for _, lb := range service.LoadBalancers {
-			targetGroupArns = append(targetGroupArns, *lb.TargetGroupArn)
-		}
-		// getURLwithPortMapping makes 2 queries
-		// one to get the target groups and another for load balancers
-		loadBalancers, err := s.getURLWithPortMapping(ctx, targetGroupArns)
-		if err != nil {
-			return nil, err
-		}
-		status = append(status, compose.ServiceStatus{
-			ID:         aws.StringValue(service.ServiceName),
-			Name:       name,
-			Replicas:   int(aws.Int64Value(service.RunningCount)),
-			Desired:    int(aws.Int64Value(service.DesiredCount)),
-			Publishers: loadBalancers,
-		})
 	}
-	return status, nil
+	if name == "" {
+		return compose.ServiceStatus{}, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceTag)
+	}
+	targetGroupArns := []string{}
+	for _, lb := range service.LoadBalancers {
+		targetGroupArns = append(targetGroupArns, *lb.TargetGroupArn)
+	}
+	// getURLwithPortMapping makes 2 queries
+	// one to get the target groups and another for load balancers
+	loadBalancers, err := s.getURLWithPortMapping(ctx, targetGroupArns)
+	if err != nil {
+		return compose.ServiceStatus{}, err
+	}
+	return compose.ServiceStatus{
+		ID:         aws.StringValue(service.ServiceName),
+		Name:       name,
+		Replicas:   int(aws.Int64Value(service.RunningCount)),
+		Desired:    int(aws.Int64Value(service.DesiredCount)),
+		Publishers: loadBalancers,
+	}, nil
 }
 
 func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error) {
