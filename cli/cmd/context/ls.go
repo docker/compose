@@ -17,13 +17,13 @@
 package context
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/cli/mobycli"
@@ -58,7 +58,8 @@ func listCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
-	cmd.Flags().StringVar(&opts.format, "format", "", "Format output as JSON")
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
+	_ = cmd.Flags().MarkHidden("json")
 
 	return cmd
 }
@@ -68,7 +69,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 	if err != nil {
 		return err
 	}
-	if opts.format != "" {
+	if opts.format != "" && opts.format != formatter.JSON && opts.format != formatter.PRETTY {
 		mobycli.Exec(cmd.Root())
 		return nil
 	}
@@ -93,35 +94,27 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 	}
 
 	if opts.json {
-		j, err := formatter.ToStandardJSON(contexts)
-		if err != nil {
-			return err
-		}
-		fmt.Println(j)
-		return nil
+		opts.format = formatter.JSON
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION\tDOCKER ENDPOINT\tKUBERNETES ENDPOINT\tORCHESTRATOR")
-	format := "%s\t%s\t%s\t%s\t%s\t%s\n"
-
-	for _, c := range contexts {
-		contextName := c.Name
-		if c.Name == currentContext {
-			contextName += " *"
-		}
-
-		fmt.Fprintf(w,
-			format,
-			contextName,
-			c.Type(),
-			c.Metadata.Description,
-			getEndpoint("docker", c.Endpoints),
-			getEndpoint("kubernetes", c.Endpoints),
-			c.Metadata.StackOrchestrator)
-	}
-
-	return w.Flush()
+	view := viewFromContextList(contexts, currentContext)
+	return formatter.Print(view, opts.format, os.Stdout,
+		func(w io.Writer) {
+			for _, c := range view {
+				contextName := c.Name
+				if c.Current {
+					contextName += " *"
+				}
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					contextName,
+					c.Type,
+					c.Description,
+					c.DockerEndpoint,
+					c.KubernetesEndpoint,
+					c.StackOrchestrator)
+			}
+		},
+		"NAME", "TYPE", "DESCRIPTION", "DOCKER ENDPOINT", "KUBERNETES ENDPOINT", "ORCHESTRATOR")
 }
 
 func getEndpoint(name string, meta map[string]interface{}) string {
@@ -140,4 +133,30 @@ func getEndpoint(name string, meta map[string]interface{}) string {
 	}
 
 	return result
+}
+
+type contextView struct {
+	Current            bool
+	Description        string
+	DockerEndpoint     string
+	KubernetesEndpoint string
+	Type               string
+	Name               string
+	StackOrchestrator  string
+}
+
+func viewFromContextList(contextList []*store.DockerContext, currentContext string) []contextView {
+	retList := make([]contextView, len(contextList))
+	for i, c := range contextList {
+		retList[i] = contextView{
+			Current:            c.Name == currentContext,
+			Description:        c.Metadata.Description,
+			DockerEndpoint:     getEndpoint("docker", c.Endpoints),
+			KubernetesEndpoint: getEndpoint("kubernetes", c.Endpoints),
+			Name:               c.Name,
+			Type:               c.Type(),
+			StackOrchestrator:  c.Metadata.StackOrchestrator,
+		}
+	}
+	return retList
 }

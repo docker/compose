@@ -33,8 +33,8 @@ type portGroup struct {
 // PortsToStrings returns a human readable published ports
 func PortsToStrings(ports []containers.Port, fqdn string) []string {
 	groupMap := make(map[string]*portGroup)
+	result := []string{}
 	var (
-		result       []string
 		hostMappings []string
 		groupMapKeys []string
 	)

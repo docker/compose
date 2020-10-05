@@ -23,8 +23,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/formatter"
 )
 
 func listCommand() *cobra.Command {
@@ -35,8 +38,13 @@ func listCommand() *cobra.Command {
 			return runList(cmd.Context(), opts)
 		},
 	}
-	lsCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	addComposeCommonFlags(lsCmd.Flags(), &opts)
 	return lsCmd
+}
+
+func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
+	f.StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 }
 
 func runList(ctx context.Context, opts composeOptions) error {
@@ -49,10 +57,26 @@ func runList(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	err = printSection(os.Stdout, func(w io.Writer) {
-		for _, stack := range stackList {
-			fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
+	view := viewFromStackList(stackList)
+	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
+		for _, stack := range view {
+			_, _ = fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
 		}
 	}, "NAME", "STATUS")
-	return err
+}
+
+type stackView struct {
+	Name   string
+	Status string
+}
+
+func viewFromStackList(stackList []compose.Stack) []stackView {
+	retList := make([]stackView, len(stackList))
+	for i, s := range stackList {
+		retList[i] = stackView{
+			Name:   s.Name,
+			Status: s.Status,
+		}
+	}
+	return retList
 }

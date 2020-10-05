@@ -14,26 +14,11 @@
    limitations under the License.
 */
 
-package cmd
+package formatter
 
-import (
-	"bytes"
-	"testing"
-
-	"gotest.tools/v3/golden"
-
-	"github.com/docker/compose-cli/api/secrets"
+const (
+	// JSON is the constant for Json formats on list commands
+	JSON = "json"
+	// PRETTY is the constant for default formats on list commands
+	PRETTY = "pretty"
 )
-
-func TestPrintList(t *testing.T) {
-	secrets := []secrets.Secret{
-		{
-			ID:          "123",
-			Name:        "secret123",
-			Description: "secret 1,2,3",
-		},
-	}
-	out := &bytes.Buffer{}
-	printList(out, secrets)
-	golden.Assert(t, out.String(), "secrets-out.golden")
-}

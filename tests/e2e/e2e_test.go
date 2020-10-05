@@ -75,6 +75,12 @@ func TestContextDefault(t *testing.T) {
 	t.Run("ls", func(t *testing.T) {
 		res := c.RunDockerCmd("context", "ls")
 		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-default"))
+
+		res = c.RunDockerCmd("context", "ls", "--format", "pretty")
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-default"))
+
+		res = c.RunDockerCmd("context", "ls", "--format", "json")
+		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
 	})
 
 	t.Run("inspect", func(t *testing.T) {
@@ -416,6 +422,26 @@ func TestVersion(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"Client":`})
 	})
 
+	t.Run("format cloud integration", func(t *testing.T) {
+		res := c.RunDockerCmd("version", "-f", "pretty")
+		res.Assert(t, icmd.Expected{Out: `Cloud integration:`})
+		res = c.RunDockerCmd("version", "-f", "")
+		res.Assert(t, icmd.Expected{Out: `Cloud integration:`})
+
+		res = c.RunDockerCmd("version", "-f", "json")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+		res = c.RunDockerCmd("version", "-f", "{{ json . }}")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+		res = c.RunDockerCmd("version", "--format", "{{json .}}")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+		res = c.RunDockerCmd("version", "--format", "{{json . }}")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+		res = c.RunDockerCmd("version", "--format", "{{ json .}}")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+		res = c.RunDockerCmd("version", "--format", "{{ json . }}")
+		res.Assert(t, icmd.Expected{Out: `"CloudIntegration":`})
+	})
+
 	t.Run("delegate version flag", func(t *testing.T) {
 		c.RunDockerCmd("context", "create", "example", "test-example")
 		c.RunDockerCmd("context", "use", "test-example")
@@ -440,6 +466,12 @@ func TestMockBackend(t *testing.T) {
 	t.Run("ps", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
 		golden.Assert(t, res.Stdout(), "ps-out-example.golden")
+
+		res = c.RunDockerCmd("ps", "--format", "pretty")
+		golden.Assert(t, res.Stdout(), "ps-out-example.golden")
+
+		res = c.RunDockerCmd("ps", "--format", "json")
+		golden.Assert(t, res.Stdout(), "ps-out-example-json.golden")
 	})
 
 	t.Run("ps quiet", func(t *testing.T) {

@@ -19,9 +19,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -33,16 +33,10 @@ import (
 )
 
 type psOpts struct {
-	all   bool
-	quiet bool
-	json  bool
-}
-
-func (o psOpts) validate() error {
-	if o.quiet && o.json {
-		return errors.New(`cannot combine "quiet" and "json" options`)
-	}
-	return nil
+	all    bool
+	quiet  bool
+	json   bool
+	format string
 }
 
 // PsCommand lists containers
@@ -59,8 +53,17 @@ func PsCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
 	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Show all containers (default shows just running)")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
+	_ = cmd.Flags().MarkHidden("json") // Legacy. This is used by VSCode Docker extension
 
 	return cmd
+}
+
+func (o psOpts) validate() error {
+	if o.quiet && o.json {
+		return errors.New(`cannot combine "quiet" and "json" options`)
+	}
+	return nil
 }
 
 func runPs(ctx context.Context, opts psOpts) error {
@@ -68,41 +71,34 @@ func runPs(ctx context.Context, opts psOpts) error {
 	if err != nil {
 		return err
 	}
-
 	c, err := client.New(ctx)
 	if err != nil {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	containers, err := c.ContainerService().List(ctx, opts.all)
+	containerList, err := c.ContainerService().List(ctx, opts.all)
 	if err != nil {
 		return errors.Wrap(err, "fetch containers")
 	}
 
 	if opts.quiet {
-		for _, c := range containers {
+		for _, c := range containerList {
 			fmt.Println(c.ID)
 		}
 		return nil
 	}
 
 	if opts.json {
-		j, err := formatter2.ToStandardJSON(containers)
-		if err != nil {
-			return err
+		opts.format = formatter2.JSON
+	}
+
+	view := viewFromContainerList(containerList)
+	return formatter2.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+		for _, c := range view {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Image, c.Command, c.Status,
+				strings.Join(c.Ports, ", "))
 		}
-		fmt.Println(j)
-		return nil
-	}
-
-	w := tabwriter.NewWriter(os.Stdout, 20, 1, 3, ' ', 0)
-	fmt.Fprintf(w, "CONTAINER ID\tIMAGE\tCOMMAND\tSTATUS\tPORTS\n")
-	format := "%s\t%s\t%s\t%s\t%s\n"
-	for _, container := range containers {
-		fmt.Fprintf(w, format, container.ID, container.Image, container.Command, container.Status, strings.Join(formatter.PortsToStrings(container.Ports, fqdn(container)), ", "))
-	}
-
-	return w.Flush()
+	}, "CONTAINER ID", "IMAGE", "COMMAND", "STATUS", "PORTS")
 }
 
 func fqdn(container containers.Container) string {
@@ -111,4 +107,26 @@ func fqdn(container containers.Container) string {
 		fqdn = container.Config.FQDN
 	}
 	return fqdn
+}
+
+type containerView struct {
+	ID      string
+	Image   string
+	Status  string
+	Command string
+	Ports   []string
+}
+
+func viewFromContainerList(containerList []containers.Container) []containerView {
+	retList := make([]containerView, len(containerList))
+	for i, c := range containerList {
+		retList[i] = containerView{
+			ID:      c.ID,
+			Image:   c.Image,
+			Status:  c.Status,
+			Command: c.Command,
+			Ports:   formatter.PortsToStrings(c.Ports, fqdn(c)),
+		}
+	}
+	return retList
 }

@@ -53,7 +53,7 @@ func (cs *aciContainerService) List(ctx context.Context, all bool) ([]containers
 	if err != nil {
 		return nil, err
 	}
-	var res []containers.Container
+	res := []containers.Container{}
 	for _, group := range containerGroups {
 		if group.Containers == nil || len(*group.Containers) == 0 {
 			return nil, fmt.Errorf("no containers found in ACI container group %s", *group.Name)

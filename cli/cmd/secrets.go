@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/formatter"
 )
 
 type createSecretOptions struct {
@@ -105,7 +104,12 @@ func inspectSecret() *cobra.Command {
 	return cmd
 }
 
+type listSecretsOpts struct {
+	format string
+}
+
 func listSecrets() *cobra.Command {
+	var opts listSecretsOpts
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -115,15 +119,38 @@ func listSecrets() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			list, err := c.SecretsService().ListSecrets(cmd.Context())
+			secretsList, err := c.SecretsService().ListSecrets(cmd.Context())
 			if err != nil {
 				return err
 			}
-			printList(os.Stdout, list)
-			return nil
+			view := viewFromSecretList(secretsList)
+			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+				for _, secret := range view {
+					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)
+				}
+			}, "ID", "NAME", "DESCRIPTION")
 		},
 	}
+	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
+}
+
+type secretView struct {
+	ID          string
+	Name        string
+	Description string
+}
+
+func viewFromSecretList(secretList []secrets.Secret) []secretView {
+	retList := make([]secretView, len(secretList))
+	for i, s := range secretList {
+		retList[i] = secretView{
+			ID:          s.ID,
+			Name:        s.Name,
+			Description: s.Description,
+		}
+	}
+	return retList
 }
 
 type deleteSecretOptions struct {
@@ -147,19 +174,4 @@ func deleteSecret() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&opts.recover, "recover", false, "Enable recovery.")
 	return cmd
-}
-
-func printList(out io.Writer, secrets []secrets.Secret) {
-	printSection(out, func(w io.Writer) {
-		for _, secret := range secrets {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description) // nolint:errcheck
-		}
-	}, "ID", "NAME", "DESCRIPTION")
-}
-
-func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
-	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t")) // nolint:errcheck
-	printer(w)
-	w.Flush() // nolint:errcheck
 }

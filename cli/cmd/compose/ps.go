@@ -22,11 +22,12 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/formatter"
 )
 
 func psCommand() *cobra.Command {
@@ -37,10 +38,9 @@ func psCommand() *cobra.Command {
 			return runPs(cmd.Context(), opts)
 		},
 	}
-	psCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
 	psCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	psCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-
+	addComposeCommonFlags(psCmd.Flags(), &opts)
 	return psCmd
 }
 
@@ -59,17 +59,34 @@ func runPs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	err = printSection(os.Stdout, func(w io.Writer) {
-		for _, service := range serviceList {
-			fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
-		}
-	}, "ID", "NAME", "REPLICAS", "PORTS")
-	return err
+	view := viewFromServiceStatusList(serviceList)
+	return formatter.Print(view, opts.Format, os.Stdout,
+		func(w io.Writer) {
+			for _, service := range view {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
+			}
+		},
+		"ID", "NAME", "REPLICAS", "PORTS")
 }
 
-func printSection(out io.Writer, printer func(io.Writer), headers ...string) error {
-	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
-	printer(w)
-	return w.Flush()
+type serviceStatusView struct {
+	ID       string
+	Name     string
+	Replicas int
+	Desired  int
+	Ports    []string
+}
+
+func viewFromServiceStatusList(serviceStatusList []compose.ServiceStatus) []serviceStatusView {
+	retList := make([]serviceStatusView, len(serviceStatusList))
+	for i, s := range serviceStatusList {
+		retList[i] = serviceStatusView{
+			ID:       s.ID,
+			Name:     s.Name,
+			Replicas: s.Replicas,
+			Desired:  s.Desired,
+			Ports:    s.Ports,
+		}
+	}
+	return retList
 }

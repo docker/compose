@@ -20,16 +20,20 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/formatter"
 )
 
+type listVolumeOpts struct {
+	format string
+}
+
 func listVolume() *cobra.Command {
+	var opts listVolumeOpts
 	cmd := &cobra.Command{
 		Use:   "ls",
 		Short: "list available volumes in context.",
@@ -43,24 +47,30 @@ func listVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			printList(os.Stdout, vols)
-			return nil
+			view := viewFromVolumeList(vols)
+			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+				for _, vol := range view {
+					_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
+				}
+			}, "ID", "DESCRIPTION")
 		},
 	}
+	cmd.Flags().StringVar(&opts.format, "format", formatter.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
 	return cmd
 }
 
-func printList(out io.Writer, volumes []volumes.Volume) {
-	printSection(out, func(w io.Writer) {
-		for _, vol := range volumes {
-			_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
-		}
-	}, "ID", "DESCRIPTION")
+type volumeView struct {
+	ID          string
+	Description string
 }
 
-func printSection(out io.Writer, printer func(io.Writer), headers ...string) {
-	w := tabwriter.NewWriter(out, 20, 1, 3, ' ', 0)
-	_, _ = fmt.Fprintln(w, strings.Join(headers, "\t"))
-	printer(w)
-	_ = w.Flush()
+func viewFromVolumeList(volumeList []volumes.Volume) []volumeView {
+	retList := make([]volumeView, len(volumeList))
+	for i, v := range volumeList {
+		retList[i] = volumeView{
+			ID:          v.ID,
+			Description: v.Description,
+		}
+	}
+	return retList
 }

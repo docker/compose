@@ -33,6 +33,7 @@ type composeOptions struct {
 	WorkingDir  string
 	ConfigPaths []string
 	Environment []string
+	Format      string
 }
 
 func (o *composeOptions) toProjectName() (string, error) {
