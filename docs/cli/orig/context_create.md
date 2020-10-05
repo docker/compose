@@ -50,9 +50,9 @@ Options:
                                             this context
                                             (swarm|kubernetes|all)
       --description string                  Description of the context
-      --docker stringToString               set the docker endpoint
+      --docker stringToString               Set the docker endpoint
                                             (default [])
-      --kubernetes stringToString           set the kubernetes endpoint
+      --kubernetes stringToString           Set the kubernetes endpoint
                                             (default [])
       --from string                         Create the context from an existing context
 ```

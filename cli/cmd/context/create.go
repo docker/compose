@@ -89,9 +89,9 @@ $ docker context create my-context --description "some description" --docker "ho
 	flags.String(
 		"default-stack-orchestrator", "",
 		"Default orchestrator for stack operations to use with this context (swarm|kubernetes|all)")
-	flags.StringToString("docker", nil, "set the docker endpoint")
-	flags.StringToString("kubernetes", nil, "set the kubernetes endpoint")
-	flags.String("from", "", "create context from a named context")
+	flags.StringToString("docker", nil, "Set the docker endpoint")
+	flags.StringToString("kubernetes", nil, "Set the kubernetes endpoint")
+	flags.String("from", "", "Create context from a named context")
 
 	return cmd
 }
