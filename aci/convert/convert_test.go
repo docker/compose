@@ -536,7 +536,7 @@ func TestComposeContainerGroupToContainerIgnoreDomainNameWithoutPorts(t *testing
 	assert.Assert(t, group.IPAddress == nil)
 }
 
-func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
+func TestComposeContainerGroupToContainerResourceRequests(t *testing.T) {
 	_0_1Gb := 0.1 * 1024 * 1024 * 1024
 	project := types.Project{
 		Services: []types.ServiceConfig{
@@ -545,7 +545,7 @@ func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
 				Image: "image1",
 				Deploy: &types.DeployConfig{
 					Resources: types.Resources{
-						Limits: &types.Resource{
+						Reservations: &types.Resource{
 							NanoCPUs:    "0.1",
 							MemoryBytes: types.UnitBytes(_0_1Gb),
 						},
@@ -558,12 +558,12 @@ func TestComposeContainerGroupToContainerResourceLimits(t *testing.T) {
 	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
-	limits := *((*group.Containers)[0]).Resources.Limits
-	assert.Equal(t, *limits.CPU, float64(0.1))
-	assert.Equal(t, *limits.MemoryInGB, float64(0.1))
+	request := *((*group.Containers)[0]).Resources.Requests
+	assert.Equal(t, *request.CPU, float64(0.1))
+	assert.Equal(t, *request.MemoryInGB, float64(0.1))
 }
 
-func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
+func TestComposeContainerGroupToContainerResourceRequestsDefaults(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -571,7 +571,7 @@ func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
 				Image: "image1",
 				Deploy: &types.DeployConfig{
 					Resources: types.Resources{
-						Limits: &types.Resource{
+						Reservations: &types.Resource{
 							NanoCPUs:    "",
 							MemoryBytes: 0,
 						},
@@ -584,9 +584,9 @@ func TestComposeContainerGroupToContainerResourceLimitsDefaults(t *testing.T) {
 	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.NilError(t, err)
 
-	limits := *((*group.Containers)[0]).Resources.Limits
-	assert.Equal(t, *limits.CPU, float64(1))
-	assert.Equal(t, *limits.MemoryInGB, float64(1))
+	request := *((*group.Containers)[0]).Resources.Requests
+	assert.Equal(t, *request.CPU, float64(1))
+	assert.Equal(t, *request.MemoryInGB, float64(1))
 }
 
 func TestComposeContainerGroupToContainerenvVar(t *testing.T) {

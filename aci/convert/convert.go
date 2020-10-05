@@ -175,10 +175,6 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 			Image:   to.StringPtr(dnsSidecarImage),
 			Command: &alpineCmd,
 			Resources: &containerinstance.ResourceRequirements{
-				Limits: &containerinstance.ResourceLimits{
-					MemoryInGB: to.Float64Ptr(0.1),  // "The memory requirement should be in incrememts of 0.1 GB."
-					CPU:        to.Float64Ptr(0.01), //  "The CPU requirement should be in incrememts of 0.01."
-				},
 				Requests: &containerinstance.ResourceRequests{
 					MemoryInGB: to.Float64Ptr(0.1),
 					CPU:        to.Float64Ptr(0.01),
@@ -357,14 +353,14 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 		volumes = &allVolumes
 	}
 
-	memLimit := 1. // Default 1 Gb
-	var cpuLimit float64 = 1
-	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
-		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
-			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
+	memRequest := 1. // Default 1 Gb
+	var cpuRequest float64 = 1
+	if s.Deploy != nil && s.Deploy.Resources.Reservations != nil {
+		if s.Deploy.Resources.Reservations.MemoryBytes != 0 {
+			memRequest = bytesToGb(s.Deploy.Resources.Reservations.MemoryBytes)
 		}
-		if s.Deploy.Resources.Limits.NanoCPUs != "" {
-			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
+		if s.Deploy.Resources.Reservations.NanoCPUs != "" {
+			cpuRequest, err = strconv.ParseFloat(s.Deploy.Resources.Reservations.NanoCPUs, 0)
 			if err != nil {
 				return containerinstance.Container{}, err
 			}
@@ -377,13 +373,9 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 			Command:              to.StringSlicePtr(s.Command),
 			EnvironmentVariables: getEnvVariables(s.Environment),
 			Resources: &containerinstance.ResourceRequirements{
-				Limits: &containerinstance.ResourceLimits{
-					MemoryInGB: to.Float64Ptr(memLimit),
-					CPU:        to.Float64Ptr(cpuLimit),
-				},
 				Requests: &containerinstance.ResourceRequests{
-					MemoryInGB: to.Float64Ptr(memLimit), // TODO: use the memory requests here and not limits
-					CPU:        to.Float64Ptr(cpuLimit), // TODO: use the cpu requests here and not limits
+					MemoryInGB: to.Float64Ptr(memRequest),
+					CPU:        to.Float64Ptr(cpuRequest),
 				},
 			},
 			VolumeMounts: volumes,
