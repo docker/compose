@@ -40,7 +40,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project) error {
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool) error {
 	cmd := exec.Command("docker-compose", "version", "--short")
 	b := bytes.Buffer{}
 	b.WriteString("v")

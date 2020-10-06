@@ -34,6 +34,7 @@ type composeOptions struct {
 	ConfigPaths []string
 	Environment []string
 	Format      string
+	Detach      bool
 }
 
 func (o *composeOptions) toProjectName() (string, error) {

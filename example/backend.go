@@ -131,7 +131,7 @@ func (cs *containerService) Delete(ctx context.Context, id string, request conta
 
 type composeService struct{}
 
-func (cs *composeService) Up(ctx context.Context, project *types.Project) error {
+func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	fmt.Printf("Up command on project %q", project.Name)
 	return nil
 }

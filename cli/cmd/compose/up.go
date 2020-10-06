@@ -40,7 +40,7 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
-	upCmd.Flags().BoolP("detach", "d", true, " Detached mode: Run containers in the background")
+	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, " Detached mode: Run containers in the background")
 
 	if contextType == store.AciContextType {
 		upCmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
@@ -68,8 +68,7 @@ func runUp(ctx context.Context, opts composeOptions) error {
 		if err != nil {
 			return "", err
 		}
-
-		return "", c.ComposeService().Up(ctx, project)
+		return "", c.ComposeService().Up(ctx, project, opts.Detach)
 	})
 	return err
 }
