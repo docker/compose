@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/tsdb/fileutil"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -34,9 +33,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/compose-spec/compose-go/loader"
-	"github.com/compose-spec/compose-go/types"
-	"gopkg.in/yaml.v3"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -45,6 +41,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/prometheus/tsdb/fileutil"
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/aci/convert"
@@ -477,15 +474,9 @@ func TestContainerRunAttached(t *testing.T) {
 
 func overwriteFileStorageAccount(t *testing.T, absComposefileName string, storageAccount string) {
 	data, err := ioutil.ReadFile(absComposefileName)
-	m, err := loader.ParseYAML(data)
 	assert.NilError(t, err)
-	p, err := loader.Load(types.ConfigDetails{ConfigFiles: []types.ConfigFile{{Config: m}}})
-	p.Volumes["mydata"].DriverOpts["storage_account_name"] = storageAccount
-	out, err := yaml.Marshal(p)
-	assert.NilError(t, err)
-	// FIXME(ulyssessouza): Change `compose-go` to omit `WorkingDir` and `Name` on YAML serialization
-	outBytes := []byte(strings.Join(strings.Split(string(out), "\n")[2:], "\n")) // Removes the first 2 lines
-	err = ioutil.WriteFile(absComposefileName, outBytes, 0644)
+	override := strings.Replace(string(data), "dockertestvolumeaccount", storageAccount, 1)
+	err = ioutil.WriteFile(absComposefileName, []byte(override), 0644)
 	assert.NilError(t, err)
 }
 
@@ -498,7 +489,7 @@ func TestUpUpdate(t *testing.T) {
 	)
 	var (
 		singlePortVolumesComposefile = "aci_demo_port_volumes.yaml"
-		multiPortVolumesComposefile  = "aci_demo_multiport_volumes.yaml"
+		multiPortComposefile         = "aci_demo_multi_port.yaml"
 	)
 	c := NewParallelE2eCLI(t, binDir)
 	sID, groupID, location := setupTestResourceGroup(t, c)
@@ -515,8 +506,7 @@ func TestUpUpdate(t *testing.T) {
 
 	singlePortVolumesComposefile = filepath.Join(dstDir, singlePortVolumesComposefile)
 	overwriteFileStorageAccount(t, singlePortVolumesComposefile, composeAccountName)
-	multiPortVolumesComposefile = filepath.Join(dstDir, multiPortVolumesComposefile)
-
+	multiPortComposefile = filepath.Join(dstDir, multiPortComposefile)
 
 	t.Run("compose up", func(t *testing.T) {
 		const (
@@ -554,7 +544,7 @@ func TestUpUpdate(t *testing.T) {
 				strings.Contains(l, ":80->80/tcp")
 			}
 		}
-		assert.Assert(t, webRunning, "web container not running ; ps:\n" + res.Stdout())
+		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
 
 		res = c.RunDockerCmd("inspect", serverContainer)
 
@@ -615,7 +605,7 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", multiPortVolumesComposefile, "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "up", "-f", multiPortComposefile, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
 		// Check three containers are running
