@@ -104,7 +104,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			w.Event(progress.Event{
 				ID:         resource,
 				Status:     progressStatus,
-				StatusText: reason,
+				StatusText: fmt.Sprintf("%s %s", status, reason),
 			})
 		}
 		if operation != stackCreate || stackErr != nil {
