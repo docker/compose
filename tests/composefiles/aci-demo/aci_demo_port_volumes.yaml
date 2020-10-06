@@ -13,11 +13,11 @@ services:
     ports:
       - "80:80"
     volumes:
-      - mydata:/mount/testvolumes
+      - mydata:/static/volume_test
 
 volumes:
   mydata:
     driver: azure_file
     driver_opts:
-      share_name: minecraft-volume
-      storage_account_name: minecraftdocker
+      share_name: dockertestshare
+      storage_account_name: dockertestvolumeaccount

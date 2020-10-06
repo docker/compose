@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -39,6 +41,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/azure-storage-file-go/azfile"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/prometheus/tsdb/fileutil"
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/aci/convert"
@@ -133,15 +136,26 @@ func getTestLocation() string {
 	return location[n]
 }
 
-func TestContainerRunVolume(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-	sID, rg, location := setupTestResourceGroup(t, c)
+func uploadTestFile(t *testing.T, aciContext store.AciContext, accountName string, fileshareName string, testFileName string, testFileContent string) {
+	storageLogin := login.StorageLoginImpl{AciContext: aciContext}
+	key, err := storageLogin.GetAzureStorageAccountKey(context.TODO(), accountName)
+	assert.NilError(t, err)
+	cred, err := azfile.NewSharedKeyCredential(accountName, key)
+	assert.NilError(t, err)
+	u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", accountName, fileshareName))
+	uploadFile(t, *cred, u.String(), testFileName, testFileContent)
+}
 
+const fileshareName = "dockertestshare"
+
+func TestRunVolume(t *testing.T) {
 	const (
-		fileshareName   = "dockertestshare"
 		testFileContent = "Volume mounted successfully!"
 		testFileName    = "index.html"
 	)
+
+	c := NewParallelE2eCLI(t, binDir)
+	sID, rg, location := setupTestResourceGroup(t, c)
 
 	// Bootstrap volume
 	aciContext := store.AciContext{
@@ -180,8 +194,8 @@ func TestContainerRunVolume(t *testing.T) {
 	t.Run("create volumes", func(t *testing.T) {
 		c.RunDockerCmd("volume", "create", "--storage-account", accountName, fileshareName)
 	})
-	volumeID = accountName + "/" + fileshareName
 
+	volumeID = accountName + "/" + fileshareName
 	t.Cleanup(func() {
 		c.RunDockerCmd("volume", "rm", volumeID)
 		res := c.RunDockerCmd("volume", "ls")
@@ -215,14 +229,7 @@ func TestContainerRunVolume(t *testing.T) {
 	})
 
 	t.Run("upload file", func(t *testing.T) {
-		storageLogin := login.StorageLoginImpl{AciContext: aciContext}
-
-		key, err := storageLogin.GetAzureStorageAccountKey(context.TODO(), accountName)
-		assert.NilError(t, err)
-		cred, err := azfile.NewSharedKeyCredential(accountName, key)
-		assert.NilError(t, err)
-		u, _ := url.Parse(fmt.Sprintf("https://%s.file.core.windows.net/%s", accountName, fileshareName))
-		uploadFile(t, *cred, u.String(), testFileName, testFileContent)
+		uploadTestFile(t, aciContext, accountName, fileshareName, testFileName, testFileContent)
 	})
 
 	t.Run("run", func(t *testing.T) {
@@ -465,24 +472,66 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 }
 
-func TestComposeUpUpdate(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-	_, groupID, location := setupTestResourceGroup(t, c)
+func overwriteFileStorageAccount(t *testing.T, absComposefileName string, storageAccount string) {
+	data, err := ioutil.ReadFile(absComposefileName)
+	assert.NilError(t, err)
+	override := strings.Replace(string(data), "dockertestvolumeaccount", storageAccount, 1)
+	err = ioutil.WriteFile(absComposefileName, []byte(override), 0644)
+	assert.NilError(t, err)
+}
 
+func TestUpUpdate(t *testing.T) {
 	const (
-		composeFile              = "../composefiles/aci-demo/aci_demo_port.yaml"
-		composeFileMultiplePorts = "../composefiles/aci-demo/aci_demo_multi_port.yaml"
-		composeProjectName       = "acidemo"
-		serverContainer          = composeProjectName + "_web"
-		wordsContainer           = composeProjectName + "_words"
-		dbContainer              = composeProjectName + "_db"
+		composeProjectName = "acidemo"
+		serverContainer    = composeProjectName + "_web"
+		wordsContainer     = composeProjectName + "_words"
+		dbContainer        = composeProjectName + "_db"
 	)
+	var (
+		singlePortVolumesComposefile = "aci_demo_port_volumes.yaml"
+		multiPortComposefile         = "aci_demo_multi_port.yaml"
+	)
+	c := NewParallelE2eCLI(t, binDir)
+	sID, groupID, location := setupTestResourceGroup(t, c)
+	composeAccountName := groupID + "-sa"
+	composeAccountName = strings.ReplaceAll(composeAccountName, "-", "")
+	composeAccountName = strings.ToLower(composeAccountName)
+
+	dstDir := filepath.Join(os.TempDir(), "e2e-aci-volume-"+composeAccountName)
+	err := fileutil.CopyDirs("../composefiles/aci-demo/", dstDir)
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		assert.NilError(t, os.RemoveAll(dstDir))
+	})
+
+	singlePortVolumesComposefile = filepath.Join(dstDir, singlePortVolumesComposefile)
+	overwriteFileStorageAccount(t, singlePortVolumesComposefile, composeAccountName)
+	multiPortComposefile = filepath.Join(dstDir, multiPortComposefile)
 
 	t.Run("compose up", func(t *testing.T) {
+		const (
+			testFileName    = "msg.txt"
+			testFileContent = "VOLUME_OK"
+		)
+
+		c.RunDockerCmd("volume", "create", "--storage-account", composeAccountName, fileshareName)
+		volumeID := composeAccountName + "/" + fileshareName
+		t.Cleanup(func() {
+			c.RunDockerCmd("volume", "rm", volumeID)
+		})
+
+		// Bootstrap volume
+		aciContext := store.AciContext{
+			SubscriptionID: sID,
+			Location:       location,
+			ResourceGroup:  groupID,
+		}
+		uploadTestFile(t, aciContext, composeAccountName, fileshareName, testFileName, testFileContent)
+
 		dnsLabelName := "nginx-" + groupID
 		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
 		// Name of Compose project is taken from current folder "acie2e"
-		c.RunDockerCmd("compose", "up", "-f", composeFile, "--domainname", dnsLabelName)
+		c.RunDockerCmd("compose", "up", "-f", singlePortVolumesComposefile, "--domainname", dnsLabelName, "--project-name", "acidemo")
 
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
@@ -495,7 +544,7 @@ func TestComposeUpUpdate(t *testing.T) {
 				strings.Contains(l, ":80->80/tcp")
 			}
 		}
-		assert.Assert(t, webRunning, "web container not running")
+		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
 
 		res = c.RunDockerCmd("inspect", serverContainer)
 
@@ -510,6 +559,9 @@ func TestComposeUpUpdate(t *testing.T) {
 
 		endpoint = fmt.Sprintf("http://%s:%d", fqdn, containerInspect.Ports[0].HostPort)
 		HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
+
+		body := HTTPGetWithRetry(t, endpoint+"/volume_test/"+testFileName, http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Assert(t, strings.Contains(body, testFileContent))
 	})
 
 	t.Run("compose ps", func(t *testing.T) {
@@ -553,7 +605,7 @@ func TestComposeUpUpdate(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", composeFileMultiplePorts, "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "up", "-f", multiPortComposefile, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
 		// Check three containers are running
@@ -645,7 +697,7 @@ func TestRunEnvVars(t *testing.T) {
 
 func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
-	rg := "E2E-" + t.Name() + "-" + startTime
+	rg := "E2E-" + t.Name() + "-" + startTime[5:]
 	azureLogin(t, c)
 	sID := getSubscriptionID(t)
 	location := getTestLocation()
