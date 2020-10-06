@@ -217,9 +217,15 @@ func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Proje
 	}
 
 	balancerType := getRequiredLoadBalancerType(project)
+	var securityGroups []string
+	if balancerType == elbv2.LoadBalancerTypeEnumApplication {
+		// see https://docs.aws.amazon.com/elasticloadbalancing/latest/network/target-group-register-targets.html#target-security-groups
+		// Network Load Balancers do not have associated security groups
+		securityGroups = r.getLoadBalancerSecurityGroups(project)
+	}
 	template.Resources["LoadBalancer"] = &elasticloadbalancingv2.LoadBalancer{
 		Scheme:         elbv2.LoadBalancerSchemeEnumInternetFacing,
-		SecurityGroups: r.getLoadBalancerSecurityGroups(project),
+		SecurityGroups: securityGroups,
 		Subnets:        r.subnets,
 		Tags:           projectTags(project),
 		Type:           balancerType,
