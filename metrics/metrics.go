@@ -17,68 +17,12 @@
 package metrics
 
 import (
-	"strings"
-
-	flag "github.com/spf13/pflag"
-
 	"github.com/docker/compose-cli/utils"
 )
 
-var managementCommands = []string{
-	"app",
-	"assemble",
-	"builder",
-	"buildx",
-	"ecs",
-	"ecs compose",
-	"cluster",
-	"compose",
-	"config",
-	"container",
-	"context",
-	// We add "context create" as a management command to be able to catch
-	// calls to "context create aci"
-	"context create",
-	"help",
-	"image",
-	// Adding "login" as a management command so that the system can catch
-	// commands like `docker login azure`
-	"login",
-	"manifest",
-	"network",
-	"node",
-	"plugin",
-	"registry",
-	"secret",
-	"service",
-	"stack",
-	"swarm",
-	"system",
-	"template",
-	"trust",
-	"volume",
-}
-
-// managementSubCommands holds a list of allowed subcommands of a management
-// command. For example we want to send an event for "docker login azure" but
-// we don't wat to send the name of the registry when the user does a
-// "docker login my-registry", we only want to send "login"
-var managementSubCommands = map[string][]string{
-	"login": {
-		"azure",
-	},
-	"context create": {
-		"aci",
-	},
-}
-
-const (
-	scanCommand = "scan"
-)
-
 // Track sends the tracking analytics to Docker Desktop
-func Track(context string, args []string, flags *flag.FlagSet, status string) {
-	command := GetCommand(args, flags)
+func Track(context string, args []string, status string) {
+	command := GetCommand(args)
 	if command != "" {
 		c := NewClient()
 		c.Send(Command{
@@ -90,115 +34,36 @@ func Track(context string, args []string, flags *flag.FlagSet, status string) {
 	}
 }
 
+func isCommand(word string) bool {
+	return utils.StringContains(commands, word) || isManagementCommand(word)
+}
+
+func isManagementCommand(word string) bool {
+	return utils.StringContains(managementCommands, word)
+}
+
+func isCommandFlag(word string) bool {
+	return utils.StringContains(commandFlags, word)
+}
+
 // GetCommand get the invoked command
-func GetCommand(args []string, flags *flag.FlagSet) string {
-	command := ""
-	strippedArgs := stripFlags(args, flags)
-
-	if len(strippedArgs) != 0 {
-		command = strippedArgs[0]
-
-		if command == scanCommand {
-			return getScanCommand(args)
-		}
-
-		for {
-			if utils.StringContains(managementCommands, command) {
-				if sub := getSubCommand(command, strippedArgs[1:]); sub != "" {
-					command += " " + sub
-					strippedArgs = strippedArgs[1:]
-					continue
-				}
-			}
+func GetCommand(args []string) string {
+	result := ""
+	onlyFlags := false
+	for _, arg := range args {
+		if arg == "--" {
 			break
 		}
-	}
-
-	return command
-}
-
-func getScanCommand(args []string) string {
-	command := args[0]
-
-	if utils.StringContains(args, "--auth") {
-		return command + " auth"
-	}
-
-	if utils.StringContains(args, "--version") {
-		return command + " version"
-	}
-
-	return command
-}
-
-func getSubCommand(command string, args []string) string {
-	if len(args) == 0 {
-		return ""
-	}
-
-	if val, ok := managementSubCommands[command]; ok {
-		if utils.StringContains(val, args[0]) {
-			return args[0]
-		}
-		return ""
-	}
-
-	if isArg(args[0]) {
-		return args[0]
-	}
-
-	return ""
-}
-
-func stripFlags(args []string, flags *flag.FlagSet) []string {
-	commands := []string{}
-
-	for len(args) > 0 {
-		s := args[0]
-		args = args[1:]
-
-		if s == "--" {
-			return commands
-		}
-
-		if flagArg(s, flags) {
-			if len(args) <= 1 {
-				return commands
+		if isCommandFlag(arg) || (!onlyFlags && isCommand(arg)) {
+			if result == "" {
+				result = arg
+			} else {
+				result = result + " " + arg
 			}
-			args = args[1:]
-		}
-
-		if isArg(s) {
-			commands = append(commands, s)
+			if !isManagementCommand(arg) {
+				onlyFlags = true
+			}
 		}
 	}
-
-	return commands
-}
-
-func flagArg(s string, flags *flag.FlagSet) bool {
-	return strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && !hasNoOptDefVal(s[2:], flags) ||
-		strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2 && !shortHasNoOptDefVal(s[1:], flags)
-}
-
-func isArg(s string) bool {
-	return s != "" && !strings.HasPrefix(s, "-")
-}
-
-func hasNoOptDefVal(name string, fs *flag.FlagSet) bool {
-	flag := fs.Lookup(name)
-	if flag == nil {
-		return false
-	}
-
-	return flag.NoOptDefVal != ""
-}
-
-func shortHasNoOptDefVal(name string, fs *flag.FlagSet) bool {
-	flag := fs.ShorthandLookup(name[:1])
-	if flag == nil {
-		return false
-	}
-
-	return flag.NoOptDefVal != ""
+	return result
 }

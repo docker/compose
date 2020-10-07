@@ -86,7 +86,7 @@ func Exec(root *cobra.Command) {
 	err := cmd.Run()
 	childExit <- true
 	if err != nil {
-		metrics.Track(store.DefaultContextType, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
 
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exiterr.ExitCode())
@@ -94,7 +94,7 @@ func Exec(root *cobra.Command) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	metrics.Track(store.DefaultContextType, os.Args[1:], root.PersistentFlags(), metrics.SuccessStatus)
+	metrics.Track(store.DefaultContextType, os.Args[1:], metrics.SuccessStatus)
 
 	os.Exit(0)
 }

@@ -185,7 +185,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("ps")
 		c.RunDockerCmd("context", "use", "test-example")
 		c.RunDockerCmd("ps")
-		c.RunDockerOrExitError("error")
+		c.RunDockerOrExitError("stop", "unknown")
 		c.RunDockerCmd("context", "use", "default")
 		c.RunDockerCmd("--context", "test-example", "ps")
 
@@ -195,7 +195,7 @@ func TestContextMetrics(t *testing.T) {
 		assert.Equal(t, `{"command":"ps","context":"moby","source":"cli","status":"success"}`, usage[1])
 		assert.Equal(t, `{"command":"context use","context":"moby","source":"cli","status":"success"}`, usage[2])
 		assert.Equal(t, `{"command":"ps","context":"example","source":"cli","status":"success"}`, usage[3])
-		assert.Equal(t, `{"command":"error","context":"example","source":"cli","status":"failure"}`, usage[4])
+		assert.Equal(t, `{"command":"stop","context":"example","source":"cli","status":"failure"}`, usage[4])
 		assert.Equal(t, `{"command":"context use","context":"example","source":"cli","status":"success"}`, usage[5])
 		assert.Equal(t, `{"command":"ps","context":"example","source":"cli","status":"success"}`, usage[6])
 	})
