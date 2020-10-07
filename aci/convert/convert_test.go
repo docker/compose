@@ -90,13 +90,11 @@ func TestContainerGroupToContainer(t *testing.T) {
 	}
 
 	var expectedContainer = containers.Container{
-		ID:          "myContainerID",
-		Status:      "Running",
-		Image:       "sha256:666",
-		Command:     "mycommand",
-		CPULimit:    3,
-		MemoryLimit: 107374182,
-		Platform:    "Linux",
+		ID:       "myContainerID",
+		Status:   "Running",
+		Image:    "sha256:666",
+		Command:  "mycommand",
+		Platform: "Linux",
 		Ports: []containers.Port{{
 			HostPort:      uint32(80),
 			ContainerPort: uint32(80),
@@ -106,7 +104,11 @@ func TestContainerGroupToContainer(t *testing.T) {
 		Config: &containers.RuntimeConfig{
 			FQDN: "myapp.eastus.azurecontainer.io",
 		},
-		RestartPolicyCondition: "any",
+		HostConfig: &containers.HostConfig{
+			CPULimit:      3,
+			MemoryLimit:   107374182,
+			RestartPolicy: "any",
+		},
 	}
 
 	container := ContainerGroupToContainer("myContainerID", myContainerGroup, myContainer, "eastus")

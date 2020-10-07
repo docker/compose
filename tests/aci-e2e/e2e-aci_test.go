@@ -249,8 +249,8 @@ func TestRunVolume(t *testing.T) {
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
-		assert.Equal(t, containerInspect.CPULimit, 1.0)
-		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyNone)
+		assert.Equal(t, containerInspect.HostConfig.CPULimit, 1.0)
+		assert.Equal(t, containerInspect.HostConfig.RestartPolicy, containers.RestartPolicyNone)
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		hostIP = containerInspect.Ports[0].HostIP
@@ -395,9 +395,9 @@ func TestContainerRunAttached(t *testing.T) {
 		containerInspect, err := ParseContainerInspect(inspectRes.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
-		assert.Equal(t, containerInspect.CPULimit, 0.1)
-		assert.Equal(t, containerInspect.MemoryLimit, uint64(107374182))
-		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyOnFailure)
+		assert.Equal(t, containerInspect.HostConfig.CPULimit, 0.1)
+		assert.Equal(t, containerInspect.HostConfig.MemoryLimit, uint64(107374182))
+		assert.Equal(t, containerInspect.HostConfig.RestartPolicy, containers.RestartPolicyOnFailure)
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		port := containerInspect.Ports[0]

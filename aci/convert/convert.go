@@ -499,26 +499,28 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		}
 	}
 
-	var config *containers.RuntimeConfig = &containers.RuntimeConfig{FQDN: fqdn(cg, region)}
-	if envVars != nil {
-		config.Env = envVars
+	config := &containers.RuntimeConfig{
+		FQDN: fqdn(cg, region),
+		Env:  envVars,
+	}
+	hostConfig := &containers.HostConfig{
+		CPULimit:      cpuLimit,
+		MemoryLimit:   uint64(memLimits),
+		RestartPolicy: toContainerRestartPolicy(cg.RestartPolicy),
 	}
 	c := containers.Container{
-		ID:                     containerID,
-		Status:                 status,
-		Image:                  to.String(cc.Image),
-		Command:                command,
-		CPUTime:                0,
-		CPULimit:               cpuLimit,
-		MemoryUsage:            0,
-		MemoryLimit:            uint64(memLimits),
-		PidsCurrent:            0,
-		PidsLimit:              0,
-		Labels:                 nil,
-		Ports:                  ToPorts(cg.IPAddress, *cc.Ports),
-		Platform:               platform,
-		RestartPolicyCondition: toContainerRestartPolicy(cg.RestartPolicy),
-		Config:                 config,
+		ID:          containerID,
+		Status:      status,
+		Image:       to.String(cc.Image),
+		Command:     command,
+		CPUTime:     0,
+		MemoryUsage: 0,
+		PidsCurrent: 0,
+		PidsLimit:   0,
+		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
+		Platform:    platform,
+		Config:      config,
+		HostConfig:  hostConfig,
 	}
 
 	return c

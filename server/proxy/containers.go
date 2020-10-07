@@ -128,14 +128,14 @@ func toGrpcContainer(c containers.Container) *containersv1.Container {
 		Command:                c.Command,
 		CpuTime:                c.CPUTime,
 		MemoryUsage:            c.MemoryUsage,
-		MemoryLimit:            c.MemoryLimit,
+		MemoryLimit:            c.HostConfig.MemoryLimit,
 		Platform:               c.Platform,
 		PidsCurrent:            c.PidsCurrent,
 		PidsLimit:              c.PidsLimit,
-		Labels:                 c.Labels,
+		Labels:                 c.Config.Labels,
 		Ports:                  portsToGrpc(c.Ports),
-		CpuLimit:               uint64(c.CPULimit),
-		RestartPolicyCondition: c.RestartPolicyCondition,
+		CpuLimit:               uint64(c.HostConfig.CPULimit),
+		RestartPolicyCondition: c.HostConfig.RestartPolicy,
 	}
 }
 
