@@ -498,7 +498,8 @@ func TestUpUpdate(t *testing.T) {
 	composeAccountName = strings.ToLower(composeAccountName)
 
 	dstDir := filepath.Join(os.TempDir(), "e2e-aci-volume-"+composeAccountName)
-	err := fileutil.CopyDirs("../composefiles/aci-demo/", dstDir)
+	srcDir := filepath.Join("..", "composefiles", "aci-demo")
+	err := fileutil.CopyDirs(srcDir, dstDir)
 	assert.NilError(t, err)
 	t.Cleanup(func() {
 		assert.NilError(t, os.RemoveAll(dstDir))

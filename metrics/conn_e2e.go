@@ -1,4 +1,4 @@
-// +build !windows
+// +build e2e
 
 /*
    Copyright 2020 Docker Compose CLI authors
@@ -18,12 +18,14 @@
 
 package metrics
 
-import "net"
-
-var (
-	socket = "/var/run/docker-cli.sock"
+import (
+	"os"
 )
 
-func conn() (net.Conn, error) {
-	return net.Dial("unix", socket)
+
+func init() {
+	testSocket, defined := os.LookupEnv("TEST_METRICS_SOCKET")
+	if defined {
+		socket = testSocket
+	}
 }
