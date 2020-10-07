@@ -20,6 +20,7 @@ package metrics
 
 import (
 	"net"
+	"strings"
 	"time"
 
 	"github.com/Microsoft/go-winio"
@@ -30,6 +31,9 @@ var (
 )
 
 func conn() (net.Conn, error) {
-	timeout := 200 * time.Millisecond
-	return winio.DialPipe(socket, &timeout)
+	if strings.HasPrefix(socket, `\\.\pipe\`) {
+		timeout := 200 * time.Millisecond
+		return winio.DialPipe(socket, &timeout)
+	}
+	return net.Dial("unix", socket)
 }
