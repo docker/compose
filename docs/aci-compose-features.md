@@ -2,7 +2,7 @@
 
 This document outlines the conversion of an application defined in a Compose file to ACI objects.
 At a high-level, each Compose deployment is mapped to a single ACI container group. 
-Each service is mapped to a container in the container group. The Docker ACI integration provides does not allow scaling of services.
+Each service is mapped to a container in the container group. The Docker ACI integration does not allow scaling of services.
 
 ## Compose fields mapping
 
@@ -58,7 +58,7 @@ __Legend:__
 | service.networks               | x |  Communication between services is implemented by defining mapping for each service in the shared `/etc/hosts` file of the container group. Each service can resolve names for other services and the resulting network calls will be redirected to `localhost`.
 | service.pid                    | x |  
 | service.ports                  | ✓ |  Only symetrical por mapping is supported in ACI. See #exposing-ports.
-| service.secrets                | ✓ |  
+| service.secrets                | ✓ |  See #secrets.
 | service.security_opt           | x |  
 | service.stop_grace_period      | x |  
 | service.stop_signal            | x |  
@@ -117,6 +117,33 @@ The short volume syntax is not allowed for ACI volumes, as it was designed for l
 A Compose file can define several volumes, with different Azure file shares or storage accounts.
 
 Credentials for storage accounts will be automatically fetched at deployment time using the Azure login to retrieve the storage account key for each storage account used. 
+
+## Secrets
+
+Secrets can be defined in compose files, and will need secret files available at deploy time next to the compose file. 
+The content of the secret file will be made available inside selected containers, under `/run/secrets/<SECRET_NAME>/<SECRET_NAME>
+External secrets are not supported with the ACI integration.
+Due to ACI secret volume mounting, each secret file is mounted in its own folder named after the secret.
+
+```yaml
+services:
+    nginx:
+        image: nginx
+        secrets:
+          - mysecret1
+    db:
+        image: mysql
+        secrets:
+          - mysecret2
+          
+secrets:
+  mysecret1:
+    file: ./my_secret1.txt
+  mysecret2:
+    file: ./my_secret2.txt
+```
+
+The nginx container will have secret1 mounted as `/run/secrets/mysecret1/mysecret1`, the db container will have secret2 mounted as `/run/secrets/mysecret1/mysecret2`
 
 ## Container Resources
 
