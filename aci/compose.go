@@ -44,7 +44,7 @@ func newComposeService(ctx store.AciContext) aciComposeService {
 	}
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, project *types.Project) error {
+func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project, cs.storageLogin)
 	addTag(&groupDefinition, composeContainerTag)

@@ -26,7 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) Up(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	err := b.SDK.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
@@ -58,7 +58,9 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project) error {
 			return err
 		}
 	}
-
+	if detach {
+		return nil
+	}
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
