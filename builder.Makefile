@@ -15,6 +15,8 @@
 GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 
+PKG_NAME := github.com/docker/compose-cli
+
 PROTOS=$(shell find protos -name \*.proto)
 
 EXTENSION:=
@@ -26,7 +28,7 @@ STATIC_FLAGS=CGO_ENABLED=0
 
 GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
 
-LDFLAGS="-s -w -X main.version=${GIT_TAG}"
+LDFLAGS="-s -w -X $(PKG_NAME)/internal.Version=${GIT_TAG}"
 GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
 BINARY?=bin/docker

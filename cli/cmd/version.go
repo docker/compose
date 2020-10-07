@@ -26,18 +26,19 @@ import (
 	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 	"github.com/docker/compose-cli/cli/mobycli"
 	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/internal"
 )
 
 const formatOpt = "format"
 
 // VersionCommand command to display version
-func VersionCommand(version string) *cobra.Command {
+func VersionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show the Docker version information",
 		Args:  cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, _ []string) {
-			runVersion(cmd, version)
+			runVersion(cmd)
 		},
 	}
 	// define flags for backward compatibility with com.docker.cli
@@ -49,15 +50,15 @@ func VersionCommand(version string) *cobra.Command {
 	return cmd
 }
 
-func runVersion(cmd *cobra.Command, version string) {
+func runVersion(cmd *cobra.Command) {
 	var versionString string
 	format := strings.ToLower(strings.ReplaceAll(cmd.Flag(formatOpt).Value.String(), " ", ""))
-	displayedVersion := strings.TrimPrefix(version, "v")
+	displayedVersion := strings.TrimPrefix(internal.Version, "v")
 	// Replace is preferred in this case to keep the order.
 	switch format {
 	case formatter.PRETTY, "":
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...),
-			"\n Version:", "\n Cloud integration:  "+displayedVersion+"\n Version:", 1)
+			"\n Version:", "\n Cloud integration: "+displayedVersion+"\n Version:", 1)
 	case formatter.JSON, formatter.TemplateJSON: // Try to catch full JSON formats
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...),
 			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
