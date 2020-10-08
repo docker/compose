@@ -858,3 +858,35 @@ func (s sdk) DeleteAutoscalingGroup(ctx context.Context, arn string) error {
 	})
 	return err
 }
+
+func (s sdk) FileSystemExists(ctx context.Context, id string) (bool, error) {
+	desc, err := s.EFS.DescribeFileSystemsWithContext(ctx, &efs.DescribeFileSystemsInput{
+		FileSystemId: aws.String(id),
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(desc.FileSystems) > 0, nil
+}
+
+func (s sdk) CreateFileSystem(ctx context.Context, name string) (string, error) {
+	res, err := s.EFS.CreateFileSystemWithContext(ctx, &efs.CreateFileSystemInput{
+		Tags: []*efs.Tag{
+			{
+				Key:   aws.String(compose.VolumeTag),
+				Value: aws.String(name),
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return aws.StringValue(res.FileSystemId), nil
+}
+
+func (s sdk) DeleteFileSystem(ctx context.Context, id string) error {
+	_, err := s.EFS.DeleteFileSystemWithContext(ctx, &efs.DeleteFileSystemInput{
+		FileSystemId: aws.String(id),
+	})
+	return err
+}

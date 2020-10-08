@@ -38,6 +38,7 @@ type awsResources struct {
 	loadBalancer     string
 	loadBalancerType string
 	securityGroups   map[string]string
+	filesystems      map[string]string
 }
 
 func (r *awsResources) serviceSecurityGroups(service types.ServiceConfig) []string {
@@ -72,7 +73,7 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsR
 	if err != nil {
 		return r, err
 	}
-	r.securityGroups, err = b.parseSecurityGroupExtension(ctx, project)
+	r.securityGroups, err = b.parseExternalNetworks(ctx, project)
 	if err != nil {
 		return r, err
 	}
@@ -139,7 +140,7 @@ func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project 
 	return "", "", nil
 }
 
-func (b *ecsAPIService) parseSecurityGroupExtension(ctx context.Context, project *types.Project) (map[string]string, error) {
+func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
 	securityGroups := make(map[string]string, len(project.Networks))
 	for name, net := range project.Networks {
 		if !net.External.External {
@@ -161,6 +162,25 @@ func (b *ecsAPIService) parseSecurityGroupExtension(ctx context.Context, project
 		securityGroups[name] = sg
 	}
 	return securityGroups, nil
+}
+
+func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
+	filesystems := make(map[string]string, len(project.Volumes))
+	// project.Volumes.filter(|v| v.External.External).first(|v| b.SDK.FileSystemExists(ctx, vol.Name))?
+	for name, vol := range project.Volumes {
+		if !vol.External.External {
+			continue
+		}
+		exists, err := b.SDK.FileSystemExists(ctx, vol.Name)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("EFS file system %s doesn't exist", vol.Name)
+		}
+		filesystems[name] = vol.Name
+	}
+	return filesystems, nil
 }
 
 // ensureResources create required resources in template if not yet defined
@@ -207,6 +227,12 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 		}
 
 		r.securityGroups[name] = cloudformation.Ref(securityGroup)
+	}
+}
+
+func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, template *cloudformation.Template) {
+	if r.filesystems == nil {
+		r.filesystems = make(map[string]string, len(project.Volumes))
 	}
 }
 
