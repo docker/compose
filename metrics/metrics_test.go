@@ -19,15 +19,10 @@ package metrics
 import (
 	"testing"
 
-	"github.com/spf13/cobra"
 	"gotest.tools/v3/assert"
 )
 
-func TestFlag(t *testing.T) {
-	root := &cobra.Command{}
-	root.PersistentFlags().BoolP("debug", "D", false, "debug")
-	root.PersistentFlags().String("str", "str", "str")
-
+func TestGetCommand(t *testing.T) {
 	testCases := []struct {
 		name     string
 		args     []string
@@ -59,16 +54,6 @@ func TestFlag(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "with unknown short flag",
-			args:     []string{"-f", "run"},
-			expected: "",
-		},
-		{
-			name:     "with unknown long flag",
-			args:     []string{"--unknown-flag", "run"},
-			expected: "",
-		},
-		{
 			name:     "management command",
 			args:     []string{"image", "ls"},
 			expected: "image ls",
@@ -76,7 +61,7 @@ func TestFlag(t *testing.T) {
 		{
 			name:     "management command with flag",
 			args:     []string{"image", "--test", "ls"},
-			expected: "image",
+			expected: "image ls",
 		},
 		{
 			name:     "management subcommand with flag",
@@ -89,24 +74,34 @@ func TestFlag(t *testing.T) {
 			expected: "login azure",
 		},
 		{
+			name:     "azure logout",
+			args:     []string{"logout", "azure"},
+			expected: "logout azure",
+		},
+		{
 			name:     "azure login with flags",
 			args:     []string{"login", "-u", "test", "azure"},
 			expected: "login azure",
 		},
 		{
-			name:     "azure login with azure user",
-			args:     []string{"login", "-u", "azure"},
+			name:     "login to a registry",
+			args:     []string{"login", "myregistry"},
 			expected: "login",
 		},
 		{
-			name:     "login to a registry",
-			args:     []string{"login", "registry"},
-			expected: "login",
+			name:     "logout from a registry",
+			args:     []string{"logout", "myregistry"},
+			expected: "logout",
 		},
 		{
 			name:     "context create aci",
 			args:     []string{"context", "create", "aci"},
 			expected: "context create aci",
+		},
+		{
+			name:     "context create ecs",
+			args:     []string{"context", "create", "ecs"},
+			expected: "context create ecs",
 		},
 		{
 			name:     "create a context from another context",
@@ -119,9 +114,9 @@ func TestFlag(t *testing.T) {
 			expected: "create",
 		},
 		{
-			name:     "create a container named aci",
-			args:     []string{"create", "aci"},
-			expected: "create",
+			name:     "start a container named aci",
+			args:     []string{"start", "aci"},
+			expected: "start",
 		},
 		{
 			name:     "create a container named test-container",
@@ -152,15 +147,44 @@ func TestFlag(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := GetCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args)
+			assert.Equal(t, testCase.expected, result)
+		})
+	}
+}
+
+func TestIgnoreHelpCommands(t *testing.T) {
+	testCases := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "help",
+			args:     []string{"--help"},
+			expected: "",
+		},
+		{
+			name:     "help on run",
+			args:     []string{"run", "--help"},
+			expected: "",
+		},
+		{
+			name:     "help on compose up",
+			args:     []string{"compose", "up", "--help"},
+			expected: "",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := GetCommand(testCase.args)
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
 }
 
 func TestEcs(t *testing.T) {
-	root := &cobra.Command{}
-
 	testCases := []struct {
 		name     string
 		args     []string
@@ -217,23 +241,21 @@ func TestEcs(t *testing.T) {
 			expected: "ecs compose logs",
 		},
 		{
-			name:     "setup",
-			args:     []string{"ecs", "setup"},
-			expected: "ecs setup",
+			name:     "ecs",
+			args:     []string{"ecs", "anything"},
+			expected: "ecs",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := GetCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args)
 			assert.Equal(t, testCase.expected, result)
 		})
 	}
 }
 
 func TestScan(t *testing.T) {
-	root := &cobra.Command{}
-
 	testCases := []struct {
 		name     string
 		args     []string
@@ -246,34 +268,34 @@ func TestScan(t *testing.T) {
 		},
 		{
 			name:     "scan image with long flags",
-			args:     []string{"scan", "--file", "file", "image"},
+			args:     []string{"scan", "--file", "file", "myimage"},
 			expected: "scan",
 		},
 		{
 			name:     "scan image with short flags",
-			args:     []string{"scan", "-f", "file", "image"},
+			args:     []string{"scan", "-f", "file", "myimage"},
 			expected: "scan",
 		},
 		{
 			name:     "scan with long flag",
-			args:     []string{"scan", "--dependency-tree", "image"},
+			args:     []string{"scan", "--dependency-tree", "myimage"},
 			expected: "scan",
 		},
 		{
 			name:     "auth",
-			args:     []string{"scan", "--auth"},
-			expected: "scan auth",
+			args:     []string{"scan", "--login"},
+			expected: "scan --login",
 		},
 		{
 			name:     "version",
 			args:     []string{"scan", "--version"},
-			expected: "scan version",
+			expected: "scan --version",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := GetCommand(testCase.args, root.PersistentFlags())
+			result := GetCommand(testCase.args)
 			assert.Equal(t, testCase.expected, result)
 		})
 	}

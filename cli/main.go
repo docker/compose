@@ -198,37 +198,37 @@ func main() {
 	if err = root.ExecuteContext(ctx); err != nil {
 		// if user canceled request, simply exit without any error message
 		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
-			metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.CanceledStatus)
+			metrics.Track(ctype, os.Args[1:], metrics.CanceledStatus)
 			os.Exit(130)
 		}
 		if ctype == store.AwsContextType {
-			exit(root, currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running:
+			exit(currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running:
 $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 		}
 
 		// Context should always be handled by new CLI
 		requiredCmd, _, _ := root.Find(os.Args[1:])
 		if requiredCmd != nil && isContextAgnosticCommand(requiredCmd) {
-			exit(root, currentContext, err, ctype)
+			exit(currentContext, err, ctype)
 		}
 		mobycli.ExecIfDefaultCtxType(ctx, root)
 
-		checkIfUnknownCommandExistInDefaultContext(err, currentContext, root, ctype)
+		checkIfUnknownCommandExistInDefaultContext(err, currentContext, ctype)
 
-		exit(root, currentContext, err, ctype)
+		exit(currentContext, err, ctype)
 	}
-	metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.SuccessStatus)
+	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
 }
 
-func exit(root *cobra.Command, ctx string, err error, ctype string) {
-	metrics.Track(ctype, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+func exit(ctx string, err error, ctype string) {
+	metrics.Track(ctype, os.Args[1:], metrics.FailureStatus)
 
 	if errors.Is(err, errdefs.ErrLoginRequired) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
 	if errors.Is(err, errdefs.ErrNotImplemented) {
-		name := metrics.GetCommand(os.Args[1:], root.PersistentFlags())
+		name := metrics.GetCommand(os.Args[1:])
 		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
 
 		os.Exit(1)
@@ -242,14 +242,14 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
-func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string, root *cobra.Command, contextType string) {
+func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string, contextType string) {
 	submatch := unknownCommandRegexp.FindSubmatch([]byte(err.Error()))
 	if len(submatch) == 2 {
 		dockerCommand := string(submatch[1])
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
-			metrics.Track(contextType, os.Args[1:], root.PersistentFlags(), metrics.FailureStatus)
+			metrics.Track(contextType, os.Args[1:], metrics.FailureStatus)
 			os.Exit(1)
 		}
 	}
