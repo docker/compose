@@ -122,20 +122,24 @@ func (p *proxy) Logs(request *containersv1.LogsRequest, stream containersv1.Cont
 
 func toGrpcContainer(c containers.Container) *containersv1.Container {
 	return &containersv1.Container{
-		Id:                     c.ID,
-		Image:                  c.Image,
-		Status:                 c.Status,
-		Command:                c.Command,
-		CpuTime:                c.CPUTime,
-		MemoryUsage:            c.MemoryUsage,
-		MemoryLimit:            c.HostConfig.MemoryLimit,
-		Platform:               c.Platform,
-		PidsCurrent:            c.PidsCurrent,
-		PidsLimit:              c.PidsLimit,
-		Labels:                 c.Config.Labels,
-		Ports:                  portsToGrpc(c.Ports),
-		CpuLimit:               uint64(c.HostConfig.CPULimit),
-		RestartPolicyCondition: c.HostConfig.RestartPolicy,
+		Id:          c.ID,
+		Image:       c.Image,
+		Status:      c.Status,
+		Command:     c.Command,
+		CpuTime:     c.CPUTime,
+		MemoryUsage: c.MemoryUsage,
+		Platform:    c.Platform,
+		PidsCurrent: c.PidsCurrent,
+		PidsLimit:   c.PidsLimit,
+		Labels:      c.Config.Labels,
+		Ports:       portsToGrpc(c.Ports),
+		HostConfig: &containersv1.HostConfig{
+			MemoryReservation: c.HostConfig.MemoryReservation,
+			MemoryLimit:       c.HostConfig.MemoryLimit,
+			CpuReservation:    uint64(c.HostConfig.CPUReservation),
+			CpuLimit:          uint64(c.HostConfig.CPULimit),
+			RestartPolicy:     c.HostConfig.RestartPolicy,
+		},
 	}
 }
 
