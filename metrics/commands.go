@@ -24,10 +24,6 @@ var commandFlags = []string{
 // Generated with generatecommands/main.go
 var managementCommands = []string{
 	"ecs",
-	"assemble",
-	"registry",
-	"template",
-	"cluster",
 	"scan",
 	"app",
 	"builder",

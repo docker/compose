@@ -24,11 +24,12 @@ import (
 	"github.com/docker/compose-cli/utils"
 )
 
-var managementCommands = []string{"ecs", "assemble", "registry", "template", "cluster", "scan"}
+var managementCommands = []string{"ecs", "scan"}
 
 var commands = []string{}
 
 func main() {
+	fmt.Println("Walking through docker help to list commands...")
 	getCommands()
 	getCommands("compose")
 
