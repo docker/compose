@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -50,23 +51,23 @@ func TestMain(m *testing.M) {
 func TestSecrets(t *testing.T) {
 	cmd, testID := setupTest(t)
 	secretName := "secret" + testID
-	description := "description " + testID
 
 	t.Run("create secret", func(t *testing.T) {
-		res := cmd.RunDockerCmd("secret", "create", secretName, "-u", "user1", "-p", "pass1", "-d", description)
-		assert.Check(t, strings.Contains(res.Stdout(), "secret:"+secretName))
+		secretFile := filepath.Join(cmd.BinDir, "secret.txt")
+		err := ioutil.WriteFile(secretFile, []byte("pass1"), 0644)
+		assert.Check(t, err == nil)
+		res := cmd.RunDockerCmd("secret", "create", secretName, secretFile)
+		assert.Check(t, strings.Contains(res.Stdout(), secretName))
 	})
 
 	t.Run("list secrets", func(t *testing.T) {
 		res := cmd.RunDockerCmd("secret", "list")
 		assert.Check(t, strings.Contains(res.Stdout(), secretName))
-		assert.Check(t, strings.Contains(res.Stdout(), description))
 	})
 
 	t.Run("inspect secret", func(t *testing.T) {
 		res := cmd.RunDockerCmd("secret", "inspect", secretName)
 		assert.Check(t, strings.Contains(res.Stdout(), `"Name": "`+secretName+`"`))
-		assert.Check(t, strings.Contains(res.Stdout(), `"Description": "`+description+`"`))
 	})
 
 	t.Run("rm secret", func(t *testing.T) {
