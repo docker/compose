@@ -24,14 +24,12 @@ import (
 	"github.com/docker/compose-cli/utils"
 )
 
-var managementCommands = []string{"ecs", "assemble", "registry", "template", "cluster"}
+var managementCommands = []string{"ecs", "assemble", "registry", "template", "cluster", "scan"}
 
 var commands = []string{}
 
 func main() {
 	getCommands()
-	getCommands("login")
-	getCommands("context", "create")
 	getCommands("compose")
 
 	fmt.Printf(`
@@ -45,10 +43,13 @@ var commands = []string{
 `, strings.Join(managementCommands, "\", \n\t\""), strings.Join(commands, "\", \n\t\""))
 }
 
+const (
+	mgtCommandsSection = "Management Commands:"
+	commandsSection    = "Commands:"
+	aliasesSection     = "Aliases:"
+)
+
 func getCommands(execCommands ...string) {
-	if len(execCommands) > 0 {
-		managementCommands = append(managementCommands, execCommands[len(execCommands)-1])
-	}
 	withHelp := append(execCommands, "--help")
 	cmd := exec.Command("docker", withHelp...)
 	output, err := cmd.Output()
@@ -57,32 +58,47 @@ func getCommands(execCommands ...string) {
 	}
 	text := string(output)
 	lines := strings.Split(text, "\n")
-	mgtCommandsStarted := false
-	commandsStarted := false
+	section := ""
 	for _, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmedLine, "Management Commands:") {
-			mgtCommandsStarted = true
+		if strings.HasPrefix(trimmedLine, mgtCommandsSection) {
+			section = mgtCommandsSection
 			continue
 		}
-		if strings.HasPrefix(trimmedLine, "Commands:") || strings.HasPrefix(trimmedLine, "Available Commands:") {
-			mgtCommandsStarted = false
-			commandsStarted = true
+		if strings.HasPrefix(trimmedLine, commandsSection) || strings.HasPrefix(trimmedLine, "Available Commands:") {
+			section = commandsSection
+			if len(execCommands) > 0 {
+				command := execCommands[len(execCommands)-1]
+				managementCommands = append(managementCommands, command)
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmedLine, aliasesSection) {
+			section = aliasesSection
 			continue
 		}
 		if trimmedLine == "" {
-			mgtCommandsStarted = false
-			commandsStarted = false
+			section = ""
 			continue
 		}
+
 		tokens := strings.Split(trimmedLine, " ")
 		command := strings.Replace(tokens[0], "*", "", 1)
-		if mgtCommandsStarted {
+		switch section {
+		case mgtCommandsSection:
 			getCommands(append(execCommands, command)...)
-		}
-		if commandsStarted {
+		case commandsSection:
 			if !utils.StringContains(commands, command) {
 				commands = append(commands, command)
+			}
+			getCommands(append(execCommands, command)...)
+		case aliasesSection:
+			aliases := strings.Split(trimmedLine, ",")
+			for _, alias := range aliases {
+				trimmedAlias := strings.TrimSpace(alias)
+				if !utils.StringContains(commands, trimmedAlias) {
+					commands = append(commands, trimmedAlias)
+				}
 			}
 		}
 	}

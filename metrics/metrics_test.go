@@ -69,6 +69,11 @@ func TestGetCommand(t *testing.T) {
 			expected: "login azure",
 		},
 		{
+			name:     "azure logout",
+			args:     []string{"logout", "azure"},
+			expected: "logout azure",
+		},
+		{
 			name:     "azure login with flags",
 			args:     []string{"login", "-u", "test", "azure"},
 			expected: "login azure",
@@ -79,9 +84,19 @@ func TestGetCommand(t *testing.T) {
 			expected: "login",
 		},
 		{
+			name:     "logout from a registry",
+			args:     []string{"logout", "myregistry"},
+			expected: "logout",
+		},
+		{
 			name:     "context create aci",
 			args:     []string{"context", "create", "aci"},
 			expected: "context create aci",
+		},
+		{
+			name:     "context create ecs",
+			args:     []string{"context", "create", "ecs"},
+			expected: "context create ecs",
 		},
 		{
 			name:     "create a context from another context",
