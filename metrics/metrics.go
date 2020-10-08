@@ -51,6 +51,9 @@ func GetCommand(args []string) string {
 	result := ""
 	onlyFlags := false
 	for _, arg := range args {
+		if arg == "--help" {
+			return ""
+		}
 		if arg == "--" {
 			break
 		}

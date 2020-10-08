@@ -59,6 +59,11 @@ func TestGetCommand(t *testing.T) {
 			expected: "image ls",
 		},
 		{
+			name:     "management command with flag",
+			args:     []string{"image", "--test", "ls"},
+			expected: "image ls",
+		},
+		{
 			name:     "management subcommand with flag",
 			args:     []string{"image", "ls", "-q"},
 			expected: "image ls",
@@ -148,7 +153,7 @@ func TestGetCommand(t *testing.T) {
 	}
 }
 
-func TestFlags(t *testing.T) {
+func TestIgnoreHelpCommands(t *testing.T) {
 	testCases := []struct {
 		name     string
 		args     []string
@@ -157,22 +162,17 @@ func TestFlags(t *testing.T) {
 		{
 			name:     "help",
 			args:     []string{"--help"},
-			expected: "--help",
+			expected: "",
 		},
 		{
 			name:     "help on run",
 			args:     []string{"run", "--help"},
-			expected: "run --help",
-		},
-		{
-			name:     "-h on run",
-			args:     []string{"run", "-h"},
-			expected: "run -h",
+			expected: "",
 		},
 		{
 			name:     "help on compose up",
 			args:     []string{"compose", "up", "--help"},
-			expected: "compose up --help",
+			expected: "",
 		},
 	}
 

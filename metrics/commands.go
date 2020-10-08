@@ -19,7 +19,7 @@ package metrics
 var commandFlags = []string{
 	//added to catch scan details
 	"--version", "--login",
-	"--help", "-h"}
+}
 
 // Generated with generatecommands/main.go
 var managementCommands = []string{

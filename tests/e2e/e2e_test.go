@@ -164,6 +164,17 @@ func TestContextMetrics(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
+	t.Run("do not send metrics on help commands", func(t *testing.T) {
+		s.ResetUsage()
+
+		c.RunDockerCmd("--help")
+		c.RunDockerCmd("ps", "--help")
+		c.RunDockerCmd("run", "--help")
+
+		usage := s.GetUsage()
+		assert.Equal(t, 0, len(usage))
+	})
+
 	t.Run("metrics on default context", func(t *testing.T) {
 		s.ResetUsage()
 
