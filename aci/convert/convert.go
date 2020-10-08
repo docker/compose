@@ -470,17 +470,26 @@ func fqdn(group containerinstance.ContainerGroup, region string) string {
 // ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container, region string) containers.Container {
 	memLimits := 0.
-	if cc.Resources != nil &&
-		cc.Resources.Limits != nil &&
-		cc.Resources.Limits.MemoryInGB != nil {
-		memLimits = *cc.Resources.Limits.MemoryInGB * 1024 * 1024 * 1024
-	}
-
+	memRequest := 0.
 	cpuLimit := 0.
-	if cc.Resources != nil &&
-		cc.Resources.Limits != nil &&
-		cc.Resources.Limits.CPU != nil {
-		cpuLimit = *cc.Resources.Limits.CPU
+	cpuReservation := 0.
+	if cc.Resources != nil {
+		if cc.Resources.Limits != nil {
+			if cc.Resources.Limits.MemoryInGB != nil {
+				memLimits = *cc.Resources.Limits.MemoryInGB * 1024 * 1024 * 1024
+			}
+			if cc.Resources.Limits.CPU != nil {
+				cpuLimit = *cc.Resources.Limits.CPU
+			}
+		}
+		if cc.Resources.Requests != nil {
+			if cc.Resources.Requests.MemoryInGB != nil {
+				memRequest = *cc.Resources.Requests.MemoryInGB * 1024 * 1024 * 1024
+			}
+			if cc.Resources.Requests.CPU != nil {
+				cpuReservation = *cc.Resources.Requests.CPU
+			}
+		}
 	}
 
 	command := ""
@@ -504,9 +513,11 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		Env:  envVars,
 	}
 	hostConfig := &containers.HostConfig{
-		CPULimit:      cpuLimit,
-		MemoryLimit:   uint64(memLimits),
-		RestartPolicy: toContainerRestartPolicy(cg.RestartPolicy),
+		CPULimit:          cpuLimit,
+		CPUReservation:    cpuReservation,
+		MemoryLimit:       uint64(memLimits),
+		MemoryReservation: uint64(memRequest),
+		RestartPolicy:     toContainerRestartPolicy(cg.RestartPolicy),
 	}
 	c := containers.Container{
 		ID:          containerID,

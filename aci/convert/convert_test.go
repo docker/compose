@@ -83,6 +83,10 @@ func TestContainerGroupToContainer(t *testing.T) {
 			Resources: &containerinstance.ResourceRequirements{
 				Limits: &containerinstance.ResourceLimits{
 					CPU:        to.Float64Ptr(3),
+					MemoryInGB: to.Float64Ptr(0.2),
+				},
+				Requests: &containerinstance.ResourceRequests{
+					CPU:        to.Float64Ptr(2),
 					MemoryInGB: to.Float64Ptr(0.1),
 				},
 			},
@@ -105,9 +109,11 @@ func TestContainerGroupToContainer(t *testing.T) {
 			FQDN: "myapp.eastus.azurecontainer.io",
 		},
 		HostConfig: &containers.HostConfig{
-			CPULimit:      3,
-			MemoryLimit:   107374182,
-			RestartPolicy: "any",
+			CPULimit:          3,
+			CPUReservation:    2,
+			MemoryLimit:       214748364,
+			MemoryReservation: 107374182,
+			RestartPolicy:     "any",
 		},
 	}
 

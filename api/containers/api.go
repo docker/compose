@@ -61,9 +61,11 @@ type RuntimeConfig struct {
 
 // HostConfig config of the container host
 type HostConfig struct {
-	RestartPolicy string
-	CPULimit      float64
-	MemoryLimit   uint64
+	RestartPolicy     string
+	CPUReservation    float64
+	CPULimit          float64
+	MemoryReservation uint64
+	MemoryLimit       uint64
 }
 
 // Port represents a published port of a container

@@ -9,7 +9,9 @@
     "PidsLimit": 0,
     "HostConfig": {
         "RestartPolicy": "none",
+        "CPUReservation": 0,
         "CPULimit": 0,
+        "MemoryReservation": 0,
         "MemoryLimit": 0
     },
     "Platform": "Linux"
