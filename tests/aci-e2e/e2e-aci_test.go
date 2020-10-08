@@ -545,17 +545,15 @@ func TestUpUpdate(t *testing.T) {
 	overwriteFileStorageAccount(t, singlePortVolumesComposefile, composeAccountName)
 	multiPortComposefile = filepath.Join(dstDir, multiPortComposefile)
 
+	volumeID := composeAccountName + "/" + fileshareName
 	t.Run("compose up", func(t *testing.T) {
 		const (
 			testFileName    = "msg.txt"
 			testFileContent = "VOLUME_OK"
+			projectName     = "acidemo"
 		)
 
 		c.RunDockerCmd("volume", "create", "--storage-account", composeAccountName, fileshareName)
-		volumeID := composeAccountName + "/" + fileshareName
-		t.Cleanup(func() {
-			c.RunDockerCmd("volume", "rm", volumeID)
-		})
 
 		// Bootstrap volume
 		aciContext := store.AciContext{
@@ -568,7 +566,7 @@ func TestUpUpdate(t *testing.T) {
 		dnsLabelName := "nginx-" + groupID
 		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
 		// Name of Compose project is taken from current folder "acie2e"
-		c.RunDockerCmd("compose", "up", "-f", singlePortVolumesComposefile, "--domainname", dnsLabelName, "--project-name", "acidemo")
+		c.RunDockerCmd("compose", "up", "-f", singlePortVolumesComposefile, "--domainname", dnsLabelName, "--project-name", projectName)
 
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
@@ -599,6 +597,17 @@ func TestUpUpdate(t *testing.T) {
 
 		body := HTTPGetWithRetry(t, endpoint+"/volume_test/"+testFileName, http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(body, testFileContent))
+
+		// Try to remove the volume while it's still in use
+		res = c.RunDockerOrExitError("volume", "rm", volumeID)
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err: fmt.Sprintf(`Error: volume "%s/%s" is used in container group %q`,
+				composeAccountName, fileshareName, projectName),
+		})
+	})
+	t.Cleanup(func() {
+		c.RunDockerCmd("volume", "rm", volumeID)
 	})
 
 	t.Run("compose ps", func(t *testing.T) {

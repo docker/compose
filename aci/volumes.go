@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -164,7 +165,38 @@ func errorEvent(resource string) progress.Event {
 	}
 }
 
+func checkVolumeUsage(ctx context.Context, aciContext store.AciContext, id string) error {
+	containerGroups, err := getACIContainerGroups(ctx, aciContext.SubscriptionID, aciContext.ResourceGroup)
+	if err != nil {
+		return err
+	}
+	for _, cg := range containerGroups {
+		if hasVolume(cg.Volumes, id) {
+			return errors.Errorf("volume %q is used in container group %q",
+				id, *cg.Name)
+		}
+	}
+	return nil
+}
+
+func hasVolume(volumes *[]containerinstance.Volume, id string) bool {
+	if volumes == nil {
+		return false
+	}
+	for _, v := range *volumes {
+		if v.AzureFile != nil && v.AzureFile.StorageAccountName != nil && v.AzureFile.ShareName != nil &&
+			(*v.AzureFile.StorageAccountName+"/"+*v.AzureFile.ShareName) == id {
+			return true
+		}
+	}
+	return false
+}
+
 func (cs *aciVolumeService) Delete(ctx context.Context, id string, options interface{}) error {
+	err := checkVolumeUsage(ctx, cs.aciContext, id)
+	if err != nil {
+		return err
+	}
 	tokens := strings.Split(id, "/")
 	if len(tokens) != 2 {
 		return errors.New("invalid format for volume ID, expected storageaccount/fileshare")
