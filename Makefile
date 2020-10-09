@@ -96,7 +96,10 @@ validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 
 validate: validate-go-mod validate-headers ## Validate sources
 
-pre-commit: all lint validate test e2e-local
+pre-commit: cli test e2e-local lint validate
+
+clean-aci-e2e: ## Make sure no ACI tests are currently runnnig in the CI when invoking this. Delete ACI E2E tests resources that might have leaked when ctrl-C E2E tests.
+	 az group list | jq '.[].name' | grep E2E-Test | xargs -n1 az-cmd group delete -y --no-wait -g
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
@@ -104,4 +107,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help
+.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help clean-aci-e2e
