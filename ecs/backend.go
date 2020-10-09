@@ -40,9 +40,6 @@ type ContextParams struct {
 	Description string
 	Region      string
 	Profile     string
-
-	AwsID     string
-	AwsSecret string
 }
 
 func init() {
