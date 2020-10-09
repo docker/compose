@@ -249,8 +249,9 @@ func TestRunVolume(t *testing.T) {
 		containerInspect, err := ParseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
-		assert.Equal(t, containerInspect.CPULimit, 1.0)
-		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyNone)
+		assert.Equal(t, containerInspect.HostConfig.CPULimit, 1.0)
+		assert.Equal(t, containerInspect.HostConfig.CPUReservation, 1.0)
+		assert.Equal(t, containerInspect.HostConfig.RestartPolicy, containers.RestartPolicyNone)
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		hostIP = containerInspect.Ports[0].HostIP
@@ -388,16 +389,18 @@ func TestContainerRunAttached(t *testing.T) {
 			}
 			return poll.Continue("waiting for container to be running, current inspect result: \n%s", res.Combined())
 		}
-		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 
 		inspectRes := c.RunDockerCmd("inspect", container)
 
 		containerInspect, err := ParseContainerInspect(inspectRes.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
-		assert.Equal(t, containerInspect.CPULimit, 0.1)
-		assert.Equal(t, containerInspect.MemoryLimit, uint64(107374182))
-		assert.Equal(t, containerInspect.RestartPolicyCondition, containers.RestartPolicyOnFailure)
+		assert.Equal(t, containerInspect.HostConfig.CPULimit, 0.1)
+		assert.Equal(t, containerInspect.HostConfig.MemoryLimit, uint64(107374182))
+		assert.Equal(t, containerInspect.HostConfig.CPUReservation, 0.1)
+		assert.Equal(t, containerInspect.HostConfig.MemoryReservation, uint64(107374182))
+		assert.Equal(t, containerInspect.HostConfig.RestartPolicy, containers.RestartPolicyOnFailure)
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		port := containerInspect.Ports[0]
@@ -478,6 +481,39 @@ func overwriteFileStorageAccount(t *testing.T, absComposefileName string, storag
 	override := strings.Replace(string(data), "dockertestvolumeaccount", storageAccount, 1)
 	err = ioutil.WriteFile(absComposefileName, []byte(override), 0644)
 	assert.NilError(t, err)
+}
+
+func TestUpResources(t *testing.T) {
+	const (
+		composeProjectName = "testresources"
+		serverContainer    = composeProjectName + "_web"
+		wordsContainer     = composeProjectName + "_words"
+	)
+
+	c := NewParallelE2eCLI(t, binDir)
+	setupTestResourceGroup(t, c)
+
+	t.Run("compose up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "up", "-f", "../composefiles/aci-demo/aci_demo_port_resources.yaml", "--project-name", composeProjectName)
+
+		res := c.RunDockerCmd("inspect", serverContainer)
+
+		webInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Equal(t, webInspect.HostConfig.CPULimit, 0.7)
+		assert.Equal(t, webInspect.HostConfig.MemoryLimit, uint64(1073741824))
+		assert.Equal(t, webInspect.HostConfig.CPUReservation, 0.5)
+		assert.Equal(t, webInspect.HostConfig.MemoryReservation, uint64(536870912))
+
+		res = c.RunDockerCmd("inspect", wordsContainer)
+
+		wordsInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Equal(t, wordsInspect.HostConfig.CPULimit, 0.5)
+		assert.Equal(t, wordsInspect.HostConfig.MemoryLimit, uint64(751619276))
+		assert.Equal(t, wordsInspect.HostConfig.CPUReservation, 0.5)
+		assert.Equal(t, wordsInspect.HostConfig.MemoryReservation, uint64(751619276))
+	})
 }
 
 func TestUpUpdate(t *testing.T) {

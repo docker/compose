@@ -175,10 +175,6 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 			Image:   to.StringPtr(dnsSidecarImage),
 			Command: &alpineCmd,
 			Resources: &containerinstance.ResourceRequirements{
-				Limits: &containerinstance.ResourceLimits{
-					MemoryInGB: to.Float64Ptr(0.1),  // "The memory requirement should be in incrememts of 0.1 GB."
-					CPU:        to.Float64Ptr(0.01), //  "The CPU requirement should be in incrememts of 0.01."
-				},
 				Requests: &containerinstance.ResourceRequests{
 					MemoryInGB: to.Float64Ptr(0.1),
 					CPU:        to.Float64Ptr(0.01),
@@ -357,38 +353,73 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 		volumes = &allVolumes
 	}
 
-	memLimit := 1. // Default 1 Gb
-	var cpuLimit float64 = 1
-	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
-		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
-			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
-		}
-		if s.Deploy.Resources.Limits.NanoCPUs != "" {
-			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
-			if err != nil {
-				return containerinstance.Container{}, err
-			}
-		}
+	resource, err := s.getResourceRequestsLimits()
+	if err != nil {
+		return containerinstance.Container{}, err
 	}
+
 	return containerinstance.Container{
 		Name: to.StringPtr(s.Name),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image:                to.StringPtr(s.Image),
 			Command:              to.StringSlicePtr(s.Command),
 			EnvironmentVariables: getEnvVariables(s.Environment),
-			Resources: &containerinstance.ResourceRequirements{
-				Limits: &containerinstance.ResourceLimits{
-					MemoryInGB: to.Float64Ptr(memLimit),
-					CPU:        to.Float64Ptr(cpuLimit),
-				},
-				Requests: &containerinstance.ResourceRequests{
-					MemoryInGB: to.Float64Ptr(memLimit), // TODO: use the memory requests here and not limits
-					CPU:        to.Float64Ptr(cpuLimit), // TODO: use the cpu requests here and not limits
-				},
-			},
-			VolumeMounts: volumes,
+			Resources:            resource,
+			VolumeMounts:         volumes,
 		},
 	}, nil
+}
+
+func (s serviceConfigAciHelper) getResourceRequestsLimits() (*containerinstance.ResourceRequirements, error) {
+	memRequest := 1. // Default 1 Gb
+	var cpuRequest float64 = 1
+	var err error
+	hasMemoryRequest := func() bool {
+		return s.Deploy != nil && s.Deploy.Resources.Reservations != nil && s.Deploy.Resources.Reservations.MemoryBytes != 0
+	}
+	hasCPURequest := func() bool {
+		return s.Deploy != nil && s.Deploy.Resources.Reservations != nil && s.Deploy.Resources.Reservations.NanoCPUs != ""
+	}
+	if hasMemoryRequest() {
+		memRequest = bytesToGb(s.Deploy.Resources.Reservations.MemoryBytes)
+	}
+
+	if hasCPURequest() {
+		cpuRequest, err = strconv.ParseFloat(s.Deploy.Resources.Reservations.NanoCPUs, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+	memLimit := memRequest
+	cpuLimit := cpuRequest
+	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
+		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
+			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
+			if !hasMemoryRequest() {
+				memRequest = memLimit
+			}
+		}
+		if s.Deploy.Resources.Limits.NanoCPUs != "" {
+			cpuLimit, err = strconv.ParseFloat(s.Deploy.Resources.Limits.NanoCPUs, 0)
+			if err != nil {
+				return nil, err
+			}
+			if !hasCPURequest() {
+				cpuRequest = cpuLimit
+			}
+		}
+	}
+	resources := containerinstance.ResourceRequirements{
+		Requests: &containerinstance.ResourceRequests{
+			MemoryInGB: to.Float64Ptr(memRequest),
+			CPU:        to.Float64Ptr(cpuRequest),
+		},
+		Limits: &containerinstance.ResourceLimits{
+			MemoryInGB: to.Float64Ptr(memLimit),
+			CPU:        to.Float64Ptr(cpuLimit),
+		},
+	}
+	return &resources, nil
 }
 
 func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.EnvironmentVariable {
@@ -411,6 +442,10 @@ func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.En
 func bytesToGb(b types.UnitBytes) float64 {
 	f := float64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
 	return math.Round(f*100) / 100
+}
+
+func gbToBytes(memInBytes float64) uint64 {
+	return uint64(memInBytes * 1024 * 1024 * 1024)
 }
 
 // ContainerGroupToServiceStatus convert from an ACI container definition to service status
@@ -438,18 +473,27 @@ func fqdn(group containerinstance.ContainerGroup, region string) string {
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container, region string) containers.Container {
-	memLimits := 0.
-	if cc.Resources != nil &&
-		cc.Resources.Limits != nil &&
-		cc.Resources.Limits.MemoryInGB != nil {
-		memLimits = *cc.Resources.Limits.MemoryInGB * 1024 * 1024 * 1024
-	}
-
+	memLimits := uint64(0)
+	memRequest := uint64(0)
 	cpuLimit := 0.
-	if cc.Resources != nil &&
-		cc.Resources.Limits != nil &&
-		cc.Resources.Limits.CPU != nil {
-		cpuLimit = *cc.Resources.Limits.CPU
+	cpuReservation := 0.
+	if cc.Resources != nil {
+		if cc.Resources.Limits != nil {
+			if cc.Resources.Limits.MemoryInGB != nil {
+				memLimits = gbToBytes(*cc.Resources.Limits.MemoryInGB)
+			}
+			if cc.Resources.Limits.CPU != nil {
+				cpuLimit = *cc.Resources.Limits.CPU
+			}
+		}
+		if cc.Resources.Requests != nil {
+			if cc.Resources.Requests.MemoryInGB != nil {
+				memRequest = gbToBytes(*cc.Resources.Requests.MemoryInGB)
+			}
+			if cc.Resources.Requests.CPU != nil {
+				cpuReservation = *cc.Resources.Requests.CPU
+			}
+		}
 	}
 
 	command := ""
@@ -468,26 +512,30 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		}
 	}
 
-	var config *containers.RuntimeConfig = &containers.RuntimeConfig{FQDN: fqdn(cg, region)}
-	if envVars != nil {
-		config.Env = envVars
+	config := &containers.RuntimeConfig{
+		FQDN: fqdn(cg, region),
+		Env:  envVars,
+	}
+	hostConfig := &containers.HostConfig{
+		CPULimit:          cpuLimit,
+		CPUReservation:    cpuReservation,
+		MemoryLimit:       memLimits,
+		MemoryReservation: memRequest,
+		RestartPolicy:     toContainerRestartPolicy(cg.RestartPolicy),
 	}
 	c := containers.Container{
-		ID:                     containerID,
-		Status:                 status,
-		Image:                  to.String(cc.Image),
-		Command:                command,
-		CPUTime:                0,
-		CPULimit:               cpuLimit,
-		MemoryUsage:            0,
-		MemoryLimit:            uint64(memLimits),
-		PidsCurrent:            0,
-		PidsLimit:              0,
-		Labels:                 nil,
-		Ports:                  ToPorts(cg.IPAddress, *cc.Ports),
-		Platform:               platform,
-		RestartPolicyCondition: toContainerRestartPolicy(cg.RestartPolicy),
-		Config:                 config,
+		ID:          containerID,
+		Status:      status,
+		Image:       to.String(cc.Image),
+		Command:     command,
+		CPUTime:     0,
+		MemoryUsage: 0,
+		PidsCurrent: 0,
+		PidsLimit:   0,
+		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
+		Platform:    platform,
+		Config:      config,
+		HostConfig:  hostConfig,
 	}
 
 	return c

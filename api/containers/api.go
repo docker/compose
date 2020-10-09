@@ -37,28 +37,35 @@ var RestartPolicyList = []string{RestartPolicyNone, RestartPolicyAny, RestartPol
 
 // Container represents a created container
 type Container struct {
-	ID                     string
-	Status                 string
-	Image                  string
-	Command                string
-	CPUTime                uint64
-	CPULimit               float64
-	MemoryUsage            uint64
-	MemoryLimit            uint64
-	PidsCurrent            uint64
-	PidsLimit              uint64
-	Config                 *RuntimeConfig `json:",omitempty"`
-	Labels                 []string       `json:",omitempty"`
-	Ports                  []Port         `json:",omitempty"`
-	Platform               string
-	RestartPolicyCondition string
+	ID          string
+	Status      string
+	Image       string
+	Command     string
+	CPUTime     uint64
+	MemoryUsage uint64
+	PidsCurrent uint64
+	PidsLimit   uint64
+	Config      *RuntimeConfig `json:",omitempty"`
+	HostConfig  *HostConfig    `json:",omitempty"`
+	Ports       []Port         `json:",omitempty"`
+	Platform    string
 }
 
 // RuntimeConfig config of a created container
 type RuntimeConfig struct {
-	Env map[string]string `json:",omitempty"`
+	Labels []string          `json:",omitempty"`
+	Env    map[string]string `json:",omitempty"`
 	// FQDN is the fqdn to use
 	FQDN string `json:"fqdn,omitempty"`
+}
+
+// HostConfig config of the container host
+type HostConfig struct {
+	RestartPolicy     string
+	CPUReservation    float64
+	CPULimit          float64
+	MemoryReservation uint64
+	MemoryLimit       uint64
 }
 
 // Port represents a published port of a container

@@ -4,11 +4,15 @@
     "Image": "nginx",
     "Command": "",
     "CPUTime": 0,
-    "CPULimit": 0,
     "MemoryUsage": 0,
-    "MemoryLimit": 0,
     "PidsCurrent": 0,
     "PidsLimit": 0,
-    "Platform": "Linux",
-    "RestartPolicyCondition": "none"
+    "HostConfig": {
+        "RestartPolicy": "none",
+        "CPUReservation": 0,
+        "CPULimit": 0,
+        "MemoryReservation": 0,
+        "MemoryLimit": 0
+    },
+    "Platform": "Linux"
 }

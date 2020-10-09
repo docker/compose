@@ -71,7 +71,9 @@ func (cs *containerService) Inspect(ctx context.Context, id string) (containers.
 		ID:                     "id",
 		Image:                  "nginx",
 		Platform:               "Linux",
-		RestartPolicyCondition: "none",
+		HostConfig: &containers.HostConfig{
+			RestartPolicy: "none",
+		},
 	}, nil
 }
 

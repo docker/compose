@@ -1,0 +1,24 @@
+services:
+  db:
+    image: gtardif/sentences-db
+
+  words:
+    image: gtardif/sentences-api
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.5'
+          memory: 0.7G
+
+  web:
+    image: gtardif/sentences-web
+    ports:
+      - "80:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 0.5G

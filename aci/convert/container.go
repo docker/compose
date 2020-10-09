@@ -54,7 +54,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 				Environment: toComposeEnvs(r.Environment),
 				Deploy: &types.DeployConfig{
 					Resources: types.Resources{
-						Limits: &types.Resource{
+						Reservations: &types.Resource{
 							NanoCPUs:    fmt.Sprintf("%f", r.CPULimit),
 							MemoryBytes: types.UnitBytes(r.MemLimit.Value()),
 						},
