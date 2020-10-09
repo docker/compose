@@ -111,8 +111,8 @@ func TestContainerGroupToContainer(t *testing.T) {
 		HostConfig: &containers.HostConfig{
 			CPULimit:          3,
 			CPUReservation:    2,
-			MemoryLimit:       214748364,
-			MemoryReservation: 107374182,
+			MemoryLimit:       gbToBytes(0.2),
+			MemoryReservation: gbToBytes(0.1),
 			RestartPolicy:     "any",
 		},
 	}
@@ -544,8 +544,9 @@ func TestComposeContainerGroupToContainerIgnoreDomainNameWithoutPorts(t *testing
 	assert.Assert(t, group.IPAddress == nil)
 }
 
+var _0_1Gb = gbToBytes(0.1)
+
 func TestComposeContainerGroupToContainerResourceRequests(t *testing.T) {
-	_0_1Gb := 0.1 * 1024 * 1024 * 1024
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -575,7 +576,6 @@ func TestComposeContainerGroupToContainerResourceRequests(t *testing.T) {
 }
 
 func TestComposeContainerGroupToContainerResourceRequestsAndLimits(t *testing.T) {
-	_0_1Gb := 0.1 * 1024 * 1024 * 1024
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
@@ -609,7 +609,6 @@ func TestComposeContainerGroupToContainerResourceRequestsAndLimits(t *testing.T)
 }
 
 func TestComposeContainerGroupToContainerResourceLimitsOnly(t *testing.T) {
-	_0_1Gb := 0.1 * 1024 * 1024 * 1024
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{

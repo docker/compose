@@ -444,6 +444,10 @@ func bytesToGb(b types.UnitBytes) float64 {
 	return math.Round(f*100) / 100
 }
 
+func gbToBytes(memInBytes float64) uint64 {
+	return uint64(memInBytes * 1024 * 1024 * 1024)
+}
+
 // ContainerGroupToServiceStatus convert from an ACI container definition to service status
 func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container, region string) compose.ServiceStatus {
 	var replicas = 1
@@ -469,14 +473,14 @@ func fqdn(group containerinstance.ContainerGroup, region string) string {
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container, region string) containers.Container {
-	memLimits := 0.
-	memRequest := 0.
+	memLimits := uint64(0)
+	memRequest := uint64(0)
 	cpuLimit := 0.
 	cpuReservation := 0.
 	if cc.Resources != nil {
 		if cc.Resources.Limits != nil {
 			if cc.Resources.Limits.MemoryInGB != nil {
-				memLimits = *cc.Resources.Limits.MemoryInGB * 1024 * 1024 * 1024
+				memLimits = gbToBytes(*cc.Resources.Limits.MemoryInGB)
 			}
 			if cc.Resources.Limits.CPU != nil {
 				cpuLimit = *cc.Resources.Limits.CPU
@@ -484,7 +488,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		}
 		if cc.Resources.Requests != nil {
 			if cc.Resources.Requests.MemoryInGB != nil {
-				memRequest = *cc.Resources.Requests.MemoryInGB * 1024 * 1024 * 1024
+				memRequest = gbToBytes(*cc.Resources.Requests.MemoryInGB)
 			}
 			if cc.Resources.Requests.CPU != nil {
 				cpuReservation = *cc.Resources.Requests.CPU
@@ -515,8 +519,8 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 	hostConfig := &containers.HostConfig{
 		CPULimit:          cpuLimit,
 		CPUReservation:    cpuReservation,
-		MemoryLimit:       uint64(memLimits),
-		MemoryReservation: uint64(memRequest),
+		MemoryLimit:       memLimits,
+		MemoryReservation: memRequest,
 		RestartPolicy:     toContainerRestartPolicy(cg.RestartPolicy),
 	}
 	c := containers.Container{
