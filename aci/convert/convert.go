@@ -49,7 +49,6 @@ const (
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeReadOnly                 = "read_only"
-	secretInlineMark               = "inline:"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
@@ -190,15 +189,9 @@ type projectAciHelper types.Project
 func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, error) {
 	var secretVolumes []containerinstance.Volume
 	for secretName, filepathToRead := range p.Secrets {
-		var data []byte
-		if strings.HasPrefix(filepathToRead.File, secretInlineMark) {
-			data = []byte(filepathToRead.File[len(secretInlineMark):])
-		} else {
-			var err error
-			data, err = ioutil.ReadFile(filepathToRead.File)
-			if err != nil {
-				return secretVolumes, err
-			}
+		data, err := ioutil.ReadFile(filepathToRead.File)
+		if err != nil {
+			return secretVolumes, err
 		}
 		if len(data) == 0 {
 			continue
