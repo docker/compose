@@ -72,6 +72,8 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 	// Private DNS namespace will allow DNS name for the services to be <service>.<project>.local
 	b.createCloudMap(project, template, resources.vpc)
 
+	b.createNFSMountTarget(project, resources, template)
+
 	for _, service := range project.Services {
 		err := b.createService(project, service, template, resources)
 		if err != nil {
@@ -79,17 +81,6 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 		}
 
 		b.createAutoscalingPolicy(project, resources, template, service)
-	}
-
-	// Create a NFS inbound rule on each mount target for volumes
-	// as "source security group" use an arbitrary network attached to service(s) who mounts target volume
-	for n, vol := range project.Volumes {
-		err := b.aws.WithVolumeSecurityGroups(ctx, vol.Name, func(securityGroups []string) error {
-			return b.createNFSmountIngress(securityGroups, project, n, template)
-		})
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	err = b.createCapacityProvider(ctx, project, template, resources)
@@ -104,7 +95,7 @@ func (b *ecsAPIService) createService(project *types.Project, service types.Serv
 	taskExecutionRole := b.createTaskExecutionRole(project, service, template)
 	taskRole := b.createTaskRole(project, service, template)
 
-	definition, err := b.createTaskDefinition(project, service)
+	definition, err := b.createTaskDefinition(project, service, resources)
 	if err != nil {
 		return err
 	}
@@ -150,6 +141,10 @@ func (b *ecsAPIService) createService(project *types.Project, service types.Serv
 
 	for dependency := range service.DependsOn {
 		dependsOn = append(dependsOn, serviceResourceName(dependency))
+	}
+
+	for _, s := range service.Volumes {
+		dependsOn = append(dependsOn, b.mountTargets(s.Source, resources)...)
 	}
 
 	minPercent, maxPercent, err := computeRollingUpdateLimits(service)
@@ -326,12 +321,11 @@ func (b *ecsAPIService) createTargetGroup(project *types.Project, service types.
 		port.Published,
 	)
 	template.Resources[targetGroupName] = &elasticloadbalancingv2.TargetGroup{
-		HealthCheckEnabled: false,
-		Port:               int(port.Target),
-		Protocol:           protocol,
-		Tags:               projectTags(project),
-		TargetType:         elbv2.TargetTypeEnumIp,
-		VpcId:              vpc,
+		Port:       int(port.Target),
+		Protocol:   protocol,
+		Tags:       projectTags(project),
+		TargetType: elbv2.TargetTypeEnumIp,
+		VpcId:      vpc,
 	}
 	return targetGroupName
 }

@@ -68,9 +68,12 @@ type API interface {
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
 	LoadBalancerType(ctx context.Context, arn string) (string, error)
 	GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
-	WithVolumeSecurityGroups(ctx context.Context, id string, fn func(securityGroups []string) error) error
 	GetParameter(ctx context.Context, name string) (string, error)
 	SecurityGroupExists(ctx context.Context, sg string) (bool, error)
 	DeleteCapacityProvider(ctx context.Context, arn string) error
 	DeleteAutoscalingGroup(ctx context.Context, arn string) error
+	FileSystemExists(ctx context.Context, id string) (bool, error)
+	FindFileSystem(ctx context.Context, tags map[string]string) (string, error)
+	CreateFileSystem(ctx context.Context, tags map[string]string) (string, error)
+	DeleteFileSystem(ctx context.Context, id string) error
 }

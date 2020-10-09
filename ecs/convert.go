@@ -39,7 +39,7 @@ import (
 const secretsInitContainerImage = "docker/ecs-secrets-sidecar"
 const searchDomainInitContainerImage = "docker/ecs-searchdomain-sidecar"
 
-func (b *ecsAPIService) createTaskDefinition(project *types.Project, service types.ServiceConfig) (*ecs.TaskDefinition, error) {
+func (b *ecsAPIService) createTaskDefinition(project *types.Project, service types.ServiceConfig, resources awsResources) (*ecs.TaskDefinition, error) {
 	cpu, mem, err := toLimits(service)
 	if err != nil {
 		return nil, err
@@ -81,11 +81,11 @@ func (b *ecsAPIService) createTaskDefinition(project *types.Project, service typ
 	}
 
 	for _, v := range service.Volumes {
-		source := project.Volumes[v.Source]
+		volume := project.Volumes[v.Source]
 		volumes = append(volumes, ecs.TaskDefinition_Volume{
 			EFSVolumeConfiguration: &ecs.TaskDefinition_EFSVolumeConfiguration{
-				FilesystemId:  source.Name,
-				RootDirectory: source.DriverOpts["root_directory"],
+				FilesystemId:  resources.filesystems[v.Source],
+				RootDirectory: volume.DriverOpts["root_directory"],
 			},
 			Name: v.Source,
 		})
@@ -100,7 +100,6 @@ func (b *ecsAPIService) createTaskDefinition(project *types.Project, service typ
 	if err != nil {
 		return nil, err
 	}
-
 	var reservations *types.Resource
 	if service.Deploy != nil && service.Deploy.Resources.Reservations != nil {
 		reservations = service.Deploy.Resources.Reservations

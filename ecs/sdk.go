@@ -787,28 +787,6 @@ func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
 	return dnsName, nil
 }
 
-func (s sdk) WithVolumeSecurityGroups(ctx context.Context, id string, fn func(securityGroups []string) error) error {
-	mounts, err := s.EFS.DescribeMountTargetsWithContext(ctx, &efs.DescribeMountTargetsInput{
-		FileSystemId: aws.String(id),
-	})
-	if err != nil {
-		return err
-	}
-	for _, mount := range mounts.MountTargets {
-		groups, err := s.EFS.DescribeMountTargetSecurityGroupsWithContext(ctx, &efs.DescribeMountTargetSecurityGroupsInput{
-			MountTargetId: mount.MountTargetId,
-		})
-		if err != nil {
-			return err
-		}
-		err = fn(aws.StringValueSlice(groups.SecurityGroups))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s sdk) GetParameter(ctx context.Context, name string) (string, error) {
 	parameter, err := s.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String(name),
@@ -869,19 +847,58 @@ func (s sdk) FileSystemExists(ctx context.Context, id string) (bool, error) {
 	return len(desc.FileSystems) > 0, nil
 }
 
-func (s sdk) CreateFileSystem(ctx context.Context, name string) (string, error) {
+func (s sdk) FindFileSystem(ctx context.Context, tags map[string]string) (string, error) {
+	var token *string
+	for {
+		desc, err := s.EFS.DescribeFileSystemsWithContext(ctx, &efs.DescribeFileSystemsInput{
+			Marker: token,
+		})
+		if err != nil {
+			return "", err
+		}
+		for _, filesystem := range desc.FileSystems {
+			if containsAll(filesystem.Tags, tags) {
+				return aws.StringValue(filesystem.FileSystemId), nil
+			}
+		}
+		if desc.NextMarker == token {
+			return "", nil
+		}
+		token = desc.NextMarker
+	}
+}
+
+func containsAll(tags []*efs.Tag, required map[string]string) bool {
+TAGS:
+	for key, value := range required {
+		for _, t := range tags {
+			if aws.StringValue(t.Key) == key && aws.StringValue(t.Value) == value {
+				continue TAGS
+			}
+		}
+		return false
+	}
+	return true
+}
+
+func (s sdk) CreateFileSystem(ctx context.Context, tags map[string]string) (string, error) {
+	var efsTags []*efs.Tag
+	for k, v := range tags {
+		efsTags = append(efsTags, &efs.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
 	res, err := s.EFS.CreateFileSystemWithContext(ctx, &efs.CreateFileSystemInput{
-		Tags: []*efs.Tag{
-			{
-				Key:   aws.String(compose.VolumeTag),
-				Value: aws.String(name),
-			},
-		},
+		Encrypted: aws.Bool(true),
+		Tags:      efsTags,
 	})
 	if err != nil {
 		return "", err
 	}
-	return aws.StringValue(res.FileSystemId), nil
+	id := aws.StringValue(res.FileSystemId)
+	logrus.Debugf("Created file system %q", id)
+	return id, nil
 }
 
 func (s sdk) DeleteFileSystem(ctx context.Context, id string) error {

@@ -20,13 +20,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/awslabs/goformation/v4/cloudformation/ec2"
-	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
+	"github.com/docker/compose-cli/api/compose"
 
+	"github.com/docker/compose-cli/errdefs"
+
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
+	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,6 +81,10 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsR
 	if err != nil {
 		return r, err
 	}
+	r.filesystems, err = b.parseExternalVolumes(ctx, project)
+	if err != nil {
+		return r, err
+	}
 	return r, nil
 }
 
@@ -88,7 +96,7 @@ func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *type
 			return "", err
 		}
 		if !ok {
-			return "", fmt.Errorf("cluster does not exist: %s", cluster)
+			return "", errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", cluster)
 		}
 		return cluster, nil
 	}
@@ -143,42 +151,62 @@ func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project 
 func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
 	securityGroups := make(map[string]string, len(project.Networks))
 	for name, net := range project.Networks {
-		if !net.External.External {
-			continue
-		}
-		sg := net.Name
+		// FIXME remove this for G.A
 		if x, ok := net.Extensions[extensionSecurityGroup]; ok {
 			logrus.Warn("to use an existing security-group, use `network.external` and `network.name` in your compose file")
 			logrus.Debugf("Security Group for network %q set by user to %q", net.Name, x)
-			sg = x.(string)
+			net.External.External = true
+			net.Name = x.(string)
+			project.Networks[name] = net
 		}
-		exists, err := b.aws.SecurityGroupExists(ctx, sg)
+
+		if !net.External.External {
+			continue
+		}
+		exists, err := b.aws.SecurityGroupExists(ctx, net.Name)
 		if err != nil {
 			return nil, err
 		}
 		if !exists {
-			return nil, fmt.Errorf("security group %s doesn't exist", sg)
+			return nil, errors.Wrapf(errdefs.ErrNotFound, "security group %q doesn't exist", net.Name)
 		}
-		securityGroups[name] = sg
+		securityGroups[name] = net.Name
 	}
 	return securityGroups, nil
 }
 
 func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
 	filesystems := make(map[string]string, len(project.Volumes))
-	// project.Volumes.filter(|v| v.External.External).first(|v| b.SDK.FileSystemExists(ctx, vol.Name))?
 	for name, vol := range project.Volumes {
-		if !vol.External.External {
+		if vol.External.External {
+			exists, err := b.aws.FileSystemExists(ctx, vol.Name)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				return nil, errors.Wrapf(errdefs.ErrNotFound, "EFS file system %q doesn't exist", vol.Name)
+			}
+			filesystems[name] = vol.Name
 			continue
 		}
-		exists, err := b.SDK.FileSystemExists(ctx, vol.Name)
+
+		logrus.Debugf("searching for existing filesystem as volume %q", name)
+		tags := map[string]string{
+			compose.ProjectTag: project.Name,
+			compose.VolumeTag:  name,
+		}
+		id, err := b.aws.FindFileSystem(ctx, tags)
 		if err != nil {
 			return nil, err
 		}
-		if !exists {
-			return nil, fmt.Errorf("EFS file system %s doesn't exist", vol.Name)
+		if id == "" {
+			logrus.Debug("no EFS filesystem found, create a fresh new one")
+			id, err = b.aws.CreateFileSystem(ctx, tags)
+			if err != nil {
+				return nil, err
+			}
 		}
-		filesystems[name] = vol.Name
+		filesystems[name] = id
 	}
 	return filesystems, nil
 }
@@ -206,11 +234,9 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 		r.securityGroups = make(map[string]string, len(project.Networks))
 	}
 	for name, net := range project.Networks {
-		if net.External.External {
-			r.securityGroups[name] = net.Name
+		if _, ok := r.securityGroups[name]; ok {
 			continue
 		}
-
 		securityGroup := networkResourceName(name)
 		template.Resources[securityGroup] = &ec2.SecurityGroup{
 			GroupDescription: fmt.Sprintf("%s Security Group for %s network", project.Name, name),
@@ -227,12 +253,6 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 		}
 
 		r.securityGroups[name] = cloudformation.Ref(securityGroup)
-	}
-}
-
-func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, template *cloudformation.Template) {
-	if r.filesystems == nil {
-		r.filesystems = make(map[string]string, len(project.Volumes))
 	}
 }
 

@@ -20,40 +20,27 @@ import (
 	"fmt"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
-	"github.com/awslabs/goformation/v4/cloudformation/ec2"
-	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) createNFSmountIngress(securityGroups []string, project *types.Project, n string, template *cloudformation.Template) error {
-	target := securityGroups[0]
-	for _, s := range project.Services {
-		for _, v := range s.Volumes {
-			if v.Source != n {
-				continue
+func (b *ecsAPIService) createNFSMountTarget(project *types.Project, resources awsResources, template *cloudformation.Template) {
+	for volume := range project.Volumes {
+		for _, subnet := range resources.subnets {
+			name := fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet))
+			template.Resources[name] = &efs.MountTarget{
+				FileSystemId:   resources.filesystems[volume],
+				SecurityGroups: resources.allSecurityGroups(),
+				SubnetId:       subnet,
 			}
-			var source string
-			for net := range s.Networks {
-				network := project.Networks[net]
-				if ext, ok := network.Extensions[extensionSecurityGroup]; ok {
-					source = ext.(string)
-				} else {
-					source = networkResourceName(net)
-				}
-				break
-			}
-			name := fmt.Sprintf("%sNFSMount%s", normalizeResourceName(s.Name), normalizeResourceName(n))
-			template.Resources[name] = &ec2.SecurityGroupIngress{
-				Description:           fmt.Sprintf("Allow NFS mount for %s on %s", s.Name, n),
-				GroupId:               target,
-				SourceSecurityGroupId: cloudformation.Ref(source),
-				IpProtocol:            "tcp",
-				FromPort:              2049,
-				ToPort:                2049,
-			}
-			service := template.Resources[serviceResourceName(s.Name)].(*ecs.Service)
-			service.AWSCloudFormationDependsOn = append(service.AWSCloudFormationDependsOn, name)
 		}
 	}
-	return nil
+}
+
+func (b *ecsAPIService) mountTargets(volume string, resources awsResources) []string {
+	var refs []string
+	for _, subnet := range resources.subnets {
+		refs = append(refs, fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet)))
+	}
+	return refs
 }

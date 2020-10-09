@@ -110,6 +110,21 @@ func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCluster", reflect.TypeOf((*MockAPI)(nil).CreateCluster), arg0, arg1)
 }
 
+// CreateFileSystem mocks base method
+func (m *MockAPI) CreateFileSystem(arg0 context.Context, arg1 map[string]string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateFileSystem", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateFileSystem indicates an expected call of CreateFileSystem
+func (mr *MockAPIMockRecorder) CreateFileSystem(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockAPI)(nil).CreateFileSystem), arg0, arg1)
+}
+
 // CreateSecret mocks base method
 func (m *MockAPI) CreateSecret(arg0 context.Context, arg1 secrets.Secret) (string, error) {
 	m.ctrl.T.Helper()
@@ -165,6 +180,20 @@ func (m *MockAPI) DeleteCapacityProvider(arg0 context.Context, arg1 string) erro
 func (mr *MockAPIMockRecorder) DeleteCapacityProvider(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCapacityProvider", reflect.TypeOf((*MockAPI)(nil).DeleteCapacityProvider), arg0, arg1)
+}
+
+// DeleteFileSystem mocks base method
+func (m *MockAPI) DeleteFileSystem(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteFileSystem", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteFileSystem indicates an expected call of DeleteFileSystem
+func (mr *MockAPIMockRecorder) DeleteFileSystem(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFileSystem", reflect.TypeOf((*MockAPI)(nil).DeleteFileSystem), arg0, arg1)
 }
 
 // DeleteSecret mocks base method
@@ -223,6 +252,36 @@ func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) ([]*clo
 func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0, arg1)
+}
+
+// FileSystemExists mocks base method
+func (m *MockAPI) FileSystemExists(arg0 context.Context, arg1 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FileSystemExists", arg0, arg1)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FileSystemExists indicates an expected call of FileSystemExists
+func (mr *MockAPIMockRecorder) FileSystemExists(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileSystemExists", reflect.TypeOf((*MockAPI)(nil).FileSystemExists), arg0, arg1)
+}
+
+// FindFileSystem mocks base method
+func (m *MockAPI) FindFileSystem(arg0 context.Context, arg1 map[string]string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindFileSystem", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindFileSystem indicates an expected call of FindFileSystem
+func (mr *MockAPIMockRecorder) FindFileSystem(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFileSystem", reflect.TypeOf((*MockAPI)(nil).FindFileSystem), arg0, arg1)
 }
 
 // GetDefaultVPC mocks base method
@@ -585,20 +644,6 @@ func (m *MockAPI) WaitStackComplete(arg0 context.Context, arg1 string, arg2 int)
 func (mr *MockAPIMockRecorder) WaitStackComplete(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitStackComplete", reflect.TypeOf((*MockAPI)(nil).WaitStackComplete), arg0, arg1, arg2)
-}
-
-// WithVolumeSecurityGroups mocks base method
-func (m *MockAPI) WithVolumeSecurityGroups(arg0 context.Context, arg1 string, arg2 func([]string) error) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WithVolumeSecurityGroups", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WithVolumeSecurityGroups indicates an expected call of WithVolumeSecurityGroups
-func (mr *MockAPIMockRecorder) WithVolumeSecurityGroups(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithVolumeSecurityGroups", reflect.TypeOf((*MockAPI)(nil).WithVolumeSecurityGroups), arg0, arg1, arg2)
 }
 
 // getURLWithPortMapping mocks base method
