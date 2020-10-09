@@ -404,7 +404,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		port := containerInspect.Ports[0]
-		assert.Assert(t, len(port.HostIP) > 0)
+		assert.Assert(t, port.HostIP != "")
 		assert.Equal(t, port.ContainerPort, uint32(80))
 		assert.Equal(t, port.HostPort, uint32(80))
 		assert.Equal(t, containerInspect.Config.FQDN, fqdn)
