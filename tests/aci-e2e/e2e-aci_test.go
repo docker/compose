@@ -384,7 +384,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 		checkRunning := func(t poll.LogT) poll.Result {
 			res := c.RunDockerOrExitError("inspect", container)
-			if res.ExitCode == 0 && strings.Contains(res.Stdout(), `"Status": "Running"`) {
+			if res.ExitCode == 0 && strings.Contains(res.Stdout(), `"Status": "Running"`) && !strings.Contains(res.Stdout(), `"HostIP": ""`) {
 				return poll.Success()
 			}
 			return poll.Continue("waiting for container to be running, current inspect result: \n%s", res.Combined())
@@ -404,7 +404,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		port := containerInspect.Ports[0]
-		assert.Assert(t, port.HostIP != "")
+		assert.Assert(t, port.HostIP != "", "empty hostIP, inspect: \n"+inspectRes.Stdout())
 		assert.Equal(t, port.ContainerPort, uint32(80))
 		assert.Equal(t, port.HostPort, uint32(80))
 		assert.Equal(t, containerInspect.Config.FQDN, fqdn)
