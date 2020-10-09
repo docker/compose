@@ -207,7 +207,7 @@ func ParseContainerInspect(stdout string) (*containers.Container, error) {
 	return &res, nil
 }
 
-// HTTPGetWithRetry performs an HTTP GET on an `endpoint`.
+// HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.
 // In the case of an error or the response status is not the expeted one, it retries the same request,
 // returning the response body as a string (empty if we could not reach it)
 func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDelay time.Duration, timeout time.Duration) string {
@@ -215,8 +215,11 @@ func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDe
 		r   *http.Response
 		err error
 	)
+	client := &http.Client{
+		Timeout: retryDelay * time.Second,
+	}
 	checkUp := func(t poll.LogT) poll.Result {
-		r, err = http.Get(endpoint)
+		r, err = client.Get(endpoint)
 		if err != nil {
 			return poll.Continue("reaching %q: Error %s", endpoint, err.Error())
 		}
