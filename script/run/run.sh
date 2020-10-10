@@ -69,4 +69,5 @@ if docker info --format '{{json .SecurityOptions}}' 2> /dev/null | grep -q 'name
     DOCKER_RUN_OPTIONS="${DOCKER_RUN_OPTIONS} --privileged"
 fi
 
-eval exec docker run --rm "${DOCKER_RUN_OPTIONS}" "${DOCKER_ADDR}" "${COMPOSE_OPTIONS}" "${VOLUMES}" -w "${PWD}" "${IMAGE}" "$@"
+# shellcheck disable=SC2086
+exec docker run --rm ${DOCKER_RUN_OPTIONS} ${DOCKER_ADDR} ${COMPOSE_OPTIONS} ${VOLUMES} -w "${PWD}" "${IMAGE}" "$@"
