@@ -5,7 +5,7 @@
       "Properties": {
         "Description": "Service Map for Docker Compose project TestSimpleConvert",
         "Name": "TestSimpleConvert.local",
-        "Vpc": "vpcID"
+        "Vpc": "vpc-123"
       },
       "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace"
     },
@@ -47,7 +47,7 @@
             "Value": "default"
           }
         ],
-        "VpcId": "vpcID"
+        "VpcId": "vpc-123"
       },
       "Type": "AWS::EC2::SecurityGroup"
     },
@@ -218,7 +218,7 @@
           }
         ],
         "TargetType": "ip",
-        "VpcId": "vpcID"
+        "VpcId": "vpc-123"
       },
       "Type": "AWS::ElasticLoadBalancingV2::TargetGroup"
     },

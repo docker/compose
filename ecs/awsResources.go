@@ -82,7 +82,7 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsR
 func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project) (string, error) {
 	if x, ok := project.Extensions[extensionCluster]; ok {
 		cluster := x.(string)
-		ok, err := b.SDK.ClusterExists(ctx, cluster)
+		ok, err := b.aws.ClusterExists(ctx, cluster)
 		if err != nil {
 			return "", err
 		}
@@ -98,20 +98,20 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
 		vpc = x.(string)
-		err := b.SDK.CheckVPC(ctx, vpc)
+		err := b.aws.CheckVPC(ctx, vpc)
 		if err != nil {
 			return "", nil, err
 		}
 
 	} else {
-		defaultVPC, err := b.SDK.GetDefaultVPC(ctx)
+		defaultVPC, err := b.aws.GetDefaultVPC(ctx)
 		if err != nil {
 			return "", nil, err
 		}
 		vpc = defaultVPC
 	}
 
-	subNets, err := b.SDK.GetSubNets(ctx, vpc)
+	subNets, err := b.aws.GetSubNets(ctx, vpc)
 	if err != nil {
 		return "", nil, err
 	}
@@ -124,7 +124,7 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (string, string, error) {
 	if x, ok := project.Extensions[extensionLoadBalancer]; ok {
 		loadBalancer := x.(string)
-		loadBalancerType, err := b.SDK.LoadBalancerType(ctx, loadBalancer)
+		loadBalancerType, err := b.aws.LoadBalancerType(ctx, loadBalancer)
 		if err != nil {
 			return "", "", err
 		}
@@ -142,16 +142,16 @@ func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project 
 func (b *ecsAPIService) parseSecurityGroupExtension(ctx context.Context, project *types.Project) (map[string]string, error) {
 	securityGroups := make(map[string]string, len(project.Networks))
 	for name, net := range project.Networks {
-		var sg string
-		if net.External.External {
-			sg = net.Name
+		if !net.External.External {
+			continue
 		}
+		sg := net.Name
 		if x, ok := net.Extensions[extensionSecurityGroup]; ok {
 			logrus.Warn("to use an existing security-group, use `network.external` and `network.name` in your compose file")
 			logrus.Debugf("Security Group for network %q set by user to %q", net.Name, x)
 			sg = x.(string)
 		}
-		exists, err := b.SDK.SecurityGroupExists(ctx, sg)
+		exists, err := b.aws.SecurityGroupExists(ctx, sg)
 		if err != nil {
 			return nil, err
 		}
@@ -186,6 +186,11 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 		r.securityGroups = make(map[string]string, len(project.Networks))
 	}
 	for name, net := range project.Networks {
+		if net.External.External {
+			r.securityGroups[name] = net.Name
+			continue
+		}
+
 		securityGroup := networkResourceName(name)
 		template.Resources[securityGroup] = &ec2.SecurityGroup{
 			GroupDescription: fmt.Sprintf("%s Security Group for %s network", project.Name, name),

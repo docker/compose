@@ -37,7 +37,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 	// progress writer
 	w := progress.ContextWriter(ctx)
 	// Get the unique Stack ID so we can collect events without getting some from previous deployments with same name
-	stackID, err := b.SDK.GetStackID(ctx, name)
+	stackID, err := b.aws.GetStackID(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 	ticker := time.NewTicker(1 * time.Second)
 	done := make(chan bool)
 	go func() {
-		b.SDK.WaitStackComplete(ctx, stackID, operation) //nolint:errcheck
+		b.aws.WaitStackComplete(ctx, stackID, operation) //nolint:errcheck
 		ticker.Stop()
 		done <- true
 	}()
@@ -58,7 +58,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			completed = true
 		case <-ticker.C:
 		}
-		events, err := b.SDK.DescribeStackEvents(ctx, stackID)
+		events, err := b.aws.DescribeStackEvents(ctx, stackID)
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			continue
 		}
 		if err := b.checkStackState(ctx, name); err != nil {
-			if e := b.SDK.DeleteStack(ctx, name); e != nil {
+			if e := b.aws.DeleteStack(ctx, name); e != nil {
 				return e
 			}
 			stackErr = err

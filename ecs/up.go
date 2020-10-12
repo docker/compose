@@ -27,7 +27,7 @@ import (
 )
 
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
-	err := b.SDK.CheckRequirements(ctx, b.Region)
+	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
 	}
@@ -37,23 +37,23 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 		return err
 	}
 
-	update, err := b.SDK.StackExists(ctx, project.Name)
+	update, err := b.aws.StackExists(ctx, project.Name)
 	if err != nil {
 		return err
 	}
 	operation := stackCreate
 	if update {
 		operation = stackUpdate
-		changeset, err := b.SDK.CreateChangeSet(ctx, project.Name, template)
+		changeset, err := b.aws.CreateChangeSet(ctx, project.Name, template)
 		if err != nil {
 			return err
 		}
-		err = b.SDK.UpdateStack(ctx, changeset)
+		err = b.aws.UpdateStack(ctx, changeset)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = b.SDK.CreateStack(ctx, project.Name, template)
+		err = b.aws.CreateStack(ctx, project.Name, template)
 		if err != nil {
 			return err
 		}

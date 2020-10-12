@@ -31,7 +31,7 @@ func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) e
 		width:  0,
 		writer: w,
 	}
-	err := b.SDK.GetLogs(ctx, project, consumer.Log)
+	err := b.aws.GetLogs(ctx, project, consumer.Log)
 	return err
 }
 

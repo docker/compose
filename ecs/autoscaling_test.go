@@ -30,7 +30,7 @@ services:
     image: hello_world
     deploy:
       x-aws-autoscaling: 75
-`)
+`, useDefaultVPC)
 	target := template.Resources["FooScalableTarget"].(*autoscaling.ScalableTarget)
 	assert.Check(t, target != nil)
 	policy := template.Resources["FooScalingPolicy"].(*autoscaling.ScalingPolicy)

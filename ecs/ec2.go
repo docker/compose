@@ -41,7 +41,7 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		return nil
 	}
 
-	ami, err := b.SDK.GetParameter(ctx, "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended")
+	ami, err := b.aws.GetParameter(ctx, "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended")
 	if err != nil {
 		return err
 	}

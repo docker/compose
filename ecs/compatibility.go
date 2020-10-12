@@ -97,6 +97,7 @@ var compatibleComposeAttributes = []string{
 	"secrets.file",
 	"volumes",
 	"volumes.external",
+	"networks.external",
 }
 
 func (c *fargateCompatibilityChecker) CheckImage(service *types.ServiceConfig) {

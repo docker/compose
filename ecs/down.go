@@ -23,17 +23,17 @@ import (
 )
 
 func (b *ecsAPIService) Down(ctx context.Context, project string) error {
-	resources, err := b.SDK.ListStackResources(ctx, project)
+	resources, err := b.aws.ListStackResources(ctx, project)
 	if err != nil {
 		return err
 	}
 
-	err = resources.apply(awsTypeCapacityProvider, delete(ctx, b.SDK.DeleteCapacityProvider))
+	err = resources.apply(awsTypeCapacityProvider, delete(ctx, b.aws.DeleteCapacityProvider))
 	if err != nil {
 		return err
 	}
 
-	err = resources.apply(awsTypeAutoscalingGroup, delete(ctx, b.SDK.DeleteAutoscalingGroup))
+	err = resources.apply(awsTypeAutoscalingGroup, delete(ctx, b.aws.DeleteAutoscalingGroup))
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (b *ecsAPIService) Down(ctx context.Context, project string) error {
 		return err
 	}
 
-	err = b.SDK.DeleteStack(ctx, project)
+	err = b.aws.DeleteStack(ctx, project)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (b *ecsAPIService) Down(ctx context.Context, project string) error {
 }
 
 func (b *ecsAPIService) previousStackEvents(ctx context.Context, project string) ([]string, error) {
-	events, err := b.SDK.DescribeStackEvents(ctx, project)
+	events, err := b.aws.DescribeStackEvents(ctx, project)
 	if err != nil {
 		return nil, err
 	}
