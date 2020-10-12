@@ -57,8 +57,7 @@ const (
 )
 
 var (
-	binDir string
-
+	binDir   string
 	location = []string{"eastus2"}
 )
 
@@ -279,8 +278,8 @@ func TestRunVolume(t *testing.T) {
 	})
 
 	t.Run("exec", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", container, "pwd")
-		assert.Assert(t, strings.Contains(res.Stdout(), "/"))
+		res := c.RunDockerCmd("exec", container, "pwd")
+		res.Assert(t, icmd.Expected{Out: "/"})
 
 		res = c.RunDockerOrExitError("exec", container, "echo", "fail_with_argument")
 		res.Assert(t, icmd.Expected{
@@ -693,7 +692,6 @@ func TestUpUpdate(t *testing.T) {
 	})
 }
 
-/*
 func TestRunEnvVars(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	_, _, _ = setupTestResourceGroup(t, c)
@@ -734,12 +732,11 @@ func TestRunEnvVars(t *testing.T) {
 			if strings.Contains(res.Stdout(), "Giving user user1 access to schema mytestdb") {
 				return poll.Success()
 			}
-			return poll.Continue("waiting for DB container to be up\n" + res.Stdout())
+			return poll.Continue("waiting for DB container to be up")
 		}
 		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 	})
 }
-*/
 
 func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
