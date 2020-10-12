@@ -49,6 +49,8 @@ const (
 	volumeDriveroptsShareNameKey   = "share_name"
 	volumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeReadOnly                 = "read_only"
+
+	serviceSecretPrefix = "aci-service-secret-"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
@@ -188,22 +190,34 @@ type projectAciHelper types.Project
 
 func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, error) {
 	var secretVolumes []containerinstance.Volume
-	for secretName, filepathToRead := range p.Secrets {
-		data, err := ioutil.ReadFile(filepathToRead.File)
-		if err != nil {
-			return secretVolumes, err
+	for _, svc := range p.Services {
+		secretServiceVolume := containerinstance.Volume{
+			Name:   to.StringPtr(serviceSecretPrefix + svc.Name),
+			Secret: make(map[string]*string),
 		}
-		if len(data) == 0 {
-			continue
+		for _, scr := range svc.Secrets {
+			data, err := ioutil.ReadFile(p.Secrets[scr.Source].File)
+			if err != nil {
+				return secretVolumes, err
+			}
+			if len(data) == 0 {
+				continue
+			}
+			dataStr := base64.StdEncoding.EncodeToString(data)
+			if scr.Target == "" {
+				scr.Target = scr.Source
+			}
+			if strings.ContainsAny(scr.Target, "\\/") {
+				return []containerinstance.Volume{},
+					errors.Errorf("in service %q, secret with source %q cannot have a path as target. Found %q", svc.Name, scr.Source, scr.Target)
+			}
+			secretServiceVolume.Secret[scr.Target] = &dataStr
 		}
-		dataStr := base64.StdEncoding.EncodeToString(data)
-		secretVolumes = append(secretVolumes, containerinstance.Volume{
-			Name: to.StringPtr(secretName),
-			Secret: map[string]*string{
-				secretName: &dataStr,
-			},
-		})
+		if len(secretServiceVolume.Secret) > 0 {
+			secretVolumes = append(secretVolumes, secretServiceVolume)
+		}
 	}
+
 	return secretVolumes, nil
 }
 
@@ -312,37 +326,29 @@ func (s serviceConfigAciHelper) getAciFileVolumeMounts(volumesCache map[string]b
 	return aciServiceVolumes, nil
 }
 
-func (s serviceConfigAciHelper) getAciSecretsVolumeMounts() []containerinstance.VolumeMount {
-	var secretVolumeMounts []containerinstance.VolumeMount
-	for _, secret := range s.Secrets {
-		secretsMountPath := "/run/secrets"
-		if secret.Target == "" {
-			secret.Target = secret.Source
-		}
-		// Specifically use "/" here and not filepath.Join() to avoid windows path being sent and used inside containers
-		secretsMountPath = secretsMountPath + "/" + secret.Target
-		vmName := strings.Split(secret.Source, "=")[0]
-		vm := containerinstance.VolumeMount{
-			Name:      to.StringPtr(vmName),
-			MountPath: to.StringPtr(secretsMountPath),
-			ReadOnly:  to.BoolPtr(true), // TODO Confirm if the secrets are read only
-		}
-		secretVolumeMounts = append(secretVolumeMounts, vm)
+func (s serviceConfigAciHelper) getAciSecretsVolumeMount() *containerinstance.VolumeMount {
+	if len(s.Secrets) == 0 {
+		return nil
 	}
-	return secretVolumeMounts
+	return &containerinstance.VolumeMount{
+		Name:      to.StringPtr(serviceSecretPrefix + s.Name),
+		MountPath: to.StringPtr("/run/secrets"),
+		ReadOnly:  to.BoolPtr(true),
+	}
 }
 
 func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (containerinstance.Container, error) {
-	secretVolumeMounts := s.getAciSecretsVolumeMounts()
 	aciServiceVolumes, err := s.getAciFileVolumeMounts(volumesCache)
 	if err != nil {
 		return containerinstance.Container{}, err
 	}
-	allVolumes := append(aciServiceVolumes, secretVolumeMounts...)
+	allVolumes := aciServiceVolumes
+	secretVolumeMount := s.getAciSecretsVolumeMount()
+	if secretVolumeMount != nil {
+		allVolumes = append(allVolumes, *secretVolumeMount)
+	}
 	var volumes *[]containerinstance.VolumeMount
-	if len(allVolumes) == 0 {
-		volumes = nil
-	} else {
+	if len(allVolumes) > 0 {
 		volumes = &allVolumes
 	}
 

@@ -516,6 +516,68 @@ func TestUpResources(t *testing.T) {
 	})
 }
 
+func TestUpSecrets(t *testing.T) {
+	const (
+		composeProjectName = "aci_secrets"
+		serverContainer    = composeProjectName + "_web"
+
+		secret1Name  = "mytarget1"
+		secret1Value = "myPassword1\n"
+
+		secret2Name  = "mysecret2"
+		secret2Value = "another_password\n"
+	)
+	var (
+		basefilePath                 = filepath.Join("..", "composefiles", composeProjectName)
+		composefilePath              = filepath.Join(basefilePath, "compose.yml")
+		composefileInvalidTargetPath = filepath.Join(basefilePath, "compose-invalid-target.yml")
+	)
+	c := NewParallelE2eCLI(t, binDir)
+	_, _, _ = setupTestResourceGroup(t, c)
+
+	t.Run("compose up invalid target", func(t *testing.T) {
+		res := c.RunDockerOrExitError("compose", "up", "-f", composefileInvalidTargetPath, "--project-name", composeProjectName)
+		assert.Equal(t, res.ExitCode, 1)
+		assert.Equal(t, res.Combined(), "in service \"web\", secret with source \"mysecret1\" cannot have a path as target. Found \"my/invalid/target1\"\n")
+	})
+
+	t.Run("compose up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
+		res := c.RunDockerCmd("ps")
+		out := lines(res.Stdout())
+		// Check one container running
+		assert.Assert(t, is.Len(out, 2))
+		webRunning := false
+		for _, l := range out {
+			if strings.Contains(l, serverContainer) {
+				webRunning = true
+				strings.Contains(l, ":80->80/tcp")
+			}
+		}
+		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
+
+		res = c.RunDockerCmd("inspect", serverContainer)
+
+		containerInspect, err := ParseContainerInspect(res.Stdout())
+		assert.NilError(t, err)
+		assert.Assert(t, is.Len(containerInspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+
+		output := HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Equal(t, output, secret1Value)
+
+		output = HTTPGetWithRetry(t, endpoint+"/"+secret2Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Equal(t, output, secret2Value)
+
+		t.Cleanup(func() {
+			c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
+			res := c.RunDockerCmd("ps")
+			out := lines(res.Stdout())
+			assert.Equal(t, len(out), 1)
+		})
+	})
+}
+
 func TestUpUpdate(t *testing.T) {
 	const (
 		composeProjectName = "acidemo"
