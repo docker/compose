@@ -106,6 +106,7 @@ func inspectSecret() *cobra.Command {
 
 type listSecretsOpts struct {
 	format string
+	quiet  bool
 }
 
 func listSecrets() *cobra.Command {
@@ -123,6 +124,12 @@ func listSecrets() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if opts.quiet {
+				for _, s := range secretsList {
+					fmt.Println(s.ID)
+				}
+				return nil
+			}
 			view := viewFromSecretList(secretsList)
 			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
 				for _, secret := range view {
@@ -132,6 +139,7 @@ func listSecrets() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
+	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
 	return cmd
 }
 

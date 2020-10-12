@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
@@ -43,11 +42,6 @@ func listCommand() *cobra.Command {
 	return lsCmd
 }
 
-func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
-	f.StringVarP(&opts.Name, "project-name", "p", "", "Project name")
-	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
-}
-
 func runList(ctx context.Context, opts composeOptions) error {
 	c, err := client.New(ctx)
 	if err != nil {
@@ -57,7 +51,12 @@ func runList(ctx context.Context, opts composeOptions) error {
 	if err != nil {
 		return err
 	}
-
+	if opts.Quiet {
+		for _, s := range stackList {
+			fmt.Println(s.Name)
+		}
+		return nil
+	}
 	view := viewFromStackList(stackList)
 	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
 		for _, stack := range view {

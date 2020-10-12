@@ -114,6 +114,8 @@ func (a *aciAPIService) ComposeService() compose.Service {
 }
 
 func (a *aciAPIService) SecretsService() secrets.Service {
+	// Not implemented on ACI
+	// Secrets are created and mounted in the container at it's creation and not stored on ACI
 	return nil
 }
 

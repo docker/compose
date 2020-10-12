@@ -58,7 +58,12 @@ func runPs(ctx context.Context, opts composeOptions) error {
 	if err != nil {
 		return err
 	}
-
+	if opts.Quiet {
+		for _, s := range serviceList {
+			fmt.Println(s.ID)
+		}
+		return nil
+	}
 	view := viewFromServiceStatusList(serviceList)
 	return formatter.Print(view, opts.Format, os.Stdout,
 		func(w io.Writer) {

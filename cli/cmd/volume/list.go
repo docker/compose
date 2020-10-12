@@ -30,6 +30,7 @@ import (
 
 type listVolumeOpts struct {
 	format string
+	quiet  bool
 }
 
 func listVolume() *cobra.Command {
@@ -47,6 +48,12 @@ func listVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if opts.quiet {
+				for _, v := range vols {
+					fmt.Println(v.ID)
+				}
+				return nil
+			}
 			view := viewFromVolumeList(vols)
 			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
 				for _, vol := range view {
@@ -56,6 +63,7 @@ func listVolume() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.format, "format", formatter.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
+	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
 	return cmd
 }
 
