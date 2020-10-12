@@ -796,7 +796,7 @@ func TestRunEnvVars(t *testing.T) {
 			}
 			return poll.Continue("waiting for DB container to be up")
 		}
-		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 	})
 }
 
