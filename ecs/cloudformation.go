@@ -38,6 +38,15 @@ import (
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+	template, err := b.convert(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+
+	return marshall(template)
+}
+
+func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*cloudformation.Template, error) {
 	err := b.checkCompatibility(project)
 	if err != nil {
 		return nil, err
@@ -48,32 +57,6 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]
 		return nil, err
 	}
 
-	template, err := b.convert(project, resources)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a NFS inbound rule on each mount target for volumes
-	// as "source security group" use an arbitrary network attached to service(s) who mounts target volume
-	for n, vol := range project.Volumes {
-		err := b.SDK.WithVolumeSecurityGroups(ctx, vol.Name, func(securityGroups []string) error {
-			return b.createNFSmountIngress(securityGroups, project, n, template)
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err = b.createCapacityProvider(ctx, project, template, resources)
-	if err != nil {
-		return nil, err
-	}
-
-	return marshall(template)
-}
-
-// Convert a compose project into a CloudFormation template
-func (b *ecsAPIService) convert(project *types.Project, resources awsResources) (*cloudformation.Template, error) {
 	template := cloudformation.NewTemplate()
 	b.ensureResources(&resources, project, template)
 
@@ -90,103 +73,128 @@ func (b *ecsAPIService) convert(project *types.Project, resources awsResources) 
 	b.createCloudMap(project, template, resources.vpc)
 
 	for _, service := range project.Services {
-		taskExecutionRole := b.createTaskExecutionRole(project, service, template)
-		taskRole := b.createTaskRole(project, service, template)
-
-		definition, err := b.createTaskDefinition(project, service)
+		err := b.createService(project, service, template, resources)
 		if err != nil {
 			return nil, err
-		}
-		definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
-		if taskRole != "" {
-			definition.TaskRoleArn = cloudformation.Ref(taskRole)
-		}
-
-		taskDefinition := fmt.Sprintf("%sTaskDefinition", normalizeResourceName(service.Name))
-		template.Resources[taskDefinition] = definition
-
-		var healthCheck *cloudmap.Service_HealthCheckConfig
-		serviceRegistry := b.createServiceRegistry(service, template, healthCheck)
-
-		var (
-			dependsOn []string
-			serviceLB []ecs.Service_LoadBalancer
-		)
-		for _, port := range service.Ports {
-			for net := range service.Networks {
-				b.createIngress(service, net, port, template, resources)
-			}
-
-			protocol := strings.ToUpper(port.Protocol)
-			if resources.loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
-				// we don't set Https as a certificate must be specified for HTTPS listeners
-				protocol = elbv2.ProtocolEnumHttp
-			}
-			targetGroupName := b.createTargetGroup(project, service, port, template, protocol, resources.vpc)
-			listenerName := b.createListener(service, port, template, targetGroupName, resources.loadBalancer, protocol)
-			dependsOn = append(dependsOn, listenerName)
-			serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
-				ContainerName:  service.Name,
-				ContainerPort:  int(port.Target),
-				TargetGroupArn: cloudformation.Ref(targetGroupName),
-			})
-		}
-
-		desiredCount := 1
-		if service.Deploy != nil && service.Deploy.Replicas != nil {
-			desiredCount = int(*service.Deploy.Replicas)
-		}
-
-		for dependency := range service.DependsOn {
-			dependsOn = append(dependsOn, serviceResourceName(dependency))
-		}
-
-		minPercent, maxPercent, err := computeRollingUpdateLimits(service)
-		if err != nil {
-			return nil, err
-		}
-
-		assignPublicIP := ecsapi.AssignPublicIpEnabled
-		launchType := ecsapi.LaunchTypeFargate
-		platformVersion := "1.4.0" // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
-		if requireEC2(service) {
-			assignPublicIP = ecsapi.AssignPublicIpDisabled
-			launchType = ecsapi.LaunchTypeEc2
-			platformVersion = "" // The platform version must be null when specifying an EC2 launch type
-		}
-
-		template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
-			AWSCloudFormationDependsOn: dependsOn,
-			Cluster:                    resources.cluster,
-			DesiredCount:               desiredCount,
-			DeploymentController: &ecs.Service_DeploymentController{
-				Type: ecsapi.DeploymentControllerTypeEcs,
-			},
-			DeploymentConfiguration: &ecs.Service_DeploymentConfiguration{
-				MaximumPercent:        maxPercent,
-				MinimumHealthyPercent: minPercent,
-			},
-			LaunchType: launchType,
-			// TODO we miss support for https://github.com/aws/containers-roadmap/issues/631 to select a capacity provider
-			LoadBalancers: serviceLB,
-			NetworkConfiguration: &ecs.Service_NetworkConfiguration{
-				AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
-					AssignPublicIp: assignPublicIP,
-					SecurityGroups: resources.serviceSecurityGroups(service),
-					Subnets:        resources.subnets,
-				},
-			},
-			PlatformVersion:    platformVersion,
-			PropagateTags:      ecsapi.PropagateTagsService,
-			SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
-			ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
-			Tags:               serviceTags(project, service),
-			TaskDefinition:     cloudformation.Ref(normalizeResourceName(taskDefinition)),
 		}
 
 		b.createAutoscalingPolicy(project, resources, template, service)
 	}
+
+	// Create a NFS inbound rule on each mount target for volumes
+	// as "source security group" use an arbitrary network attached to service(s) who mounts target volume
+	for n, vol := range project.Volumes {
+		err := b.aws.WithVolumeSecurityGroups(ctx, vol.Name, func(securityGroups []string) error {
+			return b.createNFSmountIngress(securityGroups, project, n, template)
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = b.createCapacityProvider(ctx, project, template, resources)
+	if err != nil {
+		return nil, err
+	}
+
 	return template, nil
+}
+
+func (b *ecsAPIService) createService(project *types.Project, service types.ServiceConfig, template *cloudformation.Template, resources awsResources) error {
+	taskExecutionRole := b.createTaskExecutionRole(project, service, template)
+	taskRole := b.createTaskRole(project, service, template)
+
+	definition, err := b.createTaskDefinition(project, service)
+	if err != nil {
+		return err
+	}
+	definition.ExecutionRoleArn = cloudformation.Ref(taskExecutionRole)
+	if taskRole != "" {
+		definition.TaskRoleArn = cloudformation.Ref(taskRole)
+	}
+
+	taskDefinition := fmt.Sprintf("%sTaskDefinition", normalizeResourceName(service.Name))
+	template.Resources[taskDefinition] = definition
+
+	var healthCheck *cloudmap.Service_HealthCheckConfig
+	serviceRegistry := b.createServiceRegistry(service, template, healthCheck)
+
+	var (
+		dependsOn []string
+		serviceLB []ecs.Service_LoadBalancer
+	)
+	for _, port := range service.Ports {
+		for net := range service.Networks {
+			b.createIngress(service, net, port, template, resources)
+		}
+
+		protocol := strings.ToUpper(port.Protocol)
+		if resources.loadBalancerType == elbv2.LoadBalancerTypeEnumApplication {
+			// we don't set Https as a certificate must be specified for HTTPS listeners
+			protocol = elbv2.ProtocolEnumHttp
+		}
+		targetGroupName := b.createTargetGroup(project, service, port, template, protocol, resources.vpc)
+		listenerName := b.createListener(service, port, template, targetGroupName, resources.loadBalancer, protocol)
+		dependsOn = append(dependsOn, listenerName)
+		serviceLB = append(serviceLB, ecs.Service_LoadBalancer{
+			ContainerName:  service.Name,
+			ContainerPort:  int(port.Target),
+			TargetGroupArn: cloudformation.Ref(targetGroupName),
+		})
+	}
+
+	desiredCount := 1
+	if service.Deploy != nil && service.Deploy.Replicas != nil {
+		desiredCount = int(*service.Deploy.Replicas)
+	}
+
+	for dependency := range service.DependsOn {
+		dependsOn = append(dependsOn, serviceResourceName(dependency))
+	}
+
+	minPercent, maxPercent, err := computeRollingUpdateLimits(service)
+	if err != nil {
+		return err
+	}
+
+	assignPublicIP := ecsapi.AssignPublicIpEnabled
+	launchType := ecsapi.LaunchTypeFargate
+	platformVersion := "1.4.0" // LATEST which is set to 1.3.0 (?) which doesn’t allow efs volumes.
+	if requireEC2(service) {
+		assignPublicIP = ecsapi.AssignPublicIpDisabled
+		launchType = ecsapi.LaunchTypeEc2
+		platformVersion = "" // The platform version must be null when specifying an EC2 launch type
+	}
+
+	template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
+		AWSCloudFormationDependsOn: dependsOn,
+		Cluster:                    resources.cluster,
+		DesiredCount:               desiredCount,
+		DeploymentController: &ecs.Service_DeploymentController{
+			Type: ecsapi.DeploymentControllerTypeEcs,
+		},
+		DeploymentConfiguration: &ecs.Service_DeploymentConfiguration{
+			MaximumPercent:        maxPercent,
+			MinimumHealthyPercent: minPercent,
+		},
+		LaunchType: launchType,
+		// TODO we miss support for https://github.com/aws/containers-roadmap/issues/631 to select a capacity provider
+		LoadBalancers: serviceLB,
+		NetworkConfiguration: &ecs.Service_NetworkConfiguration{
+			AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
+				AssignPublicIp: assignPublicIP,
+				SecurityGroups: resources.serviceSecurityGroups(service),
+				Subnets:        resources.subnets,
+			},
+		},
+		PlatformVersion:    platformVersion,
+		PropagateTags:      ecsapi.PropagateTagsService,
+		SchedulingStrategy: ecsapi.SchedulingStrategyReplica,
+		ServiceRegistries:  []ecs.Service_ServiceRegistry{serviceRegistry},
+		Tags:               serviceTags(project, service),
+		TaskDefinition:     cloudformation.Ref(normalizeResourceName(taskDefinition)),
+	}
+	return nil
 }
 
 const allProtocols = "-1"

@@ -17,9 +17,13 @@
 package ecs
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/docker/compose-cli/api/compose"
 
@@ -30,7 +34,6 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/iam"
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"gotest.tools/v3/assert"
@@ -38,8 +41,12 @@ import (
 )
 
 func TestSimpleConvert(t *testing.T) {
-	project := load(t, "testdata/input/simple-single-service.yaml")
-	result := convertResultAsString(t, project)
+	bytes, err := ioutil.ReadFile("testdata/input/simple-single-service.yaml")
+	assert.NilError(t, err)
+	template := convertYaml(t, string(bytes), useDefaultVPC)
+	resultAsJSON, err := marshall(template)
+	assert.NilError(t, err)
+	result := fmt.Sprintf("%s\n", string(resultAsJSON))
 	expected := "simple/simple-cloudformation-conversion.golden"
 	golden.Assert(t, result, expected)
 }
@@ -54,7 +61,7 @@ services:
         awslogs-datetime-pattern: "FOO"
 
 x-aws-logs_retention: 10
-`)
+`, useDefaultVPC)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
 	logging := getMainContainer(def, t).LogConfiguration
 	if logging != nil {
@@ -74,7 +81,7 @@ services:
     image: hello_world
     env_file:
       - testdata/input/envfile
-`)
+`, useDefaultVPC)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
 	env := getMainContainer(def, t).Environment
 	var found bool
@@ -96,7 +103,7 @@ services:
       - testdata/input/envfile
     environment:
       - "FOO=ZOT"
-`)
+`, useDefaultVPC)
 	def := template.Resources["FooTaskDefinition"].(*ecs.TaskDefinition)
 	env := getMainContainer(def, t).Environment
 	var found bool
@@ -118,7 +125,7 @@ services:
       replicas: 4 
       update_config:
         parallelism: 2
-`)
+`, useDefaultVPC)
 	service := template.Resources["FooService"].(*ecs.Service)
 	assert.Check(t, service.DeploymentConfiguration.MaximumPercent == 150)
 	assert.Check(t, service.DeploymentConfiguration.MinimumHealthyPercent == 50)
@@ -133,7 +140,7 @@ services:
       update_config:
         x-aws-min_percent: 25
         x-aws-max_percent: 125
-`)
+`, useDefaultVPC)
 	service := template.Resources["FooService"].(*ecs.Service)
 	assert.Check(t, service.DeploymentConfiguration.MaximumPercent == 125)
 	assert.Check(t, service.DeploymentConfiguration.MinimumHealthyPercent == 25)
@@ -145,7 +152,7 @@ services:
   foo:
     image: hello_world
     x-aws-pull_credentials: "secret"
-`)
+`, useDefaultVPC)
 	x := template.Resources["FooTaskExecutionRole"]
 	assert.Check(t, x != nil)
 	role := *(x.(*iam.Role))
@@ -173,7 +180,7 @@ networks:
     name: public
   back-tier:
     internal: true
-`)
+`, useDefaultVPC)
 	assert.Check(t, template.Resources["FronttierNetwork"] != nil)
 	assert.Check(t, template.Resources["BacktierNetwork"] != nil)
 	assert.Check(t, template.Resources["BacktierNetworkIngress"] != nil)
@@ -201,7 +208,7 @@ func TestLoadBalancerTypeApplication(t *testing.T) {
 `,
 	}
 	for _, y := range cases {
-		template := convertYaml(t, y)
+		template := convertYaml(t, y, useDefaultVPC)
 		lb := template.Resources["LoadBalancer"]
 		assert.Check(t, lb != nil)
 		loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
@@ -218,7 +225,7 @@ services:
     image: nginx
   foo:
     image: bar
-`)
+`, useDefaultVPC)
 	for _, r := range template.Resources {
 		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::TargetGroup")
 		assert.Check(t, r.AWSCloudFormationType() != "AWS::ElasticLoadBalancingV2::Listener")
@@ -233,7 +240,7 @@ services:
     image: nginx
     deploy:
       replicas: 10
-`)
+`, useDefaultVPC)
 	s := template.Resources["TestService"]
 	assert.Check(t, s != nil)
 	service := *s.(*ecs.Service)
@@ -245,7 +252,7 @@ func TestTaskSizeConvert(t *testing.T) {
 services:
   test:
     image: nginx
-`)
+`, useDefaultVPC)
 	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "256")
 	assert.Equal(t, def.Memory, "512")
@@ -259,7 +266,7 @@ services:
         limits:
           cpus: '0.5'
           memory: 2048M
-`)
+`, useDefaultVPC)
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "512")
 	assert.Equal(t, def.Memory, "2048")
@@ -273,7 +280,7 @@ services:
         limits:
           cpus: '4'
           memory: 8192M
-`)
+`, useDefaultVPC)
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "4096")
 	assert.Equal(t, def.Memory, "8192")
@@ -292,7 +299,7 @@ services:
             - discrete_resource_spec:
                 kind: gpus
                 value: 2
-`)
+`, useDefaultVPC, useGPU)
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "4000")
 	assert.Equal(t, def.Memory, "792")
@@ -308,25 +315,10 @@ services:
             - discrete_resource_spec:
                 kind: gpus
                 value: 2
-`)
+`, useDefaultVPC, useGPU)
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "")
 	assert.Equal(t, def.Memory, "")
-}
-func TestTaskSizeConvertFailure(t *testing.T) {
-	model := loadConfig(t, `
-services:
-  test:
-    image: nginx
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 2043248M
-`)
-	backend := &ecsAPIService{}
-	_, err := backend.convert(model, awsResources{})
-	assert.ErrorContains(t, err, "the resources requested are not supported by ECS/Fargate")
 }
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
@@ -337,11 +329,30 @@ services:
     ports:
       - 80:80
       - 88:88
-`)
+`, useDefaultVPC)
 	lb := template.Resources["LoadBalancer"]
 	assert.Check(t, lb != nil)
 	loadBalancer := *lb.(*elasticloadbalancingv2.LoadBalancer)
 	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumNetwork)
+}
+
+func TestUseCustomNetwork(t *testing.T) {
+	template := convertYaml(t, `
+services:
+  test:
+    image: nginx
+networks:
+  default:
+    external: true
+    name: sg-123abc
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.SecurityGroupExists(gomock.Any(), "sg-123abc").Return(true, nil)
+	})
+	assert.Check(t, template.Resources["DefaultNetwork"] == nil)
+	assert.Check(t, template.Resources["DefaultNetworkIngress"] == nil)
+	s := template.Resources["TestService"].(*ecs.Service)
+	assert.Check(t, s != nil)
+	assert.Check(t, s.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups[0] == "sg-123abc") //nolint:staticcheck
 }
 
 func TestServiceMapping(t *testing.T) {
@@ -360,7 +371,7 @@ services:
     init: true
     user: "user"
     working_dir: "working_dir"
-`)
+`, useDefaultVPC)
 	def := template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	container := getMainContainer(def, t)
 	assert.Equal(t, container.Image, "image")
@@ -391,7 +402,7 @@ services:
     ports:
       - 80:80
       - 88:88
-`)
+`, useDefaultVPC)
 	for _, r := range template.Resources {
 		tags := reflect.Indirect(reflect.ValueOf(r)).FieldByName("Tags")
 		if !tags.IsValid() {
@@ -401,38 +412,26 @@ services:
 			k := tags.Index(i).FieldByName("Key").String()
 			v := tags.Index(i).FieldByName("Value").String()
 			if k == compose.ProjectTag {
-				assert.Equal(t, v, "Test")
+				assert.Equal(t, v, t.Name())
 			}
 		}
 	}
 }
 
-func convertResultAsString(t *testing.T, project *types.Project) string {
-	backend := &ecsAPIService{}
-	template, err := backend.convert(project, awsResources{
-		vpc:     "vpcID",
-		subnets: []string{"subnet1", "subnet2"},
-	})
-	assert.NilError(t, err)
-	resultAsJSON, err := marshall(template)
-	assert.NilError(t, err)
-	return fmt.Sprintf("%s\n", string(resultAsJSON))
-}
-
-func load(t *testing.T, paths ...string) *types.Project {
-	options := cli.ProjectOptions{
-		Name:        t.Name(),
-		ConfigPaths: paths,
-	}
-	project, err := cli.ProjectFromOptions(&options)
-	assert.NilError(t, err)
-	return project
-}
-
-func convertYaml(t *testing.T, yaml string) *cloudformation.Template {
+func convertYaml(t *testing.T, yaml string, fn ...func(m *MockAPIMockRecorder)) *cloudformation.Template {
 	project := loadConfig(t, yaml)
-	backend := &ecsAPIService{}
-	template, err := backend.convert(project, awsResources{})
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := NewMockAPI(ctrl)
+	for _, f := range fn {
+		f(m.EXPECT())
+	}
+
+	backend := &ecsAPIService{
+		aws: m,
+	}
+	template, err := backend.convert(context.TODO(), project)
 	assert.NilError(t, err)
 	return template
 }
@@ -445,7 +444,7 @@ func loadConfig(t *testing.T, yaml string) *types.Project {
 			{Config: dict},
 		},
 	}, func(options *loader.Options) {
-		options.Name = "Test"
+		options.Name = t.Name()
 	})
 	assert.NilError(t, err)
 	return model
@@ -459,4 +458,13 @@ func getMainContainer(def *ecs.TaskDefinition, t *testing.T) ecs.TaskDefinition_
 	}
 	t.Fail()
 	return def.ContainerDefinitions[0]
+}
+
+func useDefaultVPC(m *MockAPIMockRecorder) {
+	m.GetDefaultVPC(gomock.Any()).Return("vpc-123", nil)
+	m.GetSubNets(gomock.Any(), "vpc-123").Return([]string{"subnet1", "subnet2"}, nil)
+}
+
+func useGPU(m *MockAPIMockRecorder) {
+	m.GetParameter(gomock.Any(), gomock.Any()).Return("", nil)
 }

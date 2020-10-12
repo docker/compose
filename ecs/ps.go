@@ -25,11 +25,11 @@ import (
 )
 
 func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
-	cluster, err := b.SDK.GetStackClusterID(ctx, project)
+	cluster, err := b.aws.GetStackClusterID(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-	servicesARN, err := b.SDK.ListStackServices(ctx, project)
+	servicesARN, err := b.aws.ListStackServices(ctx, project)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.Servi
 
 	status := []compose.ServiceStatus{}
 	for _, arn := range servicesARN {
-		state, err := b.SDK.DescribeService(ctx, cluster, arn)
+		state, err := b.aws.DescribeService(ctx, cluster, arn)
 		if err != nil {
 			return nil, err
 		}

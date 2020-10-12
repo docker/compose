@@ -24,7 +24,7 @@ import (
 )
 
 func (b *ecsAPIService) List(ctx context.Context, project string) ([]compose.Stack, error) {
-	stacks, err := b.SDK.ListStacks(ctx, project)
+	stacks, err := b.aws.ListStacks(ctx, project)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (b *ecsAPIService) List(ctx context.Context, project string) ([]compose.Sta
 }
 
 func (b *ecsAPIService) checkStackState(ctx context.Context, name string) error {
-	resources, err := b.SDK.ListStackResources(ctx, name)
+	resources, err := b.aws.ListStackResources(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (b *ecsAPIService) checkStackState(ctx context.Context, name string) error 
 	if len(svcArns) == 0 {
 		return nil
 	}
-	services, err := b.SDK.GetServiceTaskDefinition(ctx, cluster, svcArns)
+	services, err := b.aws.GetServiceTaskDefinition(ctx, cluster, svcArns)
 	if err != nil {
 		return err
 	}
@@ -78,14 +78,14 @@ func (b *ecsAPIService) checkStackState(ctx context.Context, name string) error 
 }
 
 func (b *ecsAPIService) checkServiceState(ctx context.Context, cluster string, service string, taskdef string) error {
-	runningTasks, err := b.SDK.GetServiceTasks(ctx, cluster, service, false)
+	runningTasks, err := b.aws.GetServiceTasks(ctx, cluster, service, false)
 	if err != nil {
 		return err
 	}
 	if len(runningTasks) > 0 {
 		return nil
 	}
-	stoppedTasks, err := b.SDK.GetServiceTasks(ctx, cluster, service, true)
+	stoppedTasks, err := b.aws.GetServiceTasks(ctx, cluster, service, true)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (b *ecsAPIService) checkServiceState(ctx context.Context, cluster string, s
 	if len(tasks) == 0 {
 		return nil
 	}
-	reason, err := b.SDK.GetTaskStoppedReason(ctx, cluster, tasks[0])
+	reason, err := b.aws.GetTaskStoppedReason(ctx, cluster, tasks[0])
 	if err != nil {
 		return err
 	}

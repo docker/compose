@@ -16,7 +16,61 @@
 
 package ecs
 
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/aws/aws-sdk-go/service/ecs"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/secrets"
+)
+
 const (
 	awsTypeCapacityProvider = "AWS::ECS::CapacityProvider"
 	awsTypeAutoscalingGroup = "AWS::AutoScaling::AutoScalingGroup"
 )
+
+//go:generate mockgen -destination=./aws_mock.go -self_package "github.com/docker/compose-cli/ecs" -package=ecs . API
+
+// API hides aws-go-sdk into a simpler, focussed API subset
+type API interface {
+	CheckRequirements(ctx context.Context, region string) error
+	ClusterExists(ctx context.Context, name string) (bool, error)
+	CreateCluster(ctx context.Context, name string) (string, error)
+	CheckVPC(ctx context.Context, vpcID string) error
+	GetDefaultVPC(ctx context.Context) (string, error)
+	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
+	GetRoleArn(ctx context.Context, name string) (string, error)
+	StackExists(ctx context.Context, name string) (bool, error)
+	CreateStack(ctx context.Context, name string, template []byte) error
+	CreateChangeSet(ctx context.Context, name string, template []byte) (string, error)
+	UpdateStack(ctx context.Context, changeset string) error
+	WaitStackComplete(ctx context.Context, name string, operation int) error
+	GetStackID(ctx context.Context, name string) (string, error)
+	ListStacks(ctx context.Context, name string) ([]compose.Stack, error)
+	GetStackClusterID(ctx context.Context, stack string) (string, error)
+	GetServiceTaskDefinition(ctx context.Context, cluster string, serviceArns []string) (map[string]string, error)
+	ListStackServices(ctx context.Context, stack string) ([]string, error)
+	GetServiceTasks(ctx context.Context, cluster string, service string, stopped bool) ([]*ecs.Task, error)
+	GetTaskStoppedReason(ctx context.Context, cluster string, taskArn string) (string, error)
+	DescribeStackEvents(ctx context.Context, stackID string) ([]*cloudformation.StackEvent, error)
+	ListStackParameters(ctx context.Context, name string) (map[string]string, error)
+	ListStackResources(ctx context.Context, name string) (stackResources, error)
+	DeleteStack(ctx context.Context, name string) error
+	CreateSecret(ctx context.Context, secret secrets.Secret) (string, error)
+	InspectSecret(ctx context.Context, id string) (secrets.Secret, error)
+	ListSecrets(ctx context.Context) ([]secrets.Secret, error)
+	DeleteSecret(ctx context.Context, id string, recover bool) error
+	GetLogs(ctx context.Context, name string, consumer func(service, container, message string)) error
+	DescribeService(ctx context.Context, cluster string, arn string) (compose.ServiceStatus, error)
+	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)
+	ListTasks(ctx context.Context, cluster string, family string) ([]string, error)
+	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
+	LoadBalancerType(ctx context.Context, arn string) (string, error)
+	GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
+	WithVolumeSecurityGroups(ctx context.Context, id string, fn func(securityGroups []string) error) error
+	GetParameter(ctx context.Context, name string) (string, error)
+	SecurityGroupExists(ctx context.Context, sg string) (bool, error)
+	DeleteCapacityProvider(ctx context.Context, arn string) error
+	DeleteAutoscalingGroup(ctx context.Context, arn string) error
+}

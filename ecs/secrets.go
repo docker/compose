@@ -23,17 +23,17 @@ import (
 )
 
 func (b *ecsAPIService) CreateSecret(ctx context.Context, secret secrets.Secret) (string, error) {
-	return b.SDK.CreateSecret(ctx, secret)
+	return b.aws.CreateSecret(ctx, secret)
 }
 
 func (b *ecsAPIService) InspectSecret(ctx context.Context, id string) (secrets.Secret, error) {
-	return b.SDK.InspectSecret(ctx, id)
+	return b.aws.InspectSecret(ctx, id)
 }
 
 func (b *ecsAPIService) ListSecrets(ctx context.Context) ([]secrets.Secret, error) {
-	return b.SDK.ListSecrets(ctx)
+	return b.aws.ListSecrets(ctx)
 }
 
 func (b *ecsAPIService) DeleteSecret(ctx context.Context, id string, recover bool) error {
-	return b.SDK.DeleteSecret(ctx, id, recover)
+	return b.aws.DeleteSecret(ctx, id, recover)
 }
