@@ -37,7 +37,7 @@ import (
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/logout"
 	"github.com/docker/compose-cli/cli/cmd/run"
-	volume "github.com/docker/compose-cli/cli/cmd/volume"
+	"github.com/docker/compose-cli/cli/cmd/volume"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 	"github.com/docker/compose-cli/config"
@@ -52,10 +52,6 @@ import (
 	_ "github.com/docker/compose-cli/ecs/local"
 	_ "github.com/docker/compose-cli/example"
 	_ "github.com/docker/compose-cli/local"
-)
-
-var (
-	version = "dev"
 )
 
 var (
@@ -122,7 +118,7 @@ func main() {
 		cmd.InspectCommand(),
 		login.Command(),
 		logout.Command(),
-		cmd.VersionCommand(version),
+		cmd.VersionCommand(),
 		cmd.StopCommand(),
 		cmd.KillCommand(),
 		cmd.SecretCommand(),
