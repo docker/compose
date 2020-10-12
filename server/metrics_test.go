@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/compose-cli/api/resources"
+
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -116,6 +118,7 @@ func (noopService) ContainerService() containers.Service { return nil }
 func (noopService) ComposeService() compose.Service      { return nil }
 func (noopService) SecretsService() secrets.Service      { return nil }
 func (noopService) VolumeService() volumes.Service       { return nil }
+func (noopService) ResourceService() resources.Service   { return nil }
 
 type mockMetricsClient struct {
 	mock.Mock

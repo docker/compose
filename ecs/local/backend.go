@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
@@ -69,4 +70,8 @@ func (e ecsLocalSimulation) SecretsService() secrets.Service {
 
 func (e ecsLocalSimulation) ComposeService() compose.Service {
 	return e
+}
+
+func (e ecsLocalSimulation) ResourceService() resources.Service {
+	return nil
 }
