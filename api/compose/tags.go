@@ -23,4 +23,6 @@ const (
 	NetworkTag = "com.docker.compose.network"
 	// ServiceTag allow to track resource related to a compose service
 	ServiceTag = "com.docker.compose.service"
+	// VolumeTag allow to track resource related to a compose volume
+	VolumeTag = "com.docker.compose.volume"
 )

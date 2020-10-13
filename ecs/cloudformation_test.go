@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/awslabs/goformation/v4/cloudformation/efs"
+
 	"github.com/golang/mock/gomock"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -336,7 +338,7 @@ services:
 	assert.Check(t, loadBalancer.Type == elbv2.LoadBalancerTypeEnumNetwork)
 }
 
-func TestUseCustomNetwork(t *testing.T) {
+func TestUseExternalNetwork(t *testing.T) {
 	template := convertYaml(t, `
 services:
   test:
@@ -353,6 +355,67 @@ networks:
 	s := template.Resources["TestService"].(*ecs.Service)
 	assert.Check(t, s != nil)
 	assert.Check(t, s.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups[0] == "sg-123abc") //nolint:staticcheck
+}
+
+func testVolume(t *testing.T, yaml string, fn ...func(m *MockAPIMockRecorder)) {
+	template := convertYaml(t, yaml, fn...)
+
+	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
+
+	s = template.Resources["DbdataNFSMountTargetOnSubnet2"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
+}
+
+func TestUseExternalVolume(t *testing.T) {
+	testVolume(t, `
+services:
+  test:
+    image: nginx
+volumes:
+  db-data:
+    external: true
+    name: fs-123abc
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.FileSystemExists(gomock.Any(), "fs-123abc").Return(true, nil)
+	})
+}
+
+func TestCreateVolume(t *testing.T) {
+	testVolume(t, `
+services:
+  test:
+    image: nginx
+volumes:
+  db-data: {}
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.FindFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+		}).Return("", nil)
+		m.CreateFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+			"Name":             fmt.Sprintf("%s_%s", t.Name(), "db-data"),
+		}).Return("fs-123abc", nil)
+	})
+}
+
+func TestReusePreviousVolume(t *testing.T) {
+	testVolume(t, `
+services:
+  test:
+    image: nginx
+volumes:
+  db-data: {}
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.FindFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+		}).Return("fs-123abc", nil)
+	})
 }
 
 func TestServiceMapping(t *testing.T) {
