@@ -200,6 +200,7 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 			return nil, err
 		}
 		if id == "" {
+			tags["Name"] = fmt.Sprintf("%s_%s", project.Name, vol.Name)
 			logrus.Debug("no EFS filesystem found, create a fresh new one")
 			id, err = b.aws.CreateFileSystem(ctx, tags)
 			if err != nil {

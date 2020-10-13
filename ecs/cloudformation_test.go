@@ -384,10 +384,6 @@ volumes:
 }
 
 func TestCreateVolume(t *testing.T) {
-	tags := map[string]string{
-		compose.ProjectTag: t.Name(),
-		compose.VolumeTag:  "db-data",
-	}
 	testVolume(t, `
 services:
   test:
@@ -395,16 +391,19 @@ services:
 volumes:
   db-data: {}
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FindFileSystem(gomock.Any(), tags).Return("", nil)
-		m.CreateFileSystem(gomock.Any(), tags).Return("fs-123abc", nil)
+		m.FindFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+		}).Return("", nil)
+		m.CreateFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+			"Name":             fmt.Sprintf("%s_%s", t.Name(), "db-data"),
+		}).Return("fs-123abc", nil)
 	})
 }
 
 func TestReusePreviousVolume(t *testing.T) {
-	tags := map[string]string{
-		compose.ProjectTag: t.Name(),
-		compose.VolumeTag:  "db-data",
-	}
 	testVolume(t, `
 services:
   test:
@@ -412,7 +411,10 @@ services:
 volumes:
   db-data: {}
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FindFileSystem(gomock.Any(), tags).Return("fs-123abc", nil)
+		m.FindFileSystem(gomock.Any(), map[string]string{
+			compose.ProjectTag: t.Name(),
+			compose.VolumeTag:  "db-data",
+		}).Return("fs-123abc", nil)
 	})
 }
 
