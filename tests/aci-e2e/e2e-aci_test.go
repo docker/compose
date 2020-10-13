@@ -810,7 +810,7 @@ func TestRunEnvVars(t *testing.T) {
 			if strings.Contains(res.Stdout(), "Giving user user1 access to schema mytestdb") {
 				return poll.Success()
 			}
-			return poll.Continue("waiting for DB container to be up")
+			return poll.Continue("waiting for DB container to be up\n%s", res.Combined())
 		}
 		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 	})
