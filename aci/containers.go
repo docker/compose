@@ -235,12 +235,15 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 
 func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) (containers.Container, error) {
 	groupName, containerName := getGroupAndContainerName(containerID)
+	if containerID == "" {
+		return containers.Container{}, errors.New("cannot inspect empty container ID")
+	}
 
 	cg, err := getACIContainerGroup(ctx, cs.ctx, groupName)
 	if err != nil {
 		return containers.Container{}, err
 	}
-	if cg.StatusCode == http.StatusNoContent {
+	if cg.IsHTTPStatus(http.StatusNoContent) || cg.ContainerGroupProperties == nil || cg.ContainerGroupProperties.Containers == nil {
 		return containers.Container{}, errdefs.ErrNotFound
 	}
 
