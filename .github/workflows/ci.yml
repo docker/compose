@@ -53,6 +53,9 @@ jobs:
           path: ~/go/pkg/mod
           key: go-${{ hashFiles('**/go.sum') }}
 
+      - name: Build packages
+        run: make -f builder.Makefile cross
+
       - name: Test
         env:
           BUILD_TAGS: example,local
