@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/spf13/pflag"
 
 	"github.com/spf13/cobra"
 
@@ -35,6 +36,13 @@ type composeOptions struct {
 	Environment []string
 	Format      string
 	Detach      bool
+	Quiet       bool
+}
+
+func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
+	f.StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
+	f.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 }
 
 func (o *composeOptions) toProjectName() (string, error) {

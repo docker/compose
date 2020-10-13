@@ -208,13 +208,19 @@ func TestRunVolume(t *testing.T) {
 	volumeID2 := accountName + "/dockertestshare2"
 
 	t.Run("list volumes", func(t *testing.T) {
-		res := c.RunDockerCmd("volume", "ls")
-		lines := lines(res.Stdout())
-		assert.Equal(t, len(lines), 3)
-		firstAccount := lines[1]
+		res := c.RunDockerCmd("volume", "ls", "--quiet")
+		l := lines(res.Stdout())
+		assert.Equal(t, len(l), 2)
+		assert.Equal(t, l[0], volumeID)
+		assert.Equal(t, l[1], volumeID2)
+
+		res = c.RunDockerCmd("volume", "ls")
+		l = lines(res.Stdout())
+		assert.Equal(t, len(l), 3)
+		firstAccount := l[1]
 		fields := strings.Fields(firstAccount)
 		assert.Equal(t, fields[0], volumeID)
-		secondAccount := lines[2]
+		secondAccount := l[2]
 		fields = strings.Fields(secondAccount)
 		assert.Equal(t, fields[0], volumeID2)
 	})
@@ -675,11 +681,15 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("compose ps", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
-		lines := lines(res.Stdout())
-		assert.Assert(t, is.Len(lines, 4))
+		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName, "--quiet")
+		l := lines(res.Stdout())
+		assert.Assert(t, is.Len(l, 3))
+
+		res = c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
+		l = lines(res.Stdout())
+		assert.Assert(t, is.Len(l, 4))
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
-		for _, line := range lines {
+		for _, line := range l {
 			fields := strings.Fields(line)
 			containerID := fields[0]
 			switch containerID {
@@ -699,11 +709,14 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("compose ls", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ls")
-		lines := lines(res.Stdout())
+		res := c.RunDockerCmd("compose", "ls", "--quiet")
+		l := lines(res.Stdout())
+		assert.Assert(t, is.Len(l, 1))
+		res = c.RunDockerCmd("compose", "ls")
+		l = lines(res.Stdout())
 
-		assert.Equal(t, 2, len(lines))
-		fields := strings.Fields(lines[1])
+		assert.Equal(t, 2, len(l))
+		fields := strings.Fields(l[1])
 		assert.Equal(t, 2, len(fields))
 		assert.Equal(t, fields[0], composeProjectName)
 		assert.Equal(t, "Running", fields[1])
