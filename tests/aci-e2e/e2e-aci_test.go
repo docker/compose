@@ -770,6 +770,7 @@ func TestUpUpdate(t *testing.T) {
 	})
 }
 
+/*
 func TestRunEnvVars(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	_, _, _ = setupTestResourceGroup(t, c)
@@ -815,6 +816,7 @@ func TestRunEnvVars(t *testing.T) {
 		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 	})
 }
+*/
 
 func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string, string) {
 	startTime := strconv.Itoa(int(time.Now().Unix()))
