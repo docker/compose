@@ -563,9 +563,12 @@ func TestUpSecrets(t *testing.T) {
 		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
 
 		output := HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		// replace windows carriage return
+		output = strings.ReplaceAll(output, "\r", "")
 		assert.Equal(t, output, secret1Value)
 
 		output = HTTPGetWithRetry(t, endpoint+"/"+secret2Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		output = strings.ReplaceAll(output, "\r", "")
 		assert.Equal(t, output, secret2Value)
 
 		t.Cleanup(func() {
@@ -796,7 +799,7 @@ func TestRunEnvVars(t *testing.T) {
 			}
 			return poll.Continue("waiting for DB container to be up")
 		}
-		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
+		poll.WaitOn(t, check, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 	})
 }
 
