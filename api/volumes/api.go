@@ -34,4 +34,6 @@ type Service interface {
 	Create(ctx context.Context, name string, options interface{}) (Volume, error)
 	// Delete deletes an existing volume
 	Delete(ctx context.Context, volumeID string, options interface{}) error
+	// Inspect inspects an existing volume
+	Inspect(ctx context.Context, volumeID string) (Volume, error)
 }

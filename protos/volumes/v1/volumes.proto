@@ -25,6 +25,7 @@ service Volumes {
 	rpc VolumesCreate(VolumesCreateRequest) returns (VolumesCreateResponse);
 	rpc VolumesList(VolumesListRequest) returns (VolumesListResponse);
 	rpc VolumesDelete(VolumesDeleteRequest) returns (VolumesDeleteResponse);
+	rpc VolumesInspect(VolumesInspectRequest) returns (VolumesInspectResponse);
 }
 
 message Volume {
@@ -59,4 +60,12 @@ message VolumesDeleteRequest {
 }
 
 message VolumesDeleteResponse {
+}
+
+message VolumesInspectRequest {
+	string id = 1;
+}
+
+message VolumesInspectResponse {
+	Volume volume = 1;
 }

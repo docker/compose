@@ -63,6 +63,14 @@ func (p *proxy) VolumesDelete(ctx context.Context, req *volumesv1.VolumesDeleteR
 	return &volumesv1.VolumesDeleteResponse{}, err
 }
 
+// VolumesInspect inspects a volume.
+func (p *proxy) VolumesInspect(ctx context.Context, req *volumesv1.VolumesInspectRequest) (*volumesv1.VolumesInspectResponse, error) {
+	v, err := Client(ctx).VolumeService().Inspect(ctx, req.Id)
+	return &volumesv1.VolumesInspectResponse{
+		Volume: toGrpcVolume(v),
+	}, err
+}
+
 func toGrpcVolumeList(volumeList []volumes.Volume) []*volumesv1.Volume {
 	var ret []*volumesv1.Volume
 	for _, v := range volumeList {

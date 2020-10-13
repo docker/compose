@@ -63,7 +63,7 @@ func (cs *aciVolumeService) List(ctx context.Context) ([]volumes.Volume, error) 
 		for fileSharePage.NotDone() {
 			values := fileSharePage.Values()
 			for _, fileShare := range values {
-				fileShares = append(fileShares, toVolume(account, *fileShare.Name))
+				fileShares = append(fileShares, toVolume(*account.Name, *fileShare.Name))
 			}
 			if err := fileSharePage.NextWithContext(ctx); err != nil {
 				return nil, err
@@ -146,7 +146,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 		return volumes.Volume{}, err
 	}
 	w.Event(event(name, progress.Done, "Created"))
-	return toVolume(account, *fileShare.Name), nil
+	return toVolume(*account.Name, *fileShare.Name), nil
 }
 
 func event(resource string, status progress.EventStatus, text string) progress.Event {
@@ -197,12 +197,10 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 	if err != nil {
 		return err
 	}
-	tokens := strings.Split(id, "/")
-	if len(tokens) != 2 {
-		return errors.New("invalid format for volume ID, expected storageaccount/fileshare")
+	storageAccount, fileshare, err := getStorageAccountAndFileshare(id)
+	if err != nil {
+		return err
 	}
-	storageAccount := tokens[0]
-	fileshare := tokens[1]
 
 	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
 	if err != nil {
@@ -240,10 +238,26 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 	return err
 }
 
-func toVolume(account storage.Account, fileShareName string) volumes.Volume {
+func (cs *aciVolumeService) Inspect(ctx context.Context, id string) (volumes.Volume, error) {
+	storageAccount, fileshareName, err := getStorageAccountAndFileshare(id)
+	if err != nil {
+		return volumes.Volume{}, err
+	}
+	fileShareClient, err := login.NewFileShareClient(cs.aciContext.SubscriptionID)
+	if err != nil {
+		return volumes.Volume{}, err
+	}
+	_, err = fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshareName, "")
+	if err != nil { // Just checks if it exists
+		return volumes.Volume{}, err
+	}
+	return toVolume(storageAccount, fileshareName), nil
+}
+
+func toVolume(storageAccountName string, fileShareName string) volumes.Volume {
 	return volumes.Volume{
-		ID:          volumeID(*account.Name, fileShareName),
-		Description: fmt.Sprintf("Fileshare %s in %s storage account", fileShareName, *account.Name),
+		ID:          volumeID(storageAccountName, fileShareName),
+		Description: fmt.Sprintf("Fileshare %s in %s storage account", fileShareName, storageAccountName),
 	}
 }
 
@@ -260,4 +274,12 @@ func defaultStorageAccountParams(aciContext store.AciContext) storage.AccountCre
 		},
 		Tags: tags,
 	}
+}
+
+func getStorageAccountAndFileshare(volumeID string) (string, string, error) {
+	tokens := strings.Split(volumeID, "/")
+	if len(tokens) != 2 {
+		return "", "", errors.New("invalid format for volume ID, expected storageaccount/fileshare")
+	}
+	return tokens[0], tokens[1], nil
 }

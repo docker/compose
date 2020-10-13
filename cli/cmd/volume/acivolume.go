@@ -26,6 +26,7 @@ import (
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/cli/formatter"
+	formatter2 "github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -40,6 +41,7 @@ func ACICommand() *cobra.Command {
 		createVolume(),
 		listVolume(),
 		rmVolume(),
+		inspectVolume(),
 	)
 	return cmd
 }
@@ -97,6 +99,31 @@ func rmVolume() *cobra.Command {
 			}
 			formatter.SetMultiErrorFormat(errs)
 			return errs.ErrorOrNil()
+		},
+	}
+	return cmd
+}
+
+func inspectVolume() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "inspect VOLUME [VOLUME...]",
+		Short: "Inspect one or more volumes.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := client.New(cmd.Context())
+			if err != nil {
+				return err
+			}
+			v, err := c.VolumeService().Inspect(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			outJSON, err := formatter2.ToStandardJSON(v)
+			if err != nil {
+				return err
+			}
+			fmt.Print(outJSON)
+			return nil
 		},
 	}
 	return cmd

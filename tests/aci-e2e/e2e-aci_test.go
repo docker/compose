@@ -145,7 +145,10 @@ func uploadTestFile(t *testing.T, aciContext store.AciContext, accountName strin
 	uploadFile(t, *cred, u.String(), testFileName, testFileContent)
 }
 
-const fileshareName = "dockertestshare"
+const (
+	fileshareName  = "dockertestshare"
+	fileshareName2 = "dockertestshare2"
+)
 
 func TestRunVolume(t *testing.T) {
 	const (
@@ -203,9 +206,9 @@ func TestRunVolume(t *testing.T) {
 	})
 
 	t.Run("create second fileshare", func(t *testing.T) {
-		c.RunDockerCmd("volume", "create", "--storage-account", accountName, "dockertestshare2")
+		c.RunDockerCmd("volume", "create", "--storage-account", accountName, fileshareName2)
 	})
-	volumeID2 := accountName + "/dockertestshare2"
+	volumeID2 := accountName + "/" + fileshareName2
 
 	t.Run("list volumes", func(t *testing.T) {
 		res := c.RunDockerCmd("volume", "ls", "--quiet")
@@ -225,12 +228,27 @@ func TestRunVolume(t *testing.T) {
 		assert.Equal(t, fields[0], volumeID2)
 	})
 
+	t.Run("inspect volumes", func(t *testing.T) {
+		res := c.RunDockerCmd("volume", "inspect", volumeID)
+		assert.Equal(t, res.Stdout(), fmt.Sprintf(`{
+    "ID": %q,
+    "Description": "Fileshare %s in %s storage account"
+}
+`, volumeID, fileshareName, accountName))
+		res = c.RunDockerCmd("volume", "inspect", volumeID2)
+		assert.Equal(t, res.Stdout(), fmt.Sprintf(`{
+    "ID": %q,
+    "Description": "Fileshare %s in %s storage account"
+}
+`, volumeID2, fileshareName2, accountName))
+	})
+
 	t.Run("delete only fileshare", func(t *testing.T) {
 		c.RunDockerCmd("volume", "rm", volumeID2)
 		res := c.RunDockerCmd("volume", "ls")
 		lines := lines(res.Stdout())
 		assert.Equal(t, len(lines), 2)
-		assert.Assert(t, !strings.Contains(res.Stdout(), "dockertestshare2"), "second fileshare still visible after rm")
+		assert.Assert(t, !strings.Contains(res.Stdout(), fileshareName2), "second fileshare still visible after rm")
 	})
 
 	t.Run("upload file", func(t *testing.T) {

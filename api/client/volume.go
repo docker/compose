@@ -37,3 +37,7 @@ func (c *volumeService) Create(ctx context.Context, name string, options interfa
 func (c *volumeService) Delete(ctx context.Context, id string, options interface{}) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (c *volumeService) Inspect(ctx context.Context, volumeID string) (volumes.Volume, error) {
+	return volumes.Volume{}, errdefs.ErrNotImplemented
+}
