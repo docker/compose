@@ -416,7 +416,7 @@ def test_interpolate_mandatory_no_err_msg(defaults_interpolator):
     with pytest.raises(UnsetRequiredSubstitution) as e:
         defaults_interpolator("not ok ${BAZ?}")
 
-    assert e.value.err == ''
+    assert e.value.err == 'BAZ'
 
 
 def test_interpolate_mixed_separators(defaults_interpolator):
