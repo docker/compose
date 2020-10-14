@@ -98,6 +98,7 @@ var compatibleComposeAttributes = []string{
 	"volumes",
 	"volumes.external",
 	"volumes.name",
+	"volumes.driver_opts",
 	"networks.external",
 	"networks.name",
 }

@@ -19,15 +19,17 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
-
 	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
 	"github.com/awslabs/goformation/v4/cloudformation/ecs"
+	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
@@ -199,24 +201,23 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 		if err != nil {
 			return nil, err
 		}
-		if id == "" {
-			tags["Name"] = fmt.Sprintf("%s_%s", project.Name, vol.Name)
-			logrus.Debug("no EFS filesystem found, create a fresh new one")
-			id, err = b.aws.CreateFileSystem(ctx, tags)
-			if err != nil {
-				return nil, err
-			}
+		if id != "" {
+			filesystems[name] = id
 		}
-		filesystems[name] = id
 	}
 	return filesystems, nil
 }
 
 // ensureResources create required resources in template if not yet defined
-func (b *ecsAPIService) ensureResources(resources *awsResources, project *types.Project, template *cloudformation.Template) {
+func (b *ecsAPIService) ensureResources(resources *awsResources, project *types.Project, template *cloudformation.Template) error {
 	b.ensureCluster(resources, project, template)
 	b.ensureNetworks(resources, project, template)
+	err := b.ensureVolumes(resources, project, template)
+	if err != nil {
+		return err
+	}
 	b.ensureLoadBalancer(resources, project, template)
+	return nil
 }
 
 func (b *ecsAPIService) ensureCluster(r *awsResources, project *types.Project, template *cloudformation.Template) {
@@ -255,6 +256,70 @@ func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, 
 
 		r.securityGroups[name] = cloudformation.Ref(securityGroup)
 	}
+}
+
+func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, template *cloudformation.Template) error {
+	for name, volume := range project.Volumes {
+		if _, ok := r.filesystems[name]; ok {
+			continue
+		}
+
+		var backupPolicy *efs.FileSystem_BackupPolicy
+		if backup, ok := volume.DriverOpts["backup_policy"]; ok {
+			backupPolicy = &efs.FileSystem_BackupPolicy{
+				Status: backup,
+			}
+		}
+
+		var lifecyclePolicies []efs.FileSystem_LifecyclePolicy
+		if policy, ok := volume.DriverOpts["lifecycle_policy"]; ok {
+			lifecyclePolicies = append(lifecyclePolicies, efs.FileSystem_LifecyclePolicy{
+				TransitionToIA: strings.TrimSpace(policy),
+			})
+		}
+
+		var provisionedThroughputInMibps float64
+		if t, ok := volume.DriverOpts["provisioned_throughput"]; ok {
+			v, err := strconv.ParseFloat(t, 64)
+			if err != nil {
+				return err
+			}
+			provisionedThroughputInMibps = v
+		}
+
+		var performanceMode = volume.DriverOpts["performance_mode"]
+		var throughputMode = volume.DriverOpts["throughput_mode"]
+		var kmsKeyID = volume.DriverOpts["kms_key_id"]
+
+		n := volumeResourceName(name)
+		template.Resources[n] = &efs.FileSystem{
+			BackupPolicy:     backupPolicy,
+			Encrypted:        true,
+			FileSystemPolicy: nil,
+			FileSystemTags: []efs.FileSystem_ElasticFileSystemTag{
+				{
+					Key:   compose.ProjectTag,
+					Value: project.Name,
+				},
+				{
+					Key:   compose.VolumeTag,
+					Value: name,
+				},
+				{
+					Key:   "Name",
+					Value: fmt.Sprintf("%s_%s", project.Name, name),
+				},
+			},
+			KmsKeyId:                        kmsKeyID,
+			LifecyclePolicies:               lifecyclePolicies,
+			PerformanceMode:                 performanceMode,
+			ProvisionedThroughputInMibps:    provisionedThroughputInMibps,
+			ThroughputMode:                  throughputMode,
+			AWSCloudFormationDeletionPolicy: "Retain",
+		}
+		r.filesystems[name] = cloudformation.Ref(n)
+	}
+	return nil
 }
 
 func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Project, template *cloudformation.Template) {
