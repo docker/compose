@@ -357,20 +357,8 @@ networks:
 	assert.Check(t, s.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups[0] == "sg-123abc") //nolint:staticcheck
 }
 
-func testVolume(t *testing.T, yaml string, fn ...func(m *MockAPIMockRecorder)) {
-	template := convertYaml(t, yaml, fn...)
-
-	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
-	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
-
-	s = template.Resources["DbdataNFSMountTargetOnSubnet2"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
-	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
-}
-
 func TestUseExternalVolume(t *testing.T) {
-	testVolume(t, `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -381,30 +369,50 @@ volumes:
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.FileSystemExists(gomock.Any(), "fs-123abc").Return(true, nil)
 	})
+	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
+
+	s = template.Resources["DbdataNFSMountTargetOnSubnet2"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
 }
 
 func TestCreateVolume(t *testing.T) {
-	testVolume(t, `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
 volumes:
-  db-data: {}
+  db-data: 
+    driver_opts:
+        backup_policy: ENABLED
+        lifecycle_policy: AFTER_30_DAYS
+        performance_mode: maxIO
+        throughput_mode: provisioned
+        provisioned_throughput: 1024
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.FindFileSystem(gomock.Any(), map[string]string{
 			compose.ProjectTag: t.Name(),
 			compose.VolumeTag:  "db-data",
 		}).Return("", nil)
-		m.CreateFileSystem(gomock.Any(), map[string]string{
-			compose.ProjectTag: t.Name(),
-			compose.VolumeTag:  "db-data",
-			"Name":             fmt.Sprintf("%s_%s", t.Name(), "db-data"),
-		}).Return("fs-123abc", nil)
 	})
+	n := volumeResourceName("db-data")
+	f := template.Resources[n].(*efs.FileSystem)
+	assert.Check(t, f != nil)
+	assert.Equal(t, f.BackupPolicy.Status, "ENABLED")                       //nolint:staticcheck
+	assert.Equal(t, f.LifecyclePolicies[0].TransitionToIA, "AFTER_30_DAYS") //nolint:staticcheck
+	assert.Equal(t, f.PerformanceMode, "maxIO")                             //nolint:staticcheck
+	assert.Equal(t, f.ThroughputMode, "provisioned")                        //nolint:staticcheck
+	assert.Equal(t, f.ProvisionedThroughputInMibps, float64(1024))          //nolint:staticcheck
+
+	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, cloudformation.Ref(n)) //nolint:staticcheck
 }
 
 func TestReusePreviousVolume(t *testing.T) {
-	testVolume(t, `
+	template := convertYaml(t, `
 services:
   test:
     image: nginx
@@ -416,6 +424,9 @@ volumes:
 			compose.VolumeTag:  "db-data",
 		}).Return("fs-123abc", nil)
 	})
+	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
+	assert.Check(t, s != nil)
+	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
 }
 
 func TestServiceMapping(t *testing.T) {

@@ -58,7 +58,10 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 	}
 
 	template := cloudformation.NewTemplate()
-	b.ensureResources(&resources, project, template)
+	err = b.ensureResources(&resources, project, template)
+	if err != nil {
+		return nil, err
+	}
 
 	for name, secret := range project.Secrets {
 		err := b.createSecret(project, name, secret, template)
@@ -439,6 +442,10 @@ func networkResourceName(network string) string {
 
 func serviceResourceName(service string) string {
 	return fmt.Sprintf("%sService", normalizeResourceName(service))
+}
+
+func volumeResourceName(service string) string {
+	return fmt.Sprintf("%sFilesystem", normalizeResourceName(service))
 }
 
 func normalizeResourceName(s string) string {
