@@ -488,13 +488,27 @@ func TestContainerRunAttached(t *testing.T) {
 		waitForStatus(t, c, container, convert.StatusRunning)
 	})
 
-	t.Run("kill & rm stopped container", func(t *testing.T) {
-		res := c.RunDockerCmd("kill", container)
-		res.Assert(t, icmd.Expected{Out: container})
-		waitForStatus(t, c, container, "Terminated", "Node Stopped")
+	t.Run("prune dry run", func(t *testing.T) {
+		res := c.RunDockerCmd("prune", "--dry-run")
+		fmt.Println("prune output:")
+		assert.Equal(t, "resources that would be deleted:\n", res.Stdout())
+		res = c.RunDockerCmd("prune", "--dry-run", "--force")
+		assert.Equal(t, "resources that would be deleted:\n"+container+"\n", res.Stdout())
+	})
 
-		res = c.RunDockerCmd("rm", container)
-		res.Assert(t, icmd.Expected{Out: container})
+	t.Run("prune", func(t *testing.T) {
+		res := c.RunDockerCmd("prune")
+		assert.Equal(t, "deleted resources:\n", res.Stdout())
+		res = c.RunDockerCmd("ps")
+		l := lines(res.Stdout())
+		assert.Equal(t, 2, len(l))
+
+		res = c.RunDockerCmd("prune", "--force")
+		assert.Equal(t, "deleted resources:\n"+container+"\n", res.Stdout())
+
+		res = c.RunDockerCmd("ps", "--all")
+		l = lines(res.Stdout())
+		assert.Equal(t, 1, len(l))
 	})
 }
 

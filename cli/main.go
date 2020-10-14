@@ -122,6 +122,7 @@ func main() {
 		cmd.StopCommand(),
 		cmd.KillCommand(),
 		cmd.SecretCommand(),
+		cmd.PruneCommand(),
 
 		// Place holders
 		cmd.EcsCommand(),

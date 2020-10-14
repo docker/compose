@@ -14,20 +14,19 @@
    limitations under the License.
 */
 
-package resources
+package client
 
 import (
 	"context"
+
+	"github.com/docker/compose-cli/api/resources"
+	"github.com/docker/compose-cli/errdefs"
 )
 
-// PruneRequest options on what to prune
-type PruneRequest struct {
-	Force  bool
-	DryRun bool
+type resourceService struct {
 }
 
-// Service interacts with the underlying container backend
-type Service interface {
-	// Prune prune resources
-	Prune(ctx context.Context, request PruneRequest) ([]string, error)
+// Prune prune resources
+func (c *resourceService) Prune(ctx context.Context, request resources.PruneRequest) ([]string, error) {
+	return nil, errdefs.ErrNotImplemented
 }

@@ -18,8 +18,10 @@ package aci
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
+	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/context/store"
 )
@@ -29,6 +31,24 @@ type aciResourceService struct {
 }
 
 func (cs *aciResourceService) Prune(ctx context.Context, request resources.PruneRequest) ([]string, error) {
-	fmt.Println("PRUNE " + cs.aciContext.ResourceGroup)
-	return nil, nil
+	res, err := getACIContainerGroups(ctx, cs.aciContext.SubscriptionID, cs.aciContext.ResourceGroup)
+	if err != nil {
+		return nil, err
+	}
+	multierr := &multierror.Error{}
+	deleted := []string{}
+	for _, containerGroup := range res {
+		if !request.Force && convert.GetGroupStatus(containerGroup) == "Node "+convert.StatusRunning {
+			continue
+		}
+
+		if !request.DryRun {
+			_, err := deleteACIContainerGroup(ctx, cs.aciContext, *containerGroup.Name)
+			multierr = multierror.Append(multierr, err)
+		}
+		if err == nil {
+			deleted = append(deleted, *containerGroup.Name)
+		}
+	}
+	return deleted, multierr.ErrorOrNil()
 }

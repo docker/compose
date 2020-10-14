@@ -542,12 +542,17 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 
 // GetStatus returns status for the specified container
 func GetStatus(container containerinstance.Container, group containerinstance.ContainerGroup) string {
-	status := compose.UNKNOWN
-	if group.InstanceView != nil && group.InstanceView.State != nil {
-		status = "Node " + *group.InstanceView.State
-	}
+	status := GetGroupStatus(group)
 	if container.InstanceView != nil && container.InstanceView.CurrentState != nil {
 		status = *container.InstanceView.CurrentState.State
 	}
 	return status
+}
+
+// GetGroupStatus returns status for the container group
+func GetGroupStatus(group containerinstance.ContainerGroup) string {
+	if group.InstanceView != nil && group.InstanceView.State != nil {
+		return "Node " + *group.InstanceView.State
+	}
+	return compose.UNKNOWN
 }

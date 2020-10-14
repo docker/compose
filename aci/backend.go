@@ -97,6 +97,9 @@ func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
 		aciVolumeService: &aciVolumeService{
 			aciContext: aciCtx,
 		},
+		aciResourceService: &aciResourceService{
+			aciContext: aciCtx,
+		},
 	}
 }
 
