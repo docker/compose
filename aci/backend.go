@@ -28,6 +28,7 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
@@ -96,6 +97,9 @@ func getAciAPIService(aciCtx store.AciContext) *aciAPIService {
 		aciVolumeService: &aciVolumeService{
 			aciContext: aciCtx,
 		},
+		aciResourceService: &aciResourceService{
+			aciContext: aciCtx,
+		},
 	}
 }
 
@@ -103,6 +107,7 @@ type aciAPIService struct {
 	*aciContainerService
 	*aciComposeService
 	*aciVolumeService
+	*aciResourceService
 }
 
 func (a *aciAPIService) ContainerService() containers.Service {
@@ -121,6 +126,10 @@ func (a *aciAPIService) SecretsService() secrets.Service {
 
 func (a *aciAPIService) VolumeService() volumes.Service {
 	return a.aciVolumeService
+}
+
+func (a *aciAPIService) ResourceService() resources.Service {
+	return a.aciResourceService
 }
 
 func getContainerID(group containerinstance.ContainerGroup, container containerinstance.Container) string {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
@@ -106,4 +107,13 @@ func (c *Client) VolumeService() volumes.Service {
 	}
 
 	return &volumeService{}
+}
+
+// ResourceService returns the backend service for the current context
+func (c *Client) ResourceService() resources.Service {
+	if vs := c.bs.ResourceService(); vs != nil {
+		return vs
+	}
+
+	return &resourceService{}
 }

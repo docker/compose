@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/context/cloud"
@@ -55,6 +56,7 @@ var backends = struct {
 type Service interface {
 	ContainerService() containers.Service
 	ComposeService() compose.Service
+	ResourceService() resources.Service
 	SecretsService() secrets.Service
 	VolumeService() volumes.Service
 }

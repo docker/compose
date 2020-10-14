@@ -28,6 +28,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
@@ -56,6 +57,10 @@ func (a *apiService) VolumeService() volumes.Service {
 	return nil
 }
 
+func (a *apiService) ResourceService() resources.Service {
+	return nil
+}
+
 func init() {
 	backend.Register("example", "example", service, cloud.NotImplementedCloudService)
 }
@@ -68,9 +73,9 @@ type containerService struct{}
 
 func (cs *containerService) Inspect(ctx context.Context, id string) (containers.Container, error) {
 	return containers.Container{
-		ID:                     "id",
-		Image:                  "nginx",
-		Platform:               "Linux",
+		ID:       "id",
+		Image:    "nginx",
+		Platform: "Linux",
 		HostConfig: &containers.HostConfig{
 			RestartPolicy: "none",
 		},

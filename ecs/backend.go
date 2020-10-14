@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
@@ -100,6 +101,10 @@ func (a *ecsAPIService) SecretsService() secrets.Service {
 }
 
 func (a *ecsAPIService) VolumeService() volumes.Service {
+	return nil
+}
+
+func (a *ecsAPIService) ResourceService() resources.Service {
 	return nil
 }
 
