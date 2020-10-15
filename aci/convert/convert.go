@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -50,7 +51,8 @@ const (
 	volumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeReadOnly                 = "read_only"
 
-	serviceSecretPrefix = "aci-service-secret-"
+	defaultSecretsPath         = "/run/secrets"
+	serviceSecretAbsPathPrefix = "aci-service-secret-path-"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
@@ -188,13 +190,15 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 
 type projectAciHelper types.Project
 
+func getServiceSecretKey(serviceName, targetDir string) string {
+	return fmt.Sprintf("%s-%s--%s",
+		serviceSecretAbsPathPrefix, serviceName, strings.ReplaceAll(targetDir, "/", "-"))
+}
+
 func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, error) {
 	var secretVolumes []containerinstance.Volume
 	for _, svc := range p.Services {
-		secretServiceVolume := containerinstance.Volume{
-			Name:   to.StringPtr(serviceSecretPrefix + svc.Name),
-			Secret: make(map[string]*string),
-		}
+		squashedTargetVolumes := make(map[string]containerinstance.Volume)
 		for _, scr := range svc.Secrets {
 			data, err := ioutil.ReadFile(p.Secrets[scr.Source].File)
 			if err != nil {
@@ -207,14 +211,31 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 			if scr.Target == "" {
 				scr.Target = scr.Source
 			}
-			if strings.ContainsAny(scr.Target, "\\/") {
+
+			if !filepath.IsAbs(scr.Target) && strings.ContainsAny(scr.Target, "\\/") {
 				return []containerinstance.Volume{},
-					errors.Errorf("in service %q, secret with source %q cannot have a path as target. Found %q", svc.Name, scr.Source, scr.Target)
+					errors.Errorf("in service %q, secret with source %q cannot have a relative path as target. "+
+						"Only absolute paths are allowed. Found %q",
+						svc.Name, scr.Source, scr.Target)
 			}
-			secretServiceVolume.Secret[scr.Target] = &dataStr
+
+			if !filepath.IsAbs(scr.Target) {
+				scr.Target = filepath.Join(defaultSecretsPath, scr.Target)
+			}
+
+			targetDir := filepath.Dir(scr.Target)
+			targetDirKey := getServiceSecretKey(svc.Name, targetDir)
+			if _, ok := squashedTargetVolumes[targetDir]; !ok {
+				squashedTargetVolumes[targetDir] = containerinstance.Volume{
+					Name:   to.StringPtr(targetDirKey),
+					Secret: make(map[string]*string),
+				}
+			}
+
+			squashedTargetVolumes[targetDir].Secret[filepath.Base(scr.Target)] = &dataStr
 		}
-		if len(secretServiceVolume.Secret) > 0 {
-			secretVolumes = append(secretVolumes, secretServiceVolume)
+		for _, v := range squashedTargetVolumes {
+			secretVolumes = append(secretVolumes, v)
 		}
 	}
 
@@ -326,15 +347,62 @@ func (s serviceConfigAciHelper) getAciFileVolumeMounts(volumesCache map[string]b
 	return aciServiceVolumes, nil
 }
 
-func (s serviceConfigAciHelper) getAciSecretsVolumeMount() *containerinstance.VolumeMount {
-	if len(s.Secrets) == 0 {
-		return nil
+func (s serviceConfigAciHelper) getAciSecretsVolumeMounts() ([]containerinstance.VolumeMount, error) {
+	vms := []containerinstance.VolumeMount{}
+	presenceSet := make(map[string]bool)
+	for _, scr := range s.Secrets {
+		if scr.Target == "" {
+			scr.Target = scr.Source
+		}
+		if !filepath.IsAbs(scr.Target) {
+			scr.Target = filepath.Join(defaultSecretsPath, scr.Target)
+		}
+
+		presenceKey := filepath.Dir(scr.Target)
+		if !presenceSet[presenceKey] {
+			vms = append(vms, containerinstance.VolumeMount{
+				Name:      to.StringPtr(getServiceSecretKey(s.Name, filepath.Dir(scr.Target))),
+				MountPath: to.StringPtr(filepath.Dir(scr.Target)),
+				ReadOnly:  to.BoolPtr(true),
+			})
+			presenceSet[presenceKey] = true
+		}
 	}
-	return &containerinstance.VolumeMount{
-		Name:      to.StringPtr(serviceSecretPrefix + s.Name),
-		MountPath: to.StringPtr("/run/secrets"),
-		ReadOnly:  to.BoolPtr(true),
+	err := validateMountPathCollisions(vms)
+	if err != nil {
+		return []containerinstance.VolumeMount{}, err
 	}
+	return vms, nil
+}
+
+func validateMountPathCollisions(vms []containerinstance.VolumeMount) error {
+	for i, vm1 := range vms {
+		for j, vm2 := range vms {
+			if i == j {
+				continue
+			}
+			var (
+				biggerVMPath  = strings.Split(*vm1.MountPath, string(filepath.Separator))
+				smallerVMPath = strings.Split(*vm2.MountPath, string(filepath.Separator))
+			)
+			if len(smallerVMPath) > len(biggerVMPath) {
+				tmp := biggerVMPath
+				biggerVMPath = smallerVMPath
+				smallerVMPath = tmp
+			}
+			isPrefixed := true
+			for i := 0; i < len(smallerVMPath); i++ {
+				if smallerVMPath[i] != biggerVMPath[i] {
+					isPrefixed = false
+					break
+				}
+			}
+			if isPrefixed {
+				return errors.Errorf("mount paths %q and %q collide. A volume mount cannot include another one.", *vm1.MountPath, *vm2.MountPath)
+			}
+		}
+	}
+	return nil
 }
 
 func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (containerinstance.Container, error) {
@@ -342,11 +410,11 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 	if err != nil {
 		return containerinstance.Container{}, err
 	}
-	allVolumes := aciServiceVolumes
-	secretVolumeMount := s.getAciSecretsVolumeMount()
-	if secretVolumeMount != nil {
-		allVolumes = append(allVolumes, *secretVolumeMount)
+	serviceSecretVolumes, err := s.getAciSecretsVolumeMounts()
+	if err != nil {
+		return containerinstance.Container{}, err
 	}
+	allVolumes := append(aciServiceVolumes, serviceSecretVolumes...)
 	var volumes *[]containerinstance.VolumeMount
 	if len(allVolumes) > 0 {
 		volumes = &allVolumes

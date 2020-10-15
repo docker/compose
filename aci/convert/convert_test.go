@@ -18,7 +18,10 @@ package convert
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -710,6 +713,151 @@ func TestConvertContainerGroupStatus(t *testing.T) {
 
 	assert.Equal(t, "Running", GetStatus(container(to.StringPtr("Running")), group(nil)))
 	assert.Equal(t, "Unknown", GetStatus(container(nil), group(nil)))
+}
+
+func TestConvertSecrets(t *testing.T) {
+	serviceName := "testservice"
+	secretName := "testsecret"
+	absBasePath := "/home/user"
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "TestConvertProjectSecrets-")
+	assert.NilError(t, err)
+	_, err = tmpFile.Write([]byte("test content"))
+	assert.NilError(t, err)
+	t.Cleanup(func() {
+		assert.NilError(t, os.Remove(tmpFile.Name()))
+	})
+
+	t.Run("mix default and absolute", func(t *testing.T) {
+		pSquashedDefaultAndAbs := projectAciHelper{
+			Services: []types.ServiceConfig{
+				{
+					Name: serviceName,
+					Secrets: []types.ServiceSecretConfig{
+						{
+							Source: secretName,
+							Target: "some_target1",
+						},
+						{
+							Source: secretName,
+						},
+						{
+							Source: secretName,
+							Target: filepath.Join(defaultSecretsPath, "some_target2"),
+						},
+						{
+							Source: secretName,
+							Target: filepath.Join(absBasePath, "some_target3"),
+						},
+						{
+							Source: secretName,
+							Target: filepath.Join(absBasePath, "some_target4"),
+						},
+					},
+				},
+			},
+			Secrets: map[string]types.SecretConfig{
+				secretName: {
+					File: tmpFile.Name(),
+				},
+			},
+		}
+		vs, err := pSquashedDefaultAndAbs.getAciSecretVolumes()
+		assert.NilError(t, err)
+		assert.Equal(t, len(vs), 2)
+
+		defaultVolumeName := getServiceSecretKey(serviceName, defaultSecretsPath)
+		assert.Equal(t, *vs[0].Name, defaultVolumeName)
+		assert.Equal(t, len(vs[0].Secret), 3)
+
+		homeVolumeName := getServiceSecretKey(serviceName, absBasePath)
+		assert.Equal(t, *vs[1].Name, homeVolumeName)
+		assert.Equal(t, len(vs[1].Secret), 2)
+
+		s := serviceConfigAciHelper(pSquashedDefaultAndAbs.Services[0])
+		vms, err := s.getAciSecretsVolumeMounts()
+		assert.NilError(t, err)
+		assert.Equal(t, len(vms), 2)
+
+		assert.Equal(t, *vms[0].Name, defaultVolumeName)
+		assert.Equal(t, *vms[0].MountPath, defaultSecretsPath)
+
+		assert.Equal(t, *vms[1].Name, homeVolumeName)
+		assert.Equal(t, *vms[1].MountPath, absBasePath)
+	})
+
+	t.Run("convert invalid target", func(t *testing.T) {
+		targetName := "some/invalid/relative/path/target"
+		pInvalidRelativePathTarget := projectAciHelper{
+			Services: []types.ServiceConfig{
+				{
+					Name: serviceName,
+					Secrets: []types.ServiceSecretConfig{
+						{
+							Source: secretName,
+							Target: targetName,
+						},
+					},
+				},
+			},
+			Secrets: map[string]types.SecretConfig{
+				secretName: {
+					File: tmpFile.Name(),
+				},
+			},
+		}
+		_, err := pInvalidRelativePathTarget.getAciSecretVolumes()
+		assert.Equal(t, err.Error(),
+			fmt.Sprintf(`in service %q, secret with source %q cannot have a relative path as target. Only absolute paths are allowed. Found %q`,
+				serviceName, secretName, targetName))
+	})
+
+	t.Run("convert colliding default targets", func(t *testing.T) {
+		targetName1 := filepath.Join(defaultSecretsPath, "target1")
+		targetName2 := filepath.Join(defaultSecretsPath, "sub/folder/target2")
+
+		service := serviceConfigAciHelper{
+			Name: serviceName,
+			Secrets: []types.ServiceSecretConfig{
+				{
+					Source: secretName,
+					Target: targetName1,
+				},
+				{
+					Source: secretName,
+					Target: targetName2,
+				},
+			},
+		}
+
+		_, err := service.getAciSecretsVolumeMounts()
+		assert.Equal(t, err.Error(),
+			fmt.Sprintf(`mount paths %q and %q collide. A volume mount cannot include another one.`,
+				filepath.Dir(targetName1), filepath.Dir(targetName2)))
+	})
+
+	t.Run("convert colliding absolute targets", func(t *testing.T) {
+		targetName1 := filepath.Join(absBasePath, "target1")
+		targetName2 := filepath.Join(absBasePath, "sub/folder/target2")
+
+		service := serviceConfigAciHelper{
+			Name: serviceName,
+			Secrets: []types.ServiceSecretConfig{
+				{
+					Source: secretName,
+					Target: targetName1,
+				},
+				{
+					Source: secretName,
+					Target: targetName2,
+				},
+			},
+		}
+
+		_, err := service.getAciSecretsVolumeMounts()
+		assert.Equal(t, err.Error(),
+			fmt.Sprintf(`mount paths %q and %q collide. A volume mount cannot include another one.`,
+				filepath.Dir(targetName1), filepath.Dir(targetName2)))
+	})
 }
 
 func container(status *string) containerinstance.Container {
