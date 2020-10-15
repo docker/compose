@@ -18,6 +18,7 @@ package aci
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -30,16 +31,26 @@ type aciResourceService struct {
 	aciContext store.AciContext
 }
 
-func (cs *aciResourceService) Prune(ctx context.Context, request resources.PruneRequest) ([]string, error) {
+func (cs *aciResourceService) Prune(ctx context.Context, request resources.PruneRequest) (resources.PruneResult, error) {
 	res, err := getACIContainerGroups(ctx, cs.aciContext.SubscriptionID, cs.aciContext.ResourceGroup)
+	result := resources.PruneResult{}
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	multierr := &multierror.Error{}
 	deleted := []string{}
+	cpus := 0.
+	mem := 0.
+
 	for _, containerGroup := range res {
 		if !request.Force && convert.GetGroupStatus(containerGroup) == "Node "+convert.StatusRunning {
 			continue
+		}
+
+		for _, container := range *containerGroup.Containers {
+			hostConfig := convert.ToHostConfig(container, containerGroup)
+			cpus += hostConfig.CPUReservation
+			mem += convert.BytesToGB(float64(hostConfig.MemoryReservation))
 		}
 
 		if !request.DryRun {
@@ -50,5 +61,7 @@ func (cs *aciResourceService) Prune(ctx context.Context, request resources.Prune
 			deleted = append(deleted, *containerGroup.Name)
 		}
 	}
-	return deleted, multierr.ErrorOrNil()
+	result.DeletedIDs = deleted
+	result.Summary = fmt.Sprintf("Total CPUs reclaimed: %.2f, total memory reclaimed: %.2f GB", cpus, mem)
+	return result, multierr.ErrorOrNil()
 }

@@ -380,7 +380,7 @@ func (s serviceConfigAciHelper) getResourceRequestsLimits() (*containerinstance.
 		return s.Deploy != nil && s.Deploy.Resources.Reservations != nil && s.Deploy.Resources.Reservations.NanoCPUs != ""
 	}
 	if hasMemoryRequest() {
-		memRequest = bytesToGb(s.Deploy.Resources.Reservations.MemoryBytes)
+		memRequest = BytesToGB(float64(s.Deploy.Resources.Reservations.MemoryBytes))
 	}
 
 	if hasCPURequest() {
@@ -393,7 +393,7 @@ func (s serviceConfigAciHelper) getResourceRequestsLimits() (*containerinstance.
 	cpuLimit := cpuRequest
 	if s.Deploy != nil && s.Deploy.Resources.Limits != nil {
 		if s.Deploy.Resources.Limits.MemoryBytes != 0 {
-			memLimit = bytesToGb(s.Deploy.Resources.Limits.MemoryBytes)
+			memLimit = BytesToGB(float64(s.Deploy.Resources.Limits.MemoryBytes))
 			if !hasMemoryRequest() {
 				memRequest = memLimit
 			}
@@ -438,8 +438,9 @@ func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.En
 	return &result
 }
 
-func bytesToGb(b types.UnitBytes) float64 {
-	f := float64(b) / 1024 / 1024 / 1024 // from bytes to gigabytes
+// BytesToGB convert bytes To GB
+func BytesToGB(b float64) float64 {
+	f := b / 1024 / 1024 / 1024 // from bytes to gigabytes
 	return math.Round(f*100) / 100
 }
 
@@ -472,6 +473,47 @@ func fqdn(group containerinstance.ContainerGroup, region string) string {
 
 // ContainerGroupToContainer composes a Container from an ACI container definition
 func ContainerGroupToContainer(containerID string, cg containerinstance.ContainerGroup, cc containerinstance.Container, region string) containers.Container {
+	command := ""
+	if cc.Command != nil {
+		command = strings.Join(*cc.Command, " ")
+	}
+
+	status := GetStatus(cc, cg)
+	platform := string(cg.OsType)
+
+	var envVars map[string]string = nil
+	if cc.EnvironmentVariables != nil && len(*cc.EnvironmentVariables) != 0 {
+		envVars = map[string]string{}
+		for _, envVar := range *cc.EnvironmentVariables {
+			envVars[*envVar.Name] = *envVar.Value
+		}
+	}
+
+	hostConfig := ToHostConfig(cc, cg)
+	config := &containers.RuntimeConfig{
+		FQDN: fqdn(cg, region),
+		Env:  envVars,
+	}
+	c := containers.Container{
+		ID:          containerID,
+		Status:      status,
+		Image:       to.String(cc.Image),
+		Command:     command,
+		CPUTime:     0,
+		MemoryUsage: 0,
+		PidsCurrent: 0,
+		PidsLimit:   0,
+		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
+		Platform:    platform,
+		Config:      config,
+		HostConfig:  hostConfig,
+	}
+
+	return c
+}
+
+// ToHostConfig convert an ACI container to host config value
+func ToHostConfig(cc containerinstance.Container, cg containerinstance.ContainerGroup) *containers.HostConfig {
 	memLimits := uint64(0)
 	memRequest := uint64(0)
 	cpuLimit := 0.
@@ -494,27 +536,6 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 			}
 		}
 	}
-
-	command := ""
-	if cc.Command != nil {
-		command = strings.Join(*cc.Command, " ")
-	}
-
-	status := GetStatus(cc, cg)
-	platform := string(cg.OsType)
-
-	var envVars map[string]string = nil
-	if cc.EnvironmentVariables != nil && len(*cc.EnvironmentVariables) != 0 {
-		envVars = map[string]string{}
-		for _, envVar := range *cc.EnvironmentVariables {
-			envVars[*envVar.Name] = *envVar.Value
-		}
-	}
-
-	config := &containers.RuntimeConfig{
-		FQDN: fqdn(cg, region),
-		Env:  envVars,
-	}
 	hostConfig := &containers.HostConfig{
 		CPULimit:          cpuLimit,
 		CPUReservation:    cpuReservation,
@@ -522,22 +543,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		MemoryReservation: memRequest,
 		RestartPolicy:     toContainerRestartPolicy(cg.RestartPolicy),
 	}
-	c := containers.Container{
-		ID:          containerID,
-		Status:      status,
-		Image:       to.String(cc.Image),
-		Command:     command,
-		CPUTime:     0,
-		MemoryUsage: 0,
-		PidsCurrent: 0,
-		PidsLimit:   0,
-		Ports:       ToPorts(cg.IPAddress, *cc.Ports),
-		Platform:    platform,
-		Config:      config,
-		HostConfig:  hostConfig,
-	}
-
-	return c
+	return hostConfig
 }
 
 // GetStatus returns status for the specified container

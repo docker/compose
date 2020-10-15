@@ -490,21 +490,20 @@ func TestContainerRunAttached(t *testing.T) {
 
 	t.Run("prune dry run", func(t *testing.T) {
 		res := c.RunDockerCmd("prune", "--dry-run")
-		fmt.Println("prune output:")
-		assert.Equal(t, "resources that would be deleted:\n", res.Stdout())
+		assert.Equal(t, "Resources that would be deleted:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
 		res = c.RunDockerCmd("prune", "--dry-run", "--force")
-		assert.Equal(t, "resources that would be deleted:\n"+container+"\n", res.Stdout())
+		assert.Equal(t, "Resources that would be deleted:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 	})
 
 	t.Run("prune", func(t *testing.T) {
 		res := c.RunDockerCmd("prune")
-		assert.Equal(t, "deleted resources:\n", res.Stdout())
+		assert.Equal(t, "Deleted resources:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
 		res = c.RunDockerCmd("ps")
 		l := lines(res.Stdout())
 		assert.Equal(t, 2, len(l))
 
 		res = c.RunDockerCmd("prune", "--force")
-		assert.Equal(t, "deleted resources:\n"+container+"\n", res.Stdout())
+		assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--all")
 		l = lines(res.Stdout())

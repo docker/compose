@@ -56,14 +56,17 @@ func runPrune(ctx context.Context, opts pruneOpts) error {
 		return errors.Wrap(err, "cannot connect to backend")
 	}
 
-	ids, err := c.ResourceService().Prune(ctx, resources.PruneRequest{Force: opts.force, DryRun: opts.dryRun})
+	result, err := c.ResourceService().Prune(ctx, resources.PruneRequest{Force: opts.force, DryRun: opts.dryRun})
 	if opts.dryRun {
-		fmt.Println("resources that would be deleted:")
+		fmt.Println("Resources that would be deleted:")
 	} else {
-		fmt.Println("deleted resources:")
+		fmt.Println("Deleted resources:")
 	}
-	for _, id := range ids {
+	for _, id := range result.DeletedIDs {
 		fmt.Println(id)
+	}
+	if result.Summary != "" {
+		fmt.Println(result.Summary)
 	}
 	return err
 }

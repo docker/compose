@@ -26,8 +26,14 @@ type PruneRequest struct {
 	DryRun bool
 }
 
+// PruneResult info on what has been pruned
+type PruneResult struct {
+	DeletedIDs []string
+	Summary    string
+}
+
 // Service interacts with the underlying container backend
 type Service interface {
 	// Prune prune resources
-	Prune(ctx context.Context, request PruneRequest) ([]string, error)
+	Prune(ctx context.Context, request PruneRequest) (PruneResult, error)
 }

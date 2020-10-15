@@ -27,6 +27,6 @@ type resourceService struct {
 }
 
 // Prune prune resources
-func (c *resourceService) Prune(ctx context.Context, request resources.PruneRequest) ([]string, error) {
-	return nil, errdefs.ErrNotImplemented
+func (c *resourceService) Prune(ctx context.Context, request resources.PruneRequest) (resources.PruneResult, error) {
+	return resources.PruneResult{}, errdefs.ErrNotImplemented
 }
