@@ -302,8 +302,8 @@ func TestRunVolume(t *testing.T) {
 	})
 
 	t.Run("exec", func(t *testing.T) {
-		res := c.RunDockerCmd("exec", container, "pwd")
-		res.Assert(t, icmd.Expected{Out: "/"})
+		res := c.RunDockerOrExitError("exec", container, "pwd")
+		assert.Assert(t, strings.Contains(res.Stdout(), "/"))
 
 		res = c.RunDockerOrExitError("exec", container, "echo", "fail_with_argument")
 		res.Assert(t, icmd.Expected{
