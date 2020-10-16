@@ -179,7 +179,7 @@ func TestComposeContainerGroupToContainerWithDnsSideCarSide(t *testing.T) {
 	assert.Equal(t, *(*group.Containers)[1].Name, "service2")
 	assert.Equal(t, *(*group.Containers)[2].Name, ComposeDNSSidecarName)
 
-	assert.DeepEqual(t, *(*group.Containers)[2].Command, []string{"sh", "-c", "echo 127.0.0.1 service1 >> /etc/hosts;echo 127.0.0.1 service2 >> /etc/hosts;sleep infinity"})
+	assert.DeepEqual(t, *(*group.Containers)[2].Command, []string{"service1", "service2"})
 
 	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
 	assert.Equal(t, *(*group.Containers)[1].Image, "image2")
