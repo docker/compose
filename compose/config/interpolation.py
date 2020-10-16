@@ -231,6 +231,7 @@ class ConversionMap:
         service_path('build', 'labels', FULL_JOKER): to_str,
         service_path('cpus'): to_float,
         service_path('cpu_count'): to_int,
+        service_path('cpu_shares'): to_int,
         service_path('cpu_quota'): to_microseconds,
         service_path('cpu_period'): to_microseconds,
         service_path('cpu_rt_period'): to_microseconds,
