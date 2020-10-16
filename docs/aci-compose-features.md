@@ -85,8 +85,7 @@ __Legend:__
 ## Logs
 
 Container logs can be obtained for each container with `docker logs <CONTAINER>`.
-The Docker ACI integration does not currently support aggregated logs for containers in a Compose application,
-due to ACI not providing either aggregated logs for a container group, or log timestamps that can be easily used to reorder logs properly for display.
+The Docker ACI integration does not currently support aggregated logs for containers in a Compose application, see https://github.com/docker/compose-cli/issues/803.
 
 ## Exposing ports
 
