@@ -492,6 +492,18 @@ services:
 	}
 }
 
+func TestTemplateMetadata(t *testing.T) {
+	template := convertYaml(t, `
+x-aws-cluster: "arn:aws:ecs:region:account:cluster/name"
+services:
+  test:
+    image: nginx
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.ClusterExists(gomock.Any(), "arn:aws:ecs:region:account:cluster/name").Return(true, nil)
+	})
+	assert.Equal(t, template.Metadata["Cluster"], "arn:aws:ecs:region:account:cluster/name")
+}
+
 func convertYaml(t *testing.T, yaml string, fn ...func(m *MockAPIMockRecorder)) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	ctrl := gomock.NewController(t)

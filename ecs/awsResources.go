@@ -64,10 +64,10 @@ func (r *awsResources) allSecurityGroups() []string {
 }
 
 // parse look into compose project for configured resource to use, and check they are valid
-func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsResources, error) {
+func (b *ecsAPIService) parse(ctx context.Context, project *types.Project, template *cloudformation.Template) (awsResources, error) {
 	r := awsResources{}
 	var err error
-	r.cluster, err = b.parseClusterExtension(ctx, project)
+	r.cluster, err = b.parseClusterExtension(ctx, project, template)
 	if err != nil {
 		return r, err
 	}
@@ -90,7 +90,7 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project) (awsR
 	return r, nil
 }
 
-func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project) (string, error) {
+func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project, template *cloudformation.Template) (string, error) {
 	if x, ok := project.Extensions[extensionCluster]; ok {
 		cluster := x.(string)
 		ok, err := b.aws.ClusterExists(ctx, cluster)
@@ -100,6 +100,8 @@ func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *type
 		if !ok {
 			return "", errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", cluster)
 		}
+
+		template.Metadata["Cluster"] = cluster
 		return cluster, nil
 	}
 	return "", nil

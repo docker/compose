@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/internal"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -51,6 +52,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -332,6 +334,7 @@ func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, erro
 }
 
 func (s sdk) GetStackClusterID(ctx context.Context, stack string) (string, error) {
+	// Note: could use DescribeStackResource but we only can detect `does not exist` case by matching string error message
 	resources, err := s.CF.ListStackResourcesWithContext(ctx, &cloudformation.ListStackResourcesInput{
 		StackName: aws.String(stack),
 	})
@@ -343,7 +346,28 @@ func (s sdk) GetStackClusterID(ctx context.Context, stack string) (string, error
 			return aws.StringValue(r.PhysicalResourceId), nil
 		}
 	}
-	return "", nil
+	// stack is using user-provided cluster
+	res, err := s.CF.GetTemplateSummaryWithContext(ctx, &cloudformation.GetTemplateSummaryInput{
+		StackName: aws.String(stack),
+	})
+	if err != nil {
+		return "", err
+	}
+	c := aws.StringValue(res.Metadata)
+	var m templateMetadata
+	err = json.Unmarshal([]byte(c), &m)
+	if err != nil {
+		return "", err
+	}
+	if m.Cluster == "" {
+		return "", errors.Wrap(errdefs.ErrNotFound, "CloudFormation is missing cluster metadata")
+	}
+
+	return m.Cluster, nil
+}
+
+type templateMetadata struct {
+	Cluster string `json:",omitempty"`
 }
 
 func (s sdk) GetServiceTaskDefinition(ctx context.Context, cluster string, serviceArns []string) (map[string]string, error) {
@@ -645,6 +669,9 @@ func (s sdk) DescribeService(ctx context.Context, cluster string, arn string) (c
 		return compose.ServiceStatus{}, err
 	}
 
+	for _, f := range services.Failures {
+		return compose.ServiceStatus{}, errors.Wrapf(errdefs.ErrNotFound, "can't get service status %s: %s", aws.StringValue(f.Detail), aws.StringValue(f.Reason))
+	}
 	service := services.Services[0]
 	var name string
 	for _, t := range service.Tags {

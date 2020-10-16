@@ -52,12 +52,12 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 		return nil, err
 	}
 
-	resources, err := b.parse(ctx, project)
+	template := cloudformation.NewTemplate()
+	resources, err := b.parse(ctx, project, template)
 	if err != nil {
 		return nil, err
 	}
 
-	template := cloudformation.NewTemplate()
 	err = b.ensureResources(&resources, project, template)
 	if err != nil {
 		return nil, err
