@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -724,7 +724,7 @@ func TestConvertSecrets(t *testing.T) {
 	_, err = tmpFile.Write([]byte("test content"))
 	assert.NilError(t, err)
 	t.Cleanup(func() {
-		assert.NilError(t, os.Remove(tmpFile.Name()))
+		_ = os.Remove(tmpFile.Name())
 	})
 
 	t.Run("mix default and absolute", func(t *testing.T) {
@@ -742,15 +742,15 @@ func TestConvertSecrets(t *testing.T) {
 						},
 						{
 							Source: secretName,
-							Target: filepath.Join(defaultSecretsPath, "some_target2"),
+							Target: path.Join(defaultSecretsPath, "some_target2"),
 						},
 						{
 							Source: secretName,
-							Target: filepath.Join(absBasePath, "some_target3"),
+							Target: path.Join(absBasePath, "some_target3"),
 						},
 						{
 							Source: secretName,
-							Target: filepath.Join(absBasePath, "some_target4"),
+							Target: path.Join(absBasePath, "some_target4"),
 						},
 					},
 				},
@@ -812,8 +812,8 @@ func TestConvertSecrets(t *testing.T) {
 	})
 
 	t.Run("convert colliding default targets", func(t *testing.T) {
-		targetName1 := filepath.Join(defaultSecretsPath, "target1")
-		targetName2 := filepath.Join(defaultSecretsPath, "sub/folder/target2")
+		targetName1 := path.Join(defaultSecretsPath, "target1")
+		targetName2 := path.Join(defaultSecretsPath, "sub/folder/target2")
 
 		service := serviceConfigAciHelper{
 			Name: serviceName,
@@ -832,12 +832,12 @@ func TestConvertSecrets(t *testing.T) {
 		_, err := service.getAciSecretsVolumeMounts()
 		assert.Equal(t, err.Error(),
 			fmt.Sprintf(`mount paths %q and %q collide. A volume mount cannot include another one.`,
-				filepath.Dir(targetName1), filepath.Dir(targetName2)))
+				path.Dir(targetName1), path.Dir(targetName2)))
 	})
 
 	t.Run("convert colliding absolute targets", func(t *testing.T) {
-		targetName1 := filepath.Join(absBasePath, "target1")
-		targetName2 := filepath.Join(absBasePath, "sub/folder/target2")
+		targetName1 := path.Join(absBasePath, "target1")
+		targetName2 := path.Join(absBasePath, "sub/folder/target2")
 
 		service := serviceConfigAciHelper{
 			Name: serviceName,
@@ -856,7 +856,7 @@ func TestConvertSecrets(t *testing.T) {
 		_, err := service.getAciSecretsVolumeMounts()
 		assert.Equal(t, err.Error(),
 			fmt.Sprintf(`mount paths %q and %q collide. A volume mount cannot include another one.`,
-				filepath.Dir(targetName1), filepath.Dir(targetName2)))
+				path.Dir(targetName1), path.Dir(targetName2)))
 	})
 }
 
