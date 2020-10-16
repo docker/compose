@@ -204,91 +204,6 @@ func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
 }
 
-func TestComposeSingleContainerRestartPolicy(t *testing.T) {
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-				Deploy: &types.DeployConfig{
-					RestartPolicy: &types.RestartPolicy{
-						Condition: "on-failure",
-					},
-				},
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-
-	assert.Assert(t, is.Len(*group.Containers, 1))
-	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
-	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
-}
-
-func TestComposeMultiContainerRestartPolicy(t *testing.T) {
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-				Deploy: &types.DeployConfig{
-					RestartPolicy: &types.RestartPolicy{
-						Condition: "on-failure",
-					},
-				},
-			},
-			{
-				Name:  "service2",
-				Image: "image2",
-				Deploy: &types.DeployConfig{
-					RestartPolicy: &types.RestartPolicy{
-						Condition: "on-failure",
-					},
-				},
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-
-	assert.Assert(t, is.Len(*group.Containers, 3))
-	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
-	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
-	assert.Equal(t, *(*group.Containers)[1].Name, "service2")
-	assert.Equal(t, group.RestartPolicy, containerinstance.OnFailure)
-}
-
-func TestComposeInconsistentMultiContainerRestartPolicy(t *testing.T) {
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-				Deploy: &types.DeployConfig{
-					RestartPolicy: &types.RestartPolicy{
-						Condition: "any",
-					},
-				},
-			},
-			{
-				Name:  "service2",
-				Image: "image2",
-				Deploy: &types.DeployConfig{
-					RestartPolicy: &types.RestartPolicy{
-						Condition: "on-failure",
-					},
-				},
-			},
-		},
-	}
-
-	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.Error(t, err, "ACI integration does not support specifying different restart policies on services in the same compose application")
-}
-
 func TestLabelsErrorMessage(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
@@ -304,24 +219,6 @@ func TestLabelsErrorMessage(t *testing.T) {
 
 	_, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
 	assert.Error(t, err, "ACI integration does not support labels in compose applications")
-}
-
-func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T) {
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-
-	assert.Assert(t, is.Len(*group.Containers, 1))
-	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
-	assert.Equal(t, group.RestartPolicy, containerinstance.Always)
 }
 
 func TestComposeContainerGroupToContainerWithDomainName(t *testing.T) {
@@ -547,20 +444,6 @@ func TestComposeContainerGroupToContainerenvVar(t *testing.T) {
 	assert.Assert(t, is.Len(envVars, 2))
 	assert.Assert(t, is.Contains(envVars, containerinstance.EnvironmentVariable{Name: to.StringPtr("key1"), Value: to.StringPtr("value1")}))
 	assert.Assert(t, is.Contains(envVars, containerinstance.EnvironmentVariable{Name: to.StringPtr("key2"), Value: to.StringPtr("value2")}))
-}
-
-func TestConvertToAciRestartPolicyCondition(t *testing.T) {
-	assert.Equal(t, toAciRestartPolicy("none"), containerinstance.Never)
-	assert.Equal(t, toAciRestartPolicy("always"), containerinstance.Always)
-	assert.Equal(t, toAciRestartPolicy("on-failure"), containerinstance.OnFailure)
-	assert.Equal(t, toAciRestartPolicy("on-failure:5"), containerinstance.Always)
-}
-
-func TestConvertToDockerRestartPolicyCondition(t *testing.T) {
-	assert.Equal(t, toContainerRestartPolicy(containerinstance.Never), "none")
-	assert.Equal(t, toContainerRestartPolicy(containerinstance.Always), "any")
-	assert.Equal(t, toContainerRestartPolicy(containerinstance.OnFailure), "on-failure")
-	assert.Equal(t, toContainerRestartPolicy(""), "any")
 }
 
 func TestConvertContainerGroupStatus(t *testing.T) {

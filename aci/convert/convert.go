@@ -155,54 +155,6 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 
 type projectAciHelper types.Project
 
-func (p projectAciHelper) getRestartPolicy() (containerinstance.ContainerGroupRestartPolicy, error) {
-	var restartPolicyCondition containerinstance.ContainerGroupRestartPolicy
-	if len(p.Services) >= 1 {
-		alreadySpecified := false
-		restartPolicyCondition = containerinstance.Always
-		for _, service := range p.Services {
-			if service.Deploy != nil &&
-				service.Deploy.RestartPolicy != nil {
-				if !alreadySpecified {
-					alreadySpecified = true
-					restartPolicyCondition = toAciRestartPolicy(service.Deploy.RestartPolicy.Condition)
-				}
-				if alreadySpecified && restartPolicyCondition != toAciRestartPolicy(service.Deploy.RestartPolicy.Condition) {
-					return "", errors.New("ACI integration does not support specifying different restart policies on services in the same compose application")
-				}
-
-			}
-		}
-	}
-	return restartPolicyCondition, nil
-}
-
-func toAciRestartPolicy(restartPolicy string) containerinstance.ContainerGroupRestartPolicy {
-	switch restartPolicy {
-	case containers.RestartPolicyNone:
-		return containerinstance.Never
-	case containers.RestartPolicyAny:
-		return containerinstance.Always
-	case containers.RestartPolicyOnFailure:
-		return containerinstance.OnFailure
-	default:
-		return containerinstance.Always
-	}
-}
-
-func toContainerRestartPolicy(aciRestartPolicy containerinstance.ContainerGroupRestartPolicy) string {
-	switch aciRestartPolicy {
-	case containerinstance.Never:
-		return containers.RestartPolicyNone
-	case containerinstance.Always:
-		return containers.RestartPolicyAny
-	case containerinstance.OnFailure:
-		return containers.RestartPolicyOnFailure
-	default:
-		return containers.RestartPolicyAny
-	}
-}
-
 type serviceConfigAciHelper types.ServiceConfig
 
 func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (containerinstance.Container, error) {
