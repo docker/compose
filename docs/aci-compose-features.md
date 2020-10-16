@@ -57,7 +57,7 @@ __Legend:__
 | service.network_mode           | x |
 | service.networks               | x |  Communication between services is implemented by defining mapping for each service in the shared `/etc/hosts` file of the container group. Each service can resolve names for other services and the resulting network calls will be redirected to `localhost`.
 | service.pid                    | x |
-| service.ports                  | ✓ |  Only symetrical por mapping is supported in ACI. See [Exposing ports](#exposing-ports).
+| service.ports                  | ✓ |  Only symetrical port mapping is supported in ACI. See [Exposing ports](#exposing-ports).
 | service.secrets                | ✓ |  See [Secrets](#secrets).
 | service.security_opt           | x |
 | service.stop_grace_period      | x |
@@ -85,7 +85,7 @@ __Legend:__
 ## Logs
 
 Container logs can be obtained for each container with `docker logs <CONTAINER>`.
-The Docker ACI integration does not currently support aggregated logs for containers in a compose application,
+The Docker ACI integration does not currently support aggregated logs for containers in a Compose application,
 due to ACI not providing either aggregated logs for a container group, or log timestamps that can be easily used to reorder logs properly for display.
 
 ## Exposing ports
