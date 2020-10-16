@@ -28,12 +28,12 @@ func (b *ecsAPIService) Down(ctx context.Context, project string) error {
 		return err
 	}
 
-	err = resources.apply(awsTypeCapacityProvider, delete(ctx, b.aws.DeleteCapacityProvider))
+	err = resources.apply(awsTypeCapacityProvider, doDelete(ctx, b.aws.DeleteCapacityProvider))
 	if err != nil {
 		return err
 	}
 
-	err = resources.apply(awsTypeAutoscalingGroup, delete(ctx, b.aws.DeleteAutoscalingGroup))
+	err = resources.apply(awsTypeAutoscalingGroup, doDelete(ctx, b.aws.DeleteAutoscalingGroup))
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (b *ecsAPIService) previousStackEvents(ctx context.Context, project string)
 	return previousEvents, nil
 }
 
-func delete(ctx context.Context, delete func(ctx context.Context, arn string) error) func(r stackResource) error {
+func doDelete(ctx context.Context, delete func(ctx context.Context, arn string) error) func(r stackResource) error {
 	return func(r stackResource) error {
 		w := progress.ContextWriter(ctx)
 		w.Event(progress.Event{

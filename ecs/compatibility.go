@@ -136,3 +136,12 @@ func (c *fargateCompatibilityChecker) CheckLoggingDriver(config *types.LoggingCo
 		c.Unsupported("services.logging.driver %s is not supported", config.Driver)
 	}
 }
+
+func (c *fargateCompatibilityChecker) CheckUlimits(service *types.ServiceConfig) {
+	for k := range service.Ulimits {
+		if k != "nofile" {
+			c.Unsupported("services.ulimits.%s is not supported by Fargate", k)
+			delete(service.Ulimits, k)
+		}
+	}
+}
