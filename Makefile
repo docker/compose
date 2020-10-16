@@ -99,7 +99,7 @@ validate: validate-go-mod validate-headers ## Validate sources
 pre-commit: cli test e2e-local lint validate
 
 clean-aci-e2e: ## Make sure no ACI tests are currently runnnig in the CI when invoking this. Delete ACI E2E tests resources that might have leaked when ctrl-C E2E tests.
-	 az group list | jq '.[].name' | grep E2E-Test | xargs -n1 az-cmd group delete -y --no-wait -g
+	 az group list | jq '.[].name' | grep E2E-Test | xargs -n1 az group delete -y --no-wait -g
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
