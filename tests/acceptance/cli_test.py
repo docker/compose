@@ -4,6 +4,7 @@ import os.path
 import re
 import signal
 import subprocess
+import tempfile
 import time
 from collections import Counter
 from collections import namedtuple
@@ -597,6 +598,28 @@ services:
         result = self.dispatch(['--compatibility', 'config'])
 
         assert yaml.load(result.stdout) == COMPOSE_COMPATIBILITY_DICT
+
+    def test_cp_from_service(self):
+        self.dispatch(['up', '-d'])
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            result = self.dispatch(['cp', "simple:/etc/passwd", tmpdirname])
+            assert not result.stdout
+            assert not result.stderr
+
+            tmpfile = os.path.join(tmpdirname, "passwd")
+            assert os.path.exists(tmpfile)
+            with open(tmpfile) as local_passwd:
+                assert "root:x:0:0" in local_passwd.read()
+
+    def test_cp_to_service(self):
+        self.dispatch(['up', '-d'])
+        result = self.dispatch(['cp', "docker-compose.yml", "simple:/home/"])
+        assert not result.stdout
+        assert not result.stderr
+
+        result = self.dispatch(['exec', '-T', 'simple', '/bin/cat', '/home/docker-compose.yml'])
+        with open(os.path.join(self.base_dir, "docker-compose.yml")) as local_compose:
+            assert local_compose.read() == result.stdout
 
     def test_ps(self):
         self.project.get_service('simple').create_container()
