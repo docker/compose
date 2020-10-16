@@ -564,18 +564,11 @@ func TestUpSecrets(t *testing.T) {
 		secret2Value = "another_password\n"
 	)
 	var (
-		basefilePath                 = filepath.Join("..", "composefiles", composeProjectName)
-		composefilePath              = filepath.Join(basefilePath, "compose.yml")
-		composefileInvalidTargetPath = filepath.Join(basefilePath, "compose-invalid-target.yml")
+		basefilePath    = filepath.Join("..", "composefiles", composeProjectName)
+		composefilePath = filepath.Join(basefilePath, "compose.yml")
 	)
 	c := NewParallelE2eCLI(t, binDir)
 	_, _, _ = setupTestResourceGroup(t, c)
-
-	t.Run("compose up invalid target", func(t *testing.T) {
-		res := c.RunDockerOrExitError("compose", "up", "-f", composefileInvalidTargetPath, "--project-name", composeProjectName)
-		assert.Equal(t, res.ExitCode, 1)
-		assert.Equal(t, res.Combined(), "in service \"web\", secret with source \"mysecret1\" cannot have a path as target. Found \"my/invalid/target1\"\n")
-	})
 
 	t.Run("compose up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
