@@ -56,8 +56,6 @@ func createEcsCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&localSimulation, "local-simulation", false, "Create context for ECS local simulation endpoints")
 	cmd.Flags().StringVar(&opts.Profile, "profile", "", "Profile")
 	cmd.Flags().StringVar(&opts.Region, "region", "", "Region")
-	cmd.Flags().StringVar(&opts.AwsID, "key-id", "", "AWS Access Key ID")
-	cmd.Flags().StringVar(&opts.AwsSecret, "secret-key", "", "AWS Secret Access Key")
 	return cmd
 }
 
