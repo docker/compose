@@ -351,6 +351,45 @@ class TopLevelCommand:
 
         print(serialize_config(compose_config, image_digests, not options['--no-interpolate']))
 
+    def cp(self, options):
+        """
+        Copy files/folders between a container and the local filesystem
+
+        Usage: cp [options] [--] SERVICE:SRC_PATH DEST_PATH
+               cp [options] [--] SRC_PATH SERVICE:DEST_PATH
+
+        Options:
+            --index=index     index of the container if there are multiple
+                              instances of a service [default: 1]
+        """
+        if self.toplevel_environment.get_boolean("COMPOSE_INTERACTIVE_NO_CLI"):
+            raise UserError("Command cp is only available with CLI")
+
+        src_path = options.get("SERVICE:SRC_PATH")
+        dest_path = options.get("DEST_PATH")
+        if ":" in src_path and ":" in dest_path:
+            raise UserError("Cannot copy between containers")
+
+        from_service = ":" in src_path
+        if from_service:
+            service, src_path = src_path.split(":", 1)
+        else:
+            service, dest_path = dest_path.split(":", 1)
+
+        index = int(options.get("--index"))
+        service = self.project.get_service(service)
+        try:
+            container = service.get_container(number=index)
+        except ValueError as e:
+            raise UserError(str(e))
+
+        args = ["cp"]
+        if from_service:
+            args += ["{}:{}".format(container.id, src_path), dest_path]
+        else:
+            args += [src_path, "{}:{}".format(container.id, dest_path)]
+        sys.exit(call_docker(args, self.toplevel_options, self.toplevel_environment))
+
     def create(self, options):
         """
         Creates containers for a service.
