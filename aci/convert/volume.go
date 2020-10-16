@@ -17,16 +17,81 @@
 package convert
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-
+	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/errdefs"
 )
+
+const (
+	azureFileDriverName            = "azure_file"
+	volumeDriveroptsShareNameKey   = "share_name"
+	volumeDriveroptsAccountNameKey = "storage_account_name"
+	volumeReadOnly                 = "read_only"
+)
+
+func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) (map[string]bool, []containerinstance.Volume, error) {
+	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
+	var azureFileVolumesSlice []containerinstance.Volume
+	for name, v := range p.Volumes {
+		if v.Driver == azureFileDriverName {
+			shareName, ok := v.DriverOpts[volumeDriveroptsShareNameKey]
+			if !ok {
+				return nil, nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
+			}
+			accountName, ok := v.DriverOpts[volumeDriveroptsAccountNameKey]
+			if !ok {
+				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
+			}
+			readOnly, ok := v.DriverOpts[volumeReadOnly]
+			if !ok {
+				readOnly = "false"
+			}
+			ro, err := strconv.ParseBool(readOnly)
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid mode %q for volume", readOnly)
+			}
+			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
+			if err != nil {
+				return nil, nil, err
+			}
+			aciVolume := containerinstance.Volume{
+				Name: to.StringPtr(name),
+				AzureFile: &containerinstance.AzureFileVolume{
+					ShareName:          to.StringPtr(shareName),
+					StorageAccountName: to.StringPtr(accountName),
+					StorageAccountKey:  to.StringPtr(accountKey),
+					ReadOnly:           &ro,
+				},
+			}
+			azureFileVolumesMap[name] = true
+			azureFileVolumesSlice = append(azureFileVolumesSlice, aciVolume)
+		}
+	}
+	return azureFileVolumesMap, azureFileVolumesSlice, nil
+}
+
+func (s serviceConfigAciHelper) getAciFileVolumeMounts(volumesCache map[string]bool) ([]containerinstance.VolumeMount, error) {
+	var aciServiceVolumes []containerinstance.VolumeMount
+	for _, sv := range s.Volumes {
+		if !volumesCache[sv.Source] {
+			return []containerinstance.VolumeMount{}, fmt.Errorf("could not find volume source %q", sv.Source)
+		}
+		aciServiceVolumes = append(aciServiceVolumes, containerinstance.VolumeMount{
+			Name:      to.StringPtr(sv.Source),
+			MountPath: to.StringPtr(sv.Target),
+		})
+	}
+	return aciServiceVolumes, nil
+}
 
 // GetRunVolumes return volume configurations for a project and a single service
 // this is meant to be used as a compose project of a single service

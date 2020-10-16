@@ -42,11 +42,7 @@ const (
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
 
-	dnsSidecarImage                = "busybox:1.31.1"
-	azureFileDriverName            = "azure_file"
-	volumeDriveroptsShareNameKey   = "share_name"
-	volumeDriveroptsAccountNameKey = "storage_account_name"
-	volumeReadOnly                 = "read_only"
+	dnsSidecarImage = "busybox:1.31.1"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
@@ -132,31 +128,6 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	return groupDefinition, nil
 }
 
-func convertPortsToAci(service serviceConfigAciHelper) ([]containerinstance.ContainerPort, []containerinstance.Port, *string, error) {
-	var groupPorts []containerinstance.Port
-	var containerPorts []containerinstance.ContainerPort
-	for _, portConfig := range service.Ports {
-		if portConfig.Published != 0 && portConfig.Published != portConfig.Target {
-			msg := fmt.Sprintf("Port mapping is not supported with ACI, cannot map port %d to %d for container %s",
-				portConfig.Published, portConfig.Target, service.Name)
-			return nil, nil, nil, errors.New(msg)
-		}
-		portNumber := int32(portConfig.Target)
-		containerPorts = append(containerPorts, containerinstance.ContainerPort{
-			Port: to.Int32Ptr(portNumber),
-		})
-		groupPorts = append(groupPorts, containerinstance.Port{
-			Port:     to.Int32Ptr(portNumber),
-			Protocol: containerinstance.TCP,
-		})
-	}
-	var dnsLabelName *string = nil
-	if service.DomainName != "" {
-		dnsLabelName = &service.DomainName
-	}
-	return containerPorts, groupPorts, dnsLabelName, nil
-}
-
 func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
 	var commands []string
 	for _, container := range containers {
@@ -183,47 +154,6 @@ func getDNSSidecar(containers []containerinstance.Container) containerinstance.C
 }
 
 type projectAciHelper types.Project
-
-func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) (map[string]bool, []containerinstance.Volume, error) {
-	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
-	var azureFileVolumesSlice []containerinstance.Volume
-	for name, v := range p.Volumes {
-		if v.Driver == azureFileDriverName {
-			shareName, ok := v.DriverOpts[volumeDriveroptsShareNameKey]
-			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
-			}
-			accountName, ok := v.DriverOpts[volumeDriveroptsAccountNameKey]
-			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
-			}
-			readOnly, ok := v.DriverOpts[volumeReadOnly]
-			if !ok {
-				readOnly = "false"
-			}
-			ro, err := strconv.ParseBool(readOnly)
-			if err != nil {
-				return nil, nil, fmt.Errorf("invalid mode %q for volume", readOnly)
-			}
-			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
-			if err != nil {
-				return nil, nil, err
-			}
-			aciVolume := containerinstance.Volume{
-				Name: to.StringPtr(name),
-				AzureFile: &containerinstance.AzureFileVolume{
-					ShareName:          to.StringPtr(shareName),
-					StorageAccountName: to.StringPtr(accountName),
-					StorageAccountKey:  to.StringPtr(accountKey),
-					ReadOnly:           &ro,
-				},
-			}
-			azureFileVolumesMap[name] = true
-			azureFileVolumesSlice = append(azureFileVolumesSlice, aciVolume)
-		}
-	}
-	return azureFileVolumesMap, azureFileVolumesSlice, nil
-}
 
 func (p projectAciHelper) getRestartPolicy() (containerinstance.ContainerGroupRestartPolicy, error) {
 	var restartPolicyCondition containerinstance.ContainerGroupRestartPolicy
@@ -274,20 +204,6 @@ func toContainerRestartPolicy(aciRestartPolicy containerinstance.ContainerGroupR
 }
 
 type serviceConfigAciHelper types.ServiceConfig
-
-func (s serviceConfigAciHelper) getAciFileVolumeMounts(volumesCache map[string]bool) ([]containerinstance.VolumeMount, error) {
-	var aciServiceVolumes []containerinstance.VolumeMount
-	for _, sv := range s.Volumes {
-		if !volumesCache[sv.Source] {
-			return []containerinstance.VolumeMount{}, fmt.Errorf("could not find volume source %q", sv.Source)
-		}
-		aciServiceVolumes = append(aciServiceVolumes, containerinstance.VolumeMount{
-			Name:      to.StringPtr(sv.Source),
-			MountPath: to.StringPtr(sv.Target),
-		})
-	}
-	return aciServiceVolumes, nil
-}
 
 func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (containerinstance.Container, error) {
 	aciServiceVolumes, err := s.getAciFileVolumeMounts(volumesCache)

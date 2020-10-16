@@ -21,8 +21,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
@@ -206,96 +204,6 @@ func TestComposeSingleContainerGroupToContainerNoDnsSideCarSide(t *testing.T) {
 	assert.Equal(t, *(*group.Containers)[0].Image, "image1")
 }
 
-func TestComposeVolumes(t *testing.T) {
-	ctx := context.TODO()
-	accountName := "myAccount"
-	mockStorageHelper.On("GetAzureStorageAccountKey", ctx, accountName).Return("123456", nil)
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-			},
-		},
-		Volumes: types.Volumes{
-			"vol1": types.VolumeConfig{
-				Driver: "azure_file",
-				DriverOpts: map[string]string{
-					"share_name":           "myFileshare",
-					"storage_account_name": accountName,
-				},
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(ctx, convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-
-	assert.Assert(t, is.Len(*group.Containers, 1))
-	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
-	expectedGroupVolume := containerinstance.Volume{
-		Name: to.StringPtr("vol1"),
-		AzureFile: &containerinstance.AzureFileVolume{
-			ShareName:          to.StringPtr("myFileshare"),
-			StorageAccountName: &accountName,
-			StorageAccountKey:  to.StringPtr("123456"),
-			ReadOnly:           to.BoolPtr(false),
-		},
-	}
-	assert.Equal(t, len(*group.Volumes), 1)
-	assert.DeepEqual(t, (*group.Volumes)[0], expectedGroupVolume)
-}
-
-func TestComposeVolumesRO(t *testing.T) {
-	ctx := context.TODO()
-	accountName := "myAccount"
-	mockStorageHelper.On("GetAzureStorageAccountKey", ctx, accountName).Return("123456", nil)
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-			},
-		},
-		Volumes: types.Volumes{
-			"vol1": types.VolumeConfig{
-				Driver: "azure_file",
-				DriverOpts: map[string]string{
-					"share_name":           "myFileshare",
-					"storage_account_name": accountName,
-					"read_only":            "true",
-				},
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(ctx, convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-
-	assert.Assert(t, is.Len(*group.Containers, 1))
-	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
-	expectedGroupVolume := containerinstance.Volume{
-		Name: to.StringPtr("vol1"),
-		AzureFile: &containerinstance.AzureFileVolume{
-			ShareName:          to.StringPtr("myFileshare"),
-			StorageAccountName: &accountName,
-			StorageAccountKey:  to.StringPtr("123456"),
-			ReadOnly:           to.BoolPtr(true),
-		},
-	}
-	assert.Equal(t, len(*group.Volumes), 1)
-	assert.DeepEqual(t, (*group.Volumes)[0], expectedGroupVolume)
-}
-
-type mockStorageLogin struct {
-	mock.Mock
-}
-
-func (s *mockStorageLogin) GetAzureStorageAccountKey(ctx context.Context, accountName string) (string, error) {
-	args := s.Called(ctx, accountName)
-	return args.String(0), args.Error(1)
-}
-
 func TestComposeSingleContainerRestartPolicy(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
@@ -414,53 +322,6 @@ func TestComposeSingleContainerGroupToContainerDefaultRestartPolicy(t *testing.T
 	assert.Assert(t, is.Len(*group.Containers, 1))
 	assert.Equal(t, *(*group.Containers)[0].Name, "service1")
 	assert.Equal(t, group.RestartPolicy, containerinstance.Always)
-}
-
-func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name:  "service1",
-				Image: "image1",
-				Ports: []types.ServicePortConfig{
-					{
-						Published: 80,
-						Target:    80,
-					},
-				},
-			},
-			{
-				Name:  "service2",
-				Image: "image2",
-				Ports: []types.ServicePortConfig{
-					{
-						Published: 8080,
-						Target:    8080,
-					},
-				},
-			},
-		},
-	}
-
-	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
-	assert.NilError(t, err)
-	assert.Assert(t, is.Len(*group.Containers, 3))
-
-	container1 := (*group.Containers)[0]
-	assert.Equal(t, *container1.Name, "service1")
-	assert.Equal(t, *container1.Image, "image1")
-	assert.Equal(t, *(*container1.Ports)[0].Port, int32(80))
-
-	container2 := (*group.Containers)[1]
-	assert.Equal(t, *container2.Name, "service2")
-	assert.Equal(t, *container2.Image, "image2")
-	assert.Equal(t, *(*container2.Ports)[0].Port, int32(8080))
-
-	groupPorts := *group.IPAddress.Ports
-	assert.Assert(t, is.Len(groupPorts, 2))
-	assert.Equal(t, *groupPorts[0].Port, int32(80))
-	assert.Equal(t, *groupPorts[1].Port, int32(8080))
-	assert.Assert(t, group.IPAddress.DNSNameLabel == nil)
 }
 
 func TestComposeContainerGroupToContainerWithDomainName(t *testing.T) {

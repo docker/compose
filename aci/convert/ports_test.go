@@ -17,14 +17,64 @@
 package convert
 
 import (
+	"context"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerinstance/mgmt/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/compose-spec/compose-go/types"
 	"gotest.tools/v3/assert"
+	is "gotest.tools/v3/assert/cmp"
 
 	"github.com/docker/compose-cli/api/containers"
 )
+
+func TestComposeContainerGroupToContainerMultiplePorts(t *testing.T) {
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 80,
+						Target:    80,
+					},
+				},
+			},
+			{
+				Name:  "service2",
+				Image: "image2",
+				Ports: []types.ServicePortConfig{
+					{
+						Published: 8080,
+						Target:    8080,
+					},
+				},
+			},
+		},
+	}
+
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+	assert.Assert(t, is.Len(*group.Containers, 3))
+
+	container1 := (*group.Containers)[0]
+	assert.Equal(t, *container1.Name, "service1")
+	assert.Equal(t, *container1.Image, "image1")
+	assert.Equal(t, *(*container1.Ports)[0].Port, int32(80))
+
+	container2 := (*group.Containers)[1]
+	assert.Equal(t, *container2.Name, "service2")
+	assert.Equal(t, *container2.Image, "image2")
+	assert.Equal(t, *(*container2.Ports)[0].Port, int32(8080))
+
+	groupPorts := *group.IPAddress.Ports
+	assert.Assert(t, is.Len(groupPorts, 2))
+	assert.Equal(t, *groupPorts[0].Port, int32(80))
+	assert.Equal(t, *groupPorts[1].Port, int32(8080))
+	assert.Assert(t, group.IPAddress.DNSNameLabel == nil)
+}
 
 func TestPortConvert(t *testing.T) {
 	expectedPorts := []containers.Port{

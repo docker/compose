@@ -27,7 +27,6 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-
 func TestConvertSecrets(t *testing.T) {
 	serviceName := "testservice"
 	secretName := "testsecret"

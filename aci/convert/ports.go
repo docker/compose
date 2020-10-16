@@ -17,12 +17,40 @@
 package convert
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/containers"
 )
+
+func convertPortsToAci(service serviceConfigAciHelper) ([]containerinstance.ContainerPort, []containerinstance.Port, *string, error) {
+	var groupPorts []containerinstance.Port
+	var containerPorts []containerinstance.ContainerPort
+	for _, portConfig := range service.Ports {
+		if portConfig.Published != 0 && portConfig.Published != portConfig.Target {
+			msg := fmt.Sprintf("Port mapping is not supported with ACI, cannot map port %d to %d for container %s",
+				portConfig.Published, portConfig.Target, service.Name)
+			return nil, nil, nil, errors.New(msg)
+		}
+		portNumber := int32(portConfig.Target)
+		containerPorts = append(containerPorts, containerinstance.ContainerPort{
+			Port: to.Int32Ptr(portNumber),
+		})
+		groupPorts = append(groupPorts, containerinstance.Port{
+			Port:     to.Int32Ptr(portNumber),
+			Protocol: containerinstance.TCP,
+		})
+	}
+	var dnsLabelName *string = nil
+	if service.DomainName != "" {
+		dnsLabelName = &service.DomainName
+	}
+	return containerPorts, groupPorts, dnsLabelName, nil
+}
 
 // ToPorts converts Azure container ports to api ports
 func ToPorts(ipAddr *containerinstance.IPAddress, ports []containerinstance.ContainerPort) []containers.Port {
