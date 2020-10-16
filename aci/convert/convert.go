@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 
@@ -212,18 +212,18 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 				scr.Target = scr.Source
 			}
 
-			if !filepath.IsAbs(scr.Target) && strings.ContainsAny(scr.Target, "\\/") {
+			if !path.IsAbs(scr.Target) && strings.ContainsAny(scr.Target, "\\/") {
 				return []containerinstance.Volume{},
 					errors.Errorf("in service %q, secret with source %q cannot have a relative path as target. "+
 						"Only absolute paths are allowed. Found %q",
 						svc.Name, scr.Source, scr.Target)
 			}
 
-			if !filepath.IsAbs(scr.Target) {
-				scr.Target = filepath.Join(defaultSecretsPath, scr.Target)
+			if !path.IsAbs(scr.Target) {
+				scr.Target = path.Join(defaultSecretsPath, scr.Target)
 			}
 
-			targetDir := filepath.Dir(scr.Target)
+			targetDir := path.Dir(scr.Target)
 			targetDirKey := getServiceSecretKey(svc.Name, targetDir)
 			if _, ok := squashedTargetVolumes[targetDir]; !ok {
 				squashedTargetVolumes[targetDir] = containerinstance.Volume{
@@ -232,7 +232,7 @@ func (p projectAciHelper) getAciSecretVolumes() ([]containerinstance.Volume, err
 				}
 			}
 
-			squashedTargetVolumes[targetDir].Secret[filepath.Base(scr.Target)] = &dataStr
+			squashedTargetVolumes[targetDir].Secret[path.Base(scr.Target)] = &dataStr
 		}
 		for _, v := range squashedTargetVolumes {
 			secretVolumes = append(secretVolumes, v)
@@ -354,15 +354,15 @@ func (s serviceConfigAciHelper) getAciSecretsVolumeMounts() ([]containerinstance
 		if scr.Target == "" {
 			scr.Target = scr.Source
 		}
-		if !filepath.IsAbs(scr.Target) {
-			scr.Target = filepath.Join(defaultSecretsPath, scr.Target)
+		if !path.IsAbs(scr.Target) {
+			scr.Target = path.Join(defaultSecretsPath, scr.Target)
 		}
 
-		presenceKey := filepath.Dir(scr.Target)
+		presenceKey := path.Dir(scr.Target)
 		if !presenceSet[presenceKey] {
 			vms = append(vms, containerinstance.VolumeMount{
-				Name:      to.StringPtr(getServiceSecretKey(s.Name, filepath.Dir(scr.Target))),
-				MountPath: to.StringPtr(filepath.Dir(scr.Target)),
+				Name:      to.StringPtr(getServiceSecretKey(s.Name, path.Dir(scr.Target))),
+				MountPath: to.StringPtr(path.Dir(scr.Target)),
 				ReadOnly:  to.BoolPtr(true),
 			})
 			presenceSet[presenceKey] = true
@@ -382,8 +382,8 @@ func validateMountPathCollisions(vms []containerinstance.VolumeMount) error {
 				continue
 			}
 			var (
-				biggerVMPath  = strings.Split(*vm1.MountPath, string(filepath.Separator))
-				smallerVMPath = strings.Split(*vm2.MountPath, string(filepath.Separator))
+				biggerVMPath  = strings.Split(*vm1.MountPath, "/")
+				smallerVMPath = strings.Split(*vm2.MountPath, "/")
 			)
 			if len(smallerVMPath) > len(biggerVMPath) {
 				tmp := biggerVMPath
