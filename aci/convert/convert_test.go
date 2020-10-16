@@ -761,17 +761,23 @@ func TestConvertSecrets(t *testing.T) {
 				},
 			},
 		}
-		vs, err := pSquashedDefaultAndAbs.getAciSecretVolumes()
+		volumes, err := pSquashedDefaultAndAbs.getAciSecretVolumes()
 		assert.NilError(t, err)
-		assert.Equal(t, len(vs), 2)
+		assert.Equal(t, len(volumes), 2)
 
 		defaultVolumeName := getServiceSecretKey(serviceName, defaultSecretsPath)
-		assert.Equal(t, *vs[0].Name, defaultVolumeName)
-		assert.Equal(t, len(vs[0].Secret), 3)
-
 		homeVolumeName := getServiceSecretKey(serviceName, absBasePath)
-		assert.Equal(t, *vs[1].Name, homeVolumeName)
-		assert.Equal(t, len(vs[1].Secret), 2)
+		// random order since this was created from a map...
+		for _, vol := range volumes {
+			switch *vol.Name {
+			case defaultVolumeName:
+				assert.Equal(t, len(vol.Secret), 3)
+			case homeVolumeName:
+				assert.Equal(t, len(vol.Secret), 2)
+			default:
+				assert.Assert(t, false, "unexpected volume name: "+*vol.Name)
+			}
+		}
 
 		s := serviceConfigAciHelper(pSquashedDefaultAndAbs.Services[0])
 		vms, err := s.getAciSecretsVolumeMounts()
