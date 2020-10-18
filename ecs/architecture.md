@@ -22,7 +22,7 @@ This diagram shows compose model and on same line AWS components that get create
   |       |  +---------+
   |       +--+ Deploy  |
   |       |  +---------+                    +-------------------+
-  |       |  x-aws-autoscale  . . . . . .   | ScalableTarget    |
+  |       |  x-aws-autoscaling  . . . . . . | ScalableTarget    |
   |       |                                 +-------------------+---+
   |       |                                     | ScalingPolicy     |
   |       |                                     +-------------------+-+
