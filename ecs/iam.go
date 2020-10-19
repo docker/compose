@@ -16,6 +16,12 @@
 
 package ecs
 
+import (
+	"fmt"
+
+	"github.com/awslabs/goformation/v4/cloudformation"
+)
+
 const (
 	ecsTaskExecutionPolicy = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 	ecrReadOnlyPolicy      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
@@ -49,7 +55,31 @@ func policyDocument(service string) PolicyDocument {
 			},
 		},
 	}
+}
 
+func volumeMountPolicyDocument(volume string, filesystem string) PolicyDocument {
+	ap := fmt.Sprintf("%sAccessPoint", normalizeResourceName(volume))
+	return PolicyDocument{
+		Version: "2012-10-17", // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html
+		Statement: []PolicyStatement{
+			{
+				Effect: "Allow",
+				Resource: []string{
+					filesystem,
+				},
+				Action: []string{
+					"elasticfilesystem:ClientMount",
+					"elasticfilesystem:ClientWrite",
+					"elasticfilesystem:ClientRootAccess",
+				},
+				Condition: Condition{
+					StringEquals: map[string]string{
+						"elasticfilesystem:AccessPointArn": cloudformation.Ref(ap),
+					},
+				},
+			},
+		},
+	}
 }
 
 // PolicyDocument describes an IAM policy document
@@ -65,9 +95,16 @@ type PolicyStatement struct {
 	Action    []string        `json:",omitempty"`
 	Principal PolicyPrincipal `json:",omitempty"`
 	Resource  []string        `json:",omitempty"`
+	Condition Condition       `json:",omitempty"`
 }
 
 // PolicyPrincipal describes an IAM policy principal
 type PolicyPrincipal struct {
 	Service string `json:",omitempty"`
+}
+
+// Condition is the map of all conditions in the statement entry.
+type Condition struct {
+	StringEquals map[string]string `json:",omitempty"`
+	Bool         map[string]string `json:",omitempty"`
 }

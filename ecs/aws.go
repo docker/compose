@@ -35,11 +35,11 @@ const (
 // API hides aws-go-sdk into a simpler, focussed API subset
 type API interface {
 	CheckRequirements(ctx context.Context, region string) error
-	ClusterExists(ctx context.Context, name string) (bool, error)
+	ResolveCluster(ctx context.Context, nameOrArn string) (awsResource, error)
 	CreateCluster(ctx context.Context, name string) (string, error)
 	CheckVPC(ctx context.Context, vpcID string) error
 	GetDefaultVPC(ctx context.Context) (string, error)
-	GetSubNets(ctx context.Context, vpcID string) ([]string, error)
+	GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error)
 	GetRoleArn(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, template []byte) error
@@ -66,14 +66,14 @@ type API interface {
 	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)
 	ListTasks(ctx context.Context, cluster string, family string) ([]string, error)
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
-	LoadBalancerType(ctx context.Context, arn string) (string, error)
+	ResolveLoadBalancer(ctx context.Context, nameOrArn string) (awsResource, string, error)
 	GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
 	GetParameter(ctx context.Context, name string) (string, error)
 	SecurityGroupExists(ctx context.Context, sg string) (bool, error)
 	DeleteCapacityProvider(ctx context.Context, arn string) error
 	DeleteAutoscalingGroup(ctx context.Context, arn string) error
-	FileSystemExists(ctx context.Context, id string) (bool, error)
-	FindFileSystem(ctx context.Context, tags map[string]string) (string, error)
+	ResolveFileSystem(ctx context.Context, id string) (awsResource, error)
+	FindFileSystem(ctx context.Context, tags map[string]string) (awsResource, error)
 	CreateFileSystem(ctx context.Context, tags map[string]string) (string, error)
 	DeleteFileSystem(ctx context.Context, id string) error
 }

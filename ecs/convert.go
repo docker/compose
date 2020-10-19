@@ -81,11 +81,15 @@ func (b *ecsAPIService) createTaskDefinition(project *types.Project, service typ
 	}
 
 	for _, v := range service.Volumes {
-		volume := project.Volumes[v.Source]
+		n := fmt.Sprintf("%sAccessPoint", normalizeResourceName(v.Source))
 		volumes = append(volumes, ecs.TaskDefinition_Volume{
 			EFSVolumeConfiguration: &ecs.TaskDefinition_EFSVolumeConfiguration{
-				FilesystemId:  resources.filesystems[v.Source],
-				RootDirectory: volume.DriverOpts["root_directory"],
+				AuthorizationConfig: &ecs.TaskDefinition_AuthorizationConfig{
+					AccessPointId: cloudformation.Ref(n),
+					IAM:           "ENABLED",
+				},
+				FilesystemId:      resources.filesystems[v.Source].ID(),
+				TransitEncryption: "ENABLED",
 			},
 			Name: v.Source,
 		})
