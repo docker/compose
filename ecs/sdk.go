@@ -904,7 +904,8 @@ func (s sdk) ResolveFileSystem(ctx context.Context, id string) (awsResource, err
 	}, nil
 }
 
-func (s sdk) FindFileSystem(ctx context.Context, tags map[string]string) (awsResource, error) {
+func (s sdk) ListFileSystems(ctx context.Context, tags map[string]string) ([]awsResource, error) {
+	var results []awsResource
 	var token *string
 	for {
 		desc, err := s.EFS.DescribeFileSystemsWithContext(ctx, &efs.DescribeFileSystemsInput{
@@ -915,14 +916,14 @@ func (s sdk) FindFileSystem(ctx context.Context, tags map[string]string) (awsRes
 		}
 		for _, filesystem := range desc.FileSystems {
 			if containsAll(filesystem.Tags, tags) {
-				return existingAWSResource{
+				results = append(results, existingAWSResource{
 					arn: aws.StringValue(filesystem.FileSystemArn),
 					id:  aws.StringValue(filesystem.FileSystemId),
-				}, nil
+				})
 			}
 		}
 		if desc.NextMarker == token {
-			return nil, nil
+			return results, nil
 		}
 		token = desc.NextMarker
 	}
@@ -941,7 +942,7 @@ TAGS:
 	return true
 }
 
-func (s sdk) CreateFileSystem(ctx context.Context, tags map[string]string) (string, error) {
+func (s sdk) CreateFileSystem(ctx context.Context, tags map[string]string, options VolumeCreateOptions) (awsResource, error) {
 	var efsTags []*efs.Tag
 	for k, v := range tags {
 		efsTags = append(efsTags, &efs.Tag{
@@ -949,16 +950,39 @@ func (s sdk) CreateFileSystem(ctx context.Context, tags map[string]string) (stri
 			Value: aws.String(v),
 		})
 	}
+	var (
+		k *string
+		p *string
+		f *float64
+		t *string
+	)
+	if options.ProvisionedThroughputInMibps > 1 {
+		f = aws.Float64(options.ProvisionedThroughputInMibps)
+	}
+	if options.KmsKeyID != "" {
+		k = aws.String(options.KmsKeyID)
+	}
+	if options.PerformanceMode != "" {
+		p = aws.String(options.PerformanceMode)
+	}
+	if options.ThroughputMode != "" {
+		t = aws.String(options.ThroughputMode)
+	}
 	res, err := s.EFS.CreateFileSystemWithContext(ctx, &efs.CreateFileSystemInput{
-		Encrypted: aws.Bool(true),
-		Tags:      efsTags,
+		Encrypted:                    aws.Bool(true),
+		KmsKeyId:                     k,
+		PerformanceMode:              p,
+		ProvisionedThroughputInMibps: f,
+		ThroughputMode:               t,
+		Tags:                         efsTags,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	id := aws.StringValue(res.FileSystemId)
-	logrus.Debugf("Created file system %q", id)
-	return id, nil
+	return existingAWSResource{
+		id:  aws.StringValue(res.FileSystemId),
+		arn: aws.StringValue(res.FileSystemArn),
+	}, nil
 }
 
 func (s sdk) DeleteFileSystem(ctx context.Context, id string) error {

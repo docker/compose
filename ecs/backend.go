@@ -98,7 +98,7 @@ func (b *ecsAPIService) SecretsService() secrets.Service {
 }
 
 func (b *ecsAPIService) VolumeService() volumes.Service {
-	return nil
+	return ecsVolumeService{backend: b}
 }
 
 func (b *ecsAPIService) ResourceService() resources.Service {

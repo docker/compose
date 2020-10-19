@@ -73,7 +73,7 @@ type API interface {
 	DeleteCapacityProvider(ctx context.Context, arn string) error
 	DeleteAutoscalingGroup(ctx context.Context, arn string) error
 	ResolveFileSystem(ctx context.Context, id string) (awsResource, error)
-	FindFileSystem(ctx context.Context, tags map[string]string) (awsResource, error)
-	CreateFileSystem(ctx context.Context, tags map[string]string) (string, error)
+	ListFileSystems(ctx context.Context, tags map[string]string) ([]awsResource, error)
+	CreateFileSystem(ctx context.Context, tags map[string]string, options VolumeCreateOptions) (awsResource, error)
 	DeleteFileSystem(ctx context.Context, id string) error
 }

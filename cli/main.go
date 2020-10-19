@@ -182,12 +182,8 @@ func main() {
 	root.AddCommand(
 		run.Command(ctype),
 		compose.Command(ctype),
+		volume.Command(ctype),
 	)
-
-	if ctype == store.AciContextType {
-		// we can also pass ctype as a parameter to the volume command and customize subcommands, flags, etc. when we have other backend implementations
-		root.AddCommand(volume.ACICommand())
-	}
 
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)

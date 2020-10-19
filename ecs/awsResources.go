@@ -253,12 +253,16 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 			compose.ProjectTag: project.Name,
 			compose.VolumeTag:  name,
 		}
-		fileSystem, err := b.aws.FindFileSystem(ctx, tags)
+		previous, err := b.aws.ListFileSystems(ctx, tags)
 		if err != nil {
 			return nil, err
 		}
-		if fileSystem != nil {
-			filesystems[name] = fileSystem
+
+		if len(previous) > 1 {
+			return nil, fmt.Errorf("multiple filesystems are tags as project=%q, volume=%q", project.Name, name)
+		}
+		if len(previous) == 1 {
+			filesystems[name] = previous[0]
 		}
 	}
 	return filesystems, nil
