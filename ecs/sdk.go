@@ -551,15 +551,21 @@ func (s sdk) DeleteStack(ctx context.Context, name string) error {
 
 func (s sdk) CreateSecret(ctx context.Context, secret secrets.Secret) (string, error) {
 	logrus.Debug("Create secret " + secret.Name)
-	secretStr, err := secret.GetCredString()
-	if err != nil {
-		return "", err
+	var tags []*secretsmanager.Tag
+	for k, v := range secret.Labels {
+		tags = []*secretsmanager.Tag{
+			{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			},
+		}
 	}
-
+	// store the secret content as string
+	content := string(secret.GetContent())
 	response, err := s.SM.CreateSecret(&secretsmanager.CreateSecretInput{
 		Name:         &secret.Name,
-		SecretString: &secretStr,
-		Description:  &secret.Description,
+		SecretString: &content,
+		Tags:         tags,
 	})
 	if err != nil {
 		return "", err
@@ -573,17 +579,15 @@ func (s sdk) InspectSecret(ctx context.Context, id string) (secrets.Secret, erro
 	if err != nil {
 		return secrets.Secret{}, err
 	}
-	labels := map[string]string{}
+	tags := map[string]string{}
 	for _, tag := range response.Tags {
-		labels[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
+		tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 	}
+
 	secret := secrets.Secret{
 		ID:     aws.StringValue(response.ARN),
 		Name:   aws.StringValue(response.Name),
-		Labels: labels,
-	}
-	if response.Description != nil {
-		secret.Description = *response.Description
+		Labels: tags,
 	}
 	return secret, nil
 }
@@ -598,19 +602,14 @@ func (s sdk) ListSecrets(ctx context.Context) ([]secrets.Secret, error) {
 	var ls []secrets.Secret
 	for _, sec := range response.SecretList {
 
-		labels := map[string]string{}
+		tags := map[string]string{}
 		for _, tag := range sec.Tags {
-			labels[*tag.Key] = *tag.Value
-		}
-		description := ""
-		if sec.Description != nil {
-			description = *sec.Description
+			tags[*tag.Key] = *tag.Value
 		}
 		ls = append(ls, secrets.Secret{
-			ID:          *sec.ARN,
-			Name:        *sec.Name,
-			Labels:      labels,
-			Description: description,
+			ID:     *sec.ARN,
+			Name:   *sec.Name,
+			Labels: tags,
 		})
 	}
 	return ls, nil

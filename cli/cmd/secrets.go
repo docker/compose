@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -27,13 +28,6 @@ import (
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/formatter"
 )
-
-type createSecretOptions struct {
-	Label       string
-	Username    string
-	Password    string
-	Description string
-}
 
 // SecretCommand manage secrets
 func SecretCommand() *cobra.Command {
@@ -52,18 +46,39 @@ func SecretCommand() *cobra.Command {
 }
 
 func createSecret() *cobra.Command {
-	opts := createSecretOptions{}
 	cmd := &cobra.Command{
-		Use:   "create NAME",
+		Use:   "create [OPTIONS] SECRET [file|-]",
 		Short: "Creates a secret.",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := client.New(cmd.Context())
 			if err != nil {
 				return err
 			}
+			file := "-"
+			if len(args) == 2 {
+				file = args[1]
+			}
+			if len(file) == 0 {
+				return fmt.Errorf("secret data source empty: %q", file)
+			}
+			var in io.ReadCloser
+			switch file {
+			case "-":
+				in = os.Stdin
+			default:
+				in, err = os.Open(file)
+				if err != nil {
+					return err
+				}
+				defer func() { _ = in.Close() }()
+			}
+			content, err := ioutil.ReadAll(in)
+			if err != nil {
+				return fmt.Errorf("failed to read content from %q: %v", file, err)
+			}
 			name := args[0]
-			secret := secrets.NewSecret(name, opts.Username, opts.Password, opts.Description)
+			secret := secrets.NewSecret(name, content)
 			id, err := c.SecretsService().CreateSecret(cmd.Context(), secret)
 			if err != nil {
 				return err
@@ -72,10 +87,6 @@ func createSecret() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().StringVarP(&opts.Username, "username", "u", "", "username")
-	cmd.Flags().StringVarP(&opts.Password, "password", "p", "", "password")
-	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Secret description")
 	return cmd
 }
 
@@ -135,7 +146,7 @@ func listSecrets() *cobra.Command {
 				for _, secret := range view {
 					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", secret.ID, secret.Name, secret.Description)
 				}
-			}, "ID", "NAME", "DESCRIPTION")
+			}, "ID", "NAME")
 		},
 	}
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
@@ -153,9 +164,8 @@ func viewFromSecretList(secretList []secrets.Secret) []secretView {
 	retList := make([]secretView, len(secretList))
 	for i, s := range secretList {
 		retList[i] = secretView{
-			ID:          s.ID,
-			Name:        s.Name,
-			Description: s.Description,
+			ID:   s.ID,
+			Name: s.Name,
 		}
 	}
 	return retList
