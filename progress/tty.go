@@ -146,12 +146,19 @@ func lineText(event Event, terminalWidth, statusPadding int, color bool) string 
 	if padding < 0 {
 		padding = 0
 	}
+	// calculate the max length for the status text, on errors it
+	// is 2-3 lines long and breaks the line formating
+	maxStatusLen := terminalWidth - textLen - statusPadding - 15
+	status := event.StatusText
+	if len(status) > maxStatusLen {
+		status = status[:maxStatusLen] + "..."
+	}
 	text := fmt.Sprintf(" %s %s %s%s %s",
 		event.spinner.String(),
 		event.ID,
 		event.Text,
 		strings.Repeat(" ", padding),
-		event.StatusText,
+		status,
 	)
 	timer := fmt.Sprintf("%.1fs\n", elapsed)
 	o := align(text, timer, terminalWidth)
