@@ -1,8 +1,10 @@
 ARG DOCKER_VERSION=19.03.8
 ARG PYTHON_VERSION=3.7.7
 ARG BUILD_ALPINE_VERSION=3.11
+ARG BUILD_CENTOS_VERSION=7
 ARG BUILD_DEBIAN_VERSION=slim-stretch
 ARG RUNTIME_ALPINE_VERSION=3.11.5
+ARG RUNTIME_CENTOS_VERSION=7
 ARG RUNTIME_DEBIAN_VERSION=stretch-20200414-slim
 
 ARG DISTRO=alpine
@@ -40,6 +42,24 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     openssl \
     zlib1g-dev
 
+FROM centos:${BUILD_CENTOS_VERSION} AS build-centos
+RUN yum install -y \
+    gcc \
+    git \
+    libffi-devel \
+    make \
+    openssl \
+    openssl-devel
+WORKDIR /tmp/python3/
+ARG PYTHON_VERSION
+RUN curl -L https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz | tar xzf - \
+    && cd Python-${PYTHON_VERSION} \
+    && ./configure --enable-optimizations --enable-shared --prefix=/usr LDFLAGS="-Wl,-rpath /usr/lib" \
+    && make altinstall
+RUN alternatives --install /usr/bin/python python /usr/bin/python2.7 50
+RUN alternatives --install /usr/bin/python python /usr/bin/python3.7 60
+RUN curl https://bootstrap.pypa.io/get-pip.py | python -
+
 FROM build-${DISTRO} AS build
 ENTRYPOINT ["sh", "/usr/local/bin/docker-compose-entrypoint.sh"]
 WORKDIR /code/
@@ -70,6 +90,7 @@ COPY --from=build /usr/local/bin/docker-compose /docker-compose-${TARGETOS}-${TA
 
 FROM alpine:${RUNTIME_ALPINE_VERSION} AS runtime-alpine
 FROM debian:${RUNTIME_DEBIAN_VERSION} AS runtime-debian
+FROM centos:${RUNTIME_CENTOS_VERSION} AS runtime-centos
 FROM runtime-${DISTRO} AS runtime
 COPY docker-compose-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["sh", "/usr/local/bin/docker-compose-entrypoint.sh"]
