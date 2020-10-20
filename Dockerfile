@@ -5,7 +5,7 @@ ARG BUILD_DEBIAN_VERSION=slim-stretch
 ARG RUNTIME_ALPINE_VERSION=3.11.5
 ARG RUNTIME_DEBIAN_VERSION=stretch-20200414-slim
 
-ARG BUILD_PLATFORM=alpine
+ARG DISTRO=alpine
 
 FROM docker:${DOCKER_VERSION} AS docker-cli
 
@@ -40,15 +40,14 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     openssl \
     zlib1g-dev
 
-FROM build-${BUILD_PLATFORM} AS build
-COPY docker-compose-entrypoint.sh /usr/local/bin/
+FROM build-${DISTRO} AS build
 ENTRYPOINT ["sh", "/usr/local/bin/docker-compose-entrypoint.sh"]
-COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /code/
+COPY docker-compose-entrypoint.sh /usr/local/bin/
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 RUN pip install \
     virtualenv==20.0.30 \
     tox==3.19.0
-
 COPY requirements-dev.txt .
 COPY requirements-indirect.txt .
 COPY requirements.txt .
@@ -64,9 +63,14 @@ ARG GIT_COMMIT=unknown
 ENV DOCKER_COMPOSE_GITSHA=$GIT_COMMIT
 RUN script/build/linux-entrypoint
 
+FROM scratch AS bin
+ARG TARGETARCH
+ARG TARGETOS
+COPY --from=build /usr/local/bin/docker-compose /docker-compose-${TARGETOS}-${TARGETARCH}
+
 FROM alpine:${RUNTIME_ALPINE_VERSION} AS runtime-alpine
 FROM debian:${RUNTIME_DEBIAN_VERSION} AS runtime-debian
-FROM runtime-${BUILD_PLATFORM} AS runtime
+FROM runtime-${DISTRO} AS runtime
 COPY docker-compose-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["sh", "/usr/local/bin/docker-compose-entrypoint.sh"]
 COPY --from=docker-cli  /usr/local/bin/docker           /usr/local/bin/docker
