@@ -17,13 +17,17 @@
 package ecs
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
 )
 
 func (b *ecsAPIService) createNFSMountTarget(project *types.Project, resources awsResources, template *cloudformation.Template) {
@@ -96,4 +100,57 @@ func (b *ecsAPIService) createAccessPoints(project *types.Project, r awsResource
 
 		template.Resources[n] = &ap
 	}
+}
+
+// VolumeCreateOptions hold EFS filesystem creation options
+type VolumeCreateOptions struct {
+	KmsKeyID                     string
+	PerformanceMode              string
+	ProvisionedThroughputInMibps float64
+	ThroughputMode               string
+}
+
+type ecsVolumeService struct {
+	backend *ecsAPIService
+}
+
+func (e ecsVolumeService) List(ctx context.Context) ([]volumes.Volume, error) {
+	filesystems, err := e.backend.aws.ListFileSystems(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	var vol []volumes.Volume
+	for _, fs := range filesystems {
+		vol = append(vol, volumes.Volume{
+			ID:          fs.ID(),
+			Description: fs.ARN(),
+		})
+	}
+	return vol, nil
+}
+
+func (e ecsVolumeService) Create(ctx context.Context, name string, options interface{}) (volumes.Volume, error) {
+	fs, err := e.backend.aws.CreateFileSystem(ctx, map[string]string{
+		"Name": name,
+	}, options.(VolumeCreateOptions))
+	return volumes.Volume{
+		ID:          fs.ID(),
+		Description: fs.ARN(),
+	}, err
+
+}
+
+func (e ecsVolumeService) Delete(ctx context.Context, volumeID string, options interface{}) error {
+	return e.backend.aws.DeleteFileSystem(ctx, volumeID)
+}
+
+func (e ecsVolumeService) Inspect(ctx context.Context, volumeID string) (volumes.Volume, error) {
+	ok, err := e.backend.aws.ResolveFileSystem(ctx, volumeID)
+	if ok == nil {
+		err = errors.Wrapf(errdefs.ErrNotFound, "filesystem %q does not exists", volumeID)
+	}
+	return volumes.Volume{
+		ID:          volumeID,
+		Description: ok.ARN(),
+	}, err
 }

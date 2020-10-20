@@ -6,13 +6,12 @@ package ecs
 
 import (
 	context "context"
-	reflect "reflect"
-
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	ecs "github.com/aws/aws-sdk-go/service/ecs"
 	compose "github.com/docker/compose-cli/api/compose"
 	secrets "github.com/docker/compose-cli/api/secrets"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -97,18 +96,18 @@ func (mr *MockAPIMockRecorder) CreateCluster(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // CreateFileSystem mocks base method
-func (m *MockAPI) CreateFileSystem(arg0 context.Context, arg1 map[string]string) (string, error) {
+func (m *MockAPI) CreateFileSystem(arg0 context.Context, arg1 map[string]string, arg2 VolumeCreateOptions) (awsResource, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateFileSystem", arg0, arg1)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "CreateFileSystem", arg0, arg1, arg2)
+	ret0, _ := ret[0].(awsResource)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateFileSystem indicates an expected call of CreateFileSystem
-func (mr *MockAPIMockRecorder) CreateFileSystem(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateFileSystem(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockAPI)(nil).CreateFileSystem), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileSystem", reflect.TypeOf((*MockAPI)(nil).CreateFileSystem), arg0, arg1, arg2)
 }
 
 // CreateSecret mocks base method
@@ -238,21 +237,6 @@ func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) ([]*clo
 func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0, arg1)
-}
-
-// FindFileSystem mocks base method
-func (m *MockAPI) FindFileSystem(arg0 context.Context, arg1 map[string]string) (awsResource, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindFileSystem", arg0, arg1)
-	ret0, _ := ret[0].(awsResource)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindFileSystem indicates an expected call of FindFileSystem
-func (mr *MockAPIMockRecorder) FindFileSystem(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFileSystem", reflect.TypeOf((*MockAPI)(nil).FindFileSystem), arg0, arg1)
 }
 
 // GetDefaultVPC mocks base method
@@ -452,6 +436,21 @@ func (m *MockAPI) InspectSecret(arg0 context.Context, arg1 string) (secrets.Secr
 func (mr *MockAPIMockRecorder) InspectSecret(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InspectSecret", reflect.TypeOf((*MockAPI)(nil).InspectSecret), arg0, arg1)
+}
+
+// ListFileSystems mocks base method
+func (m *MockAPI) ListFileSystems(arg0 context.Context, arg1 map[string]string) ([]awsResource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListFileSystems", arg0, arg1)
+	ret0, _ := ret[0].([]awsResource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListFileSystems indicates an expected call of ListFileSystems
+func (mr *MockAPIMockRecorder) ListFileSystems(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFileSystems", reflect.TypeOf((*MockAPI)(nil).ListFileSystems), arg0, arg1)
 }
 
 // ListSecrets mocks base method

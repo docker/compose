@@ -390,7 +390,7 @@ volumes:
         throughput_mode: provisioned
         provisioned_throughput: 1024
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FindFileSystem(gomock.Any(), map[string]string{
+		m.ListFileSystems(gomock.Any(), map[string]string{
 			compose.ProjectTag: t.Name(),
 			compose.VolumeTag:  "db-data",
 		}).Return(nil, nil)
@@ -420,7 +420,7 @@ volumes:
       uid: 1002
       gid: 1002
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FindFileSystem(gomock.Any(), gomock.Any()).Return(nil, nil)
+		m.ListFileSystems(gomock.Any(), gomock.Any()).Return(nil, nil)
 	})
 	a := template.Resources["DbdataAccessPoint"].(*efs.AccessPoint)
 	assert.Check(t, a != nil)
@@ -436,10 +436,14 @@ services:
 volumes:
   db-data: {}
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FindFileSystem(gomock.Any(), map[string]string{
+		m.ListFileSystems(gomock.Any(), map[string]string{
 			compose.ProjectTag: t.Name(),
 			compose.VolumeTag:  "db-data",
-		}).Return(existingAWSResource{id: "fs-123abc"}, nil)
+		}).Return([]awsResource{
+			existingAWSResource{
+				id: "fs-123abc",
+			},
+		}, nil)
 	})
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
 	assert.Check(t, s != nil)

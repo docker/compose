@@ -20,25 +20,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/spf13/cobra"
-
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/ecs"
 	formatter2 "github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
+
+	"github.com/hashicorp/go-multierror"
+	"github.com/spf13/cobra"
 )
 
-// ACICommand manage volumes
-func ACICommand() *cobra.Command {
+// Command manage volumes
+func Command(ctype string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "volume",
 		Short: "Manages volumes",
 	}
 
 	cmd.AddCommand(
-		createVolume(),
+		createVolume(ctype),
 		listVolume(),
 		rmVolume(),
 		inspectVolume(),
@@ -46,11 +48,25 @@ func ACICommand() *cobra.Command {
 	return cmd
 }
 
-func createVolume() *cobra.Command {
-	aciOpts := aci.VolumeCreateOptions{}
+func createVolume(ctype string) *cobra.Command {
+	var usage string
+	var short string
+	switch ctype {
+	case store.AciContextType:
+		usage = "create --storage-account ACCOUNT VOLUME"
+		short = "Creates an Azure file share to use as ACI volume."
+	case store.EcsContextType:
+		usage = "create [OPTIONS] VOLUME"
+		short = "Creates an EFS filesystem to use as AWS volume."
+	default:
+		usage = "create [OPTIONS] VOLUME"
+		short = "Creates a volume"
+	}
+
+	var opts interface{}
 	cmd := &cobra.Command{
-		Use:   "create --storage-account ACCOUNT VOLUME",
-		Short: "Creates an Azure file share to use as ACI volume.",
+		Use:   usage,
+		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
@@ -59,7 +75,7 @@ func createVolume() *cobra.Command {
 				return err
 			}
 			result, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
-				volume, err := c.VolumeService().Create(ctx, args[0], aciOpts)
+				volume, err := c.VolumeService().Create(ctx, args[0], opts)
 				if err != nil {
 					return "", err
 				}
@@ -73,8 +89,20 @@ func createVolume() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
-	_ = cmd.MarkFlagRequired("storage-account")
+	switch ctype {
+	case store.AciContextType:
+		aciOpts := aci.VolumeCreateOptions{}
+		cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
+		_ = cmd.MarkFlagRequired("storage-account")
+		opts = aciOpts
+	case store.EcsContextType:
+		ecsOpts := ecs.VolumeCreateOptions{}
+		cmd.Flags().StringVar(&ecsOpts.KmsKeyID, "kms-key", "", "ID of the AWS KMS CMK to be used to protect the encrypted file system")
+		cmd.Flags().StringVar(&ecsOpts.PerformanceMode, "performance-mode", "", "performance mode of the file system. (generalPurpose|maxIO)")
+		cmd.Flags().Float64Var(&ecsOpts.ProvisionedThroughputInMibps, "provisioned-throughput", 0, "throughput in MiB/s (1-1024)")
+		cmd.Flags().StringVar(&ecsOpts.ThroughputMode, "throughput-mode", "", "throughput mode (bursting|provisioned)")
+		opts = ecsOpts
+	}
 	return cmd
 }
 
