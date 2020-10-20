@@ -54,6 +54,8 @@ var compatibleComposeAttributes = []string{
 	"services.cap_drop",
 	"services.depends_on",
 	"services.deploy",
+	"services.deploy.placement",
+	"services.deploy.placement.constraints",
 	"services.deploy.replicas",
 	"services.deploy.resources.limits",
 	"services.deploy.resources.limits.cpus",

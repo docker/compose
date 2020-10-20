@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/autoscaling"
@@ -28,11 +29,22 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
+const (
+	placementConstraintAMI     = "node.ami == "
+	placementConstraintMachine = "node.machine == "
+)
+
 func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *types.Project, template *cloudformation.Template, resources awsResources) error {
-	var ec2 bool
-	for _, s := range project.Services {
-		if requireEC2(s) {
+	var (
+		ec2         bool
+		ami         string
+		machineType string
+	)
+	for _, service := range project.Services {
+		if requireEC2(service) {
 			ec2 = true
+			// TODO once we can assign a service to a CapacityProvider, we could run this _per service_
+			ami, machineType = getUserDefinedMachine(service)
 			break
 		}
 	}
@@ -41,14 +53,20 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		return nil
 	}
 
-	ami, err := b.aws.GetParameter(ctx, "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended")
-	if err != nil {
-		return err
+	if ami == "" {
+		recommended, err := b.aws.GetParameter(ctx, "/aws/service/ecs/optimized-ami/amazon-linux-2/gpu/recommended")
+		if err != nil {
+			return err
+		}
+		ami = recommended
 	}
 
-	machineType, err := guessMachineType(project)
-	if err != nil {
-		return err
+	if machineType == "" {
+		t, err := guessMachineType(project)
+		if err != nil {
+			return err
+		}
+		machineType = t
 	}
 
 	template.Resources["CapacityProvider"] = &ecs.CapacityProvider{
@@ -97,4 +115,18 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 	}
 
 	return nil
+}
+
+func getUserDefinedMachine(s types.ServiceConfig) (ami string, machineType string) {
+	if s.Deploy != nil {
+		for _, s := range s.Deploy.Placement.Constraints {
+			if strings.HasPrefix(s, placementConstraintAMI) {
+				ami = s[len(placementConstraintAMI):]
+			}
+			if strings.HasPrefix(s, placementConstraintMachine) {
+				machineType = s[len(placementConstraintMachine):]
+			}
+		}
+	}
+	return ami, machineType
 }

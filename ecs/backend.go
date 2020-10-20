@@ -85,23 +85,23 @@ type ecsAPIService struct {
 	aws    API
 }
 
-func (a *ecsAPIService) ContainerService() containers.Service {
+func (b *ecsAPIService) ContainerService() containers.Service {
 	return nil
 }
 
-func (a *ecsAPIService) ComposeService() compose.Service {
-	return a
+func (b *ecsAPIService) ComposeService() compose.Service {
+	return b
 }
 
-func (a *ecsAPIService) SecretsService() secrets.Service {
-	return a
+func (b *ecsAPIService) SecretsService() secrets.Service {
+	return b
 }
 
-func (a *ecsAPIService) VolumeService() volumes.Service {
+func (b *ecsAPIService) VolumeService() volumes.Service {
 	return nil
 }
 
-func (a *ecsAPIService) ResourceService() resources.Service {
+func (b *ecsAPIService) ResourceService() resources.Service {
 	return nil
 }
 
