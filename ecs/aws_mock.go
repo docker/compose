@@ -6,12 +6,13 @@ package ecs
 
 import (
 	context "context"
+	reflect "reflect"
+
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	ecs "github.com/aws/aws-sdk-go/service/ecs"
 	compose "github.com/docker/compose-cli/api/compose"
 	secrets "github.com/docker/compose-cli/api/secrets"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -63,21 +64,6 @@ func (m *MockAPI) CheckVPC(arg0 context.Context, arg1 string) error {
 func (mr *MockAPIMockRecorder) CheckVPC(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckVPC", reflect.TypeOf((*MockAPI)(nil).CheckVPC), arg0, arg1)
-}
-
-// ClusterExists mocks base method
-func (m *MockAPI) ClusterExists(arg0 context.Context, arg1 string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClusterExists", arg0, arg1)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ClusterExists indicates an expected call of ClusterExists
-func (mr *MockAPIMockRecorder) ClusterExists(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClusterExists", reflect.TypeOf((*MockAPI)(nil).ClusterExists), arg0, arg1)
 }
 
 // CreateChangeSet mocks base method
@@ -254,26 +240,11 @@ func (mr *MockAPIMockRecorder) DescribeStackEvents(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeStackEvents", reflect.TypeOf((*MockAPI)(nil).DescribeStackEvents), arg0, arg1)
 }
 
-// FileSystemExists mocks base method
-func (m *MockAPI) FileSystemExists(arg0 context.Context, arg1 string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FileSystemExists", arg0, arg1)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FileSystemExists indicates an expected call of FileSystemExists
-func (mr *MockAPIMockRecorder) FileSystemExists(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileSystemExists", reflect.TypeOf((*MockAPI)(nil).FileSystemExists), arg0, arg1)
-}
-
 // FindFileSystem mocks base method
-func (m *MockAPI) FindFileSystem(arg0 context.Context, arg1 map[string]string) (string, error) {
+func (m *MockAPI) FindFileSystem(arg0 context.Context, arg1 map[string]string) (awsResource, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindFileSystem", arg0, arg1)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(awsResource)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -439,10 +410,10 @@ func (mr *MockAPIMockRecorder) GetStackID(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // GetSubNets mocks base method
-func (m *MockAPI) GetSubNets(arg0 context.Context, arg1 string) ([]string, error) {
+func (m *MockAPI) GetSubNets(arg0 context.Context, arg1 string) ([]awsResource, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSubNets", arg0, arg1)
-	ret0, _ := ret[0].([]string)
+	ret0, _ := ret[0].([]awsResource)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -573,19 +544,50 @@ func (mr *MockAPIMockRecorder) ListTasks(arg0, arg1, arg2 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTasks", reflect.TypeOf((*MockAPI)(nil).ListTasks), arg0, arg1, arg2)
 }
 
-// LoadBalancerType mocks base method
-func (m *MockAPI) LoadBalancerType(arg0 context.Context, arg1 string) (string, error) {
+// ResolveCluster mocks base method
+func (m *MockAPI) ResolveCluster(arg0 context.Context, arg1 string) (awsResource, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LoadBalancerType", arg0, arg1)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "ResolveCluster", arg0, arg1)
+	ret0, _ := ret[0].(awsResource)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// LoadBalancerType indicates an expected call of LoadBalancerType
-func (mr *MockAPIMockRecorder) LoadBalancerType(arg0, arg1 interface{}) *gomock.Call {
+// ResolveCluster indicates an expected call of ResolveCluster
+func (mr *MockAPIMockRecorder) ResolveCluster(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadBalancerType", reflect.TypeOf((*MockAPI)(nil).LoadBalancerType), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveCluster", reflect.TypeOf((*MockAPI)(nil).ResolveCluster), arg0, arg1)
+}
+
+// ResolveFileSystem mocks base method
+func (m *MockAPI) ResolveFileSystem(arg0 context.Context, arg1 string) (awsResource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveFileSystem", arg0, arg1)
+	ret0, _ := ret[0].(awsResource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ResolveFileSystem indicates an expected call of ResolveFileSystem
+func (mr *MockAPIMockRecorder) ResolveFileSystem(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveFileSystem", reflect.TypeOf((*MockAPI)(nil).ResolveFileSystem), arg0, arg1)
+}
+
+// ResolveLoadBalancer mocks base method
+func (m *MockAPI) ResolveLoadBalancer(arg0 context.Context, arg1 string) (awsResource, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResolveLoadBalancer", arg0, arg1)
+	ret0, _ := ret[0].(awsResource)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ResolveLoadBalancer indicates an expected call of ResolveLoadBalancer
+func (mr *MockAPIMockRecorder) ResolveLoadBalancer(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveLoadBalancer", reflect.TypeOf((*MockAPI)(nil).ResolveLoadBalancer), arg0, arg1)
 }
 
 // SecurityGroupExists mocks base method

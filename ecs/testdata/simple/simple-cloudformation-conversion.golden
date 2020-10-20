@@ -98,7 +98,10 @@
       ],
       "Properties": {
         "Cluster": {
-          "Ref": "Cluster"
+          "Fn::GetAtt": [
+            "Cluster",
+            "Arn"
+          ]
         },
         "DeploymentConfiguration": {
           "MaximumPercent": 200,
@@ -299,6 +302,7 @@
               "Action": [
                 "sts:AssumeRole"
               ],
+              "Condition": {},
               "Effect": "Allow",
               "Principal": {
                 "Service": "ecs-tasks.amazonaws.com"

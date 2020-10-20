@@ -83,7 +83,7 @@ func (b *ecsAPIService) createCapacityProvider(ctx context.Context, project *typ
 		LaunchConfigurationName: cloudformation.Ref("LaunchConfiguration"),
 		MaxSize:                 "10", //TODO
 		MinSize:                 "1",
-		VPCZoneIdentifier:       resources.subnets,
+		VPCZoneIdentifier:       resources.subnetsIDs(),
 	}
 
 	userData := base64.StdEncoding.EncodeToString([]byte(

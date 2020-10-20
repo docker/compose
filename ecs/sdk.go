@@ -29,6 +29,7 @@ import (
 	"github.com/docker/compose-cli/internal"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -107,15 +108,22 @@ func (s sdk) CheckRequirements(ctx context.Context, region string) error {
 	return nil
 }
 
-func (s sdk) ClusterExists(ctx context.Context, name string) (bool, error) {
-	logrus.Debug("CheckRequirements if cluster was already created: ", name)
+func (s sdk) ResolveCluster(ctx context.Context, nameOrArn string) (awsResource, error) {
+	logrus.Debug("CheckRequirements if cluster was already created: ", nameOrArn)
 	clusters, err := s.ECS.DescribeClustersWithContext(ctx, &ecs.DescribeClustersInput{
-		Clusters: []*string{aws.String(name)},
+		Clusters: []*string{aws.String(nameOrArn)},
 	})
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return len(clusters.Clusters) > 0, nil
+	if len(clusters.Clusters) == 0 {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", nameOrArn)
+	}
+	it := clusters.Clusters[0]
+	return existingAWSResource{
+		arn: aws.StringValue(it.ClusterArn),
+		id:  aws.StringValue(it.ClusterName),
+	}, nil
 }
 
 func (s sdk) CreateCluster(ctx context.Context, name string) (string, error) {
@@ -139,7 +147,7 @@ func (s sdk) CheckVPC(ctx context.Context, vpcID string) error {
 	if !*output.EnableDnsSupport.Value {
 		return fmt.Errorf("VPC %q doesn't have DNS resolution enabled", vpcID)
 	}
-	return err
+	return nil
 }
 
 func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
@@ -161,7 +169,7 @@ func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 	return *vpcs.Vpcs[0].VpcId, nil
 }
 
-func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
+func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error) {
 	logrus.Debug("Retrieve SubNets")
 	subnets, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 		DryRun: nil,
@@ -176,9 +184,12 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]string, error) {
 		return nil, err
 	}
 
-	ids := []string{}
+	ids := []awsResource{}
 	for _, subnet := range subnets.Subnets {
-		ids = append(ids, *subnet.SubnetId)
+		ids = append(ids, existingAWSResource{
+			arn: aws.StringValue(subnet.SubnetArn),
+			id:  aws.StringValue(subnet.SubnetId),
+		})
 	}
 	return ids, nil
 }
@@ -784,18 +795,31 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	return publicIPs, nil
 }
 
-func (s sdk) LoadBalancerType(ctx context.Context, arn string) (string, error) {
-	logrus.Debug("Check if LoadBalancer exists: ", arn)
+func (s sdk) ResolveLoadBalancer(ctx context.Context, nameOrarn string) (awsResource, string, error) {
+	logrus.Debug("Check if LoadBalancer exists: ", nameOrarn)
+	var arns []*string
+	var names []*string
+	if arn.IsARN(nameOrarn) {
+		arns = append(arns, aws.String(nameOrarn))
+	} else {
+		names = append(names, aws.String(nameOrarn))
+	}
+
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
-		LoadBalancerArns: []*string{aws.String(arn)},
+		LoadBalancerArns: arns,
+		Names:            names,
 	})
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 	if len(lbs.LoadBalancers) == 0 {
-		return "", fmt.Errorf("load balancer does not exist: %s", arn)
+		return nil, "", errors.Wrapf(errdefs.ErrNotFound, "load balancer %q does not exist", nameOrarn)
 	}
-	return aws.StringValue(lbs.LoadBalancers[0].Type), nil
+	it := lbs.LoadBalancers[0]
+	return existingAWSResource{
+		arn: aws.StringValue(it.LoadBalancerArn),
+		id:  aws.StringValue(it.LoadBalancerName),
+	}, aws.StringValue(it.Type), nil
 }
 
 func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error) {
@@ -863,32 +887,42 @@ func (s sdk) DeleteAutoscalingGroup(ctx context.Context, arn string) error {
 	return err
 }
 
-func (s sdk) FileSystemExists(ctx context.Context, id string) (bool, error) {
+func (s sdk) ResolveFileSystem(ctx context.Context, id string) (awsResource, error) {
 	desc, err := s.EFS.DescribeFileSystemsWithContext(ctx, &efs.DescribeFileSystemsInput{
 		FileSystemId: aws.String(id),
 	})
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return len(desc.FileSystems) > 0, nil
+	if len(desc.FileSystems) == 0 {
+		return nil, errors.Wrapf(errdefs.ErrNotFound, "EFS file system %q doesn't exist", id)
+	}
+	it := desc.FileSystems[0]
+	return existingAWSResource{
+		arn: aws.StringValue(it.FileSystemArn),
+		id:  aws.StringValue(it.FileSystemId),
+	}, nil
 }
 
-func (s sdk) FindFileSystem(ctx context.Context, tags map[string]string) (string, error) {
+func (s sdk) FindFileSystem(ctx context.Context, tags map[string]string) (awsResource, error) {
 	var token *string
 	for {
 		desc, err := s.EFS.DescribeFileSystemsWithContext(ctx, &efs.DescribeFileSystemsInput{
 			Marker: token,
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, filesystem := range desc.FileSystems {
 			if containsAll(filesystem.Tags, tags) {
-				return aws.StringValue(filesystem.FileSystemId), nil
+				return existingAWSResource{
+					arn: aws.StringValue(filesystem.FileSystemArn),
+					id:  aws.StringValue(filesystem.FileSystemId),
+				}, nil
 			}
 		}
 		if desc.NextMarker == token {
-			return "", nil
+			return nil, nil
 		}
 		token = desc.NextMarker
 	}

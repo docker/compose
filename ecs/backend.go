@@ -19,9 +19,6 @@ package ecs
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/resources"
@@ -32,6 +29,9 @@ import (
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 const backendType = store.EcsContextType

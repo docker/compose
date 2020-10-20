@@ -62,7 +62,7 @@ func (b *ecsAPIService) createAutoscalingPolicy(project *types.Project, resource
 	}
 
 	// Why isn't this just the service ARN ?????
-	resourceID := cloudformation.Join("/", []string{"service", resources.cluster, cloudformation.GetAtt(serviceResourceName(service.Name), "Name")})
+	resourceID := cloudformation.Join("/", []string{"service", resources.cluster.ID(), cloudformation.GetAtt(serviceResourceName(service.Name), "Name")})
 
 	target := fmt.Sprintf("%sScalableTarget", normalizeResourceName(service.Name))
 	template.Resources[target] = &applicationautoscaling.ScalableTarget{

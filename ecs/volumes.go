@@ -19,6 +19,8 @@ package ecs
 import (
 	"fmt"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/compose-spec/compose-go/types"
@@ -27,11 +29,11 @@ import (
 func (b *ecsAPIService) createNFSMountTarget(project *types.Project, resources awsResources, template *cloudformation.Template) {
 	for volume := range project.Volumes {
 		for _, subnet := range resources.subnets {
-			name := fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet))
+			name := fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet.ID()))
 			template.Resources[name] = &efs.MountTarget{
-				FileSystemId:   resources.filesystems[volume],
+				FileSystemId:   resources.filesystems[volume].ID(),
 				SecurityGroups: resources.allSecurityGroups(),
-				SubnetId:       subnet,
+				SubnetId:       subnet.ID(),
 			}
 		}
 	}
@@ -40,7 +42,58 @@ func (b *ecsAPIService) createNFSMountTarget(project *types.Project, resources a
 func (b *ecsAPIService) mountTargets(volume string, resources awsResources) []string {
 	var refs []string
 	for _, subnet := range resources.subnets {
-		refs = append(refs, fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet)))
+		refs = append(refs, fmt.Sprintf("%sNFSMountTargetOn%s", normalizeResourceName(volume), normalizeResourceName(subnet.ID())))
 	}
 	return refs
+}
+
+func (b *ecsAPIService) createAccessPoints(project *types.Project, r awsResources, template *cloudformation.Template) {
+	for name, volume := range project.Volumes {
+		n := fmt.Sprintf("%sAccessPoint", normalizeResourceName(name))
+
+		uid := volume.DriverOpts["uid"]
+		gid := volume.DriverOpts["gid"]
+		permissions := volume.DriverOpts["permissions"]
+		path := volume.DriverOpts["root_directory"]
+
+		ap := efs.AccessPoint{
+			AccessPointTags: []efs.AccessPoint_AccessPointTag{
+				{
+					Key:   compose.ProjectTag,
+					Value: project.Name,
+				},
+				{
+					Key:   compose.VolumeTag,
+					Value: name,
+				},
+				{
+					Key:   "Name",
+					Value: fmt.Sprintf("%s_%s", project.Name, name),
+				},
+			},
+			FileSystemId: r.filesystems[name].ID(),
+		}
+
+		if uid != "" {
+			ap.PosixUser = &efs.AccessPoint_PosixUser{
+				Uid: uid,
+				Gid: gid,
+			}
+		}
+		if path != "" {
+			root := efs.AccessPoint_RootDirectory{
+				Path: path,
+			}
+			ap.RootDirectory = &root
+			if uid != "" {
+				root.CreationInfo = &efs.AccessPoint_CreationInfo{
+					OwnerUid:    uid,
+					OwnerGid:    gid,
+					Permissions: permissions,
+				}
+			}
+		}
+
+		template.Resources[n] = &ap
+	}
 }

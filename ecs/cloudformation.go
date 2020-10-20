@@ -77,6 +77,8 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 
 	b.createNFSMountTarget(project, resources, template)
 
+	b.createAccessPoints(project, resources, template)
+
 	for _, service := range project.Services {
 		err := b.createService(project, service, template, resources)
 		if err != nil {
@@ -96,7 +98,7 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 
 func (b *ecsAPIService) createService(project *types.Project, service types.ServiceConfig, template *cloudformation.Template, resources awsResources) error {
 	taskExecutionRole := b.createTaskExecutionRole(project, service, template)
-	taskRole := b.createTaskRole(project, service, template)
+	taskRole := b.createTaskRole(project, service, template, resources)
 
 	definition, err := b.createTaskDefinition(project, service, resources)
 	if err != nil {
@@ -166,7 +168,7 @@ func (b *ecsAPIService) createService(project *types.Project, service types.Serv
 
 	template.Resources[serviceResourceName(service.Name)] = &ecs.Service{
 		AWSCloudFormationDependsOn: dependsOn,
-		Cluster:                    resources.cluster,
+		Cluster:                    resources.cluster.ARN(),
 		DesiredCount:               desiredCount,
 		DeploymentController: &ecs.Service_DeploymentController{
 			Type: ecsapi.DeploymentControllerTypeEcs,
@@ -182,7 +184,7 @@ func (b *ecsAPIService) createService(project *types.Project, service types.Serv
 			AwsvpcConfiguration: &ecs.Service_AwsVpcConfiguration{
 				AssignPublicIp: assignPublicIP,
 				SecurityGroups: resources.serviceSecurityGroups(service),
-				Subnets:        resources.subnets,
+				Subnets:        resources.subnetsIDs(),
 			},
 		},
 		PlatformVersion:    platformVersion,
@@ -287,7 +289,7 @@ func computeRollingUpdateLimits(service types.ServiceConfig) (int, int, error) {
 
 func (b *ecsAPIService) createListener(service types.ServiceConfig, port types.ServicePortConfig,
 	template *cloudformation.Template,
-	targetGroupName string, loadBalancerARN string, protocol string) string {
+	targetGroupName string, loadBalancer awsResource, protocol string) string {
 	listenerName := fmt.Sprintf(
 		"%s%s%dListener",
 		normalizeResourceName(service.Name),
@@ -309,7 +311,7 @@ func (b *ecsAPIService) createListener(service types.ServiceConfig, port types.S
 				Type: elbv2.ActionTypeEnumForward,
 			},
 		},
-		LoadBalancerArn: loadBalancerARN,
+		LoadBalancerArn: loadBalancer.ARN(),
 		Protocol:        protocol,
 		Port:            int(port.Target),
 	}
@@ -375,12 +377,19 @@ func (b *ecsAPIService) createTaskExecutionRole(project *types.Project, service 
 	return taskExecutionRole
 }
 
-func (b *ecsAPIService) createTaskRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template) string {
+func (b *ecsAPIService) createTaskRole(project *types.Project, service types.ServiceConfig, template *cloudformation.Template, resources awsResources) string {
 	taskRole := fmt.Sprintf("%sTaskRole", normalizeResourceName(service.Name))
 	rolePolicies := []iam.Role_Policy{}
 	if roles, ok := service.Extensions[extensionRole]; ok {
 		rolePolicies = append(rolePolicies, iam.Role_Policy{
+			PolicyName:     fmt.Sprintf("%s%sPolicy", normalizeResourceName(project.Name), normalizeResourceName(service.Name)),
 			PolicyDocument: roles,
+		})
+	}
+	for _, vol := range service.Volumes {
+		rolePolicies = append(rolePolicies, iam.Role_Policy{
+			PolicyName:     fmt.Sprintf("%s%sVolumeMountPolicy", normalizeResourceName(project.Name), normalizeResourceName(service.Name)),
+			PolicyDocument: volumeMountPolicyDocument(vol.Source, resources.filesystems[vol.Source].ARN()),
 		})
 	}
 	managedPolicies := []string{}

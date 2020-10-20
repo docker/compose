@@ -38,13 +38,13 @@ import (
 
 // awsResources hold the AWS component being used or created to support services definition
 type awsResources struct {
-	vpc              string
-	subnets          []string
-	cluster          string
-	loadBalancer     string
+	vpc              string // shouldn't this also be an awsResource ?
+	subnets          []awsResource
+	cluster          awsResource
+	loadBalancer     awsResource
 	loadBalancerType string
 	securityGroups   map[string]string
-	filesystems      map[string]string
+	filesystems      map[string]awsResource
 }
 
 func (r *awsResources) serviceSecurityGroups(service types.ServiceConfig) []string {
@@ -61,6 +61,63 @@ func (r *awsResources) allSecurityGroups() []string {
 		securityGroups = append(securityGroups, r)
 	}
 	return securityGroups
+}
+
+func (r *awsResources) subnetsIDs() []string {
+	var ids []string
+	for _, r := range r.subnets {
+		ids = append(ids, r.ID())
+	}
+	return ids
+}
+
+// awsResource is abstract representation for any (existing or future) AWS resource that we can refer both by ID or full ARN
+type awsResource interface {
+	ARN() string
+	ID() string
+}
+
+// existingAWSResource hold references to an existing AWS component
+type existingAWSResource struct {
+	arn string
+	id  string
+}
+
+func (r existingAWSResource) ARN() string {
+	return r.arn
+}
+
+func (r existingAWSResource) ID() string {
+	return r.id
+}
+
+// cloudformationResource hold references to a future AWS resource managed by CloudFormation
+// to be used by CloudFormation resources where Ref returns the Amazon Resource ID
+type cloudformationResource struct {
+	logicalName string
+}
+
+func (r cloudformationResource) ARN() string {
+	return cloudformation.GetAtt(r.logicalName, "Arn")
+}
+
+func (r cloudformationResource) ID() string {
+	return cloudformation.Ref(r.logicalName)
+}
+
+// cloudformationARNResource hold references to a future AWS resource managed by CloudFormation
+// to be used by CloudFormation resources where Ref returns the Amazon Resource Name (ARN)
+type cloudformationARNResource struct {
+	logicalName  string
+	nameProperty string
+}
+
+func (r cloudformationARNResource) ARN() string {
+	return cloudformation.Ref(r.logicalName)
+}
+
+func (r cloudformationARNResource) ID() string {
+	return cloudformation.GetAtt(r.logicalName, r.nameProperty)
 }
 
 // parse look into compose project for configured resource to use, and check they are valid
@@ -90,28 +147,28 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project, templ
 	return r, nil
 }
 
-func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project, template *cloudformation.Template) (string, error) {
+func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *types.Project, template *cloudformation.Template) (awsResource, error) {
 	if x, ok := project.Extensions[extensionCluster]; ok {
-		cluster := x.(string)
-		ok, err := b.aws.ClusterExists(ctx, cluster)
+		nameOrArn := x.(string) // can be name _or_ ARN.
+		cluster, err := b.aws.ResolveCluster(ctx, nameOrArn)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if !ok {
-			return "", errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", cluster)
+			return nil, errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", cluster)
 		}
 
-		template.Metadata["Cluster"] = cluster
+		template.Metadata["Cluster"] = cluster.ARN()
 		return cluster, nil
 	}
-	return "", nil
+	return nil, nil
 }
 
-func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project) (string, []string, error) {
+func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project) (string, []awsResource, error) {
 	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
-		vpc = x.(string)
-		err := b.aws.CheckVPC(ctx, vpc)
+		vpcID := x.(string)
+		err := b.aws.CheckVPC(ctx, vpcID)
 		if err != nil {
 			return "", nil, err
 		}
@@ -134,22 +191,22 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 	return vpc, subNets, nil
 }
 
-func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (string, string, error) {
+func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (awsResource, string, error) {
 	if x, ok := project.Extensions[extensionLoadBalancer]; ok {
-		loadBalancer := x.(string)
-		loadBalancerType, err := b.aws.LoadBalancerType(ctx, loadBalancer)
+		nameOrArn := x.(string)
+		loadBalancer, loadBalancerType, err := b.aws.ResolveLoadBalancer(ctx, nameOrArn)
 		if err != nil {
-			return "", "", err
+			return nil, "", err
 		}
 
 		required := getRequiredLoadBalancerType(project)
 		if loadBalancerType != required {
-			return "", "", fmt.Errorf("load balancer %s is of type %s, project require a %s", loadBalancer, loadBalancerType, required)
+			return nil, "", fmt.Errorf("load balancer %q is of type %s, project require a %s", nameOrArn, loadBalancerType, required)
 		}
 
-		return loadBalancer, loadBalancerType, nil
+		return loadBalancer, loadBalancerType, err
 	}
-	return "", "", nil
+	return nil, "", nil
 }
 
 func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
@@ -179,18 +236,15 @@ func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *type
 	return securityGroups, nil
 }
 
-func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types.Project) (map[string]string, error) {
-	filesystems := make(map[string]string, len(project.Volumes))
+func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types.Project) (map[string]awsResource, error) {
+	filesystems := make(map[string]awsResource, len(project.Volumes))
 	for name, vol := range project.Volumes {
 		if vol.External.External {
-			exists, err := b.aws.FileSystemExists(ctx, vol.Name)
+			arn, err := b.aws.ResolveFileSystem(ctx, vol.Name)
 			if err != nil {
 				return nil, err
 			}
-			if !exists {
-				return nil, errors.Wrapf(errdefs.ErrNotFound, "EFS file system %q doesn't exist", vol.Name)
-			}
-			filesystems[name] = vol.Name
+			filesystems[name] = arn
 			continue
 		}
 
@@ -199,12 +253,12 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 			compose.ProjectTag: project.Name,
 			compose.VolumeTag:  name,
 		}
-		id, err := b.aws.FindFileSystem(ctx, tags)
+		fileSystem, err := b.aws.FindFileSystem(ctx, tags)
 		if err != nil {
 			return nil, err
 		}
-		if id != "" {
-			filesystems[name] = id
+		if fileSystem != nil {
+			filesystems[name] = fileSystem
 		}
 	}
 	return filesystems, nil
@@ -223,14 +277,14 @@ func (b *ecsAPIService) ensureResources(resources *awsResources, project *types.
 }
 
 func (b *ecsAPIService) ensureCluster(r *awsResources, project *types.Project, template *cloudformation.Template) {
-	if r.cluster != "" {
+	if r.cluster != nil {
 		return
 	}
 	template.Resources["Cluster"] = &ecs.Cluster{
 		ClusterName: project.Name,
 		Tags:        projectTags(project),
 	}
-	r.cluster = cloudformation.Ref("Cluster")
+	r.cluster = cloudformationResource{logicalName: "Cluster"}
 }
 
 func (b *ecsAPIService) ensureNetworks(r *awsResources, project *types.Project, template *cloudformation.Template) {
@@ -319,13 +373,13 @@ func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, t
 			ThroughputMode:                  throughputMode,
 			AWSCloudFormationDeletionPolicy: "Retain",
 		}
-		r.filesystems[name] = cloudformation.Ref(n)
+		r.filesystems[name] = cloudformationResource{logicalName: n}
 	}
 	return nil
 }
 
 func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Project, template *cloudformation.Template) {
-	if r.loadBalancer != "" {
+	if r.loadBalancer != nil {
 		return
 	}
 	if allServices(project.Services, func(it types.ServiceConfig) bool {
@@ -345,11 +399,14 @@ func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Proje
 	template.Resources["LoadBalancer"] = &elasticloadbalancingv2.LoadBalancer{
 		Scheme:         elbv2.LoadBalancerSchemeEnumInternetFacing,
 		SecurityGroups: securityGroups,
-		Subnets:        r.subnets,
+		Subnets:        r.subnetsIDs(),
 		Tags:           projectTags(project),
 		Type:           balancerType,
 	}
-	r.loadBalancer = cloudformation.Ref("LoadBalancer")
+	r.loadBalancer = cloudformationARNResource{
+		logicalName:  "LoadBalancer",
+		nameProperty: "LoadBalancerName",
+	}
 	r.loadBalancerType = balancerType
 }
 

@@ -365,7 +365,7 @@ volumes:
     external: true
     name: fs-123abc
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.FileSystemExists(gomock.Any(), "fs-123abc").Return(true, nil)
+		m.ResolveFileSystem(gomock.Any(), "fs-123abc").Return(existingAWSResource{id: "fs-123abc"}, nil)
 	})
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
 	assert.Check(t, s != nil)
@@ -393,7 +393,7 @@ volumes:
 		m.FindFileSystem(gomock.Any(), map[string]string{
 			compose.ProjectTag: t.Name(),
 			compose.VolumeTag:  "db-data",
-		}).Return("", nil)
+		}).Return(nil, nil)
 	})
 	n := volumeResourceName("db-data")
 	f := template.Resources[n].(*efs.FileSystem)
@@ -409,6 +409,25 @@ volumes:
 	assert.Equal(t, s.FileSystemId, cloudformation.Ref(n)) //nolint:staticcheck
 }
 
+func TestCreateAccessPoint(t *testing.T) {
+	template := convertYaml(t, `
+services:
+  test:
+    image: nginx
+volumes:
+  db-data:
+    driver_opts:
+      uid: 1002
+      gid: 1002
+`, useDefaultVPC, func(m *MockAPIMockRecorder) {
+		m.FindFileSystem(gomock.Any(), gomock.Any()).Return(nil, nil)
+	})
+	a := template.Resources["DbdataAccessPoint"].(*efs.AccessPoint)
+	assert.Check(t, a != nil)
+	assert.Equal(t, a.PosixUser.Uid, "1002") //nolint:staticcheck
+	assert.Equal(t, a.PosixUser.Gid, "1002") //nolint:staticcheck
+}
+
 func TestReusePreviousVolume(t *testing.T) {
 	template := convertYaml(t, `
 services:
@@ -420,7 +439,7 @@ volumes:
 		m.FindFileSystem(gomock.Any(), map[string]string{
 			compose.ProjectTag: t.Name(),
 			compose.VolumeTag:  "db-data",
-		}).Return("fs-123abc", nil)
+		}).Return(existingAWSResource{id: "fs-123abc"}, nil)
 	})
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
 	assert.Check(t, s != nil)
@@ -497,7 +516,10 @@ services:
   test:
     image: nginx
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
-		m.ClusterExists(gomock.Any(), "arn:aws:ecs:region:account:cluster/name").Return(true, nil)
+		m.ResolveCluster(gomock.Any(), "arn:aws:ecs:region:account:cluster/name").Return(existingAWSResource{
+			arn: "arn:aws:ecs:region:account:cluster/name",
+			id:  "name",
+		}, nil)
 	})
 	assert.Equal(t, template.Metadata["Cluster"], "arn:aws:ecs:region:account:cluster/name")
 }
@@ -546,7 +568,10 @@ func getMainContainer(def *ecs.TaskDefinition, t *testing.T) ecs.TaskDefinition_
 
 func useDefaultVPC(m *MockAPIMockRecorder) {
 	m.GetDefaultVPC(gomock.Any()).Return("vpc-123", nil)
-	m.GetSubNets(gomock.Any(), "vpc-123").Return([]string{"subnet1", "subnet2"}, nil)
+	m.GetSubNets(gomock.Any(), "vpc-123").Return([]awsResource{
+		existingAWSResource{id: "subnet1"},
+		existingAWSResource{id: "subnet2"},
+	}, nil)
 }
 
 func useGPU(m *MockAPIMockRecorder) {
