@@ -79,8 +79,8 @@ type VolumeCreateOptions struct {
 }
 
 func (cs *aciVolumeService) Create(ctx context.Context, name string, options interface{}) (volumes.Volume, error) {
-	opts, ok := options.(VolumeCreateOptions)
-	if !ok {
+	opts, ok := options.(*VolumeCreateOptions)
+	if !ok || opts == nil {
 		return volumes.Volume{}, errors.New("could not read Azure VolumeCreateOptions struct from generic parameter")
 	}
 	w := progress.ContextWriter(ctx)
