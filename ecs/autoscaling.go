@@ -17,6 +17,7 @@
 package ecs
 
 import (
+	"encoding/json"
 	"fmt"
 
 	applicationautoscaling2 "github.com/aws/aws-sdk-go/service/applicationautoscaling"
@@ -26,13 +27,37 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) createAutoscalingPolicy(project *types.Project, resources awsResources, template *cloudformation.Template, service types.ServiceConfig) {
+type autoscalingConfig struct {
+	Memory int `json:"memory,omitempty"`
+	CPU    int `json:"cpu,omitempty"`
+	Min    int `json:"min,omitempty"`
+	Max    int `json:"max,omitempty"`
+}
+
+func (b *ecsAPIService) createAutoscalingPolicy(project *types.Project, resources awsResources, template *cloudformation.Template, service types.ServiceConfig) error {
 	if service.Deploy == nil {
-		return
+		return nil
 	}
 	v, ok := service.Deploy.Extensions[extensionAutoScaling]
 	if !ok {
-		return
+		return nil
+	}
+
+	marshalled, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	var config autoscalingConfig
+	err = json.Unmarshal(marshalled, &config)
+	if err != nil {
+		return err
+	}
+
+	if config.Memory != 0 && config.CPU != 0 {
+		return fmt.Errorf("%s can't be set with both cpu and memory targets", extensionAutoScaling)
+	}
+	if config.Max == 0 {
+		return fmt.Errorf("%s MUST define max replicas", extensionAutoScaling)
 	}
 
 	role := fmt.Sprintf("%sAutoScalingRole", normalizeResourceName(service.Name))
@@ -66,13 +91,22 @@ func (b *ecsAPIService) createAutoscalingPolicy(project *types.Project, resource
 
 	target := fmt.Sprintf("%sScalableTarget", normalizeResourceName(service.Name))
 	template.Resources[target] = &applicationautoscaling.ScalableTarget{
-		MaxCapacity:                10,
-		MinCapacity:                0,
+		MaxCapacity:                config.Max,
+		MinCapacity:                config.Min,
 		ResourceId:                 resourceID,
 		RoleARN:                    cloudformation.GetAtt(role, "Arn"),
 		ScalableDimension:          applicationautoscaling2.ScalableDimensionEcsServiceDesiredCount,
 		ServiceNamespace:           applicationautoscaling2.ServiceNamespaceEcs,
 		AWSCloudFormationDependsOn: []string{serviceResourceName(service.Name)},
+	}
+
+	var (
+		metric        = applicationautoscaling2.MetricTypeEcsserviceAverageCpuutilization
+		targetPercent = config.CPU
+	)
+	if config.Memory != 0 {
+		metric = applicationautoscaling2.MetricTypeEcsserviceAverageMemoryUtilization
+		targetPercent = config.Memory
 	}
 
 	policy := fmt.Sprintf("%sScalingPolicy", normalizeResourceName(service.Name))
@@ -83,11 +117,12 @@ func (b *ecsAPIService) createAutoscalingPolicy(project *types.Project, resource
 		StepScalingPolicyConfiguration: nil,
 		TargetTrackingScalingPolicyConfiguration: &applicationautoscaling.ScalingPolicy_TargetTrackingScalingPolicyConfiguration{
 			PredefinedMetricSpecification: &applicationautoscaling.ScalingPolicy_PredefinedMetricSpecification{
-				PredefinedMetricType: applicationautoscaling2.MetricTypeEcsserviceAverageCpuutilization,
+				PredefinedMetricType: metric,
 			},
 			ScaleOutCooldown: 60,
 			ScaleInCooldown:  60,
-			TargetValue:      float64(v.(int)),
+			TargetValue:      float64(targetPercent),
 		},
 	}
+	return nil
 }

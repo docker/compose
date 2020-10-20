@@ -83,7 +83,10 @@ func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*c
 			return nil, err
 		}
 
-		b.createAutoscalingPolicy(project, resources, template, service)
+		err = b.createAutoscalingPolicy(project, resources, template, service)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = b.createCapacityProvider(ctx, project, template, resources)
