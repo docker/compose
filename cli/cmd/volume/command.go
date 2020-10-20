@@ -94,14 +94,14 @@ func createVolume(ctype string) *cobra.Command {
 		aciOpts := aci.VolumeCreateOptions{}
 		cmd.Flags().StringVar(&aciOpts.Account, "storage-account", "", "Storage account name")
 		_ = cmd.MarkFlagRequired("storage-account")
-		opts = aciOpts
+		opts = &aciOpts
 	case store.EcsContextType:
 		ecsOpts := ecs.VolumeCreateOptions{}
 		cmd.Flags().StringVar(&ecsOpts.KmsKeyID, "kms-key", "", "ID of the AWS KMS CMK to be used to protect the encrypted file system")
 		cmd.Flags().StringVar(&ecsOpts.PerformanceMode, "performance-mode", "", "performance mode of the file system. (generalPurpose|maxIO)")
 		cmd.Flags().Float64Var(&ecsOpts.ProvisionedThroughputInMibps, "provisioned-throughput", 0, "throughput in MiB/s (1-1024)")
 		cmd.Flags().StringVar(&ecsOpts.ThroughputMode, "throughput-mode", "", "throughput mode (bursting|provisioned)")
-		opts = ecsOpts
+		opts = &ecsOpts
 	}
 	return cmd
 }
