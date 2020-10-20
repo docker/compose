@@ -74,8 +74,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			knownEvents[*event.EventId] = struct{}{}
 
 			resource := aws.StringValue(event.LogicalResourceId)
-			reason := shortenMessage(
-				aws.StringValue(event.ResourceStatusReason))
+			reason := aws.StringValue(event.ResourceStatusReason)
 			status := aws.StringValue(event.ResourceStatus)
 			progressStatus := progress.Working
 
@@ -116,21 +115,13 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			}
 			stackErr = err
 			operation = stackDelete
-			reason := shortenMessage(err.Error())
 			w.Event(progress.Event{
 				ID:         name,
 				Status:     progress.Error,
-				StatusText: reason,
+				StatusText: err.Error(),
 			})
 		}
 	}
 
 	return stackErr
-}
-
-func shortenMessage(message string) string {
-	if len(message) < 30 {
-		return message
-	}
-	return message[:30] + "..."
 }
