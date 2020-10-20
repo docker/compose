@@ -13,6 +13,9 @@ pipeline {
         timeout(time: 2, unit: 'HOURS')
         timestamps()
     }
+    environment {
+        DOCKER_BUILDKIT="1"
+    }
 
     stages {
         stage('Build test images') {
@@ -229,7 +232,7 @@ def buildImage(baseImage) {
             ansiColor('xterm') {
                 sh """docker build -t ${imageName} \\
                     --target build \\
-                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg DISTRO="${baseImage}" \\
                     --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
                     .\\
                 """
@@ -276,7 +279,7 @@ def buildRuntimeImage(baseImage) {
     def imageName = "docker/compose:${baseImage}-${env.BRANCH_NAME}"
     ansiColor('xterm') {
         sh """docker build -t ${imageName} \\
-            --build-arg BUILD_PLATFORM="${baseImage}" \\
+            --build-arg DISTRO="${baseImage}" \\
             --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}" \\
             .
         """
