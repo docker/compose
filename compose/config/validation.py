@@ -502,13 +502,13 @@ def get_schema_path():
 
 
 def load_jsonschema(version):
-    suffix = "compose_spec"
+    name = "compose_spec"
     if version == V1:
-        suffix = "v1"
+        name = "config_schema_v1"
 
     filename = os.path.join(
         get_schema_path(),
-        "config_schema_{}.json".format(suffix))
+        "{}.json".format(name))
 
     if not os.path.exists(filename):
         raise ConfigurationError(
