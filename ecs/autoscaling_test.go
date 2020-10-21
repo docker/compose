@@ -29,13 +29,15 @@ services:
   foo:
     image: hello_world
     deploy:
-      x-aws-autoscaling: 75
+      x-aws-autoscaling: 
+        cpu: 75
+        max: 10
 `, useDefaultVPC)
 	target := template.Resources["FooScalableTarget"].(*autoscaling.ScalableTarget)
 	assert.Check(t, target != nil)
+	assert.Check(t, target.MaxCapacity == 10) //nolint:staticcheck
+
 	policy := template.Resources["FooScalingPolicy"].(*autoscaling.ScalingPolicy)
-	if policy == nil || policy.TargetTrackingScalingPolicyConfiguration == nil {
-		t.Fail()
-	}
-	assert.Check(t, policy.TargetTrackingScalingPolicyConfiguration.TargetValue == float64(75))
+	assert.Check(t, policy != nil)
+	assert.Check(t, policy.TargetTrackingScalingPolicyConfiguration.TargetValue == float64(75)) //nolint:staticcheck
 }
