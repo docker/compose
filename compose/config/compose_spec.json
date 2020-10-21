@@ -1,14 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft/2019-09/schema#",
-  "id": "config_schema_compose_spec.json",
+  "id": "compose_spec.json",
   "type": "object",
   "title": "Compose Specification",
   "description": "The Compose file is a YAML file defining a multi-containers based application.",
+
   "properties": {
     "version": {
       "type": "string",
       "description": "Version of the Compose specification used. Tools not implementing required version MUST reject the configuration file."
     },
+
     "services": {
       "id": "#/properties/services",
       "type": "object",
@@ -19,6 +21,7 @@
       },
       "additionalProperties": false
     },
+
     "networks": {
       "id": "#/properties/networks",
       "type": "object",
@@ -28,6 +31,7 @@
         }
       }
     },
+
     "volumes": {
       "id": "#/properties/volumes",
       "type": "object",
@@ -38,6 +42,7 @@
       },
       "additionalProperties": false
     },
+
     "secrets": {
       "id": "#/properties/secrets",
       "type": "object",
@@ -48,6 +53,7 @@
       },
       "additionalProperties": false
     },
+
     "configs": {
       "id": "#/properties/configs",
       "type": "object",
@@ -59,12 +65,16 @@
       "additionalProperties": false
     }
   },
+
   "patternProperties": {"^x-": {}},
   "additionalProperties": false,
+
   "definitions": {
+
     "service": {
       "id": "#/definitions/service",
       "type": "object",
+
       "properties": {
         "deploy": {"$ref": "#/definitions/deployment"},
         "build": {
@@ -190,7 +200,6 @@
         "device_cgroup_rules": {"$ref": "#/definitions/list_of_strings"},
         "devices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "dns": {"$ref": "#/definitions/string_or_list"},
-
         "dns_opt": {"type": "array","items": {"type": "string"}, "uniqueItems": true},
         "dns_search": {"$ref": "#/definitions/string_or_list"},
         "domainname": {"type": "string"},
@@ -211,12 +220,12 @@
           },
           "uniqueItems": true
         },
-
         "extends": {
           "oneOf": [
             {"type": "string"},
             {
               "type": "object",
+
               "properties": {
                 "service": {"type": "string"},
                 "file": {"type": "string"}
@@ -245,6 +254,7 @@
         "links": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
         "logging": {
           "type": "object",
+
           "properties": {
             "driver": {"type": "string"},
             "options": {
@@ -258,7 +268,7 @@
           "patternProperties": {"^x-": {}}
         },
         "mac_address": {"type": "string"},
-        "mem_limit": {"type": "string"},
+        "mem_limit": {"type": ["number", "string"]},
         "mem_reservation": {"type": ["string", "integer"]},
         "mem_swappiness": {"type": "integer"},
         "memswap_limit": {"type": ["number", "string"]},
@@ -425,9 +435,9 @@
                 "additionalProperties": false,
                 "patternProperties": {"^x-": {}}
               }
-            ],
-            "uniqueItems": true
-          }
+            ]
+          },
+          "uniqueItems": true
         },
         "volumes_from": {
           "type": "array",
@@ -558,6 +568,7 @@
       "additionalProperties": false,
       "patternProperties": {"^x-": {}}
     },
+
     "generic_resources": {
       "id": "#/definitions/generic_resources",
       "type": "array",
@@ -578,6 +589,7 @@
         "patternProperties": {"^x-": {}}
       }
     },
+
     "network": {
       "id": "#/definitions/network",
       "type": ["object", "null"],
@@ -607,10 +619,10 @@
                     "additionalProperties": false,
                     "patternProperties": {"^.+$": {"type": "string"}}
                   }
-                }
-              },
-              "additionalProperties": false,
-              "patternProperties": {"^x-": {}}
+                },
+                "additionalProperties": false,
+                "patternProperties": {"^x-": {}}
+              }
             },
             "options": {
               "type": "object",
@@ -640,6 +652,7 @@
       "additionalProperties": false,
       "patternProperties": {"^x-": {}}
     },
+
     "volume": {
       "id": "#/definitions/volume",
       "type": ["object", "null"],
@@ -668,6 +681,7 @@
       "additionalProperties": false,
       "patternProperties": {"^x-": {}}
     },
+
     "secret": {
       "id": "#/definitions/secret",
       "type": "object",
@@ -693,6 +707,7 @@
       "additionalProperties": false,
       "patternProperties": {"^x-": {}}
     },
+
     "config": {
       "id": "#/definitions/config",
       "type": "object",
@@ -714,17 +729,20 @@
       "additionalProperties": false,
       "patternProperties": {"^x-": {}}
     },
+
     "string_or_list": {
       "oneOf": [
         {"type": "string"},
         {"$ref": "#/definitions/list_of_strings"}
       ]
     },
+
     "list_of_strings": {
       "type": "array",
       "items": {"type": "string"},
       "uniqueItems": true
     },
+
     "list_or_dict": {
       "oneOf": [
         {
@@ -739,6 +757,7 @@
         {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
       ]
     },
+
     "blkio_limit": {
       "type": "object",
       "properties": {
@@ -755,6 +774,7 @@
       },
       "additionalProperties": false
     },
+
     "constraints": {
       "service": {
         "id": "#/definitions/constraints/service",
