@@ -126,7 +126,7 @@ Credentials for storage accounts will be automatically fetched at deployment tim
 ## Secrets
 
 Secrets can be defined in compose files, and will need secret files available at deploy time next to the compose file.
-The content of the secret file will be made available inside selected containers, under `/run/secrets/<SECRET_NAME>`.
+The content of the secret file will be made available inside selected containers, by default under `/run/secrets/<SECRET_NAME>`.
 External secrets are not supported with the ACI integration.
 
 ```yaml
@@ -147,7 +147,7 @@ secrets:
     file: ./my_secret2.txt
 ```
 
-The nginx container will have secret1 mounted as `/run/secrets/mysecret1/mysecret1`, the db container will have secret2 mounted as `/run/secrets/mysecret1/mysecret2`
+The nginx container will have secret1 mounted as `/run/secrets/mysecret1`, the db container will have secret2 mounted as `/run/secrets/mysecret2`
 
 **Note that file paths are not allowed in the target**
 
