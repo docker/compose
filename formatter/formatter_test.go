@@ -57,7 +57,6 @@ func TestPrint(t *testing.T) {
 			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
 		}
 	}, "NAME", "STATUS"))
-	assert.Equal(t, b.String(), `{"Name":"myName1","Status":"myStatus1"}
-{"Name":"myName2","Status":"myStatus2"}
+	assert.Equal(t, b.String(), `[{"Name":"myName1","Status":"myStatus1"},{"Name":"myName2","Status":"myStatus2"}]
 `)
 }

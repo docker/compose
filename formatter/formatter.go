@@ -35,15 +35,11 @@ func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func
 	case JSON:
 		switch reflect.TypeOf(toJSON).Kind() {
 		case reflect.Slice:
-			s := reflect.ValueOf(toJSON)
-			for i := 0; i < s.Len(); i++ {
-				obj := s.Index(i).Interface()
-				jsonLine, err := ToJSON(obj, "", "")
-				if err != nil {
-					return err
-				}
-				_, _ = fmt.Fprint(outWriter, jsonLine)
+			outJSON, err := ToJSON(toJSON, "", "")
+			if err != nil {
+				return err
 			}
+			_, _ = fmt.Fprint(outWriter, outJSON)
 		default:
 			outJSON, err := ToStandardJSON(toJSON)
 			if err != nil {
