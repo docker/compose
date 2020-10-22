@@ -400,12 +400,24 @@ func (b *ecsAPIService) ensureLoadBalancer(r *awsResources, project *types.Proje
 		// Network Load Balancers do not have associated security groups
 		securityGroups = r.getLoadBalancerSecurityGroups(project)
 	}
+
+	var loadBalancerAttributes []elasticloadbalancingv2.LoadBalancer_LoadBalancerAttribute
+	if balancerType == elbv2.LoadBalancerTypeEnumNetwork {
+		loadBalancerAttributes = append(
+			loadBalancerAttributes,
+			elasticloadbalancingv2.LoadBalancer_LoadBalancerAttribute{
+				Key:   "load_balancing.cross_zone.enabled",
+				Value: "true",
+			})
+	}
+
 	template.Resources["LoadBalancer"] = &elasticloadbalancingv2.LoadBalancer{
-		Scheme:         elbv2.LoadBalancerSchemeEnumInternetFacing,
-		SecurityGroups: securityGroups,
-		Subnets:        r.subnetsIDs(),
-		Tags:           projectTags(project),
-		Type:           balancerType,
+		Scheme:                 elbv2.LoadBalancerSchemeEnumInternetFacing,
+		SecurityGroups:         securityGroups,
+		Subnets:                r.subnetsIDs(),
+		Tags:                   projectTags(project),
+		Type:                   balancerType,
+		LoadBalancerAttributes: loadBalancerAttributes,
 	}
 	r.loadBalancer = cloudformationARNResource{
 		logicalName:  "LoadBalancer",
