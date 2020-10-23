@@ -128,7 +128,7 @@ class Project:
                 config_data.secrets)
 
             service_dict['scale'] = project.get_service_scale(service_dict)
-
+            device_requests = project.get_device_requests(service_dict)
             service_dict = translate_credential_spec_to_security_opt(service_dict)
             service_dict, ignored_keys = translate_deploy_keys_to_container_config(
                 service_dict
@@ -154,6 +154,7 @@ class Project:
                     ipc_mode=ipc_mode,
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
+                    device_requests=device_requests,
                     extra_labels=extra_labels,
                     **service_dict)
             )
@@ -330,6 +331,31 @@ class Project:
             log.warning("Scale is limited to {} ('max_replicas_per_node' field).".format(
                 max_replicas))
         return scale
+
+    def get_device_requests(self, service_dict):
+        deploy_dict = service_dict.get('deploy', None)
+        if not deploy_dict:
+            return
+
+        resources = deploy_dict.get('resources', None)
+        if not resources or not resources.get('reservations', None):
+            return
+        devices = resources['reservations'].get('devices')
+        if not devices:
+            return
+
+        for dev in devices:
+            count = dev.get("count", -1)
+            if not isinstance(count, int):
+                if count != "all":
+                    raise ConfigurationError(
+                        'Invalid value "{}" for devices count'.format(dev["count"]),
+                        '(expected integer or "all")')
+                dev["count"] = -1
+
+            if 'capabilities' in dev:
+                dev['capabilities'] = [dev['capabilities']]
+        return devices
 
     def start(self, service_names=None, **options):
         containers = []

@@ -524,7 +524,8 @@
               "properties": {
                 "cpus": {"type": ["number", "string"]},
                 "memory": {"type": "string"},
-                "generic_resources": {"$ref": "#/definitions/generic_resources"}
+                "generic_resources": {"$ref": "#/definitions/generic_resources"},
+                "devices": {"$ref": "#/definitions/devices"}
               },
               "additionalProperties": false,
               "patternProperties": {"^x-": {}}
@@ -585,6 +586,23 @@
             "patternProperties": {"^x-": {}}
           }
         },
+        "additionalProperties": false,
+        "patternProperties": {"^x-": {}}
+      }
+    },
+
+    "devices": {
+      "id": "#/definitions/devices",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+            "capabilities": {"$ref": "#/definitions/list_of_strings"},
+            "count": {"type": ["string", "integer"]},
+            "device_ids": {"$ref": "#/definitions/list_of_strings"},
+            "driver":{"type": "string"},
+            "options":{"$ref": "#/definitions/list_or_dict"}
+          },
         "additionalProperties": false,
         "patternProperties": {"^x-": {}}
       }
