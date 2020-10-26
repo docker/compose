@@ -126,7 +126,7 @@ Credentials for storage accounts will be automatically fetched at deployment tim
 ## Secrets
 
 Secrets can be defined in compose files, and will need secret files available at deploy time next to the compose file.
-The content of the secret file will be made available inside selected containers, under `/run/secrets/<SECRET_NAME>`.
+The content of the secret file will be made available inside selected containers, by default under `/run/secrets/<SECRET_NAME>`.
 External secrets are not supported with the ACI integration.
 
 ```yaml
@@ -147,9 +147,39 @@ secrets:
     file: ./my_secret2.txt
 ```
 
-The nginx container will have secret1 mounted as `/run/secrets/mysecret1/mysecret1`, the db container will have secret2 mounted as `/run/secrets/mysecret1/mysecret2`
+The nginx container will have secret1 mounted as `/run/secrets/mysecret1`, the db container will have secret2 mounted as `/run/secrets/mysecret2`
 
-**Note that file paths are not allowed in the target**
+A target can also be specified to set the name of the mounted file or by specifying an absolute path where to mount the secret file
+
+```yaml
+services:
+    nginx:
+        image: nginx
+        secrets:
+          - source: mysecret1
+            target: renamedsecret1.txt
+    db:
+        image: mysql
+        secrets:
+          - source: mysecret1
+            target: /mnt/dbmount/mysecretonmount1.txt
+          - source: mysecret2
+            target: /mnt/dbmount/mysecretonmount2.txt
+
+secrets:
+  mysecret1:
+    file: ./my_secret1.txt
+  mysecret2:
+    file: ./my_secret2.txt
+```
+
+In this example the `nginx` service will have its secret mounted in `/run/secrets/renamedsecret1.txt` and `db` will have 2 files (`mysecretonmount1.txt` and `mysecretonmount2.txt`). 
+Both of them with be mounted in the same folder (`/mnt/dbmount/`).
+
+
+**Note that absolute file paths are not allowed in the target**
+
+**The target folder will be empty when mounting inside**
 
 ## Container Resources
 
