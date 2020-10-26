@@ -177,9 +177,9 @@ In this example the `nginx` service will have its secret mounted in `/run/secret
 Both of them with be mounted in the same folder (`/mnt/dbmount/`).
 
 
-**Note that absolute file paths are not allowed in the target**
+**Note:** Relative file paths are not allowed in the target
 
-**The target folder will be empty when mounting inside**
+**Note:** Secret files cannot be mounted in a folder next to other existing files
 
 ## Container Resources
 
