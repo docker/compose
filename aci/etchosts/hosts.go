@@ -33,6 +33,10 @@ func SetHostNames(file string, hosts ...string) error {
 	fmt.Println("Setting local hosts for " + strings.Join(hosts, ", "))
 	for _, host := range hosts {
 		_, err = f.WriteString("\n127.0.0.1 " + host)
+		if err != nil {
+			return err
+		}
 	}
+	_, err = f.WriteString("\n")
 	return err
 }
