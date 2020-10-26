@@ -17,7 +17,9 @@
 package etchosts
 
 import (
+	"fmt"
 	"os"
+	"strings"
 )
 
 // SetHostNames appends hosts aliases for loopback address to etc/host file
@@ -28,6 +30,7 @@ func SetHostNames(file string, hosts ...string) error {
 	}
 	defer f.Close() //nolint:errcheck
 
+	fmt.Println("Setting local hosts for " + strings.Join(hosts, ", "))
 	for _, host := range hosts {
 		_, err = f.WriteString("\n127.0.0.1 " + host)
 	}

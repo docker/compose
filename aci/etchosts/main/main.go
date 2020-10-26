@@ -18,10 +18,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/docker/compose-cli/aci/etchosts"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/docker/compose-cli/aci/etchosts"
 )
 
 const hosts = "/etc/hosts"
@@ -39,8 +40,8 @@ func main() {
 	}
 
 	// ACI restart policy is currently at container group level, cannot let the sidecar terminate quietly once /etc/hosts has been edited
-	// Pause forever (until someone explicitely terminates this process ; go is not happy to stop all goroutines otherwise)
-	exitSignal := make(chan os.Signal)
+	// Pause forever (until someone explicitly terminates this process ; go is not happy to stop all goroutines otherwise)
+	exitSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM)
 	<-exitSignal
 }
