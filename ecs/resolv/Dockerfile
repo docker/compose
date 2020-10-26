@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM FROM golang:1.15 AS builder
+FROM golang:1.15 AS builder
 WORKDIR $GOPATH/src/github.com/docker/compose-cli/ecs/resolv
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/resolv main/main.go
