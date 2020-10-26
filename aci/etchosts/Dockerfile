@@ -19,4 +19,3 @@ RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/hosts main/main.go
 
 FROM scratch
 COPY --from=builder /go/bin/hosts /hosts
-ENTRYPOINT ["/hosts"]

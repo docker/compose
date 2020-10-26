@@ -129,7 +129,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 }
 
 func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
-	var names []string
+	names := []string{"/hosts"}
 	for _, container := range containers {
 		names = append(names, *container.Name)
 	}
