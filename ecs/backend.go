@@ -38,6 +38,7 @@ const backendType = store.EcsContextType
 
 // ContextParams options for creating AWS context
 type ContextParams struct {
+	Name        string
 	Description string
 	Region      string
 	Profile     string

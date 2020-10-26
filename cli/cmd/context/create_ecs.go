@@ -45,6 +45,7 @@ func createEcsCommand() *cobra.Command {
 		Short: "Create a context for Amazon ECS",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Name = args[0]
 			if localSimulation {
 				return runCreateLocalSimulation(cmd.Context(), args[0], opts)
 			}
