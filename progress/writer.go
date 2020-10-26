@@ -39,7 +39,7 @@ const (
 	Error
 )
 
-// Event reprensents a progress event
+// Event represents a progress event.
 type Event struct {
 	ID         string
 	Text       string
