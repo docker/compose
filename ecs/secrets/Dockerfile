@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM golang:1.14.4-alpine AS builder
+FROM FROM golang:1.15 AS builder
 WORKDIR $GOPATH/src/github.com/docker/compose-cli/ecs/secrets
 COPY . .
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/secrets main/main.go
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/secrets main/main.go
 
 FROM scratch
 COPY --from=builder /go/bin/secrets /secrets

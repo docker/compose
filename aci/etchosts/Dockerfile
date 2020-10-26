@@ -12,11 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM FROM golang:1.15 AS builder
-WORKDIR $GOPATH/src/github.com/docker/compose-cli/ecs/resolv
+FROM golang:1.15 AS builder
+WORKDIR $GOPATH/src/github.com/docker/compose-cli/aci/etchosts
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/resolv main/main.go
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/hosts main/main.go
 
 FROM scratch
-COPY --from=builder /go/bin/resolv /resolv
-ENTRYPOINT ["/resolv"]
+COPY --from=builder /go/bin/hosts /hosts
