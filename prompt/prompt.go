@@ -64,7 +64,7 @@ func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 	return b, err
 }
 
-// Password  implemetns a text input with masked characters
+// Password implements a text input with masked characters.
 func (u User) Password(message string) (string, error) {
 	qs := &survey.Password{
 		Message: message,
