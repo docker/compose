@@ -216,8 +216,9 @@ func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDe
 		err error
 	)
 	client := &http.Client{
-		Timeout: retryDelay * time.Second,
+		Timeout: retryDelay,
 	}
+	fmt.Printf("	[%s] GET %s\n", t.Name(), endpoint)
 	checkUp := func(t poll.LogT) poll.Result {
 		r, err = client.Get(endpoint)
 		if err != nil {
