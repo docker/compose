@@ -46,6 +46,7 @@ type Opts struct {
 	EnvironmentFiles       []string
 	RestartPolicyCondition string
 	DomainName             string
+	Rm                     bool
 }
 
 // ToContainerConfig convert run options to a container configuration
