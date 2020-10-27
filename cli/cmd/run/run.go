@@ -18,6 +18,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -43,7 +44,7 @@ func Command(contextType string) *cobra.Command {
 			if len(args) > 1 {
 				opts.Command = args[1:]
 			}
-			return runRun(cmd.Context(), args[0], opts)
+			return runRun(cmd.Context(), args[0], contextType, opts)
 		},
 	}
 	cmd.Flags().SetInterspersed(false)
@@ -58,15 +59,22 @@ func Command(contextType string) *cobra.Command {
 	cmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	cmd.Flags().StringArrayVar(&opts.EnvironmentFiles, "env-file", []string{}, "Path to environment files to be translated as environment variables")
 	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", containers.RestartPolicyNone, "Restart policy to apply when a container exits")
+	cmd.Flags().BoolVar(&opts.Rm, "rm", false, "Automatically remove the container when it exits")
 
 	if contextType == store.AciContextType {
 		cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	}
 
+	_ = cmd.Flags().MarkHidden("rm")
+
 	return cmd
 }
 
-func runRun(ctx context.Context, image string, opts run.Opts) error {
+func runRun(ctx context.Context, image string, contextType string, opts run.Opts) error {
+	if opts.Rm {
+		return errors.New(`Option "rm" is not yet implemented for context type: ` + contextType)
+	}
+
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
