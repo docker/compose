@@ -6,11 +6,11 @@ Compose is a tool for defining and running multi-container Docker applications.
 With Compose, you use a Compose file to configure your application's services.
 Then, using a single command, you create and start all the services
 from your configuration. To learn more about all the features of Compose
-see [the list of features](https://github.com/docker/docker.github.io/blob/master/compose/index.md#features).
+see [the list of features](https://docs.docker.com/compose/#features).
 
 Compose is great for development, testing, and staging environments, as well as
 CI workflows. You can learn more about each case in
-[Common Use Cases](https://github.com/docker/docker.github.io/blob/master/compose/index.md#common-use-cases).
+[Common Use Cases](https://docs.docker.com/compose/#common-use-cases).
 
 Using Compose is basically a three-step process.
 
@@ -35,7 +35,7 @@ A `docker-compose.yml` looks like this:
         image: redis
 
 For more information about the Compose file, see the
-[Compose file reference](https://github.com/docker/docker.github.io/blob/master/compose/compose-file/compose-versioning.md).
+[Compose file reference](https://docs.docker.com/compose/compose-file/compose-versioning/).
 
 Compose has commands for managing the whole lifecycle of your application:
 
@@ -61,4 +61,4 @@ Want to help build Compose? Check out our [contributing documentation](https://g
 Releasing
 ---------
 
-Releases are built by maintainers, following an outline of the [release process](https://github.com/docker/compose/blob/master/project/RELEASE-PROCESS.md).
+Releases are built by maintainers, following an outline of the [release process](https://github.com/docker/compose/blob/master/script/release/README.md).
