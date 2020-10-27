@@ -15,8 +15,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.15.2-alpine
-ARG GOLANGCI_LINT_VERSION=v1.31.0-alpine
+ARG GO_VERSION=1.15.3-alpine
+ARG GOLANGCI_LINT_VERSION=v1.32.0-alpine
+ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
@@ -32,7 +33,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 FROM base AS make-protos
-RUN go get github.com/golang/protobuf/protoc-gen-go@v1.4.1
+ARG PROTOC_GEN_GO_VERSION
+RUN go get github.com/golang/protobuf/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
 COPY . .
 RUN make -f builder.Makefile protos
 
