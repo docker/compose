@@ -45,17 +45,11 @@ message Container {
 	string command = 4;
 	uint64 cpu_time = 5;
 	uint64 memory_usage = 6;
-	// kept for breaking change for now, moved to HostConfig
-	uint64 memory_limit = 7;
 	uint64 pids_current = 8;
 	uint64 pids_limit = 9;
 	repeated string labels = 10;
 	repeated Port ports = 11;
-	// kept for breaking change for now, moved to HostConfig
-	uint64 cpu_limit = 12;
 	string platform = 13;
-	// kept for breaking change for now, moved to HostConfig
-	string restart_policy_condition = 14;
 	HostConfig host_config = 15;
 }
 
