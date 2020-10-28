@@ -42,7 +42,7 @@ const (
 	// ComposeDNSSidecarName name of the dns sidecar container
 	ComposeDNSSidecarName = "aci--dns--sidecar"
 
-	dnsSidecarImage = "docker/aci-hostnames-sidecar"
+	dnsSidecarImage = "docker/aci-hostnames-sidecar:1.0"
 )
 
 // ToContainerGroup converts a compose project into a ACI container group
