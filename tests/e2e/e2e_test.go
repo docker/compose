@@ -415,6 +415,8 @@ func TestLegacy(t *testing.T) {
 			ExitCode: 1,
 			Err:      `"docker swarm join" requires exactly 1 argument.`,
 		})
+		res = c.RunDockerCmd("context", "update", "moby-ctx", "--description", "updated context")
+		res.Assert(t, icmd.Expected{Out: "moby-ctx"})
 	})
 
 	t.Run("host flag overrides context", func(t *testing.T) {
