@@ -18,6 +18,7 @@ package ecs
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
@@ -61,6 +62,13 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
+	if ecsCtx.CredentialsFromEnv {
+		creds := getEnvVars()
+		if !creds.HaveRequiredCredentials() {
+			return nil, fmt.Errorf(`context requires credentials to be passed as environment variable.`)
+		}
+	}
+
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Profile:           ecsCtx.Profile,
 		SharedConfigState: session.SharedConfigEnable,
