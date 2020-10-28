@@ -154,12 +154,6 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 				return nil, "", err
 			}
 		}
-		/*if creds.Profile == "" {
-			creds.Profile = opts.Name
-
-		}
-		fmt.Printf("Saving credentials under profile %s\n", creds.Profile)
-		h.createProfile(creds.Profile, &creds)*/
 	case 1:
 		accessKey, secretKey, err := h.askCredentials()
 		if err != nil {
@@ -199,7 +193,6 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 		}
 	}
 
-	//os.Exit(0)
 	ecsCtx, descr := h.createContext(&creds, opts.Description)
 	return ecsCtx, descr, nil
 }
