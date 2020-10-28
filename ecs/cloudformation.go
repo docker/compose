@@ -210,7 +210,7 @@ func (b *ecsAPIService) createIngress(service types.ServiceConfig, net string, p
 	ingress := fmt.Sprintf("%s%dIngress", normalizeResourceName(net), port.Target)
 	template.Resources[ingress] = &ec2.SecurityGroupIngress{
 		CidrIp:      "0.0.0.0/0",
-		Description: fmt.Sprintf("%s:%d/%s on %s nextwork", service.Name, port.Target, port.Protocol, net),
+		Description: fmt.Sprintf("%s:%d/%s on %s network", service.Name, port.Target, port.Protocol, net),
 		GroupId:     resources.securityGroups[net],
 		FromPort:    int(port.Target),
 		IpProtocol:  protocol,
