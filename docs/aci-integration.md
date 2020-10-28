@@ -117,7 +117,7 @@ services:
           memory: 50M
 ```
 
-In this general example, the _redis_ service is constrained to use no more than 50M of memory (50 MB) and 0.50 (50% of a single core) of available processing time (CPU).
+In this example, the _redis_ service is constrained to use no more than 50M of memory (50 MB) and 0.50 (50% of a single core) of available processing time (CPU).
 
 ## Environment variables
 
