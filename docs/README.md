@@ -7,7 +7,6 @@ The general architecture of the CLI is described [here](architecture.md)
 The Compose CLI can deploy single containers or Compose applications to ACI. 
 
 * [ACI integration user guide](https://docs.docker.com/engine/context/aci-integration/)
-* General description of the [main features of the ACI integration](aci-integration.md)
 * [Mapping `docker run` options to ACI deployments](aci-container-features.md) (single container) 
 * [Mapping Compose file options to ACI deployments](aci-compose-features.md)
 
