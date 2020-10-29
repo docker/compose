@@ -81,22 +81,41 @@ func TestCompose(t *testing.T) {
 	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/nginx.yaml")
+		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/demo_multi_port.yaml")
 	})
 
-	var url string
+	var webURL, wordsURL string
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
-		lines := strings.Split(res.Stdout(), "\n")
+		fmt.Println(strings.TrimSpace(res.Stdout()))
+		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 
-		assert.Equal(t, 3, len(lines))
-		fields := strings.Fields(lines[1])
-		assert.Equal(t, 4, len(fields))
-		assert.Check(t, strings.Contains(fields[0], stack))
-		assert.Equal(t, "nginx", fields[1])
-		assert.Equal(t, "1/1", fields[2])
-		assert.Check(t, strings.Contains(fields[3], "->80/http"))
-		url = "http://" + strings.Replace(fields[3], "->80/http", "", 1)
+		assert.Equal(t, 4, len(lines))
+
+		var dbDisplayed, wordsDisplayed, webDisplayed bool
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			containerID := fields[0]
+			serviceName := fields[1]
+			switch serviceName {
+			case "db":
+				dbDisplayed = true
+				assert.DeepEqual(t, fields, []string{containerID, serviceName, "1/1"})
+			case "words":
+				wordsDisplayed = true
+				assert.Check(t, strings.Contains(fields[3], ":8080->8080/tcp"))
+				wordsURL = "http://" + strings.Replace(fields[3], "->8080/tcp", "", 1) + "/noun"
+			case "web":
+				webDisplayed = true
+				assert.Equal(t, fields[1], "web")
+				assert.Check(t, strings.Contains(fields[3], ":80->80/tcp"))
+				webURL = "http://" + strings.Replace(fields[3], "->80/tcp", "", 1)
+			}
+		}
+
+		assert.Check(t, dbDisplayed)
+		assert.Check(t, wordsDisplayed)
+		assert.Check(t, webDisplayed)
 	})
 
 	t.Run("compose ls", func(t *testing.T) {
@@ -110,21 +129,17 @@ func TestCompose(t *testing.T) {
 		assert.Equal(t, "Running", fields[1])
 	})
 
-	t.Run("nginx GET", func(t *testing.T) {
-		checkUp := func(t poll.LogT) poll.Result {
-			r, err := http.Get(url)
-			if err != nil {
-				return poll.Continue("Err while getting %s : %v", url, err)
-			} else if r.StatusCode != http.StatusOK {
-				return poll.Continue("status %s while getting %s", r.Status, url)
-			}
-			b, err := ioutil.ReadAll(r.Body)
-			if err == nil && strings.Contains(string(b), "Welcome to nginx!") {
-				return poll.Success()
-			}
-			return poll.Error(fmt.Errorf("No nginx welcome page received at %s: \n%s", url, string(b)))
-		}
-		poll.WaitOn(t, checkUp, poll.WithDelay(2*time.Second), poll.WithTimeout(60*time.Second))
+	t.Run("Words GET validating cross service connection", func(t *testing.T) {
+		out := HTTPGetWithRetry(t, wordsURL, http.StatusOK, 5*time.Second, 180*time.Second)
+		assert.Assert(t, strings.Contains(out, `"word":`))
+	})
+
+	t.Run("web app GET", func(t *testing.T) {
+		out := HTTPGetWithRetry(t, webURL, http.StatusOK, 3*time.Second, 120*time.Second)
+		assert.Assert(t, strings.Contains(out, "Docker Compose demo"))
+
+		out = HTTPGetWithRetry(t, webURL+"/words/noun", http.StatusOK, 2*time.Second, 60*time.Second)
+		assert.Assert(t, strings.Contains(out, `"word":`))
 	})
 
 	t.Run("compose down", func(t *testing.T) {

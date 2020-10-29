@@ -33,6 +33,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/pkg/fileutils"
+
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -612,7 +614,7 @@ func TestUpUpdate(t *testing.T) {
 	)
 	var (
 		singlePortVolumesComposefile = "aci_demo_port_volumes.yaml"
-		multiPortComposefile         = "aci_demo_multi_port.yaml"
+		multiPortComposefile         = "demo_multi_port.yaml"
 	)
 	c := NewParallelE2eCLI(t, binDir)
 	sID, groupID, location := setupTestResourceGroup(t, c)
@@ -627,6 +629,8 @@ func TestUpUpdate(t *testing.T) {
 	t.Cleanup(func() {
 		assert.NilError(t, os.RemoveAll(dstDir))
 	})
+	_, err = fileutils.CopyFile(filepath.Join(filepath.Join("..", "composefiles"), multiPortComposefile), filepath.Join(dstDir, multiPortComposefile))
+	assert.NilError(t, err)
 
 	singlePortVolumesComposefile = filepath.Join(dstDir, singlePortVolumesComposefile)
 	overwriteFileStorageAccount(t, singlePortVolumesComposefile, composeAccountName)
