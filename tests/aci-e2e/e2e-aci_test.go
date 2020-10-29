@@ -434,14 +434,7 @@ func TestContainerRunAttached(t *testing.T) {
 		endpoint = fmt.Sprintf("http://%s:%d", fqdn, port.HostPort)
 
 		assert.Assert(t, !strings.Contains(followLogsProcess.Stdout(), "/test"))
-		checkRequest := func(t poll.LogT) poll.Result {
-			r, _ := http.Get(endpoint + "/test")
-			if r != nil && r.StatusCode == http.StatusNotFound {
-				return poll.Success()
-			}
-			return poll.Continue("waiting for container to serve request")
-		}
-		poll.WaitOn(t, checkRequest, poll.WithDelay(1*time.Second), poll.WithTimeout(60*time.Second))
+		HTTPGetWithRetry(t, endpoint+"/test", http.StatusNotFound, 2*time.Second, 60*time.Second)
 
 		checkLog := func(t poll.LogT) poll.Result {
 			if strings.Contains(followLogsProcess.Stdout(), "/test") {

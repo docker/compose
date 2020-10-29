@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"syscall"
 	"time"
 
@@ -73,11 +74,19 @@ func init() {
 	if err != nil {
 		fatal(errors.Wrap(err, "unable to get absolute bin path"))
 	}
-	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), path)); err != nil {
+
+	if err := os.Setenv("PATH", appendPaths(os.Getenv("PATH"), path)); err != nil {
 		panic(err)
 	}
 	// Seed random
 	rand.Seed(time.Now().UnixNano())
+}
+
+func appendPaths(envPath string, path string) string {
+	if envPath == "" {
+		return path
+	}
+	return strings.Join([]string{envPath, path}, string(os.PathListSeparator))
 }
 
 func isContextAgnosticCommand(cmd *cobra.Command) bool {
