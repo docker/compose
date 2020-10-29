@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/containerd/console"
 	"github.com/spf13/cobra"
@@ -59,6 +60,12 @@ func Command(contextType string) *cobra.Command {
 	cmd.Flags().StringArrayVar(&opts.EnvironmentFiles, "env-file", []string{}, "Path to environment files to be translated as environment variables")
 	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", containers.RestartPolicyRunNo, "Restart policy to apply when a container exits (no|always|on-failure)")
 	cmd.Flags().BoolVar(&opts.Rm, "rm", false, "Automatically remove the container when it exits")
+	cmd.Flags().StringVar(&opts.HealthCmd, "health-cmd", "", "Command to run to check health")
+	cmd.Flags().DurationVar(&opts.HealthInterval, "health-interval", time.Duration(0), "Time between running the check (ms|s|m|h) (default 0s)")
+	cmd.Flags().IntVar(&opts.HealthRetries, "health-retries", 10, "Consecutive failures needed to report unhealthy")
+	cmd.Flags().DurationVar(&opts.HealthStartPeriod, "health-start-period", time.Duration(0), "Start period for the container to initialize before starting "+
+		"health-retries countdown (ms|s|m|h) (default 0s)")
+	cmd.Flags().DurationVar(&opts.HealthTimeout, "health-timeout", time.Duration(0), "Maximum time to allow one check to run (ms|s|m|h) (default 0s)")
 
 	if contextType == store.AciContextType {
 		cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")

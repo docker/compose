@@ -47,7 +47,7 @@ __Legend:__
 | service.external_links         | x |
 | service.extra_hosts            | x |
 | service.group_add              | x |
-| service.healthcheck            | n |
+| service.healthcheck            | ✓ | 
 | service.hostname               | x |
 | service.image                  | ✓ |  Private images will be accessible if the user is logged into the corresponding registry at deploy time. Users will be automatically logged in to Azure Container Registry using their Azure login if possible.
 | service.isolation              | x |
@@ -209,3 +209,21 @@ services:
 
 In this example, the db container will be allocated 2 CPUs and 2G of memory. It will be allowed to use up to 3 CPUs and 3G of memory, using some of the resources allocated to the web container.
 The web container will have its limits set to the same values as reservations, by default.
+
+## Healthchecks
+
+Healthchecks can be described in the `healthcheck` section in the service. It translates to `LivenessProbe` in ACI. By that, the container is restarted if it becomes unhealthy.
+
+```yaml
+services:
+  web:
+    image: nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+**Note:** that the `test` command can be a `string` or an array starting or not by `NONE`, `CMD`, `CMD-SHELL`. In the ACI implementation, these prefixes are ignored.

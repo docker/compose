@@ -20,6 +20,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -54,6 +56,7 @@ type Container struct {
 	HostConfig  *HostConfig    `json:",omitempty"`
 	Ports       []Port         `json:",omitempty"`
 	Platform    string
+	Healthcheck Healthcheck
 }
 
 // RuntimeConfig config of a created container
@@ -112,6 +115,24 @@ type ContainerConfig struct {
 	DomainName string
 	// AutoRemove sets the container to be removed automatically when stopped
 	AutoRemove bool
+	// Healthcheck contains the command and interval of the checks
+	Healthcheck Healthcheck
+}
+
+// Healthcheck defines the configuration of a healthcheck
+type Healthcheck struct {
+	// Disable disables the check
+	Disable bool
+	// Test is the command to be run to check the health of the container
+	Test []string
+	// Interval is the period in between the checks
+	Interval types.Duration
+	// Retries is the number of attempts before declaring the container as healthy or unhealthy
+	Retries int
+	// StartPeriod is the start delay before starting the checks
+	StartPeriod types.Duration
+	// Timeout is the timeout in between checks
+	Timeout types.Duration
 }
 
 // ExecRequest contaiens configuration about an exec request

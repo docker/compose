@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/opts"
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
@@ -44,6 +46,11 @@ type Opts struct {
 	RestartPolicyCondition string
 	DomainName             string
 	Rm                     bool
+	HealthCmd              string
+	HealthInterval         time.Duration
+	HealthRetries          int
+	HealthStartPeriod      time.Duration
+	HealthTimeout          time.Duration
 }
 
 // ToContainerConfig convert run options to a container configuration
@@ -76,6 +83,13 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		envVars = append(envVars, vars...)
 	}
 
+	var healthCmd []string
+	var healthInterval types.Duration
+	if len(r.HealthCmd) > 0 {
+		healthCmd = strings.Split(r.HealthCmd, " ")
+		healthInterval = types.Duration(r.HealthInterval)
+	}
+
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
@@ -89,6 +103,11 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		RestartPolicyCondition: restartPolicy,
 		DomainName:             r.DomainName,
 		AutoRemove:             r.Rm,
+		Healthcheck: containers.Healthcheck{
+			Disable:  len(healthCmd) == 0,
+			Test:     healthCmd,
+			Interval: healthInterval,
+		},
 	}, nil
 }
 
