@@ -69,3 +69,8 @@ func TestCheckOwnCommand(t *testing.T) {
 	assert.Assert(t, !isContextAgnosticCommand(cmd.LogsCommand()))
 	assert.Assert(t, !isContextAgnosticCommand(cmd.PsCommand()))
 }
+
+func TestAppendPaths(t *testing.T) {
+	assert.Equal(t, appendPaths("", "/bin/path"), "/bin/path")
+	assert.Equal(t, appendPaths("path1", "binaryPath"), "path1"+string(os.PathListSeparator)+"binaryPath")
+}
