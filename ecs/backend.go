@@ -49,7 +49,7 @@ type ContextParams struct {
 	CredsFromEnv bool
 }
 
-func (c ContextParams) HaveRequiredCredentials() bool {
+func (c ContextParams) haveRequiredCredentials() bool {
 	if c.AccessKey == "" || c.SecretKey == "" {
 		return false
 	}
@@ -81,8 +81,8 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 
 	if ecsCtx.CredentialsFromEnv {
 		creds := getEnvVars()
-		if !creds.HaveRequiredCredentials() {
-			return nil, fmt.Errorf(`context requires credentials to be passed as environment variable.`)
+		if !creds.haveRequiredCredentials() {
+			return nil, fmt.Errorf(`context requires credentials to be passed as environment variable`)
 		}
 		region = creds.Region
 		profile = creds.Profile

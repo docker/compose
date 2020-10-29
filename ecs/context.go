@@ -125,6 +125,56 @@ func (h contextCreateAWSHelper) createContext(c *ContextParams) (interface{}, st
 	}, description
 }
 
+func (h contextCreateAWSHelper) selectFromLocalProfile(opts *ContextParams) error {
+	profilesList, err := getProfiles()
+	if err != nil {
+		return err
+	}
+	// choose profile
+	opts.Profile, err = h.chooseProfile(profilesList)
+	if err != nil {
+		return err
+	}
+
+	if opts.Region == "" {
+		region, isDefinedInProfile, err := getRegion(opts.Profile)
+		if err != nil {
+			return err
+		}
+		if isDefinedInProfile {
+			opts.Region = region
+		} else {
+			fmt.Println("No region defined in the profile. Choose the region to use.")
+			opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (h contextCreateAWSHelper) createProfileFromCredentials(opts *ContextParams) error {
+	accessKey, secretKey, err := h.askCredentials()
+	if err != nil {
+		return err
+	}
+	opts.AccessKey = accessKey
+	opts.SecretKey = secretKey
+	// we need a region set -- either read it from profile or prompt user
+	// prompt for the region to use with this context
+	opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
+	if err != nil {
+		return err
+	}
+	// save as a profile
+	if opts.Profile == "" {
+		opts.Profile = opts.Name
+	}
+	fmt.Printf("Saving credentials under profile %s\n", opts.Profile)
+	return h.createProfile(opts.Profile, opts)
+}
+
 func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
 	if opts.CredsFromEnv {
 		ecsCtx, descr := h.createContext(&opts)
@@ -147,51 +197,15 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 	switch selected {
 	case 0:
 		opts.CredsFromEnv = true
-
 	case 1:
-		profilesList, err := getProfiles()
-		if err != nil {
-			return nil, "", err
-		}
-		// choose profile
-		opts.Profile, err = h.chooseProfile(profilesList)
-		if err != nil {
-			return nil, "", err
-		}
+		err = h.selectFromLocalProfile(&opts)
 
-		if opts.Region == "" {
-			region, isDefinedInProfile, err := getRegion(opts.Profile)
-			if isDefinedInProfile {
-				opts.Region = region
-			} else {
-				fmt.Println("No region defined in the profile. Choose the region to use.")
-				opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
-				if err != nil {
-					return nil, "", err
-				}
-			}
-		}
 	case 2:
-		accessKey, secretKey, err := h.askCredentials()
-		if err != nil {
-			return nil, "", err
-		}
-		opts.AccessKey = accessKey
-		opts.SecretKey = secretKey
-		// we need a region set -- either read it from profile or prompt user
-		// prompt for the region to use with this context
-		opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
-		if err != nil {
-			return nil, "", err
-		}
-		// save as a profile
-		if opts.Profile == "" {
-			opts.Profile = opts.Name
-		}
-		fmt.Printf("Saving credentials under profile %s\n", opts.Profile)
-		h.createProfile(opts.Profile, &opts)
+		err = h.createProfileFromCredentials(&opts)
 	}
-
+	if err != nil {
+		return nil, "", err
+	}
 	ecsCtx, descr := h.createContext(&opts)
 	return ecsCtx, descr, nil
 }
