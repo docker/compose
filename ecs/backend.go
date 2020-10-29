@@ -39,10 +39,24 @@ const backendType = store.EcsContextType
 
 // ContextParams options for creating AWS context
 type ContextParams struct {
-	Name        string
-	Description string
-	Region      string
-	Profile     string
+	Name         string
+	Description  string
+	AccessKey    string
+	SecretKey    string
+	SessionToken string
+	Profile      string
+	Region       string
+	CredsFromEnv bool
+}
+
+func (c ContextParams) HaveRequiredCredentials() bool {
+	if c.AccessKey == "" || c.SecretKey == "" {
+		return false
+	}
+	if c.Region == "" && c.Profile == "" {
+		return false
+	}
+	return true
 }
 
 func init() {
@@ -62,18 +76,34 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
+	var region string
+	var profile string
+
 	if ecsCtx.CredentialsFromEnv {
 		creds := getEnvVars()
 		if !creds.HaveRequiredCredentials() {
 			return nil, fmt.Errorf(`context requires credentials to be passed as environment variable.`)
 		}
+		region = creds.Region
+		profile = creds.Profile
+	} else {
+		// get region
+		profile = ecsCtx.Profile
+		if ecsCtx.Region != "" {
+			region = ecsCtx.Region
+		} else {
+			r, _, err := getRegion(ecsCtx.Profile)
+			if err != nil {
+				return nil, err
+			}
+			region = r
+		}
 	}
-
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Profile:           ecsCtx.Profile,
+		Profile:           profile,
 		SharedConfigState: session.SharedConfigEnable,
 		Config: aws.Config{
-			Region: aws.String(ecsCtx.Region),
+			Region: aws.String(region),
 		},
 	})
 	if err != nil {
@@ -83,7 +113,7 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 	sdk := newSDK(sess)
 	return &ecsAPIService{
 		ctx:    ecsCtx,
-		Region: ecsCtx.Region,
+		Region: region,
 		aws:    sdk,
 	}, nil
 }

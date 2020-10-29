@@ -33,37 +33,22 @@ import (
 	"github.com/docker/compose-cli/prompt"
 )
 
-type contextElements struct {
-	AccessKey    string
-	SecretKey    string
-	SessionToken string
-	Profile      string
-	Region       string
-	CredsFromEnv bool
-}
+func getEnvVars() ContextParams {
+	c := ContextParams{}
 
-func (c contextElements) HaveRequiredCredentials() bool {
-	if c.AccessKey != "" && c.SecretKey != "" {
-		return true
-	}
-	return false
-}
-
-type contextCreateAWSHelper struct {
-	user prompt.UI
-}
-
-func newContextCreateHelper() contextCreateAWSHelper {
-	return contextCreateAWSHelper{
-		user: prompt.User{},
-	}
-}
-
-func getEnvVars() contextElements {
-	c := contextElements{}
+	//check profile env vars
 	profile := os.Getenv("AWS_PROFILE")
 	if profile != "" {
 		c.Profile = profile
+	}
+	// check REGION env vars
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		region = os.Getenv("AWS_DEFAULT_REGION")
+		if region == "" {
+			region = "us-east-1"
+		}
+		c.Region = region
 	}
 
 	p := credentials.EnvProvider{}
@@ -77,7 +62,17 @@ func getEnvVars() contextElements {
 	return c
 }
 
-func (h contextCreateAWSHelper) createProfile(name string, c *contextElements) error {
+type contextCreateAWSHelper struct {
+	user prompt.UI
+}
+
+func newContextCreateHelper() contextCreateAWSHelper {
+	return contextCreateAWSHelper{
+		user: prompt.User{},
+	}
+}
+
+func (h contextCreateAWSHelper) createProfile(name string, c *ContextParams) error {
 	if c != nil {
 		if c.AccessKey != "" && c.SecretKey != "" {
 			return h.saveCredentials(name, c.AccessKey, c.SecretKey)
@@ -102,18 +97,26 @@ func (h contextCreateAWSHelper) createProfile(name string, c *contextElements) e
 	return nil
 }
 
-func (h contextCreateAWSHelper) createContext(c *contextElements, description string) (interface{}, string) {
+func (h contextCreateAWSHelper) createContext(c *ContextParams) (interface{}, string) {
 	if c.Profile == "default" {
 		c.Profile = ""
 	}
-	description = strings.TrimSpace(
-		fmt.Sprintf("%s (%s)", description, c.Region))
+	var description string
+
 	if c.CredsFromEnv {
+		if c.Description == "" {
+			description = "credentials read from environment"
+		}
 		return store.EcsContext{
 			CredentialsFromEnv: c.CredsFromEnv,
 			Profile:            c.Profile,
 			Region:             c.Region,
 		}, description
+	}
+
+	if c.Region != "" {
+		description = strings.TrimSpace(
+			fmt.Sprintf("%s (%s)", c.Description, c.Region))
 	}
 	return store.EcsContext{
 		Profile: c.Profile,
@@ -122,14 +125,16 @@ func (h contextCreateAWSHelper) createContext(c *contextElements, description st
 }
 
 func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
-	creds := contextElements{}
-
-	options := []string{
-		"Use AWS credentials set via environment variables",
-		"Create a new profile with AWS credentials",
-		"Select from existing local AWS profiles",
+	if opts.CredsFromEnv {
+		ecsCtx, descr := h.createContext(&opts)
+		return ecsCtx, descr, nil
 	}
-	//if creds.HaveRequiredProps() {
+	options := []string{
+		"Use AWS credentials from environment",
+		"Select from existing AWS profiles",
+		"Create new profile from AWS credentials",
+	}
+
 	selected, err := h.user.Select("Would you like to create your context based on", options)
 	if err != nil {
 		if err == terminal.InterruptErr {
@@ -137,63 +142,56 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 		}
 		return nil, "", err
 	}
-	if creds.Region == "" {
-		creds.Region = opts.Region
-	}
-	if creds.Profile == "" {
-		creds.Profile = opts.Profile
-	}
 
 	switch selected {
 	case 0:
-		creds.CredsFromEnv = true
-		// confirm region profile should target
-		if creds.Region == "" {
-			creds.Region, err = h.chooseRegion(creds.Region, creds.Profile)
-			if err != nil {
-				return nil, "", err
-			}
-		}
+		opts.CredsFromEnv = true
+
 	case 1:
-		accessKey, secretKey, err := h.askCredentials()
-		if err != nil {
-			return nil, "", err
-		}
-		creds.AccessKey = accessKey
-		creds.SecretKey = secretKey
-		// we need a region set -- either read it from profile or prompt user
-
-		// prompt for the region to use with this context
-		creds.Region, err = h.chooseRegion(creds.Region, creds.Profile)
-		if err != nil {
-			return nil, "", err
-		}
-		// save as a profile
-		if creds.Profile == "" {
-			creds.Profile = opts.Name
-		}
-		fmt.Printf("Saving credentials under profile %s\n", creds.Profile)
-		h.createProfile(creds.Profile, &creds)
-
-	case 2:
-		profilesList, err := h.getProfiles()
+		profilesList, err := getProfiles()
 		if err != nil {
 			return nil, "", err
 		}
 		// choose profile
-		creds.Profile, err = h.chooseProfile(profilesList)
+		opts.Profile, err = h.chooseProfile(profilesList)
 		if err != nil {
 			return nil, "", err
 		}
-		if creds.Region == "" {
-			creds.Region, err = h.chooseRegion(creds.Region, creds.Profile)
-			if err != nil {
-				return nil, "", err
+
+		if opts.Region == "" {
+			region, isDefinedInProfile, err := getRegion(opts.Profile)
+			if isDefinedInProfile {
+				opts.Region = region
+			} else {
+				fmt.Println("No region defined in the profile. Choose the region to use.")
+				opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
+				if err != nil {
+					return nil, "", err
+				}
 			}
 		}
+	case 2:
+		accessKey, secretKey, err := h.askCredentials()
+		if err != nil {
+			return nil, "", err
+		}
+		opts.AccessKey = accessKey
+		opts.SecretKey = secretKey
+		// we need a region set -- either read it from profile or prompt user
+		// prompt for the region to use with this context
+		opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
+		if err != nil {
+			return nil, "", err
+		}
+		// save as a profile
+		if opts.Profile == "" {
+			opts.Profile = opts.Name
+		}
+		fmt.Printf("Saving credentials under profile %s\n", opts.Profile)
+		h.createProfile(opts.Profile, &opts)
 	}
 
-	ecsCtx, descr := h.createContext(&creds, opts.Description)
+	ecsCtx, descr := h.createContext(&opts)
 	return ecsCtx, descr, nil
 }
 
@@ -229,7 +227,7 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	return credIni.SaveTo(p.Filename)
 }
 
-func (h contextCreateAWSHelper) getProfiles() ([]string, error) {
+func getProfiles() ([]string, error) {
 	profiles := []string{}
 	// parse both .aws/credentials and .aws/config for profiles
 	configFiles := map[string]bool{
@@ -269,7 +267,7 @@ func (h contextCreateAWSHelper) chooseProfile(profiles []string) (string, error)
 	return profile, nil
 }
 
-func (h contextCreateAWSHelper) getRegionSuggestion(region string, profile string) (string, error) {
+func getRegion(profile string) (string, bool, error) {
 	if profile == "" {
 		profile = "default"
 	}
@@ -278,13 +276,14 @@ func (h contextCreateAWSHelper) getRegionSuggestion(region string, profile strin
 	configIni, err := ini.Load(awsConfig)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return "", err
+			return "", false, err
 		}
 		configIni = ini.Empty()
 	}
 
-	var f func(string, string) string
-	f = func(r string, p string) string {
+	var f func(string) (string, string)
+	f = func(p string) (string, string) {
+		r := ""
 		section, err := configIni.GetSection(p)
 		if err == nil {
 			reg, err := section.GetKey("region")
@@ -295,28 +294,33 @@ func (h contextCreateAWSHelper) getRegionSuggestion(region string, profile strin
 		if r == "" {
 			switch p {
 			case "":
-				return "us-east-1"
+				return "us-east-1", ""
 			case "default":
-				return f(r, "")
+				return f("")
 			}
-			return f(r, "default")
+			return f("default")
 		}
-		return r
+		return r, p
 	}
 
 	if profile != "default" {
 		profile = fmt.Sprintf("profile %s", profile)
 	}
-	return f(region, profile), nil
+	region, p := f(profile)
+	return region, p == profile, nil
 }
 
 func (h contextCreateAWSHelper) chooseRegion(region string, profile string) (string, error) {
-	suggestion, err := h.getRegionSuggestion(region, profile)
-	if err != nil {
-		return "", err
+	suggestion := region
+	if suggestion == "" {
+		region, _, err := getRegion(profile)
+		if err != nil {
+			return "", err
+		}
+		suggestion = region
 	}
 	// promp user for region
-	region, err = h.user.Input("Region", suggestion)
+	region, err := h.user.Input("Region", suggestion)
 	if err != nil {
 		return "", err
 	}
@@ -327,14 +331,6 @@ func (h contextCreateAWSHelper) chooseRegion(region string, profile string) (str
 }
 
 func (h contextCreateAWSHelper) askCredentials() (string, string, error) {
-	/*confirm, err := h.user.Confirm("Enter AWS credentials", false)
-	if err != nil {
-		return "", "", err
-	}
-	if !confirm {
-		return "", "", nil
-	}*/
-
 	accessKeyID, err := h.user.Input("AWS Access Key ID", "")
 	if err != nil {
 		return "", "", err
