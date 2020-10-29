@@ -73,7 +73,7 @@ func init() {
 	if err != nil {
 		fatal(errors.Wrap(err, "unable to get absolute bin path"))
 	}
-	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), path)); err != nil {
+	if err := os.Setenv("PATH", fmt.Sprintf("%s%s%s", os.Getenv("PATH"), os.PathListSeparator, path)); err != nil {
 		panic(err)
 	}
 	// Seed random
