@@ -43,7 +43,8 @@ func getEnvVars() ContextParams {
 	}
 	// check REGION env vars
 	region := os.Getenv("AWS_REGION")
-	if region == "" {
+	c.Region = region
+	if c.Region == "" {
 		region = os.Getenv("AWS_DEFAULT_REGION")
 		if region == "" {
 			region = "us-east-1"
