@@ -167,8 +167,8 @@ func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *type
 func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project) (string, []awsResource, error) {
 	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
-		vpcID := x.(string)
-		err := b.aws.CheckVPC(ctx, vpcID)
+		vpc = x.(string)
+		err := b.aws.CheckVPC(ctx, vpc)
 		if err != nil {
 			return "", nil, err
 		}
