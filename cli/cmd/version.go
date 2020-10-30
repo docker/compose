@@ -59,7 +59,7 @@ func runVersion(cmd *cobra.Command) {
 	case formatter.PRETTY, "":
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...),
 			"\n Version:", "\n Cloud integration: "+displayedVersion+"\n Version:", 1)
-	case formatter.JSON, formatter.TemplateJSON: // Try to catch full JSON formats
+	case formatter.JSON, formatter.TemplateLegacyJSON: // Try to catch full JSON formats
 		versionString = strings.Replace(getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...),
 			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
 	default:
