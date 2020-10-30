@@ -32,6 +32,25 @@ func Print(toJSON interface{}, format string, outWriter io.Writer, writerFn func
 	switch strings.ToLower(format) {
 	case PRETTY, "":
 		return PrintPrettySection(outWriter, writerFn, headers...)
+	case TemplateLegacyJSON:
+		switch reflect.TypeOf(toJSON).Kind() {
+		case reflect.Slice:
+			s := reflect.ValueOf(toJSON)
+			for i := 0; i < s.Len(); i++ {
+				obj := s.Index(i).Interface()
+				outJSON, err := ToJSON(obj, "", "")
+				if err != nil {
+					return err
+				}
+				_, _ = fmt.Fprint(outWriter, outJSON)
+			}
+		default:
+			outJSON, err := ToStandardJSON(toJSON)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintln(outWriter, outJSON)
+		}
 	case JSON:
 		switch reflect.TypeOf(toJSON).Kind() {
 		case reflect.Slice:

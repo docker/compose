@@ -1,0 +1,1 @@
+{"Current":true,"Description":"Current DOCKER_HOST based configuration","DockerEndpoint":"unix:///var/run/docker.sock","KubernetesEndpoint":"","ContextType":"moby","Name":"default","StackOrchestrator":"swarm"}

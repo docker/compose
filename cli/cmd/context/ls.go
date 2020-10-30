@@ -70,7 +70,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return err
 	}
 	format := strings.ToLower(strings.ReplaceAll(opts.format, " ", ""))
-	if format != "" && format != formatter.JSON && format != formatter.PRETTY && format != formatter.TemplateJSON {
+	if format != "" && format != formatter.JSON && format != formatter.PRETTY && format != formatter.TemplateLegacyJSON {
 		mobycli.Exec(cmd.Root())
 		return nil
 	}
@@ -94,8 +94,11 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return nil
 	}
 
-	if opts.json || format == formatter.JSON || format == formatter.TemplateJSON {
+	if opts.json || format == formatter.JSON {
 		opts.format = formatter.JSON
+	}
+	if format == formatter.TemplateLegacyJSON {
+		opts.format = formatter.TemplateLegacyJSON
 	}
 
 	view := viewFromContextList(contexts, currentContext)
@@ -108,7 +111,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 					contextName,
-					c.Type,
+					c.ContextType,
 					c.Description,
 					c.DockerEndpoint,
 					c.KubernetesEndpoint,
@@ -141,7 +144,7 @@ type contextView struct {
 	Description        string
 	DockerEndpoint     string
 	KubernetesEndpoint string
-	Type               string
+	ContextType        string
 	Name               string
 	StackOrchestrator  string
 }
@@ -155,7 +158,7 @@ func viewFromContextList(contextList []*store.DockerContext, currentContext stri
 			DockerEndpoint:     getEndpoint("docker", c.Endpoints),
 			KubernetesEndpoint: getEndpoint("kubernetes", c.Endpoints),
 			Name:               c.Name,
-			Type:               c.Type(),
+			ContextType:        c.Type(),
 			StackOrchestrator:  c.Metadata.StackOrchestrator,
 		}
 	}

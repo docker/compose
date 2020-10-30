@@ -59,4 +59,15 @@ func TestPrint(t *testing.T) {
 	}, "NAME", "STATUS"))
 	assert.Equal(t, b.String(), `[{"Name":"myName1","Status":"myStatus1"},{"Name":"myName2","Status":"myStatus2"}]
 `)
+
+	b.Reset()
+	assert.NilError(t, Print(testList, TemplateLegacyJSON, b, func(w io.Writer) {
+		for _, t := range testList {
+			_, _ = fmt.Fprintf(w, "%s\t%s\n", t.Name, t.Status)
+		}
+	}, "NAME", "STATUS"))
+	json := b.String()
+	assert.Equal(t, json, `{"Name":"myName1","Status":"myStatus1"}
+{"Name":"myName2","Status":"myStatus2"}
+`)
 }
