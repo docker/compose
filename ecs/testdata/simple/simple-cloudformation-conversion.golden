@@ -234,7 +234,7 @@
               "TestSimpleConvert.local"
             ],
             "Essential": "false",
-            "Image": "docker/ecs-searchdomain-sidecar",
+            "Image": "docker/ecs-searchdomain-sidecar:1.0",
             "LogConfiguration": {
               "LogDriver": "awslogs",
               "Options": {
