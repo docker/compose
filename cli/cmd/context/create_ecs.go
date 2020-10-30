@@ -55,9 +55,8 @@ func createEcsCommand() *cobra.Command {
 
 	addDescriptionFlag(cmd, &opts.Description)
 	cmd.Flags().BoolVar(&localSimulation, "local-simulation", false, "Create context for ECS local simulation endpoints")
-	cmd.Flags().StringVar(&opts.Profile, "profile", "", "Profile")
-	cmd.Flags().StringVar(&opts.Region, "region", "", "Region")
-	cmd.Flags().BoolVar(&opts.CredsFromEnv, "from-env", false, "Use credentials and region from environment")
+	cmd.Flags().StringVar(&opts.Profile, "profile", "", "Use an existing AWS profile")
+	cmd.Flags().BoolVar(&opts.CredsFromEnv, "from-env", false, "Use AWS environment variables for profile, or credentials and region")
 	return cmd
 }
 

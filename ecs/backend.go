@@ -43,20 +43,19 @@ type ContextParams struct {
 	Description  string
 	AccessKey    string
 	SecretKey    string
-	SessionToken string
 	Profile      string
 	Region       string
 	CredsFromEnv bool
 }
 
-func (c ContextParams) haveRequiredCredentials() bool {
-	if c.AccessKey == "" || c.SecretKey == "" {
-		return false
+func (c ContextParams) haveRequiredEnvVars() bool {
+	if c.Profile != "" {
+		return true
 	}
-	if c.Region == "" && c.Profile == "" {
-		return false
+	if c.AccessKey != "" && c.SecretKey != "" {
+		return true
 	}
-	return true
+	return false
 }
 
 func init() {
@@ -76,29 +75,26 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
-	var region string
-	var profile string
+	region := ""
+	profile := ecsCtx.Profile
 
 	if ecsCtx.CredentialsFromEnv {
-		creds := getEnvVars()
-		if !creds.haveRequiredCredentials() {
-			return nil, fmt.Errorf(`context requires credentials to be passed as environment variable`)
+		env := getEnvVars()
+		if !env.haveRequiredEnvVars() {
+			return nil, fmt.Errorf("context requires credentials to be passed as environment variables")
 		}
-		region = creds.Region
-		profile = creds.Profile
-	} else {
-		// get region
-		profile = ecsCtx.Profile
-		if ecsCtx.Region != "" {
-			region = ecsCtx.Region
-		} else {
-			r, _, err := getRegion(ecsCtx.Profile)
-			if err != nil {
-				return nil, err
-			}
-			region = r
-		}
+		profile = env.Profile
+		region = env.Region
 	}
+
+	if region == "" {
+		r, err := getRegion(profile)
+		if err != nil {
+			return nil, err
+		}
+		region = r
+	}
+
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Profile:           profile,
 		SharedConfigState: session.SharedConfigEnable,

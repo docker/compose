@@ -53,7 +53,6 @@ type AciContext struct {
 type EcsContext struct {
 	CredentialsFromEnv bool   `json:",omitempty"`
 	Profile            string `json:",omitempty"`
-	Region             string `json:",omitempty"`
 }
 
 // AwsContext is the context for the ecs plugin
