@@ -139,6 +139,7 @@ func toGrpcContainer(c containers.Container) *containersv1.Container {
 			CpuReservation:    uint64(c.HostConfig.CPUReservation),
 			CpuLimit:          uint64(c.HostConfig.CPULimit),
 			RestartPolicy:     c.HostConfig.RestartPolicy,
+			AutoRemove:        c.HostConfig.AutoRemove,
 		},
 	}
 }
@@ -165,5 +166,6 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 		CPULimit:               float64(request.GetCpuLimit()),
 		RestartPolicyCondition: request.RestartPolicyCondition,
 		Environment:            request.Environment,
+		AutoRemove:             request.AutoRemove,
 	}
 }

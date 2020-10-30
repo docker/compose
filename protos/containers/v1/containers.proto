@@ -59,6 +59,7 @@ message HostConfig {
 	uint64 cpu_reservation = 3;
 	uint64 cpu_limit = 4;
 	string restart_policy = 5;
+	bool auto_remove = 6;
 }
 
 message InspectRequest {
@@ -110,7 +111,8 @@ message RunRequest {
 	uint64 cpu_limit = 7;
 	string restart_policy_condition = 8;
 	repeated string command = 9;
-	repeated string environment = 10; 
+	repeated string environment = 10;
+	bool auto_remove = 11;
 }
 
 message RunResponse {

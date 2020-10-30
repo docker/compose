@@ -22,14 +22,12 @@ import (
 	"strings"
 
 	"github.com/docker/cli/opts"
-
-	"github.com/docker/compose-cli/utils"
-
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/utils"
 )
 
 // Opts contain run command options
@@ -91,6 +89,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		Environment:            envVars,
 		RestartPolicyCondition: restartPolicy,
 		DomainName:             r.DomainName,
+		AutoRemove:             r.Rm,
 	}, nil
 }
 

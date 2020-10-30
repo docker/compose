@@ -21,8 +21,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/icmd"
+	"gotest.tools/v3/poll"
 
 	. "github.com/docker/compose-cli/tests/framework"
 )
@@ -54,6 +56,23 @@ func TestLocalBackend(t *testing.T) {
 		})
 		res = c.RunDockerCmd("inspect", containerName)
 		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
+	})
+
+	t.Run("run rm", func(t *testing.T) {
+		res := c.RunDockerCmd("run", "--rm", "-d", "nginx")
+		containerName := strings.TrimSpace(res.Combined())
+		t.Cleanup(func() {
+			_ = c.RunDockerOrExitError("rm", "-f", containerName)
+		})
+		_ = c.RunDockerCmd("stop", containerName)
+		checkRemoved := func(t poll.LogT) poll.Result {
+			res = c.RunDockerOrExitError("inspect", containerName)
+			if res.ExitCode == 1 && strings.Contains(res.Stderr(), "No such container") {
+				return poll.Success()
+			}
+			return poll.Continue("waiting for container to be removed")
+		}
+		poll.WaitOn(t, checkRemoved, poll.WithDelay(1*time.Second), poll.WithTimeout(10*time.Second))
 	})
 
 	t.Run("run with ports", func(t *testing.T) {

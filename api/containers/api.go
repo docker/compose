@@ -66,6 +66,7 @@ type HostConfig struct {
 	CPULimit          float64
 	MemoryReservation uint64
 	MemoryLimit       uint64
+	AutoRemove        bool
 }
 
 // Port represents a published port of a container
@@ -104,6 +105,8 @@ type ContainerConfig struct {
 	RestartPolicyCondition string
 	// DomainName Container NIS domain name
 	DomainName string
+	// AutoRemove sets the container to be removed automatically when stopped
+	AutoRemove bool
 }
 
 // ExecRequest contaiens configuration about an exec request
