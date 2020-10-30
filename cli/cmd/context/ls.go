@@ -111,7 +111,7 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 					contextName,
-					c.Type,
+					c.ContextType,
 					c.Description,
 					c.DockerEndpoint,
 					c.KubernetesEndpoint,
@@ -144,7 +144,7 @@ type contextView struct {
 	Description        string
 	DockerEndpoint     string
 	KubernetesEndpoint string
-	Type               string
+	ContextType        string
 	Name               string
 	StackOrchestrator  string
 }
@@ -158,7 +158,7 @@ func viewFromContextList(contextList []*store.DockerContext, currentContext stri
 			DockerEndpoint:     getEndpoint("docker", c.Endpoints),
 			KubernetesEndpoint: getEndpoint("kubernetes", c.Endpoints),
 			Name:               c.Name,
-			Type:               c.Type(),
+			ContextType:        c.Type(),
 			StackOrchestrator:  c.Metadata.StackOrchestrator,
 		}
 	}
