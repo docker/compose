@@ -66,6 +66,53 @@ func newContextCreateHelper() contextCreateAWSHelper {
 	}
 }
 
+func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
+	if opts.CredsFromEnv {
+		ecsCtx, descr := h.createContext(&opts)
+		return ecsCtx, descr, nil
+	}
+	if opts.Profile != "" {
+		// check profile exists
+		profilesList, err := getProfiles()
+		if err != nil {
+			return nil, "", err
+		}
+		if !contains(profilesList, opts.Profile) {
+			return nil, "", fmt.Errorf("profile %q not found", opts.Profile)
+		}
+		ecsCtx, descr := h.createContext(&opts)
+		return ecsCtx, descr, nil
+	}
+	options := []string{
+		"An existing AWS profile",
+		"A new AWS profile",
+		"AWS environment variables",
+	}
+
+	selected, err := h.user.Select("Create a Docker context using:", options)
+	if err != nil {
+		if err == terminal.InterruptErr {
+			return nil, "", errdefs.ErrCanceled
+		}
+		return nil, "", err
+	}
+
+	switch selected {
+	case 0:
+		err = h.selectFromLocalProfile(&opts)
+	case 1:
+		err = h.createProfileFromCredentials(&opts)
+	case 2:
+		opts.CredsFromEnv = true
+
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	ecsCtx, descr := h.createContext(&opts)
+	return ecsCtx, descr, nil
+}
+
 func (h contextCreateAWSHelper) createContext(c *ContextParams) (interface{}, string) {
 	if c.Profile == "default" {
 		c.Profile = ""
@@ -132,41 +179,6 @@ func (h contextCreateAWSHelper) createProfileFromCredentials(opts *ContextParams
 		return err
 	}
 	return h.saveRegion(opts.Name, opts.Region)
-}
-
-func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
-	if opts.CredsFromEnv {
-		ecsCtx, descr := h.createContext(&opts)
-		return ecsCtx, descr, nil
-	}
-	options := []string{
-		"An existing AWS profile",
-		"A new AWS profile",
-		"AWS environment variables",
-	}
-
-	selected, err := h.user.Select("Create a Docker context using:", options)
-	if err != nil {
-		if err == terminal.InterruptErr {
-			return nil, "", errdefs.ErrCanceled
-		}
-		return nil, "", err
-	}
-
-	switch selected {
-	case 0:
-		err = h.selectFromLocalProfile(&opts)
-	case 1:
-		err = h.createProfileFromCredentials(&opts)
-	case 2:
-		opts.CredsFromEnv = true
-
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	ecsCtx, descr := h.createContext(&opts)
-	return ecsCtx, descr, nil
 }
 
 func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID string, secretAccessKey string) error {

@@ -18,6 +18,7 @@ package context
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -46,6 +47,9 @@ func createEcsCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
+			if opts.CredsFromEnv && opts.Profile != "" {
+				return fmt.Errorf("--profile and --from-env flags cannot be set at the same time")
+			}
 			if localSimulation {
 				return runCreateLocalSimulation(cmd.Context(), args[0], opts)
 			}
