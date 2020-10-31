@@ -288,6 +288,13 @@ func createEnvironment(project *types.Project, service types.ServiceConfig) ([]e
 			Value: value,
 		})
 	}
+
+	//order env keys for idempotence between calls
+	//to avoid unnecessary resource recreations on CloudFormation
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].Name < pairs[j].Name
+	})
+
 	return pairs, nil
 }
 
