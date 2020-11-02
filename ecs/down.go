@@ -68,7 +68,7 @@ func doDelete(ctx context.Context, delete func(ctx context.Context, arn string) 
 		w.Event(progress.Event{
 			ID:         r.LogicalID,
 			Status:     progress.Working,
-			StatusText: "DELETE_IN_PROGRESS",
+			StatusText: "DeleteInProgress",
 		})
 		return delete(ctx, r.ARN)
 	}

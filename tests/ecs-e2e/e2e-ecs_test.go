@@ -148,7 +148,7 @@ func TestCompose(t *testing.T) {
 
 		checkUp := func(t poll.LogT) poll.Result {
 			out := res.Stdout()
-			if !strings.Contains(out, "DELETE_COMPLETE") {
+			if !strings.Contains(out, "DeleteComplete") {
 				return poll.Continue("current status \n%s\n", out)
 			}
 			return poll.Success()
