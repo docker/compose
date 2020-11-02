@@ -21,7 +21,9 @@ package local
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -100,13 +102,76 @@ func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, 
 		command = strings.Join(c.Config.Cmd, " ")
 	}
 
+	rc := containerJSONToRuntimeConfig(&c)
+	hc := containerJSONToHostConfig(&c)
+
 	return containers.Container{
-		ID:       stringid.TruncateID(c.ID),
-		Status:   status,
-		Image:    c.Image,
-		Command:  command,
-		Platform: c.Platform,
+		ID:         stringid.TruncateID(c.ID),
+		Status:     status,
+		Image:      c.Image,
+		Command:    command,
+		Platform:   c.Platform,
+		Config:     rc,
+		HostConfig: hc,
 	}, nil
+}
+
+func containerJSONToRuntimeConfig(m *types.ContainerJSON) *containers.RuntimeConfig {
+	if m.Config == nil {
+		return nil
+	}
+	var env map[string]string
+	if m.Config.Env != nil {
+		env = make(map[string]string)
+		for _, e := range m.Config.Env {
+			tokens := strings.Split(e, "=")
+			if len(tokens) != 2 {
+				continue
+			}
+			env[tokens[0]] = tokens[1]
+		}
+	}
+
+	var labels []string
+	if m.Config.Labels != nil {
+		for k, v := range m.Config.Labels {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	sort.Strings(labels)
+
+	if env == nil &&
+		labels == nil {
+		return nil
+	}
+
+	return &containers.RuntimeConfig{
+		Env:    env,
+		Labels: labels,
+	}
+}
+
+func containerJSONToHostConfig(m *types.ContainerJSON) *containers.HostConfig {
+	if m.HostConfig == nil {
+		return nil
+	}
+
+	var restartPolicy string
+	switch m.HostConfig.RestartPolicy.Name {
+	case "always":
+		restartPolicy = containers.RestartPolicyAny
+	case "on-failure":
+		restartPolicy = containers.RestartPolicyOnFailure
+	case "no", "":
+		fallthrough
+	default:
+		restartPolicy = containers.RestartPolicyNone
+	}
+
+	return &containers.HostConfig{
+		AutoRemove:    m.HostConfig.AutoRemove,
+		RestartPolicy: restartPolicy,
+	}
 }
 
 func (ms *local) List(ctx context.Context, all bool) ([]containers.Container, error) {
