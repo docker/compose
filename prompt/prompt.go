@@ -20,6 +20,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 )
 
+//go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose-cli/prompt" -package=prompt . UI
+
 // UI - prompt user input
 type UI interface {
 	Select(message string, options []string) (int, error)

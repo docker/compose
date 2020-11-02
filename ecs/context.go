@@ -20,17 +20,22 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
-
-	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/defaults"
-	"gopkg.in/ini.v1"
 
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/prompt"
+
+	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/defaults"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
+	"gopkg.in/ini.v1"
 )
 
 func getEnvVars() ContextParams {
@@ -57,66 +62,77 @@ func getEnvVars() ContextParams {
 }
 
 type contextCreateAWSHelper struct {
-	user prompt.UI
+	user             prompt.UI
+	availableRegions func(opts *ContextParams) ([]string, error)
 }
 
 func newContextCreateHelper() contextCreateAWSHelper {
 	return contextCreateAWSHelper{
-		user: prompt.User{},
+		user:             prompt.User{},
+		availableRegions: listAvailableRegions,
 	}
 }
 
 func (h contextCreateAWSHelper) createContextData(_ context.Context, opts ContextParams) (interface{}, string, error) {
 	if opts.CredsFromEnv {
+		// Explicit creation from ENV variables
 		ecsCtx, descr := h.createContext(&opts)
 		return ecsCtx, descr, nil
-	}
-	if opts.Profile != "" {
+	} else if opts.AccessKey != "" && opts.SecretKey != "" {
+		// Explicit creation using keys
+		err := h.createProfileFromCredentials(&opts)
+		if err != nil {
+			return nil, "", err
+		}
+	} else if opts.Profile != "" {
+		// Excplicit creation by selecting a profile
 		// check profile exists
 		profilesList, err := getProfiles()
 		if err != nil {
 			return nil, "", err
 		}
 		if !contains(profilesList, opts.Profile) {
-			return nil, "", fmt.Errorf("profile %q not found", opts.Profile)
+			return nil, "", errors.Wrapf(errdefs.ErrNotFound, "profile %q not found", opts.Profile)
 		}
-		ecsCtx, descr := h.createContext(&opts)
-		return ecsCtx, descr, nil
-	}
-	options := []string{
-		"An existing AWS profile",
-		"A new AWS profile",
-		"AWS environment variables",
-	}
+	} else {
+		// interactive
+		var options []string
+		var actions []func(params *ContextParams) error
 
-	selected, err := h.user.Select("Create a Docker context using:", options)
-	if err != nil {
-		if err == terminal.InterruptErr {
-			return nil, "", errdefs.ErrCanceled
+		if _, err := os.Stat(getAWSConfigFile()); err == nil {
+			// User has .aws/config file, so we can offer to select one of his profiles
+			options = append(options, "An existing AWS profile")
+			actions = append(actions, h.selectFromLocalProfile)
 		}
-		return nil, "", err
+
+		options = append(options, "AWS secret and token credentials")
+		actions = append(actions, h.createProfileFromCredentials)
+
+		options = append(options, "AWS environment variables")
+		actions = append(actions, func(params *ContextParams) error {
+			opts.CredsFromEnv = true
+			return nil
+		})
+
+		selected, err := h.user.Select("Create a Docker context using:", options)
+		if err != nil {
+			if err == terminal.InterruptErr {
+				return nil, "", errdefs.ErrCanceled
+			}
+			return nil, "", err
+		}
+
+		err = actions[selected](&opts)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
-	switch selected {
-	case 0:
-		err = h.selectFromLocalProfile(&opts)
-	case 1:
-		err = h.createProfileFromCredentials(&opts)
-	case 2:
-		opts.CredsFromEnv = true
-
-	}
-	if err != nil {
-		return nil, "", err
-	}
 	ecsCtx, descr := h.createContext(&opts)
 	return ecsCtx, descr, nil
 }
 
 func (h contextCreateAWSHelper) createContext(c *ContextParams) (interface{}, string) {
-	if c.Profile == "default" {
-		c.Profile = ""
-	}
 	var description string
 
 	if c.CredsFromEnv {
@@ -148,56 +164,42 @@ func (h contextCreateAWSHelper) selectFromLocalProfile(opts *ContextParams) erro
 }
 
 func (h contextCreateAWSHelper) createProfileFromCredentials(opts *ContextParams) error {
-	accessKey, secretKey, err := h.askCredentials()
-	if err != nil {
-		return err
-	}
-	opts.AccessKey = accessKey
-	opts.SecretKey = secretKey
-	// we need a region set -- either read it from profile or prompt user
-	// prompt for the region to use with this context
-	opts.Region, err = h.chooseRegion(opts.Region, opts.Profile)
-	if err != nil {
-		return err
-	}
-	// save as a profile
-	if opts.Profile == "" {
-		opts.Profile = opts.Name
-	}
-	// check profile does not already exist
-	profilesList, err := getProfiles()
-	if err != nil {
-		return err
-	}
-	if contains(profilesList, opts.Profile) {
-		return fmt.Errorf("profile %q already exists", opts.Profile)
-	}
-	fmt.Printf("Saving to profile %q\n", opts.Profile)
-	// context name used as profile name
-	err = h.saveCredentials(opts.Name, opts.AccessKey, opts.SecretKey)
-	if err != nil {
-		return err
-	}
-	return h.saveRegion(opts.Name, opts.Region)
-}
-
-func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID string, secretAccessKey string) error {
-	p := credentials.SharedCredentialsProvider{Profile: profile}
-	_, err := p.Retrieve()
-	if err == nil {
-		return fmt.Errorf("credentials already exist")
+	if opts.AccessKey == "" || opts.SecretKey == "" {
+		fmt.Println("Retrieve or create AWS Access Key and Secret on https://console.aws.amazon.com/iam/home?#security_credential")
+		accessKey, secretKey, err := h.askCredentials()
+		if err != nil {
+			return err
+		}
+		opts.AccessKey = accessKey
+		opts.SecretKey = secretKey
 	}
 
-	if err.(awserr.Error).Code() == "SharedCredsLoad" && err.(awserr.Error).Message() == "failed to load shared credentials file" {
-		_, err := os.Create(p.Filename)
+	if opts.Region == "" {
+		err := h.chooseRegion(opts)
 		if err != nil {
 			return err
 		}
 	}
-	credIni, err := ini.Load(p.Filename)
+	// save as a profile
+	if opts.Profile == "" {
+		opts.Profile = "default"
+	}
+	// context name used as profile name
+	err := h.saveCredentials(opts.Profile, opts.AccessKey, opts.SecretKey)
 	if err != nil {
 		return err
 	}
+	return h.saveRegion(opts.Profile, opts.Region)
+}
+
+func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID string, secretAccessKey string) error {
+	file := getAWSCredentialsFile()
+	err := os.MkdirAll(filepath.Dir(file), 0700)
+	if err != nil {
+		return err
+	}
+
+	credIni := ini.Empty()
 	section, err := credIni.NewSection(profile)
 	if err != nil {
 		return err
@@ -210,7 +212,7 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	if err != nil {
 		return err
 	}
-	return credIni.SaveTo(p.Filename)
+	return credIni.SaveTo(file)
 }
 
 func (h contextCreateAWSHelper) saveRegion(profile, region string) error {
@@ -218,7 +220,7 @@ func (h contextCreateAWSHelper) saveRegion(profile, region string) error {
 		return nil
 	}
 	// loads ~/.aws/config
-	awsConfig := defaults.SharedConfigFilename()
+	awsConfig := getAWSConfigFile()
 	configIni, err := ini.Load(awsConfig)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -249,8 +251,8 @@ func getProfiles() ([]string, error) {
 	profiles := []string{}
 	// parse both .aws/credentials and .aws/config for profiles
 	configFiles := map[string]bool{
-		defaults.SharedCredentialsFilename(): false,
-		defaults.SharedConfigFilename():      true,
+		getAWSCredentialsFile(): false,
+		getAWSConfigFile():      true,
 	}
 	for f, prefix := range configFiles {
 		sections, err := loadIniFile(f, prefix)
@@ -267,6 +269,10 @@ func getProfiles() ([]string, error) {
 			}
 		}
 	}
+	sort.Slice(profiles, func(i, j int) bool {
+		return profiles[i] < profiles[j]
+	})
+
 	return profiles, nil
 }
 
@@ -316,32 +322,49 @@ func getRegion(profile string) (string, error) {
 	region := getProfileRegion(profile)
 	if region == "" {
 		region = getProfileRegion("default")
-		if region == "" {
-			return "us-east-1", nil
-		}
-		return region, nil
+	}
+	if region == "" {
+		// fallback to AWS default
+		region = "us-east-1"
 	}
 	return region, nil
 }
 
-func (h contextCreateAWSHelper) chooseRegion(region string, profile string) (string, error) {
-	suggestion := region
-	if suggestion == "" {
-		region, err := getRegion(profile)
-		if err != nil {
-			return "", err
-		}
-		suggestion = region
+func (h contextCreateAWSHelper) chooseRegion(opts *ContextParams) error {
+	regions, err := h.availableRegions(opts)
+	if err != nil {
+		return err
 	}
 	// promp user for region
-	region, err := h.user.Input("Region", suggestion)
+	selected, err := h.user.Select("Region", regions)
 	if err != nil {
-		return "", err
+		return err
 	}
-	if region == "" {
-		return "", fmt.Errorf("region cannot be empty")
+	opts.Region = regions[selected]
+	return nil
+}
+
+func listAvailableRegions(opts *ContextParams) ([]string, error) {
+	// Setup SDK with credentials, will also validate those
+	session, err := session.NewSessionWithOptions(session.Options{
+		Config: aws.Config{
+			Credentials: credentials.NewStaticCredentials(opts.AccessKey, opts.SecretKey, ""),
+			Region:      aws.String("us-east-1"),
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
-	return region, nil
+
+	desc, err := ec2.New(session).DescribeRegions(&ec2.DescribeRegionsInput{})
+	if err != nil {
+		return nil, err
+	}
+	var regions []string
+	for _, r := range desc.Regions {
+		regions = append(regions, aws.StringValue(r.RegionName))
+	}
+	return regions, nil
 }
 
 func (h contextCreateAWSHelper) askCredentials() (string, string, error) {
@@ -383,4 +406,20 @@ func loadIniFile(path string, prefix bool) (map[string]ini.Section, error) {
 		}
 	}
 	return profiles, nil
+}
+
+func getAWSConfigFile() string {
+	awsConfig, ok := os.LookupEnv("AWS_CONFIG_FILE")
+	if !ok {
+		awsConfig = defaults.SharedConfigFilename()
+	}
+	return awsConfig
+}
+
+func getAWSCredentialsFile() string {
+	awsConfig, ok := os.LookupEnv("AWS_SHARED_CREDENTIALS_FILE")
+	if !ok {
+		awsConfig = defaults.SharedCredentialsFilename()
+	}
+	return awsConfig
 }
