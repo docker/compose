@@ -23,9 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose-cli/progress"
-
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/iancoleman/strcase"
+
+	"github.com/docker/compose-cli/progress"
 )
 
 func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int, ignored ...string) error { //nolint:gocyclo
@@ -103,7 +104,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			w.Event(progress.Event{
 				ID:         resource,
 				Status:     progressStatus,
-				StatusText: fmt.Sprintf("%s %s", status, reason),
+				StatusText: fmt.Sprintf("%s %s", toCamelCase(status), reason),
 			})
 		}
 		if operation != stackCreate || stackErr != nil {
@@ -124,4 +125,8 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 	}
 
 	return stackErr
+}
+
+func toCamelCase(status string) string {
+	return strcase.ToCamel(strings.ToLower(status))
 }
