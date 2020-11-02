@@ -18,7 +18,6 @@ package run
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -65,14 +64,22 @@ func Command(contextType string) *cobra.Command {
 		cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	}
 
-	_ = cmd.Flags().MarkHidden("rm")
+	switch contextType {
+	case store.LocalContextType:
+	default:
+		_ = cmd.Flags().MarkHidden("rm")
+	}
 
 	return cmd
 }
 
 func runRun(ctx context.Context, image string, contextType string, opts run.Opts) error {
-	if opts.Rm {
-		return errors.New(`Option "rm" is not yet implemented for context type: ` + contextType)
+	switch contextType {
+	case store.LocalContextType:
+	default:
+		if opts.Rm {
+			return fmt.Errorf(`flag "--rm" is not yet implemented for %q context type`, contextType)
+		}
 	}
 
 	c, err := client.New(ctx)

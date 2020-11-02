@@ -26,14 +26,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/stringid"
-
-	"github.com/docker/go-connections/nat"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/docker/pkg/stringid"
+	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -151,6 +149,7 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings: hostBindings,
+		AutoRemove:   r.AutoRemove,
 	}
 
 	created, err := ms.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)

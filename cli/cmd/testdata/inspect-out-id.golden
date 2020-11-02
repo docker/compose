@@ -12,7 +12,8 @@
         "CPUReservation": 0,
         "CPULimit": 0,
         "MemoryReservation": 0,
-        "MemoryLimit": 0
+        "MemoryLimit": 0,
+        "AutoRemove": false
     },
     "Platform": "Linux"
 }
