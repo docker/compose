@@ -111,7 +111,9 @@ publish-ecs-search-sidecar: build-ecs-search-sidecar ## build & publish ecs sear
 	docker pull docker/ecs-searchdomain-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/ecs-searchdomain-sidecar:$(tag)
 
 clean-aci-e2e: ## Make sure no ACI tests are currently runnnig in the CI when invoking this. Delete ACI E2E tests resources that might have leaked when ctrl-C E2E tests.
-	 az group list | jq '.[].name' | grep E2E-Test | xargs -n1 az group delete -y --no-wait -g
+	@ echo "Will delete resource groups: "
+	@ az group list | jq '.[].name' | grep -i E2E-Test
+	az group list | jq '.[].name' | grep -i E2E-Test | xargs -n1 az group delete -y --no-wait -g
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
