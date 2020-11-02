@@ -145,6 +145,7 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 	containerConfig := &container.Config{
 		Image:        r.Image,
 		Labels:       r.Labels,
+		Env:          r.Environment,
 		ExposedPorts: exposedPorts,
 	}
 	hostConfig := &container.HostConfig{
