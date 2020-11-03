@@ -40,6 +40,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.0
+	github.com/hashicorp/go-uuid v1.0.1
 	github.com/iancoleman/strcase v0.1.2
 	github.com/joho/godotenv v1.3.0
 	github.com/labstack/echo v3.3.10+incompatible
