@@ -514,43 +514,11 @@ func overwriteFileStorageAccount(t *testing.T, absComposefileName string, storag
 	assert.NilError(t, err)
 }
 
-func TestUpResources(t *testing.T) {
+func TestUpSecretsResources(t *testing.T) {
 	const (
-		composeProjectName = "testresources"
-		serverContainer    = composeProjectName + "_web"
-		wordsContainer     = composeProjectName + "_words"
-	)
-
-	c := NewParallelE2eCLI(t, binDir)
-	setupTestResourceGroup(t, c)
-
-	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", "../composefiles/aci-demo/aci_demo_port_resources.yaml", "--project-name", composeProjectName)
-
-		res := c.RunDockerCmd("inspect", serverContainer)
-
-		webInspect, err := ParseContainerInspect(res.Stdout())
-		assert.NilError(t, err)
-		assert.Equal(t, webInspect.HostConfig.CPULimit, 0.7)
-		assert.Equal(t, webInspect.HostConfig.MemoryLimit, uint64(1073741824))
-		assert.Equal(t, webInspect.HostConfig.CPUReservation, 0.5)
-		assert.Equal(t, webInspect.HostConfig.MemoryReservation, uint64(536870912))
-
-		res = c.RunDockerCmd("inspect", wordsContainer)
-
-		wordsInspect, err := ParseContainerInspect(res.Stdout())
-		assert.NilError(t, err)
-		assert.Equal(t, wordsInspect.HostConfig.CPULimit, 0.5)
-		assert.Equal(t, wordsInspect.HostConfig.MemoryLimit, uint64(751619276))
-		assert.Equal(t, wordsInspect.HostConfig.CPUReservation, 0.5)
-		assert.Equal(t, wordsInspect.HostConfig.MemoryReservation, uint64(751619276))
-	})
-}
-
-func TestUpSecrets(t *testing.T) {
-	const (
-		composeProjectName = "aci_secrets"
-		serverContainer    = composeProjectName + "_web"
+		composeProjectName = "aci_test"
+		web1               = composeProjectName + "_web1"
+		web2               = composeProjectName + "_web2"
 
 		secret1Name  = "mytarget1"
 		secret1Value = "myPassword1\n"
@@ -559,7 +527,7 @@ func TestUpSecrets(t *testing.T) {
 		secret2Value = "another_password\n"
 	)
 	var (
-		basefilePath    = filepath.Join("..", "composefiles", composeProjectName)
+		basefilePath    = filepath.Join("..", "composefiles", "aci_secrets_resources")
 		composefilePath = filepath.Join(basefilePath, "compose.yml")
 	)
 	c := NewParallelE2eCLI(t, binDir)
@@ -569,23 +537,27 @@ func TestUpSecrets(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
-		// Check one container running
-		assert.Assert(t, is.Len(out, 2))
-		webRunning := false
-		for _, l := range out {
-			if strings.Contains(l, serverContainer) {
-				webRunning = true
-				strings.Contains(l, ":80->80/tcp")
-			}
-		}
-		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
+		// Check 2 containers running
+		assert.Assert(t, is.Len(out, 3))
+	})
 
-		res = c.RunDockerCmd("inspect", serverContainer)
+	t.Cleanup(func() {
+		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
+		res := c.RunDockerCmd("ps")
+		out := lines(res.Stdout())
+		assert.Equal(t, len(out), 1)
+	})
 
-		containerInspect, err := ParseContainerInspect(res.Stdout())
-		assert.NilError(t, err)
-		assert.Assert(t, is.Len(containerInspect.Ports, 1))
-		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
+	res := c.RunDockerCmd("inspect", web1)
+	web1Inspect, err := ParseContainerInspect(res.Stdout())
+	assert.NilError(t, err)
+	res = c.RunDockerCmd("inspect", web2)
+	web2Inspect, err := ParseContainerInspect(res.Stdout())
+	assert.NilError(t, err)
+
+	t.Run("read secrets in service 1", func(t *testing.T) {
+		assert.Assert(t, is.Len(web1Inspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", web1Inspect.Ports[0].HostIP, web1Inspect.Ports[0].HostPort)
 
 		output := HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusOK, 2*time.Second, 20*time.Second)
 		// replace windows carriage return
@@ -595,13 +567,29 @@ func TestUpSecrets(t *testing.T) {
 		output = HTTPGetWithRetry(t, endpoint+"/"+secret2Name, http.StatusOK, 2*time.Second, 20*time.Second)
 		output = strings.ReplaceAll(output, "\r", "")
 		assert.Equal(t, output, secret2Value)
+	})
 
-		t.Cleanup(func() {
-			c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
-			res := c.RunDockerCmd("ps")
-			out := lines(res.Stdout())
-			assert.Equal(t, len(out), 1)
-		})
+	t.Run("read secrets in service 2", func(t *testing.T) {
+		assert.Assert(t, is.Len(web2Inspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", web2Inspect.Ports[0].HostIP, web2Inspect.Ports[0].HostPort)
+
+		output := HTTPGetWithRetry(t, endpoint+"/"+secret2Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		output = strings.ReplaceAll(output, "\r", "")
+		assert.Equal(t, output, secret2Value)
+
+		HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusNotFound, 2*time.Second, 20*time.Second)
+	})
+
+	t.Run("check resource limits", func(t *testing.T) {
+		assert.Equal(t, web1Inspect.HostConfig.CPULimit, 0.7)
+		assert.Equal(t, web1Inspect.HostConfig.MemoryLimit, uint64(1073741824))
+		assert.Equal(t, web1Inspect.HostConfig.CPUReservation, 0.5)
+		assert.Equal(t, web1Inspect.HostConfig.MemoryReservation, uint64(536870912))
+
+		assert.Equal(t, web2Inspect.HostConfig.CPULimit, 0.5)
+		assert.Equal(t, web2Inspect.HostConfig.MemoryLimit, uint64(751619276))
+		assert.Equal(t, web2Inspect.HostConfig.CPUReservation, 0.5)
+		assert.Equal(t, web2Inspect.HostConfig.MemoryReservation, uint64(751619276))
 	})
 }
 

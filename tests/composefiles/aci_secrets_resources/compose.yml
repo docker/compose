@@ -1,0 +1,37 @@
+services:
+  web1:
+    build: ./web1
+    image: dockereng/e2e_test_secret_server1
+    ports:
+      - "80:80"
+    secrets:
+      - source: mysecret1
+        target: mytarget1
+      - mysecret2
+    deploy:
+      resources:
+        limits:
+          cpus: '0.7'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 0.5G
+
+  web2:
+    build: ./web2
+    image:  dockereng/e2e_test_secret_server2
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.5'
+          memory: 0.7G
+    secrets:
+      - mysecret2
+
+secrets:
+  mysecret1:
+    file: ./my_secret1.txt
+  mysecret2:
+    file: ./my_secret2.txt
