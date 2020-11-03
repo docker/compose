@@ -168,16 +168,15 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 		if localTestProfile != "" {
 			region := os.Getenv("TEST_AWS_REGION")
 			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", "default", "--region", region)
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--from-env")
 		} else {
-			profile := "default"
 			region := os.Getenv("AWS_DEFAULT_REGION")
 			secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 			keyID := os.Getenv("AWS_ACCESS_KEY_ID")
 			assert.Check(t, keyID != "")
 			assert.Check(t, secretKey != "")
 			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", profile, "--region", region)
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--from-env")
 		}
 		res.Assert(t, icmd.Expected{Out: "Successfully created ecs context \"" + contextName + "\""})
 		res = c.RunDockerCmd("context", "use", contextName)

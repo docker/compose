@@ -51,8 +51,8 @@ type AciContext struct {
 
 // EcsContext is the context for the AWS backend
 type EcsContext struct {
-	Profile string `json:",omitempty"`
-	Region  string `json:",omitempty"`
+	CredentialsFromEnv bool   `json:",omitempty"`
+	Profile            string `json:",omitempty"`
 }
 
 // AwsContext is the context for the ecs plugin

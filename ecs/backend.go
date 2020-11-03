@@ -18,6 +18,7 @@ package ecs
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
@@ -38,9 +39,23 @@ const backendType = store.EcsContextType
 
 // ContextParams options for creating AWS context
 type ContextParams struct {
-	Description string
-	Region      string
-	Profile     string
+	Name         string
+	Description  string
+	AccessKey    string
+	SecretKey    string
+	Profile      string
+	Region       string
+	CredsFromEnv bool
+}
+
+func (c ContextParams) haveRequiredEnvVars() bool {
+	if c.Profile != "" {
+		return true
+	}
+	if c.AccessKey != "" && c.SecretKey != "" {
+		return true
+	}
+	return false
 }
 
 func init() {
@@ -60,11 +75,31 @@ func service(ctx context.Context) (backend.Service, error) {
 }
 
 func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
+	region := ""
+	profile := ecsCtx.Profile
+
+	if ecsCtx.CredentialsFromEnv {
+		env := getEnvVars()
+		if !env.haveRequiredEnvVars() {
+			return nil, fmt.Errorf("context requires credentials to be passed as environment variables")
+		}
+		profile = env.Profile
+		region = env.Region
+	}
+
+	if region == "" {
+		r, err := getRegion(profile)
+		if err != nil {
+			return nil, err
+		}
+		region = r
+	}
+
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Profile:           ecsCtx.Profile,
+		Profile:           profile,
 		SharedConfigState: session.SharedConfigEnable,
 		Config: aws.Config{
-			Region: aws.String(ecsCtx.Region),
+			Region: aws.String(region),
 		},
 	})
 	if err != nil {
@@ -74,7 +109,7 @@ func getEcsAPIService(ecsCtx store.EcsContext) (*ecsAPIService, error) {
 	sdk := newSDK(sess)
 	return &ecsAPIService{
 		ctx:    ecsCtx,
-		Region: ecsCtx.Region,
+		Region: region,
 		aws:    sdk,
 	}, nil
 }
