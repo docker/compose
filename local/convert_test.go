@@ -36,7 +36,7 @@ func TestToRuntimeConfig(t *testing.T) {
 			Labels: map[string]string{"foo1": "bar1", "foo2": "bar2"},
 		},
 	}
-	rc := containerJSONToRuntimeConfig(m)
+	rc := toRuntimeConfig(m)
 	res := &containers.RuntimeConfig{
 		Env:    map[string]string{"FOO1": "BAR1", "FOO2": "BAR2"},
 		Labels: []string{"foo1=bar1", "foo2=bar2"},
@@ -65,7 +65,7 @@ func TestToHostConfig(t *testing.T) {
 		},
 		ContainerJSONBase: base,
 	}
-	hc := containerJSONToHostConfig(m)
+	hc := toHostConfig(m)
 	res := &containers.HostConfig{
 		AutoRemove:    true,
 		RestartPolicy: containers.RestartPolicyNone,
@@ -73,4 +73,31 @@ func TestToHostConfig(t *testing.T) {
 		MemoryLimit:   512 * 1024 * 1024,
 	}
 	assert.DeepEqual(t, hc, res)
+}
+
+func TestFromRestartPolicyName(t *testing.T) {
+	t.Parallel()
+	moby := []string{"always", "on-failure", "no", ""}
+	ours := []string{
+		containers.RestartPolicyAny,
+		containers.RestartPolicyOnFailure,
+		containers.RestartPolicyNone,
+		containers.RestartPolicyNone,
+	}
+	for i, p := range moby {
+		assert.Equal(t, fromRestartPolicyName(p), ours[i])
+	}
+}
+
+func TestToRestartPolicy(t *testing.T) {
+	t.Parallel()
+	ours := []string{containers.RestartPolicyAny, containers.RestartPolicyOnFailure, containers.RestartPolicyNone}
+	moby := []container.RestartPolicy{
+		{Name: "always"},
+		{Name: "on-failure"},
+		{Name: "no"},
+	}
+	for i, p := range ours {
+		assert.Equal(t, toRestartPolicy(p), moby[i])
+	}
 }

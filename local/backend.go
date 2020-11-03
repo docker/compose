@@ -21,10 +21,7 @@ package local
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,7 +30,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -102,8 +98,8 @@ func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, 
 		command = strings.Join(c.Config.Cmd, " ")
 	}
 
-	rc := containerJSONToRuntimeConfig(&c)
-	hc := containerJSONToHostConfig(&c)
+	rc := toRuntimeConfig(&c)
+	hc := toHostConfig(&c)
 
 	return containers.Container{
 		ID:         stringid.TruncateID(c.ID),
@@ -114,66 +110,6 @@ func (ms *local) Inspect(ctx context.Context, id string) (containers.Container, 
 		Config:     rc,
 		HostConfig: hc,
 	}, nil
-}
-
-func containerJSONToRuntimeConfig(m *types.ContainerJSON) *containers.RuntimeConfig {
-	if m.Config == nil {
-		return nil
-	}
-	var env map[string]string
-	if m.Config.Env != nil {
-		env = make(map[string]string)
-		for _, e := range m.Config.Env {
-			tokens := strings.Split(e, "=")
-			if len(tokens) != 2 {
-				continue
-			}
-			env[tokens[0]] = tokens[1]
-		}
-	}
-
-	var labels []string
-	if m.Config.Labels != nil {
-		for k, v := range m.Config.Labels {
-			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
-		}
-	}
-	sort.Strings(labels)
-
-	if env == nil &&
-		labels == nil {
-		return nil
-	}
-
-	return &containers.RuntimeConfig{
-		Env:    env,
-		Labels: labels,
-	}
-}
-
-func containerJSONToHostConfig(m *types.ContainerJSON) *containers.HostConfig {
-	if m.HostConfig == nil {
-		return nil
-	}
-
-	var restartPolicy string
-	switch m.HostConfig.RestartPolicy.Name {
-	case "always":
-		restartPolicy = containers.RestartPolicyAny
-	case "on-failure":
-		restartPolicy = containers.RestartPolicyOnFailure
-	case "no", "":
-		fallthrough
-	default:
-		restartPolicy = containers.RestartPolicyNone
-	}
-
-	return &containers.HostConfig{
-		AutoRemove:    m.HostConfig.AutoRemove,
-		RestartPolicy: restartPolicy,
-		CPULimit:      float64(m.HostConfig.Resources.NanoCPUs) / 1e9,
-		MemoryLimit:   uint64(m.HostConfig.Resources.Memory),
-	}
 }
 
 func (ms *local) List(ctx context.Context, all bool) ([]containers.Container, error) {
@@ -351,48 +287,4 @@ func (ms *local) Delete(ctx context.Context, containerID string, request contain
 		return errors.Wrapf(errdefs.ErrNotFound, "container %q", containerID)
 	}
 	return err
-}
-
-func toPorts(ports []types.Port) []containers.Port {
-	result := []containers.Port{}
-	for _, port := range ports {
-		result = append(result, containers.Port{
-			ContainerPort: uint32(port.PrivatePort),
-			HostPort:      uint32(port.PublicPort),
-			HostIP:        port.IP,
-			Protocol:      port.Type,
-		})
-	}
-
-	return result
-}
-
-func fromPorts(ports []containers.Port) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, error) {
-	var (
-		exposedPorts = make(map[nat.Port]struct{}, len(ports))
-		bindings     = make(map[nat.Port][]nat.PortBinding)
-	)
-
-	for _, port := range ports {
-		p, err := nat.NewPort(port.Protocol, strconv.Itoa(int(port.ContainerPort)))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if _, exists := exposedPorts[p]; !exists {
-			exposedPorts[p] = struct{}{}
-		}
-
-		portBinding := nat.PortBinding{
-			HostIP:   port.HostIP,
-			HostPort: strconv.Itoa(int(port.HostPort)),
-		}
-		bslice, exists := bindings[p]
-		if !exists {
-			bslice = []nat.PortBinding{}
-		}
-		bindings[p] = append(bslice, portBinding)
-	}
-
-	return exposedPorts, bindings, nil
 }
