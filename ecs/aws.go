@@ -42,8 +42,8 @@ type API interface {
 	GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error)
 	GetRoleArn(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
-	CreateStack(ctx context.Context, name string, template []byte) error
-	CreateChangeSet(ctx context.Context, name string, template []byte) (string, error)
+	CreateStack(ctx context.Context, name string, region string, template []byte) error
+	CreateChangeSet(ctx context.Context, name string, region string, template []byte) (string, error)
 	UpdateStack(ctx context.Context, changeset string) error
 	WaitStackComplete(ctx context.Context, name string, operation int) error
 	GetStackID(ctx context.Context, name string) (string, error)

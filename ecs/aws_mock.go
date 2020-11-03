@@ -66,18 +66,18 @@ func (mr *MockAPIMockRecorder) CheckVPC(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // CreateChangeSet mocks base method
-func (m *MockAPI) CreateChangeSet(arg0 context.Context, arg1 string, arg2 []byte) (string, error) {
+func (m *MockAPI) CreateChangeSet(arg0 context.Context, arg1, arg2 string, arg3 []byte) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateChangeSet", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CreateChangeSet", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateChangeSet indicates an expected call of CreateChangeSet
-func (mr *MockAPIMockRecorder) CreateChangeSet(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateChangeSet(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateChangeSet", reflect.TypeOf((*MockAPI)(nil).CreateChangeSet), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateChangeSet", reflect.TypeOf((*MockAPI)(nil).CreateChangeSet), arg0, arg1, arg2, arg3)
 }
 
 // CreateCluster mocks base method
@@ -126,17 +126,17 @@ func (mr *MockAPIMockRecorder) CreateSecret(arg0, arg1 interface{}) *gomock.Call
 }
 
 // CreateStack mocks base method
-func (m *MockAPI) CreateStack(arg0 context.Context, arg1 string, arg2 []byte) error {
+func (m *MockAPI) CreateStack(arg0 context.Context, arg1, arg2 string, arg3 []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "CreateStack", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateStack indicates an expected call of CreateStack
-func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) CreateStack(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStack", reflect.TypeOf((*MockAPI)(nil).CreateStack), arg0, arg1, arg2, arg3)
 }
 
 // DeleteAutoscalingGroup mocks base method

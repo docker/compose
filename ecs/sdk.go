@@ -21,11 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/hashicorp/go-uuid"
 	"strings"
 	"time"
 
@@ -36,6 +31,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -54,27 +50,31 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 type sdk struct {
-	ECS ecsiface.ECSAPI
-	EC2 ec2iface.EC2API
-	EFS efsiface.EFSAPI
-	ELB elbv2iface.ELBV2API
-	CW  cloudwatchlogsiface.CloudWatchLogsAPI
-	IAM iamiface.IAMAPI
-	CF  cloudformationiface.CloudFormationAPI
-	SM  secretsmanageriface.SecretsManagerAPI
-	SSM ssmiface.SSMAPI
-	AG  autoscalingiface.AutoScalingAPI
-	S3 s3iface.S3API
+	ECS      ecsiface.ECSAPI
+	EC2      ec2iface.EC2API
+	EFS      efsiface.EFSAPI
+	ELB      elbv2iface.ELBV2API
+	CW       cloudwatchlogsiface.CloudWatchLogsAPI
+	IAM      iamiface.IAMAPI
+	CF       cloudformationiface.CloudFormationAPI
+	SM       secretsmanageriface.SecretsManagerAPI
+	SSM      ssmiface.SSMAPI
+	AG       autoscalingiface.AutoScalingAPI
+	S3       s3iface.S3API
 	uploader *s3manager.Uploader
 }
 
@@ -86,17 +86,17 @@ func newSDK(sess *session.Session) sdk {
 		request.AddToUserAgent(r, internal.ECSUserAgentName+"/"+internal.Version)
 	})
 	return sdk{
-		ECS: ecs.New(sess),
-		EC2: ec2.New(sess),
-		EFS: efs.New(sess),
-		ELB: elbv2.New(sess),
-		CW:  cloudwatchlogs.New(sess),
-		IAM: iam.New(sess),
-		CF:  cloudformation.New(sess),
-		SM:  secretsmanager.New(sess),
-		SSM: ssm.New(sess),
-		AG:  autoscaling.New(sess),
-		S3:  s3.New(sess),
+		ECS:      ecs.New(sess),
+		EC2:      ec2.New(sess),
+		EFS:      efs.New(sess),
+		ELB:      elbv2.New(sess),
+		CW:       cloudwatchlogs.New(sess),
+		IAM:      iam.New(sess),
+		CF:       cloudformation.New(sess),
+		SM:       secretsmanager.New(sess),
+		SSM:      ssm.New(sess),
+		AG:       autoscaling.New(sess),
+		S3:       s3.New(sess),
 		uploader: s3manager.NewUploader(sess),
 	}
 }
@@ -197,11 +197,9 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error
 			return nil, err
 		}
 		for _, subnet := range subnets.Subnets {
-			id := aws.StringValue(subnet.SubnetId)
-			logrus.Debugf("Found SubNet %s", id)
 			ids = append(ids, existingAWSResource{
 				arn: aws.StringValue(subnet.SubnetArn),
-				id:  id,
+				id:  aws.StringValue(subnet.SubnetId),
 			})
 		}
 
@@ -238,10 +236,17 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 
 type uploadedTemplateFunc func(ctx context.Context, name string, url string) (string, error)
 
-func (s sdk) withTemplate(ctx context.Context, name string, template []byte, fn uploadedTemplateFunc) (string, error) {
+func (s sdk) withTemplate(ctx context.Context, name string, template []byte, region string, fn uploadedTemplateFunc) (string, error) {
 	logrus.Debug("Create s3 bucket to store cloudformation template")
+	var configuration *s3.CreateBucketConfiguration
+	if region != "us-east-1" {
+		configuration = &s3.CreateBucketConfiguration{
+			LocationConstraint: aws.String(region),
+		}
+	}
 	_, err := s.S3.CreateBucket(&s3.CreateBucketInput{
-		Bucket: aws.String("com.docker.compose"),
+		Bucket:                    aws.String("com.docker.compose." + region),
+		CreateBucketConfiguration: configuration,
 	})
 	if err != nil {
 		ae, ok := err.(awserr.Error)
@@ -261,7 +266,7 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, fn 
 	upload, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(template),
-		Bucket:      aws.String("com.docker.compose"),
+		Bucket:      aws.String("com.docker.compose." + region),
 		ContentType: aws.String("application/json"),
 		Tagging:     aws.String(name),
 	})
@@ -270,7 +275,7 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, fn 
 		return "", err
 	}
 
-	defer s.S3.DeleteObjects(&s3.DeleteObjectsInput{
+	defer s.S3.DeleteObjects(&s3.DeleteObjectsInput{ //nolint: errcheck
 		Bucket: aws.String("com.docker.compose"),
 		Delete: &s3.Delete{
 			Objects: []*s3.ObjectIdentifier{
@@ -285,10 +290,10 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, fn 
 	return fn(ctx, name, upload.Location)
 }
 
-func (s sdk) CreateStack(ctx context.Context, name string, template []byte) error {
+func (s sdk) CreateStack(ctx context.Context, name string, region string, template []byte) error {
 	logrus.Debug("Create CloudFormation stack")
 
-	stackId, err := s.withTemplate(ctx, name, template, func(ctx context.Context, name string, url string) (string, error) {
+	stackID, err := s.withTemplate(ctx, name, template, region, func(ctx context.Context, name string, url string) (string, error) {
 		stack, err := s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 			OnFailure:        aws.String("DELETE"),
 			StackName:        aws.String(name),
@@ -309,14 +314,14 @@ func (s sdk) CreateStack(ctx context.Context, name string, template []byte) erro
 		}
 		return aws.StringValue(stack.StackId), nil
 	})
-	logrus.Debugf("Stack %s created", stackId)
+	logrus.Debugf("Stack %s created", stackID)
 	return err
 }
 
-func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte) (string, error) {
+func (s sdk) CreateChangeSet(ctx context.Context, name string, region string, template []byte) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
 
-	changeset, err := s.withTemplate(ctx, name, template, func(ctx context.Context, name string, url string) (string, error) {
+	changeset, err := s.withTemplate(ctx, name, template, region, func(ctx context.Context, name string, url string) (string, error) {
 		update := fmt.Sprintf("Update%s", time.Now().Format("2006-01-02-15-04-05"))
 		changeset, err := s.CF.CreateChangeSetWithContext(ctx, &cloudformation.CreateChangeSetInput{
 			ChangeSetName: aws.String(update),

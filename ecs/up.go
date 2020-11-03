@@ -44,7 +44,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 	operation := stackCreate
 	if update {
 		operation = stackUpdate
-		changeset, err := b.aws.CreateChangeSet(ctx, project.Name, template)
+		changeset, err := b.aws.CreateChangeSet(ctx, project.Name, b.Region, template)
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 			return err
 		}
 	} else {
-		err = b.aws.CreateStack(ctx, project.Name, template)
+		err = b.aws.CreateStack(ctx, project.Name, b.Region, template)
 		if err != nil {
 			return err
 		}
