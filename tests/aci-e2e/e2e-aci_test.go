@@ -517,8 +517,8 @@ func overwriteFileStorageAccount(t *testing.T, absComposefileName string, storag
 func TestUpSecretsResources(t *testing.T) {
 	const (
 		composeProjectName = "aci_test"
-		serverContainer    = composeProjectName + "_web"
-		secondContainer    = composeProjectName + "_web2"
+		web1               = composeProjectName + "_web1"
+		web2               = composeProjectName + "_web2"
 
 		secret1Name  = "mytarget1"
 		secret1Value = "myPassword1\n"
@@ -537,16 +537,8 @@ func TestUpSecretsResources(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
-		// Check one container running
+		// Check 2 containers running
 		assert.Assert(t, is.Len(out, 3))
-		webRunning := false
-		for _, l := range out {
-			if strings.Contains(l, serverContainer) {
-				webRunning = true
-				strings.Contains(l, ":80->80/tcp")
-			}
-		}
-		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
 	})
 
 	t.Cleanup(func() {
@@ -556,13 +548,16 @@ func TestUpSecretsResources(t *testing.T) {
 		assert.Equal(t, len(out), 1)
 	})
 
-	res := c.RunDockerCmd("inspect", serverContainer)
-	webInspect, err := ParseContainerInspect(res.Stdout())
+	res := c.RunDockerCmd("inspect", web1)
+	web1Inspect, err := ParseContainerInspect(res.Stdout())
+	assert.NilError(t, err)
+	res = c.RunDockerCmd("inspect", web2)
+	web2Inspect, err := ParseContainerInspect(res.Stdout())
 	assert.NilError(t, err)
 
-	t.Run("read secrets", func(t *testing.T) {
-		assert.Assert(t, is.Len(webInspect.Ports, 1))
-		endpoint := fmt.Sprintf("http://%s:%d", webInspect.Ports[0].HostIP, webInspect.Ports[0].HostPort)
+	t.Run("read secrets in service 1", func(t *testing.T) {
+		assert.Assert(t, is.Len(web1Inspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", web1Inspect.Ports[0].HostIP, web1Inspect.Ports[0].HostPort)
 
 		output := HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusOK, 2*time.Second, 20*time.Second)
 		// replace windows carriage return
@@ -574,16 +569,23 @@ func TestUpSecretsResources(t *testing.T) {
 		assert.Equal(t, output, secret2Value)
 	})
 
-	t.Run("check resource limits", func(t *testing.T) {
-		assert.Equal(t, webInspect.HostConfig.CPULimit, 0.7)
-		assert.Equal(t, webInspect.HostConfig.MemoryLimit, uint64(1073741824))
-		assert.Equal(t, webInspect.HostConfig.CPUReservation, 0.5)
-		assert.Equal(t, webInspect.HostConfig.MemoryReservation, uint64(536870912))
+	t.Run("read secrets in service 2", func(t *testing.T) {
+		assert.Assert(t, is.Len(web2Inspect.Ports, 1))
+		endpoint := fmt.Sprintf("http://%s:%d", web2Inspect.Ports[0].HostIP, web2Inspect.Ports[0].HostPort)
 
-		res = c.RunDockerCmd("inspect", secondContainer)
-		web2Inspect, err := ParseContainerInspect(res.Stdout())
-		assert.NilError(t, err)
-		assert.NilError(t, err)
+		output := HTTPGetWithRetry(t, endpoint+"/"+secret2Name, http.StatusOK, 2*time.Second, 20*time.Second)
+		output = strings.ReplaceAll(output, "\r", "")
+		assert.Equal(t, output, secret2Value)
+
+		HTTPGetWithRetry(t, endpoint+"/"+secret1Name, http.StatusNotFound, 2*time.Second, 20*time.Second)
+	})
+
+	t.Run("check resource limits", func(t *testing.T) {
+		assert.Equal(t, web1Inspect.HostConfig.CPULimit, 0.7)
+		assert.Equal(t, web1Inspect.HostConfig.MemoryLimit, uint64(1073741824))
+		assert.Equal(t, web1Inspect.HostConfig.CPUReservation, 0.5)
+		assert.Equal(t, web1Inspect.HostConfig.MemoryReservation, uint64(536870912))
+
 		assert.Equal(t, web2Inspect.HostConfig.CPULimit, 0.5)
 		assert.Equal(t, web2Inspect.HostConfig.MemoryLimit, uint64(751619276))
 		assert.Equal(t, web2Inspect.HostConfig.CPUReservation, 0.5)
