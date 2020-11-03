@@ -15,6 +15,4 @@
 FROM python:3.8
 WORKDIR /run/secrets
 
-EXPOSE 8080
-ENTRYPOINT ["python"]
-CMD ["-m", "http.server", "8080"]
+CMD python -m http.server ${PORT:-80}
