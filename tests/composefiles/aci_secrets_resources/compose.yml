@@ -1,7 +1,7 @@
 services:
   web1:
-    build: ./web1
-    image: dockereng/e2e_test_secret_server1
+    build: ./web
+    image: dockerinternal/e2e_test_secret_server
     ports:
       - "80:80"
     secrets:
@@ -18,10 +18,12 @@ services:
           memory: 0.5G
 
   web2:
-    build: ./web2
-    image:  dockereng/e2e_test_secret_server2
+    build: ./web
+    image:  dockerinternal/e2e_test_secret_server
     ports:
       - "8080:8080"
+    environment:
+      - PORT=8080
     deploy:
       resources:
         reservations:

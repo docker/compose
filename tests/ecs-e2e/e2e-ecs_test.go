@@ -81,18 +81,18 @@ func TestCompose(t *testing.T) {
 	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/demo_multi_port.yaml")
+		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/ecs_e2e/multi_port_secrets.yaml")
 	})
 
-	var webURL, wordsURL string
+	var webURL, wordsURL, secretsURL string
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
 		fmt.Println(strings.TrimSpace(res.Stdout()))
 		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 
-		assert.Equal(t, 4, len(lines))
+		assert.Equal(t, 5, len(lines))
 
-		var dbDisplayed, wordsDisplayed, webDisplayed bool
+		var dbDisplayed, wordsDisplayed, webDisplayed, secretsDisplayed bool
 		for _, line := range lines {
 			fields := strings.Fields(line)
 			containerID := fields[0]
@@ -107,15 +107,19 @@ func TestCompose(t *testing.T) {
 				wordsURL = "http://" + strings.Replace(fields[3], "->8080/tcp", "", 1) + "/noun"
 			case "web":
 				webDisplayed = true
-				assert.Equal(t, fields[1], "web")
 				assert.Check(t, strings.Contains(fields[3], ":80->80/tcp"))
 				webURL = "http://" + strings.Replace(fields[3], "->80/tcp", "", 1)
+			case "websecrets":
+				secretsDisplayed = true
+				assert.Check(t, strings.Contains(fields[3], ":90->90/tcp"))
+				secretsURL = "http://" + strings.Replace(fields[3], "->90/tcp", "", 1)
 			}
 		}
 
 		assert.Check(t, dbDisplayed)
 		assert.Check(t, wordsDisplayed)
 		assert.Check(t, webDisplayed)
+		assert.Check(t, secretsDisplayed)
 	})
 
 	t.Run("compose ls", func(t *testing.T) {
@@ -142,6 +146,12 @@ func TestCompose(t *testing.T) {
 		assert.Assert(t, strings.Contains(out, `"word":`))
 	})
 
+	t.Run("access secret", func(t *testing.T) {
+		out := HTTPGetWithRetry(t, secretsURL+"/mysecret1", http.StatusOK, 3*time.Second, 120*time.Second)
+		out = strings.ReplaceAll(out, "\r", "")
+		assert.Equal(t, out, "myPassword1\n")
+	})
+
 	t.Run("compose down", func(t *testing.T) {
 		cmd := c.NewDockerCmd("compose", "down", "--project-name", stack)
 		res := icmd.StartCmd(cmd)
@@ -166,9 +176,7 @@ func setupTest(t *testing.T) (*E2eCLI, string) {
 		localTestProfile := os.Getenv("TEST_AWS_PROFILE")
 		var res *icmd.Result
 		if localTestProfile != "" {
-			region := os.Getenv("TEST_AWS_REGION")
-			assert.Check(t, region != "")
-			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--from-env")
+			res = c.RunDockerCmd("context", "create", "ecs", contextName, "--profile", localTestProfile)
 		} else {
 			region := os.Getenv("AWS_DEFAULT_REGION")
 			secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
