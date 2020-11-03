@@ -171,25 +171,34 @@ func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 
 func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error) {
 	logrus.Debug("Retrieve SubNets")
-	subnets, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
-		DryRun: nil,
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String("vpc-id"),
-				Values: []*string{aws.String(vpcID)},
-			},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	ids := []awsResource{}
-	for _, subnet := range subnets.Subnets {
-		ids = append(ids, existingAWSResource{
-			arn: aws.StringValue(subnet.SubnetArn),
-			id:  aws.StringValue(subnet.SubnetId),
+	var token *string
+	for {
+		subnets, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{aws.String(vpcID)},
+				},
+			},
+			NextToken: token,
 		})
+		if err != nil {
+			return nil, err
+		}
+		for _, subnet := range subnets.Subnets {
+			id := aws.StringValue(subnet.SubnetId)
+			logrus.Debugf("Found SubNet %s", id)
+			ids = append(ids, existingAWSResource{
+				arn: aws.StringValue(subnet.SubnetArn),
+				id:  id,
+			})
+		}
+
+		if subnets.NextToken == token {
+			break
+		}
+		token = subnets.NextToken
 	}
 	return ids, nil
 }
