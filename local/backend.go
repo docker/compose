@@ -152,8 +152,9 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 		ExposedPorts: exposedPorts,
 	}
 	hostConfig := &container.HostConfig{
-		PortBindings: hostBindings,
-		AutoRemove:   r.AutoRemove,
+		PortBindings:  hostBindings,
+		AutoRemove:    r.AutoRemove,
+		RestartPolicy: toRestartPolicy(r.RestartPolicyCondition),
 		Resources: container.Resources{
 			NanoCPUs: int64(r.CPULimit * 1e9),
 			Memory:   int64(r.MemLimit),
