@@ -171,6 +171,7 @@ func containerJSONToHostConfig(m *types.ContainerJSON) *containers.HostConfig {
 	return &containers.HostConfig{
 		AutoRemove:    m.HostConfig.AutoRemove,
 		RestartPolicy: restartPolicy,
+		CPULimit:      float64(m.HostConfig.Resources.NanoCPUs) / 1e9,
 	}
 }
 
@@ -216,6 +217,9 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 	hostConfig := &container.HostConfig{
 		PortBindings: hostBindings,
 		AutoRemove:   r.AutoRemove,
+		Resources: container.Resources{
+			NanoCPUs: int64(r.CPULimit * 1e9),
+		},
 	}
 
 	created, err := ms.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)

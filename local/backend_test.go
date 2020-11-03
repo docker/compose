@@ -52,6 +52,9 @@ func TestToHostConfig(t *testing.T) {
 			RestartPolicy: container.RestartPolicy{
 				Name: "",
 			},
+			Resources: container.Resources{
+				NanoCPUs: 750000000,
+			},
 		},
 	}
 	m := &types.ContainerJSON{
@@ -65,6 +68,7 @@ func TestToHostConfig(t *testing.T) {
 	res := &containers.HostConfig{
 		AutoRemove:    true,
 		RestartPolicy: containers.RestartPolicyNone,
+		CPULimit:      0.75,
 	}
 	assert.DeepEqual(t, hc, res)
 }
