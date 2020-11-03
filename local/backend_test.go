@@ -54,6 +54,7 @@ func TestToHostConfig(t *testing.T) {
 			},
 			Resources: container.Resources{
 				NanoCPUs: 750000000,
+				Memory:   512 * 1024 * 1024,
 			},
 		},
 	}
@@ -69,6 +70,7 @@ func TestToHostConfig(t *testing.T) {
 		AutoRemove:    true,
 		RestartPolicy: containers.RestartPolicyNone,
 		CPULimit:      0.75,
+		MemoryLimit:   512 * 1024 * 1024,
 	}
 	assert.DeepEqual(t, hc, res)
 }

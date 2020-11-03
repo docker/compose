@@ -172,6 +172,7 @@ func containerJSONToHostConfig(m *types.ContainerJSON) *containers.HostConfig {
 		AutoRemove:    m.HostConfig.AutoRemove,
 		RestartPolicy: restartPolicy,
 		CPULimit:      float64(m.HostConfig.Resources.NanoCPUs) / 1e9,
+		MemoryLimit:   uint64(m.HostConfig.Resources.Memory),
 	}
 }
 
@@ -219,6 +220,7 @@ func (ms *local) Run(ctx context.Context, r containers.ContainerConfig) error {
 		AutoRemove:   r.AutoRemove,
 		Resources: container.Resources{
 			NanoCPUs: int64(r.CPULimit * 1e9),
+			Memory:   int64(r.MemLimit),
 		},
 	}
 
