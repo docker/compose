@@ -840,6 +840,6 @@ class ProjectError(Exception):
 
     def __str__(self):
         if self.value:
-            return self.msg + "\n" + "\n".join(self.value)
+            return "\n".join([self.msg] + self.value)
         else:
             return self.msg
