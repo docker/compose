@@ -11,13 +11,11 @@
 # You can add additional volumes (or any docker run options) using
 # the ${COMPOSE_OPTIONS} environment variable.
 #
-# You can set a specific image tag from Docker Hub, such as "1.27.4", or "alpine-1.27.4"
-# using the $DOCKER_COMPOSE_IMAGE_TAG environment variable (defaults to "1.27.4")
+# You can set a specific image and tag, such as "docker/compose:1.27.4", or "docker/compose:alpine-1.27.4"
+# using the $DOCKER_COMPOSE_IMAGE_TAG environment variable (defaults to "docker/compose:1.27.4")
 #
 
 set -e
-
-IMAGE="docker/compose:${DOCKER_COMPOSE_IMAGE_TAG:-1.27.4}"
 
 # Setup options for connecting to docker host
 if [ -z "${DOCKER_HOST}" ]; then
@@ -70,4 +68,4 @@ if docker info --format '{{json .SecurityOptions}}' 2> /dev/null | grep -q 'name
 fi
 
 # shellcheck disable=SC2086
-exec docker run --rm ${DOCKER_RUN_OPTIONS} ${DOCKER_ADDR} ${COMPOSE_OPTIONS} ${VOLUMES} -w "${PWD}" "${IMAGE}" "$@"
+exec docker run --rm ${DOCKER_RUN_OPTIONS} ${DOCKER_ADDR} ${COMPOSE_OPTIONS} ${VOLUMES} -w "${PWD}" "${DOCKER_COMPOSE_IMAGE_TAG:-docker/compose:1.27.4}" "$@"
