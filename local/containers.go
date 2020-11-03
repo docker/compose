@@ -27,6 +27,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
@@ -104,6 +105,17 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 		return err
 	}
 
+	var mounts []mount.Mount
+	for _, v := range r.Volumes {
+		tokens := strings.Split(v, ":")
+		if len(tokens) != 2 {
+			return errors.Wrapf(errdefs.ErrParsingFailed, "volume %q has invalid format", v)
+		}
+		src := tokens[0]
+		tgt := tokens[1]
+		mounts = append(mounts, mount.Mount{Type: "volume", Source: src, Target: tgt})
+	}
+
 	containerConfig := &container.Config{
 		Image:        r.Image,
 		Labels:       r.Labels,
@@ -112,6 +124,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	}
 	hostConfig := &container.HostConfig{
 		PortBindings:  hostBindings,
+		Mounts:        mounts,
 		AutoRemove:    r.AutoRemove,
 		RestartPolicy: toRestartPolicy(r.RestartPolicyCondition),
 		Resources: container.Resources{
