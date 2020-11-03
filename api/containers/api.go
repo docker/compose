@@ -85,7 +85,7 @@ type Port struct {
 type ContainerConfig struct {
 	// ID uniquely identifies the container
 	ID string
-	// Image specifies the iamge reference used for a container
+	// Image specifies the image reference used for a container
 	Image string
 	// Command are the arguments passed to the container's entrypoint
 	Command []string
