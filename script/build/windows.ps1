@@ -6,7 +6,7 @@
 #
 #        http://git-scm.com/download/win
 #
-# 2. Install Python 3.7.x:
+# 2. Install Python 3.9.x:
 #
 #        https://www.python.org/downloads/
 #
