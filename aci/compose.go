@@ -46,17 +46,48 @@ func newComposeService(ctx store.AciContext) aciComposeService {
 
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
-	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project, cs.storageLogin)
-	addTag(&groupDefinition, composeContainerTag)
 
+	if err := autocreateFileshares(ctx, project); err != nil {
+		return err
+	}
+
+	groupDefinition, err := convert.ToContainerGroup(ctx, cs.ctx, *project, cs.storageLogin)
 	if err != nil {
 		return err
 	}
+
+	addTag(&groupDefinition, composeContainerTag)
 	return createOrUpdateACIContainers(ctx, cs.ctx, groupDefinition)
+}
+
+func (cs aciComposeService) warnKeepVolumeOnDown(ctx context.Context, projectName string) error {
+	cgClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
+	if err != nil {
+		return err
+	}
+	cg, err := cgClient.Get(ctx, cs.ctx.ResourceGroup, projectName)
+	if err != nil {
+		return err
+	}
+	if cg.Volumes == nil {
+		return nil
+	}
+	for _, v := range *cg.Volumes {
+		if v.AzureFile == nil || v.AzureFile.StorageAccountName == nil || v.AzureFile.ShareName == nil {
+			continue
+		}
+		fmt.Printf("WARNING: fileshare \"%s/%s\" will NOT be deleted. Use 'docker volume rm' if you want to delete this volume\n",
+			*v.AzureFile.StorageAccountName, *v.AzureFile.ShareName)
+	}
+	return nil
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, project string) error {
 	logrus.Debugf("Down on project with name %q", project)
+
+	if err := cs.warnKeepVolumeOnDown(ctx, project); err != nil {
+		return err
+	}
 
 	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project)
 	if err != nil {

@@ -32,21 +32,24 @@ import (
 )
 
 const (
-	azureFileDriverName            = "azure_file"
-	volumeDriveroptsShareNameKey   = "share_name"
-	volumeDriveroptsAccountNameKey = "storage_account_name"
+	// AzureFileDriverName driver name for azure file share
+	AzureFileDriverName = "azure_file"
+	// VolumeDriveroptsShareNameKey driver opt for fileshare name
+	VolumeDriveroptsShareNameKey = "share_name"
+	// VolumeDriveroptsAccountNameKey driver opt for storage account
+	VolumeDriveroptsAccountNameKey = "storage_account_name"
 	volumeReadOnly                 = "read_only"
 )
 
 func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) ([]containerinstance.Volume, error) {
 	var azureFileVolumesSlice []containerinstance.Volume
 	for name, v := range p.Volumes {
-		if v.Driver == azureFileDriverName {
-			shareName, ok := v.DriverOpts[volumeDriveroptsShareNameKey]
+		if v.Driver == AzureFileDriverName {
+			shareName, ok := v.DriverOpts[VolumeDriveroptsShareNameKey]
 			if !ok {
 				return nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
 			}
-			accountName, ok := v.DriverOpts[volumeDriveroptsAccountNameKey]
+			accountName, ok := v.DriverOpts[VolumeDriveroptsAccountNameKey]
 			if !ok {
 				return nil, fmt.Errorf("cannot retrieve account name for Azurefile")
 			}
@@ -105,15 +108,15 @@ func GetRunVolumes(volumes []string) (map[string]types.VolumeConfig, []types.Ser
 		readOnly := strconv.FormatBool(vi.readonly)
 		projectVolumes[vi.name] = types.VolumeConfig{
 			Name:   vi.name,
-			Driver: azureFileDriverName,
+			Driver: AzureFileDriverName,
 			DriverOpts: map[string]string{
-				volumeDriveroptsAccountNameKey: vi.storageAccount,
-				volumeDriveroptsShareNameKey:   vi.fileshare,
+				VolumeDriveroptsAccountNameKey: vi.storageAccount,
+				VolumeDriveroptsShareNameKey:   vi.fileshare,
 				volumeReadOnly:                 readOnly,
 			},
 		}
 		sv := types.ServiceVolumeConfig{
-			Type:     azureFileDriverName,
+			Type:     AzureFileDriverName,
 			Source:   vi.name,
 			Target:   vi.target,
 			ReadOnly: vi.readonly,
