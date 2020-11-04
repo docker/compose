@@ -1,3 +1,6 @@
+# syntax=docker/dockerfile:experimental
+
+
 #   Copyright 2020 Docker Compose CLI authors
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +15,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM python:3.8
-WORKDIR /run/secrets
+FROM golang:1.15-alpine AS build
+COPY main.go .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server main.go
 
-CMD python -m http.server ${PORT:-80}
+FROM alpine
+COPY --from=build /go/server /
+CMD /server "${PORT:-80}" "${DIR:-/run/secrets}"

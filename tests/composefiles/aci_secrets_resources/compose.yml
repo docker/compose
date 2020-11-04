@@ -19,7 +19,7 @@ services:
 
   web2:
     build: ./web
-    image:  dockerinternal/e2e_test_secret_server
+    image: dockerinternal/e2e_test_secret_server
     ports:
       - "8080:8080"
     environment:
