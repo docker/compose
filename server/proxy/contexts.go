@@ -50,12 +50,58 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 	result := &contextsv1.ListResponse{}
 
 	for _, c := range contexts {
-		result.Contexts = append(result.Contexts, &contextsv1.Context{
+		endpointName := c.Type()
+		if c.Type() == store.DefaultContextType {
+			endpointName = "docker"
+		}
+		var endpoint interface{} = c.Endpoints[endpointName]
+
+		context := contextsv1.Context{
 			Name:        c.Name,
 			ContextType: c.Type(),
+			Description: c.Metadata.Description,
 			Current:     c.Name == configFile.CurrentContext,
-		})
-	}
+		}
+		switch c.Type() {
+		case store.DefaultContextType:
+			context.Endpoint = getDockerEndpoint(endpoint)
+		case store.AciContextType:
+			context.Endpoint = getAciEndpoint(endpoint)
+		case store.EcsContextType:
+			context.Endpoint = getEcsEndpoint(endpoint)
+		}
 
+		result.Contexts = append(result.Contexts, &context)
+	}
 	return result, nil
+}
+
+func getDockerEndpoint(endpoint interface{}) *contextsv1.Context_DockerEndpoint {
+	typedEndpoint := endpoint.(*store.Endpoint)
+	return &contextsv1.Context_DockerEndpoint{
+		DockerEndpoint: &contextsv1.DockerEndpoint{
+			Host: typedEndpoint.Host,
+		},
+	}
+}
+
+func getAciEndpoint(endpoint interface{}) *contextsv1.Context_AciEndpoint {
+	typedEndpoint := endpoint.(*store.AciContext)
+	return &contextsv1.Context_AciEndpoint{
+		AciEndpoint: &contextsv1.AciEndpoint{
+			ResourceGroup:  typedEndpoint.ResourceGroup,
+			Region:         typedEndpoint.Location,
+			SubscriptionId: typedEndpoint.SubscriptionID,
+		},
+	}
+}
+
+func getEcsEndpoint(endpoint interface{}) *contextsv1.Context_EcsEndpoint {
+	typedEndpoint := endpoint.(*store.EcsContext)
+	return &contextsv1.Context_EcsEndpoint{
+		EcsEndpoint: &contextsv1.EcsEndpoint{
+			FromEnvironment: typedEndpoint.CredentialsFromEnv,
+			Profile:         typedEndpoint.Profile,
+		},
+	}
 }
