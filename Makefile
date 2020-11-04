@@ -110,6 +110,12 @@ build-ecs-search-sidecar:  ## build ecs search sidecar image locally and tag it 
 publish-ecs-search-sidecar: build-ecs-search-sidecar ## build & publish ecs search sidecar image with make publish-ecs-search-sidecar tag=0.1
 	docker pull docker/ecs-searchdomain-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/ecs-searchdomain-sidecar:$(tag)
 
+build-ecs-secrets-sidecar:  ## build ecs secrets sidecar image locally and tag it with make build-ecs-secrets-sidecar tag=0.1
+	docker build -t docker/ecs-secrets-sidecar:$(tag) ecs/secrets
+
+publish-ecs-secrets-sidecar: build-ecs-secrets-sidecar ## build & publish ecs secrets sidecar image with make publish-ecs-secrets-sidecar tag=0.1
+	docker pull docker/ecs-secrets-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/ecs-secrets-sidecar:$(tag)
+
 clean-aci-e2e: ## Make sure no ACI tests are currently runnnig in the CI when invoking this. Delete ACI E2E tests resources that might have leaked when ctrl-C E2E tests.
 	@ echo "Will delete resource groups: "
 	@ az group list | jq '.[].name' | grep -i E2E-Test
