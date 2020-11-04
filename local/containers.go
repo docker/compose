@@ -118,6 +118,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 
 	containerConfig := &container.Config{
 		Image:        r.Image,
+		Cmd:          r.Command,
 		Labels:       r.Labels,
 		Env:          r.Environment,
 		ExposedPorts: exposedPorts,
