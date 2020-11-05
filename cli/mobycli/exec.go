@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -60,7 +61,16 @@ func mustDelegateToMoby(ctxType string) bool {
 
 // Exec delegates to com.docker.cli if on moby context
 func Exec(root *cobra.Command) {
-	cmd := exec.Command(ComDockerCli, os.Args[1:]...)
+	execBinary := ComDockerCli
+	if runtime.GOOS == "windows" { // workaround for windows issue https://github.com/golang/go/issues/38736
+		var err error
+		execBinary, err = LookPath(ComDockerCli)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	cmd := exec.Command(execBinary, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
