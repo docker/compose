@@ -30,6 +30,27 @@ message Context {
     string name = 1;
 	string contextType = 2;
 	bool current = 3;
+	string description = 4;
+	oneof Endpoint {
+		DockerEndpoint docker_endpoint = 5;
+		AciEndpoint aci_endpoint = 6;
+		EcsEndpoint ecs_endpoint = 7;
+	}
+}
+
+message DockerEndpoint {
+	string host = 1;
+}
+
+message AciEndpoint {
+	string region = 1;
+	string resource_group = 2;
+	string subscription_id = 3;
+}
+
+message EcsEndpoint {
+	string profile = 1;
+	bool from_environment = 2;
 }
 
 message SetCurrentRequest {
