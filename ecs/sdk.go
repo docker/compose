@@ -264,9 +264,20 @@ func (s sdk) CreateChangeSet(ctx context.Context, name string, template []byte) 
 		return "", err
 	}
 
-	err = s.CF.WaitUntilChangeSetCreateCompleteWithContext(ctx, &cloudformation.DescribeChangeSetInput{
+	// we have to WaitUntilChangeSetCreateComplete even this in fail with error `ResourceNotReady`
+	// so that we can invoke DescribeChangeSet to check status, and then we can know about the actual creation failure cause.
+	s.CF.WaitUntilChangeSetCreateCompleteWithContext(ctx, &cloudformation.DescribeChangeSetInput{ // nolint:errcheck
 		ChangeSetName: changeset.Id,
 	})
+
+	desc, err := s.CF.DescribeChangeSetWithContext(ctx, &cloudformation.DescribeChangeSetInput{
+		ChangeSetName: aws.String(update),
+		StackName:     aws.String(name),
+	})
+	if aws.StringValue(desc.Status) == "FAILED" {
+		return *changeset.Id, fmt.Errorf(aws.StringValue(desc.StatusReason))
+	}
+
 	return *changeset.Id, err
 }
 
