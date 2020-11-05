@@ -57,9 +57,7 @@ func listCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only show context names")
-	cmd.Flags().BoolVar(&opts.json, "json", false, "Format output as JSON")
 	cmd.Flags().StringVar(&opts.format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
-	_ = cmd.Flags().MarkHidden("json")
 
 	return cmd
 }

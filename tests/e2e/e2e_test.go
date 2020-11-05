@@ -82,9 +82,6 @@ func TestContextDefault(t *testing.T) {
 		res = c.RunDockerCmd("context", "ls", "--format", "json")
 		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
 
-		res = c.RunDockerCmd("context", "ls", "--json")
-		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-json"))
-
 		res = c.RunDockerCmd("context", "ls", "--format", "{{ json . }}")
 		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-legacy-json"))
 	})
