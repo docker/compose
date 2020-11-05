@@ -47,6 +47,10 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 		return &contextsv1.ListResponse{}, err
 	}
 
+	return convertContexts(contexts, configFile.CurrentContext), nil
+}
+
+func convertContexts(contexts []*store.DockerContext, currentContext string) *contextsv1.ListResponse {
 	result := &contextsv1.ListResponse{}
 
 	for _, c := range contexts {
@@ -60,7 +64,7 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 			Name:        c.Name,
 			ContextType: c.Type(),
 			Description: c.Metadata.Description,
-			Current:     c.Name == configFile.CurrentContext,
+			Current:     c.Name == currentContext,
 		}
 		switch c.Type() {
 		case store.DefaultContextType:
@@ -73,7 +77,7 @@ func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListReque
 
 		result.Contexts = append(result.Contexts, &context)
 	}
-	return result, nil
+	return result
 }
 
 func getDockerEndpoint(endpoint interface{}) *contextsv1.Context_DockerEndpoint {
