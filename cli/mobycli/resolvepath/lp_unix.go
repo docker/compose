@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package mobycli
+package resolvepath
 
 import (
 	"os/exec"

@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/cli/mobycli/resolvepath"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/metrics"
@@ -60,7 +61,7 @@ func mustDelegateToMoby(ctxType string) bool {
 
 // Exec delegates to com.docker.cli if on moby context
 func Exec(root *cobra.Command) {
-	execBinary, err := LookPath(ComDockerCli)
+	execBinary, err := resolvepath.LookPath(ComDockerCli)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
