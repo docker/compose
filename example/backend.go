@@ -158,6 +158,6 @@ func (cs *composeService) Logs(ctx context.Context, project string, w io.Writer)
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+func (cs *composeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

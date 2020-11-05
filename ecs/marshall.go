@@ -22,29 +22,50 @@ import (
 	"strings"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
+	"github.com/sanathkr/go-yaml"
 )
 
-func marshall(template *cloudformation.Template) ([]byte, error) {
-	raw, err := template.JSON()
+func marshall(template *cloudformation.Template, format string) ([]byte, error) {
+	var (
+		source    func() ([]byte, error)
+		marshal   func(in interface{}) ([]byte, error)
+		unmarshal func(in []byte, out interface{}) error
+	)
+	switch format {
+	case "yaml":
+		source = template.YAML
+		marshal = yaml.Marshal
+		unmarshal = yaml.Unmarshal
+	case "json":
+		source = template.JSON
+		marshal = func(in interface{}) ([]byte, error) {
+			return json.MarshalIndent(in, "", "  ")
+		}
+		unmarshal = json.Unmarshal
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
+	}
+
+	raw, err := source()
 	if err != nil {
 		return nil, err
 	}
 
 	var unmarshalled interface{}
-	if err := json.Unmarshal(raw, &unmarshalled); err != nil {
+	if err := unmarshal(raw, &unmarshalled); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %s", err)
 	}
 
-	if input, ok := unmarshalled.(map[string]interface{}); ok {
+	if input, ok := unmarshalled.(map[interface{}]interface{}); ok {
 		if resources, ok := input["Resources"]; ok {
-			for _, uresource := range resources.(map[string]interface{}) {
-				if resource, ok := uresource.(map[string]interface{}); ok {
+			for _, uresource := range resources.(map[interface{}]interface{}) {
+				if resource, ok := uresource.(map[interface{}]interface{}); ok {
 					if resource["Type"] == "AWS::ECS::TaskDefinition" {
-						properties := resource["Properties"].(map[string]interface{})
+						properties := resource["Properties"].(map[interface{}]interface{})
 						for _, def := range properties["ContainerDefinitions"].([]interface{}) {
-							containerDefinition := def.(map[string]interface{})
+							containerDefinition := def.(map[interface{}]interface{})
 							if strings.HasSuffix(containerDefinition["Name"].(string), "_InitContainer") {
-								containerDefinition["Essential"] = "false"
+								containerDefinition["Essential"] = false
 							}
 						}
 					}
@@ -53,9 +74,5 @@ func marshall(template *cloudformation.Template) ([]byte, error) {
 		}
 	}
 
-	raw, err = json.MarshalIndent(unmarshalled, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("invalid JSON: %s", err)
-	}
-	return raw, err
+	return marshal(unmarshalled)
 }

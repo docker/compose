@@ -36,7 +36,7 @@ type Service interface {
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, projectName string) ([]Stack, error)
 	// Convert translate compose model into backend's native format
-	Convert(ctx context.Context, project *types.Project) ([]byte, error)
+	Convert(ctx context.Context, project *types.Project, format string) ([]byte, error)
 }
 
 // PortPublisher hold status about published port

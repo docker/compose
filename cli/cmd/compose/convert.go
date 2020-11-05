@@ -39,6 +39,7 @@ func convertCommand() *cobra.Command {
 	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	convertCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
+	convertCmd.Flags().StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 
 	return convertCmd
 }
@@ -60,7 +61,7 @@ func runConvert(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	json, err = c.ComposeService().Convert(ctx, project)
+	json, err = c.ComposeService().Convert(ctx, project, opts.Format)
 	if err != nil {
 		return err
 	}

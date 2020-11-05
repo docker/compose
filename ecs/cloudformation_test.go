@@ -44,7 +44,7 @@ func TestSimpleConvert(t *testing.T) {
 	bytes, err := ioutil.ReadFile("testdata/input/simple-single-service.yaml")
 	assert.NilError(t, err)
 	template := convertYaml(t, string(bytes), useDefaultVPC)
-	resultAsJSON, err := marshall(template)
+	resultAsJSON, err := marshall(template, "yaml")
 	assert.NilError(t, err)
 	result := fmt.Sprintf("%s\n", string(resultAsJSON))
 	expected := "simple/simple-cloudformation-conversion.golden"

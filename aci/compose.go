@@ -129,6 +129,6 @@ func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writ
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

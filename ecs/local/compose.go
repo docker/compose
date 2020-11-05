@@ -57,7 +57,7 @@ func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, deta
 		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
 	}
 
-	converted, err := e.Convert(ctx, project)
+	converted, err := e.Convert(ctx, project, "yaml")
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, deta
 	return cmd.Run()
 }
 
-func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
 	project.Networks["credentials_network"] = types.NetworkConfig{
 		Driver: "bridge",
 		Ipam: types.IPAMConfig{
