@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/cli/mobycli/resolvepath"
 	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/metrics"
@@ -60,7 +61,12 @@ func mustDelegateToMoby(ctxType string) bool {
 
 // Exec delegates to com.docker.cli if on moby context
 func Exec(root *cobra.Command) {
-	cmd := exec.Command(ComDockerCli, os.Args[1:]...)
+	execBinary, err := resolvepath.LookPath(ComDockerCli)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	cmd := exec.Command(execBinary, os.Args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -83,7 +89,7 @@ func Exec(root *cobra.Command) {
 		}
 	}()
 
-	err := cmd.Run()
+	err = cmd.Run()
 	childExit <- true
 	if err != nil {
 		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)

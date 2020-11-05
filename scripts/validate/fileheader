@@ -24,4 +24,4 @@ fi
 
 BASEPATH="${1-}"
 
-ltag -t "${BASEPATH}scripts/validate/template" -excludes "validate testdata" --check -v
+ltag -t "${BASEPATH}scripts/validate/template" -excludes "validate testdata resolvepath" --check -v
