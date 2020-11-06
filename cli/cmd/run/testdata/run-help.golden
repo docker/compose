@@ -13,5 +13,5 @@ Flags:
   -m, --memory bytes           Memory limit
       --name string            Assign a name to the container
   -p, --publish stringArray    Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT
-      --restart string         Restart policy to apply when a container exits (default "none")
+      --restart string         Restart policy to apply when a container exits (no|always|on-failure) (default "no")
   -v, --volume stringArray     Volume. Ex: storageaccount/my_share[:/absolute/path/to/target][:ro]

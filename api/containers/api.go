@@ -24,16 +24,21 @@ import (
 )
 
 const (
-	// RestartPolicyAny Always restarts
-	RestartPolicyAny = "any"
 	// RestartPolicyNone Never restarts
 	RestartPolicyNone = "none"
+	// RestartPolicyAny Always restarts
+	RestartPolicyAny = "any"
 	// RestartPolicyOnFailure Restarts only on failure
 	RestartPolicyOnFailure = "on-failure"
+
+	// RestartPolicyRunNo Always restarts
+	RestartPolicyRunNo = "no"
+	// RestartPolicyRunAlways Always restarts
+	RestartPolicyRunAlways = "always"
 )
 
 // RestartPolicyList all available restart policy values
-var RestartPolicyList = []string{RestartPolicyNone, RestartPolicyAny, RestartPolicyOnFailure}
+var RestartPolicyList = []string{RestartPolicyRunNo, RestartPolicyRunAlways, RestartPolicyOnFailure}
 
 // Container represents a created container
 type Container struct {
