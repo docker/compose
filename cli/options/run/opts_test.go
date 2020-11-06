@@ -201,9 +201,20 @@ func TestValidateRestartPolicy(t *testing.T) {
 			expectedError: nil,
 		},
 		{
+			in:            "no",
+			expected:      "none",
+			expectedError: nil,
+		},
+		{
+			in:            "always",
+			expected:      "any",
+			expectedError: nil,
+		},
+
+		{
 			in:            "toto",
 			expected:      "",
-			expectedError: errors.New("invalid restart value, must be one of none, any, on-failure"),
+			expectedError: errors.New("invalid restart value, must be one of no, always, on-failure"),
 		},
 	}
 	for _, testCase := range testCases {

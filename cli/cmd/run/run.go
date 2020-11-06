@@ -57,7 +57,7 @@ func Command(contextType string) *cobra.Command {
 	cmd.Flags().VarP(&opts.Memory, "memory", "m", "Memory limit")
 	cmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	cmd.Flags().StringArrayVar(&opts.EnvironmentFiles, "env-file", []string{}, "Path to environment files to be translated as environment variables")
-	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", containers.RestartPolicyNone, "Restart policy to apply when a container exits")
+	cmd.Flags().StringVarP(&opts.RestartPolicyCondition, "restart", "", containers.RestartPolicyRunNo, "Restart policy to apply when a container exits (no|always|on-failure)")
 	cmd.Flags().BoolVar(&opts.Rm, "rm", false, "Automatically remove the container when it exits")
 
 	if contextType == store.AciContextType {
