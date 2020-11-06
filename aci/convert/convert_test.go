@@ -195,6 +195,43 @@ func TestHealthcheckTranslation(t *testing.T) {
 	assert.Assert(t, (*group.Containers)[0].LivenessProbe == nil)
 }
 
+func TestHealthcheckTranslationZeroValues(t *testing.T) {
+	test := []string{
+		"my",
+		"command",
+		"--option",
+	}
+	interval := types.Duration(0)
+	retries := uint64(0)
+	startPeriod := types.Duration(0)
+	timeout := types.Duration(0)
+
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				HealthCheck: &types.HealthCheckConfig{
+					Test:        test,
+					Timeout:     &timeout,
+					Interval:    &interval,
+					Retries:     &retries,
+					StartPeriod: &startPeriod,
+					Disable:     false,
+				},
+			},
+		},
+	}
+	group, err := ToContainerGroup(context.TODO(), convertCtx, project, mockStorageHelper)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, (*group.Containers)[0].LivenessProbe.Exec.Command, to.StringSlicePtr(test))
+	assert.Assert(t, (*group.Containers)[0].LivenessProbe.PeriodSeconds == nil)
+	assert.Assert(t, (*group.Containers)[0].LivenessProbe.SuccessThreshold == nil)
+	assert.Assert(t, (*group.Containers)[0].LivenessProbe.FailureThreshold == nil)
+	assert.Assert(t, (*group.Containers)[0].LivenessProbe.InitialDelaySeconds == nil)
+	assert.Assert(t, (*group.Containers)[0].LivenessProbe.TimeoutSeconds == nil)
+}
+
 func TestContainerGroupToServiceStatus(t *testing.T) {
 	myContainerGroup := containerinstance.ContainerGroup{
 		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{

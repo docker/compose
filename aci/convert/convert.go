@@ -130,7 +130,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 }
 
 func durationToSeconds(d *types.Duration) *int32 {
-	if d == nil {
+	if d == nil || *d == 0 {
 		return nil
 	}
 	v := int32(time.Duration(*d).Seconds())
@@ -262,16 +262,19 @@ func (s serviceConfigAciHelper) getLivenessProbe() *containerinstance.ContainerP
 		if s.HealthCheck.Retries != nil {
 			retries = to.Int32Ptr(int32(*s.HealthCheck.Retries))
 		}
-		return &containerinstance.ContainerProbe{
+		probe := containerinstance.ContainerProbe{
 			Exec: &containerinstance.ContainerExec{
 				Command: to.StringSlicePtr(testArray),
 			},
 			InitialDelaySeconds: durationToSeconds(s.HealthCheck.StartPeriod),
 			PeriodSeconds:       durationToSeconds(s.HealthCheck.Interval),
-			FailureThreshold:    retries,
-			SuccessThreshold:    retries,
 			TimeoutSeconds:      durationToSeconds(s.HealthCheck.Timeout),
 		}
+		if retries != nil && *retries > 0 {
+			probe.FailureThreshold = retries
+			probe.SuccessThreshold = retries
+		}
+		return &probe
 	}
 	return nil
 }
