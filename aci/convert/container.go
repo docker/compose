@@ -40,6 +40,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 		return types.Project{}, err
 	}
 
+	retries := uint64(r.Healthcheck.Retries)
 	project := types.Project{
 		Name: r.ID,
 		Services: []types.ServiceConfig{
@@ -52,6 +53,14 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 				Volumes:     serviceConfigVolumes,
 				DomainName:  r.DomainName,
 				Environment: toComposeEnvs(r.Environment),
+				HealthCheck: &types.HealthCheckConfig{
+					Test:        r.Healthcheck.Test,
+					Timeout:     &r.Healthcheck.Timeout,
+					Interval:    &r.Healthcheck.Interval,
+					Retries:     &retries,
+					StartPeriod: &r.Healthcheck.StartPeriod,
+					Disable:     r.Healthcheck.Disable,
+				},
 				Deploy: &types.DeployConfig{
 					Resources: types.Resources{
 						Reservations: &types.Resource{

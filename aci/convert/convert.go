@@ -23,6 +23,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -68,7 +69,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 		return containerinstance.ContainerGroup{}, err
 	}
 
-	var containers []containerinstance.Container
+	var ctnrs []containerinstance.Container
 	restartPolicy, err := project.getRestartPolicy()
 	if err != nil {
 		return containerinstance.ContainerGroup{}, err
@@ -78,7 +79,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 		Location: &aciContext.Location,
 		ContainerGroupProperties: &containerinstance.ContainerGroupProperties{
 			OsType:                   containerinstance.Linux,
-			Containers:               &containers,
+			Containers:               &ctnrs,
 			Volumes:                  volumes,
 			ImageRegistryCredentials: &registryCreds,
 			RestartPolicy:            restartPolicy,
@@ -110,7 +111,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 			dnsLabelName = serviceDomainName
 		}
 
-		containers = append(containers, containerDefinition)
+		ctnrs = append(ctnrs, containerDefinition)
 	}
 	if len(groupPorts) > 0 {
 		groupDefinition.ContainerGroupProperties.IPAddress = &containerinstance.IPAddress{
@@ -119,13 +120,21 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 			DNSNameLabel: dnsLabelName,
 		}
 	}
-	if len(containers) > 1 {
-		dnsSideCar := getDNSSidecar(containers)
-		containers = append(containers, dnsSideCar)
+	if len(ctnrs) > 1 {
+		dnsSideCar := getDNSSidecar(ctnrs)
+		ctnrs = append(ctnrs, dnsSideCar)
 	}
-	groupDefinition.ContainerGroupProperties.Containers = &containers
+	groupDefinition.ContainerGroupProperties.Containers = &ctnrs
 
 	return groupDefinition, nil
+}
+
+func durationToSeconds(d *types.Duration) *int32 {
+	if d == nil || *d == 0 {
+		return nil
+	}
+	v := int32(time.Duration(*d).Seconds())
+	return &v
 }
 
 func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
@@ -181,6 +190,7 @@ func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (c
 			EnvironmentVariables: getEnvVariables(s.Environment),
 			Resources:            resource,
 			VolumeMounts:         volumes,
+			LivenessProbe:        s.getLivenessProbe(),
 		},
 	}, nil
 }
@@ -235,6 +245,38 @@ func (s serviceConfigAciHelper) getResourceRequestsLimits() (*containerinstance.
 		},
 	}
 	return &resources, nil
+}
+
+func (s serviceConfigAciHelper) getLivenessProbe() *containerinstance.ContainerProbe {
+	if s.HealthCheck != nil && !s.HealthCheck.Disable && len(s.HealthCheck.Test) > 0 {
+		testArray := s.HealthCheck.Test
+		switch s.HealthCheck.Test[0] {
+		case "NONE", "CMD", "CMD-SHELL":
+			testArray = s.HealthCheck.Test[1:]
+		}
+		if len(testArray) == 0 {
+			return nil
+		}
+
+		var retries *int32
+		if s.HealthCheck.Retries != nil {
+			retries = to.Int32Ptr(int32(*s.HealthCheck.Retries))
+		}
+		probe := containerinstance.ContainerProbe{
+			Exec: &containerinstance.ContainerExec{
+				Command: to.StringSlicePtr(testArray),
+			},
+			InitialDelaySeconds: durationToSeconds(s.HealthCheck.StartPeriod),
+			PeriodSeconds:       durationToSeconds(s.HealthCheck.Interval),
+			TimeoutSeconds:      durationToSeconds(s.HealthCheck.Timeout),
+		}
+		if retries != nil && *retries > 0 {
+			probe.FailureThreshold = retries
+			probe.SuccessThreshold = retries
+		}
+		return &probe
+	}
+	return nil
 }
 
 func getEnvVariables(composeEnv types.MappingWithEquals) *[]containerinstance.EnvironmentVariable {
@@ -310,6 +352,31 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		FQDN: fqdn(cg, region),
 		Env:  envVars,
 	}
+
+	var healthcheck = containers.Healthcheck{
+		Disable: true,
+	}
+	if cc.LivenessProbe != nil &&
+		cc.LivenessProbe.Exec != nil &&
+		cc.LivenessProbe.Exec.Command != nil {
+		if len(*cc.LivenessProbe.Exec.Command) > 0 {
+			healthcheck.Disable = false
+			healthcheck.Test = *cc.LivenessProbe.Exec.Command
+			if cc.LivenessProbe.PeriodSeconds != nil {
+				healthcheck.Interval = types.Duration(int64(*cc.LivenessProbe.PeriodSeconds) * int64(time.Second))
+			}
+			if cc.LivenessProbe.SuccessThreshold != nil {
+				healthcheck.Retries = int(*cc.LivenessProbe.SuccessThreshold)
+			}
+			if cc.LivenessProbe.TimeoutSeconds != nil {
+				healthcheck.Timeout = types.Duration(int64(*cc.LivenessProbe.TimeoutSeconds) * int64(time.Second))
+			}
+			if cc.LivenessProbe.InitialDelaySeconds != nil {
+				healthcheck.StartPeriod = types.Duration(int64(*cc.LivenessProbe.InitialDelaySeconds) * int64(time.Second))
+			}
+		}
+	}
+
 	c := containers.Container{
 		ID:          containerID,
 		Status:      status,
@@ -323,6 +390,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 		Platform:    platform,
 		Config:      config,
 		HostConfig:  hostConfig,
+		Healthcheck: healthcheck,
 	}
 
 	return c

@@ -15,5 +15,13 @@
         "MemoryLimit": 0,
         "AutoRemove": false
     },
-    "Platform": "Linux"
+    "Platform": "Linux",
+    "Healthcheck": {
+        "Disable": false,
+        "Test": null,
+        "Interval": "0s",
+        "Retries": 0,
+        "StartPeriod": "0s",
+        "Timeout": "0s"
+    }
 }
