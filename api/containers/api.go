@@ -39,9 +39,6 @@ const (
 	RestartPolicyRunAlways = "always"
 )
 
-// RestartPolicyList all available restart policy values
-var RestartPolicyList = []string{RestartPolicyRunNo, RestartPolicyRunAlways, RestartPolicyOnFailure}
-
 // Container represents a created container
 type Container struct {
 	ID          string

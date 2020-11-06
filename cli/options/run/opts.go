@@ -53,6 +53,9 @@ type Opts struct {
 	HealthTimeout          time.Duration
 }
 
+// RestartPolicyList all available restart policy values
+var RestartPolicyList = []string{containers.RestartPolicyRunNo, containers.RestartPolicyRunAlways, containers.RestartPolicyOnFailure}
+
 // ToContainerConfig convert run options to a container configuration
 func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, error) {
 	if r.Name == "" {
@@ -124,7 +127,7 @@ var restartPolicyMap = map[string]string{
 func toRestartPolicy(value string) (string, error) {
 	value, ok := restartPolicyMap[value]
 	if !ok {
-		return "", fmt.Errorf("invalid restart value, must be one of %s", strings.Join(containers.RestartPolicyList, ", "))
+		return "", fmt.Errorf("invalid restart value, must be one of %s", strings.Join(RestartPolicyList, ", "))
 	}
 	return value, nil
 }
