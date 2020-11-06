@@ -37,13 +37,13 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project) ([]byte, error) {
+func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
 	template, err := b.convert(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
-	return marshall(template)
+	return marshall(template, format)
 }
 
 func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*cloudformation.Template, error) {

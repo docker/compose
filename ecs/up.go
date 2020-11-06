@@ -32,7 +32,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 		return err
 	}
 
-	template, err := b.Convert(ctx, project)
+	template, err := b.Convert(ctx, project, "yaml")
 	if err != nil {
 		return err
 	}

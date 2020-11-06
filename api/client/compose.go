@@ -55,6 +55,6 @@ func (c *composeService) List(context.Context, string) ([]compose.Stack, error) 
 }
 
 // Convert translate compose model into backend's native format
-func (c *composeService) Convert(context.Context, *types.Project) ([]byte, error) {
+func (c *composeService) Convert(context.Context, *types.Project, string) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
