@@ -282,6 +282,9 @@ func getACIContainerLogs(ctx context.Context, aciContext store.AciContext, conta
 	if err != nil {
 		return "", fmt.Errorf("cannot get container logs: %v", err)
 	}
+	if logs.Content == nil {
+		return "", nil
+	}
 	return *logs.Content, err
 }
 
