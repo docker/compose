@@ -39,6 +39,32 @@ services:
           memory: 2048M
 ```
 
+###### IAM roles
+
+Assign an existing user role to a task:
+
+```yaml
+services:
+  test:
+    x-aws-policies:
+      - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+```
+
+###### IAM policies
+
+Assign an in-line IAM policy to a task:
+
+```yaml
+services:
+  test:
+    x-aws-role:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action: sqs:*
+          Resource: arn:aws:sqs:us-east-1:12345678:myqueue
+```
+
 ###### Logging
 Pass options to awslogs driver
 ```yaml
@@ -85,7 +111,7 @@ services:
 
 
 
-#### Load Balancers
+##### Load Balancers
 
 When a service in the compose file exposes a port, a load balancer is being created and configured to distribute the traffic between all containers.
 
@@ -189,6 +215,26 @@ volumes:
         provisioned_throughput: 1024
 ```
 
+## Networks
+
+Networks are mapped to security groups.
+```yaml
+services:
+  test:
+    image: nginx
+networks:
+  default:
+```
+Using an external network/security group:
+```yaml
+services:
+  test:
+    image: nginx
+networks:
+  default:
+    external: true
+    name: sg-123abc
+```
 
 ## Secrets
 Secrets are stored in __AWS SecretsManager__ as strings and are mounted to containers  under `/run/secrets/`.
@@ -221,6 +267,7 @@ secrets:
     external: true
 ```
 
+
 ## Access private images
 When a service is configured with an image from a private repository on Docker Hub, make sure you have configured pull credentials correctly before deploying the Compose stack.
 
@@ -249,26 +296,4 @@ services:
 ```
 
 
-
-
-#### Networks
-
-Networks are mapped to security groups.
-```yaml
-services:
-  test:
-    image: nginx
-networks:
-  default:
-```
-Using an external network/security group:
-```yaml
-services:
-  test:
-    image: nginx
-networks:
-  default:
-    external: true
-    name: sg-123abc
-```
 
