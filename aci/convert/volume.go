@@ -38,18 +38,17 @@ const (
 	volumeReadOnly                 = "read_only"
 )
 
-func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) (map[string]bool, []containerinstance.Volume, error) {
-	azureFileVolumesMap := make(map[string]bool, len(p.Volumes))
+func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.StorageLogin) ([]containerinstance.Volume, error) {
 	var azureFileVolumesSlice []containerinstance.Volume
 	for name, v := range p.Volumes {
 		if v.Driver == azureFileDriverName {
 			shareName, ok := v.DriverOpts[volumeDriveroptsShareNameKey]
 			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
+				return nil, fmt.Errorf("cannot retrieve fileshare name for Azurefile")
 			}
 			accountName, ok := v.DriverOpts[volumeDriveroptsAccountNameKey]
 			if !ok {
-				return nil, nil, fmt.Errorf("cannot retrieve account name for Azurefile")
+				return nil, fmt.Errorf("cannot retrieve account name for Azurefile")
 			}
 			readOnly, ok := v.DriverOpts[volumeReadOnly]
 			if !ok {
@@ -57,11 +56,11 @@ func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.St
 			}
 			ro, err := strconv.ParseBool(readOnly)
 			if err != nil {
-				return nil, nil, fmt.Errorf("invalid mode %q for volume", readOnly)
+				return nil, fmt.Errorf("invalid mode %q for volume", readOnly)
 			}
 			accountKey, err := helper.GetAzureStorageAccountKey(ctx, accountName)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			aciVolume := containerinstance.Volume{
 				Name: to.StringPtr(name),
@@ -72,18 +71,17 @@ func (p projectAciHelper) getAciFileVolumes(ctx context.Context, helper login.St
 					ReadOnly:           &ro,
 				},
 			}
-			azureFileVolumesMap[name] = true
 			azureFileVolumesSlice = append(azureFileVolumesSlice, aciVolume)
 		}
 	}
-	return azureFileVolumesMap, azureFileVolumesSlice, nil
+	return azureFileVolumesSlice, nil
 }
 
-func (s serviceConfigAciHelper) getAciFileVolumeMounts(volumesCache map[string]bool) ([]containerinstance.VolumeMount, error) {
+func (s serviceConfigAciHelper) getAciFileVolumeMounts() ([]containerinstance.VolumeMount, error) {
 	var aciServiceVolumes []containerinstance.VolumeMount
 	for _, sv := range s.Volumes {
-		if !volumesCache[sv.Source] {
-			return []containerinstance.VolumeMount{}, fmt.Errorf("could not find volume source %q", sv.Source)
+		if sv.Type == string(types.VolumeTypeBind) {
+			return []containerinstance.VolumeMount{}, fmt.Errorf("host path (%q) not allowed as volume source, you need to reference an Azure File Share defined in the 'volumes' section", sv.Source)
 		}
 		aciServiceVolumes = append(aciServiceVolumes, containerinstance.VolumeMount{
 			Name:      to.StringPtr(sv.Source),

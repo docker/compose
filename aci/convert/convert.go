@@ -50,7 +50,7 @@ const (
 func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.Project, storageHelper login.StorageLogin) (containerinstance.ContainerGroup, error) {
 	project := projectAciHelper(p)
 	containerGroupName := strings.ToLower(project.Name)
-	volumesCache, volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
+	volumesSlice, err := project.getAciFileVolumes(ctx, storageHelper)
 	if err != nil {
 		return containerinstance.ContainerGroup{}, err
 	}
@@ -90,7 +90,7 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 	var dnsLabelName *string
 	for _, s := range project.Services {
 		service := serviceConfigAciHelper(s)
-		containerDefinition, err := service.getAciContainer(volumesCache)
+		containerDefinition, err := service.getAciContainer()
 		if err != nil {
 			return containerinstance.ContainerGroup{}, err
 		}
@@ -162,8 +162,8 @@ type projectAciHelper types.Project
 
 type serviceConfigAciHelper types.ServiceConfig
 
-func (s serviceConfigAciHelper) getAciContainer(volumesCache map[string]bool) (containerinstance.Container, error) {
-	aciServiceVolumes, err := s.getAciFileVolumeMounts(volumesCache)
+func (s serviceConfigAciHelper) getAciContainer() (containerinstance.Container, error) {
+	aciServiceVolumes, err := s.getAciFileVolumeMounts()
 	if err != nil {
 		return containerinstance.Container{}, err
 	}
