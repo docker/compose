@@ -71,5 +71,7 @@ When running a container with `docker run`, by default the command line stays at
 
 ## Healthchecks
 
-Healthchecks can be described with the `--healthcheck-xxx` flags. It translates to `LivenessProbe` in ACI. By that, the container is terminated if it becomes unhealthy.
+A health check can be described using the flags prefixed by `--healthcheck`. This is translated into `LivenessProbe` for ACI. If the health check fails then the container is considered unhealthy and terminated.
+In order for the container to be restarted automatically, the container needs to be run with a restart policy (set by the `--restart` flag) other than `no`. Note that the default restart policy if one isn't set is `no`.
+
 In order to restart automatically, the container also need to have a restart policy set with `--restart` (`docker run` defaults to no restart policy)

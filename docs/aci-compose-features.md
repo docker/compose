@@ -173,7 +173,7 @@ secrets:
     file: ./my_secret2.txt
 ```
 
-In this example the `nginx` service will have its secret mounted in `/run/secrets/renamedsecret1.txt` and `db` will have 2 files (`mysecretonmount1.txt` and `mysecretonmount2.txt`).
+In this example the `nginx` service will have its secret mounted to `/run/secrets/renamedsecret1.txt` and `db` will have 2 files (`mysecretonmount1.txt` and `mysecretonmount2.txt`).
 Both of them with be mounted in the same folder (`/mnt/dbmount/`).
 
 
@@ -212,8 +212,8 @@ The web container will have its limits set to the same values as reservations, b
 
 ## Healthchecks
 
-Healthchecks can be described in the `healthcheck` section in the service. It translates to `LivenessProbe` in ACI. By that, the container is terminated if it becomes unhealthy.
-In order to restart automatically, the container also need to have a restart policy not set to "none"
+A health check can be described in the `healthcheck` section of each service. This is translated to a `LivenessProbe` in ACI. If the health check fails then the container is considered unhealthy and terminated.
+In order for the container to be restarted automatically, the service needs to have a restart policy other than `none` to be set. Note that the default restart policy if one isn't set is `any`.
 
 ```yaml
 services:
