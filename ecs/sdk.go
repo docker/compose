@@ -234,9 +234,15 @@ func (s sdk) StackExists(ctx context.Context, name string) (bool, error) {
 	return len(stacks.Stacks) > 0, nil
 }
 
-type uploadedTemplateFunc func(ctx context.Context, name string, url string) (string, error)
+type uploadedTemplateFunc func(body *string, url *string) (string, error)
+
+const cloudformationBytesLimit = 51200
 
 func (s sdk) withTemplate(ctx context.Context, name string, template []byte, region string, fn uploadedTemplateFunc) (string, error) {
+	if len(template) < cloudformationBytesLimit {
+		return fn(aws.String(string(template)), nil)
+	}
+
 	logrus.Debug("Create s3 bucket to store cloudformation template")
 	var configuration *s3.CreateBucketConfiguration
 	if region != "us-east-1" {
@@ -244,8 +250,11 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 			LocationConstraint: aws.String(region),
 		}
 	}
+	// CloudFormation will only allow URL from a same-region bucket
+	// to avoid conflicts we suffix bucket name by region, so we can create comparable buckets in other regions.
+	bucket := "com.docker.compose." + region
 	_, err := s.S3.CreateBucket(&s3.CreateBucketInput{
-		Bucket:                    aws.String("com.docker.compose." + region),
+		Bucket:                    aws.String(bucket),
 		CreateBucketConfiguration: configuration,
 	})
 	if err != nil {
@@ -266,7 +275,7 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 	upload, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(template),
-		Bucket:      aws.String("com.docker.compose." + region),
+		Bucket:      aws.String(bucket),
 		ContentType: aws.String("application/json"),
 		Tagging:     aws.String(name),
 	})
@@ -276,7 +285,7 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 	}
 
 	defer s.S3.DeleteObjects(&s3.DeleteObjectsInput{ //nolint: errcheck
-		Bucket: aws.String("com.docker.compose"),
+		Bucket: aws.String(bucket),
 		Delete: &s3.Delete{
 			Objects: []*s3.ObjectIdentifier{
 				{
@@ -287,17 +296,18 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 		},
 	})
 
-	return fn(ctx, name, upload.Location)
+	return fn(nil, aws.String(upload.Location))
 }
 
 func (s sdk) CreateStack(ctx context.Context, name string, region string, template []byte) error {
 	logrus.Debug("Create CloudFormation stack")
 
-	stackID, err := s.withTemplate(ctx, name, template, region, func(ctx context.Context, name string, url string) (string, error) {
+	stackID, err := s.withTemplate(ctx, name, template, region, func(body *string, url *string) (string, error) {
 		stack, err := s.CF.CreateStackWithContext(ctx, &cloudformation.CreateStackInput{
 			OnFailure:        aws.String("DELETE"),
 			StackName:        aws.String(name),
-			TemplateURL:      aws.String(url),
+			TemplateBody:     body,
+			TemplateURL:      url,
 			TimeoutInMinutes: nil,
 			Capabilities: []*string{
 				aws.String(cloudformation.CapabilityCapabilityIam),
@@ -320,14 +330,15 @@ func (s sdk) CreateStack(ctx context.Context, name string, region string, templa
 
 func (s sdk) CreateChangeSet(ctx context.Context, name string, region string, template []byte) (string, error) {
 	logrus.Debug("Create CloudFormation Changeset")
+	update := fmt.Sprintf("Update%s", time.Now().Format("2006-01-02-15-04-05"))
 
-	changeset, err := s.withTemplate(ctx, name, template, region, func(ctx context.Context, name string, url string) (string, error) {
-		update := fmt.Sprintf("Update%s", time.Now().Format("2006-01-02-15-04-05"))
+	changeset, err := s.withTemplate(ctx, name, template, region, func(body *string, url *string) (string, error) {
 		changeset, err := s.CF.CreateChangeSetWithContext(ctx, &cloudformation.CreateChangeSetInput{
 			ChangeSetName: aws.String(update),
 			ChangeSetType: aws.String(cloudformation.ChangeSetTypeUpdate),
 			StackName:     aws.String(name),
-			TemplateBody:  aws.String(string(template)),
+			TemplateBody:  body,
+			TemplateURL:   url,
 			Capabilities: []*string{
 				aws.String(cloudformation.CapabilityCapabilityIam),
 			},
