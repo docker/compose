@@ -27,9 +27,10 @@ import (
 
 func (b *ecsAPIService) checkCompatibility(project *types.Project) error {
 	var checker compatibility.Checker = &fargateCompatibilityChecker{
-		compatibility.AllowList{
+		AllowList: compatibility.AllowList{
 			Supported: compatibleComposeAttributes,
 		},
+		projet: project,
 	}
 	compatibility.Check(project, checker)
 	for _, err := range checker.Errors() {
@@ -46,6 +47,7 @@ func (b *ecsAPIService) checkCompatibility(project *types.Project) error {
 
 type fargateCompatibilityChecker struct {
 	compatibility.AllowList
+	projet *types.Project
 }
 
 var compatibleComposeAttributes = []string{
@@ -91,7 +93,6 @@ var compatibleComposeAttributes = []string{
 	"services.user",
 	"services.volumes",
 	"services.volumes.read_only",
-	"services.volumes.source",
 	"services.volumes.target",
 	"services.working_dir",
 	"secrets.external",
@@ -117,6 +118,15 @@ func (c *fargateCompatibilityChecker) CheckPortsPublished(p *types.ServicePortCo
 	}
 	if p.Published != p.Target {
 		c.Incompatible("published port can't be set to a distinct value than container port")
+	}
+}
+
+func (c *fargateCompatibilityChecker) CheckVolumesSource(config *types.ServiceVolumeConfig) {
+	if config.Type == types.VolumeTypeBind {
+		c.Incompatible("ECS Fargate does not support bind mounts from host")
+	}
+	if config.Type == types.VolumeTypeTmpfs {
+		c.Incompatible("ECS Fargate does not support tmpfs")
 	}
 }
 
