@@ -47,7 +47,7 @@ __Legend:__
 | service.external_links         | x |
 | service.extra_hosts            | x |
 | service.group_add              | x |
-| service.healthcheck            | ✓ | 
+| service.healthcheck            | ✓ |
 | service.hostname               | x |
 | service.image                  | ✓ |  Private images will be accessible if the user is logged into the corresponding registry at deploy time. Users will be automatically logged in to Azure Container Registry using their Azure login if possible.
 | service.isolation              | x |
@@ -173,7 +173,7 @@ secrets:
     file: ./my_secret2.txt
 ```
 
-In this example the `nginx` service will have its secret mounted in `/run/secrets/renamedsecret1.txt` and `db` will have 2 files (`mysecretonmount1.txt` and `mysecretonmount2.txt`). 
+In this example the `nginx` service will have its secret mounted to `/run/secrets/renamedsecret1.txt` and `db` will have 2 files (`mysecretonmount1.txt` and `mysecretonmount2.txt`).
 Both of them with be mounted in the same folder (`/mnt/dbmount/`).
 
 
@@ -212,12 +212,16 @@ The web container will have its limits set to the same values as reservations, b
 
 ## Healthchecks
 
-Healthchecks can be described in the `healthcheck` section in the service. It translates to `LivenessProbe` in ACI. By that, the container is restarted if it becomes unhealthy.
+A health check can be described in the `healthcheck` section of each service. This is translated to a `LivenessProbe` in ACI. If the health check fails then the container is considered unhealthy and terminated.
+In order for the container to be restarted automatically, the service needs to have a restart policy other than `none` to be set. Note that the default restart policy if one isn't set is `any`.
 
 ```yaml
 services:
   web:
     image: nginx
+    deploy:
+      restart_policy:
+        condition: on-failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
