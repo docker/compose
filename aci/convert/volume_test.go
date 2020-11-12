@@ -119,6 +119,30 @@ func TestComposeVolumes(t *testing.T) {
 	assert.DeepEqual(t, (*group.Volumes)[0], expectedGroupVolume)
 }
 
+func TestPathVolumeErrorMessage(t *testing.T) {
+	ctx := context.TODO()
+	accountName := "myAccount"
+	mockStorageHelper.On("GetAzureStorageAccountKey", ctx, accountName).Return("123456", nil)
+	project := types.Project{
+		Services: []types.ServiceConfig{
+			{
+				Name:  "service1",
+				Image: "image1",
+				Volumes: []types.ServiceVolumeConfig{
+					{
+						Source: "/path",
+						Target: "/target",
+						Type:   string(types.VolumeTypeBind),
+					},
+				},
+			},
+		},
+	}
+
+	_, err := ToContainerGroup(ctx, convertCtx, project, mockStorageHelper)
+	assert.ErrorContains(t, err, `host path ("/path") not allowed as volume source, you need to reference an Azure File Share defined in the 'volumes' section`)
+}
+
 func TestComposeVolumesRO(t *testing.T) {
 	ctx := context.TODO()
 	accountName := "myAccount"
