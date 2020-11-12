@@ -390,6 +390,9 @@ func getConfiguredLimits(service types.ServiceConfig) (types.UnitBytes, int64, e
 
 	limits := service.Deploy.Resources.Limits
 	if limits == nil {
+		limits = service.Deploy.Resources.Reservations
+	}
+	if limits == nil {
 		return 0, 0, nil
 	}
 
