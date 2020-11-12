@@ -17,7 +17,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -49,6 +51,7 @@ import (
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 	. "github.com/docker/compose-cli/tests/framework"
@@ -271,7 +274,7 @@ func TestRunVolume(t *testing.T) {
 	t.Run("inspect", func(t *testing.T) {
 		res := c.RunDockerCmd("inspect", container)
 
-		containerInspect, err := ParseContainerInspect(res.Stdout())
+		containerInspect, err := parseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
 		assert.Equal(t, containerInspect.HostConfig.CPULimit, 1.0)
@@ -418,7 +421,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 		inspectRes := c.RunDockerCmd("inspect", container)
 
-		containerInspect, err := ParseContainerInspect(inspectRes.Stdout())
+		containerInspect, err := parseContainerInspect(inspectRes.Stdout())
 		assert.NilError(t, err)
 		assert.Equal(t, containerInspect.Platform, "Linux")
 		assert.Equal(t, containerInspect.HostConfig.CPULimit, 0.1)
@@ -549,10 +552,10 @@ func TestUpSecretsResources(t *testing.T) {
 	})
 
 	res := c.RunDockerCmd("inspect", web1)
-	web1Inspect, err := ParseContainerInspect(res.Stdout())
+	web1Inspect, err := parseContainerInspect(res.Stdout())
 	assert.NilError(t, err)
 	res = c.RunDockerCmd("inspect", web2)
-	web2Inspect, err := ParseContainerInspect(res.Stdout())
+	web2Inspect, err := parseContainerInspect(res.Stdout())
 	assert.NilError(t, err)
 
 	t.Run("read secrets in service 1", func(t *testing.T) {
@@ -593,11 +596,11 @@ func TestUpSecretsResources(t *testing.T) {
 	})
 
 	t.Run("check healthchecks inspect", func(t *testing.T) {
-		assert.Equal(t, web1Inspect.Healthcheck.Disable, false)
-		assert.Equal(t, time.Duration(web1Inspect.Healthcheck.Interval), 5*time.Second)
+		assert.Assert(t, web1Inspect.Healthcheck != nil)
+		assert.Equal(t, time.Duration(*web1Inspect.Healthcheck.Interval), 5*time.Second)
 		assert.DeepEqual(t, web1Inspect.Healthcheck.Test, []string{"curl", "-f", "http://localhost:80/healthz"})
 
-		assert.Equal(t, web2Inspect.Healthcheck.Disable, true)
+		assert.Assert(t, web2Inspect.Healthcheck == nil)
 	})
 
 	t.Run("healthcheck restart failed app", func(t *testing.T) {
@@ -623,7 +626,7 @@ func TestUpSecretsResources(t *testing.T) {
 		poll.WaitOn(t, checkLogsReset, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
 
 		res := c.RunDockerCmd("inspect", web1)
-		web1Inspect, err = ParseContainerInspect(res.Stdout())
+		web1Inspect, err = parseContainerInspect(res.Stdout())
 		assert.Equal(t, web1Inspect.Status, "Running")
 	})
 }
@@ -697,7 +700,7 @@ func TestUpUpdate(t *testing.T) {
 
 		res = c.RunDockerCmd("inspect", serverContainer)
 
-		containerInspect, err := ParseContainerInspect(res.Stdout())
+		containerInspect, err := parseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		assert.Assert(t, is.Len(containerInspect.Ports, 1))
 		endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
@@ -781,7 +784,7 @@ func TestUpUpdate(t *testing.T) {
 		for _, cName := range []string{serverContainer, wordsContainer} {
 			res = c.RunDockerCmd("inspect", cName)
 
-			containerInspect, err := ParseContainerInspect(res.Stdout())
+			containerInspect, err := parseContainerInspect(res.Stdout())
 			assert.NilError(t, err)
 			assert.Assert(t, is.Len(containerInspect.Ports, 1))
 			endpoint := fmt.Sprintf("http://%s:%d", containerInspect.Ports[0].HostIP, containerInspect.Ports[0].HostPort)
@@ -949,7 +952,7 @@ func getContainerName(stdout string) string {
 func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...string) {
 	checkStopped := func(logt poll.LogT) poll.Result {
 		res := c.RunDockerCmd("inspect", containerID)
-		containerInspect, err := ParseContainerInspect(res.Stdout())
+		containerInspect, err := parseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		for _, status := range statuses {
 			if containerInspect.Status == status {
@@ -960,6 +963,15 @@ func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...stri
 	}
 
 	poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
+}
+
+func parseContainerInspect(stdout string) (*cmd.ContainerInspectView, error) {
+	var res cmd.ContainerInspectView
+	rdr := bytes.NewReader([]byte(stdout))
+	if err := json.NewDecoder(rdr).Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 func waitWithTimeout(blockingCall func(), timeout time.Duration) error {

@@ -66,20 +66,22 @@ func runInspect(ctx context.Context, id string) error {
 	return nil
 }
 
-type containerInspectView struct {
+// ContainerInspectView inspect view
+type ContainerInspectView struct {
 	ID          string
 	Status      string
 	Image       string
-	Command     string                 `json:",omitempty"`
-	HostConfig  *containers.HostConfig `json:",omitempty"`
-	Ports       *[]containers.Port     `json:",omitempty"`
+	Command     string                    `json:",omitempty"`
+	HostConfig  *containers.HostConfig    `json:",omitempty"`
+	Ports       []containers.Port         `json:",omitempty"`
+	Config      *containers.RuntimeConfig `json:",omitempty"`
 	Platform    string
 	Healthcheck *containerInspectHealthcheck `json:",omitempty"`
 }
 
 type containerInspectHealthcheck struct {
 	// Test is the command to be run to check the health of the container
-	Test *[]string `json:",omitempty"`
+	Test []string `json:",omitempty"`
 	// Interval is the period in between the checks
 	Interval *types.Duration `json:",omitempty"`
 	// Retries is the number of attempts before declaring the container as healthy or unhealthy
@@ -90,21 +92,21 @@ type containerInspectHealthcheck struct {
 	Timeout *types.Duration `json:",omitempty"`
 }
 
-func getInspectView(container containers.Container) containerInspectView {
+func getInspectView(container containers.Container) ContainerInspectView {
 	var (
 		healthcheck *containerInspectHealthcheck
-		test        *[]string
+		test        []string
 		retries     *int
-		ports       *[]containers.Port
+		ports       []containers.Port
 	)
 
+	if len(container.Ports) > 0 {
+		ports = container.Ports
+	}
 	if !container.Healthcheck.Disable && len(container.Healthcheck.Test) > 0 {
-		test = &container.Healthcheck.Test
+		test = container.Healthcheck.Test
 		if container.Healthcheck.Retries != 0 {
 			retries = to.IntPtr(container.Healthcheck.Retries)
-		}
-		if len(container.Ports) > 0 {
-			ports = &container.Ports
 		}
 		getDurationPtr := func(d types.Duration) *types.Duration {
 			if d == types.Duration(0) {
@@ -122,11 +124,13 @@ func getInspectView(container containers.Container) containerInspectView {
 		}
 	}
 
-	return containerInspectView{
-		ID:          container.ID,
-		Status:      container.Status,
-		Image:       container.Image,
-		Command:     container.Command,
+	return ContainerInspectView{
+		ID:      container.ID,
+		Status:  container.Status,
+		Image:   container.Image,
+		Command: container.Command,
+
+		Config:      container.Config,
 		HostConfig:  container.HostConfig,
 		Ports:       ports,
 		Platform:    container.Platform,
