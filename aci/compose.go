@@ -62,7 +62,7 @@ func (cs *aciComposeService) Down(ctx context.Context, project string) error {
 	if err != nil {
 		return err
 	}
-	if cg.StatusCode == http.StatusNoContent {
+	if cg.IsHTTPStatus(http.StatusNoContent) {
 		return errdefs.ErrNotFound
 	}
 

@@ -223,7 +223,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 		if err == nil {
 			if _, ok := account.Tags[dockerVolumeTag]; ok {
 				result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount)
-				if result.StatusCode == http.StatusNoContent {
+				if result.IsHTTPStatus(http.StatusNoContent) {
 					return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", storageAccount)
 				}
 				return err

@@ -173,7 +173,7 @@ func stopACIContainerGroup(ctx context.Context, aciContext store.AciContext, con
 	}
 
 	result, err := containerGroupsClient.Stop(ctx, aciContext.ResourceGroup, containerGroupName)
-	if result.StatusCode == http.StatusNotFound {
+	if result.IsHTTPStatus(http.StatusNotFound) {
 		return errdefs.ErrNotFound
 	}
 	return err

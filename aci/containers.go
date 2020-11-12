@@ -223,7 +223,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 
 	cg, err := deleteACIContainerGroup(ctx, cs.ctx, groupName)
 	// Delete returns `StatusNoContent` if the group is not found
-	if cg.StatusCode == http.StatusNoContent {
+	if cg.IsHTTPStatus(http.StatusNoContent) {
 		return errdefs.ErrNotFound
 	}
 	if err != nil {
