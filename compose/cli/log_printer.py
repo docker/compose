@@ -16,18 +16,22 @@ from compose.utils import split_buffer
 
 class LogPresenter:
 
-    def __init__(self, prefix_width, color_func):
+    def __init__(self, prefix_width, color_func, keep_prefix=True):
         self.prefix_width = prefix_width
         self.color_func = color_func
+        self.keep_prefix = keep_prefix
 
     def present(self, container, line):
-        prefix = container.name_without_project.ljust(self.prefix_width)
-        return '{prefix} {line}'.format(
-            prefix=self.color_func(prefix + ' |'),
-            line=line)
+        to_log = '{line}'.format(line=line)
+
+        if self.keep_prefix:
+            prefix = container.name_without_project.ljust(self.prefix_width)
+            to_log = '{prefix} '.format(prefix=self.color_func(prefix + ' |')) + to_log
+
+        return to_log
 
 
-def build_log_presenters(service_names, monochrome):
+def build_log_presenters(service_names, monochrome, keep_prefix=True):
     """Return an iterable of functions.
 
     Each function can be used to format the logs output of a container.
@@ -38,7 +42,7 @@ def build_log_presenters(service_names, monochrome):
         return text
 
     for color_func in cycle([no_color] if monochrome else colors.rainbow()):
-        yield LogPresenter(prefix_width, color_func)
+        yield LogPresenter(prefix_width, color_func, keep_prefix)
 
 
 def max_name_width(service_names, max_index_width=3):
