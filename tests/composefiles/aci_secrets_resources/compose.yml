@@ -9,6 +9,8 @@ services:
         target: mytarget1
       - mysecret2
     deploy:
+      restart_policy:
+        condition: on-failure
       resources:
         limits:
           cpus: '0.7'
@@ -16,6 +18,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 0.5G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthz"]
+      interval: 5s
 
   web2:
     build: ./web
@@ -25,6 +30,8 @@ services:
     environment:
       - PORT=8080
     deploy:
+      restart_policy:
+        condition: on-failure
       resources:
         reservations:
           cpus: '0.5'

@@ -591,6 +591,41 @@ func TestUpSecretsResources(t *testing.T) {
 		assert.Equal(t, web2Inspect.HostConfig.CPUReservation, 0.5)
 		assert.Equal(t, web2Inspect.HostConfig.MemoryReservation, uint64(751619276))
 	})
+
+	t.Run("check healthchecks inspect", func(t *testing.T) {
+		assert.Equal(t, web1Inspect.Healthcheck.Disable, false)
+		assert.Equal(t, time.Duration(web1Inspect.Healthcheck.Interval), 5*time.Second)
+		assert.DeepEqual(t, web1Inspect.Healthcheck.Test, []string{"curl", "-f", "http://localhost:80/healthz"})
+
+		assert.Equal(t, web2Inspect.Healthcheck.Disable, true)
+	})
+
+	t.Run("healthcheck restart failed app", func(t *testing.T) {
+		endpoint := fmt.Sprintf("http://%s:%d", web1Inspect.Ports[0].HostIP, web1Inspect.Ports[0].HostPort)
+		HTTPGetWithRetry(t, endpoint+"/failtestserver", http.StatusOK, 3*time.Second, 3*time.Second)
+
+		logs := c.RunDockerCmd("logs", web1).Combined()
+		assert.Assert(t, strings.Contains(logs, "GET /healthz"))
+		assert.Assert(t, strings.Contains(logs, "GET /failtestserver"))
+		assert.Assert(t, strings.Contains(logs, "Server failing"))
+
+		checkLogsReset := func(logt poll.LogT) poll.Result {
+			res := c.RunDockerOrExitError("logs", web1)
+			if res.ExitCode == 0 &&
+				!strings.Contains(res.Combined(), "GET /failtestserver") &&
+				strings.Contains(res.Combined(), "Listening on port 80") &&
+				strings.Contains(res.Combined(), "GET /healthz") {
+				return poll.Success()
+			}
+			return poll.Continue("Logs not reset by healcheck restart\n" + res.Combined())
+		}
+
+		poll.WaitOn(t, checkLogsReset, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
+
+		res := c.RunDockerCmd("inspect", web1)
+		web1Inspect, err = ParseContainerInspect(res.Stdout())
+		assert.Equal(t, web1Inspect.Status, "Running")
+	})
 }
 
 func TestUpUpdate(t *testing.T) {

@@ -17,11 +17,49 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 )
 
 func main() {
-	log.Fatal(http.ListenAndServe(":"+os.Args[1], http.FileServer(http.Dir(os.Args[2]))))
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "Usage: web PORT FOLDER")
+		os.Exit(1)
+	}
+
+	http.HandleFunc("/failtestserver", log(fail))
+	http.HandleFunc("/healthz", log(healthz))
+	dir := os.Args[2]
+	fileServer := http.FileServer(http.Dir(dir))
+	http.HandleFunc("/", log(fileServer.ServeHTTP))
+
+	port := os.Args[1]
+	fmt.Println("Listening on port " + port)
+	err := http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		fmt.Printf("Error while starting server: %v", err)
+	}
+}
+
+var healthy bool = true
+
+func fail(w http.ResponseWriter, req *http.Request) {
+	healthy = false
+	fmt.Println("Server failing")
+}
+
+func healthz(w http.ResponseWriter, r *http.Request) {
+	if !healthy {
+		fmt.Println("unhealthy")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+}
+
+func log(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+		handler(w, r)
+	}
 }

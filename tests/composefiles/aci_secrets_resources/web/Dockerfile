@@ -21,5 +21,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server main.go
 
 FROM alpine
+RUN apk --no-cache add curl
 COPY --from=build /go/server /
 CMD /server "${PORT:-80}" "${DIR:-/run/secrets}"
