@@ -20,7 +20,6 @@ package local
 
 import (
 	"context"
-
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -53,22 +52,23 @@ func service(ctx context.Context) (backend.Service, error) {
 	}, nil
 }
 
-func (cs *containerService) ContainerService() containers.Service {
-	return cs
+func (s *local) ContainerService() containers.Service {
+	return s.containerService
 }
 
-func (ms *local) ComposeService() compose.Service {
+func (s *local) ComposeService() compose.Service {
+	return s
+}
+
+func (s *local) SecretsService() secrets.Service {
 	return nil
 }
 
-func (ms *local) SecretsService() secrets.Service {
+func (s *local) VolumeService() volumes.Service {
+	return s.volumeService
+}
+
+func (s *local) ResourceService() resources.Service {
 	return nil
 }
 
-func (vs *volumeService) VolumeService() volumes.Service {
-	return vs
-}
-
-func (ms *local) ResourceService() resources.Service {
-	return nil
-}

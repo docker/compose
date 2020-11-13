@@ -21,6 +21,7 @@ package local
 import (
 	"bufio"
 	"context"
+	"github.com/docker/docker/api/types/network"
 	"io"
 	"strings"
 	"time"
@@ -134,13 +135,21 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 		},
 	}
 
-	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)
+	id, err := cs.create(ctx, containerConfig, hostConfig, nil, r.ID)
+	if err != nil {
+		return err
+	}
+	return cs.apiClient.ContainerStart(ctx, id, types.ContainerStartOptions{})
+}
+
+func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, name string) (string, error) {
+	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
 
 	if err != nil {
 		if client.IsErrNotFound(err) {
-			io, err := cs.apiClient.ImagePull(ctx, r.Image, types.ImagePullOptions{})
+			io, err := cs.apiClient.ImagePull(ctx, containerConfig.Image, types.ImagePullOptions{})
 			if err != nil {
-				return err
+				return "", err
 			}
 			scanner := bufio.NewScanner(io)
 
@@ -149,21 +158,20 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 			}
 
 			if err = scanner.Err(); err != nil {
-				return err
+				return "", err
 			}
 			if err = io.Close(); err != nil {
-				return err
+				return "", err
 			}
-			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, nil, r.ID)
+			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
 			if err != nil {
-				return err
+				return "", err
 			}
 		} else {
-			return err
+			return "", err
 		}
 	}
-
-	return cs.apiClient.ContainerStart(ctx, created.ID, types.ContainerStartOptions{})
+	return created.ID, nil
 }
 
 func (cs *containerService) Start(ctx context.Context, containerID string) error {
