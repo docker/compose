@@ -23,6 +23,7 @@ var commandFlags = []string{
 
 // Generated with generatecommands/main.go
 var managementCommands = []string{
+	"help",
 	"ecs",
 	"scan",
 	"app",

@@ -174,6 +174,11 @@ func TestKeepHelpCommands(t *testing.T) {
 			args:     []string{"--help"},
 			expected: "--help",
 		},
+		{
+			name:     "help commands",
+			args:     []string{"help", "run"},
+			expected: "help run",
+		},
 	}
 
 	for _, testCase := range testCases {

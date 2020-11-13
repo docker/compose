@@ -35,6 +35,7 @@ func main() {
 
 	fmt.Printf(`
 var managementCommands = []string{
+	"help",
 	"%s",
 }
 
