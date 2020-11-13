@@ -669,7 +669,7 @@ class ConfigTest(unittest.TestCase):
 
             assert 'Invalid service name \'mong\\o\'' in excinfo.exconly()
 
-    def test_config_duplicate_cache_from_values_validation_error(self):
+    def test_config_duplicate_cache_from_values_no_validation_error(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(
                 build_config_details({
@@ -681,7 +681,7 @@ class ConfigTest(unittest.TestCase):
                 })
             )
 
-        assert 'build.cache_from contains non-unique items' in exc.exconly()
+        assert 'build.cache_from contains non-unique items' not in exc.exconly()
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(
