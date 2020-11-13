@@ -162,12 +162,12 @@ func TestKeepHelpCommands(t *testing.T) {
 		{
 			name:     "run with help flag",
 			args:     []string{"run", "--help"},
-			expected: "run --help",
+			expected: "--help run",
 		},
 		{
 			name:     "with help flag before-after commands",
 			args:     []string{"compose", "--help", "up"},
-			expected: "compose --help up",
+			expected: "--help compose up",
 		},
 		{
 			name:     "help flag",

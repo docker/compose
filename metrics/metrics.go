@@ -17,6 +17,8 @@
 package metrics
 
 import (
+	"strings"
+
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -51,15 +53,15 @@ func GetCommand(args []string) string {
 	result := ""
 	onlyFlags := false
 	for _, arg := range args {
+		if arg == "--help" {
+			result = strings.TrimSpace(arg + " " + result)
+			continue
+		}
 		if arg == "--" {
 			break
 		}
 		if isCommandFlag(arg) || (!onlyFlags && isCommand(arg)) {
-			if result == "" {
-				result = arg
-			} else {
-				result = result + " " + arg
-			}
+			result = strings.TrimSpace(result + " " + arg)
 			if isCommand(arg) && !isManagementCommand(arg) {
 				onlyFlags = true
 			}
