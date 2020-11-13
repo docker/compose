@@ -153,26 +153,31 @@ func TestGetCommand(t *testing.T) {
 	}
 }
 
-func TestIgnoreHelpCommands(t *testing.T) {
+func TestKeepHelpCommands(t *testing.T) {
 	testCases := []struct {
 		name     string
 		args     []string
 		expected string
 	}{
 		{
-			name:     "help",
-			args:     []string{"--help"},
-			expected: "",
-		},
-		{
-			name:     "help on run",
+			name:     "run with help flag",
 			args:     []string{"run", "--help"},
-			expected: "",
+			expected: "--help run",
 		},
 		{
-			name:     "help on compose up",
-			args:     []string{"compose", "up", "--help"},
-			expected: "",
+			name:     "with help flag before-after commands",
+			args:     []string{"compose", "--help", "up"},
+			expected: "--help compose up",
+		},
+		{
+			name:     "help flag",
+			args:     []string{"--help"},
+			expected: "--help",
+		},
+		{
+			name:     "help commands",
+			args:     []string{"help", "run"},
+			expected: "help run",
 		},
 	}
 
