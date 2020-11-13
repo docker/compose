@@ -17,51 +17,14 @@
 package ecs
 
 import (
-	"bytes"
 	"context"
-	"fmt"
+	"github.com/docker/compose-cli/formatter"
 	"io"
-	"strconv"
-	"strings"
 )
 
 func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := logConsumer{
-		colors: map[string]colorFunc{},
-		width:  0,
-		writer: w,
-	}
+	consumer := formatter.NewLogConsumer(w)
 	err := b.aws.GetLogs(ctx, project, consumer.Log)
 	return err
 }
 
-func (l *logConsumer) Log(service, container, message string) {
-	cf, ok := l.colors[service]
-	if !ok {
-		cf = <-loop
-		l.colors[service] = cf
-		l.computeWidth()
-	}
-	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", service)
-
-	for _, line := range strings.Split(message, "\n") {
-		buf := bytes.NewBufferString(fmt.Sprintf("%s %s\n", cf(prefix), line))
-		l.writer.Write(buf.Bytes()) // nolint:errcheck
-	}
-}
-
-func (l *logConsumer) computeWidth() {
-	width := 0
-	for n := range l.colors {
-		if len(n) > width {
-			width = len(n)
-		}
-	}
-	l.width = width + 3
-}
-
-type logConsumer struct {
-	colors map[string]colorFunc
-	width  int
-	writer io.Writer
-}

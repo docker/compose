@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/formatter"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -43,11 +44,22 @@ import (
 
 func (s *local) Up(ctx context.Context, project *types.Project, detach bool) error {
 	for k, network := range project.Networks {
-		if !network.External.External {
+		if !network.External.External && network.Name != "" {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Networks[k] = network
 		}
 		err := s.ensureNetwork(ctx, network)
+		if err != nil {
+			return err
+		}
+	}
+
+	for k, volume := range project.Volumes {
+		if !volume.External.External && volume.Name != "" {
+			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
+			project.Volumes[k] = volume
+		}
+		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
 		}
@@ -104,11 +116,13 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 		return err
 	}
 	var wg sync.WaitGroup
+	consumer := formatter.NewLogConsumer(w)
 	for _, c := range list {
+		service := c.Labels["com.docker.compose.service"]
 		go func() {
 			s.containerService.Logs(ctx, c.ID, containers.LogsRequest{
 				Follow: true,
-				Writer: w,
+				Writer: consumer.GetWriter(service, c.ID),
 			})
 			wg.Done()
 		}()
@@ -414,6 +428,22 @@ func (s *local) connectContainerToNetwork(ctx context.Context, id string, servic
 		Aliases: []string{service},
 	})
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
+	// TODO could identify volume by label vs name
+	_, err := s.volumeService.Inspect(ctx, volume.Name)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			// TODO we miss support for driver_opts and labels
+			_, err := s.volumeService.Create(ctx, volume.Name, nil)
+			if err != nil {
+				return err
+			}
+		}
 		return err
 	}
 	return nil
