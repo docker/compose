@@ -20,20 +20,25 @@ package local
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/containers"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
+	"github.com/sanathkr/go-yaml"
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 func (s *local) Up(ctx context.Context, project *types.Project, detach bool) error {
@@ -75,25 +80,88 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 
 
 func (s *local) Down(ctx context.Context, projectName string) error {
-	panic("implement me")
+	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", "com.docker.compose.project="+projectName),
+		),
+	})
+	if err != nil {
+		return err
+	}
+	for _, c := range list {
+		s.containerService.Stop(ctx, c.ID, nil)
+	}
+	return nil
 }
 
 func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error {
-	panic("implement me")
+	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", "com.docker.compose.project="+projectName),
+		),
+	})
+	if err != nil {
+		return err
+	}
+	var wg sync.WaitGroup
+	for _, c := range list {
+		go func() {
+			s.containerService.Logs(ctx, c.ID, containers.LogsRequest{
+				Follow: true,
+				Writer: w,
+			})
+			wg.Done()
+		}()
+		wg.Add(1)
+	}
+	wg.Wait()
+	return nil
 }
 
 func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
-	panic("implement me")
+	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", "com.docker.compose.project="+projectName),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	var status []compose.ServiceStatus
+	for _,c := range list {
+		// TODO group by service
+		status = append(status, compose.ServiceStatus{
+			ID:         c.ID,
+			Name:       c.Labels["com.docker.compose.service"],
+			Replicas:   0,
+			Desired:    0,
+			Ports:      nil,
+			Publishers: nil,
+		})
+	}
+	return status, nil
 }
 
 func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
-	panic("implement me")
+	_, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+	var stacks []compose.Stack
+	// TODO rebuild stacks based on containers
+	return stacks, nil
 }
 
 func (s *local) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
-	panic("implement me")
+	switch format {
+	case "json":
+		return json.MarshalIndent(project, "", "  ")
+	case "yaml":
+		return yaml.Marshal(project)
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
+	}
 }
-
 
 func getContainerCreateOptions(p *types.Project, s types.ServiceConfig)  (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 	labels := map[string]string{
