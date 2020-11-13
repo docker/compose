@@ -18,7 +18,7 @@ package metrics
 
 var commandFlags = []string{
 	//added to catch scan details
-	"--version", "--login",
+	"--version", "--login", "--help",
 }
 
 // Generated with generatecommands/main.go

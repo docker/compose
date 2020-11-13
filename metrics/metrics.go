@@ -51,9 +51,6 @@ func GetCommand(args []string) string {
 	result := ""
 	onlyFlags := false
 	for _, arg := range args {
-		if arg == "--help" {
-			return ""
-		}
 		if arg == "--" {
 			break
 		}
@@ -63,7 +60,7 @@ func GetCommand(args []string) string {
 			} else {
 				result = result + " " + arg
 			}
-			if !isManagementCommand(arg) {
+			if isCommand(arg) && !isManagementCommand(arg) {
 				onlyFlags = true
 			}
 		}
