@@ -68,13 +68,15 @@ class Project:
     """
     A collection of services.
     """
-    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None):
+    def __init__(self, name, services, client, networks=None, volumes=None, config_version=None,
+                 enabled_profiles=None):
         self.name = name
         self.services = services
         self.client = client
         self.volumes = volumes or ProjectVolumes({})
         self.networks = networks or ProjectNetworks({}, False)
         self.config_version = config_version
+        self.enabled_profiles = enabled_profiles or []
 
     def labels(self, one_off=OneOffFilter.exclude, legacy=False):
         name = self.name
@@ -86,7 +88,8 @@ class Project:
         return labels
 
     @classmethod
-    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=None):
+    def from_config(cls, name, config_data, client, default_platform=None, extra_labels=None,
+                    enabled_profiles=None):
         """
         Construct a Project from a config.Config object.
         """
@@ -98,7 +101,7 @@ class Project:
             networks,
             use_networking)
         volumes = ProjectVolumes.from_config(name, config_data, client)
-        project = cls(name, [], client, project_networks, volumes, config_data.version)
+        project = cls(name, [], client, project_networks, volumes, config_data.version, enabled_profiles)
 
         for service_dict in config_data.services:
             service_dict = dict(service_dict)
@@ -186,7 +189,7 @@ class Project:
             if name not in valid_names:
                 raise NoSuchService(name)
 
-    def get_services(self, service_names=None, include_deps=False):
+    def get_services(self, service_names=None, include_deps=False, auto_enable_profiles=True):
         """
         Returns a list of this project's services filtered
         by the provided list of names, or all services if service_names is None
@@ -199,15 +202,36 @@ class Project:
         reordering as needed to resolve dependencies.
 
         Raises NoSuchService if any of the named services do not exist.
+
+        Raises ConfigurationError if any service depended on is not enabled by active profiles
         """
+        # create a copy so we can *locally* add auto-enabled profiles later
+        enabled_profiles = self.enabled_profiles.copy()
+
         if service_names is None or len(service_names) == 0:
-            service_names = self.service_names
+            auto_enable_profiles = False
+            service_names = [
+                service.name
+                for service in self.services
+                if service.enabled_for_profiles(enabled_profiles)
+            ]
 
         unsorted = [self.get_service(name) for name in service_names]
         services = [s for s in self.services if s in unsorted]
 
+        if auto_enable_profiles:
+            # enable profiles of explicitly targeted services
+            for service in services:
+                for profile in service.get_profiles():
+                    if profile not in enabled_profiles:
+                        enabled_profiles.append(profile)
+
         if include_deps:
-            services = reduce(self._inject_deps, services, [])
+            services = reduce(
+                lambda acc, s: self._inject_deps(acc, s, enabled_profiles),
+                services,
+                []
+            )
 
         uniques = []
         [uniques.append(s) for s in services if s not in uniques]
@@ -438,10 +462,12 @@ class Project:
         self.remove_images(remove_image_type)
 
     def remove_images(self, remove_image_type):
-        for service in self.get_services():
+        for service in self.services:
             service.remove_image(remove_image_type)
 
     def restart(self, service_names=None, **options):
+        # filter service_names by enabled profiles
+        service_names = [s.name for s in self.get_services(service_names)]
         containers = self.containers(service_names, stopped=True)
 
         parallel.parallel_execute(
@@ -856,14 +882,26 @@ class Project:
                 )
             )
 
-    def _inject_deps(self, acc, service):
+    def _inject_deps(self, acc, service, enabled_profiles):
         dep_names = service.get_dependency_names()
 
         if len(dep_names) > 0:
             dep_services = self.get_services(
                 service_names=list(set(dep_names)),
-                include_deps=True
+                include_deps=True,
+                auto_enable_profiles=False
             )
+
+            for dep in dep_services:
+                if not dep.enabled_for_profiles(enabled_profiles):
+                    raise ConfigurationError(
+                        'Service "{dep_name}" was pulled in as a dependency of '
+                        'service "{service_name}" but is not enabled by the '
+                        'active profiles. '
+                        'You may fix this by adding a common profile to '
+                        '"{dep_name}" and "{service_name}".'
+                        .format(dep_name=dep.name, service_name=service.name)
+                    )
         else:
             dep_services = []
 

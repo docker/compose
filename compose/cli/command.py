@@ -66,7 +66,8 @@ def project_from_options(project_dir, options, additional_options=None):
         environment=environment,
         override_dir=override_dir,
         interpolate=(not additional_options.get('--no-interpolate')),
-        environment_file=environment_file
+        environment_file=environment_file,
+        enabled_profiles=get_profiles_from_options(options, environment)
     )
 
 
@@ -115,9 +116,21 @@ def get_config_path_from_options(base_dir, options, environment):
     return None
 
 
+def get_profiles_from_options(options, environment):
+    profile_option = options.get('--profile')
+    if profile_option:
+        return profile_option
+
+    profiles = environment.get('COMPOSE_PROFILE')
+    if profiles:
+        return profiles.split(',')
+
+    return []
+
+
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 context=None, environment=None, override_dir=None,
-                interpolate=True, environment_file=None):
+                interpolate=True, environment_file=None, enabled_profiles=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
@@ -139,6 +152,7 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
             client,
             environment.get('DOCKER_DEFAULT_PLATFORM'),
             execution_context_labels(config_details, environment_file),
+            enabled_profiles,
         )
 
 
