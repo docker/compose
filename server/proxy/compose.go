@@ -21,6 +21,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+
 	composev1 "github.com/docker/compose-cli/protos/compose/v1"
 )
 
@@ -44,7 +45,7 @@ func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest)
 	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName)
 }
 
-func (p *proxy) Ps(ctx context.Context, request *composev1.ComposePsRequest) (*composev1.ComposePsResponse, error) {
+func (p *proxy) Services(ctx context.Context, request *composev1.ComposePsRequest) (*composev1.ComposePsResponse, error) {
 	projectName := request.GetProjectName()
 	if projectName == "" {
 		project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
@@ -70,7 +71,7 @@ func (p *proxy) Ps(ctx context.Context, request *composev1.ComposePsRequest) (*c
 	return &composev1.ComposePsResponse{Services: response}, nil
 }
 
-func (p *proxy) ListStacks(ctx context.Context, request *composev1.ComposeListRequest) (*composev1.ComposeListResponse, error) {
+func (p *proxy) Stacks(ctx context.Context, request *composev1.ComposeListRequest) (*composev1.ComposeListResponse, error) {
 	stacks, err := Client(ctx).ComposeService().List(ctx, request.ProjectName)
 	if err != nil {
 		return nil, err

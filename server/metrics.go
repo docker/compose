@@ -43,6 +43,10 @@ var (
 		"/com.docker.api.protos.volumes.v1.Volumes/VolumesDelete":  "volume rm",
 		"/com.docker.api.protos.volumes.v1.Volumes/VolumesCreate":  "volume create",
 		"/com.docker.api.protos.volumes.v1.Volumes/VolumesInspect": "volume inspect",
+		"/com.docker.api.protos.compose.v1.Compose/Up":             "compose up",
+		"/com.docker.api.protos.compose.v1.Compose/Down":           "compose down",
+		"/com.docker.api.protos.compose.v1.Compose/Stacks":         "compose ls",
+		"/com.docker.api.protos.compose.v1.Compose/Services":       "compose ps",
 	}
 )
 

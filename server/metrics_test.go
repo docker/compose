@@ -35,6 +35,7 @@ import (
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/metrics"
+	composev1 "github.com/docker/compose-cli/protos/compose/v1"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
@@ -105,6 +106,7 @@ func setupServer() *grpc.Server {
 	ctx := context.TODO()
 	s := New(ctx)
 	p := proxy.New(ctx)
+	composev1.RegisterComposeServer(s, p)
 	containersv1.RegisterContainersServer(s, p)
 	streamsv1.RegisterStreamingServer(s, p)
 	volumesv1.RegisterVolumesServer(s, p)

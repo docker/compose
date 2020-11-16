@@ -22,8 +22,8 @@ option go_package = "github.com/docker/compose-cli/protos/compose/v1;v1";
 service Compose {
   rpc Up(ComposeUpRequest) returns (ComposeUpResponse);
   rpc Down(ComposeDownRequest) returns (ComposeDownResponse);
-  rpc ListStacks(ComposeListRequest)returns (ComposeListResponse);
-  rpc Ps(ComposePsRequest)returns (ComposePsResponse);
+  rpc Stacks(ComposeListRequest)returns (ComposeListResponse);
+  rpc Services(ComposePsRequest)returns (ComposePsResponse);
 }
 
 message ComposeUpRequest {
