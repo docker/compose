@@ -319,6 +319,21 @@ services:
 	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
 	assert.Equal(t, def.Cpu, "")
 	assert.Equal(t, def.Memory, "")
+
+	template = convertYaml(t, `
+services:
+  test:
+    image: nginx
+    deploy:
+      resources:
+        reservations:
+          devices: 
+            - capabilities: [gpu]
+              count: 2
+`, useDefaultVPC, useGPU)
+	def = template.Resources["TestTaskDefinition"].(*ecs.TaskDefinition)
+	assert.Equal(t, def.Cpu, "")
+	assert.Equal(t, def.Memory, "")
 }
 
 func TestLoadBalancerTypeNetwork(t *testing.T) {
