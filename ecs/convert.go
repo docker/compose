@@ -562,6 +562,11 @@ func gpuRequirements(s types.ServiceConfig) int64 {
 					return resource.DiscreteResourceSpec.Value
 				}
 			}
+			for _, device := range reservations.Devices {
+				if len(device.Capabilities) == 1 && device.Capabilities[0] == "gpu" {
+					return int64(device.Count)
+				}
+			}
 		}
 	}
 	return 0

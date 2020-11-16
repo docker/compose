@@ -65,6 +65,8 @@ var compatibleComposeAttributes = []string{
 	"services.deploy.resources.reservations",
 	"services.deploy.resources.reservations.cpus",
 	"services.deploy.resources.reservations.memory",
+	"services.deploy.resources.reservations.devices",
+	"services.deploy.resources.reservations.devices.count",
 	"services.deploy.resources.reservations.generic_resources",
 	"services.deploy.resources.reservations.generic_resources.discrete_resource_spec",
 	"services.deploy.update_config",
@@ -154,6 +156,14 @@ func (c *fargateCompatibilityChecker) CheckUlimits(service *types.ServiceConfig)
 		if k != "nofile" {
 			c.Unsupported("services.ulimits.%s is not supported by Fargate", k)
 			delete(service.Ulimits, k)
+		}
+	}
+}
+
+func (c *fargateCompatibilityChecker) CheckDeployResourcesDevicesCapabilities(s string, r types.DeviceRequest) {
+	for _, cap := range r.Capabilities {
+		if cap != "gpu" {
+			c.Unsupported("services.deploy.resources.%s.devices.capabilities = %s", s, cap)
 		}
 	}
 }
