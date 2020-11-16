@@ -77,6 +77,13 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		if err != nil {
 			return err
 		}
+		w := progress.ContextWriter(ctx)
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Working,
+			StatusText: "Create",
+			Done:       false,
+		})
 		name := fmt.Sprintf("%s_%s", project.Name, service.Name)
 		id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
 		if err != nil {
@@ -89,10 +96,22 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 				return err
 			}
 		}
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Working,
+			StatusText: "Start",
+			Done:       false,
+		})
 		err = s.containerService.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
 		if err != nil {
 			return err
 		}
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Done,
+			StatusText: "Started",
+			Done:       true,
+		})
 	}
 	return nil
 }
@@ -488,9 +507,22 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				}
 				createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
 			}
+			w := progress.ContextWriter(ctx)
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Network %q", n.Name),
+				Status:     progress.Working,
+				StatusText: "Create",
+				Done:       false,
+			})
 			if _, err := s.containerService.apiClient.NetworkCreate(context.Background(), n.Name, createOpts); err != nil {
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Network %q", n.Name),
+				Status:     progress.Working,
+				StatusText: "Created",
+				Done:       true,
+			})
 			return nil
 		} else {
 			return err
@@ -514,8 +546,21 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 	_, err := s.volumeService.Inspect(ctx, volume.Name)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
+			w := progress.ContextWriter(ctx)
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Volume %q", volume.Name),
+				Status:     progress.Working,
+				StatusText: "Create",
+				Done:       false,
+			})
 			// TODO we miss support for driver_opts and labels
 			_, err := s.volumeService.Create(ctx, volume.Name, nil)
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Volume %q", volume.Name),
+				Status:     progress.Done,
+				StatusText: "Created",
+				Done:       true,
+			})
 			if err != nil {
 				return err
 			}
