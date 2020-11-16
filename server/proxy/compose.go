@@ -44,7 +44,19 @@ func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*c
 }
 
 func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
-	err := Client(ctx).ComposeService().Down(ctx, "TODO")
+	options, err := cli.NewProjectOptions(request.Files,
+		cli.WithOsEnv,
+		cli.WithWorkingDirectory(request.WorkDir),
+		cli.WithName(request.ProjectName))
+	if err != nil {
+		return nil, err
+	}
+
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	err = Client(ctx).ComposeService().Down(ctx, project.Name)
 	if err != nil {
 		return nil, err
 	}
