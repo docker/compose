@@ -263,7 +263,7 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 					StatusText: jm.Error.Message,
 					Done:       true,
 				})
-			} else if jm.Status == "Pull complete" {
+			} else if jm.Status == "Pull complete" || jm.Status == "Already exists" {
 				w.Event(progress.Event{
 					ID:     jm.ID,
 					Text:   jm.Status,
