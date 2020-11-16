@@ -33,11 +33,41 @@ func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*c
 }
 
 func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
-	project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
+	projectName := request.GetProjectName()
+	if projectName == "" {
+		project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
+		if err != nil {
+			return nil, err
+		}
+		projectName = project.Name
+	}
+	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName)
+}
+
+func (p *proxy) Ps(ctx context.Context, request *composev1.ComposePsRequest) (*composev1.ComposePsResponse, error) {
+	projectName := request.GetProjectName()
+	if projectName == "" {
+		project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
+		if err != nil {
+			return nil, err
+		}
+		projectName = project.Name
+	}
+	services, err := Client(ctx).ComposeService().Ps(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
-	return &composev1.ComposeDownResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Down(ctx, project.Name)
+	response := []*composev1.Service{}
+	for _, service := range services {
+		response = append(response, &composev1.Service{
+			Id:       service.ID,
+			Name:     service.Name,
+			Replicas: uint32(service.Replicas),
+			Desired:  uint32(service.Desired),
+			Ports:    service.Ports,
+		})
+	}
+	return &composev1.ComposePsResponse{Services: response}, nil
 }
 
 func (p *proxy) ListStacks(ctx context.Context, request *composev1.ComposeListRequest) (*composev1.ComposeListResponse, error) {

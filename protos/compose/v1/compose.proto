@@ -23,6 +23,7 @@ service Compose {
   rpc Up(ComposeUpRequest) returns (ComposeUpResponse);
   rpc Down(ComposeDownRequest) returns (ComposeDownResponse);
   rpc ListStacks(ComposeListRequest)returns (ComposeListResponse);
+  rpc Ps(ComposePsRequest)returns (ComposePsResponse);
 }
 
 message ComposeUpRequest {
@@ -47,8 +48,6 @@ message ComposeDownResponse {
 
 message ComposeListRequest {
   string projectName = 1;
-  string workDir = 2;
-  repeated string files = 3;
 }
 
 message ComposeListResponse {
@@ -60,4 +59,22 @@ message Stack {
 	string name = 2;
 	string status = 3;
 	string reason = 4;
+}
+
+message ComposePsRequest {
+  string projectName = 1;
+  string workDir = 2;
+  repeated string files = 3;
+}
+
+message ComposePsResponse {
+  repeated Service services = 1;
+}
+
+message Service {
+  string id = 1;
+	string name = 2;
+	uint32 replicas = 3;
+	uint32 desired = 4;
+	repeated string Ports = 5;
 }
