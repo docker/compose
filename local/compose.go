@@ -22,6 +22,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/opencontainers/go-digest"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
@@ -38,10 +45,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
-	"io"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 func (s *local) Up(ctx context.Context, project *types.Project, detach bool) error {
@@ -67,51 +70,139 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 
+	w := progress.ContextWriter(ctx)
 	for _, service := range project.Services {
 		err := s.applyPullPolicy(ctx, service)
 		if err != nil {
 			return err
 		}
 
-		containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service)
-		if err != nil {
-			return err
-		}
-		w := progress.ContextWriter(ctx)
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Working,
-			StatusText: "Create",
-			Done:       false,
+		actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+			Filters: filters.NewArgs(
+				filters.Arg("label", "com.docker.compose.project="+project.Name),
+				filters.Arg("label", "com.docker.compose.service="+service.Name),
+			),
 		})
-		name := fmt.Sprintf("%s_%s", project.Name, service.Name)
-		id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
 		if err != nil {
 			return err
 		}
-		for net, _ := range service.Networks {
-			name := fmt.Sprintf("%s_%s", project.Name, net)
-			err = s.connectContainerToNetwork(ctx, id, service.Name, name)
+
+		expected, err := jsonHash(s)
+		if err != nil {
+			return err
+		}
+
+		if len(actual) == 0 {
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Service %q", service.Name),
+				Status:     progress.Working,
+				StatusText: "Create",
+				Done:       false,
+			})
+			name := fmt.Sprintf("%s_%s", project.Name, service.Name)
+			err = s.runContainer(ctx, project, service, name, nil)
 			if err != nil {
 				return err
 			}
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Service %q", service.Name),
+				Status:     progress.Done,
+				StatusText: "Created",
+				Done:       true,
+			})
+			continue
 		}
+
+		container := actual[0]
+		diverged := container.Labels["com.docker.compose.config-hash"] != expected
+		if diverged {
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Service %q", service.Name),
+				Status:     progress.Working,
+				StatusText: "Recreate",
+				Done:       false,
+			})
+			err := s.containerService.Stop(ctx, container.ID, nil)
+			if err != nil {
+				return err
+			}
+			name := getContainerName(container)
+			tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
+			err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
+			if err != nil {
+				return err
+			}
+			err = s.runContainer(ctx, project, service, name, &container)
+			if err != nil {
+				return err
+			}
+			err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+			if err != nil {
+				return err
+			}
+			w.Event(progress.Event{
+				ID:         fmt.Sprintf("Service %q", service.Name),
+				Status:     progress.Done,
+				StatusText: "Recreated",
+				Done:       true,
+			})
+			continue
+		}
+
+		if container.State == "running" {
+			// already running, skip
+			continue
+		}
+
 		w.Event(progress.Event{
 			ID:         fmt.Sprintf("Service %q", service.Name),
 			Status:     progress.Working,
-			StatusText: "Start",
+			StatusText: "Restart",
 			Done:       false,
 		})
-		err = s.containerService.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
+		err = s.containerService.Start(ctx, container.ID)
 		if err != nil {
 			return err
 		}
 		w.Event(progress.Event{
 			ID:         fmt.Sprintf("Service %q", service.Name),
 			Status:     progress.Done,
-			StatusText: "Started",
+			StatusText: "Restarted",
 			Done:       true,
 		})
+	}
+	return nil
+}
+
+func getContainerName(c moby.Container) string {
+	// Names return container canonical name /foo  + link aliases /linked_by/foo
+	for _, name := range c.Names {
+		if strings.LastIndex(name, "/") == 0 {
+			return name[1:]
+		}
+	}
+	return c.Names[0][1:]
+}
+
+func (s *local) runContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, container *moby.Container) error {
+	containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service, container)
+	if err != nil {
+		return err
+	}
+	id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
+	if err != nil {
+		return err
+	}
+	for net, _ := range service.Networks {
+		name := fmt.Sprintf("%s_%s", project.Name, net)
+		err = s.connectContainerToNetwork(ctx, id, service.Name, name)
+		if err != nil {
+			return err
+		}
+	}
+	err = s.containerService.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -185,7 +276,6 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 	}
 }
 
-
 func (s *local) Down(ctx context.Context, projectName string) error {
 	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
@@ -196,7 +286,10 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 		return err
 	}
 	for _, c := range list {
-		s.containerService.Stop(ctx, c.ID, nil)
+		err := s.containerService.Stop(ctx, c.ID, nil)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -237,7 +330,7 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 		return nil, err
 	}
 	var status []compose.ServiceStatus
-	for _,c := range list {
+	for _, c := range list {
 		// TODO group by service
 		status = append(status, compose.ServiceStatus{
 			ID:         c.ID,
@@ -272,10 +365,15 @@ func (s *local) Convert(ctx context.Context, project *types.Project, format stri
 	}
 }
 
-func getContainerCreateOptions(p *types.Project, s types.ServiceConfig)  (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+	hash, err := jsonHash(s)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	labels := map[string]string{
-		"com.docker.compose.project": p.Name,
-		"com.docker.compose.service": s.Name,
+		"com.docker.compose.project":     p.Name,
+		"com.docker.compose.service":     s.Name,
+		"com.docker.compose.config-hash": hash,
 	}
 
 	var (
@@ -324,7 +422,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig)  (*conta
 		// StopTimeout: 	 s.StopGracePeriod FIXME conversion
 	}
 
-	mountOptions, err := buildContainerMountOptions(p, s)
+	mountOptions, err := buildContainerMountOptions(p, s, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -351,7 +449,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig)  (*conta
 	return &containerConfig, &hostConfig, networkConfig, nil
 }
 
-func buildContainerPorts(s types.ServiceConfig)  nat.PortSet {
+func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
 	ports := nat.PortSet{}
 	for _, p := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", p.Target, p.Protocol))
@@ -360,7 +458,7 @@ func buildContainerPorts(s types.ServiceConfig)  nat.PortSet {
 	return ports
 }
 
-func buildContainerBindingOptions(s types.ServiceConfig)  (nat.PortMap, error) {
+func buildContainerBindingOptions(s types.ServiceConfig) (nat.PortMap, error) {
 	bindings := nat.PortMap{}
 	for _, port := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
@@ -375,10 +473,32 @@ func buildContainerBindingOptions(s types.ServiceConfig)  (nat.PortMap, error) {
 	return bindings, nil
 }
 
-func buildContainerMountOptions(p *types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
+func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
+	var inherited []string
+	if inherit != nil {
+		for _, m := range inherit.Mounts {
+			if m.Type == "tmpfs" {
+				continue
+			}
+			src := m.Source
+			if m.Type == "volume" {
+				src = m.Name
+			}
+			mounts = append(mounts, mount.Mount{
+				Type:     m.Type,
+				Source:   src,
+				Target:   m.Destination,
+				ReadOnly: !m.RW,
+			})
+			inherited = append(inherited, m.Destination)
+		}
+	}
 
 	for _, v := range s.Volumes {
+		if contains(inherited, v.Target) {
+			continue
+		}
 		source := v.Source
 		if v.Type == "bind" && !filepath.IsAbs(source) {
 			// FIXME handle ~/
@@ -442,7 +562,7 @@ func buildDefaultNetworkConfig(s types.ServiceConfig, networkMode container.Netw
 	}
 }
 
-func  getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
+func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 	aliases := []string{s.Name}
 	if c != nil {
 		aliases = append(aliases, c.Aliases...)
@@ -478,7 +598,6 @@ func getNetworksForService(s types.ServiceConfig) map[string]*types.ServiceNetwo
 	}
 	return map[string]*types.ServiceNetworkConfig{"default": nil}
 }
-
 
 func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
 	_, err := s.containerService.apiClient.NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
@@ -568,4 +687,21 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 		return err
 	}
 	return nil
+}
+
+func jsonHash(o interface{}) (string, error) {
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", nil
+	}
+	return digest.SHA256.FromBytes(bytes).String(), nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
