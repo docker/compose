@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	composev1 "github.com/docker/compose-cli/protos/compose/v1"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
@@ -64,6 +65,7 @@ func runServe(ctx context.Context, opts serveOpts) error {
 
 	p := proxy.New(ctx)
 
+	composev1.RegisterComposeServer(s, p)
 	containersv1.RegisterContainersServer(s, p)
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
 	streamsv1.RegisterStreamingServer(s, p)
