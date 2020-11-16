@@ -31,6 +31,7 @@ message ComposeUpRequest {
 }
 
 message ComposeUpResponse {
+  string projectName = 1;
 }
 
 message ComposeDownRequest {
@@ -40,4 +41,5 @@ message ComposeDownRequest {
 }
 
 message ComposeDownResponse {
+  string projectName = 1;
 }

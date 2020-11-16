@@ -20,55 +20,38 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/cli"
-	"github.com/docker/compose-cli/api/containers"
+	"github.com/compose-spec/compose-go/types"
 	composev1 "github.com/docker/compose-cli/protos/compose/v1"
-	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
-	"github.com/docker/compose-cli/server/proxy/streams"
 )
 
 func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*composev1.ComposeUpResponse, error) {
-	options, err := cli.NewProjectOptions(request.Files,
-		cli.WithOsEnv,
-		cli.WithWorkingDirectory(request.WorkDir),
-		cli.WithName(request.ProjectName))
+	project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-
-	project, err := cli.ProjectFromOptions(options)
-	if err != nil {
-		return nil, err
-	}
-
-	return &composev1.ComposeUpResponse{}, Client(ctx).ComposeService().Up(ctx, project, true)
+	return &composev1.ComposeUpResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Up(ctx, project, true)
 }
 
 func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
-	options, err := cli.NewProjectOptions(request.Files,
-		cli.WithOsEnv,
-		cli.WithWorkingDirectory(request.WorkDir),
-		cli.WithName(request.ProjectName))
+	project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-
-	project, err := cli.ProjectFromOptions(options)
-	if err != nil {
-		return nil, err
-	}
-	err = Client(ctx).ComposeService().Down(ctx, project.Name)
-	if err != nil {
-		return nil, err
-	}
-	response := &composev1.ComposeDownResponse{}
-	return response, err
+	return &composev1.ComposeDownResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Down(ctx, project.Name)
 }
 
-func (p *proxy) ComposeLogs(request *containersv1.LogsRequest, stream containersv1.Containers_LogsServer) error {
-	return Client(stream.Context()).ContainerService().Logs(stream.Context(), request.GetContainerId(), containers.LogsRequest{
-		Follow: request.Follow,
-		Writer: &streams.Log{
-			Stream: stream,
-		},
-	})
+func (p *proxy) ListStacks(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
+	project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
+	if err != nil {
+		return nil, err
+	}
+	return &composev1.ComposeDownResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Down(ctx, project.Name)
+}
+
+func getComposeProject(files []string, workingDir string, projectName string) (*types.Project, error) {
+	options, err := cli.NewProjectOptions(files, cli.WithWorkingDirectory(workingDir), cli.WithName(projectName))
+	if err != nil {
+		return nil, err
+	}
+	return cli.ProjectFromOptions(options)
 }
