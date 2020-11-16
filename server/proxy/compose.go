@@ -40,12 +40,21 @@ func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest)
 	return &composev1.ComposeDownResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Down(ctx, project.Name)
 }
 
-func (p *proxy) ListStacks(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
-	project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
+func (p *proxy) ListStacks(ctx context.Context, request *composev1.ComposeListRequest) (*composev1.ComposeListResponse, error) {
+	stacks, err := Client(ctx).ComposeService().List(ctx, request.ProjectName)
 	if err != nil {
 		return nil, err
 	}
-	return &composev1.ComposeDownResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Down(ctx, project.Name)
+	response := []*composev1.Stack{}
+	for _, stack := range stacks {
+		response = append(response, &composev1.Stack{
+			Id:     stack.ID,
+			Name:   stack.Name,
+			Status: stack.Status,
+			Reason: stack.Reason,
+		})
+	}
+	return &composev1.ComposeListResponse{Stacks: response}, nil
 }
 
 func getComposeProject(files []string, workingDir string, projectName string) (*types.Project, error) {
