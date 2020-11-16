@@ -26,6 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -33,6 +34,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
@@ -66,12 +68,17 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 	}
 
 	for _, service := range project.Services {
+		err := s.applyPullPolicy(ctx, service)
+		if err != nil {
+			return err
+		}
+
 		containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service)
 		if err != nil {
 			return err
 		}
 		name := fmt.Sprintf("%s_%s", project.Name, service.Name)
-		id, err := s.create(ctx, containerConfig, hostConfig, networkingConfig, name)
+		id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
 		if err != nil {
 			return err
 		}
@@ -88,6 +95,75 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 	return nil
+}
+
+func (s *local) applyPullPolicy(ctx context.Context, service types.ServiceConfig) error {
+	w := progress.ContextWriter(ctx)
+	// TODO build vs pull should be controlled by pull policy
+	// if service.Build {}
+	if service.Image != "" {
+		_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				stream, err := s.containerService.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{})
+				if err != nil {
+					return err
+				}
+				dec := json.NewDecoder(stream)
+				for {
+					var jm jsonmessage.JSONMessage
+					if err := dec.Decode(&jm); err != nil {
+						if err == io.EOF {
+							break
+						}
+						return err
+					}
+					toProgressEvent(jm, w)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
+	if jm.Progress != nil {
+		if jm.Progress.Total != 0 {
+			percentage := int(float64(jm.Progress.Current)/float64(jm.Progress.Total)*100) / 2
+			numSpaces := 50 - percentage
+			w.Event(progress.Event{
+				ID:         jm.ID,
+				Text:       jm.Status,
+				Status:     0,
+				StatusText: fmt.Sprintf("[%s>%s] ", strings.Repeat("=", percentage), strings.Repeat(" ", numSpaces)),
+				Done:       jm.Status == "Pull complete",
+			})
+		} else {
+			if jm.Error != nil {
+				w.Event(progress.Event{
+					ID:         jm.ID,
+					Text:       jm.Status,
+					Status:     progress.Error,
+					StatusText: jm.Error.Message,
+					Done:       true,
+				})
+			} else if jm.Status == "Pull complete" {
+				w.Event(progress.Event{
+					ID:     jm.ID,
+					Text:   jm.Status,
+					Status: progress.Done,
+					Done:   true,
+				})
+			} else {
+				w.Event(progress.Event{
+					ID:     jm.ID,
+					Text:   jm.Status,
+					Status: progress.Working,
+					Done:   false,
+				})
+			}
+		}
+	}
 }
 
 

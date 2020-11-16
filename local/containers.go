@@ -143,7 +143,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 }
 
 func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, name string) (string, error) {
-	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
+	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, nil, name)
 
 	if err != nil {
 		if client.IsErrNotFound(err) {
@@ -163,7 +163,7 @@ func (cs *containerService) create(ctx context.Context, containerConfig *contain
 			if err = io.Close(); err != nil {
 				return "", err
 			}
-			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
+			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, nil, name)
 			if err != nil {
 				return "", err
 			}
