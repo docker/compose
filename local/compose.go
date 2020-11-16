@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/opencontainers/go-digest"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
@@ -71,107 +72,112 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 	}
 
 	w := progress.ContextWriter(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, service := range project.Services {
-		err := s.applyPullPolicy(ctx, service)
-		if err != nil {
-			return err
-		}
+		service := service
+		eg.Go(func() error {
+			err := s.applyPullPolicy(ctx, service)
+			if err != nil {
+				return err
+			}
 
-		actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-			Filters: filters.NewArgs(
-				filters.Arg("label", "com.docker.compose.project="+project.Name),
-				filters.Arg("label", "com.docker.compose.service="+service.Name),
-			),
-		})
-		if err != nil {
-			return err
-		}
+			actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+				Filters: filters.NewArgs(
+					filters.Arg("label", "com.docker.compose.project="+project.Name),
+					filters.Arg("label", "com.docker.compose.service="+service.Name),
+				),
+			})
+			if err != nil {
+				return err
+			}
 
-		expected, err := jsonHash(s)
-		if err != nil {
-			return err
-		}
+			expected, err := jsonHash(s)
+			if err != nil {
+				return err
+			}
 
-		if len(actual) == 0 {
+			if len(actual) == 0 {
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Service %q", service.Name),
+					Status:     progress.Working,
+					StatusText: "Create",
+					Done:       false,
+				})
+				name := fmt.Sprintf("%s_%s", project.Name, service.Name)
+				err = s.runContainer(ctx, project, service, name, nil)
+				if err != nil {
+					return err
+				}
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Service %q", service.Name),
+					Status:     progress.Done,
+					StatusText: "Created",
+					Done:       true,
+				})
+				return nil
+			}
+
+			container := actual[0]
+			diverged := container.Labels["com.docker.compose.config-hash"] != expected
+			if diverged {
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Service %q", service.Name),
+					Status:     progress.Working,
+					StatusText: "Recreate",
+					Done:       false,
+				})
+				err := s.containerService.Stop(ctx, container.ID, nil)
+				if err != nil {
+					return err
+				}
+				name := getContainerName(container)
+				tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
+				err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
+				if err != nil {
+					return err
+				}
+				err = s.runContainer(ctx, project, service, name, &container)
+				if err != nil {
+					return err
+				}
+				err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+				if err != nil {
+					return err
+				}
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Service %q", service.Name),
+					Status:     progress.Done,
+					StatusText: "Recreated",
+					Done:       true,
+				})
+				return nil
+			}
+
+			if container.State == "running" {
+				// already running, skip
+				return nil
+			}
+
 			w.Event(progress.Event{
 				ID:         fmt.Sprintf("Service %q", service.Name),
 				Status:     progress.Working,
-				StatusText: "Create",
+				StatusText: "Restart",
 				Done:       false,
 			})
-			name := fmt.Sprintf("%s_%s", project.Name, service.Name)
-			err = s.runContainer(ctx, project, service, name, nil)
+			err = s.containerService.Start(ctx, container.ID)
 			if err != nil {
 				return err
 			}
 			w.Event(progress.Event{
 				ID:         fmt.Sprintf("Service %q", service.Name),
 				Status:     progress.Done,
-				StatusText: "Created",
+				StatusText: "Restarted",
 				Done:       true,
 			})
-			continue
-		}
-
-		container := actual[0]
-		diverged := container.Labels["com.docker.compose.config-hash"] != expected
-		if diverged {
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Service %q", service.Name),
-				Status:     progress.Working,
-				StatusText: "Recreate",
-				Done:       false,
-			})
-			err := s.containerService.Stop(ctx, container.ID, nil)
-			if err != nil {
-				return err
-			}
-			name := getContainerName(container)
-			tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
-			err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
-			if err != nil {
-				return err
-			}
-			err = s.runContainer(ctx, project, service, name, &container)
-			if err != nil {
-				return err
-			}
-			err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
-			if err != nil {
-				return err
-			}
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Service %q", service.Name),
-				Status:     progress.Done,
-				StatusText: "Recreated",
-				Done:       true,
-			})
-			continue
-		}
-
-		if container.State == "running" {
-			// already running, skip
-			continue
-		}
-
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Working,
-			StatusText: "Restart",
-			Done:       false,
-		})
-		err = s.containerService.Start(ctx, container.ID)
-		if err != nil {
-			return err
-		}
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Done,
-			StatusText: "Restarted",
-			Done:       true,
+			return nil
 		})
 	}
-	return nil
+	return eg.Wait()
 }
 
 func getContainerName(c moby.Container) string {
@@ -193,7 +199,7 @@ func (s *local) runContainer(ctx context.Context, project *types.Project, servic
 	if err != nil {
 		return err
 	}
-	for net, _ := range service.Networks {
+	for net := range service.Networks {
 		name := fmt.Sprintf("%s_%s", project.Name, net)
 		err = s.connectContainerToNetwork(ctx, id, service.Name, name)
 		if err != nil {
