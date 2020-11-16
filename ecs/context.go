@@ -199,8 +199,15 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 		return err
 	}
 
-	credIni := ini.Empty()
-	section, err := credIni.NewSection(profile)
+	credentials, err := ini.Load(file)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		credentials = ini.Empty()
+	}
+
+	section, err := credentials.NewSection(profile)
 	if err != nil {
 		return err
 	}
@@ -212,7 +219,7 @@ func (h contextCreateAWSHelper) saveCredentials(profile string, accessKeyID stri
 	if err != nil {
 		return err
 	}
-	return credIni.SaveTo(file)
+	return credentials.SaveTo(file)
 }
 
 func (h contextCreateAWSHelper) saveRegion(profile, region string) error {
