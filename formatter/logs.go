@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-
+// NewLogConsumer creates a new LogConsumer
 func NewLogConsumer(w io.Writer) LogConsumer {
 	return LogConsumer{
 		colors: map[string]colorFunc{},
@@ -33,6 +33,7 @@ func NewLogConsumer(w io.Writer) LogConsumer {
 	}
 }
 
+// Log formats a log message as received from service/container
 func (l *LogConsumer) Log(service, container, message string) {
 	cf, ok := l.colors[service]
 	if !ok {
@@ -48,11 +49,12 @@ func (l *LogConsumer) Log(service, container, message string) {
 	}
 }
 
+// GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
 func (l *LogConsumer) GetWriter(service, container string) io.Writer {
 	return splitBuffer{
-		service: service,
+		service:   service,
 		container: container,
-		consumer: l,
+		consumer:  l,
 	}
 }
 
@@ -66,12 +68,12 @@ func (l *LogConsumer) computeWidth() {
 	l.width = width + 3
 }
 
+// LogConsumer consume logs from services and format them
 type LogConsumer struct {
 	colors map[string]colorFunc
 	width  int
 	writer io.Writer
 }
-
 
 type splitBuffer struct {
 	service   string
@@ -88,4 +90,3 @@ func (s splitBuffer) Write(b []byte) (n int, err error) {
 	}
 	return len(b), nil
 }
-

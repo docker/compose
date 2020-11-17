@@ -18,8 +18,9 @@ package ecs
 
 import (
 	"context"
-	"github.com/docker/compose-cli/formatter"
 	"io"
+
+	"github.com/docker/compose-cli/formatter"
 )
 
 func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
@@ -27,4 +28,3 @@ func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) e
 	err := b.aws.GetLogs(ctx, project, consumer.Log)
 	return err
 }
-
