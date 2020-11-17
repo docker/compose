@@ -41,7 +41,7 @@ func init() {
 }
 
 func service(ctx context.Context) (backend.Service, error) {
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
