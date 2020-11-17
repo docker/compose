@@ -191,10 +191,11 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 	consumer := formatter.NewLogConsumer(w)
 	for _, c := range list {
 		service := c.Labels["com.docker.compose.service"]
+		containerId := c.ID
 		go func() {
-			s.containerService.Logs(ctx, c.ID, containers.LogsRequest{
+			s.containerService.Logs(ctx,containerId, containers.LogsRequest{
 				Follow: true,
-				Writer: consumer.GetWriter(service, c.ID),
+				Writer: consumer.GetWriter(service, containerId),
 			})
 			wg.Done()
 		}()
@@ -533,7 +534,6 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 	}
 	return nil
 }
-
 
 func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
 	// TODO could identify volume by label vs name
