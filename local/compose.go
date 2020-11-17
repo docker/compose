@@ -165,7 +165,7 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 func (s *local) Down(ctx context.Context, projectName string) error {
 	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("label", "com.docker.compose.project="+projectName),
+			projectFilter(projectName),
 		),
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error {
 	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("label", "com.docker.compose.project="+projectName),
+			projectFilter(projectName),
 		),
 	})
 	if err != nil {
@@ -221,7 +221,7 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 	var wg sync.WaitGroup
 	consumer := formatter.NewLogConsumer(w)
 	for _, c := range list {
-		service := c.Labels["com.docker.compose.service"]
+		service := c.Labels[serviceLabel]
 		containerId := c.ID
 		go func() {
 			s.containerService.Logs(ctx,containerId, containers.LogsRequest{
@@ -239,7 +239,7 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
 	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("label", "com.docker.compose.project="+projectName),
+			projectFilter(projectName),
 		),
 	})
 	if err != nil {
@@ -250,7 +250,7 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 		// TODO group by service
 		status = append(status, compose.ServiceStatus{
 			ID:         c.ID,
-			Name:       c.Labels["com.docker.compose.service"],
+			Name:       c.Labels[serviceLabel],
 			Replicas:   0,
 			Desired:    0,
 			Ports:      nil,
@@ -259,6 +259,7 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 	}
 	return status, nil
 }
+
 
 func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
 	_, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{All: true})
@@ -287,10 +288,10 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		return nil, nil, nil, err
 	}
 	labels := map[string]string{
-		"com.docker.compose.project":     p.Name,
-		"com.docker.compose.service":     s.Name,
-		"com.docker.compose.config-hash": hash,
-		"com.docker.compose.container-number": strconv.Itoa(number),
+		projectLabel:     p.Name,
+		serviceLabel:     s.Name,
+		configHashLabel: hash,
+		containerNumberLabel: strconv.Itoa(number),
 	}
 
 	var (

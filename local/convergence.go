@@ -34,8 +34,8 @@ import (
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("label", "com.docker.compose.project="+project.Name),
-			filters.Arg("label", "com.docker.compose.service="+service.Name),
+			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
+			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service.Name)),
 		),
 	})
 	if err != nil {
@@ -80,7 +80,7 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 	}
 	for _, container := range actual {
 		container := container
-		diverged := container.Labels["com.docker.compose.config-hash"] != expected
+		diverged := container.Labels[configHashLabel] != expected
 		if diverged {
 			eg.Go(func() error {
 				return s.recreateContainer(ctx, project, service, container)
@@ -103,7 +103,7 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 func nextContainerNumber(containers []moby.Container) (int, error) {
 	max := 0
 	for _, c := range containers {
-		n, err := strconv.Atoi(c.Labels["com.docker.compose.container-number"])
+		n, err := strconv.Atoi(c.Labels[containerNumberLabel])
 		if err != nil {
 			return 0, err
 		}
@@ -164,7 +164,7 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 	if err != nil {
 		return err
 	}
-	number, err := strconv.Atoi(container.Labels["com.docker.compose.container-number"])
+	number, err := strconv.Atoi(container.Labels[containerNumberLabel])
 	if err != nil {
 		return err
 	}
