@@ -22,8 +22,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -169,13 +171,42 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 	if err != nil {
 		return err
 	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+	w := progress.ContextWriter(ctx)
 	for _, c := range list {
-		err := s.containerService.Stop(ctx, c.ID, nil)
-		if err != nil {
-			return err
-		}
+		container := c
+		eg.Go(func() error {
+			w.Event(progress.Event{
+				ID:     getContainerName(container),
+				Text:   "Stopping",
+				Status: progress.Working,
+				Done:   false,
+			})
+			err := s.containerService.Stop(ctx, container.ID, nil)
+			if err != nil {
+				return err
+			}
+			w.Event(progress.Event{
+				ID:     getContainerName(container),
+				Text:   "Removing",
+				Status: progress.Working,
+				Done:   false,
+			})
+			err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+			if err != nil {
+				return err
+			}
+			w.Event(progress.Event{
+				ID:     getContainerName(container),
+				Text:   "Removed",
+				Status: progress.Done,
+				Done:   true,
+			})
+			return nil
+		})
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error {
@@ -250,7 +281,7 @@ func (s *local) Convert(ctx context.Context, project *types.Project, format stri
 	}
 }
 
-func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 	hash, err := jsonHash(s)
 	if err != nil {
 		return nil, nil, nil, err
@@ -259,6 +290,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, inherit 
 		"com.docker.compose.project":     p.Name,
 		"com.docker.compose.service":     s.Name,
 		"com.docker.compose.config-hash": hash,
+		"com.docker.compose.container-number": strconv.Itoa(number),
 	}
 
 	var (
@@ -523,7 +555,7 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 			}
 			w.Event(progress.Event{
 				ID:         fmt.Sprintf("Network %q", n.Name),
-				Status:     progress.Working,
+				Status:     progress.Done,
 				StatusText: "Created",
 				Done:       true,
 			})
