@@ -45,7 +45,7 @@ func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest)
 	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName)
 }
 
-func (p *proxy) Services(ctx context.Context, request *composev1.ComposePsRequest) (*composev1.ComposePsResponse, error) {
+func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServicesRequest) (*composev1.ComposeServicesResponse, error) {
 	projectName := request.GetProjectName()
 	if projectName == "" {
 		project, err := getComposeProject(request.Files, request.WorkDir, request.ProjectName)
@@ -68,10 +68,10 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposePsReques
 			Ports:    service.Ports,
 		})
 	}
-	return &composev1.ComposePsResponse{Services: response}, nil
+	return &composev1.ComposeServicesResponse{Services: response}, nil
 }
 
-func (p *proxy) Stacks(ctx context.Context, request *composev1.ComposeListRequest) (*composev1.ComposeListResponse, error) {
+func (p *proxy) Stacks(ctx context.Context, request *composev1.ComposeStacksRequest) (*composev1.ComposeStacksResponse, error) {
 	stacks, err := Client(ctx).ComposeService().List(ctx, request.ProjectName)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (p *proxy) Stacks(ctx context.Context, request *composev1.ComposeListReques
 			Reason: stack.Reason,
 		})
 	}
-	return &composev1.ComposeListResponse{Stacks: response}, nil
+	return &composev1.ComposeStacksResponse{Stacks: response}, nil
 }
 
 func getComposeProject(files []string, workingDir string, projectName string) (*types.Project, error) {
