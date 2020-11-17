@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -57,7 +58,7 @@ func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, deta
 		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
 	}
 
-	converted, err := e.Convert(ctx, project, "yaml")
+	converted, err := e.Convert(ctx, project, "json")
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,15 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project,
 		"secrets":  project.Secrets,
 		"configs":  project.Configs,
 	}
-	return yaml.Marshal(config)
+	switch format {
+	case "json":
+		return json.MarshalIndent(config, "", "  ")
+	case "yaml":
+		return yaml.Marshal(config)
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
+	}
+
 }
 
 func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
