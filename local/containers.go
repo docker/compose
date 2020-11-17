@@ -25,12 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
@@ -145,10 +143,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 }
 
 func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, name string) (string, error) {
-	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, &v1.Platform{
-		OS:           "linux",
-		Architecture: "amd64",
-	}, name)
+	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
 
 	if err != nil {
 		if client.IsErrNotFound(err) {
@@ -168,10 +163,7 @@ func (cs *containerService) create(ctx context.Context, containerConfig *contain
 			if err = io.Close(); err != nil {
 				return "", err
 			}
-			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, &v1.Platform{
-				OS:           "linux",
-				Architecture: "amd64",
-			}, name)
+			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
 			if err != nil {
 				return "", err
 			}

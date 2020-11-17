@@ -6,6 +6,9 @@ go 1.15
 // we need to create a new release tag for docker/distribution
 replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
 
+// unix.SYS_IOCTL has been removed from golang/sys but still in use by docker/docker until 20.x
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.1.1
 	github.com/Azure/azure-sdk-for-go v43.3.0+incompatible
@@ -18,22 +21,23 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
+	github.com/Microsoft/hcsshim v0.8.10 // indirect
 	github.com/aws/aws-sdk-go v1.35.15
-	github.com/awslabs/goformation/v4 v4.15.3
+	github.com/awslabs/goformation/v4 v4.15.2
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/compose-spec/compose-go v0.0.0-20201116112017-777513ca88e2
-	github.com/containerd/console v1.0.1
+	github.com/containerd/console v1.0.0
 	github.com/containerd/containerd v1.3.5 // indirect
+	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
 	github.com/docker/distribution v0.0.0-00010101000000-000000000000 // indirect
-	github.com/docker/docker v20.10.0-beta1.0.20201113105859-b6bfff2a628f+incompatible
+	github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
 	github.com/docker/docker-credential-helpers v0.6.3 // indirect
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.4
-	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.3
@@ -45,10 +49,12 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.0 // indirect
-	github.com/moby/term v0.0.0-20200915141129-7f0af18e79f2
+	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
+	github.com/onsi/ginkgo v1.14.2 // indirect
+	github.com/onsi/gomega v1.10.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.0.1
+	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/tsdb v0.10.0
 	github.com/sanathkr/go-yaml v0.0.0-20170819195128-ed9d249f429b
@@ -58,7 +64,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	golang.org/x/mod v0.3.0
-	golang.org/x/net v0.0.0-20201026091529-146b70c837a4
+	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	google.golang.org/grpc v1.33.1
