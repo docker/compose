@@ -55,10 +55,10 @@ message ComposeStacksResponse {
 }
 
 message Stack {
-	string id = 1;
-	string name = 2;
-	string status = 3;
-	string reason = 4;
+  string id = 1;
+  string name = 2;
+  string status = 3;
+  string reason = 4;
 }
 
 message ComposeServicesRequest {
@@ -73,8 +73,8 @@ message ComposeServicesResponse {
 
 message Service {
   string id = 1;
-	string name = 2;
-	uint32 replicas = 3;
-	uint32 desired = 4;
-	repeated string Ports = 5;
+  string name = 2;
+  uint32 replicas = 3;
+  uint32 desired = 4;
+  repeated string Ports = 5;
 }
