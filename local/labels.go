@@ -1,3 +1,5 @@
+// +build local
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -14,17 +16,20 @@
    limitations under the License.
 */
 
-package ecs
+package local
 
 import (
-	"context"
-	"io"
-
-	"github.com/docker/compose-cli/formatter"
+	"fmt"
+	"github.com/docker/docker/api/types/filters"
 )
 
-func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := formatter.NewLogConsumer(w)
-	err := b.aws.GetLogs(ctx, project, consumer.Log)
-	return err
+const (
+	projectLabel = "com.docker.compose.project"
+	serviceLabel = "com.docker.compose.service"
+	configHashLabel = "com.docker.compose.config-hash"
+	containerNumberLabel = "com.docker.compose.container-number"
+)
+
+func projectFilter(projectName string) filters.KeyValuePair {
+	return filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, projectName))
 }

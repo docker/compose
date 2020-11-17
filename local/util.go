@@ -1,3 +1,5 @@
+// +build local
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -14,17 +16,35 @@
    limitations under the License.
 */
 
-package ecs
+package local
 
 import (
-	"context"
-	"io"
-
-	"github.com/docker/compose-cli/formatter"
+	"encoding/json"
+	"github.com/opencontainers/go-digest"
 )
 
-func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := formatter.NewLogConsumer(w)
-	err := b.aws.GetLogs(ctx, project, consumer.Log)
-	return err
+func jsonHash(o interface{}) (string, error) {
+	bytes, err := json.Marshal(o)
+	if err != nil {
+		return "", nil
+	}
+	return digest.SHA256.FromBytes(bytes).String(), nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAll(slice []string, items []string) bool {
+	for _, i := range items {
+		if !contains(slice, i) {
+			return false
+		}
+	}
+	return true
 }
