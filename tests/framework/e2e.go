@@ -17,8 +17,6 @@
 package framework
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -35,8 +33,6 @@ import (
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
-
-	"github.com/docker/compose-cli/api/containers"
 )
 
 var (
@@ -194,17 +190,6 @@ func GoldenFile(name string) string {
 		return name + "-windows.golden"
 	}
 	return name + ".golden"
-}
-
-// ParseContainerInspect parses the output of a `docker inspect` command for a
-// container
-func ParseContainerInspect(stdout string) (*containers.Container, error) {
-	var res containers.Container
-	rdr := bytes.NewReader([]byte(stdout))
-	if err := json.NewDecoder(rdr).Decode(&res); err != nil {
-		return nil, err
-	}
-	return &res, nil
 }
 
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.

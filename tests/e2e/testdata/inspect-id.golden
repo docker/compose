@@ -2,11 +2,6 @@
     "ID": "id",
     "Status": "",
     "Image": "nginx",
-    "Command": "",
-    "CPUTime": 0,
-    "MemoryUsage": 0,
-    "PidsCurrent": 0,
-    "PidsLimit": 0,
     "HostConfig": {
         "RestartPolicy": "none",
         "CPUReservation": 0,
@@ -15,13 +10,5 @@
         "MemoryLimit": 0,
         "AutoRemove": false
     },
-    "Platform": "Linux",
-    "Healthcheck": {
-        "Disable": false,
-        "Test": null,
-        "Interval": "0s",
-        "Retries": 0,
-        "StartPeriod": "0s",
-        "Timeout": "0s"
-    }
+    "Platform": "Linux"
 }

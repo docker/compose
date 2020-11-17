@@ -20,10 +20,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -52,11 +55,85 @@ func runInspect(ctx context.Context, id string) error {
 		return err
 	}
 
-	j, err := formatter.ToStandardJSON(container)
+	view := getInspectView(container)
+
+	j, err := formatter.ToStandardJSON(view)
 	if err != nil {
 		return err
 	}
 	fmt.Print(j)
 
 	return nil
+}
+
+// ContainerInspectView inspect view
+type ContainerInspectView struct {
+	ID          string
+	Status      string
+	Image       string
+	Command     string                    `json:",omitempty"`
+	HostConfig  *containers.HostConfig    `json:",omitempty"`
+	Ports       []containers.Port         `json:",omitempty"`
+	Config      *containers.RuntimeConfig `json:",omitempty"`
+	Platform    string
+	Healthcheck *containerInspectHealthcheck `json:",omitempty"`
+}
+
+type containerInspectHealthcheck struct {
+	// Test is the command to be run to check the health of the container
+	Test []string `json:",omitempty"`
+	// Interval is the period in between the checks
+	Interval *types.Duration `json:",omitempty"`
+	// Retries is the number of attempts before declaring the container as healthy or unhealthy
+	Retries *int `json:",omitempty"`
+	// StartPeriod is the start delay before starting the checks
+	StartPeriod *types.Duration `json:",omitempty"`
+	// Timeout is the timeout in between checks
+	Timeout *types.Duration `json:",omitempty"`
+}
+
+func getInspectView(container containers.Container) ContainerInspectView {
+	var (
+		healthcheck *containerInspectHealthcheck
+		test        []string
+		retries     *int
+		ports       []containers.Port
+	)
+
+	if len(container.Ports) > 0 {
+		ports = container.Ports
+	}
+	if !container.Healthcheck.Disable && len(container.Healthcheck.Test) > 0 {
+		test = container.Healthcheck.Test
+		if container.Healthcheck.Retries != 0 {
+			retries = to.IntPtr(container.Healthcheck.Retries)
+		}
+		getDurationPtr := func(d types.Duration) *types.Duration {
+			if d == types.Duration(0) {
+				return nil
+			}
+			return &d
+		}
+
+		healthcheck = &containerInspectHealthcheck{
+			Test:        test,
+			Retries:     retries,
+			Interval:    getDurationPtr(container.Healthcheck.Interval),
+			StartPeriod: getDurationPtr(container.Healthcheck.StartPeriod),
+			Timeout:     getDurationPtr(container.Healthcheck.Timeout),
+		}
+	}
+
+	return ContainerInspectView{
+		ID:      container.ID,
+		Status:  container.Status,
+		Image:   container.Image,
+		Command: container.Command,
+
+		Config:      container.Config,
+		HostConfig:  container.HostConfig,
+		Ports:       ports,
+		Platform:    container.Platform,
+		Healthcheck: healthcheck,
+	}
 }
