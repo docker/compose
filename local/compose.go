@@ -28,7 +28,6 @@ import (
 	"sync"
 
 	"github.com/opencontainers/go-digest"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
@@ -71,113 +70,115 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 
-	w := progress.ContextWriter(ctx)
-	eg, ctx := errgroup.WithContext(ctx)
 	for _, service := range project.Services {
-		service := service
-		eg.Go(func() error {
-			err := s.applyPullPolicy(ctx, service)
-			if err != nil {
-				return err
-			}
-
-			actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-				Filters: filters.NewArgs(
-					filters.Arg("label", "com.docker.compose.project="+project.Name),
-					filters.Arg("label", "com.docker.compose.service="+service.Name),
-				),
-			})
-			if err != nil {
-				return err
-			}
-
-			expected, err := jsonHash(s)
-			if err != nil {
-				return err
-			}
-
-			if len(actual) == 0 {
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Service %q", service.Name),
-					Status:     progress.Working,
-					StatusText: "Create",
-					Done:       false,
-				})
-				name := fmt.Sprintf("%s_%s", project.Name, service.Name)
-				err = s.runContainer(ctx, project, service, name, nil)
-				if err != nil {
-					return err
-				}
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Service %q", service.Name),
-					Status:     progress.Done,
-					StatusText: "Created",
-					Done:       true,
-				})
-				return nil
-			}
-
-			container := actual[0]
-			diverged := container.Labels["com.docker.compose.config-hash"] != expected
-			if diverged {
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Service %q", service.Name),
-					Status:     progress.Working,
-					StatusText: "Recreate",
-					Done:       false,
-				})
-				err := s.containerService.Stop(ctx, container.ID, nil)
-				if err != nil {
-					return err
-				}
-				name := getContainerName(container)
-				tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
-				err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
-				if err != nil {
-					return err
-				}
-				err = s.runContainer(ctx, project, service, name, &container)
-				if err != nil {
-					return err
-				}
-				err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
-				if err != nil {
-					return err
-				}
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Service %q", service.Name),
-					Status:     progress.Done,
-					StatusText: "Recreated",
-					Done:       true,
-				})
-				return nil
-			}
-
-			if container.State == "running" {
-				// already running, skip
-				return nil
-			}
-
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Service %q", service.Name),
-				Status:     progress.Working,
-				StatusText: "Restart",
-				Done:       false,
-			})
-			err = s.containerService.Start(ctx, container.ID)
-			if err != nil {
-				return err
-			}
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Service %q", service.Name),
-				Status:     progress.Done,
-				StatusText: "Restarted",
-				Done:       true,
-			})
-			return nil
-		})
+		err := s.applyPullPolicy(ctx, service)
+		if err != nil {
+			return err
+		}
 	}
-	return eg.Wait()
+
+	err := inDependencyOrder(ctx, project, func(service types.ServiceConfig) error {
+		return s.ensureService(ctx, project, service)
+	})
+	return err
+}
+
+func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", "com.docker.compose.project="+project.Name),
+			filters.Arg("label", "com.docker.compose.service="+service.Name),
+		),
+	})
+	if err != nil {
+		return err
+	}
+
+	expected, err := jsonHash(s)
+	if err != nil {
+		return err
+	}
+
+	w := progress.ContextWriter(ctx)
+	if len(actual) == 0 {
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Working,
+			StatusText: "Create",
+			Done:       false,
+		})
+		name := fmt.Sprintf("%s_%s", project.Name, service.Name)
+		err = s.runContainer(ctx, project, service, name, nil)
+		if err != nil {
+			return err
+		}
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Done,
+			StatusText: "Created",
+			Done:       true,
+		})
+		return nil
+	}
+
+	container := actual[0]
+	diverged := container.Labels["com.docker.compose.config-hash"] != expected
+	if diverged {
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Working,
+			StatusText: "Recreate",
+			Done:       false,
+		})
+		err := s.containerService.Stop(ctx, container.ID, nil)
+		if err != nil {
+			return err
+		}
+		name := getContainerName(container)
+		tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
+		err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
+		if err != nil {
+			return err
+		}
+		err = s.runContainer(ctx, project, service, name, &container)
+		if err != nil {
+			return err
+		}
+		err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+		if err != nil {
+			return err
+		}
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Service %q", service.Name),
+			Status:     progress.Done,
+			StatusText: "Recreated",
+			Done:       true,
+		})
+		return nil
+	}
+
+	if container.State == "running" {
+		// already running, skip
+		return nil
+	}
+
+	w.Event(progress.Event{
+		ID:         fmt.Sprintf("Service %q", service.Name),
+		Status:     progress.Working,
+		StatusText: "Restart",
+		Done:       false,
+	})
+	err = s.containerService.Start(ctx, container.ID)
+	if err != nil {
+		return err
+	}
+	w.Event(progress.Event{
+		ID:         fmt.Sprintf("Service %q", service.Name),
+		Status:     progress.Done,
+		StatusText: "Restarted",
+		Done:       true,
+	})
+	return nil
 }
 
 func getContainerName(c moby.Container) string {
@@ -710,4 +711,13 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func containsAll(slice []string, items []string) bool {
+	for _, i := range items {
+		if !contains(slice, i) {
+			return false
+		}
+	}
+	return true
 }
