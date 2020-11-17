@@ -27,8 +27,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/opencontainers/go-digest"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
@@ -83,104 +81,6 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 	return err
 }
 
-func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("label", "com.docker.compose.project="+project.Name),
-			filters.Arg("label", "com.docker.compose.service="+service.Name),
-		),
-	})
-	if err != nil {
-		return err
-	}
-
-	expected, err := jsonHash(s)
-	if err != nil {
-		return err
-	}
-
-	w := progress.ContextWriter(ctx)
-	if len(actual) == 0 {
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Working,
-			StatusText: "Create",
-			Done:       false,
-		})
-		name := fmt.Sprintf("%s_%s", project.Name, service.Name)
-		err = s.runContainer(ctx, project, service, name, nil)
-		if err != nil {
-			return err
-		}
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Done,
-			StatusText: "Created",
-			Done:       true,
-		})
-		return nil
-	}
-
-	container := actual[0]
-	diverged := container.Labels["com.docker.compose.config-hash"] != expected
-	if diverged {
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Working,
-			StatusText: "Recreate",
-			Done:       false,
-		})
-		err := s.containerService.Stop(ctx, container.ID, nil)
-		if err != nil {
-			return err
-		}
-		name := getContainerName(container)
-		tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
-		err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
-		if err != nil {
-			return err
-		}
-		err = s.runContainer(ctx, project, service, name, &container)
-		if err != nil {
-			return err
-		}
-		err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
-		if err != nil {
-			return err
-		}
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Service %q", service.Name),
-			Status:     progress.Done,
-			StatusText: "Recreated",
-			Done:       true,
-		})
-		return nil
-	}
-
-	if container.State == "running" {
-		// already running, skip
-		return nil
-	}
-
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Working,
-		StatusText: "Restart",
-		Done:       false,
-	})
-	err = s.containerService.Start(ctx, container.ID)
-	if err != nil {
-		return err
-	}
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Done,
-		StatusText: "Restarted",
-		Done:       true,
-	})
-	return nil
-}
-
 func getContainerName(c moby.Container) string {
 	// Names return container canonical name /foo  + link aliases /linked_by/foo
 	for _, name := range c.Names {
@@ -189,29 +89,6 @@ func getContainerName(c moby.Container) string {
 		}
 	}
 	return c.Names[0][1:]
-}
-
-func (s *local) runContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, container *moby.Container) error {
-	containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service, container)
-	if err != nil {
-		return err
-	}
-	id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
-	if err != nil {
-		return err
-	}
-	for net := range service.Networks {
-		name := fmt.Sprintf("%s_%s", project.Name, net)
-		err = s.connectContainerToNetwork(ctx, id, service.Name, name)
-		if err != nil {
-			return err
-		}
-	}
-	err = s.containerService.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *local) applyPullPolicy(ctx context.Context, service types.ServiceConfig) error {
@@ -657,15 +534,6 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 	return nil
 }
 
-func (s *local) connectContainerToNetwork(ctx context.Context, id string, service string, n string) error {
-	err := s.containerService.apiClient.NetworkConnect(ctx, n, id, &network.EndpointSettings{
-		Aliases: []string{service},
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
 	// TODO could identify volume by label vs name
@@ -694,30 +562,4 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 		return err
 	}
 	return nil
-}
-
-func jsonHash(o interface{}) (string, error) {
-	bytes, err := json.Marshal(o)
-	if err != nil {
-		return "", nil
-	}
-	return digest.SHA256.FromBytes(bytes).String(), nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
-}
-
-func containsAll(slice []string, items []string) bool {
-	for _, i := range items {
-		if !contains(slice, i) {
-			return false
-		}
-	}
-	return true
 }
