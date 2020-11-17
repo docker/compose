@@ -86,13 +86,6 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		envVars = append(envVars, vars...)
 	}
 
-	var healthCmd []string
-	var healthInterval types.Duration
-	if len(r.HealthCmd) > 0 {
-		healthCmd = strings.Split(r.HealthCmd, " ")
-		healthInterval = types.Duration(r.HealthInterval)
-	}
-
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
@@ -106,12 +99,24 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		RestartPolicyCondition: restartPolicy,
 		DomainName:             r.DomainName,
 		AutoRemove:             r.Rm,
-		Healthcheck: containers.Healthcheck{
-			Disable:  len(healthCmd) == 0,
-			Test:     healthCmd,
-			Interval: healthInterval,
-		},
+		Healthcheck:            r.toHealthcheck(),
 	}, nil
+}
+
+func (r *Opts) toHealthcheck() containers.Healthcheck {
+	var healthCmd []string
+
+	if len(r.HealthCmd) > 0 {
+		healthCmd = strings.Split(r.HealthCmd, " ")
+	}
+	return containers.Healthcheck{
+		Disable:     len(healthCmd) == 0,
+		Test:        healthCmd,
+		Interval:    types.Duration(r.HealthInterval),
+		StartPeriod: types.Duration(r.HealthStartPeriod),
+		Timeout:     types.Duration(r.HealthTimeout),
+		Retries:     r.HealthRetries,
+	}
 }
 
 var restartPolicyMap = map[string]string{

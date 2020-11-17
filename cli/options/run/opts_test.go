@@ -20,7 +20,9 @@ import (
 	"errors"
 	"regexp"
 	"testing"
+	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
@@ -226,4 +228,32 @@ func TestValidateRestartPolicy(t *testing.T) {
 		}
 		assert.Equal(t, testCase.expected, result)
 	}
+}
+
+func TestToHealthcheck(t *testing.T) {
+	testOpt := Opts{
+		HealthCmd: "curl",
+	}
+
+	assert.DeepEqual(t, testOpt.toHealthcheck(), containers.Healthcheck{
+		Disable: false,
+		Test:    []string{"curl"},
+	})
+
+	testOpt = Opts{
+		HealthCmd:         "curl",
+		HealthRetries:     3,
+		HealthInterval:    5 * time.Second,
+		HealthTimeout:     2 * time.Second,
+		HealthStartPeriod: 10 * time.Second,
+	}
+
+	assert.DeepEqual(t, testOpt.toHealthcheck(), containers.Healthcheck{
+		Disable:     false,
+		Test:        []string{"curl"},
+		Retries:     3,
+		Interval:    types.Duration(5 * time.Second),
+		StartPeriod: types.Duration(10 * time.Second),
+		Timeout:     types.Duration(2 * time.Second),
+	})
 }

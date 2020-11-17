@@ -98,7 +98,7 @@ func TestContainerGroupToContainer(t *testing.T) {
 					}),
 				},
 				PeriodSeconds:       to.Int32Ptr(10),
-				SuccessThreshold:    to.Int32Ptr(3),
+				FailureThreshold:    to.Int32Ptr(3),
 				InitialDelaySeconds: to.Int32Ptr(2),
 				TimeoutSeconds:      to.Int32Ptr(1),
 			},
@@ -178,7 +178,7 @@ func TestHealthcheckTranslation(t *testing.T) {
 		assert.NilError(t, err)
 		assert.DeepEqual(t, (*group.Containers)[0].LivenessProbe.Exec.Command, to.StringSlicePtr(test))
 		assert.Equal(t, *(*group.Containers)[0].LivenessProbe.PeriodSeconds, int32(10))
-		assert.Equal(t, *(*group.Containers)[0].LivenessProbe.SuccessThreshold, int32(42))
+		assert.Assert(t, (*group.Containers)[0].LivenessProbe.SuccessThreshold == nil)
 		assert.Equal(t, *(*group.Containers)[0].LivenessProbe.FailureThreshold, int32(42))
 		assert.Equal(t, *(*group.Containers)[0].LivenessProbe.InitialDelaySeconds, int32(2))
 		assert.Equal(t, *(*group.Containers)[0].LivenessProbe.TimeoutSeconds, int32(3))

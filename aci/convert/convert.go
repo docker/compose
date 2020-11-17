@@ -272,7 +272,6 @@ func (s serviceConfigAciHelper) getLivenessProbe() *containerinstance.ContainerP
 		}
 		if retries != nil && *retries > 0 {
 			probe.FailureThreshold = retries
-			probe.SuccessThreshold = retries
 		}
 		return &probe
 	}
@@ -365,8 +364,8 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 			if cc.LivenessProbe.PeriodSeconds != nil {
 				healthcheck.Interval = types.Duration(int64(*cc.LivenessProbe.PeriodSeconds) * int64(time.Second))
 			}
-			if cc.LivenessProbe.SuccessThreshold != nil {
-				healthcheck.Retries = int(*cc.LivenessProbe.SuccessThreshold)
+			if cc.LivenessProbe.FailureThreshold != nil {
+				healthcheck.Retries = int(*cc.LivenessProbe.FailureThreshold)
 			}
 			if cc.LivenessProbe.TimeoutSeconds != nil {
 				healthcheck.Timeout = types.Duration(int64(*cc.LivenessProbe.TimeoutSeconds) * int64(time.Second))
