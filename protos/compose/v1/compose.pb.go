@@ -111,6 +111,8 @@ type ComposeUpResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	ProjectName string `protobuf:"bytes,1,opt,name=projectName,proto3" json:"projectName,omitempty"`
 }
 
 func (x *ComposeUpResponse) Reset() {
@@ -145,10 +147,21 @@ func (*ComposeUpResponse) Descriptor() ([]byte, []int) {
 	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{1}
 }
 
+func (x *ComposeUpResponse) GetProjectName() string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return ""
+}
+
 type ComposeDownRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	ProjectName string   `protobuf:"bytes,1,opt,name=projectName,proto3" json:"projectName,omitempty"`
+	WorkDir     string   `protobuf:"bytes,2,opt,name=workDir,proto3" json:"workDir,omitempty"`
+	Files       []string `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
 }
 
 func (x *ComposeDownRequest) Reset() {
@@ -183,10 +196,33 @@ func (*ComposeDownRequest) Descriptor() ([]byte, []int) {
 	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *ComposeDownRequest) GetProjectName() string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return ""
+}
+
+func (x *ComposeDownRequest) GetWorkDir() string {
+	if x != nil {
+		return x.WorkDir
+	}
+	return ""
+}
+
+func (x *ComposeDownRequest) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
 type ComposeDownResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	ProjectName string `protobuf:"bytes,1,opt,name=projectName,proto3" json:"projectName,omitempty"`
 }
 
 func (x *ComposeDownResponse) Reset() {
@@ -221,6 +257,367 @@ func (*ComposeDownResponse) Descriptor() ([]byte, []int) {
 	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{3}
 }
 
+func (x *ComposeDownResponse) GetProjectName() string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return ""
+}
+
+type ComposeListRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ProjectName string `protobuf:"bytes,1,opt,name=projectName,proto3" json:"projectName,omitempty"`
+}
+
+func (x *ComposeListRequest) Reset() {
+	*x = ComposeListRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ComposeListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComposeListRequest) ProtoMessage() {}
+
+func (x *ComposeListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComposeListRequest.ProtoReflect.Descriptor instead.
+func (*ComposeListRequest) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ComposeListRequest) GetProjectName() string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return ""
+}
+
+type ComposeListResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Stacks []*Stack `protobuf:"bytes,1,rep,name=stacks,proto3" json:"stacks,omitempty"`
+}
+
+func (x *ComposeListResponse) Reset() {
+	*x = ComposeListResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ComposeListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComposeListResponse) ProtoMessage() {}
+
+func (x *ComposeListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComposeListResponse.ProtoReflect.Descriptor instead.
+func (*ComposeListResponse) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ComposeListResponse) GetStacks() []*Stack {
+	if x != nil {
+		return x.Stacks
+	}
+	return nil
+}
+
+type Stack struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id     string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name   string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Status string `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Reason string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+}
+
+func (x *Stack) Reset() {
+	*x = Stack{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Stack) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Stack) ProtoMessage() {}
+
+func (x *Stack) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Stack.ProtoReflect.Descriptor instead.
+func (*Stack) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Stack) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Stack) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Stack) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Stack) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ComposePsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ProjectName string   `protobuf:"bytes,1,opt,name=projectName,proto3" json:"projectName,omitempty"`
+	WorkDir     string   `protobuf:"bytes,2,opt,name=workDir,proto3" json:"workDir,omitempty"`
+	Files       []string `protobuf:"bytes,3,rep,name=files,proto3" json:"files,omitempty"`
+}
+
+func (x *ComposePsRequest) Reset() {
+	*x = ComposePsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ComposePsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComposePsRequest) ProtoMessage() {}
+
+func (x *ComposePsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComposePsRequest.ProtoReflect.Descriptor instead.
+func (*ComposePsRequest) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ComposePsRequest) GetProjectName() string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return ""
+}
+
+func (x *ComposePsRequest) GetWorkDir() string {
+	if x != nil {
+		return x.WorkDir
+	}
+	return ""
+}
+
+func (x *ComposePsRequest) GetFiles() []string {
+	if x != nil {
+		return x.Files
+	}
+	return nil
+}
+
+type ComposePsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Services []*Service `protobuf:"bytes,1,rep,name=services,proto3" json:"services,omitempty"`
+}
+
+func (x *ComposePsResponse) Reset() {
+	*x = ComposePsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ComposePsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ComposePsResponse) ProtoMessage() {}
+
+func (x *ComposePsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ComposePsResponse.ProtoReflect.Descriptor instead.
+func (*ComposePsResponse) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ComposePsResponse) GetServices() []*Service {
+	if x != nil {
+		return x.Services
+	}
+	return nil
+}
+
+type Service struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id       string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name     string   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Replicas uint32   `protobuf:"varint,3,opt,name=replicas,proto3" json:"replicas,omitempty"`
+	Desired  uint32   `protobuf:"varint,4,opt,name=desired,proto3" json:"desired,omitempty"`
+	Ports    []string `protobuf:"bytes,5,rep,name=Ports,proto3" json:"Ports,omitempty"`
+}
+
+func (x *Service) Reset() {
+	*x = Service{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_protos_compose_v1_compose_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Service) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Service) ProtoMessage() {}
+
+func (x *Service) ProtoReflect() protoreflect.Message {
+	mi := &file_protos_compose_v1_compose_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Service.ProtoReflect.Descriptor instead.
+func (*Service) Descriptor() ([]byte, []int) {
+	return file_protos_compose_v1_compose_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Service) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Service) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Service) GetReplicas() uint32 {
+	if x != nil {
+		return x.Replicas
+	}
+	return 0
+}
+
+func (x *Service) GetDesired() uint32 {
+	if x != nil {
+		return x.Desired
+	}
+	return 0
+}
+
+func (x *Service) GetPorts() []string {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
+}
+
 var File_protos_compose_v1_compose_proto protoreflect.FileDescriptor
 
 var file_protos_compose_v1_compose_proto_rawDesc = []byte{
@@ -234,11 +631,55 @@ var file_protos_compose_v1_compose_proto_rawDesc = []byte{
 	0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x77, 0x6f, 0x72,
 	0x6b, 0x44, 0x69, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x77, 0x6f, 0x72, 0x6b,
 	0x44, 0x69, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03,
-	0x28, 0x09, 0x52, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x22, 0x13, 0x0a, 0x11, 0x43, 0x6f, 0x6d,
-	0x70, 0x6f, 0x73, 0x65, 0x55, 0x70, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x14,
-	0x0a, 0x12, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x44, 0x6f, 0x77, 0x6e, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x22, 0x15, 0x0a, 0x13, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x44,
-	0x6f, 0x77, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x32, 0xed, 0x01, 0x0a, 0x07,
+	0x28, 0x09, 0x52, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x22, 0x35, 0x0a, 0x11, 0x43, 0x6f, 0x6d,
+	0x70, 0x6f, 0x73, 0x65, 0x55, 0x70, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x20,
+	0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65,
+	0x22, 0x66, 0x0a, 0x12, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x44, 0x6f, 0x77, 0x6e, 0x52,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63,
+	0x74, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x72, 0x6f,
+	0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x77, 0x6f, 0x72, 0x6b,
+	0x44, 0x69, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x77, 0x6f, 0x72, 0x6b, 0x44,
+	0x69, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28,
+	0x09, 0x52, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x22, 0x37, 0x0a, 0x13, 0x43, 0x6f, 0x6d, 0x70,
+	0x6f, 0x73, 0x65, 0x44, 0x6f, 0x77, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x20, 0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d,
+	0x65, 0x22, 0x36, 0x0a, 0x12, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x4c, 0x69, 0x73, 0x74,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65,
+	0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x72,
+	0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d, 0x65, 0x22, 0x56, 0x0a, 0x13, 0x43, 0x6f, 0x6d,
+	0x70, 0x6f, 0x73, 0x65, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x12, 0x3f, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x63, 0x6b, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x27, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70,
+	0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65,
+	0x2e, 0x76, 0x31, 0x2e, 0x53, 0x74, 0x61, 0x63, 0x6b, 0x52, 0x06, 0x73, 0x74, 0x61, 0x63, 0x6b,
+	0x73, 0x22, 0x5b, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x63, 0x6b, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61,
+	0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x16,
+	0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06,
+	0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x22, 0x64,
+	0x0a, 0x10, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x50, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e, 0x61, 0x6d,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74,
+	0x4e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x77, 0x6f, 0x72, 0x6b, 0x44, 0x69, 0x72, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x77, 0x6f, 0x72, 0x6b, 0x44, 0x69, 0x72, 0x12, 0x14,
+	0x0a, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x66,
+	0x69, 0x6c, 0x65, 0x73, 0x22, 0x5a, 0x0a, 0x11, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x50,
+	0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x45, 0x0a, 0x08, 0x73, 0x65, 0x72,
+	0x76, 0x69, 0x63, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x29, 0x2e, 0x63, 0x6f,
+	0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x53,
+	0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x52, 0x08, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73,
+	0x22, 0x79, 0x0a, 0x07, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69,
+	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12,
+	0x1a, 0x0a, 0x08, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x0d, 0x52, 0x08, 0x72, 0x65, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x64,
+	0x65, 0x73, 0x69, 0x72, 0x65, 0x64, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x07, 0x64, 0x65,
+	0x73, 0x69, 0x72, 0x65, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x50, 0x6f, 0x72, 0x74, 0x73, 0x18, 0x05,
+	0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x50, 0x6f, 0x72, 0x74, 0x73, 0x32, 0xd9, 0x03, 0x0a, 0x07,
 	0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x12, 0x6d, 0x0a, 0x02, 0x55, 0x70, 0x12, 0x32, 0x2e,
 	0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70,
 	0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76, 0x31,
@@ -253,11 +694,26 @@ var file_protos_compose_v1_compose_proto_rawDesc = []byte{
 	0x75, 0x65, 0x73, 0x74, 0x1a, 0x35, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65,
 	0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d,
 	0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x44,
-	0x6f, 0x77, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x34, 0x5a, 0x32, 0x67,
-	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72,
-	0x2f, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2d, 0x63, 0x6c, 0x69, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x73, 0x2f, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2f, 0x76, 0x31, 0x3b, 0x76,
-	0x31, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6f, 0x77, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x75, 0x0a, 0x06, 0x53,
+	0x74, 0x61, 0x63, 0x6b, 0x73, 0x12, 0x34, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b,
+	0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f,
+	0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65,
+	0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x35, 0x2e, 0x63, 0x6f,
+	0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x43,
+	0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x4c, 0x69, 0x73, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x73, 0x0a, 0x08, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x12, 0x32,
+	0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e, 0x61, 0x70, 0x69, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2e, 0x76,
+	0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x50, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x33, 0x2e, 0x63, 0x6f, 0x6d, 0x2e, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2e,
+	0x61, 0x70, 0x69, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x63, 0x6f, 0x6d, 0x70, 0x6f,
+	0x73, 0x65, 0x2e, 0x76, 0x31, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x50, 0x73, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x42, 0x34, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x6f, 0x63, 0x6b, 0x65, 0x72, 0x2f, 0x63, 0x6f, 0x6d,
+	0x70, 0x6f, 0x73, 0x65, 0x2d, 0x63, 0x6c, 0x69, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2f,
+	0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x73, 0x65, 0x2f, 0x76, 0x31, 0x3b, 0x76, 0x31, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -272,23 +728,35 @@ func file_protos_compose_v1_compose_proto_rawDescGZIP() []byte {
 	return file_protos_compose_v1_compose_proto_rawDescData
 }
 
-var file_protos_compose_v1_compose_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_protos_compose_v1_compose_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_protos_compose_v1_compose_proto_goTypes = []interface{}{
 	(*ComposeUpRequest)(nil),    // 0: com.docker.api.protos.compose.v1.ComposeUpRequest
 	(*ComposeUpResponse)(nil),   // 1: com.docker.api.protos.compose.v1.ComposeUpResponse
 	(*ComposeDownRequest)(nil),  // 2: com.docker.api.protos.compose.v1.ComposeDownRequest
 	(*ComposeDownResponse)(nil), // 3: com.docker.api.protos.compose.v1.ComposeDownResponse
+	(*ComposeListRequest)(nil),  // 4: com.docker.api.protos.compose.v1.ComposeListRequest
+	(*ComposeListResponse)(nil), // 5: com.docker.api.protos.compose.v1.ComposeListResponse
+	(*Stack)(nil),               // 6: com.docker.api.protos.compose.v1.Stack
+	(*ComposePsRequest)(nil),    // 7: com.docker.api.protos.compose.v1.ComposePsRequest
+	(*ComposePsResponse)(nil),   // 8: com.docker.api.protos.compose.v1.ComposePsResponse
+	(*Service)(nil),             // 9: com.docker.api.protos.compose.v1.Service
 }
 var file_protos_compose_v1_compose_proto_depIdxs = []int32{
-	0, // 0: com.docker.api.protos.compose.v1.Compose.Up:input_type -> com.docker.api.protos.compose.v1.ComposeUpRequest
-	2, // 1: com.docker.api.protos.compose.v1.Compose.Down:input_type -> com.docker.api.protos.compose.v1.ComposeDownRequest
-	1, // 2: com.docker.api.protos.compose.v1.Compose.Up:output_type -> com.docker.api.protos.compose.v1.ComposeUpResponse
-	3, // 3: com.docker.api.protos.compose.v1.Compose.Down:output_type -> com.docker.api.protos.compose.v1.ComposeDownResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	6, // 0: com.docker.api.protos.compose.v1.ComposeListResponse.stacks:type_name -> com.docker.api.protos.compose.v1.Stack
+	9, // 1: com.docker.api.protos.compose.v1.ComposePsResponse.services:type_name -> com.docker.api.protos.compose.v1.Service
+	0, // 2: com.docker.api.protos.compose.v1.Compose.Up:input_type -> com.docker.api.protos.compose.v1.ComposeUpRequest
+	2, // 3: com.docker.api.protos.compose.v1.Compose.Down:input_type -> com.docker.api.protos.compose.v1.ComposeDownRequest
+	4, // 4: com.docker.api.protos.compose.v1.Compose.Stacks:input_type -> com.docker.api.protos.compose.v1.ComposeListRequest
+	7, // 5: com.docker.api.protos.compose.v1.Compose.Services:input_type -> com.docker.api.protos.compose.v1.ComposePsRequest
+	1, // 6: com.docker.api.protos.compose.v1.Compose.Up:output_type -> com.docker.api.protos.compose.v1.ComposeUpResponse
+	3, // 7: com.docker.api.protos.compose.v1.Compose.Down:output_type -> com.docker.api.protos.compose.v1.ComposeDownResponse
+	5, // 8: com.docker.api.protos.compose.v1.Compose.Stacks:output_type -> com.docker.api.protos.compose.v1.ComposeListResponse
+	8, // 9: com.docker.api.protos.compose.v1.Compose.Services:output_type -> com.docker.api.protos.compose.v1.ComposePsResponse
+	6, // [6:10] is the sub-list for method output_type
+	2, // [2:6] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_protos_compose_v1_compose_proto_init() }
@@ -345,6 +813,78 @@ func file_protos_compose_v1_compose_proto_init() {
 				return nil
 			}
 		}
+		file_protos_compose_v1_compose_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ComposeListRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_compose_v1_compose_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ComposeListResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_compose_v1_compose_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Stack); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_compose_v1_compose_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ComposePsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_compose_v1_compose_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ComposePsResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_protos_compose_v1_compose_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Service); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -352,7 +892,7 @@ func file_protos_compose_v1_compose_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_protos_compose_v1_compose_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -380,6 +920,8 @@ const _ = grpc.SupportPackageIsVersion6
 type ComposeClient interface {
 	Up(ctx context.Context, in *ComposeUpRequest, opts ...grpc.CallOption) (*ComposeUpResponse, error)
 	Down(ctx context.Context, in *ComposeDownRequest, opts ...grpc.CallOption) (*ComposeDownResponse, error)
+	Stacks(ctx context.Context, in *ComposeListRequest, opts ...grpc.CallOption) (*ComposeListResponse, error)
+	Services(ctx context.Context, in *ComposePsRequest, opts ...grpc.CallOption) (*ComposePsResponse, error)
 }
 
 type composeClient struct {
@@ -408,10 +950,30 @@ func (c *composeClient) Down(ctx context.Context, in *ComposeDownRequest, opts .
 	return out, nil
 }
 
+func (c *composeClient) Stacks(ctx context.Context, in *ComposeListRequest, opts ...grpc.CallOption) (*ComposeListResponse, error) {
+	out := new(ComposeListResponse)
+	err := c.cc.Invoke(ctx, "/com.docker.api.protos.compose.v1.Compose/Stacks", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *composeClient) Services(ctx context.Context, in *ComposePsRequest, opts ...grpc.CallOption) (*ComposePsResponse, error) {
+	out := new(ComposePsResponse)
+	err := c.cc.Invoke(ctx, "/com.docker.api.protos.compose.v1.Compose/Services", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ComposeServer is the server API for Compose service.
 type ComposeServer interface {
 	Up(context.Context, *ComposeUpRequest) (*ComposeUpResponse, error)
 	Down(context.Context, *ComposeDownRequest) (*ComposeDownResponse, error)
+	Stacks(context.Context, *ComposeListRequest) (*ComposeListResponse, error)
+	Services(context.Context, *ComposePsRequest) (*ComposePsResponse, error)
 }
 
 // UnimplementedComposeServer can be embedded to have forward compatible implementations.
@@ -423,6 +985,12 @@ func (*UnimplementedComposeServer) Up(context.Context, *ComposeUpRequest) (*Comp
 }
 func (*UnimplementedComposeServer) Down(context.Context, *ComposeDownRequest) (*ComposeDownResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Down not implemented")
+}
+func (*UnimplementedComposeServer) Stacks(context.Context, *ComposeListRequest) (*ComposeListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stacks not implemented")
+}
+func (*UnimplementedComposeServer) Services(context.Context, *ComposePsRequest) (*ComposePsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Services not implemented")
 }
 
 func RegisterComposeServer(s *grpc.Server, srv ComposeServer) {
@@ -465,6 +1033,42 @@ func _Compose_Down_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Compose_Stacks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ComposeListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ComposeServer).Stacks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/com.docker.api.protos.compose.v1.Compose/Stacks",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ComposeServer).Stacks(ctx, req.(*ComposeListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Compose_Services_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ComposePsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ComposeServer).Services(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/com.docker.api.protos.compose.v1.Compose/Services",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ComposeServer).Services(ctx, req.(*ComposePsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Compose_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "com.docker.api.protos.compose.v1.Compose",
 	HandlerType: (*ComposeServer)(nil),
@@ -476,6 +1080,14 @@ var _Compose_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Down",
 			Handler:    _Compose_Down_Handler,
+		},
+		{
+			MethodName: "Stacks",
+			Handler:    _Compose_Stacks_Handler,
+		},
+		{
+			MethodName: "Services",
+			Handler:    _Compose_Services_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

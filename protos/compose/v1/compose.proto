@@ -22,6 +22,8 @@ option go_package = "github.com/docker/compose-cli/protos/compose/v1;v1";
 service Compose {
   rpc Up(ComposeUpRequest) returns (ComposeUpResponse);
   rpc Down(ComposeDownRequest) returns (ComposeDownResponse);
+  rpc Stacks(ComposeListRequest)returns (ComposeListResponse);
+  rpc Services(ComposePsRequest)returns (ComposePsResponse);
 }
 
 message ComposeUpRequest {
@@ -31,10 +33,48 @@ message ComposeUpRequest {
 }
 
 message ComposeUpResponse {
+  string projectName = 1;
 }
 
 message ComposeDownRequest {
+  string projectName = 1;
+  string workDir = 2;
+  repeated string files = 3;
 }
 
 message ComposeDownResponse {
+  string projectName = 1;
+}
+
+message ComposeListRequest {
+  string projectName = 1;
+}
+
+message ComposeListResponse {
+  repeated Stack stacks = 1;
+}
+
+message Stack {
+	string id = 1;
+	string name = 2;
+	string status = 3;
+	string reason = 4;
+}
+
+message ComposePsRequest {
+  string projectName = 1;
+  string workDir = 2;
+  repeated string files = 3;
+}
+
+message ComposePsResponse {
+  repeated Service services = 1;
+}
+
+message Service {
+  string id = 1;
+	string name = 2;
+	uint32 replicas = 3;
+	uint32 desired = 4;
+	repeated string Ports = 5;
 }
