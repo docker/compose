@@ -34,3 +34,7 @@ const (
 func projectFilter(projectName string) filters.KeyValuePair {
 	return filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, projectName))
 }
+
+func hasProjectLabelFilter() filters.KeyValuePair {
+	return filters.Arg("label", projectLabel)
+}
