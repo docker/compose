@@ -4,6 +4,9 @@ aci:
 ecs:
   - ecs/**/*
 
+local:
+  - local/**/*
+
 cli:
   - cli/**/*
 
