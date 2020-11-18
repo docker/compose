@@ -21,6 +21,8 @@ package local
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/progress"
@@ -28,7 +30,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
-	"strconv"
 )
 
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
@@ -228,7 +229,6 @@ func (s *local) runContainer(ctx context.Context, project *types.Project, servic
 	}
 	return nil
 }
-
 
 func (s *local) connectContainerToNetwork(ctx context.Context, id string, service string, n string) error {
 	err := s.containerService.apiClient.NetworkConnect(ctx, n, id, &network.EndpointSettings{

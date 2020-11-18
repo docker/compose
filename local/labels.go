@@ -20,13 +20,14 @@ package local
 
 import (
 	"fmt"
+
 	"github.com/docker/docker/api/types/filters"
 )
 
 const (
-	projectLabel = "com.docker.compose.project"
-	serviceLabel = "com.docker.compose.service"
-	configHashLabel = "com.docker.compose.config-hash"
+	projectLabel         = "com.docker.compose.project"
+	serviceLabel         = "com.docker.compose.service"
+	configHashLabel      = "com.docker.compose.config-hash"
 	containerNumberLabel = "com.docker.compose.container-number"
 )
 

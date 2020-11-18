@@ -22,7 +22,6 @@ import (
 	"os"
 )
 
-
 func init() {
 	testSocket, defined := os.LookupEnv("TEST_METRICS_SOCKET")
 	if defined {

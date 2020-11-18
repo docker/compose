@@ -72,6 +72,7 @@ cache-clear: ## Clear the builder cache
 
 lint: ## run linter(s)
 	@docker build . \
+	--build-arg BUILD_TAGS=example,local,e2e \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 

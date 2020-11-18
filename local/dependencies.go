@@ -20,15 +20,16 @@ package local
 
 import (
 	"context"
+
 	"github.com/compose-spec/compose-go/types"
 	"golang.org/x/sync/errgroup"
 )
 
 func inDependencyOrder(ctx context.Context, project *types.Project, fn func(types.ServiceConfig) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 	var (
 		scheduled []string
-		ready []string
+		ready     []string
 	)
 	results := make(chan string)
 	for len(ready) < len(project.Services) {
