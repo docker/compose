@@ -25,15 +25,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func inDependencyOrder(ctx context.Context, project *types.Project, fn func(types.ServiceConfig) error) error {
-	eg, _ := errgroup.WithContext(ctx)
+func inDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
 	var (
 		scheduled []string
 		ready     []string
 	)
+	services := sortByDependency(project.Services)
+
 	results := make(chan string)
-	for len(ready) < len(project.Services) {
-		for _, service := range project.Services {
+	errors := make(chan error)
+	eg, ctx := errgroup.WithContext(ctx)
+	for len(ready) < len(services) {
+		for _, service := range services {
 			if contains(scheduled, service.Name) {
 				continue
 			}
@@ -41,9 +44,9 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(type
 				service := service
 				scheduled = append(scheduled, service.Name)
 				eg.Go(func() error {
-					err := fn(service)
+					err := fn(ctx, service)
 					if err != nil {
-						close(results)
+						errors <- err
 						return err
 					}
 					results <- service.Name
@@ -51,11 +54,30 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(type
 				})
 			}
 		}
-		result, ok := <-results
-		if !ok {
-			break
+		select {
+		case result := <-results:
+			ready = append(ready, result)
+		case err := <-errors:
+			return err
 		}
-		ready = append(ready, result)
 	}
 	return eg.Wait()
+}
+
+// sortByDependency sort a Service slice so it can be processed in respect to dependency ordering
+func sortByDependency(services types.Services) types.Services {
+	var sorted types.Services
+	var done []string
+	for len(sorted) < len(services) {
+		for _, s := range services {
+			if contains(done, s.Name) {
+				continue
+			}
+			if containsAll(done, s.GetDependencies()) {
+				sorted = append(sorted, s)
+				done = append(done, s.Name)
+			}
+		}
+	}
+	return sorted
 }

@@ -79,8 +79,8 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 
-	err := inDependencyOrder(ctx, project, func(service types.ServiceConfig) error {
-		return s.ensureService(ctx, project, service)
+	err := inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		return s.ensureService(c, project, service)
 	})
 	return err
 }

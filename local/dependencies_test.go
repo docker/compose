@@ -49,7 +49,7 @@ func TestInDependencyOrder(t *testing.T) {
 		},
 	}
 	//nolint:errcheck, unparam
-	go inDependencyOrder(context.TODO(), &project, func(config types.ServiceConfig) error {
+	go inDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
 		order <- config.Name
 		return nil
 	})

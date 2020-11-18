@@ -33,6 +33,11 @@ import (
 	"github.com/docker/compose-cli/progress"
 )
 
+const (
+	extLifecycle  = "x-lifecycle"
+	forceRecreate = "force_recreate"
+)
+
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
@@ -80,10 +85,11 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 	if err != nil {
 		return err
 	}
+
 	for _, container := range actual {
 		container := container
 		diverged := container.Labels[configHashLabel] != expected
-		if diverged {
+		if diverged || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
 				return s.recreateContainer(ctx, project, service, container)
 			})
@@ -184,7 +190,18 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 		StatusText: "Recreated",
 		Done:       true,
 	})
+	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
+}
+
+// setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
+func setDependentLifecycle(project *types.Project, service string, strategy string) {
+	for i, s := range project.Services {
+		if contains(s.GetDependencies(), service) {
+			s.Extensions[extLifecycle] = strategy
+			project.Services[i] = s
+		}
+	}
 }
 
 func (s *local) restartContainer(ctx context.Context, service types.ServiceConfig, container moby.Container) error {
