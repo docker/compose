@@ -43,11 +43,13 @@ FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS lint-base
 FROM base AS lint
 ENV CGO_ENABLED=0
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
+ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/.cache/golangci-lint \
+    BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile lint
 

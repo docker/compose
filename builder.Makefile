@@ -39,6 +39,7 @@ WORK_DIR:=$(shell mktemp -d)
 TAGS:=
 ifdef BUILD_TAGS
   TAGS=-tags $(BUILD_TAGS)
+  LINT_TAGS=--build-tags $(BUILD_TAGS)
 endif
 
 TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ --transform s/docker-linux-amd64/docker/ --transform s/docker-darwin-amd64/docker/
@@ -68,7 +69,7 @@ test:
 
 .PHONY: lint
 lint:
-	golangci-lint run --timeout 10m0s ./...
+	golangci-lint run $(LINT_TAGS) --timeout 10m0s ./...
 
 .PHONY: import-restrictions
 import-restrictions:
