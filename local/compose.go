@@ -22,12 +22,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
@@ -222,11 +223,11 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 	consumer := formatter.NewLogConsumer(w)
 	for _, c := range list {
 		service := c.Labels[serviceLabel]
-		containerId := c.ID
+		containerID := c.ID
 		go func() {
-			s.containerService.Logs(ctx,containerId, containers.LogsRequest{
+			_ = s.containerService.Logs(ctx, containerID, containers.LogsRequest{
 				Follow: true,
-				Writer: consumer.GetWriter(service, containerId),
+				Writer: consumer.GetWriter(service, containerID),
 			})
 			wg.Done()
 		}()
@@ -260,7 +261,6 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 	return status, nil
 }
 
-
 func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
 	_, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{All: true})
 	if err != nil {
@@ -288,9 +288,9 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		return nil, nil, nil, err
 	}
 	labels := map[string]string{
-		projectLabel:     p.Name,
-		serviceLabel:     s.Name,
-		configHashLabel: hash,
+		projectLabel:         p.Name,
+		serviceLabel:         s.Name,
+		configHashLabel:      hash,
 		containerNumberLabel: strconv.Itoa(number),
 	}
 
@@ -340,15 +340,8 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		// StopTimeout: 	 s.StopGracePeriod FIXME conversion
 	}
 
-	mountOptions, err := buildContainerMountOptions(p, s, inherit)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	bindings, err := buildContainerBindingOptions(s)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	mountOptions := buildContainerMountOptions(p, s, inherit)
+	bindings := buildContainerBindingOptions(s)
 
 	networkMode := getNetworkMode(p, s)
 	hostConfig := container.HostConfig{
@@ -376,7 +369,7 @@ func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
 	return ports
 }
 
-func buildContainerBindingOptions(s types.ServiceConfig) (nat.PortMap, error) {
+func buildContainerBindingOptions(s types.ServiceConfig) nat.PortMap {
 	bindings := nat.PortMap{}
 	for _, port := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
@@ -388,10 +381,10 @@ func buildContainerBindingOptions(s types.ServiceConfig) (nat.PortMap, error) {
 		bind = append(bind, binding)
 		bindings[p] = bind
 	}
-	return bindings, nil
+	return bindings
 }
 
-func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) []mount.Mount {
 	mounts := []mount.Mount{}
 	var inherited []string
 	if inherit != nil {
@@ -434,7 +427,7 @@ func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit
 			TmpfsOptions:  buildTmpfsOptions(v.Tmpfs),
 		})
 	}
-	return mounts, nil
+	return mounts
 }
 
 func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
@@ -561,9 +554,8 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				Done:       true,
 			})
 			return nil
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }

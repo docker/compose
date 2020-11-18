@@ -20,8 +20,9 @@ package local
 
 import (
 	"context"
-	"gotest.tools/v3/assert"
 	"testing"
+
+	"gotest.tools/v3/assert"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -31,27 +32,28 @@ func TestInDependencyOrder(t *testing.T) {
 	project := types.Project{
 		Services: []types.ServiceConfig{
 			{
-				Name:            "test1",
+				Name: "test1",
 				DependsOn: map[string]types.ServiceDependency{
 					"test2": {},
 				},
 			},
 			{
-				Name:            "test2",
+				Name: "test2",
 				DependsOn: map[string]types.ServiceDependency{
 					"test3": {},
 				},
 			},
 			{
-				Name:            "test3",
+				Name: "test3",
 			},
 		},
 	}
+	//nolint:errcheck, unparam
 	go inDependencyOrder(context.TODO(), &project, func(config types.ServiceConfig) error {
 		order <- config.Name
 		return nil
 	})
-	assert.Equal(t, <- order, "test3")
-	assert.Equal(t, <- order, "test2")
-	assert.Equal(t, <- order, "test1")
+	assert.Equal(t, <-order, "test3")
+	assert.Equal(t, <-order, "test2")
+	assert.Equal(t, <-order, "test1")
 }

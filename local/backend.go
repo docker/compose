@@ -20,6 +20,7 @@ package local
 
 import (
 	"context"
+
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -71,6 +72,3 @@ func (s *local) VolumeService() volumes.Service {
 func (s *local) ResourceService() resources.Service {
 	return nil
 }
-
-
-

@@ -20,13 +20,14 @@ package local
 
 import (
 	"encoding/json"
+
 	"github.com/opencontainers/go-digest"
 )
 
 func jsonHash(o interface{}) (string, error) {
 	bytes, err := json.Marshal(o)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	return digest.SHA256.FromBytes(bytes).String(), nil
 }
