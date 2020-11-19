@@ -101,7 +101,7 @@ func toMobyEnv(environment compose.MappingWithEquals) []string {
 		if v == nil {
 			env = append(env, k)
 		} else {
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
+			env = append(env, fmt.Sprintf("%s=%s", k, *v))
 		}
 	}
 	return env

@@ -223,6 +223,9 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 func setDependentLifecycle(project *types.Project, service string, strategy string) {
 	for i, s := range project.Services {
 		if contains(s.GetDependencies(), service) {
+			if s.Extensions == nil {
+				s.Extensions = map[string]interface{}{}
+			}
 			s.Extensions[extLifecycle] = strategy
 			project.Services[i] = s
 		}
