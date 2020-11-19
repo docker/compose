@@ -26,37 +26,27 @@ import (
 )
 
 func inDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
-	var (
-		scheduled []string
-		ready     []string
-	)
-	services := sortByDependency(project.Services)
+	graph := buildDependencyGraph(project.Services)
 
+	eg, ctx := errgroup.WithContext(ctx)
 	results := make(chan string)
 	errors := make(chan error)
-	eg, ctx := errgroup.WithContext(ctx)
-	for len(ready) < len(services) {
-		for _, service := range services {
-			if contains(scheduled, service.Name) {
-				continue
-			}
-			if containsAll(ready, service.GetDependencies()) {
-				service := service
-				scheduled = append(scheduled, service.Name)
-				eg.Go(func() error {
-					err := fn(ctx, service)
-					if err != nil {
-						errors <- err
-						return err
-					}
-					results <- service.Name
-					return nil
-				})
-			}
+	for len(graph) > 0 {
+		for _, n := range graph.independents() {
+			service := n.service
+			eg.Go(func() error {
+				err := fn(ctx, service)
+				if err != nil {
+					errors <- err
+					return err
+				}
+				results <- service.Name
+				return nil
+			})
 		}
 		select {
 		case result := <-results:
-			ready = append(ready, result)
+			graph.resolved(result)
 		case err := <-errors:
 			return err
 		}
@@ -64,20 +54,60 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 	return eg.Wait()
 }
 
-// sortByDependency sort a Service slice so it can be processed in respect to dependency ordering
-func sortByDependency(services types.Services) types.Services {
-	var sorted types.Services
-	var done []string
-	for len(sorted) < len(services) {
-		for _, s := range services {
-			if contains(done, s.Name) {
-				continue
-			}
-			if containsAll(done, s.GetDependencies()) {
-				sorted = append(sorted, s)
-				done = append(done, s.Name)
-			}
+type dependencyGraph map[string]node
+
+type node struct {
+	service      types.ServiceConfig
+	dependencies []string
+	dependent    []string
+}
+
+func (d dependencyGraph) independents() []node {
+	var nodes []node
+	for _, node := range d {
+		if len(node.dependencies) == 0 {
+			nodes = append(nodes, node)
 		}
 	}
-	return sorted
+	return nodes
+}
+
+func (graph dependencyGraph) resolved(result string) {
+	for _, parent := range graph[result].dependent {
+		node := graph[parent]
+		node.dependencies = remove(node.dependencies, result)
+		graph[parent] = node
+	}
+	delete(graph, result)
+}
+
+func buildDependencyGraph(services types.Services) dependencyGraph {
+	graph := dependencyGraph{}
+	for _, s := range services {
+		graph[s.Name] = node{
+			service: s,
+		}
+	}
+
+	for _, s := range services {
+		node := graph[s.Name]
+		for _, name := range s.GetDependencies() {
+			dependency := graph[name]
+			node.dependencies = append(node.dependencies, name)
+			dependency.dependent = append(dependency.dependent, s.Name)
+			graph[name] = dependency
+		}
+		graph[s.Name] = node
+	}
+	return graph
+}
+
+func remove(slice []string, item string) []string {
+	var s []string
+	for _, i := range slice {
+		if i != item {
+			s = append(s, i)
+		}
+	}
+	return s
 }
