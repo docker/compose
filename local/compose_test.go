@@ -61,6 +61,47 @@ func TestContainersToStacks(t *testing.T) {
 	})
 }
 
+func TestContainersToServiceStatus(t *testing.T) {
+	containers := []types.Container{
+		{
+			ID:     "c1",
+			State:  "running",
+			Labels: map[string]string{serviceLabel: "service1"},
+		},
+		{
+			ID:     "c2",
+			State:  "exited",
+			Labels: map[string]string{serviceLabel: "service1"},
+		},
+		{
+			ID:     "c3",
+			State:  "running",
+			Labels: map[string]string{serviceLabel: "service1"},
+		},
+		{
+			ID:     "c4",
+			State:  "running",
+			Labels: map[string]string{serviceLabel: "service2"},
+		},
+	}
+	services, err := containersToServiceStatus(containers)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, services, []compose.ServiceStatus{
+		{
+			ID:       "service1",
+			Name:     "service1",
+			Replicas: 2,
+			Desired:  3,
+		},
+		{
+			ID:       "service2",
+			Name:     "service2",
+			Replicas: 1,
+			Desired:  1,
+		},
+	})
+}
+
 func TestStacksMixedStatus(t *testing.T) {
 	assert.Equal(t, combinedStatus([]string{"running"}), "running(1)")
 	assert.Equal(t, combinedStatus([]string{"running", "running", "running"}), "running(3)")
