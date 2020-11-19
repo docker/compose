@@ -40,7 +40,10 @@ const (
 )
 
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	s.waitDependencies(ctx, project, service)
+	err := s.waitDependencies(ctx, project, service)
+	if err != nil {
+		return err
+	}
 
 	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
@@ -117,7 +120,10 @@ func (s *local) waitDependencies(ctx context.Context, project *types.Project, se
 		switch config.Condition {
 		case "service_healthy":
 			eg.Go(func() error {
-				for range time.Tick(500 * time.Millisecond) {
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					<-ticker.C
 					healthy, err := s.isServiceHealthy(ctx, project, dep)
 					if err != nil {
 						return err
@@ -126,7 +132,6 @@ func (s *local) waitDependencies(ctx context.Context, project *types.Project, se
 						return nil
 					}
 				}
-				return nil
 			})
 		}
 	}

@@ -62,9 +62,9 @@ type node struct {
 	dependent    []string
 }
 
-func (d dependencyGraph) independents() []node {
+func (graph dependencyGraph) independents() []node {
 	var nodes []node
-	for _, node := range d {
+	for _, node := range graph {
 		if len(node.dependencies) == 0 {
 			nodes = append(nodes, node)
 		}
