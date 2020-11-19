@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -39,6 +40,8 @@ const (
 )
 
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	s.waitDependencies(ctx, project, service)
+
 	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
@@ -104,6 +107,28 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 		eg.Go(func() error {
 			return s.restartContainer(ctx, service, container)
 		})
+	}
+	return eg.Wait()
+}
+
+func (s *local) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	for dep, config := range service.DependsOn {
+		switch config.Condition {
+		case "service_healthy":
+			eg.Go(func() error {
+				for range time.Tick(500 * time.Millisecond) {
+					healthy, err := s.isServiceHealthy(ctx, project, dep)
+					if err != nil {
+						return err
+					}
+					if healthy {
+						return nil
+					}
+				}
+				return nil
+			})
+		}
 	}
 	return eg.Wait()
 }
@@ -256,4 +281,34 @@ func (s *local) connectContainerToNetwork(ctx context.Context, id string, servic
 		return err
 	}
 	return nil
+}
+
+func (s *local) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
+	containers, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
+			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service)),
+		),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	for _, c := range containers {
+		container, err := s.containerService.apiClient.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return false, err
+		}
+		if container.State == nil || container.State.Health == nil {
+			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
+		}
+		switch container.State.Health.Status {
+		case "starting":
+			return false, nil
+		case "unhealthy":
+			return false, nil
+		}
+	}
+	return true, nil
+
 }

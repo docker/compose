@@ -389,10 +389,10 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		MacAddress:      s.MacAddress,
 		Labels:          labels,
 		StopSignal:      s.StopSignal,
-		//		Env:             s.Environment, FIXME conversion
-		//		Healthcheck:     s.HealthCheck, FIXME conversion
+		Env:             toMobyEnv(s.Environment),
+		Healthcheck:     toMobyHealthCheck(s.HealthCheck),
 		// Volumes:         // FIXME unclear to me the overlap with HostConfig.Mounts
-		// StopTimeout: 	 s.StopGracePeriod FIXME conversion
+		StopTimeout: toSeconds(s.StopGracePeriod),
 	}
 
 	mountOptions := buildContainerMountOptions(p, s, inherit)
