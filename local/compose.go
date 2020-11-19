@@ -24,17 +24,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/formatter"
-	"github.com/docker/compose-cli/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -46,6 +41,12 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/progress"
 )
 
 func (s *local) Up(ctx context.Context, project *types.Project, detach bool) error {
@@ -262,13 +263,67 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 }
 
 func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
-	_, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{All: true})
+	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(hasProjectLabelFilter()),
+	})
 	if err != nil {
 		return nil, err
 	}
-	var stacks []compose.Stack
-	// TODO rebuild stacks based on containers
-	return stacks, nil
+
+	return containersToStacks(list)
+}
+
+func containersToStacks(containers []moby.Container) ([]compose.Stack, error) {
+	statusesByProject := map[string][]string{}
+	keys := []string{}
+	for _, c := range containers {
+		project, ok := c.Labels[projectLabel]
+		if !ok {
+			return nil, fmt.Errorf("No label %q set on container %q of compose project", serviceLabel, c.ID)
+		}
+		projectStatuses, ok := statusesByProject[project]
+		if !ok {
+			projectStatuses = []string{}
+			keys = append(keys, project)
+		}
+		projectStatuses = append(projectStatuses, c.State)
+		statusesByProject[project] = projectStatuses
+	}
+
+	sort.Strings(keys)
+	var projects []compose.Stack
+	for _, project := range keys {
+		statuses := statusesByProject[project]
+		projects = append(projects, compose.Stack{
+			ID:     project,
+			Name:   project,
+			Status: combinedStatus(statuses),
+		})
+	}
+	return projects, nil
+}
+
+func combinedStatus(statuses []string) string {
+	nbByStatus := map[string]int{}
+	keys := []string{}
+	for _, status := range statuses {
+		nb, ok := nbByStatus[status]
+		if !ok {
+			nb = 0
+			keys = append(keys, status)
+		}
+		nbByStatus[status] = nb + 1
+	}
+	sort.Strings(keys)
+	result := ""
+	for _, status := range keys {
+		nb := nbByStatus[status]
+		if result != "" {
+			result = result + ", "
+		}
+		result = result + fmt.Sprintf("%s(%d)", status, nb)
+	}
+	return result
 }
 
 func (s *local) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {

@@ -24,12 +24,13 @@ import (
 	"strconv"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/progress"
 )
 
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
