@@ -247,19 +247,51 @@ func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceSt
 	if err != nil {
 		return nil, err
 	}
-	var status []compose.ServiceStatus
-	for _, c := range list {
-		// TODO group by service
-		status = append(status, compose.ServiceStatus{
-			ID:         c.ID,
-			Name:       c.Labels[serviceLabel],
-			Replicas:   0,
-			Desired:    0,
-			Ports:      nil,
-			Publishers: nil,
+	return containersToServiceStatus(list)
+}
+
+func containersToServiceStatus(containers []moby.Container) ([]compose.ServiceStatus, error) {
+	containersByLabel, keys, err := groupContainerByLabel(containers, serviceLabel)
+	if err != nil {
+		return nil, err
+	}
+	var services []compose.ServiceStatus
+	for _, service := range keys {
+		containers := containersByLabel[service]
+		runnningContainers := []moby.Container{}
+		for _, container := range containers {
+			if container.State == "running" {
+				runnningContainers = append(runnningContainers, container)
+			}
+		}
+		services = append(services, compose.ServiceStatus{
+			ID:       service,
+			Name:     service,
+			Desired:  len(containers),
+			Replicas: len(runnningContainers),
 		})
 	}
-	return status, nil
+	return services, nil
+}
+
+func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {
+	containersByLabel := map[string][]moby.Container{}
+	keys := []string{}
+	for _, c := range containers {
+		label, ok := c.Labels[labelName]
+		if !ok {
+			return nil, nil, fmt.Errorf("No label %q set on container %q of compose project", labelName, c.ID)
+		}
+		labelContainers, ok := containersByLabel[label]
+		if !ok {
+			labelContainers = []moby.Container{}
+			keys = append(keys, label)
+		}
+		labelContainers = append(labelContainers, c)
+		containersByLabel[label] = labelContainers
+	}
+	sort.Strings(keys)
+	return containersByLabel, keys, nil
 }
 
 func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
@@ -274,33 +306,27 @@ func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, 
 }
 
 func containersToStacks(containers []moby.Container) ([]compose.Stack, error) {
-	statusesByProject := map[string][]string{}
-	keys := []string{}
-	for _, c := range containers {
-		project, ok := c.Labels[projectLabel]
-		if !ok {
-			return nil, fmt.Errorf("No label %q set on container %q of compose project", serviceLabel, c.ID)
-		}
-		projectStatuses, ok := statusesByProject[project]
-		if !ok {
-			projectStatuses = []string{}
-			keys = append(keys, project)
-		}
-		projectStatuses = append(projectStatuses, c.State)
-		statusesByProject[project] = projectStatuses
+	containersByLabel, keys, err := groupContainerByLabel(containers, projectLabel)
+	if err != nil {
+		return nil, err
 	}
-
-	sort.Strings(keys)
 	var projects []compose.Stack
 	for _, project := range keys {
-		statuses := statusesByProject[project]
 		projects = append(projects, compose.Stack{
 			ID:     project,
 			Name:   project,
-			Status: combinedStatus(statuses),
+			Status: combinedStatus(containerToState(containersByLabel[project])),
 		})
 	}
 	return projects, nil
+}
+
+func containerToState(containers []moby.Container) []string {
+	statuses := []string{}
+	for _, c := range containers {
+		statuses = append(statuses, c.State)
+	}
+	return statuses
 }
 
 func combinedStatus(statuses []string) string {
