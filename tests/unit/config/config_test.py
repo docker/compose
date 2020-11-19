@@ -238,7 +238,9 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert 'Invalid top-level property "web"' in excinfo.exconly()
+        assert "compose.config.errors.ConfigurationError: " \
+               "The Compose file 'filename.yml' is invalid because:\n" \
+               "'web' does not match any of the regexes: '^x-'" in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
     def test_named_volume_config_empty(self):

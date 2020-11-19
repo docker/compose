@@ -3039,3 +3039,12 @@ services:
         self.base_dir = 'tests/fixtures/run-quiet-pull'
         result = self.dispatch(['run', '--quiet-pull', 'simple'])
         assert result.stdout.strip() == "Hello, World!"
+
+    def test_up_no_log_prefix(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-log-prefix'])
+
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with code 0' in result.stdout
+        assert 'exited with code 0' in result.stdout
