@@ -31,9 +31,13 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 	eg, ctx := errgroup.WithContext(ctx)
 	results := make(chan string)
 	errors := make(chan error)
+	scheduled := map[string]bool{}
 	for len(graph) > 0 {
 		for _, n := range graph.independents() {
 			service := n.service
+			if scheduled[service.Name] {
+				continue
+			}
 			eg.Go(func() error {
 				err := fn(ctx, service)
 				if err != nil {
@@ -43,6 +47,7 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 				results <- service.Name
 				return nil
 			})
+			scheduled[service.Name] = true
 		}
 		select {
 		case result := <-results:
