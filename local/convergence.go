@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -33,7 +34,17 @@ import (
 	"github.com/docker/compose-cli/progress"
 )
 
+const (
+	extLifecycle  = "x-lifecycle"
+	forceRecreate = "force_recreate"
+)
+
 func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	err := s.waitDependencies(ctx, project, service)
+	if err != nil {
+		return err
+	}
+
 	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
@@ -80,10 +91,11 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 	if err != nil {
 		return err
 	}
+
 	for _, container := range actual {
 		container := container
 		diverged := container.Labels[configHashLabel] != expected
-		if diverged {
+		if diverged || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
 				return s.recreateContainer(ctx, project, service, container)
 			})
@@ -98,6 +110,30 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 		eg.Go(func() error {
 			return s.restartContainer(ctx, service, container)
 		})
+	}
+	return eg.Wait()
+}
+
+func (s *local) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	for dep, config := range service.DependsOn {
+		switch config.Condition {
+		case "service_healthy":
+			eg.Go(func() error {
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+				for {
+					<-ticker.C
+					healthy, err := s.isServiceHealthy(ctx, project, dep)
+					if err != nil {
+						return err
+					}
+					if healthy {
+						return nil
+					}
+				}
+			})
+		}
 	}
 	return eg.Wait()
 }
@@ -184,7 +220,21 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 		StatusText: "Recreated",
 		Done:       true,
 	})
+	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
+}
+
+// setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
+func setDependentLifecycle(project *types.Project, service string, strategy string) {
+	for i, s := range project.Services {
+		if contains(s.GetDependencies(), service) {
+			if s.Extensions == nil {
+				s.Extensions = map[string]interface{}{}
+			}
+			s.Extensions[extLifecycle] = strategy
+			project.Services[i] = s
+		}
+	}
 }
 
 func (s *local) restartContainer(ctx context.Context, service types.ServiceConfig, container moby.Container) error {
@@ -239,4 +289,34 @@ func (s *local) connectContainerToNetwork(ctx context.Context, id string, servic
 		return err
 	}
 	return nil
+}
+
+func (s *local) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
+	containers, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
+			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service)),
+		),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	for _, c := range containers {
+		container, err := s.containerService.apiClient.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return false, err
+		}
+		if container.State == nil || container.State.Health == nil {
+			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
+		}
+		switch container.State.Health.Status {
+		case "starting":
+			return false, nil
+		case "unhealthy":
+			return false, nil
+		}
+	}
+	return true, nil
+
 }

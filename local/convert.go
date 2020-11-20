@@ -23,7 +23,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	compose "github.com/compose-spec/compose-go/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -91,6 +93,57 @@ func toPorts(ports []types.Port) []containers.Port {
 	}
 
 	return result
+}
+
+func toMobyEnv(environment compose.MappingWithEquals) []string {
+	var env []string
+	for k, v := range environment {
+		if v == nil {
+			env = append(env, k)
+		} else {
+			env = append(env, fmt.Sprintf("%s=%s", k, *v))
+		}
+	}
+	return env
+}
+
+func toMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig {
+	if check == nil {
+		return nil
+	}
+	var (
+		interval time.Duration
+		timeout  time.Duration
+		period   time.Duration
+		retries  int
+	)
+	if check.Interval != nil {
+		interval = time.Duration(*check.Interval)
+	}
+	if check.Timeout != nil {
+		timeout = time.Duration(*check.Timeout)
+	}
+	if check.StartPeriod != nil {
+		period = time.Duration(*check.StartPeriod)
+	}
+	if check.Retries != nil {
+		retries = int(*check.Retries)
+	}
+	return &container.HealthConfig{
+		Test:        check.Test,
+		Interval:    interval,
+		Timeout:     timeout,
+		StartPeriod: period,
+		Retries:     retries,
+	}
+}
+
+func toSeconds(d *compose.Duration) *int {
+	if d == nil {
+		return nil
+	}
+	s := int(time.Duration(*d).Seconds())
+	return &s
 }
 
 func fromPorts(ports []containers.Port) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, error) {
