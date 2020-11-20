@@ -45,7 +45,6 @@ type Event struct {
 	Text       string
 	Status     EventStatus
 	StatusText string
-	Done       bool
 
 	startTime time.Time
 	endTime   time.Time

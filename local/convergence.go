@@ -169,7 +169,6 @@ func (s *local) createContainer(ctx context.Context, project *types.Project, ser
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Working,
 		StatusText: "Create",
-		Done:       false,
 	})
 	err := s.runContainer(ctx, project, service, name, number, nil)
 	if err != nil {
@@ -179,7 +178,6 @@ func (s *local) createContainer(ctx context.Context, project *types.Project, ser
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Done,
 		StatusText: "Created",
-		Done:       true,
 	})
 	return nil
 }
@@ -190,7 +188,6 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Working,
 		StatusText: "Recreate",
-		Done:       false,
 	})
 	err := s.containerService.Stop(ctx, container.ID, nil)
 	if err != nil {
@@ -218,7 +215,6 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Done,
 		StatusText: "Recreated",
-		Done:       true,
 	})
 	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
@@ -243,7 +239,6 @@ func (s *local) restartContainer(ctx context.Context, service types.ServiceConfi
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Working,
 		StatusText: "Restart",
-		Done:       false,
 	})
 	err := s.containerService.Start(ctx, container.ID)
 	if err != nil {
@@ -253,7 +248,6 @@ func (s *local) restartContainer(ctx context.Context, service types.ServiceConfi
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Done,
 		StatusText: "Restarted",
-		Done:       true,
 	})
 	return nil
 }
