@@ -57,7 +57,7 @@ __Legend:__
 | service.network_mode           | x |
 | service.networks               | x |  Communication between services is implemented by defining mapping for each service in the shared `/etc/hosts` file of the container group. Each service can resolve names for other services and the resulting network calls will be redirected to `localhost`.
 | service.pid                    | x |
-| service.ports                  | ✓ |  Only symetrical port mapping is supported in ACI. See [Exposing ports](#exposing-ports).
+| service.ports                  | ✓ |  Only symmetrical port mapping is supported in ACI. See [Exposing ports](#exposing-ports).
 | service.secrets                | ✓ |  See [Secrets](#secrets).
 | service.security_opt           | x |
 | service.stop_grace_period      | x |
@@ -184,7 +184,7 @@ Both of them with be mounted in the same folder (`/mnt/dbmount/`).
 ## Container Resources
 
 CPU and memory reservations and limits can be set in compose.
-Resource limits must be greater than reservation. In ACI, setting resource limits different from resource reservation will cause containers in the same container group to compete for resources. Resource limits cannot be greater than the total resource reservation for the container group. (Therefore single containers cannot have resoure limits different from resource reservations)
+Resource limits must be greater than reservation. In ACI, setting resource limits different from resource reservation will cause containers in the same container group to compete for resources. Resource limits cannot be greater than the total resource reservation for the container group. (Therefore single containers cannot have resource limits different from resource reservations)
 
 ```yaml
 services:
