@@ -57,7 +57,7 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 
 	scale := getScale(service)
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {
 		next, err := nextContainerNumber(actual)
 		if err != nil {
@@ -115,7 +115,7 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 }
 
 func (s *local) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 	for dep, config := range service.DependsOn {
 		switch config.Condition {
 		case "service_healthy":
