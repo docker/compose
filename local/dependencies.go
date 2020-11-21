@@ -21,6 +21,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
@@ -36,6 +37,10 @@ const (
 
 func inDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
 	g := NewGraph(project.Services)
+	if b, err := g.HasCycles(); b {
+		return err
+	}
+
 	leaves := g.Leaves()
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -50,7 +55,7 @@ func inDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, fn func(context.Context, types.ServiceConfig) error) error {
 	for _, node := range nodes {
 		n := node
-		// Don't start this service yet if all of their children have
+		// Don't start this service yet if all of its children have
 		// not been started yet.
 		if len(graph.FilterChildren(n.Service.Name, ServiceStopped)) != 0 {
 			continue
@@ -152,8 +157,6 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	sourceVertex.Children[destination] = destinationVertex
 	destinationVertex.Parents[source] = sourceVertex
 
-	g.Vertices[source] = sourceVertex
-	g.Vertices[destination] = destinationVertex
 	return nil
 }
 
@@ -191,4 +194,56 @@ func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	}
 
 	return res
+}
+
+func (g *Graph) HasCycles() (bool, error) {
+	discovered := []string{}
+	finished := []string{}
+
+	for _, vertex := range g.Vertices {
+		path := []string{
+			vertex.Key,
+		}
+		if !contains(discovered, vertex.Key) && !contains(finished, vertex.Key) {
+			var err error
+			discovered, finished, err = g.visit(vertex.Key, path, discovered, finished)
+
+			if err != nil {
+				return true, err
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (g *Graph) visit(key string, path []string, discovered []string, finished []string) ([]string, []string, error) {
+	discovered = append(discovered, key)
+
+	for _, v := range g.Vertices[key].Children {
+		path := append(path, v.Key)
+		if contains(discovered, v.Key) {
+			return nil, nil, fmt.Errorf("cycle found: %s", strings.Join(path, " -> "))
+		}
+
+		if !contains(finished, v.Key) {
+			if _, _, err := g.visit(v.Key, path, discovered, finished); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	discovered = remove(discovered, key)
+	finished = append(finished, key)
+	return discovered, finished, nil
+}
+
+func remove(slice []string, item string) []string {
+	var s []string
+	for _, i := range slice {
+		if i != item {
+			s = append(s, i)
+		}
+	}
+	return s
 }
