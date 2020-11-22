@@ -174,7 +174,7 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 		return err
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 	for _, c := range list {
 		container := c
@@ -625,7 +625,7 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				StatusText: "Create",
 				Done:       false,
 			})
-			if _, err := s.containerService.apiClient.NetworkCreate(context.Background(), n.Name, createOpts); err != nil {
+			if _, err := s.containerService.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
 			w.Event(progress.Event{
