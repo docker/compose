@@ -129,12 +129,15 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 		if jm.Progress.Total != 0 {
 			percentage := int(float64(jm.Progress.Current)/float64(jm.Progress.Total)*100) / 2
 			numSpaces := 50 - percentage
+			status := progress.Working
+			if jm.Status == "Pull complete" {
+				status = progress.Done
+			}
 			w.Event(progress.Event{
 				ID:         jm.ID,
 				Text:       jm.Status,
-				Status:     0,
+				Status:     status,
 				StatusText: fmt.Sprintf("[%s>%s] ", strings.Repeat("=", percentage), strings.Repeat(" ", numSpaces)),
-				Done:       jm.Status == "Pull complete",
 			})
 		} else {
 			if jm.Error != nil {
@@ -143,21 +146,18 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 					Text:       jm.Status,
 					Status:     progress.Error,
 					StatusText: jm.Error.Message,
-					Done:       true,
 				})
 			} else if jm.Status == "Pull complete" || jm.Status == "Already exists" {
 				w.Event(progress.Event{
 					ID:     jm.ID,
 					Text:   jm.Status,
 					Status: progress.Done,
-					Done:   true,
 				})
 			} else {
 				w.Event(progress.Event{
 					ID:     jm.ID,
 					Text:   jm.Status,
 					Status: progress.Working,
-					Done:   false,
 				})
 			}
 		}
@@ -183,7 +183,6 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 				ID:     getContainerName(container),
 				Text:   "Stopping",
 				Status: progress.Working,
-				Done:   false,
 			})
 			err := s.containerService.Stop(ctx, container.ID, nil)
 			if err != nil {
@@ -193,7 +192,6 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 				ID:     getContainerName(container),
 				Text:   "Removing",
 				Status: progress.Working,
-				Done:   false,
 			})
 			err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
 			if err != nil {
@@ -203,7 +201,6 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 				ID:     getContainerName(container),
 				Text:   "Removed",
 				Status: progress.Done,
-				Done:   true,
 			})
 			return nil
 		})
@@ -623,7 +620,6 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				ID:         fmt.Sprintf("Network %q", n.Name),
 				Status:     progress.Working,
 				StatusText: "Create",
-				Done:       false,
 			})
 			if _, err := s.containerService.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
@@ -632,7 +628,6 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				ID:         fmt.Sprintf("Network %q", n.Name),
 				Status:     progress.Done,
 				StatusText: "Created",
-				Done:       true,
 			})
 			return nil
 		}
@@ -651,7 +646,6 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 				ID:         fmt.Sprintf("Volume %q", volume.Name),
 				Status:     progress.Working,
 				StatusText: "Create",
-				Done:       false,
 			})
 			// TODO we miss support for driver_opts and labels
 			_, err := s.volumeService.Create(ctx, volume.Name, nil)
@@ -659,7 +653,6 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 				ID:         fmt.Sprintf("Volume %q", volume.Name),
 				Status:     progress.Done,
 				StatusText: "Created",
-				Done:       true,
 			})
 			if err != nil {
 				return err
