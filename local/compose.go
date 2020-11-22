@@ -127,8 +127,6 @@ func (s *local) applyPullPolicy(ctx context.Context, service types.ServiceConfig
 func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 	if jm.Progress != nil {
 		if jm.Progress.Total != 0 {
-			percentage := int(float64(jm.Progress.Current)/float64(jm.Progress.Total)*100) / 2
-			numSpaces := 50 - percentage
 			status := progress.Working
 			if jm.Status == "Pull complete" {
 				status = progress.Done
@@ -137,7 +135,7 @@ func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
 				ID:         jm.ID,
 				Text:       jm.Status,
 				Status:     status,
-				StatusText: fmt.Sprintf("[%s>%s] ", strings.Repeat("=", percentage), strings.Repeat(" ", numSpaces)),
+				StatusText: jm.Progress.String(),
 			})
 		} else {
 			if jm.Error != nil {
