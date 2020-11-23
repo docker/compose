@@ -141,4 +141,7 @@ jobs:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: make e2e-aci
+        # need to docker logout on windows nodes, it seems GHActions does a `docker login --user githubactions` specifically on windows nodes
+        run: |
+          docker logout
+          make e2e-aci
