@@ -57,9 +57,8 @@ func (cs *aciResourceService) Prune(ctx context.Context, request resources.Prune
 			_, err := deleteACIContainerGroup(ctx, cs.aciContext, *containerGroup.Name)
 			multierr = multierror.Append(multierr, err)
 		}
-		if err == nil {
-			deleted = append(deleted, *containerGroup.Name)
-		}
+
+		deleted = append(deleted, *containerGroup.Name)
 	}
 	result.DeletedIDs = deleted
 	result.Summary = fmt.Sprintf("Total CPUs reclaimed: %.2f, total memory reclaimed: %.2f GB", cpus, mem)
