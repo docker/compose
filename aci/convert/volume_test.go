@@ -207,8 +207,8 @@ func getAzurefileVolumeConfig(name string, accountNameKey string, shareNameKey s
 		Name:   name,
 		Driver: "azure_file",
 		DriverOpts: map[string]string{
-			volumeDriveroptsAccountNameKey: accountNameKey,
-			volumeDriveroptsShareNameKey:   shareNameKey,
+			VolumeDriveroptsAccountNameKey: accountNameKey,
+			VolumeDriveroptsShareNameKey:   shareNameKey,
 			volumeReadOnly:                 strconv.FormatBool(readOnly),
 		},
 	}

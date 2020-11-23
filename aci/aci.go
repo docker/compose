@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	tm "github.com/buger/goterm"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/morikuni/aec"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
@@ -64,12 +66,46 @@ func createACIContainers(ctx context.Context, aciContext store.AciContext, group
 	return createOrUpdateACIContainers(ctx, aciContext, groupDefinition)
 }
 
+func autocreateFileshares(ctx context.Context, project *types.Project) error {
+	clt, err := client.New(ctx)
+	if err != nil {
+		return err
+	}
+	for _, v := range project.Volumes {
+		if v.Driver != convert.AzureFileDriverName {
+			return fmt.Errorf("cannot use ACI volume, required driver is %q, found %q", convert.AzureFileDriverName, v.Driver)
+		}
+		shareName, ok := v.DriverOpts[convert.VolumeDriveroptsShareNameKey]
+		if !ok {
+			return fmt.Errorf("cannot retrieve fileshare name for Azure file share")
+		}
+		accountName, ok := v.DriverOpts[convert.VolumeDriveroptsAccountNameKey]
+		if !ok {
+			return fmt.Errorf("cannot retrieve account name for Azure file share")
+		}
+		_, err = clt.VolumeService().Inspect(ctx, fmt.Sprintf("%s/%s", accountName, shareName))
+		if err != nil { // Not found, autocreate fileshare
+			if !errdefs.IsNotFoundError(err) {
+				return err
+			}
+			aciVolumeOpts := &VolumeCreateOptions{
+				Account: accountName,
+			}
+			if _, err = clt.VolumeService().Create(ctx, shareName, aciVolumeOpts); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {
 	w := progress.ContextWriter(ctx)
 	containerGroupsClient, err := login.NewContainerGroupsClient(aciContext.SubscriptionID)
 	if err != nil {
 		return errors.Wrapf(err, "cannot get container group client")
 	}
+
 	groupDisplay := "Group " + *groupDefinition.Name
 	w.Event(progress.Event{
 		ID:         groupDisplay,

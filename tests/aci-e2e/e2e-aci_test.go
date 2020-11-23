@@ -644,9 +644,7 @@ func TestUpUpdate(t *testing.T) {
 	)
 	c := NewParallelE2eCLI(t, binDir)
 	sID, groupID, location := setupTestResourceGroup(t, c)
-	composeAccountName := groupID + "-sa"
-	composeAccountName = strings.ReplaceAll(composeAccountName, "-", "")
-	composeAccountName = strings.ToLower(composeAccountName)
+	composeAccountName := strings.ToLower(strings.ReplaceAll(groupID, "-", "") + "sa")
 
 	dstDir := filepath.Join(os.TempDir(), "e2e-aci-volume-"+composeAccountName)
 	srcDir := filepath.Join("..", "composefiles", "aci-demo")
@@ -663,28 +661,33 @@ func TestUpUpdate(t *testing.T) {
 	multiPortComposefile = filepath.Join(dstDir, multiPortComposefile)
 
 	volumeID := composeAccountName + "/" + fileshareName
+	const (
+		testFileName    = "msg.txt"
+		testFileContent = "VOLUME_OK"
+		projectName     = "acidemo"
+	)
+	var (
+		dnsLabelName = "nginx-" + groupID
+		fqdn         = dnsLabelName + "." + location + ".azurecontainer.io"
+	)
+
 	t.Run("compose up", func(t *testing.T) {
-		const (
-			testFileName    = "msg.txt"
-			testFileContent = "VOLUME_OK"
-			projectName     = "acidemo"
-		)
-
-		c.RunDockerCmd("volume", "create", "--storage-account", composeAccountName, fileshareName)
-
-		// Bootstrap volume
 		aciContext := store.AciContext{
 			SubscriptionID: sID,
 			Location:       location,
 			ResourceGroup:  groupID,
 		}
-		uploadTestFile(t, aciContext, composeAccountName, fileshareName, testFileName, testFileContent)
-
-		dnsLabelName := "nginx-" + groupID
-		fqdn := dnsLabelName + "." + location + ".azurecontainer.io"
-		// Name of Compose project is taken from current folder "acie2e"
 		c.RunDockerCmd("compose", "up", "-f", singlePortVolumesComposefile, "--domainname", dnsLabelName, "--project-name", projectName)
 
+		// Volume should be autocreated by the "compose up"
+		uploadTestFile(t, aciContext, composeAccountName, fileshareName, testFileName, testFileContent)
+	})
+
+	t.Cleanup(func() {
+		c.RunDockerCmd("volume", "rm", volumeID)
+	})
+
+	t.Run("check deployed compose app", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
 		out := lines(res.Stdout())
 		// Check three containers are running
@@ -722,9 +725,6 @@ func TestUpUpdate(t *testing.T) {
 			Err: fmt.Sprintf(`Error: volume "%s/%s" is used in container group %q`,
 				composeAccountName, fileshareName, projectName),
 		})
-	})
-	t.Cleanup(func() {
-		c.RunDockerCmd("volume", "rm", volumeID)
 	})
 
 	t.Run("compose ps", func(t *testing.T) {

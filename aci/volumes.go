@@ -232,7 +232,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 	}
 
 	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshare)
-	if result.StatusCode == 204 {
+	if result.HasHTTPStatus(http.StatusNoContent) {
 		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %q", fileshare)
 	}
 	return err
@@ -247,8 +247,11 @@ func (cs *aciVolumeService) Inspect(ctx context.Context, id string) (volumes.Vol
 	if err != nil {
 		return volumes.Volume{}, err
 	}
-	_, err = fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshareName, "")
+	res, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshareName, "")
 	if err != nil { // Just checks if it exists
+		if res.HasHTTPStatus(http.StatusNotFound) {
+			return volumes.Volume{}, errors.Wrapf(errdefs.ErrNotFound, "account %q, file share %q. Original message %s", storageAccount, fileshareName, err.Error())
+		}
 		return volumes.Volume{}, err
 	}
 	return toVolume(storageAccount, fileshareName), nil
