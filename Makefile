@@ -97,7 +97,7 @@ validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 
 validate: validate-go-mod validate-headers ## Validate sources
 
-pre-commit: cli test e2e-local lint validate
+pre-commit: validate import-restrictions check-dependencies lint cli test e2e-local
 
 build-aci-sidecar:  ## build aci sidecar image locally and tag it with make build-aci-sidecar tag=0.1
 	docker build -t docker/aci-hostnames-sidecar:$(tag) aci/etchosts
