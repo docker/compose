@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"gotest.tools/v3/assert"
+	"gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
@@ -78,7 +80,7 @@ func TestLocalBackendRun(t *testing.T) {
 	})
 
 	t.Run("run with ports", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "-p", "8080:80", "nginx")
+		res := c.RunDockerCmd("run", "-d", "-p", "80", "nginx")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrExitError("rm", "-f", containerName)
@@ -86,7 +88,7 @@ func TestLocalBackendRun(t *testing.T) {
 		res = c.RunDockerCmd("inspect", containerName)
 		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
 		res = c.RunDockerCmd("ps")
-		res.Assert(t, icmd.Expected{Out: "0.0.0.0:8080->80/tcp"})
+		assert.Assert(t, cmp.Regexp(`0\.0\.0\.0:\d*->80/tcp`, res.Stdout()))
 	})
 
 	t.Run("run with volume", func(t *testing.T) {
