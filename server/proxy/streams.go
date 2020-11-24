@@ -17,7 +17,7 @@
 package proxy
 
 import (
-	"github.com/google/uuid"
+	"github.com/hashicorp/go-uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 
@@ -28,8 +28,11 @@ import (
 func (p *proxy) NewStream(stream streamsv1.Streaming_NewStreamServer) error {
 	var (
 		ctx = stream.Context()
-		id  = uuid.New().String()
 	)
+	id, err := uuid.GenerateUUID()
+	if err != nil {
+		return err
+	}
 	md := metadata.New(map[string]string{
 		"id": id,
 	})

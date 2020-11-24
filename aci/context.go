@@ -24,7 +24,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/Azure/azure-sdk-for-go/profiles/preview/preview/subscription/mgmt/subscription"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
-	"github.com/google/uuid"
+	"github.com/hashicorp/go-uuid"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/context/store"
@@ -117,7 +117,10 @@ func (helper contextCreateACIHelper) createGroup(ctx context.Context, subscripti
 	if location == "" {
 		location = "eastus"
 	}
-	gid := uuid.New().String()
+	gid, err := uuid.GenerateUUID()
+	if err != nil {
+		return resources.Group{}, err
+	}
 	g, err := helper.resourceGroupHelper.CreateOrUpdate(ctx, subscriptionID, gid, resources.Group{
 		Location: &location,
 	})
