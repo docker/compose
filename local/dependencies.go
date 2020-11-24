@@ -28,8 +28,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// ServiceStatus indicates the status of a service
 type ServiceStatus int
 
+// Services status flags
 const (
 	ServiceStopped ServiceStatus = iota
 	ServiceStarted
@@ -76,11 +78,13 @@ func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex,
 	return nil
 }
 
+// Graph represents project as service dependencies
 type Graph struct {
 	Vertices map[string]*Vertex
 	lock     sync.RWMutex
 }
 
+// Vertex represents a service in the dependencies structure
 type Vertex struct {
 	Key      string
 	Service  types.ServiceConfig
@@ -89,6 +93,7 @@ type Vertex struct {
 	Parents  map[string]*Vertex
 }
 
+// GetParents returns a slice with the parent vertexes of the current Vertex
 func (v *Vertex) GetParents() []*Vertex {
 	var res []*Vertex
 	for _, p := range v.Parents {
@@ -97,6 +102,7 @@ func (v *Vertex) GetParents() []*Vertex {
 	return res
 }
 
+// NewGraph returns the dependency graph of the services
 func NewGraph(services types.Services) *Graph {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
@@ -109,14 +115,14 @@ func NewGraph(services types.Services) *Graph {
 
 	for _, s := range services {
 		for _, name := range s.GetDependencies() {
-			graph.AddEdge(s.Name, name)
+			_ = graph.AddEdge(s.Name, name)
 		}
 	}
 
 	return graph
 }
 
-// We then create a constructor function for the Vertex
+// NewVertex is the constructor function for the Vertex
 func NewVertex(key string, service types.ServiceConfig) *Vertex {
 	return &Vertex{
 		Key:      key,
@@ -127,6 +133,7 @@ func NewVertex(key string, service types.ServiceConfig) *Vertex {
 	}
 }
 
+// AddVertex adds a vertex to the Graph
 func (g *Graph) AddVertex(key string, service types.ServiceConfig) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -135,6 +142,7 @@ func (g *Graph) AddVertex(key string, service types.ServiceConfig) {
 	g.Vertices[key] = v
 }
 
+// AddEdge adds a relationship of dependency between vertexes `source` and `destination`
 func (g *Graph) AddEdge(source string, destination string) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -160,6 +168,7 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	return nil
 }
 
+// Leaves returns the slice of leaves of the graph
 func (g *Graph) Leaves() []*Vertex {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -174,12 +183,14 @@ func (g *Graph) Leaves() []*Vertex {
 	return res
 }
 
+// UpdateStatus updates the status of a certain vertex
 func (g *Graph) UpdateStatus(key string, status ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.Vertices[key].Status = status
 }
 
+// FilterChildren returns children of a certain vertex that are in a certain status
 func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -196,6 +207,7 @@ func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	return res
 }
 
+// HasCycles detects cycles in the graph
 func (g *Graph) HasCycles() (bool, error) {
 	discovered := []string{}
 	finished := []string{}
