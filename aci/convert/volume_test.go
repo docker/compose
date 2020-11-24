@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2018-10-01/containerinstance"
+	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2019-12-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/stretchr/testify/mock"

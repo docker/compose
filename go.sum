@@ -38,8 +38,8 @@ github.com/AlecAivazis/survey/v2 v2.2.3/go.mod h1:9FJRdMdDm8rnT+zHVbvQT2RTSTLq0T
 github.com/Azure/azure-pipeline-go v0.2.1 h1:OLBdZJ3yvOn2MezlWvbrBMTEUQC72zAftRZOMdj5HYo=
 github.com/Azure/azure-pipeline-go v0.2.1/go.mod h1:UGSo8XybXnIGZ3epmeBw7Jdz+HiUVpqIlpz/HKHylF4=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
-github.com/Azure/azure-sdk-for-go v43.3.0+incompatible h1:o0G4JAsOzeVJEwU0Ud9bh+lUHPUc0GkFENJ02dk51Uo=
-github.com/Azure/azure-sdk-for-go v43.3.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
+github.com/Azure/azure-sdk-for-go v48.2.0+incompatible h1:+t2P1j1r5N6lYgPiiz7ZbEVZFkWjVe9WhHbMm0gg8hw=
+github.com/Azure/azure-sdk-for-go v48.2.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-storage-file-go v0.8.0 h1:OX8DGsleWLUE6Mw4R/OeWEZMvsTIpwN94J59zqKQnTI=
 github.com/Azure/azure-storage-file-go v0.8.0/go.mod h1:3w3mufGcMjcOJ3w+4Gs+5wsSgkT7xDwWWqMMIrXtW4c=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=

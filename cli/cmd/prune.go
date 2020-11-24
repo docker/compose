@@ -57,11 +57,15 @@ func runPrune(ctx context.Context, opts pruneOpts) error {
 	}
 
 	result, err := c.ResourceService().Prune(ctx, resources.PruneRequest{Force: opts.force, DryRun: opts.dryRun})
-	if opts.dryRun {
-		fmt.Println("Resources that would be deleted:")
-	} else {
-		fmt.Println("Deleted resources:")
+	if err != nil {
+		return err
 	}
+	deletedResourcesMsg := "Deleted resources:"
+	if opts.dryRun {
+		deletedResourcesMsg = "Resources that would be deleted:"
+	}
+	fmt.Println(deletedResourcesMsg)
+
 	for _, id := range result.DeletedIDs {
 		fmt.Println(id)
 	}
