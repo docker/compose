@@ -373,6 +373,23 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
+def check_swarm_only_config(service_dicts):
+    warning_template = (
+        "Some services ({services}) use the '{key}' key, which will be ignored. "
+        "Compose does not support '{key}' configuration - use "
+        "`docker stack deploy` to deploy to a swarm."
+    )
+    key = 'configs'
+    services = [s for s in service_dicts if s.get(key)]
+    if services:
+        log.warning(
+            warning_template.format(
+                services=", ".join(sorted(s['name'] for s in services)),
+                key=key
+            )
+        )
+
+
 def load(config_details, interpolate=True):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
@@ -408,6 +425,8 @@ def load(config_details, interpolate=True):
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
+
+    check_swarm_only_config(service_dicts)
 
     return Config(main_file.config_version, main_file.version,
                   service_dicts, volumes, networks, secrets, configs)
