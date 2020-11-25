@@ -25,10 +25,17 @@ import (
 )
 
 const (
-	projectLabel         = "com.docker.compose.project"
-	serviceLabel         = "com.docker.compose.service"
-	configHashLabel      = "com.docker.compose.config-hash"
 	containerNumberLabel = "com.docker.compose.container-number"
+	oneoffLabel          = "com.docker.compose.oneoff"
+	projectLabel         = "com.docker.compose.project"
+	workingDirLabel      = "com.docker.compose.project.working_dir"
+	configFilesLabel     = "com.docker.compose.project.config_files"
+	serviceLabel         = "com.docker.compose.service"
+	versionLabel         = "com.docker.compose.version"
+	configHashLabel      = "com.docker.compose.config-hash"
+
+	//ComposeVersion Compose version
+	ComposeVersion = "1.0-alpha"
 )
 
 func projectFilter(projectName string) filters.KeyValuePair {
