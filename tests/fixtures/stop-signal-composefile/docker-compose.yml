@@ -1,10 +1,11 @@
-simple:
-  image: busybox:1.31.0-uclibc
-  command:
-    - sh
-    - '-c'
-    - |
-        trap 'exit 0' SIGINT
-        trap 'exit 1' SIGTERM
-        while true; do :; done
-  stop_signal: SIGINT
+services:
+  simple:
+    image: busybox:1.31.0-uclibc
+    command:
+      - sh
+      - '-c'
+      - |
+          trap 'exit 0' SIGINT
+          trap 'exit 1' SIGTERM
+          while true; do :; done
+    stop_signal: SIGINT

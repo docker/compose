@@ -1,2 +1,3 @@
-foo:
-  build: ../build-ctx/
+services:
+  foo:
+    build: ../build-ctx/

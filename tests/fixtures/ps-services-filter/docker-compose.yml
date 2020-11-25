@@ -1,6 +1,7 @@
-with_image:
-  image: busybox:1.31.0-uclibc
-  command: top
-with_build:
-  build: ../build-ctx/
-  command: top
+services:
+  with_image:
+    image: busybox:1.31.0-uclibc
+    command: top
+  with_build:
+    build: ../build-ctx/
+    command: top

@@ -1,11 +1,12 @@
-mydb:
-  build: '.'
-myweb:
-  build: '.'
-  extends:
-    service: web
-  command: top
-web:
-  build: '.'
-  links:
-    - "mydb:db"
+services:
+  mydb:
+    build: '.'
+  myweb:
+    build: '.'
+    extends:
+      service: web
+    command: top
+  web:
+    build: '.'
+    links:
+      - "mydb:db"

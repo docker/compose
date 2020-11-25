@@ -1,3 +1,4 @@
-definedinyamlnotyml:
-  image: busybox:1.31.0-uclibc
-  command: top
+services:
+  definedinyamlnotyml:
+    image: busybox:1.31.0-uclibc
+    command: top

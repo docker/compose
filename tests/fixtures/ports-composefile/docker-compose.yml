@@ -1,8 +1,8 @@
-
-simple:
-  image: busybox:1.31.0-uclibc
-  command: top
-  ports:
-    - '3000'
-    - '49152:3001'
-    - '49153-49154:3002-3003'
+services:
+  simple:
+    image: busybox:1.31.0-uclibc
+    command: top
+    ports:
+      - '3000'
+      - '49152:3001'
+      - '49153-49154:3002-3003'

@@ -1,5 +1,6 @@
-db:
-  image: busybox
-  volumes:
-    - ./foo:/foo
-    - ./bar:/bar
+services:
+  db:
+    image: busybox
+    volumes:
+      - ./foo:/foo
+      - ./bar:/bar

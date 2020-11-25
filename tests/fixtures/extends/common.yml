@@ -1,7 +1,8 @@
-web:
-  image: busybox
-  command: /bin/true
-  net: host
-  environment:
-    - FOO=1
-    - BAR=1
+services:
+  web:
+    image: busybox
+    command: /bin/true
+    net: host
+    environment:
+      - FOO=1
+      - BAR=1

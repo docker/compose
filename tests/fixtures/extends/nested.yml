@@ -1,6 +1,7 @@
-myweb:
-  extends:
-    file: nested-intermediate.yml
-    service: webintermediate
-  environment:
-    - "BAR=2"
+services:
+  myweb:
+    extends:
+      file: nested-intermediate.yml
+      service: webintermediate
+    environment:
+      - "BAR=2"

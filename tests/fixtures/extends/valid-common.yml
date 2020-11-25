@@ -1,3 +1,4 @@
-common-config:
-  environment:
-    - FOO=1
+services:
+  common-config:
+    environment:
+      - FOO=1

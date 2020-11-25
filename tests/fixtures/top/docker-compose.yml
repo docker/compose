@@ -1,6 +1,7 @@
-service_a:
-  image: busybox:1.31.0-uclibc
-  command: top
-service_b:
-  image: busybox:1.31.0-uclibc
-  command: top
+services:
+  service_a:
+    image: busybox:1.31.0-uclibc
+    command: top
+  service_b:
+    image: busybox:1.31.0-uclibc
+    command: top

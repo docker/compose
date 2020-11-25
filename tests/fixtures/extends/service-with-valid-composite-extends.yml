@@ -1,5 +1,6 @@
-myweb:
-  build: '.'
-  extends:
-    file: 'valid-composite-extends.yml'
-    service: web
+services:
+  myweb:
+    build: '.'
+    extends:
+      file: 'valid-composite-extends.yml'
+      service: web

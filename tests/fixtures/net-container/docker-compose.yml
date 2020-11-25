@@ -1,7 +1,8 @@
-foo:
-  image: busybox
-  command: top
-  net: "container:bar"
-bar:
-  image: busybox
-  command: top
+services:
+  foo:
+    image: busybox
+    command: top
+    net: "container:bar"
+  bar:
+    image: busybox
+    command: top

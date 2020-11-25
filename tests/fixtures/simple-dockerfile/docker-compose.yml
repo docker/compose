@@ -1,2 +1,3 @@
-simple:
-  build: .
+services:
+  simple:
+    build: .

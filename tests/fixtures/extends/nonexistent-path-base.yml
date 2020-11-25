@@ -1,6 +1,7 @@
-dnebase:
-  build: nonexistent.path
-  command: /bin/true
-  environment:
-    - FOO=1
-    - BAR=1
+services:
+  dnebase:
+    build: nonexistent.path
+    command: /bin/true
+    environment:
+      - FOO=1
+      - BAR=1

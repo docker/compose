@@ -1,5 +1,6 @@
-test:
-  image: busybox
-  command: top
-  volumes:
-    - "~/${VOLUME_NAME}:/container-path"
+services:
+  test:
+    image: busybox
+    command: top
+    volumes:
+      - "~/${VOLUME_NAME}:/container-path"

@@ -1,4 +1,5 @@
-service:
-  image: busybox:1.31.0-uclibc
-  user: notauser
-  command: id
+services:
+  service:
+    image: busybox:1.31.0-uclibc
+    user: notauser
+    command: id

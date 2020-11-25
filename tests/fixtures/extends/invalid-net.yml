@@ -1,8 +1,9 @@
-myweb:
-  build: '.'
-  extends:
-    service: web
-  command: top
-web:
-  build: '.'
-  net: "container:db"
+services:
+  myweb:
+    build: '.'
+    extends:
+      service: web
+    command: top
+  web:
+    build: '.'
+    net: "container:db"

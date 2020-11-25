@@ -1,6 +1,7 @@
-simple:
-  image: busybox:1.31.0-uclibc
-  command: top
-another:
-  image: nonexisting-image:latest
-  command: top
+services:
+  simple:
+    image: busybox:1.31.0-uclibc
+    command: top
+  another:
+    image: nonexisting-image:latest
+    command: top

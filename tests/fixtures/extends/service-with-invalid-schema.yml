@@ -1,4 +1,5 @@
-myweb:
-  extends:
-    file: valid-composite-extends.yml
-    service: web
+services:
+  myweb:
+    extends:
+      file: valid-composite-extends.yml
+      service: web

@@ -1,11 +1,12 @@
-db:
-  image: busybox:1.27.2
-  command: top
-web:
-  image: busybox:1.27.2
-  command: top
-  links:
-    - db:db
-console:
-  image: busybox:1.27.2
-  command: top
+services:
+  db:
+    image: busybox:1.27.2
+    command: top
+  web:
+    image: busybox:1.27.2
+    command: top
+    links:
+      - db:db
+  console:
+    image: busybox:1.27.2
+    command: top

@@ -1,10 +1,10 @@
-
-web:
+services:
+  web:
     image: busybox:1.31.0-uclibc
     command: "sleep 100"
     links:
         - db
 
-db:
+  db:
     image: busybox:1.31.0-uclibc
     command: "sleep 200"

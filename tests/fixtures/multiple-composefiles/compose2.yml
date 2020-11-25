@@ -1,3 +1,4 @@
-yetanother:
-  image: busybox:1.31.0-uclibc
-  command: top
+services:
+  yetanother:
+    image: busybox:1.31.0-uclibc
+    command: top

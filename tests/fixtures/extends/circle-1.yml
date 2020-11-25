@@ -1,12 +1,13 @@
-foo:
-  image: busybox
-bar:
-  image: busybox
-web:
-  extends:
-    file: circle-2.yml
-    service: other
-baz:
-  image: busybox
-quux:
-  image: busybox
+services:
+  foo:
+    image: busybox
+  bar:
+    image: busybox
+  web:
+    extends:
+      file: circle-2.yml
+      service: other
+  baz:
+    image: busybox
+  quux:
+    image: busybox

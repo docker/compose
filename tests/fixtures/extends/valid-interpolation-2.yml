@@ -1,3 +1,4 @@
-web:
-  build: '.'
-  hostname: "host-${HOSTNAME_VALUE}"
+services:
+  web:
+    build: '.'
+    hostname: "host-${HOSTNAME_VALUE}"

@@ -1,15 +1,16 @@
-base:
-  image: busybox
-  environment:
-    - "BAR=1"
+services:
+  base:
+    image: busybox
+    environment:
+      - "BAR=1"
 
-verbose:
-  extends:
-    service: base
-  environment:
-    - "FOO=1"
+  verbose:
+    extends:
+      service: base
+    environment:
+      - "FOO=1"
 
-shorthand:
-  extends: base
-  environment:
-    - "FOO=2"
+  shorthand:
+    extends: base
+    environment:
+      - "FOO=2"

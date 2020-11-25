@@ -1,9 +1,10 @@
-myweb:
-  build: '.'
-  extends:
-    service: web
-  command: top
-web:
-  build: '.'
-  volumes_from:
-    - "db"
+services:
+  myweb:
+    build: '.'
+    extends:
+      service: web
+    command: top
+  web:
+    build: '.'
+    volumes_from:
+      - "db"

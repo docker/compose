@@ -1,17 +1,18 @@
-myweb:
-  extends:
-    file: common.yml
-    service: web
-  command: top
-  links:
-    - "mydb:db"
-  environment:
-    # leave FOO alone
-    # override BAR
-    BAR: "2"
-    # add BAZ
-    BAZ: "2"
-  net: bridge
-mydb:
-  image: busybox
-  command: top
+services:
+  myweb:
+    extends:
+      file: common.yml
+      service: web
+    command: top
+    links:
+      - "mydb:db"
+    environment:
+      # leave FOO alone
+      # override BAR
+      BAR: "2"
+      # add BAZ
+      BAZ: "2"
+    net: bridge
+  mydb:
+    image: busybox
+    command: top

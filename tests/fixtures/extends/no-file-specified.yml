@@ -1,9 +1,10 @@
-myweb:
-  extends:
-    service: web
-  environment:
-    - "BAR=1"
-web:
-  image: busybox
-  environment:
-    - "BAZ=3"
+services:
+  myweb:
+    extends:
+      service: web
+    environment:
+      - "BAR=1"
+  web:
+    image: busybox
+    environment:
+      - "BAZ=3"

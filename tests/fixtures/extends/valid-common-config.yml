@@ -1,6 +1,7 @@
-myweb:
-  build: '.'
-  extends:
-    file: valid-common.yml
-    service: common-config
-  command: top
+services:
+  myweb:
+    build: '.'
+    extends:
+      file: valid-common.yml
+      service: common-config
+    command: top

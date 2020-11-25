@@ -1,7 +1,8 @@
-service:
-  image: busybox:1.31.0-uclibc
-  command: top
+services:
+  service:
+    image: busybox:1.31.0-uclibc
+    command: top
 
-  labels:
-    foo: bar
-    hello: world
+    labels:
+      foo: bar
+      hello: world
