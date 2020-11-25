@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,9 +30,6 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/buildx/build"
-	"github.com/docker/buildx/driver"
-	px "github.com/docker/buildx/util/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -41,7 +37,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/errdefs"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
@@ -76,14 +71,12 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 
-	for _, service := range project.Services {
-		err := s.applyPullPolicy(ctx, project, service)
-		if err != nil {
-			return err
-		}
+	err := s.ensureImagesExists(ctx, project)
+	if err != nil {
+		return err
 	}
 
-	err := inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	err = inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, project, service)
 	})
 	return err
@@ -99,94 +92,15 @@ func getContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
-func (s *local) applyPullPolicy(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	w := progress.ContextWriter(ctx)
-	// TODO build vs pull should be controlled by pull policy
-	opts := map[string]build.Options{}
-	if service.Build != nil {
-		opts[service.Name] = s.buildImage(ctx, service, project.WorkingDir)
-	}
-
-	if len(opts) > 0 {
-		w := px.NewPrinter(ctx, os.Stdout, "auto")
-		const drivername = "buildx_buildkit_default"
-		d, err := driver.GetDriver(ctx, drivername, nil, s.containerService.apiClient, nil, nil, "", nil, project.WorkingDir)
-		if err != nil {
-			return err
+func (s *local) needPull(ctx context.Context, service types.ServiceConfig) (bool, error) {
+	_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return true, nil
 		}
-		driverInfo := []build.DriverInfo{
-			{
-				Name:   "default",
-				Driver: d,
-			},
-		}
-		// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-		// FIXME pass auth file from
-		_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
-		return err
+		return false, err
 	}
-
-	if service.Image != "" {
-		_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				stream, err := s.containerService.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{})
-				if err != nil {
-					return err
-				}
-				dec := json.NewDecoder(stream)
-				for {
-					var jm jsonmessage.JSONMessage
-					if err := dec.Decode(&jm); err != nil {
-						if err == io.EOF {
-							break
-						}
-						return err
-					}
-					toProgressEvent(jm, w)
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
-	if jm.Progress != nil {
-		if jm.Progress.Total != 0 {
-			status := progress.Working
-			if jm.Status == "Pull complete" {
-				status = progress.Done
-			}
-			w.Event(progress.Event{
-				ID:         jm.ID,
-				Text:       jm.Status,
-				Status:     status,
-				StatusText: jm.Progress.String(),
-			})
-		} else {
-			if jm.Error != nil {
-				w.Event(progress.Event{
-					ID:         jm.ID,
-					Text:       jm.Status,
-					Status:     progress.Error,
-					StatusText: jm.Error.Message,
-				})
-			} else if jm.Status == "Pull complete" || jm.Status == "Already exists" {
-				w.Event(progress.Event{
-					ID:     jm.ID,
-					Text:   jm.Status,
-					Status: progress.Done,
-				})
-			} else {
-				w.Event(progress.Event{
-					ID:     jm.ID,
-					Text:   jm.Status,
-					Status: progress.Working,
-				})
-			}
-		}
-	}
+	return false, nil
 }
 
 func (s *local) Down(ctx context.Context, projectName string) error {
