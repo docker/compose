@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -30,6 +31,9 @@ import (
 	"sync"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/buildx/build"
+	"github.com/docker/buildx/driver"
+	px "github.com/docker/buildx/util/progress"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -73,7 +77,7 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 	}
 
 	for _, service := range project.Services {
-		err := s.applyPullPolicy(ctx, service)
+		err := s.applyPullPolicy(ctx, project, service)
 		if err != nil {
 			return err
 		}
@@ -95,10 +99,33 @@ func getContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
-func (s *local) applyPullPolicy(ctx context.Context, service types.ServiceConfig) error {
+func (s *local) applyPullPolicy(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	w := progress.ContextWriter(ctx)
 	// TODO build vs pull should be controlled by pull policy
-	// if service.Build {}
+	opts := map[string]build.Options{}
+	if service.Build != nil {
+		opts[service.Name] = s.buildImage(ctx, service, project.WorkingDir)
+	}
+
+	if len(opts) > 0 {
+		w := px.NewPrinter(ctx, os.Stdout, "auto")
+		const drivername = "buildx_buildkit_default"
+		d, err := driver.GetDriver(ctx, drivername, nil, s.containerService.apiClient, nil, nil, "", nil, project.WorkingDir)
+		if err != nil {
+			return err
+		}
+		driverInfo := []build.DriverInfo{
+			{
+				Name:   "default",
+				Driver: d,
+			},
+		}
+		// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
+		// FIXME pass auth file from
+		_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
+		return err
+	}
+
 	if service.Image != "" {
 		_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
 		if err != nil {

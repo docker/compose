@@ -6,6 +6,13 @@ go 1.15
 // we need to create a new release tag for docker/distribution
 replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
 
+// (for buildx)
+replace github.com/containerd/containerd => github.com/containerd/containerd v1.3.1-0.20200227195959-4d242818bf55
+
+replace github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82
+
+replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
+
 // unix.SYS_IOCTL has been removed from golang/sys but still in use by docker/docker until 20.x
 replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
@@ -27,10 +34,9 @@ require (
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/compose-spec/compose-go v0.0.0-20201122180821-0f87549cda1e
 	github.com/containerd/console v1.0.1
-	github.com/containerd/containerd v1.3.5 // indirect
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
+	github.com/docker/buildx v0.4.2
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
-	github.com/docker/distribution v0.0.0-00010101000000-000000000000 // indirect
 	github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
 	github.com/docker/docker-credential-helpers v0.6.3 // indirect
 	github.com/docker/go-connections v0.4.0
@@ -51,7 +57,6 @@ require (
 	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/tsdb v0.10.0
 	github.com/sanathkr/go-yaml v0.0.0-20170819195128-ed9d249f429b
