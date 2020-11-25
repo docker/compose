@@ -150,7 +150,8 @@ func lineText(event Event, terminalWidth, statusPadding int, color bool) string 
 	// is 2-3 lines long and breaks the line formating
 	maxStatusLen := terminalWidth - textLen - statusPadding - 15
 	status := event.StatusText
-	if len(status) > maxStatusLen {
+	// in some cases (debugging under VS Code), terminalWidth is set to zero by goterm.Width() ; ensuring we don't tweak strings with negative char index
+	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
 	text := fmt.Sprintf(" %s %s %s%s %s",
