@@ -30,7 +30,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -39,13 +38,13 @@ const (
 	forceRecreate = "force_recreate"
 )
 
-func (s *local) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	err := s.waitDependencies(ctx, project, service)
 	if err != nil {
 		return err
 	}
 
-	actual, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	actual, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
 			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service.Name)),
@@ -77,11 +76,11 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 		for i := scale; i < len(actual); i++ {
 			container := actual[i]
 			eg.Go(func() error {
-				err := s.containerService.Stop(ctx, container.ID, nil)
+				err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 				if err != nil {
 					return err
 				}
-				return s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+				return s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			})
 		}
 		actual = actual[:scale]
@@ -114,7 +113,7 @@ func (s *local) ensureService(ctx context.Context, project *types.Project, servi
 	return eg.Wait()
 }
 
-func (s *local) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for dep, config := range service.DependsOn {
 		switch config.Condition {
@@ -163,7 +162,7 @@ func getScale(config types.ServiceConfig) int {
 	return 1
 }
 
-func (s *local) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int) error {
+func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.Event{
 		ID:         fmt.Sprintf("Service %q", service.Name),
@@ -182,20 +181,20 @@ func (s *local) createContainer(ctx context.Context, project *types.Project, ser
 	return nil
 }
 
-func (s *local) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
+func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.Event{
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Working,
 		StatusText: "Recreate",
 	})
-	err := s.containerService.Stop(ctx, container.ID, nil)
+	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 	if err != nil {
 		return err
 	}
 	name := getContainerName(container)
 	tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
-	err = s.containerService.apiClient.ContainerRename(ctx, container.ID, tmpName)
+	err = s.apiClient.ContainerRename(ctx, container.ID, tmpName)
 	if err != nil {
 		return err
 	}
@@ -207,7 +206,7 @@ func (s *local) recreateContainer(ctx context.Context, project *types.Project, s
 	if err != nil {
 		return err
 	}
-	err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+	err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 	if err != nil {
 		return err
 	}
@@ -233,14 +232,14 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 	}
 }
 
-func (s *local) restartContainer(ctx context.Context, service types.ServiceConfig, container moby.Container) error {
+func (s *composeService) restartContainer(ctx context.Context, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.Event{
 		ID:         fmt.Sprintf("Service %q", service.Name),
 		Status:     progress.Working,
 		StatusText: "Restart",
 	})
-	err := s.containerService.Start(ctx, container.ID)
+	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
@@ -252,15 +251,16 @@ func (s *local) restartContainer(ctx context.Context, service types.ServiceConfi
 	return nil
 }
 
-func (s *local) runContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container) error {
+func (s *composeService) runContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container) error {
 	containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service, number, container)
 	if err != nil {
 		return err
 	}
-	id, err := s.containerService.create(ctx, containerConfig, hostConfig, networkingConfig, name)
+	created, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
 	if err != nil {
 		return err
 	}
+	id := created.ID
 	for net := range service.Networks {
 		name := fmt.Sprintf("%s_%s", project.Name, net)
 		err = s.connectContainerToNetwork(ctx, id, service.Name, name)
@@ -268,15 +268,15 @@ func (s *local) runContainer(ctx context.Context, project *types.Project, servic
 			return err
 		}
 	}
-	err = s.containerService.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
+	err = s.apiClient.ContainerStart(ctx, id, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *local) connectContainerToNetwork(ctx context.Context, id string, service string, n string) error {
-	err := s.containerService.apiClient.NetworkConnect(ctx, n, id, &network.EndpointSettings{
+func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, service string, n string) error {
+	err := s.apiClient.NetworkConnect(ctx, n, id, &network.EndpointSettings{
 		Aliases: []string{service},
 	})
 	if err != nil {
@@ -285,8 +285,8 @@ func (s *local) connectContainerToNetwork(ctx context.Context, id string, servic
 	return nil
 }
 
-func (s *local) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
-	containers, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
 			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service)),
@@ -297,7 +297,7 @@ func (s *local) isServiceHealthy(ctx context.Context, project *types.Project, se
 	}
 
 	for _, c := range containers {
-		container, err := s.containerService.apiClient.ContainerInspect(ctx, c.ID)
+		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, err
 		}

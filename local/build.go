@@ -25,6 +25,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/docker/docker/errdefs"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
@@ -32,7 +34,7 @@ import (
 	"github.com/docker/buildx/util/progress"
 )
 
-func (s *local) ensureImagesExists(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
 	for _, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
@@ -71,9 +73,20 @@ func (s *local) ensureImagesExists(ctx context.Context, project *types.Project) 
 	return s.build(ctx, project, opts)
 }
 
-func (s *local) build(ctx context.Context, project *types.Project, opts map[string]build.Options) error {
+func (s *composeService) needPull(ctx context.Context, service types.ServiceConfig) (bool, error) {
+	_, _, err := s.apiClient.ImageInspectWithRaw(ctx, service.Image)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options) error {
 	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.containerService.apiClient, nil, nil, "", nil, project.WorkingDir)
+	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, "", nil, project.WorkingDir)
 	if err != nil {
 		return err
 	}
@@ -89,7 +102,7 @@ func (s *local) build(ctx context.Context, project *types.Project, opts map[stri
 	return err
 }
 
-func (s *local) buildImage(ctx context.Context, service types.ServiceConfig, contextPath string) build.Options {
+func (s *composeService) buildImage(ctx context.Context, service types.ServiceConfig, contextPath string) build.Options {
 	var tags []string
 	if service.Image != "" {
 		tags = append(tags, service.Image)
