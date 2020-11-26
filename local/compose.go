@@ -37,7 +37,6 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/errdefs"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
@@ -75,14 +74,12 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 		}
 	}
 
-	for _, service := range project.Services {
-		err := s.applyPullPolicy(ctx, service)
-		if err != nil {
-			return err
-		}
+	err := s.ensureImagesExists(ctx, project)
+	if err != nil {
+		return err
 	}
 
-	err := inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	err = inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, project, service)
 	})
 	return err
@@ -98,71 +95,15 @@ func getContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
-func (s *local) applyPullPolicy(ctx context.Context, service types.ServiceConfig) error {
-	w := progress.ContextWriter(ctx)
-	// TODO build vs pull should be controlled by pull policy
-	// if service.Build {}
-	if service.Image != "" {
-		_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				stream, err := s.containerService.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{})
-				if err != nil {
-					return err
-				}
-				dec := json.NewDecoder(stream)
-				for {
-					var jm jsonmessage.JSONMessage
-					if err := dec.Decode(&jm); err != nil {
-						if err == io.EOF {
-							break
-						}
-						return err
-					}
-					toProgressEvent(jm, w)
-				}
-			}
+func (s *local) needPull(ctx context.Context, service types.ServiceConfig) (bool, error) {
+	_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return true, nil
 		}
+		return false, err
 	}
-	return nil
-}
-
-func toProgressEvent(jm jsonmessage.JSONMessage, w progress.Writer) {
-	if jm.Progress != nil {
-		if jm.Progress.Total != 0 {
-			status := progress.Working
-			if jm.Status == "Pull complete" {
-				status = progress.Done
-			}
-			w.Event(progress.Event{
-				ID:         jm.ID,
-				Text:       jm.Status,
-				Status:     status,
-				StatusText: jm.Progress.String(),
-			})
-		} else {
-			if jm.Error != nil {
-				w.Event(progress.Event{
-					ID:         jm.ID,
-					Text:       jm.Status,
-					Status:     progress.Error,
-					StatusText: jm.Error.Message,
-				})
-			} else if jm.Status == "Pull complete" || jm.Status == "Already exists" {
-				w.Event(progress.Event{
-					ID:     jm.ID,
-					Text:   jm.Status,
-					Status: progress.Done,
-				})
-			} else {
-				w.Event(progress.Event{
-					ID:     jm.ID,
-					Text:   jm.Status,
-					Status: progress.Working,
-				})
-			}
-		}
-	}
+	return false, nil
 }
 
 func (s *local) Down(ctx context.Context, projectName string) error {

@@ -1,15 +1,15 @@
 services:
   db:
-    build: db
+    build: aci-demo/db
     image: gtardif/sentences-db
 
   words:
-    build: words
+    build: aci-demo/words
     image: gtardif/sentences-api
     ports:
       - "8080:8080"
   web:
-    build: web
+    build: aci-demo/web
     image: gtardif/sentences-web
     ports:
       - "80:80"
