@@ -315,7 +315,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		oneoffLabel:          "False",
 		configHashLabel:      hash,
 		workingDirLabel:      p.WorkingDir,
-		configFilesLabel:     strings.Join(p.ConfigNames(), ","),
+		configFilesLabel:     strings.Join(p.ComposeFiles, ","),
 		containerNumberLabel: strconv.Itoa(number),
 	}
 

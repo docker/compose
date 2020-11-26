@@ -57,7 +57,7 @@ func TestLocalBackendComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files":`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../../tests/composefiles/demo_multi_port.yaml"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})

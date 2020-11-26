@@ -32,7 +32,7 @@ require (
 	github.com/aws/aws-sdk-go v1.35.33
 	github.com/awslabs/goformation/v4 v4.15.6
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/compose-spec/compose-go v0.0.0-20201122180821-0f87549cda1e
+	github.com/compose-spec/compose-go v0.0.0-20201126152818-90e602b681e4
 	github.com/containerd/console v1.0.1
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/docker/buildx v0.4.2

@@ -149,8 +149,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/cloudflare/cfssl v0.0.0-20181213083726-b94e044bb51e/go.mod h1:yMWuSON2oQp+43nFtAV/uvKQIFpSPerB57DCt9t8sSA=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20201122180821-0f87549cda1e h1:EO6seAKT1UtMjk1RGmuXS1tFkSkWr6FPjQru/mC+r/U=
-github.com/compose-spec/compose-go v0.0.0-20201122180821-0f87549cda1e/go.mod h1:Pm8gjIoib7x9av1XGkijXddjyV4aTHEq9EwVOvWH624=
+github.com/compose-spec/compose-go v0.0.0-20201126152818-90e602b681e4 h1:dN1SwJkUU2sz2udsmvfsSi66stSo7YM9sUy81I22WwU=
+github.com/compose-spec/compose-go v0.0.0-20201126152818-90e602b681e4/go.mod h1:Pm8gjIoib7x9av1XGkijXddjyV4aTHEq9EwVOvWH624=
 github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/containerd/cgroups v0.0.0-20200217135630-d732e370d46d/go.mod h1:CStdkl05lBnJej94BPFoJ7vB8cELKXwViS+dgfW0/M8=
 github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 h1:qWj4qVYZ95vLWwqyNJCQg7rDsG5wPdze0UaPolH7DUk=
