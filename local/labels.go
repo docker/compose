@@ -28,6 +28,7 @@ const (
 	containerNumberLabel = "com.docker.compose.container-number"
 	oneoffLabel          = "com.docker.compose.oneoff"
 	projectLabel         = "com.docker.compose.project"
+	volumeLabel          = "com.docker.compose.volume"
 	workingDirLabel      = "com.docker.compose.project.working_dir"
 	configFilesLabel     = "com.docker.compose.project.config_files"
 	serviceLabel         = "com.docker.compose.service"

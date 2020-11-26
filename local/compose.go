@@ -73,7 +73,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Volumes[k] = volume
 		}
-		err := s.ensureVolume(ctx, volume)
+		err := s.ensureVolume(ctx, project, volume)
 		if err != nil {
 			return err
 		}
@@ -182,8 +182,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writ
 			return err
 		})
 	}
-	eg.Wait()
-	return nil
+	return eg.Wait()
 }
 
 func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
@@ -592,10 +591,17 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	return nil
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
+func (s *composeService) ensureVolume(ctx context.Context, project *types.Project, volume types.VolumeConfig) error {
 	// TODO could identify volume by label vs name
 	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
+		labels := volume.Labels
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[projectLabel] = project.Name
+		labels[volumeLabel] = volume.Name
+
 		if errdefs.IsNotFound(err) {
 			w := progress.ContextWriter(ctx)
 			w.Event(progress.Event{
@@ -605,8 +611,10 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 			})
 			// TODO we miss support for driver_opts and labels
 			_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
-				Labels: nil,
-				Name:   volume.Name,
+				Labels:     labels,
+				Name:       volume.Name,
+				Driver:     volume.Driver,
+				DriverOpts: volume.DriverOpts,
 			})
 			w.Event(progress.Event{
 				ID:         fmt.Sprintf("Volume %q", volume.Name),
