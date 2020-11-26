@@ -1,11 +1,13 @@
 #!/bin/bash
 set -ex
 
+. $(dirname $0)/../setup/osx_helpers.sh
+
 TOOLCHAIN_PATH="$(realpath $(dirname $0)/../../build/toolchain)"
 
 rm -rf venv
 
-virtualenv -p "${TOOLCHAIN_PATH}"/bin/python3 venv
+python -m virtualenv -p "${TOOLCHAIN_PATH}"/bin/python3 venv
 venv/bin/pip install -r requirements-indirect.txt
 venv/bin/pip install -r requirements.txt
 venv/bin/pip install -r requirements-build.txt

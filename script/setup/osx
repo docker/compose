@@ -24,25 +24,13 @@ PYTHON_SHA1=5744a10ba989d2badacbab3c00cdcb83c83106c7
 #
 # Install prerequisites.
 #
-if ! [ -x "$(command -v brew)" ]; then
-  ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-fi
-if ! [ -x "$(command -v grealpath)" ]; then
-  brew update > /dev/null
-  brew install coreutils
-fi
-if ! [ -x "$(command -v python3)" ]; then
-  brew update > /dev/null
-  brew install python3
-fi
-if ! [ -x "$(command -v virtualenv)" ]; then
-  pip3 install virtualenv==20.0.30
-fi
+python -m pip --version 2>&1 /dev/null || curl -L https://bootstrap.pypa.io/get-pip.py | python
+python -m virtualenv --version 2>&1 /dev/null || python -m pip install virtualenv==20.0.30
 
 #
 # Create toolchain directory.
 #
-BUILD_PATH="$(grealpath $(dirname $0)/../../build)"
+BUILD_PATH="$(realpath $(dirname $0)/../../build)"
 mkdir -p ${BUILD_PATH}
 TOOLCHAIN_PATH="${BUILD_PATH}/toolchain"
 mkdir -p ${TOOLCHAIN_PATH}

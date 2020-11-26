@@ -39,3 +39,17 @@ openssl_version() {
 macos_version() {
   sw_vers -productVersion | cut -f1,2 -d'.'
 }
+
+# Realpath substitute.
+realpath() {
+  local OURPWD=$PWD
+  cd "$(dirname "$1")"
+  local LINK=$(readlink "$(basename "$1")")
+  while [ "$LINK" ]; do
+    cd "$(dirname "$LINK")"
+    LINK=$(readlink "$(basename "$1")")
+  done
+  local REALPATH="$PWD/$(basename "$1")"
+  cd "$OURPWD"
+  echo "$REALPATH"
+}
