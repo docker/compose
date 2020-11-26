@@ -55,6 +55,9 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Networks[k] = network
 		}
+		network.Labels = network.Labels.Add(networkLabel, k)
+		network.Labels = network.Labels.Add(projectLabel, project.Name)
+		network.Labels = network.Labels.Add(versionLabel, ComposeVersion)
 		err := s.ensureNetwork(ctx, network)
 		if err != nil {
 			return err

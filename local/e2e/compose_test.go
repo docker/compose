@@ -37,14 +37,34 @@ func TestLocalBackendComposeUp(t *testing.T) {
 
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName)
-		t.Cleanup(func() {
-			_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
-		})
+	})
+	t.Cleanup(func() {
+		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
+	})
+
+	t.Run("check running project", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:80"
 		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, `"word":`))
+	})
+
+	t.Run("check compose labels", func(t *testing.T) {
+		res := c.RunDockerCmd("--context", "default", "inspect", projectName+"_web_1")
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files":`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
+
+		res = c.RunDockerCmd("--context", "default", "network", "inspect", projectName+"_default")
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.network": "default"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": `})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version": `})
 	})
 }
