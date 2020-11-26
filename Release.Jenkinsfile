@@ -1,8 +1,8 @@
 #!groovy
 
-def dockerVersions = ['19.03.8', '18.09.9']
+def dockerVersions = ['19.03.13', '18.09.9']
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py37']
+def pythonVersions = ['py39']
 
 pipeline {
     agent none
@@ -84,7 +84,7 @@ pipeline {
                     steps {
                         checkout scm
                         sh './script/setup/osx'
-                        sh 'tox -e py37 -- tests/unit'
+                        sh 'tox -e py39 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
                           checksum('docker-compose-Darwin-x86_64')
@@ -121,7 +121,7 @@ pipeline {
                     }
                     steps {
                         checkout scm
-                        bat 'tox.exe -e py37 -- tests/unit'
+                        bat 'tox.exe -e py39 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
                             checksum('docker-compose-Windows-x86_64.exe')

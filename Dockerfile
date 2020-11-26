@@ -1,11 +1,13 @@
-ARG DOCKER_VERSION=19.03.8
-ARG PYTHON_VERSION=3.7.7
-ARG BUILD_ALPINE_VERSION=3.11
+ARG DOCKER_VERSION=19.03
+ARG PYTHON_VERSION=3.9.0
+
+ARG BUILD_ALPINE_VERSION=3.12
 ARG BUILD_CENTOS_VERSION=7
-ARG BUILD_DEBIAN_VERSION=slim-stretch
-ARG RUNTIME_ALPINE_VERSION=3.11.5
+ARG BUILD_DEBIAN_VERSION=slim-buster
+
+ARG RUNTIME_ALPINE_VERSION=3.12
 ARG RUNTIME_CENTOS_VERSION=7
-ARG RUNTIME_DEBIAN_VERSION=stretch-20200414-slim
+ARG RUNTIME_DEBIAN_VERSION=buster-slim
 
 ARG DISTRO=alpine
 
@@ -36,7 +38,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
     libc-dev \
     libffi-dev \
-    libgcc-6-dev \
+    libgcc-8-dev \
     libssl-dev \
     make \
     openssl \
@@ -57,7 +59,7 @@ RUN curl -L https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_
     && ./configure --enable-optimizations --enable-shared --prefix=/usr LDFLAGS="-Wl,-rpath /usr/lib" \
     && make altinstall
 RUN alternatives --install /usr/bin/python python /usr/bin/python2.7 50
-RUN alternatives --install /usr/bin/python python /usr/bin/python3.7 60
+RUN alternatives --install /usr/bin/python python /usr/bin/python$(echo "${PYTHON_VERSION}" | cut -c1-3) 60
 RUN curl https://bootstrap.pypa.io/get-pip.py | python -
 
 FROM build-${DISTRO} AS build

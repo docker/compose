@@ -1,8 +1,8 @@
 #!groovy
 
-def dockerVersions = ['19.03.8']
+def dockerVersions = ['19.03.13']
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py37']
+def pythonVersions = ['py39']
 
 pipeline {
     agent none
