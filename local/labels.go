@@ -33,6 +33,7 @@ const (
 	serviceLabel         = "com.docker.compose.service"
 	versionLabel         = "com.docker.compose.version"
 	configHashLabel      = "com.docker.compose.config-hash"
+	networkLabel         = "com.docker.compose.network"
 
 	//ComposeVersion Compose version
 	ComposeVersion = "1.0-alpha"
