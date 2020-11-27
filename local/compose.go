@@ -73,7 +73,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Volumes[k] = volume
 		}
-		err := s.ensureVolume(ctx, project, volume)
+		volume.Labels = volume.Labels.Add(volumeLabel, k)
+		volume.Labels = volume.Labels.Add(projectLabel, project.Name)
+		volume.Labels = volume.Labels.Add(versionLabel, ComposeVersion)
+		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
 		}
@@ -591,17 +594,10 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	return nil
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, project *types.Project, volume types.VolumeConfig) error {
+func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
 	// TODO could identify volume by label vs name
 	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
-		labels := volume.Labels
-		if labels == nil {
-			labels = map[string]string{}
-		}
-		labels[projectLabel] = project.Name
-		labels[volumeLabel] = volume.Name
-
 		if errdefs.IsNotFound(err) {
 			w := progress.ContextWriter(ctx)
 			w.Event(progress.Event{
@@ -611,7 +607,7 @@ func (s *composeService) ensureVolume(ctx context.Context, project *types.Projec
 			})
 			// TODO we miss support for driver_opts and labels
 			_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
-				Labels:     labels,
+				Labels:     volume.Labels,
 				Name:       volume.Name,
 				Driver:     volume.Driver,
 				DriverOpts: volume.DriverOpts,
