@@ -52,7 +52,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			}
 		}
 		if service.Build != nil {
-			opts[service.Name] = s.buildImage(service, project.WorkingDir)
+			opts[service.Name] = s.toBuildOptions(service, project.WorkingDir)
 			continue
 		}
 
@@ -102,7 +102,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	return err
 }
 
-func (s *composeService) buildImage(service types.ServiceConfig, contextPath string) build.Options {
+func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string) build.Options {
 	var tags []string
 	if service.Image != "" {
 		tags = append(tags, service.Image)
