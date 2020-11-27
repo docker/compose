@@ -143,6 +143,25 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 			return nil
 		})
 	}
+	err = eg.Wait()
+	if err != nil {
+		return err
+	}
+	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(projectName),
+		),
+	})
+	if err != nil {
+		return err
+	}
+	for _, network := range networks {
+		networkID := network.ID
+		networkName := network.Name
+		eg.Go(func() error {
+			return s.ensureNetworkDown(ctx, networkID, networkName)
+		})
+	}
 	return eg.Wait()
 }
 
@@ -590,6 +609,32 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 		}
 		return err
 	}
+	return nil
+}
+
+func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string, networkName string) error {
+	w := progress.ContextWriter(ctx)
+	w.Event(progress.Event{
+		ID:         fmt.Sprintf("Network %q", networkName),
+		Status:     progress.Working,
+		StatusText: "Delete",
+	})
+
+	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
+		msg := fmt.Sprintf("failed to create network %s", networkID)
+		w.Event(progress.Event{
+			ID:         fmt.Sprintf("Network %q", networkName),
+			Status:     progress.Error,
+			StatusText: "Error: " + msg,
+		})
+		return errors.Wrapf(err, msg)
+	}
+
+	w.Event(progress.Event{
+		ID:         fmt.Sprintf("Network %q", networkName),
+		Status:     progress.Done,
+		StatusText: "Deleted",
+	})
 	return nil
 }
 

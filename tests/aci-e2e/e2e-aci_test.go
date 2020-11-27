@@ -206,7 +206,7 @@ func TestRunVolume(t *testing.T) {
 	t.Cleanup(func() {
 		c.RunDockerCmd("volume", "rm", volumeID)
 		res := c.RunDockerCmd("volume", "ls")
-		lines := lines(res.Stdout())
+		lines := Lines(res.Stdout())
 		assert.Equal(t, len(lines), 1)
 	})
 
@@ -217,13 +217,13 @@ func TestRunVolume(t *testing.T) {
 
 	t.Run("list volumes", func(t *testing.T) {
 		res := c.RunDockerCmd("volume", "ls", "--quiet")
-		l := lines(res.Stdout())
+		l := Lines(res.Stdout())
 		assert.Equal(t, len(l), 2)
 		assert.Equal(t, l[0], volumeID)
 		assert.Equal(t, l[1], volumeID2)
 
 		res = c.RunDockerCmd("volume", "ls")
-		l = lines(res.Stdout())
+		l = Lines(res.Stdout())
 		assert.Equal(t, len(l), 3)
 		firstAccount := l[1]
 		fields := strings.Fields(firstAccount)
@@ -251,7 +251,7 @@ func TestRunVolume(t *testing.T) {
 	t.Run("delete only fileshare", func(t *testing.T) {
 		c.RunDockerCmd("volume", "rm", volumeID2)
 		res := c.RunDockerCmd("volume", "ls")
-		lines := lines(res.Stdout())
+		lines := Lines(res.Stdout())
 		assert.Equal(t, len(lines), 2)
 		assert.Assert(t, !strings.Contains(res.Stdout(), fileshareName2), "second fileshare still visible after rm")
 	})
@@ -288,7 +288,7 @@ func TestRunVolume(t *testing.T) {
 
 	t.Run("ps", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		l := out[len(out)-1]
 		assert.Assert(t, strings.Contains(l, container), "Looking for %q in line: %s", container, l)
 		assert.Assert(t, strings.Contains(l, "nginx"))
@@ -377,10 +377,6 @@ func TestRunVolume(t *testing.T) {
 		}
 		poll.WaitOn(t, checkStopped, poll.WithDelay(5*time.Second), poll.WithTimeout(60*time.Second))
 	})
-}
-
-func lines(output string) []string {
-	return strings.Split(strings.TrimSpace(output), "\n")
 }
 
 func TestContainerRunAttached(t *testing.T) {
@@ -472,11 +468,11 @@ func TestContainerRunAttached(t *testing.T) {
 
 	t.Run("ps stopped container with --all", func(t *testing.T) {
 		res := c.RunDockerCmd("ps", container)
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 1))
 
 		res = c.RunDockerCmd("ps", "--all", container)
-		out = lines(res.Stdout())
+		out = Lines(res.Stdout())
 		assert.Assert(t, is.Len(out, 2))
 	})
 
@@ -497,14 +493,14 @@ func TestContainerRunAttached(t *testing.T) {
 		res := c.RunDockerCmd("prune")
 		assert.Equal(t, "Deleted resources:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
 		res = c.RunDockerCmd("ps")
-		l := lines(res.Stdout())
+		l := Lines(res.Stdout())
 		assert.Equal(t, 2, len(l))
 
 		res = c.RunDockerCmd("prune", "--force")
 		assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--all")
-		l = lines(res.Stdout())
+		l = Lines(res.Stdout())
 		assert.Equal(t, 1, len(l))
 	})
 }
@@ -539,7 +535,7 @@ func TestUpSecretsResources(t *testing.T) {
 	t.Run("compose up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		// Check 2 containers running
 		assert.Assert(t, is.Len(out, 3))
 	})
@@ -547,7 +543,7 @@ func TestUpSecretsResources(t *testing.T) {
 	t.Cleanup(func() {
 		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
 	})
 
@@ -689,7 +685,7 @@ func TestUpUpdate(t *testing.T) {
 
 	t.Run("check deployed compose app", func(t *testing.T) {
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 		webRunning := false
@@ -729,11 +725,11 @@ func TestUpUpdate(t *testing.T) {
 
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName, "--quiet")
-		l := lines(res.Stdout())
+		l := Lines(res.Stdout())
 		assert.Assert(t, is.Len(l, 3))
 
 		res = c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
-		l = lines(res.Stdout())
+		l = Lines(res.Stdout())
 		assert.Assert(t, is.Len(l, 4))
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
 		for _, line := range l {
@@ -757,10 +753,10 @@ func TestUpUpdate(t *testing.T) {
 
 	t.Run("compose ls", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ls", "--quiet")
-		l := lines(res.Stdout())
+		l := Lines(res.Stdout())
 		assert.Assert(t, is.Len(l, 1))
 		res = c.RunDockerCmd("compose", "ls")
-		l = lines(res.Stdout())
+		l = Lines(res.Stdout())
 
 		assert.Equal(t, 2, len(l))
 		fields := strings.Fields(l[1])
@@ -777,7 +773,7 @@ func TestUpUpdate(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", multiPortComposefile, "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		// Check three containers are running
 		assert.Assert(t, is.Len(out, 4))
 
@@ -812,7 +808,7 @@ func TestUpUpdate(t *testing.T) {
 	t.Run("down", func(t *testing.T) {
 		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
 		res := c.RunDockerCmd("ps")
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
 	})
 }
@@ -835,7 +831,7 @@ func TestRunEnvVars(t *testing.T) {
 		cmd.Env = append(cmd.Env, "MYSQL_USER=user1")
 		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Success)
-		out := lines(res.Stdout())
+		out := Lines(res.Stdout())
 		container := strings.TrimSpace(out[len(out)-1])
 
 		res = c.RunDockerCmd("inspect", container)
@@ -882,7 +878,7 @@ func setupTestResourceGroup(t *testing.T, c *E2eCLI) (string, string, string) {
 	createAciContextAndUseIt(t, c, sID, rg, location)
 	// Check nothing is running
 	res := c.RunDockerCmd("ps")
-	assert.Assert(t, is.Len(lines(res.Stdout()), 1))
+	assert.Assert(t, is.Len(Lines(res.Stdout()), 1))
 	return sID, rg, location
 }
 
@@ -945,7 +941,7 @@ func uploadFile(t *testing.T, cred azfile.SharedKeyCredential, baseURL, fileName
 }
 
 func getContainerName(stdout string) string {
-	out := lines(stdout)
+	out := Lines(stdout)
 	return strings.TrimSpace(out[len(out)-1])
 }
 
