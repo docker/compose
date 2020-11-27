@@ -85,6 +85,9 @@ func (s *composeService) needPull(ctx context.Context, service types.ServiceConf
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options) error {
+	if len(opts) == 0 {
+		return nil
+	}
 	const drivername = "default"
 	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, "", nil, project.WorkingDir)
 	if err != nil {
