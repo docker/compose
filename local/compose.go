@@ -54,6 +54,10 @@ type composeService struct {
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+	err := s.ensureImagesExists(ctx, project)
+	if err != nil {
+		return err
+	}
 	for k, network := range project.Networks {
 		if !network.External.External && network.Name != "" {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
@@ -80,11 +84,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 		if err != nil {
 			return err
 		}
-	}
-
-	err := s.ensureImagesExists(ctx, project)
-	if err != nil {
-		return err
 	}
 
 	err = inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
