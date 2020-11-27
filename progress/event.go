@@ -54,7 +54,7 @@ func ErrorEvent(ID string) Event {
 
 // CreatingEvent creates a new Create in progress Event
 func CreatingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Creating...")
+	return NewEvent(ID, Working, "Creating")
 }
 
 // CreatedEvent creates a new Created (done) Event
@@ -64,7 +64,7 @@ func CreatedEvent(ID string) Event {
 
 // RemovingEvent creates a new Removing in progress Event
 func RemovingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Removing...")
+	return NewEvent(ID, Working, "Removing")
 }
 
 // RemovedEvent creates a new removed (done) Event
