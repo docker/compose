@@ -20,41 +20,11 @@ import (
 	"context"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/containerd/console"
 	"github.com/moby/term"
 	"golang.org/x/sync/errgroup"
 )
-
-// EventStatus indicates the status of an action
-type EventStatus int
-
-const (
-	// Working means that the current task is working
-	Working EventStatus = iota
-	// Done means that the current task is done
-	Done
-	// Error means that the current task has errored
-	Error
-)
-
-// Event represents a progress event.
-type Event struct {
-	ID         string
-	Text       string
-	Status     EventStatus
-	StatusText string
-
-	startTime time.Time
-	endTime   time.Time
-	spinner   *spinner
-}
-
-func (e *Event) stop() {
-	e.endTime = time.Now()
-	e.spinner.Stop()
-}
 
 // Writer can write multiple progress events
 type Writer interface {

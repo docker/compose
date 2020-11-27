@@ -116,11 +116,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			}
 			stackErr = err
 			operation = stackDelete
-			w.Event(progress.Event{
-				ID:         name,
-				Status:     progress.Error,
-				StatusText: err.Error(),
-			})
+			w.Event(progress.ErrorEvent(name, err.Error()))
 		}
 	}
 

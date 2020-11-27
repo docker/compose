@@ -117,29 +117,17 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 	for _, c := range list {
 		container := c
 		eg.Go(func() error {
-			w.Event(progress.Event{
-				ID:     getContainerName(container),
-				Text:   "Stopping",
-				Status: progress.Working,
-			})
+			w.Event(progress.NewEvent(getContainerName(container), progress.Working, "Stopping"))
 			err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 			if err != nil {
 				return err
 			}
-			w.Event(progress.Event{
-				ID:     getContainerName(container),
-				Text:   "Removing",
-				Status: progress.Working,
-			})
+			w.Event(progress.RemovingEvent(getContainerName(container)))
 			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			if err != nil {
 				return err
 			}
-			w.Event(progress.Event{
-				ID:     getContainerName(container),
-				Text:   "Removed",
-				Status: progress.Done,
-			})
+			w.Event(progress.RemovedEvent(getContainerName(container)))
 			return nil
 		})
 	}
@@ -591,20 +579,13 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 				}
 				createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
 			}
+			networkEventName := fmt.Sprintf("Network %q", n.Name)
 			w := progress.ContextWriter(ctx)
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Network %q", n.Name),
-				Status:     progress.Working,
-				StatusText: "Create",
-			})
+			w.Event(progress.CreatingEvent(networkEventName))
 			if _, err := s.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Network %q", n.Name),
-				Status:     progress.Done,
-				StatusText: "Created",
-			})
+			w.Event(progress.CreatedEvent(networkEventName))
 			return nil
 		}
 		return err
@@ -614,27 +595,16 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 
 func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string, networkName string) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Network %q", networkName),
-		Status:     progress.Working,
-		StatusText: "Delete",
-	})
+	eventName := fmt.Sprintf("Network %q", networkName)
+	w.Event(progress.RemovingEvent(eventName))
 
 	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
 		msg := fmt.Sprintf("failed to create network %s", networkID)
-		w.Event(progress.Event{
-			ID:         fmt.Sprintf("Network %q", networkName),
-			Status:     progress.Error,
-			StatusText: "Error: " + msg,
-		})
+		w.Event(progress.ErrorEvent(eventName, "Error: "+msg))
 		return errors.Wrapf(err, msg)
 	}
 
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Network %q", networkName),
-		Status:     progress.Done,
-		StatusText: "Deleted",
-	})
+	w.Event(progress.RemovedEvent(eventName))
 	return nil
 }
 
@@ -643,12 +613,9 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
+			eventName := fmt.Sprintf("Volume %q", volume.Name)
 			w := progress.ContextWriter(ctx)
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Volume %q", volume.Name),
-				Status:     progress.Working,
-				StatusText: "Create",
-			})
+			w.Event(progress.CreatingEvent(eventName))
 			// TODO we miss support for driver_opts and labels
 			_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
 				Labels:     volume.Labels,
@@ -656,11 +623,7 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 				Driver:     volume.Driver,
 				DriverOpts: volume.DriverOpts,
 			})
-			w.Event(progress.Event{
-				ID:         fmt.Sprintf("Volume %q", volume.Name),
-				Status:     progress.Done,
-				StatusText: "Created",
-			})
+			w.Event(progress.CreatedEvent(eventName))
 			if err != nil {
 				return err
 			}
