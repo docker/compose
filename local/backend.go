@@ -35,6 +35,7 @@ import (
 type local struct {
 	*containerService
 	*volumeService
+	*composeService
 }
 
 func init() {
@@ -50,6 +51,7 @@ func service(ctx context.Context) (backend.Service, error) {
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
+		composeService:   &composeService{apiClient},
 	}, nil
 }
 
@@ -58,7 +60,7 @@ func (s *local) ContainerService() containers.Service {
 }
 
 func (s *local) ComposeService() compose.Service {
-	return s
+	return s.composeService
 }
 
 func (s *local) SecretsService() secrets.Service {

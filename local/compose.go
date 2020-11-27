@@ -27,7 +27,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -36,19 +35,25 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
+	mobyvolume "github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
 
-func (s *local) Up(ctx context.Context, project *types.Project, detach bool) error {
+type composeService struct {
+	apiClient *client.Client
+}
+
+func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	for k, network := range project.Networks {
 		if !network.External.External && network.Name != "" {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
@@ -68,6 +73,9 @@ func (s *local) Up(ctx context.Context, project *types.Project, detach bool) err
 			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Volumes[k] = volume
 		}
+		volume.Labels = volume.Labels.Add(volumeLabel, k)
+		volume.Labels = volume.Labels.Add(projectLabel, project.Name)
+		volume.Labels = volume.Labels.Add(versionLabel, ComposeVersion)
 		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
@@ -95,19 +103,8 @@ func getContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
-func (s *local) needPull(ctx context.Context, service types.ServiceConfig) (bool, error) {
-	_, _, err := s.containerService.apiClient.ImageInspectWithRaw(ctx, service.Image)
-	if err != nil {
-		if errdefs.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
-}
-
-func (s *local) Down(ctx context.Context, projectName string) error {
-	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) Down(ctx context.Context, projectName string) error {
+	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -126,7 +123,7 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 				Text:   "Stopping",
 				Status: progress.Working,
 			})
-			err := s.containerService.Stop(ctx, container.ID, nil)
+			err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 			if err != nil {
 				return err
 			}
@@ -135,7 +132,7 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 				Text:   "Removing",
 				Status: progress.Working,
 			})
-			err = s.containerService.Delete(ctx, container.ID, containers.DeleteRequest{})
+			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			if err != nil {
 				return err
 			}
@@ -150,8 +147,8 @@ func (s *local) Down(ctx context.Context, projectName string) error {
 	return eg.Wait()
 }
 
-func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error {
-	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writer) error {
+	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -159,26 +156,40 @@ func (s *local) Logs(ctx context.Context, projectName string, w io.Writer) error
 	if err != nil {
 		return err
 	}
-	var wg sync.WaitGroup
 	consumer := formatter.NewLogConsumer(w)
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		service := c.Labels[serviceLabel]
-		containerID := c.ID
-		go func() {
-			_ = s.containerService.Logs(ctx, containerID, containers.LogsRequest{
-				Follow: true,
-				Writer: consumer.GetWriter(service, containerID),
+		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return err
+		}
+
+		eg.Go(func() error {
+			r, err := s.apiClient.ContainerLogs(ctx, container.ID, moby.ContainerLogsOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Follow:     true,
 			})
-			wg.Done()
-		}()
-		wg.Add(1)
+			defer r.Close() // nolint errcheck
+
+			if err != nil {
+				return err
+			}
+			w := consumer.GetWriter(service, container.ID)
+			if container.Config.Tty {
+				_, err = io.Copy(w, r)
+			} else {
+				_, err = stdcopy.StdCopy(w, w, r)
+			}
+			return err
+		})
 	}
-	wg.Wait()
-	return nil
+	return eg.Wait()
 }
 
-func (s *local) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
-	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
+	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -233,8 +244,8 @@ func groupContainerByLabel(containers []moby.Container, labelName string) (map[s
 	return containersByLabel, keys, nil
 }
 
-func (s *local) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
-	list, err := s.containerService.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
+	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(hasProjectLabelFilter()),
 	})
 	if err != nil {
@@ -291,7 +302,7 @@ func combinedStatus(statuses []string) string {
 	return result
 }
 
-func (s *local) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (s *composeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
 	switch format {
 	case "json":
 		return json.MarshalIndent(project, "", "  ")
@@ -535,8 +546,8 @@ func getNetworksForService(s types.ServiceConfig) map[string]*types.ServiceNetwo
 	return map[string]*types.ServiceNetworkConfig{"default": nil}
 }
 
-func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
-	_, err := s.containerService.apiClient.NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
+	_, err := s.apiClient.NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			createOpts := moby.NetworkCreate{
@@ -568,7 +579,7 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 				Status:     progress.Working,
 				StatusText: "Create",
 			})
-			if _, err := s.containerService.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
+			if _, err := s.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
 			w.Event(progress.Event{
@@ -583,9 +594,9 @@ func (s *local) ensureNetwork(ctx context.Context, n types.NetworkConfig) error 
 	return nil
 }
 
-func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
+func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
 	// TODO could identify volume by label vs name
-	_, err := s.volumeService.Inspect(ctx, volume.Name)
+	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			w := progress.ContextWriter(ctx)
@@ -595,7 +606,12 @@ func (s *local) ensureVolume(ctx context.Context, volume types.VolumeConfig) err
 				StatusText: "Create",
 			})
 			// TODO we miss support for driver_opts and labels
-			_, err := s.volumeService.Create(ctx, volume.Name, nil)
+			_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
+				Labels:     volume.Labels,
+				Name:       volume.Name,
+				Driver:     volume.Driver,
+				DriverOpts: volume.DriverOpts,
+			})
 			w.Event(progress.Event{
 				ID:         fmt.Sprintf("Volume %q", volume.Name),
 				Status:     progress.Done,
