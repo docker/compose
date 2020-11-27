@@ -87,12 +87,14 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 	w.Event(progress.NewEvent(opts.Account, progress.Working, "Validating"))
 	accountClient, err := login.NewStorageAccountsClient(cs.aciContext.SubscriptionID)
 	if err != nil {
+		w.Event(progress.ErrorEvent(opts.Account))
 		return volumes.Volume{}, err
 	}
 	account, err := accountClient.GetProperties(ctx, cs.aciContext.ResourceGroup, opts.Account, "")
 	if err == nil {
 		w.Event(progress.NewEvent(opts.Account, progress.Done, "Use existing"))
 	} else if !account.HasHTTPStatus(http.StatusNotFound) {
+		w.Event(progress.ErrorEvent(opts.Account))
 		return volumes.Volume{}, err
 	} else {
 		result, err := accountClient.CheckNameAvailability(ctx, storage.AccountCheckNameAvailabilityParameters{
@@ -100,9 +102,11 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 			Type: to.StringPtr("Microsoft.Storage/storageAccounts"),
 		})
 		if err != nil {
+			w.Event(progress.ErrorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		if !*result.NameAvailable {
+			w.Event(progress.ErrorEvent(opts.Account))
 			return volumes.Volume{}, errors.New("error: " + *result.Message)
 		}
 		parameters := defaultStorageAccountParams(cs.aciContext)
@@ -111,16 +115,16 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 
 		future, err := accountClient.Create(ctx, cs.aciContext.ResourceGroup, opts.Account, parameters)
 		if err != nil {
-			w.Event(progress.ErrorEvent(opts.Account, "Error"))
+			w.Event(progress.ErrorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		if err := future.WaitForCompletionRef(ctx, accountClient.Client); err != nil {
-			w.Event(progress.ErrorEvent(opts.Account, "Error"))
+			w.Event(progress.ErrorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		account, err = future.Result(accountClient)
 		if err != nil {
-			w.Event(progress.ErrorEvent(opts.Account, "Error"))
+			w.Event(progress.ErrorEvent(opts.Account))
 			return volumes.Volume{}, err
 		}
 		w.Event(progress.CreatedEvent(opts.Account))
@@ -133,16 +137,16 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 
 	fileShare, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, *account.Name, name, "")
 	if err == nil {
-		w.Event(progress.ErrorEvent(name, "Error"))
+		w.Event(progress.ErrorEvent(name))
 		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", name)
 	}
 	if !fileShare.HasHTTPStatus(http.StatusNotFound) {
-		w.Event(progress.ErrorEvent(name, "Error"))
+		w.Event(progress.ErrorEvent(name))
 		return volumes.Volume{}, err
 	}
 	fileShare, err = fileShareClient.Create(ctx, cs.aciContext.ResourceGroup, *account.Name, name, storage.FileShare{})
 	if err != nil {
-		w.Event(progress.ErrorEvent(name, "Error"))
+		w.Event(progress.ErrorEvent(name))
 		return volumes.Volume{}, err
 	}
 	w.Event(progress.CreatedEvent(name))

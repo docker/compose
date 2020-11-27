@@ -116,6 +116,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		groupDefinition,
 	)
 	if err != nil {
+		w.Event(progress.ErrorEvent(groupDisplay))
 		return err
 	}
 

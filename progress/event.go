@@ -42,9 +42,14 @@ type Event struct {
 	spinner   *spinner
 }
 
-// ErrorEvent creates a new Error Event
-func ErrorEvent(ID string, msg string) Event {
+// ErrorMessageEvent creates a new Error Event with message
+func ErrorMessageEvent(ID string, msg string) Event {
 	return NewEvent(ID, Error, msg)
+}
+
+// ErrorEvent creates a new Error Event
+func ErrorEvent(ID string) Event {
+	return NewEvent(ID, Error, "Error")
 }
 
 // CreatingEvent creates a new Create in progress Event
@@ -57,12 +62,12 @@ func CreatedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Created")
 }
 
-// CreatingEvent creates a new Create in progress Event
+// RemovingEvent creates a new Removing in progress Event
 func RemovingEvent(ID string) Event {
 	return NewEvent(ID, Working, "Removing...")
 }
 
-// CreatedEvent creates a new Created (done) Event
+// RemovedEvent creates a new removed (done) Event
 func RemovedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Removed")
 }

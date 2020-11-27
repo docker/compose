@@ -68,7 +68,7 @@ func doDelete(ctx context.Context, delete func(ctx context.Context, arn string) 
 		w.Event(progress.RemovingEvent(r.LogicalID))
 		err := delete(ctx, r.ARN)
 		if err != nil {
-			w.Event(progress.ErrorEvent(r.LogicalID, "Error"))
+			w.Event(progress.ErrorEvent(r.LogicalID))
 			return err
 		}
 		w.Event(progress.RemovedEvent(r.LogicalID))

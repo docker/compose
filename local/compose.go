@@ -120,11 +120,13 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 			w.Event(progress.NewEvent(getContainerName(container), progress.Working, "Stopping"))
 			err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 			if err != nil {
+				w.Event(progress.ErrorMessageEvent(getContainerName(container), "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(getContainerName(container)))
 			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			if err != nil {
+				w.Event(progress.ErrorMessageEvent(getContainerName(container), "Error while Removing"))
 				return err
 			}
 			w.Event(progress.RemovedEvent(getContainerName(container)))
@@ -583,6 +585,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 			w := progress.ContextWriter(ctx)
 			w.Event(progress.CreatingEvent(networkEventName))
 			if _, err := s.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
+				w.Event(progress.ErrorEvent(networkEventName))
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
 			w.Event(progress.CreatedEvent(networkEventName))
@@ -599,9 +602,8 @@ func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string
 	w.Event(progress.RemovingEvent(eventName))
 
 	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
-		msg := fmt.Sprintf("failed to create network %s", networkID)
-		w.Event(progress.ErrorEvent(eventName, "Error: "+msg))
-		return errors.Wrapf(err, msg)
+		w.Event(progress.ErrorEvent(eventName))
+		return errors.Wrapf(err, fmt.Sprintf("failed to create network %s", networkID))
 	}
 
 	w.Event(progress.RemovedEvent(eventName))
@@ -623,10 +625,11 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 				Driver:     volume.Driver,
 				DriverOpts: volume.DriverOpts,
 			})
-			w.Event(progress.CreatedEvent(eventName))
 			if err != nil {
+				w.Event(progress.ErrorEvent(eventName))
 				return err
 			}
+			w.Event(progress.CreatedEvent(eventName))
 		}
 		return err
 	}

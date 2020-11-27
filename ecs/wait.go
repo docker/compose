@@ -101,11 +101,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 					}
 				}
 			}
-			w.Event(progress.Event{
-				ID:         resource,
-				Status:     progressStatus,
-				StatusText: fmt.Sprintf("%s %s", toCamelCase(status), reason),
-			})
+			w.Event(progress.NewEvent(resource, progressStatus, fmt.Sprintf("%s %s", toCamelCase(status), reason)))
 		}
 		if operation != stackCreate || stackErr != nil {
 			continue
@@ -116,7 +112,7 @@ func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, op
 			}
 			stackErr = err
 			operation = stackDelete
-			w.Event(progress.ErrorEvent(name, err.Error()))
+			w.Event(progress.ErrorMessageEvent(name, err.Error()))
 		}
 	}
 
