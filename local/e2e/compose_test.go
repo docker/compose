@@ -35,11 +35,10 @@ func TestLocalBackendComposeUp(t *testing.T) {
 
 	const projectName = "compose-e2e-demo"
 
+	networkList := c.RunDockerCmd("--context", "default", "network", "ls")
+
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName)
-	})
-	t.Cleanup(func() {
-		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -49,6 +48,9 @@ func TestLocalBackendComposeUp(t *testing.T) {
 		endpoint := "http://localhost:80"
 		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, `"word":`))
+
+		res = c.RunDockerCmd("--context", "default", "network", "ls")
+		assert.Equal(t, len(Lines(res.Stdout())), len(Lines(networkList.Stdout()))+1)
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
@@ -66,5 +68,14 @@ func TestLocalBackendComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.network": "default"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": `})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version": `})
+	})
+
+	t.Run("down", func(t *testing.T) {
+		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
+	})
+
+	t.Run("check compose labels", func(t *testing.T) {
+		networksAfterDown := c.RunDockerCmd("--context", "default", "network", "ls")
+		assert.Equal(t, networkList.Stdout(), networksAfterDown.Stdout())
 	})
 }

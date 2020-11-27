@@ -192,6 +192,11 @@ func GoldenFile(name string) string {
 	return name + ".golden"
 }
 
+//Lines split output into lines
+func Lines(output string) []string {
+	return strings.Split(strings.TrimSpace(output), "\n")
+}
+
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.
 // In the case of an error or the response status is not the expeted one, it retries the same request,
 // returning the response body as a string (empty if we could not reach it)
