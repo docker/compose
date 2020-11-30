@@ -13,19 +13,19 @@ if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
   SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
 fi
 
-OPENSSL_VERSION=1.1.1h
+OPENSSL_VERSION=1.1.1i
 OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
-OPENSSL_SHA1=8d0d099e8973ec851368c8c775e05e1eadca1794
+OPENSSL_SHA1=eb684ba4ed31fe2c48062aead75233ecd36882a6
 
-PYTHON_VERSION=3.9.0
-PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
-PYTHON_SHA1=5744a10ba989d2badacbab3c00cdcb83c83106c7
+PYTHON_VERSION=3.9.1
+PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION%r*}/Python-${PYTHON_VERSION}.tgz
+PYTHON_SHA1=7c22b8183188f2b51d9404c4cdfa00e40cb0663b
 
 #
 # Install prerequisites.
 #
 python -m pip --version 2>&1 /dev/null || curl -L https://bootstrap.pypa.io/get-pip.py | python
-python -m virtualenv --version 2>&1 /dev/null || python -m pip install virtualenv==20.0.30
+python -m pip install virtualenv==20.0.30
 
 #
 # Create toolchain directory.
@@ -56,7 +56,8 @@ if ! [[ $(${TOOLCHAIN_PATH}/bin/openssl version) == *"${OPENSSL_VERSION}"* ]]; t
     cd ${OPENSSL_SRC_PATH}
     export MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET}
     export SDKROOT=${SDK_PATH}
-    ./Configure darwin64-x86_64-cc --prefix=${TOOLCHAIN_PATH}
+    OPENSSL_CONFIG_FLAGS="darwin64-$(uname -m)-cc --prefix=${TOOLCHAIN_PATH}"
+    ./Configure $OPENSSL_CONFIG_FLAGS
     make install_sw install_dev
   )
 fi
@@ -79,8 +80,8 @@ if ! [[ $(${TOOLCHAIN_PATH}/bin/python3 --version) == *"${PYTHON_VERSION}"* ]]; 
       MACOSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET} \
       CFLAGS="-isysroot ${SDK_PATH} -I${TOOLCHAIN_PATH}/include" \
       CPPFLAGS="-I${SDK_PATH}/usr/include -I${TOOLCHAIN_PATH}/include" \
-      LDFLAGS="-isysroot ${SDK_PATH} -L ${TOOLCHAIN_PATH}/lib"
-    make -j 4
+      LDFLAGS="-isysroot ${SDK_PATH} -L${TOOLCHAIN_PATH}/lib"
+    make -j4
     make install PYTHONAPPSDIR=${TOOLCHAIN_PATH}
     make frameworkinstallextras PYTHONAPPSDIR=${TOOLCHAIN_PATH}/share
   )
