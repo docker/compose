@@ -25,6 +25,8 @@ import (
 
 // Service manages a compose project
 type Service interface {
+	// Build executes the equivalent to a `compose build`
+	Build(ctx context.Context, project *types.Project) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, detach bool) error
 	// Down executes the equivalent to a `compose down`

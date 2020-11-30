@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 )
 
@@ -88,6 +89,10 @@ func Command(contextType string) *cobra.Command {
 		logsCommand(),
 		convertCommand(),
 	)
+
+	if contextType == store.LocalContextType {
+		command.AddCommand(buildCommand())
+	}
 
 	return command
 }
