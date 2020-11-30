@@ -163,31 +163,21 @@ func getScale(config types.ServiceConfig) int {
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int) error {
+	eventName := fmt.Sprintf("Service %q", service.Name)
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Working,
-		StatusText: "Create",
-	})
+	w.Event(progress.CreatingEvent(eventName))
 	err := s.runContainer(ctx, project, service, name, number, nil)
 	if err != nil {
 		return err
 	}
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Done,
-		StatusText: "Created",
-	})
+	w.Event(progress.CreatedEvent(eventName))
 	return nil
 }
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Working,
-		StatusText: "Recreate",
-	})
+	eventName := fmt.Sprintf("Service %q", service.Name)
+	w.Event(progress.NewEvent(eventName, progress.Working, "Recreate"))
 	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 	if err != nil {
 		return err
@@ -210,11 +200,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Done,
-		StatusText: "Recreated",
-	})
+	w.Event(progress.NewEvent(eventName, progress.Done, "Recreated"))
 	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
 }
@@ -234,20 +220,13 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 
 func (s *composeService) restartContainer(ctx context.Context, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Working,
-		StatusText: "Restart",
-	})
+	eventName := fmt.Sprintf("Service %q", service.Name)
+	w.Event(progress.NewEvent(eventName, progress.Working, "Restart"))
 	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
-	w.Event(progress.Event{
-		ID:         fmt.Sprintf("Service %q", service.Name),
-		Status:     progress.Done,
-		StatusText: "Restarted",
-	})
+	w.Event(progress.NewEvent(eventName, progress.Done, "Restarted"))
 	return nil
 }
 

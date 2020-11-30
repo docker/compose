@@ -107,11 +107,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 	}
 
 	groupDisplay := "Group " + *groupDefinition.Name
-	w.Event(progress.Event{
-		ID:         groupDisplay,
-		Status:     progress.Working,
-		StatusText: "Waiting",
-	})
+	w.Event(progress.CreatingEvent(groupDisplay))
 
 	future, err := containerGroupsClient.CreateOrUpdate(
 		ctx,
@@ -120,21 +116,14 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 		groupDefinition,
 	)
 	if err != nil {
+		w.Event(progress.ErrorEvent(groupDisplay))
 		return err
 	}
 
-	w.Event(progress.Event{
-		ID:         groupDisplay,
-		Status:     progress.Done,
-		StatusText: "Created",
-	})
+	w.Event(progress.CreatedEvent(groupDisplay))
 	for _, c := range *groupDefinition.Containers {
 		if c.Name != nil && *c.Name != convert.ComposeDNSSidecarName {
-			w.Event(progress.Event{
-				ID:         *c.Name,
-				Status:     progress.Working,
-				StatusText: "Waiting",
-			})
+			w.Event(progress.CreatingEvent(*c.Name))
 		}
 	}
 
@@ -145,11 +134,7 @@ func createOrUpdateACIContainers(ctx context.Context, aciContext store.AciContex
 
 	for _, c := range *groupDefinition.Containers {
 		if c.Name != nil && *c.Name != convert.ComposeDNSSidecarName {
-			w.Event(progress.Event{
-				ID:         *c.Name,
-				Status:     progress.Done,
-				StatusText: "Done",
-			})
+			w.Event(progress.CreatedEvent(*c.Name))
 		}
 	}
 

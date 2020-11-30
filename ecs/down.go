@@ -65,11 +65,13 @@ func (b *ecsAPIService) previousStackEvents(ctx context.Context, project string)
 func doDelete(ctx context.Context, delete func(ctx context.Context, arn string) error) func(r stackResource) error {
 	return func(r stackResource) error {
 		w := progress.ContextWriter(ctx)
-		w.Event(progress.Event{
-			ID:         r.LogicalID,
-			Status:     progress.Working,
-			StatusText: "DeleteInProgress",
-		})
-		return delete(ctx, r.ARN)
+		w.Event(progress.RemovingEvent(r.LogicalID))
+		err := delete(ctx, r.ARN)
+		if err != nil {
+			w.Event(progress.ErrorEvent(r.LogicalID))
+			return err
+		}
+		w.Event(progress.RemovedEvent(r.LogicalID))
+		return nil
 	}
 }
