@@ -558,6 +558,10 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	_, err := s.apiClient.NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
+			if n.External.External {
+				return fmt.Errorf("Network %s declared as external, but could not be found", n.Name)
+			}
+
 			createOpts := moby.NetworkCreate{
 				// TODO NameSpace Labels
 				Labels:     n.Labels,
