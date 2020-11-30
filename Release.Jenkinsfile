@@ -117,7 +117,7 @@ pipeline {
                         label 'windows-python'
                     }
                     environment {
-                        PATH = "$PATH;C:\\Python37;C:\\Python37\\Scripts"
+                        PATH = "C:\\Python39;C:\\Python39\\Scripts;$PATH"
                     }
                     steps {
                         checkout scm
