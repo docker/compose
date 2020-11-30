@@ -59,7 +59,7 @@ RUN curl -L https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_
     && ./configure --enable-optimizations --enable-shared --prefix=/usr LDFLAGS="-Wl,-rpath /usr/lib" \
     && make altinstall
 RUN alternatives --install /usr/bin/python python /usr/bin/python2.7 50
-RUN alternatives --install /usr/bin/python python /usr/bin/python$(echo "${PYTHON_VERSION}" | cut -c1-3) 60
+RUN alternatives --install /usr/bin/python python /usr/bin/python$(echo "${PYTHON_VERSION%.*}") 60
 RUN curl https://bootstrap.pypa.io/get-pip.py | python -
 
 FROM build-${DISTRO} AS build
