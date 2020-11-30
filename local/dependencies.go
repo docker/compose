@@ -37,29 +37,64 @@ const (
 	ServiceStarted
 )
 
-func inDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
+type graphTraversalConfig struct {
+	extremityNodesFn            func(*Graph) []*Vertex                        // leaves or roots
+	adjacentNodesFn             func(*Vertex) []*Vertex                       // getParents or getChildren
+	filterAdjacentByStatusFn    func(*Graph, string, ServiceStatus) []*Vertex // filterChildren or filterParents
+	targetServiceStatus         ServiceStatus
+	adjacentServiceStatusToSkip ServiceStatus
+}
+
+var (
+	upDirectionTraversalConfig = graphTraversalConfig{
+		extremityNodesFn:            leaves,
+		adjacentNodesFn:             getParents,
+		filterAdjacentByStatusFn:    filterChildren,
+		adjacentServiceStatusToSkip: ServiceStopped,
+		targetServiceStatus:         ServiceStarted,
+	}
+	downDirectionTraversalConfig = graphTraversalConfig{
+		extremityNodesFn:            roots,
+		adjacentNodesFn:             getChildren,
+		filterAdjacentByStatusFn:    filterParents,
+		adjacentServiceStatusToSkip: ServiceStarted,
+		targetServiceStatus:         ServiceStopped,
+	}
+)
+
+// InDependencyOrder applies the function to the services of the project taking in account the dependency order
+func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
+	return visit(ctx, project, upDirectionTraversalConfig, fn)
+}
+
+// InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
+	return visit(ctx, project, downDirectionTraversalConfig, fn)
+}
+
+func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error) error {
 	g := NewGraph(project.Services)
 	if b, err := g.HasCycles(); b {
 		return err
 	}
 
-	leaves := g.Leaves()
+	nodes := traversalConfig.extremityNodesFn(g)
 
 	eg, _ := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return run(ctx, g, eg, leaves, fn)
+		return run(ctx, g, eg, nodes, traversalConfig, fn)
 	})
 
 	return eg.Wait()
 }
 
 // Note: this could be `graph.walk` or whatever
-func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, fn func(context.Context, types.ServiceConfig) error) error {
+func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error) error {
 	for _, node := range nodes {
 		n := node
 		// Don't start this service yet if all of its children have
 		// not been started yet.
-		if len(graph.FilterChildren(n.Service.Name, ServiceStopped)) != 0 {
+		if len(traversalConfig.filterAdjacentByStatusFn(graph, n.Service.Name, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
 			continue
 		}
 
@@ -69,9 +104,9 @@ func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex,
 				return err
 			}
 
-			graph.UpdateStatus(n.Service.Name, ServiceStarted)
+			graph.UpdateStatus(n.Service.Name, traversalConfig.targetServiceStatus)
 
-			return run(ctx, graph, eg, n.GetParents(), fn)
+			return run(ctx, graph, eg, traversalConfig.adjacentNodesFn(n), traversalConfig, fn)
 		})
 	}
 
@@ -93,10 +128,27 @@ type Vertex struct {
 	Parents  map[string]*Vertex
 }
 
-// GetParents returns a slice with the parent vertexes of the current Vertex
+func getParents(v *Vertex) []*Vertex {
+	return v.GetParents()
+}
+
+// GetParents returns a slice with the parent vertexes of the a Vertex
 func (v *Vertex) GetParents() []*Vertex {
 	var res []*Vertex
 	for _, p := range v.Parents {
+		res = append(res, p)
+	}
+	return res
+}
+
+func getChildren(v *Vertex) []*Vertex {
+	return v.GetChildren()
+}
+
+// GetChildren returns a slice with the child vertexes of the a Vertex
+func (v *Vertex) GetChildren() []*Vertex {
+	var res []*Vertex
+	for _, p := range v.Children {
 		res = append(res, p)
 	}
 	return res
@@ -168,6 +220,10 @@ func (g *Graph) AddEdge(source string, destination string) error {
 	return nil
 }
 
+func leaves(g *Graph) []*Vertex {
+	return g.Leaves()
+}
+
 // Leaves returns the slice of leaves of the graph
 func (g *Graph) Leaves() []*Vertex {
 	g.lock.Lock()
@@ -183,11 +239,33 @@ func (g *Graph) Leaves() []*Vertex {
 	return res
 }
 
+func roots(g *Graph) []*Vertex {
+	return g.Roots()
+}
+
+// Roots returns the slice of "Roots" of the graph
+func (g *Graph) Roots() []*Vertex {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	var res []*Vertex
+	for _, v := range g.Vertices {
+		if len(v.Parents) == 0 {
+			res = append(res, v)
+		}
+	}
+	return res
+}
+
 // UpdateStatus updates the status of a certain vertex
 func (g *Graph) UpdateStatus(key string, status ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.Vertices[key].Status = status
+}
+
+func filterChildren(g *Graph, k string, s ServiceStatus) []*Vertex {
+	return g.FilterChildren(k, s)
 }
 
 // FilterChildren returns children of a certain vertex that are in a certain status
@@ -201,6 +279,27 @@ func (g *Graph) FilterChildren(key string, status ServiceStatus) []*Vertex {
 	for _, child := range vertex.Children {
 		if child.Status == status {
 			res = append(res, child)
+		}
+	}
+
+	return res
+}
+
+func filterParents(g *Graph, k string, s ServiceStatus) []*Vertex {
+	return g.FilterParents(k, s)
+}
+
+// FilterParents returns the parents of a certain vertex that are in a certain status
+func (g *Graph) FilterParents(key string, status ServiceStatus) []*Vertex {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	var res []*Vertex
+	vertex := g.Vertices[key]
+
+	for _, parent := range vertex.Parents {
+		if parent.Status == status {
+			res = append(res, parent)
 		}
 	}
 

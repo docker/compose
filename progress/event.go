@@ -62,6 +62,11 @@ func CreatedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Created")
 }
 
+// StoppingEvent stops a new Removing in progress Event
+func StoppingEvent(ID string) Event {
+	return NewEvent(ID, Working, "Stopping")
+}
+
 // RemovingEvent creates a new Removing in progress Event
 func RemovingEvent(ID string) Event {
 	return NewEvent(ID, Working, "Removing")

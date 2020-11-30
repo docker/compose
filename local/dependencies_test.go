@@ -27,33 +27,46 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func TestInDependencyOrder(t *testing.T) {
-	order := make(chan string)
-	project := types.Project{
-		Services: []types.ServiceConfig{
-			{
-				Name: "test1",
-				DependsOn: map[string]types.ServiceDependency{
-					"test2": {},
-				},
-			},
-			{
-				Name: "test2",
-				DependsOn: map[string]types.ServiceDependency{
-					"test3": {},
-				},
-			},
-			{
-				Name: "test3",
+var project = types.Project{
+	Services: []types.ServiceConfig{
+		{
+			Name: "test1",
+			DependsOn: map[string]types.ServiceDependency{
+				"test2": {},
 			},
 		},
-	}
+		{
+			Name: "test2",
+			DependsOn: map[string]types.ServiceDependency{
+				"test3": {},
+			},
+		},
+		{
+			Name: "test3",
+		},
+	},
+}
+
+func TestInDependencyUpCommandOrder(t *testing.T) {
+	order := make(chan string)
 	//nolint:errcheck, unparam
-	go inDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
+	go InDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
 		order <- config.Name
 		return nil
 	})
 	assert.Equal(t, <-order, "test3")
 	assert.Equal(t, <-order, "test2")
 	assert.Equal(t, <-order, "test1")
+}
+
+func TestInDependencyReverseDownCommandOrder(t *testing.T) {
+	order := make(chan string)
+	//nolint:errcheck, unparam
+	go InReverseDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
+		order <- config.Name
+		return nil
+	})
+	assert.Equal(t, <-order, "test1")
+	assert.Equal(t, <-order, "test2")
+	assert.Equal(t, <-order, "test3")
 }
