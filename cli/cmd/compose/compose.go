@@ -20,9 +20,9 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/cli"
-	"github.com/spf13/pflag"
-
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/errdefs"
@@ -99,4 +99,41 @@ func checkComposeSupport(ctx context.Context) error {
 	}
 
 	return err
+}
+
+//
+func filter(project *types.Project, services []string) error {
+	if len(services) == 0 {
+		// All services
+		return nil
+	}
+
+	names := map[string]bool{}
+	err := addServiceNames(project, services, names)
+	if err != nil {
+		return err
+	}
+	var filtered types.Services
+	for _, s := range project.Services {
+		if _, ok := names[s.Name]; ok {
+			filtered = append(filtered, s)
+		}
+	}
+	project.Services = filtered
+	return nil
+}
+
+func addServiceNames(project *types.Project, services []string, names map[string]bool) error {
+	for _, name := range services {
+		names[name] = true
+		service, err := project.GetService(name)
+		if err != nil {
+			return err
+		}
+		err = addServiceNames(project, service.GetDependencies(), names)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

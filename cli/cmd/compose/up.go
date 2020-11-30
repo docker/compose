@@ -19,9 +19,8 @@ package compose
 import (
 	"context"
 
-	"github.com/spf13/cobra"
-
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/context/store"
@@ -31,9 +30,9 @@ import (
 func upCommand(contextType string) *cobra.Command {
 	opts := composeOptions{}
 	upCmd := &cobra.Command{
-		Use: "up",
+		Use: "up [SERVICE...]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUp(cmd.Context(), opts)
+			return runUp(cmd.Context(), opts, args)
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -49,7 +48,7 @@ func upCommand(contextType string) *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts composeOptions) error {
+func runUp(ctx context.Context, opts composeOptions, services []string) error {
 	c, err := client.New(ctx)
 	if err != nil {
 		return err
@@ -61,10 +60,15 @@ func runUp(ctx context.Context, opts composeOptions) error {
 			return "", err
 		}
 		project, err := cli.ProjectFromOptions(options)
+		if err != nil {
+			return "", err
+		}
 		if opts.DomainName != "" {
 			//arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
 			project.Services[0].DomainName = opts.DomainName
 		}
+
+		err = filter(project, services)
 		if err != nil {
 			return "", err
 		}
