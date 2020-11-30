@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/buildx/build"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -51,6 +52,17 @@ import (
 
 type composeService struct {
 	apiClient *client.Client
+}
+
+func (s *composeService) Build(ctx context.Context, project *types.Project) error {
+	opts := map[string]build.Options{}
+	for _, service := range project.Services {
+		if service.Build != nil {
+			opts[service.Name] = s.toBuildOptions(service, project.WorkingDir)
+		}
+	}
+
+	return s.build(ctx, project, opts)
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {

@@ -44,6 +44,10 @@ func newComposeService(ctx store.AciContext) aciComposeService {
 	}
 }
 
+func (cs *aciComposeService) Build(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 

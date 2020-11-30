@@ -24,7 +24,12 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/errdefs"
 )
+
+func (b *ecsAPIService) Build(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
 
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	err := b.aws.CheckRequirements(ctx, b.Region)
