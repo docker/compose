@@ -59,7 +59,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 		return err
 	}
 	for k, network := range project.Networks {
-		if !network.External.External && network.Name != "" {
+		if !network.External.External && network.Name == k {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Networks[k] = network
 		}
@@ -559,9 +559,8 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			if n.External.External {
-				return fmt.Errorf("Network %s declared as external, but could not be found", n.Name)
+				return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 			}
-
 			createOpts := moby.NetworkCreate{
 				// TODO NameSpace Labels
 				Labels:     n.Labels,
