@@ -235,7 +235,7 @@ func (s *composeService) runContainer(ctx context.Context, project *types.Projec
 	if err != nil {
 		return err
 	}
-	created, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
+	created, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, nil, name)
 	if err != nil {
 		return err
 	}

@@ -49,7 +49,8 @@ func TestGrpcContainerToContainerConfig(t *testing.T) {
 		Environment: []string{"PROTOVAR=VALUE"},
 	}
 
-	cc := grpcContainerToContainerConfig(r)
+	cc, err := grpcContainerToContainerConfig(r)
+	assert.NilError(t, err)
 	assert.Equal(t, cc.ID, "myId")
 	assert.Equal(t, cc.Image, "myImage")
 	assert.Equal(t, cc.MemLimit, formatter.MemBytes(41))

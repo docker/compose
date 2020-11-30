@@ -67,6 +67,10 @@ func Command(contextType string) *cobra.Command {
 		"health-retries countdown (ms|s|m|h) (default 0s)")
 	cmd.Flags().DurationVar(&opts.HealthTimeout, "health-timeout", time.Duration(0), "Maximum time to allow one check to run (ms|s|m|h) (default 0s)")
 
+	if contextType == store.LocalContextType {
+		cmd.Flags().StringVar(&opts.Platform, "platform", os.Getenv("DOCKER_DEFAULT_PLATFORM"), "Set platform if server is multi-platform capable")
+	}
+
 	if contextType == store.AciContextType {
 		cmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	}

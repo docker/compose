@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/containerd/containerd/platforms"
 	"github.com/docker/cli/opts"
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/go-connections/nat"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
@@ -51,6 +53,7 @@ type Opts struct {
 	HealthRetries          int
 	HealthStartPeriod      time.Duration
 	HealthTimeout          time.Duration
+	Platform               string
 }
 
 // RestartPolicyList all available restart policy values
@@ -86,6 +89,16 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		envVars = append(envVars, vars...)
 	}
 
+	var platform *specs.Platform
+
+	if r.Platform != "" {
+		p, err := platforms.Parse(r.Platform)
+		if err != nil {
+			return containers.ContainerConfig{}, err
+		}
+		platform = &p
+	}
+
 	return containers.ContainerConfig{
 		ID:                     r.Name,
 		Image:                  image,
@@ -100,6 +113,7 @@ func (r *Opts) ToContainerConfig(image string) (containers.ContainerConfig, erro
 		DomainName:             r.DomainName,
 		AutoRemove:             r.Rm,
 		Healthcheck:            r.toHealthcheck(),
+		Platform:               platform,
 	}, nil
 }
 

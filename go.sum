@@ -218,8 +218,8 @@ github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8/go.mod h1:JLrzqnKDaYBop
 github.com/docker/compose-on-kubernetes v0.4.19-0.20190128150448-356b2919c496/go.mod h1:iT2pYfi580XlpaV4KmK0T6+4/9+XoKmk/fhoDod1emE=
 github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe h1:pni13lAFm1g4cjHU6c3n4qGvvJGZQK4VvKRKMseQ42E=
 github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe/go.mod h1:Oqz4IonmMNc2N7GqfTL2xkhCQx0yS6nR+HrOZJnmKIk=
-github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82 h1:kZwwJwYnVWtU/byBNjD9rEGWVMvwnfiKu9lFJXjrk04=
-github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v17.12.0-ce-rc1.0.20200730172259-9f28837c1d93+incompatible h1:UcwmC9cQLDd+vVRaZ9K06KzmMBWGTqa/lpdkoIAyjt8=
+github.com/docker/docker v17.12.0-ce-rc1.0.20200730172259-9f28837c1d93+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.6.0/go.mod h1:WRaJzqw3CTB9bk10avuGsjVBZsD05qeibJ1/TYlvc0Y=
 github.com/docker/docker-credential-helpers v0.6.1/go.mod h1:WRaJzqw3CTB9bk10avuGsjVBZsD05qeibJ1/TYlvc0Y=
 github.com/docker/docker-credential-helpers v0.6.3 h1:zI2p9+1NQYdnG6sMU26EX4aVGlqbInSQxQXLvzJ4RPQ=

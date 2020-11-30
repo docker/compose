@@ -9,7 +9,7 @@ replace github.com/docker/distribution => github.com/docker/distribution v0.0.0-
 // (for buildx)
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.3.1-0.20200227195959-4d242818bf55
 
-replace github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200227233006-38f52c9fec82
+replace github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200730172259-9f28837c1d93+incompatible
 
 replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
 
@@ -34,6 +34,7 @@ require (
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/compose-spec/compose-go v0.0.0-20201126191557-f67043ab8858
 	github.com/containerd/console v1.0.1
+	github.com/containerd/containerd v1.4.0-0
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/docker/buildx v0.4.2
 	github.com/docker/cli v0.0.0-20200528204125-dd360c7c0de8
@@ -57,6 +58,7 @@ require (
 	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/tsdb v0.10.0
 	github.com/sanathkr/go-yaml v0.0.0-20170819195128-ed9d249f429b
