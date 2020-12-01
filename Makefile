@@ -12,7 +12,7 @@ ifeq ($(UNAME_S),Darwin)
 	BUILD_SCRIPT = osx
 endif
 
-COMPOSE_SPEC_SCHEMA_PATH = "compose/config/config_schema_compose_spec.json"
+COMPOSE_SPEC_SCHEMA_PATH = "compose/config/compose_spec.json"
 COMPOSE_SPEC_RAW_URL = "https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json"
 
 all: cli

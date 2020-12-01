@@ -709,7 +709,7 @@ class Service:
             except NoSuchImageError:
                 return None
 
-        return {
+        c = {
             'options': self.options,
             'image_id': image_id(),
             'links': self.get_link_names(),
@@ -719,8 +719,12 @@ class Service:
             'volumes_from': [
                 (v.source.name, v.mode)
                 for v in self.volumes_from if isinstance(v.source, Service)
-            ],
+            ]
         }
+
+        if self.device_requests:
+            c['devices'] = self.device_requests
+        return c
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name

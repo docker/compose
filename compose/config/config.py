@@ -1166,6 +1166,7 @@ def merge_reservations(base, override):
     md.merge_scalar('cpus')
     md.merge_scalar('memory')
     md.merge_sequence('generic_resources', types.GenericResource.parse)
+    md.merge_field('devices', merge_unique_objects_lists, default=[])
     return dict(md)
 
 
