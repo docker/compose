@@ -128,7 +128,7 @@ class Project:
                 config_data.secrets)
 
             service_dict['scale'] = project.get_service_scale(service_dict)
-            device_requests = project.get_device_requests(service_dict)
+            service_dict['device_requests'] = project.get_device_requests(service_dict)
             service_dict = translate_credential_spec_to_security_opt(service_dict)
             service_dict, ignored_keys = translate_deploy_keys_to_container_config(
                 service_dict
@@ -154,7 +154,6 @@ class Project:
                     ipc_mode=ipc_mode,
                     platform=service_dict.pop('platform', None),
                     default_platform=default_platform,
-                    device_requests=device_requests,
                     extra_labels=extra_labels,
                     **service_dict)
             )
