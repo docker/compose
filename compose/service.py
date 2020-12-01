@@ -181,7 +181,6 @@ class Service:
             pid_mode=None,
             default_platform=None,
             extra_labels=None,
-            device_requests=None,
             **options
     ):
         self.name = name
@@ -197,7 +196,6 @@ class Service:
         self.secrets = secrets or []
         self.scale_num = scale
         self.default_platform = default_platform
-        self.device_requests = device_requests
         self.options = options
         self.extra_labels = extra_labels or []
 
@@ -709,7 +707,7 @@ class Service:
             except NoSuchImageError:
                 return None
 
-        c = {
+        return {
             'options': self.options,
             'image_id': image_id(),
             'links': self.get_link_names(),
@@ -721,10 +719,6 @@ class Service:
                 for v in self.volumes_from if isinstance(v.source, Service)
             ]
         }
-
-        if self.device_requests:
-            c['devices'] = self.device_requests
-        return c
 
     def get_dependency_names(self):
         net_name = self.network_mode.service_name
@@ -1023,7 +1017,7 @@ class Service:
             privileged=options.get('privileged', False),
             network_mode=self.network_mode.mode,
             devices=options.get('devices'),
-            device_requests=self.device_requests,
+            device_requests=options.get('device_requests'),
             dns=options.get('dns'),
             dns_opt=options.get('dns_opt'),
             dns_search=options.get('dns_search'),

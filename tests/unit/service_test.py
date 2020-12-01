@@ -732,29 +732,6 @@ class ServiceTest(unittest.TestCase):
         }
         assert config_dict == expected
 
-    def test_config_dict_with_device_requests(self):
-        self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
-        service = Service(
-            'foo',
-            image='example.com/foo',
-            client=self.mock_client,
-            network_mode=ServiceNetworkMode(Service('other')),
-            networks={'default': None},
-            device_requests=[{'driver': 'nvidia', 'device_ids': ['0'], 'capabilities': ['gpu']}])
-
-        config_dict = service.config_dict()
-        expected = {
-            'image_id': 'abcd',
-            'options': {'image': 'example.com/foo'},
-            'links': [],
-            'net': 'other',
-            'secrets': [],
-            'networks': {'default': None},
-            'volumes_from': [],
-            'devices': [{'driver': 'nvidia', 'device_ids': ['0'], 'capabilities': ['gpu']}],
-        }
-        assert config_dict == expected
-
     def test_config_hash_matches_label(self):
         self.mock_client.inspect_image.return_value = {'Id': 'abcd'}
         service = Service(
