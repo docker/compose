@@ -132,6 +132,9 @@ func (s *composeService) Push(ctx context.Context, project *types.Project) error
 					}
 					return err
 				}
+				if jm.Error != nil {
+					return errors.New(jm.Error.Message)
+				}
 				toProgressEvent(service.Name, jm, w)
 			}
 			return nil
@@ -142,13 +145,13 @@ func (s *composeService) Push(ctx context.Context, project *types.Project) error
 
 func toProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Writer) {
 	if jm.ID == "" {
+		// skipped
 		return
 	}
 	var (
 		text   string
 		status = progress.Working
 	)
-
 	if jm.Status == "Pull complete" || jm.Status == "Already exists" {
 		status = progress.Done
 	}
@@ -160,7 +163,7 @@ func toProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Write
 		text = jm.Progress.String()
 	}
 	w.Event(progress.Event{
-		ID:         fmt.Sprintf("%s: %s", prefix, jm.ID),
+		ID:         fmt.Sprintf("Pushing %s: %s", prefix, jm.ID),
 		Text:       jm.Status,
 		Status:     status,
 		StatusText: text,
