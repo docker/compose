@@ -143,6 +143,10 @@ func (cs *composeService) Build(ctx context.Context, project *types.Project) err
 	return nil
 }
 
+func (cs *composeService) Push(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	fmt.Printf("Up command on project %q", project.Name)
 	return nil

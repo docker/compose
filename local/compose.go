@@ -20,6 +20,7 @@ package local
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
+	"github.com/docker/cli/cli/config"
+	"github.com/docker/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -39,7 +42,9 @@ import (
 	mobyvolume "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/errdefs"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/docker/registry"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
@@ -63,6 +68,106 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 	}
 
 	return s.build(ctx, project, opts)
+}
+
+func (s *composeService) Push(ctx context.Context, project *types.Project) error {
+	configFile, err := config.Load(config.Dir())
+	if err != nil {
+		return err
+	}
+	eg, ctx := errgroup.WithContext(ctx)
+
+	info, err := s.apiClient.Info(ctx)
+	if err != nil {
+		return err
+	}
+	if info.IndexServerAddress == "" {
+		info.IndexServerAddress = registry.IndexServer
+	}
+
+	for _, service := range project.Services {
+		if service.Build == nil {
+			continue
+		}
+		service := service
+		eg.Go(func() error {
+			w := progress.ContextWriter(ctx)
+
+			ref, err := reference.ParseNormalizedNamed(service.Image)
+			if err != nil {
+				return err
+			}
+
+			repoInfo, err := registry.ParseRepositoryInfo(ref)
+			if err != nil {
+				return err
+			}
+
+			key := repoInfo.Index.Name
+			if repoInfo.Index.Official {
+				key = info.IndexServerAddress
+			}
+			authConfig, err := configFile.GetAuthConfig(key)
+			if err != nil {
+				return err
+			}
+
+			buf, err := json.Marshal(authConfig)
+			if err != nil {
+				return err
+			}
+
+			stream, err := s.apiClient.ImagePush(ctx, service.Image, moby.ImagePushOptions{
+				RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+			})
+			if err != nil {
+				return err
+			}
+			dec := json.NewDecoder(stream)
+			for {
+				var jm jsonmessage.JSONMessage
+				if err := dec.Decode(&jm); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+				if jm.Error != nil {
+					return errors.New(jm.Error.Message)
+				}
+				toProgressEvent(service.Name, jm, w)
+			}
+			return nil
+		})
+	}
+	return eg.Wait()
+}
+
+func toProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Writer) {
+	if jm.ID == "" {
+		// skipped
+		return
+	}
+	var (
+		text   string
+		status = progress.Working
+	)
+	if jm.Status == "Pull complete" || jm.Status == "Already exists" {
+		status = progress.Done
+	}
+	if jm.Error != nil {
+		status = progress.Error
+		text = jm.Error.Message
+	}
+	if jm.Progress != nil {
+		text = jm.Progress.String()
+	}
+	w.Event(progress.Event{
+		ID:         fmt.Sprintf("Pushing %s: %s", prefix, jm.ID),
+		Text:       jm.Status,
+		Status:     status,
+		StatusText: text,
+	})
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
