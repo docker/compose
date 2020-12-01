@@ -91,7 +91,9 @@ func Command(contextType string) *cobra.Command {
 	)
 
 	if contextType == store.LocalContextType {
-		command.AddCommand(buildCommand())
+		command.AddCommand(
+			buildCommand(),
+			pushCommand())
 	}
 
 	return command
