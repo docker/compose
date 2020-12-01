@@ -30,7 +30,7 @@ func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*c
 	if err != nil {
 		return nil, err
 	}
-	return &composev1.ComposeUpResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Up(ctx, project, true)
+	return &composev1.ComposeUpResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Up(ctx, project, true, nil)
 }
 
 func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {

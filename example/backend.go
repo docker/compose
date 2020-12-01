@@ -151,7 +151,7 @@ func (cs *composeService) Pull(ctx context.Context, project *types.Project) erro
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool, w io.Writer) error {
 	fmt.Printf("Up command on project %q", project.Name)
 	return nil
 }

@@ -18,13 +18,14 @@ package compose
 
 import (
 	"context"
+	"github.com/docker/compose-cli/progress"
+	"os"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/progress"
 )
 
 func upCommand(contextType string) *cobra.Command {
@@ -54,25 +55,26 @@ func runUp(ctx context.Context, opts composeOptions, services []string) error {
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		options, err := opts.toProjectOptions()
-		if err != nil {
-			return "", err
-		}
-		project, err := cli.ProjectFromOptions(options)
-		if err != nil {
-			return "", err
-		}
-		if opts.DomainName != "" {
-			// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
-			project.Services[0].DomainName = opts.DomainName
-		}
+	options, err := opts.toProjectOptions()
+	if err != nil {
+		return err
+	}
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return err
+	}
+	if opts.DomainName != "" {
+		// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
+		project.Services[0].DomainName = opts.DomainName
+	}
 
-		err = filter(project, services)
-		if err != nil {
-			return "", err
-		}
-		return "", c.ComposeService().Up(ctx, project, opts.Detach)
+	err = filter(project, services)
+	if err != nil {
+		return err
+	}
+
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return "", c.ComposeService().Up(ctx, project, opts.Detach, os.Stdout)
 	})
 	return err
 }

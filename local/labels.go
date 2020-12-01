@@ -51,3 +51,7 @@ func serviceFilter(serviceName string) filters.KeyValuePair {
 func hasProjectLabelFilter() filters.KeyValuePair {
 	return filters.Arg("label", projectLabel)
 }
+
+func serviceFilter(serviceName string) filters.KeyValuePair {
+	return filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, serviceName))
+}

@@ -56,7 +56,7 @@ func (cs *aciComposeService) Pull(ctx context.Context, project *types.Project) e
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool, w io.Writer) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 
 	if err := autocreateFileshares(ctx, project); err != nil {

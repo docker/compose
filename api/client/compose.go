@@ -41,7 +41,7 @@ func (c *composeService) Pull(ctx context.Context, project *types.Project) error
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Up(context.Context, *types.Project, bool) error {
+func (c *composeService) Up(context.Context, *types.Project, bool, io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 

@@ -1,3 +1,5 @@
+// +build local
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -14,17 +16,14 @@
    limitations under the License.
 */
 
-package ecs
+package local
 
-import (
-	"context"
-	"io"
-
-	"github.com/docker/compose-cli/formatter"
+const (
+	containerCreated    = "created"
+	containerRestarting = "restarting"
+	containerRunning    = "running"
+	containerRemoving   = "removing" //nolint
+	containerPaused     = "paused"   //nolint
+	containerExited     = "exited"   //nolint
+	containerDead       = "dead"     //nolint
 )
-
-func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := formatter.NewLogConsumer(ctx, w)
-	err := b.aws.GetLogs(ctx, project, consumer.Log)
-	return err
-}
