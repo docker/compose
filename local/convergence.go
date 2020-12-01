@@ -240,9 +240,9 @@ func (s *composeService) runContainer(ctx context.Context, project *types.Projec
 		return err
 	}
 	id := created.ID
-	for net := range service.Networks {
-		name := fmt.Sprintf("%s_%s", project.Name, net)
-		err = s.connectContainerToNetwork(ctx, id, service.Name, name)
+	for netName := range service.Networks {
+		network := project.Networks[netName]
+		err = s.connectContainerToNetwork(ctx, id, service.Name, network.Name)
 		if err != nil {
 			return err
 		}
