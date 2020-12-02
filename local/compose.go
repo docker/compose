@@ -261,28 +261,28 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 }
 
 func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, filter filters.Args) error {
-	cnts, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filter,
 	})
 	if err != nil {
 		return err
 	}
-	for _, c := range cnts {
+	for _, c := range containers {
 		eg.Go(func() error {
-			cName := getContainerName(c)
-			w.Event(progress.StoppingEvent(cName))
+			eventName := "Container " + getContainerName(c)
+			w.Event(progress.StoppingEvent(eventName))
 			err := s.apiClient.ContainerStop(ctx, c.ID, nil)
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(cName, "Error while Stopping"))
+				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
-			w.Event(progress.RemovingEvent(cName))
+			w.Event(progress.RemovingEvent(eventName))
 			err = s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{})
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(cName, "Error while Removing"))
+				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
 			}
-			w.Event(progress.RemovedEvent(cName))
+			w.Event(progress.RemovedEvent(eventName))
 			return nil
 		})
 	}
