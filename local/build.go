@@ -52,7 +52,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			}
 		}
 		if service.Build != nil {
-			opts[service.Name] = s.toBuildOptions(service, project.WorkingDir)
+			imageName := service.Image
+			if imageName == "" {
+				imageName = project.Name + "_" + service.Name
+			}
+			opts[imageName] = s.toBuildOptions(service, project.WorkingDir)
 			continue
 		}
 
