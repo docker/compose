@@ -35,7 +35,7 @@ SILENT_COMMANDS = {
 
 def project_from_options(project_dir, options, additional_options=None):
     additional_options = additional_options or {}
-    override_dir = options.get('--project-directory')
+    override_dir = get_project_dir(options)
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or project_dir, environment_file)
     environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
@@ -59,7 +59,7 @@ def project_from_options(project_dir, options, additional_options=None):
 
     return get_project(
         project_dir,
-        get_config_path_from_options(project_dir, options, environment),
+        get_config_path_from_options(options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         context=context,
@@ -87,21 +87,29 @@ def set_parallel_limit(environment):
         parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
+def get_project_dir(options):
+    override_dir = None
+    files = get_config_path_from_options(options, os.environ)
+    if files:
+        if files[0] == '-':
+            return '.'
+        override_dir = os.path.dirname(files[0])
+    return options.get('--project-directory') or override_dir
+
+
 def get_config_from_options(base_dir, options, additional_options=None):
     additional_options = additional_options or {}
-    override_dir = options.get('--project-directory')
+    override_dir = get_project_dir(options)
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or base_dir, environment_file)
-    config_path = get_config_path_from_options(
-        base_dir, options, environment
-    )
+    config_path = get_config_path_from_options(options, environment)
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
         not additional_options.get('--no-interpolate')
     )
 
 
-def get_config_path_from_options(base_dir, options, environment):
+def get_config_path_from_options(options, environment):
     def unicode_paths(paths):
         return [p.decode('utf-8') if isinstance(p, bytes) else p for p in paths]
 

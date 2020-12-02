@@ -39,6 +39,7 @@ from ..service import ImageType
 from ..service import NeedsBuildError
 from ..service import OperationFailedError
 from .command import get_config_from_options
+from .command import get_project_dir
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
 from .docopt_command import get_handler
@@ -245,7 +246,7 @@ class TopLevelCommand:
 
     @property
     def project_dir(self):
-        return self.toplevel_options.get('--project-directory') or '.'
+        return get_project_dir(self.toplevel_options)
 
     @property
     def toplevel_environment(self):
@@ -431,6 +432,7 @@ class TopLevelCommand:
         Options:
             --json      Output events as a stream of json objects
         """
+
         def format_event(event):
             attributes = ["%s=%s" % item for item in event['attributes'].items()]
             return ("{time} {type} {action} {id} ({attrs})").format(
@@ -1382,13 +1384,13 @@ def get_docker_start_call(container_options, container_id):
 
 
 def log_printer_from_project(
-    project,
-    containers,
-    monochrome,
-    log_args,
-    cascade_stop=False,
-    event_stream=None,
-    keep_prefix=True,
+        project,
+        containers,
+        monochrome,
+        log_args,
+        cascade_stop=False,
+        event_stream=None,
+        keep_prefix=True,
 ):
     return LogPrinter(
         containers,
