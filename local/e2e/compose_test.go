@@ -37,6 +37,13 @@ func TestLocalBackendComposeUp(t *testing.T) {
 
 	networkList := c.RunDockerCmd("--context", "default", "network", "ls")
 
+	t.Run("build", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "build", "-f", "../../tests/composefiles/demo_multi_port.yaml")
+		res.Assert(t, icmd.Expected{Out: "COPY words.sql /docker-entrypoint-initdb.d/"})
+		res.Assert(t, icmd.Expected{Out: "COPY pom.xml ."})
+		res.Assert(t, icmd.Expected{Out: "COPY static /static/"})
+	})
+
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName)
 	})
