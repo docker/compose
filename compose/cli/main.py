@@ -182,7 +182,7 @@ class TopLevelCommand:
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f <arg>...] [options] [--] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [--profile <name>...] [options] [--] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
@@ -190,6 +190,7 @@ class TopLevelCommand:
                                   (default: docker-compose.yml)
       -p, --project-name NAME     Specify an alternate project name
                                   (default: directory name)
+      --profile NAME              Specify a profile to enable
       -c, --context NAME          Specify a context name
       --verbose                   Show more output
       --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)

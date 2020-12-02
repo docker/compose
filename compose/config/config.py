@@ -133,6 +133,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'logging',
     'network_mode',
     'platform',
+    'profiles',
     'scale',
     'stop_grace_period',
 ]
@@ -1047,7 +1048,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'cap_add', 'cap_drop', 'expose', 'external_links',
-        'volumes_from', 'device_cgroup_rules',
+        'volumes_from', 'device_cgroup_rules', 'profiles',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 

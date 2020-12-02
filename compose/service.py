@@ -1329,6 +1329,24 @@ class Service:
 
         return result
 
+    def get_profiles(self):
+        if 'profiles' not in self.options:
+            return []
+
+        return self.options.get('profiles')
+
+    def enabled_for_profiles(self, enabled_profiles):
+        # if service has no profiles specified it is always enabled
+        if 'profiles' not in self.options:
+            return True
+
+        service_profiles = self.options.get('profiles')
+        for profile in enabled_profiles:
+            if profile in service_profiles:
+                return True
+
+        return False
+
 
 def short_id_alias_exists(container, network):
     aliases = container.get(
