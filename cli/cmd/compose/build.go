@@ -38,6 +38,9 @@ func buildCommand() *cobra.Command {
 			return runBuild(cmd.Context(), opts, args)
 		},
 	}
+	buildCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
+	buildCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
+
 	return buildCmd
 }
 
