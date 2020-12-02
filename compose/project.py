@@ -746,7 +746,7 @@ class Project:
 
         return plans
 
-    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=False, silent=False,
+    def pull(self, service_names=None, ignore_pull_failures=False, parallel_pull=True, silent=False,
              include_deps=False):
         services = self.get_services(service_names, include_deps)
 
