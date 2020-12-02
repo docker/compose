@@ -69,7 +69,7 @@ COPY docker-compose-entrypoint.sh /usr/local/bin/
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 RUN pip install \
     virtualenv==20.2.1 \
-    tox==3.19.0
+    tox==3.20.1
 COPY requirements-dev.txt .
 COPY requirements-indirect.txt .
 COPY requirements.txt .
