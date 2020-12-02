@@ -18,6 +18,12 @@
 
 package local
 
+import (
+	"io"
+
+	moby "github.com/docker/docker/api/types"
+)
+
 const (
 	containerCreated    = "created"
 	containerRestarting = "restarting"
@@ -27,3 +33,32 @@ const (
 	containerExited     = "exited"   //nolint
 	containerDead       = "dead"     //nolint
 )
+
+var _ io.ReadCloser = containerStdout{}
+
+type containerStdout struct {
+	moby.HijackedResponse
+}
+
+func (l containerStdout) Read(p []byte) (n int, err error) {
+	return l.Reader.Read(p)
+}
+
+func (l containerStdout) Close() error {
+	l.HijackedResponse.Close()
+	return nil
+}
+
+var _ io.WriteCloser = containerStdin{}
+
+type containerStdin struct {
+	moby.HijackedResponse
+}
+
+func (c containerStdin) Write(p []byte) (n int, err error) {
+	return c.Conn.Write(p)
+}
+
+func (c containerStdin) Close() error {
+	return c.CloseWrite()
+}

@@ -37,7 +37,7 @@ func NewLogConsumer(ctx context.Context, w io.Writer) LogConsumer {
 
 // Log formats a log message as received from service/container
 func (l *LogConsumer) Log(service, container, message string) {
-	if l.ctx.Err() == context.Canceled {
+	if l.ctx.Err() != nil {
 		return
 	}
 	cf, ok := l.colors[service]

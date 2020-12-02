@@ -45,7 +45,7 @@ func TestLocalBackendComposeUp(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName)
+		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {

@@ -151,7 +151,16 @@ func (cs *composeService) Pull(ctx context.Context, project *types.Project) erro
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool, w io.Writer) error {
+func (cs *composeService) Create(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (cs *composeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+
 	fmt.Printf("Up command on project %q", project.Name)
 	return nil
 }

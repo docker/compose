@@ -31,8 +31,12 @@ type Service interface {
 	Push(ctx context.Context, project *types.Project) error
 	// Pull executes the equivalent of a `compose pull`
 	Pull(ctx context.Context, project *types.Project) error
+	// Create executes the equivalent to a `compose create`
+	Create(ctx context.Context, project *types.Project) error
+	// Start executes the equivalent to a `compose start`
+	Start(ctx context.Context, project *types.Project, w io.Writer) error
 	// Up executes the equivalent to a `compose up`
-	Up(ctx context.Context, project *types.Project, detach bool, w io.Writer) error
+	Up(ctx context.Context, project *types.Project, detach bool) error
 	// Down executes the equivalent to a `compose down`
 	Down(ctx context.Context, projectName string) error
 	// Logs executes the equivalent to a `compose logs`

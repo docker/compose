@@ -28,17 +28,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	types2 "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/compose-spec/compose-go/types"
+	types2 "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 	"golang.org/x/mod/semver"
+
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project) error {
@@ -53,7 +52,16 @@ func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) er
 	return errdefs.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool, w io.Writer) error {
+func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool) error {
+
 	cmd := exec.Command("docker-compose", "version", "--short")
 	b := bytes.Buffer{}
 	b.WriteString("v")
