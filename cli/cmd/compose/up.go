@@ -64,7 +64,7 @@ func runUp(ctx context.Context, opts composeOptions, services []string) error {
 			return "", err
 		}
 		if opts.DomainName != "" {
-			//arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
+			// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
 			project.Services[0].DomainName = opts.DomainName
 		}
 

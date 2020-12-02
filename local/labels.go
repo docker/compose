@@ -44,6 +44,10 @@ func projectFilter(projectName string) filters.KeyValuePair {
 	return filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, projectName))
 }
 
+func serviceFilter(serviceName string) filters.KeyValuePair {
+	return filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, serviceName))
+}
+
 func hasProjectLabelFilter() filters.KeyValuePair {
 	return filters.Arg("label", projectLabel)
 }

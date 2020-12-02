@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/config"
@@ -203,7 +204,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 		}
 	}
 
-	err = inDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	err = InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, project, service)
 	})
 	return err
@@ -220,35 +221,21 @@ func getContainerName(c moby.Container) string {
 }
 
 func (s *composeService) Down(ctx context.Context, projectName string) error {
-	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-	})
-	if err != nil {
+	eg, _ := errgroup.WithContext(ctx)
+	w := progress.ContextWriter(ctx)
+
+	project, err := s.projectFromContainerLabels(ctx, projectName)
+	if err != nil || project == nil {
 		return err
 	}
 
-	eg, _ := errgroup.WithContext(ctx)
-	w := progress.ContextWriter(ctx)
-	for _, c := range list {
-		container := c
-		eg.Go(func() error {
-			w.Event(progress.NewEvent(getContainerName(container), progress.Working, "Stopping"))
-			err := s.apiClient.ContainerStop(ctx, container.ID, nil)
-			if err != nil {
-				w.Event(progress.ErrorMessageEvent(getContainerName(container), "Error while Stopping"))
-				return err
-			}
-			w.Event(progress.RemovingEvent(getContainerName(container)))
-			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
-			if err != nil {
-				w.Event(progress.ErrorMessageEvent(getContainerName(container), "Error while Removing"))
-				return err
-			}
-			w.Event(progress.RemovedEvent(getContainerName(container)))
-			return nil
-		})
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		filter := filters.NewArgs(projectFilter(project.Name), serviceFilter(service.Name))
+		return s.removeContainers(ctx, w, eg, filter)
+	})
+
+	if err != nil {
+		return err
 	}
 	err = eg.Wait()
 	if err != nil {
@@ -262,14 +249,91 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 	if err != nil {
 		return err
 	}
-	for _, network := range networks {
-		networkID := network.ID
-		networkName := network.Name
+	for _, n := range networks {
+		networkID := n.ID
+		networkName := n.Name
 		eg.Go(func() error {
 			return s.ensureNetworkDown(ctx, networkID, networkName)
 		})
 	}
+
 	return eg.Wait()
+}
+
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, filter filters.Args) error {
+	cnts, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filter,
+	})
+	if err != nil {
+		return err
+	}
+	for _, c := range cnts {
+		eg.Go(func() error {
+			cName := getContainerName(c)
+			w.Event(progress.StoppingEvent(cName))
+			err := s.apiClient.ContainerStop(ctx, c.ID, nil)
+			if err != nil {
+				w.Event(progress.ErrorMessageEvent(cName, "Error while Stopping"))
+				return err
+			}
+			w.Event(progress.RemovingEvent(cName))
+			err = s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{})
+			if err != nil {
+				w.Event(progress.ErrorMessageEvent(cName, "Error while Removing"))
+				return err
+			}
+			w.Event(progress.RemovedEvent(cName))
+			return nil
+		})
+	}
+	return nil
+}
+
+func (s *composeService) projectFromContainerLabels(ctx context.Context, projectName string) (*types.Project, error) {
+	cnts, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(projectName),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(cnts) == 0 {
+		return nil, nil
+	}
+	options, err := loadProjectOptionsFromLabels(cnts[0])
+	if err != nil {
+		return nil, err
+	}
+	if options.ConfigPaths[0] == "-" {
+		fakeProject := &types.Project{
+			Name: projectName,
+		}
+		for _, c := range cnts {
+			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
+				Name: c.Labels[serviceLabel],
+			})
+		}
+		return fakeProject, nil
+	}
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
+func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error) {
+	var configFiles []string
+	relativePathConfigFiles := strings.Split(c.Labels[configFilesLabel], ",")
+	for _, c := range relativePathConfigFiles {
+		configFiles = append(configFiles, filepath.Base(c))
+	}
+	return cli.NewProjectOptions(configFiles,
+		cli.WithOsEnv,
+		cli.WithWorkingDirectory(c.Labels[workingDirLabel]),
+		cli.WithName(c.Labels[projectLabel]))
 }
 
 func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writer) error {
@@ -443,7 +507,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	//TODO: change oneoffLabel value for containers started with `docker compose run`
+	// TODO: change oneoffLabel value for containers started with `docker compose run`
 	labels := map[string]string{
 		projectLabel:         p.Name,
 		serviceLabel:         s.Name,
@@ -653,7 +717,7 @@ func getNetworkMode(p *types.Project, service types.ServiceConfig) container.Net
 		return container.NetworkMode("none")
 	}
 
-	/// FIXME incomplete implementation
+	// FIXME incomplete implementation
 	if strings.HasPrefix(mode, "service:") {
 		panic("Not yet implemented")
 	}
