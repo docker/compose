@@ -111,12 +111,14 @@ class TemplateWithDefaults(Template):
             var, _, err = braced.partition(':?')
             result = mapping.get(var)
             if not result:
+                err = err or var
                 raise UnsetRequiredSubstitution(err)
             return result
         elif '?' == sep:
             var, _, err = braced.partition('?')
             if var in mapping:
                 return mapping.get(var)
+            err = err or var
             raise UnsetRequiredSubstitution(err)
 
     # Modified from python2.7/string.py
