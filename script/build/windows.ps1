@@ -16,7 +16,7 @@
 #
 # 4. In Powershell, run the following commands:
 #
-#        $ pip install 'virtualenv==20.0.30'
+#        $ pip install 'virtualenv==20.2.1'
 #        $ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # 5. Clone the repository:

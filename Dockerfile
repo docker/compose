@@ -68,7 +68,7 @@ WORKDIR /code/
 COPY docker-compose-entrypoint.sh /usr/local/bin/
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 RUN pip install \
-    virtualenv==20.0.30 \
+    virtualenv==20.2.1 \
     tox==3.19.0
 COPY requirements-dev.txt .
 COPY requirements-indirect.txt .
