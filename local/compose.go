@@ -204,11 +204,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 		}
 	}
 
-	err = s.ensureImagesExists(ctx, project)
-	if err != nil {
-		return err
-	}
-
 	err = InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, project, service)
 	})
