@@ -21,6 +21,8 @@ import (
 	"errors"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/containerd/containerd/platforms"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/formatter"
@@ -73,7 +75,11 @@ func (p *proxy) Kill(ctx context.Context, request *containersv1.KillRequest) (*c
 }
 
 func (p *proxy) Run(ctx context.Context, request *containersv1.RunRequest) (*containersv1.RunResponse, error) {
-	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, grpcContainerToContainerConfig(request))
+	containerConfig, err := grpcContainerToContainerConfig(request)
+	if err != nil {
+		return nil, err
+	}
+	return &containersv1.RunResponse{}, Client(ctx).ContainerService().Run(ctx, containerConfig)
 }
 
 func (p *proxy) Inspect(ctx context.Context, request *containersv1.InspectRequest) (*containersv1.InspectResponse, error) {
@@ -151,7 +157,7 @@ func toGrpcContainer(c containers.Container) *containersv1.Container {
 	}
 }
 
-func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers.ContainerConfig {
+func grpcContainerToContainerConfig(request *containersv1.RunRequest) (containers.ContainerConfig, error) {
 	var ports []containers.Port
 	for _, p := range request.GetPorts() {
 		ports = append(ports, containers.Port{
@@ -160,6 +166,16 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 			HostPort:      p.HostPort,
 			Protocol:      p.Protocol,
 		})
+	}
+
+	var platform *specs.Platform
+
+	if request.Platform != "" {
+		p, err := platforms.Parse(request.Platform)
+		if err != nil {
+			return containers.ContainerConfig{}, err
+		}
+		platform = &p
 	}
 
 	return containers.ContainerConfig{
@@ -179,5 +195,6 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) containers
 			Test:     request.GetHealthcheck().GetTest(),
 			Interval: types.Duration(request.GetHealthcheck().GetInterval()),
 		},
-	}
+		Platform: platform,
+	}, nil
 }

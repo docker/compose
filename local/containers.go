@@ -32,6 +32,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/containers"
@@ -135,15 +136,15 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 		},
 	}
 
-	id, err := cs.create(ctx, containerConfig, hostConfig, nil, r.ID)
+	id, err := cs.create(ctx, containerConfig, hostConfig, nil, r.Platform, r.ID)
 	if err != nil {
 		return err
 	}
 	return cs.apiClient.ContainerStart(ctx, id, types.ContainerStartOptions{})
 }
 
-func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, name string) (string, error) {
-	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
+func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, name string) (string, error) {
+	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, platform, name)
 
 	if err != nil {
 		if client.IsErrNotFound(err) {
@@ -163,7 +164,7 @@ func (cs *containerService) create(ctx context.Context, containerConfig *contain
 			if err = io.Close(); err != nil {
 				return "", err
 			}
-			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, name)
+			created, err = cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, platform, name)
 			if err != nil {
 				return "", err
 			}

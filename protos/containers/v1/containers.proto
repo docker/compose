@@ -121,6 +121,7 @@ message RunRequest {
 	repeated string environment = 10;
 	bool auto_remove = 11;
 	Healthcheck  healthcheck = 12;
+	string platform = 13;
 }
 
 message RunResponse {

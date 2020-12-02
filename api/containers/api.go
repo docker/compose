@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/compose-spec/compose-go/types"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/formatter"
 )
@@ -114,6 +115,8 @@ type ContainerConfig struct {
 	AutoRemove bool
 	// Healthcheck contains the command and interval of the checks
 	Healthcheck Healthcheck
+	// Platform contains the platform information
+	Platform *specs.Platform
 }
 
 // Healthcheck defines the configuration of a healthcheck
