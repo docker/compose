@@ -215,7 +215,7 @@ class TopLevelCommand:
       build              Build or rebuild services
       config             Validate and view the Compose file
       create             Create services
-      down               Stop and remove containers, networks, images, and volumes
+      down               Stop and remove resources
       events             Receive real time events from containers
       exec               Execute a command in a running container
       help               Get help on a command
