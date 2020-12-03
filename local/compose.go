@@ -267,17 +267,17 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	if err != nil {
 		return err
 	}
-	for _, c := range containers {
+	for _, container := range containers {
 		eg.Go(func() error {
-			eventName := "Container " + getContainerName(c)
+			eventName := "Container " + getContainerName(container)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.apiClient.ContainerStop(ctx, c.ID, nil)
+			err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{})
+			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
@@ -290,7 +290,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 }
 
 func (s *composeService) projectFromContainerLabels(ctx context.Context, projectName string) (*types.Project, error) {
-	cnts, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -298,10 +298,10 @@ func (s *composeService) projectFromContainerLabels(ctx context.Context, project
 	if err != nil {
 		return nil, err
 	}
-	if len(cnts) == 0 {
+	if len(containers) == 0 {
 		return nil, nil
 	}
-	options, err := loadProjectOptionsFromLabels(cnts[0])
+	options, err := loadProjectOptionsFromLabels(containers[0])
 	if err != nil {
 		return nil, err
 	}
@@ -309,9 +309,9 @@ func (s *composeService) projectFromContainerLabels(ctx context.Context, project
 		fakeProject := &types.Project{
 			Name: projectName,
 		}
-		for _, c := range cnts {
+		for _, container := range containers {
 			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
-				Name: c.Labels[serviceLabel],
+				Name: container.Labels[serviceLabel],
 			})
 		}
 		return fakeProject, nil
