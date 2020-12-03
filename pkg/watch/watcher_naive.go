@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/tilt-dev/fsnotify"
@@ -261,7 +263,12 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "too many open files") && runtime.GOOS == "linux" {
+			return nil, fmt.Errorf("Hit OS limits creating a watcher.\n" +
+				"Run 'sysctl fs.inotify.max_user_instances' to check your inotify limits.\n" +
+				"To raise them, run 'sudo sysctl fs.inotify.max_user_instances=1024'")
+		}
+		return nil, errors.Wrap(err, "creating file watcher")
 	}
 	MaybeIncreaseBufferSize(fsw)
 
