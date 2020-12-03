@@ -90,6 +90,7 @@ func Command(contextType string) *cobra.Command {
 		listCommand(),
 		logsCommand(),
 		convertCommand(),
+		runCommand(),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
@@ -99,7 +100,7 @@ func Command(contextType string) *cobra.Command {
 			pullCommand(),
 		)
 	}
-
+	command.Flags().SetInterspersed(false)
 	return command
 }
 

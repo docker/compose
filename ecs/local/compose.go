@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
+	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 )
 
@@ -161,4 +162,10 @@ func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compo
 }
 func (e ecsLocalSimulation) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
 	return e.compose.List(ctx, projectName)
+}
+func (e ecsLocalSimulation) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+	return "", errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose run")
+}
+func (e ecsLocalSimulation) Run(ctx context.Context, container string, detach bool) error {
+	return errdefs.ErrNotImplemented
 }

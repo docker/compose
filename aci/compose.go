@@ -201,3 +201,10 @@ func (cs *aciComposeService) Logs(ctx context.Context, projectName string, consu
 func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
+
+func (cs *aciComposeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+	return "", errdefs.ErrNotImplemented
+}
+func (cs *aciComposeService) Run(ctx context.Context, container string, detach bool) error {
+	return errdefs.ErrNotImplemented
+}

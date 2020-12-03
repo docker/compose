@@ -14,38 +14,20 @@
    limitations under the License.
 */
 
-package compose
+package ecs
 
 import (
-	"encoding/json"
+	"context"
 
-	"github.com/opencontainers/go-digest"
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/errdefs"
 )
 
-func jsonHash(o interface{}) (string, error) {
-	bytes, err := json.Marshal(o)
-	if err != nil {
-		return "", err
-	}
-	return digest.SHA256.FromBytes(bytes).String(), nil
+func (b *ecsAPIService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+	return "", errdefs.ErrNotImplemented
 }
 
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
-}
-
-func unique(s []string) []string {
-	items := []string{}
-	for _, item := range s {
-		if contains(items, item) {
-			continue
-		}
-		items = append(items, item)
-	}
-	return items
+func (b *ecsAPIService) Run(ctx context.Context, container string, detach bool) error {
+	return errdefs.ErrNotImplemented
 }

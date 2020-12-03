@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"io"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -46,6 +47,10 @@ type Service interface {
 	List(ctx context.Context, projectName string) ([]Stack, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+	// CreateOneOffContainer creates a service oneoff container and starts its dependencies
+	CreateOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (string, error)
+	// Run attaches to and starts a one-off container
+	Run(ctx context.Context, container string, detach bool) error
 }
 
 // UpOptions group options of the Up API
@@ -64,6 +69,25 @@ type DownOptions struct {
 type ConvertOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
+}
+
+// RunOptions holds all flags for compose run
+type RunOptions struct {
+	Name        string
+	Command     []string
+	WorkingDir  string
+	Environment []string
+	Publish     []string
+	Labels      []string
+	Volumes     []string
+	Remove      bool
+	NoDeps      bool
+	LogConsumer LogConsumer
+
+	Detach bool
+
+	Stdout io.ReadCloser
+	Stdin  io.WriteCloser
 }
 
 // PortPublisher hold status about published port

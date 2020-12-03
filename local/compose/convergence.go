@@ -61,6 +61,10 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 		for i := 0; i < missing; i++ {
 			number := next + i
 			name := fmt.Sprintf("%s_%s_%d", project.Name, service.Name, number)
+			if len(service.ContainerName) > 0 {
+				name = service.ContainerName
+			}
+
 			eg.Go(func() error {
 				return s.createContainer(ctx, project, service, name, number)
 			})
