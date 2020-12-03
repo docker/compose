@@ -32,7 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
-	"github.com/docker/cli/cli/config"
+	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -52,6 +52,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/config"
 	"github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
@@ -72,7 +73,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 }
 
 func (s *composeService) Push(ctx context.Context, project *types.Project) error {
-	configFile, err := config.Load(config.Dir())
+	configFile, err := cliconfig.Load(config.Dir(ctx))
 	if err != nil {
 		return err
 	}
@@ -136,12 +137,133 @@ func (s *composeService) Push(ctx context.Context, project *types.Project) error
 				if jm.Error != nil {
 					return errors.New(jm.Error.Message)
 				}
-				toProgressEvent(service.Name, jm, w)
+				toProgressEvent("Pushing "+service.Name, jm, w)
 			}
 			return nil
 		})
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) Pull(ctx context.Context, project *types.Project) error {
+	configFile, err := cliconfig.Load(config.Dir(ctx))
+	if err != nil {
+		return err
+	}
+	info, err := s.apiClient.Info(ctx)
+	if err != nil {
+		return err
+	}
+
+	if info.IndexServerAddress == "" {
+		info.IndexServerAddress = registry.IndexServer
+	}
+
+	w := progress.ContextWriter(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
+
+	for _, srv := range project.Services {
+		service := srv
+		eg.Go(func() error {
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Working,
+				Text:   "Pulling",
+			})
+			ref, err := reference.ParseNormalizedNamed(service.Image)
+			if err != nil {
+				return err
+			}
+
+			repoInfo, err := registry.ParseRepositoryInfo(ref)
+			if err != nil {
+				return err
+			}
+
+			key := repoInfo.Index.Name
+			if repoInfo.Index.Official {
+				key = info.IndexServerAddress
+			}
+
+			authConfig, err := configFile.GetAuthConfig(key)
+			if err != nil {
+				return err
+			}
+
+			buf, err := json.Marshal(authConfig)
+			if err != nil {
+				return err
+			}
+
+			stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
+				RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+			})
+			if err != nil {
+				w.Event(progress.Event{
+					ID:     service.Name,
+					Status: progress.Error,
+					Text:   "Error",
+				})
+				return err
+			}
+
+			dec := json.NewDecoder(stream)
+			for {
+				var jm jsonmessage.JSONMessage
+				if err := dec.Decode(&jm); err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+				if jm.Error != nil {
+					return errors.New(jm.Error.Message)
+				}
+				toPullProgressEvent(service.Name, jm, w)
+			}
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   "Pulled",
+			})
+			return nil
+		})
+	}
+
+	return eg.Wait()
+}
+
+func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {
+	if jm.ID == "" || jm.Progress == nil {
+		return
+	}
+
+	var (
+		text   string
+		status = progress.Working
+	)
+
+	text = jm.Progress.String()
+
+	if jm.Status == "Pull complete" ||
+		jm.Status == "Already exists" ||
+		strings.Contains(jm.Status, "Image is up to date") ||
+		strings.Contains(jm.Status, "Downloaded newer image") {
+		status = progress.Done
+	}
+
+	if jm.Error != nil {
+		status = progress.Error
+		text = jm.Error.Message
+	}
+
+	w.Event(progress.Event{
+		ID:         jm.ID,
+		ParentID:   parent,
+		Text:       jm.Status,
+		Status:     status,
+		StatusText: text,
+	})
 }
 
 func toProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Writer) {

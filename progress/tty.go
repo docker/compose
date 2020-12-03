@@ -79,6 +79,7 @@ func (w *ttyWriter) Event(e Event) {
 		last.Status = e.Status
 		last.Text = e.Text
 		last.StatusText = e.StatusText
+		last.ParentID = e.ParentID
 		w.events[e.ID] = last
 	} else {
 		e.startTime = time.Now()
@@ -116,24 +117,41 @@ func (w *ttyWriter) print() {
 
 	var statusPadding int
 	for _, v := range w.eventIDs {
-		l := len(fmt.Sprintf("%s %s", w.events[v].ID, w.events[v].Text))
+		event := w.events[v]
+		l := len(fmt.Sprintf("%s %s", event.ID, event.Text))
 		if statusPadding < l {
 			statusPadding = l
+		}
+		if event.ParentID != "" {
+			statusPadding -= 2
 		}
 	}
 
 	numLines := 0
 	for _, v := range w.eventIDs {
-		line := lineText(w.events[v], terminalWidth, statusPadding, runtime.GOOS != "windows")
+		event := w.events[v]
+		if event.ParentID != "" {
+			continue
+		}
+		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows")
 		// nolint: errcheck
 		fmt.Fprint(w.out, line)
 		numLines++
+		for _, v := range w.eventIDs {
+			ev := w.events[v]
+			if ev.ParentID == event.ID {
+				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows")
+				// nolint: errcheck
+				fmt.Fprint(w.out, line)
+				numLines++
+			}
+		}
 	}
 
 	w.numLines = numLines
 }
 
-func lineText(event Event, terminalWidth, statusPadding int, color bool) string {
+func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
 		endTime = event.endTime
@@ -154,7 +172,8 @@ func lineText(event Event, terminalWidth, statusPadding int, color bool) string 
 	if maxStatusLen > 0 && len(status) > maxStatusLen {
 		status = status[:maxStatusLen] + "..."
 	}
-	text := fmt.Sprintf(" %s %s %s%s %s",
+	text := fmt.Sprintf("%s %s %s %s%s %s",
+		pad,
 		event.spinner.String(),
 		event.ID,
 		event.Text,

@@ -33,6 +33,7 @@ const (
 // Event represents a progress event.
 type Event struct {
 	ID         string
+	ParentID   string
 	Text       string
 	Status     EventStatus
 	StatusText string

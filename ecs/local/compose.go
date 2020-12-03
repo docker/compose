@@ -49,6 +49,10 @@ func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project) er
 	return errdefs.ErrNotImplemented
 }
 
+func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool) error {
 	cmd := exec.Command("docker-compose", "version", "--short")
 	b := bytes.Buffer{}

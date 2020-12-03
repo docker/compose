@@ -37,32 +37,30 @@ func (c *composeService) Push(ctx context.Context, project *types.Project) error
 	return errdefs.ErrNotImplemented
 }
 
-// Up executes the equivalent to a `compose up`
+func (c *composeService) Pull(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (c *composeService) Up(context.Context, *types.Project, bool) error {
 	return errdefs.ErrNotImplemented
 }
 
-// Down executes the equivalent to a `compose down`
 func (c *composeService) Down(context.Context, string) error {
 	return errdefs.ErrNotImplemented
 }
 
-// Logs executes the equivalent to a `compose logs`
 func (c *composeService) Logs(context.Context, string, io.Writer) error {
 	return errdefs.ErrNotImplemented
 }
 
-// Ps executes the equivalent to a `compose ps`
 func (c *composeService) Ps(context.Context, string) ([]compose.ServiceStatus, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-// List executes the equivalent to a `docker stack ls`
 func (c *composeService) List(context.Context, string) ([]compose.Stack, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-// Convert translate compose model into backend's native format
 func (c *composeService) Convert(context.Context, *types.Project, string) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
