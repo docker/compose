@@ -35,6 +35,10 @@ func (b *ecsAPIService) Push(ctx context.Context, project *types.Project) error 
 	return errdefs.ErrNotImplemented
 }
 
+func (b *ecsAPIService) Pull(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {

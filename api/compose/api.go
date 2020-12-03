@@ -29,6 +29,8 @@ type Service interface {
 	Build(ctx context.Context, project *types.Project) error
 	// Push executes the equivalent ot a `compose push`
 	Push(ctx context.Context, project *types.Project) error
+	// Pull executes the equivalent of a `compose pull`
+	Pull(ctx context.Context, project *types.Project) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, detach bool) error
 	// Down executes the equivalent to a `compose down`
