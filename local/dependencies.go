@@ -64,16 +64,16 @@ var (
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
 func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
-	return visit(ctx, project, upDirectionTraversalConfig, fn)
+	return visit(ctx, project, upDirectionTraversalConfig, fn, ServiceStopped)
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
 func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
-	return visit(ctx, project, downDirectionTraversalConfig, fn)
+	return visit(ctx, project, downDirectionTraversalConfig, fn, ServiceStarted)
 }
 
-func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error) error {
-	g := NewGraph(project.Services)
+func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error, initialStatus ServiceStatus) error {
+	g := NewGraph(project.Services, initialStatus)
 	if b, err := g.HasCycles(); b {
 		return err
 	}
@@ -155,14 +155,14 @@ func (v *Vertex) GetChildren() []*Vertex {
 }
 
 // NewGraph returns the dependency graph of the services
-func NewGraph(services types.Services) *Graph {
+func NewGraph(services types.Services, initialStatus ServiceStatus) *Graph {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
 		Vertices: map[string]*Vertex{},
 	}
 
 	for _, s := range services {
-		graph.AddVertex(s.Name, s)
+		graph.AddVertex(s.Name, s, initialStatus)
 	}
 
 	for _, s := range services {
@@ -175,22 +175,22 @@ func NewGraph(services types.Services) *Graph {
 }
 
 // NewVertex is the constructor function for the Vertex
-func NewVertex(key string, service types.ServiceConfig) *Vertex {
+func NewVertex(key string, service types.ServiceConfig, initialStatus ServiceStatus) *Vertex {
 	return &Vertex{
 		Key:      key,
 		Service:  service,
-		Status:   ServiceStopped,
+		Status:   initialStatus,
 		Parents:  map[string]*Vertex{},
 		Children: map[string]*Vertex{},
 	}
 }
 
 // AddVertex adds a vertex to the Graph
-func (g *Graph) AddVertex(key string, service types.ServiceConfig) {
+func (g *Graph) AddVertex(key string, service types.ServiceConfig, initialStatus ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	v := NewVertex(key, service)
+	v := NewVertex(key, service, initialStatus)
 	g.Vertices[key] = v
 }
 
