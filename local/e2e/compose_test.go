@@ -45,7 +45,7 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "up", "-d", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	const projectName = "compose-e2e-volume"
 
 	t.Run("up with volume", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "--workdir", "volume-test", "--project-name", projectName)
+		c.RunDockerCmd("compose", "up", "-d", "--workdir", "volume-test", "--project-name", projectName)
 
 		output := HTTPGetWithRetry(t, "http://localhost:8090", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
