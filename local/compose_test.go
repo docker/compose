@@ -19,9 +19,13 @@
 package local
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	composetypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/docker/api/types"
+	mountTypes "github.com/docker/docker/api/types/mount"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -106,4 +110,18 @@ func TestStacksMixedStatus(t *testing.T) {
 	assert.Equal(t, combinedStatus([]string{"running"}), "running(1)")
 	assert.Equal(t, combinedStatus([]string{"running", "running", "running"}), "running(3)")
 	assert.Equal(t, combinedStatus([]string{"running", "exited", "running"}), "exited(1), running(2)")
+}
+
+func TestBuildBindMount(t *testing.T) {
+	volume := composetypes.ServiceVolumeConfig{
+		Type:   composetypes.VolumeTypeBind,
+		Source: "e2e/volume-test",
+		Target: "/data",
+	}
+	mount, err := buildMount(volume)
+	assert.NilError(t, err)
+	assert.Assert(t, filepath.IsAbs(mount.Source))
+	_, err = os.Stat(mount.Source)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Type, mountTypes.TypeBind)
 }

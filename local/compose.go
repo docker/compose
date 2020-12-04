@@ -873,28 +873,36 @@ func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit
 		if contains(inherited, v.Target) {
 			continue
 		}
-		source := v.Source
-		if v.Type == "bind" && !filepath.IsAbs(source) {
-			// volume source has already been prefixed with workdir if required, by compose-go project loader
-			var err error
-			source, err = filepath.Abs(source)
-			if err != nil {
-				return nil, err
-			}
+		mount, err := buildMount(v)
+		if err != nil {
+			return nil, err
 		}
-
-		mounts = append(mounts, mount.Mount{
-			Type:          mount.Type(v.Type),
-			Source:        source,
-			Target:        v.Target,
-			ReadOnly:      v.ReadOnly,
-			Consistency:   mount.Consistency(v.Consistency),
-			BindOptions:   buildBindOption(v.Bind),
-			VolumeOptions: buildVolumeOptions(v.Volume),
-			TmpfsOptions:  buildTmpfsOptions(v.Tmpfs),
-		})
+		mounts = append(mounts, mount)
 	}
 	return mounts, nil
+}
+
+func buildMount(volume types.ServiceVolumeConfig) (mount.Mount, error) {
+	source := volume.Source
+	if volume.Type == "bind" && !filepath.IsAbs(source) {
+		// volume source has already been prefixed with workdir if required, by compose-go project loader
+		var err error
+		source, err = filepath.Abs(source)
+		if err != nil {
+			return mount.Mount{}, err
+		}
+	}
+
+	return mount.Mount{
+		Type:          mount.Type(volume.Type),
+		Source:        source,
+		Target:        volume.Target,
+		ReadOnly:      volume.ReadOnly,
+		Consistency:   mount.Consistency(volume.Consistency),
+		BindOptions:   buildBindOption(volume.Bind),
+		VolumeOptions: buildVolumeOptions(volume.Volume),
+		TmpfsOptions:  buildTmpfsOptions(volume.Tmpfs),
+	}, nil
 }
 
 func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
