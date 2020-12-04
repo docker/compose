@@ -800,7 +800,10 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		StopTimeout: toSeconds(s.StopGracePeriod),
 	}
 
-	mountOptions := buildContainerMountOptions(p, s, inherit)
+	mountOptions, err := buildContainerMountOptions(p, s, inherit)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	bindings := buildContainerBindingOptions(s)
 
 	networkMode := getNetworkMode(p, s)
@@ -844,7 +847,7 @@ func buildContainerBindingOptions(s types.ServiceConfig) nat.PortMap {
 	return bindings
 }
 
-func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) []mount.Mount {
+func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	var inherited []string
 	if inherit != nil {
@@ -872,8 +875,12 @@ func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit
 		}
 		source := v.Source
 		if v.Type == "bind" && !filepath.IsAbs(source) {
-			// FIXME handle ~/
-			source = filepath.Join(p.WorkingDir, source)
+			// volume source has already been prefixed with workdir if required, by compose-go project loader
+			var err error
+			source, err = filepath.Abs(source)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		mounts = append(mounts, mount.Mount{
@@ -887,7 +894,7 @@ func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit
 			TmpfsOptions:  buildTmpfsOptions(v.Tmpfs),
 		})
 	}
-	return mounts
+	return mounts, nil
 }
 
 func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
