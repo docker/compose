@@ -111,6 +111,15 @@ RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
     make -f builder.Makefile check-license-headers
 
+FROM base AS make-go-mod-tidy
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod tidy
+
+FROM scratch AS go-mod-tidy
+COPY --from=make-go-mod-tidy /compose-cli/go.mod .
+COPY --from=make-go-mod-tidy /compose-cli/go.sum .
+
 FROM base AS check-go-mod
 COPY . .
 RUN make -f builder.Makefile check-go-mod

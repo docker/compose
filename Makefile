@@ -92,6 +92,9 @@ moby-cli-link: ## Create com.docker.cli symlink if does not already exist
 validate-headers: ## Check license header for all files
 	@docker build . --target check-license-headers
 
+go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and go.sum
+	@docker build . --target go-mod-tidy --output .
+
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	@docker build . --target check-go-mod
 
@@ -128,4 +131,4 @@ help: ## Show help
 
 FORCE:
 
-.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help clean-aci-e2e
+.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help clean-aci-e2e go-mod-tidy
