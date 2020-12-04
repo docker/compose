@@ -103,8 +103,15 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 			Driver: d,
 		},
 	}
+
+	// Progress needs its own context that lives longer than the
+	// build one otherwise it won't read all the messages from
+	// build and will lock
+	progressCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w := progress.NewPrinter(progressCtx, os.Stdout, "auto")
+
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	w := progress.NewPrinter(ctx, os.Stdout, "auto")
 	_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
 	return err
 }
