@@ -94,7 +94,9 @@ func TestLocalComposeVolume(t *testing.T) {
 
 	const projectName = "compose-e2e-volume"
 
-	t.Run("up with volume", func(t *testing.T) {
+	t.Run("up with build and no image name, volume", func(t *testing.T) {
+		//ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("--context", "default", "rmi", "compose-e2e-volume_nginx")
 		c.RunDockerCmd("compose", "up", "-d", "--workdir", "volume-test", "--project-name", projectName)
 
 		output := HTTPGetWithRetry(t, "http://localhost:8090", http.StatusOK, 2*time.Second, 20*time.Second)

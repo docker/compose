@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: nginx
+    build: nginx-build
     volumes:
       - ./static:/usr/share/nginx/html
     ports:

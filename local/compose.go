@@ -66,7 +66,11 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 	opts := map[string]build.Options{}
 	for _, service := range project.Services {
 		if service.Build != nil {
-			opts[service.Name] = s.toBuildOptions(service, project.WorkingDir)
+			imageName := service.Image
+			if imageName == "" {
+				imageName = project.Name + "_" + service.Name
+			}
+			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 		}
 	}
 
