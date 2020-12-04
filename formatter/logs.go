@@ -18,6 +18,7 @@ package formatter
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -25,8 +26,9 @@ import (
 )
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(w io.Writer) LogConsumer {
+func NewLogConsumer(ctx context.Context, w io.Writer) LogConsumer {
 	return LogConsumer{
+		ctx:    ctx,
 		colors: map[string]colorFunc{},
 		width:  0,
 		writer: w,
@@ -35,6 +37,9 @@ func NewLogConsumer(w io.Writer) LogConsumer {
 
 // Log formats a log message as received from service/container
 func (l *LogConsumer) Log(service, container, message string) {
+	if l.ctx.Err() != nil {
+		return
+	}
 	cf, ok := l.colors[service]
 	if !ok {
 		cf = <-loop
@@ -70,6 +75,7 @@ func (l *LogConsumer) computeWidth() {
 
 // LogConsumer consume logs from services and format them
 type LogConsumer struct {
+	ctx    context.Context
 	colors map[string]colorFunc
 	width  int
 	writer io.Writer

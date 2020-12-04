@@ -19,6 +19,7 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -39,7 +40,16 @@ func (b *ecsAPIService) Pull(ctx context.Context, project *types.Project) error 
 	return errdefs.ErrNotImplemented
 }
 
+func (b *ecsAPIService) Create(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
+
 	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err

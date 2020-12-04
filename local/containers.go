@@ -143,7 +143,11 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	return cs.apiClient.ContainerStart(ctx, id, types.ContainerStartOptions{})
 }
 
-func (cs *containerService) create(ctx context.Context, containerConfig *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *specs.Platform, name string) (string, error) {
+func (cs *containerService) create(ctx context.Context,
+	containerConfig *container.Config,
+	hostConfig *container.HostConfig,
+	networkingConfig *network.NetworkingConfig,
+	platform *specs.Platform, name string) (string, error) {
 	created, err := cs.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, platform, name)
 
 	if err != nil {

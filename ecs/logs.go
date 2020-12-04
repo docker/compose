@@ -24,7 +24,7 @@ import (
 )
 
 func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := formatter.NewLogConsumer(w)
+	consumer := formatter.NewLogConsumer(ctx, w)
 	err := b.aws.GetLogs(ctx, project, consumer.Log)
 	return err
 }

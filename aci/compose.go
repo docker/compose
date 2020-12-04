@@ -56,6 +56,14 @@ func (cs *aciComposeService) Pull(ctx context.Context, project *types.Project) e
 	return errdefs.ErrNotImplemented
 }
 
+func (cs *aciComposeService) Create(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 

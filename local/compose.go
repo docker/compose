@@ -53,6 +53,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/config"
+	errdefs2 "github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
@@ -294,12 +295,17 @@ func toProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Write
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+	return errdefs2.ErrNotImplemented
+}
+
+func (s *composeService) Create(ctx context.Context, project *types.Project) error {
 	err := s.ensureImagesExists(ctx, project)
 	if err != nil {
 		return err
 	}
+
 	for k, network := range project.Networks {
-		if !network.External.External && network.Name == k {
+		if !network.External.External && network.Name != "" {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
 			project.Networks[k] = network
 		}
@@ -326,10 +332,117 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, detach 
 		}
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, project, service)
 	})
+}
+
+func (s *composeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+	var group *errgroup.Group
+	if w != nil {
+		eg, err := s.attach(ctx, project, w)
+		if err != nil {
+			return err
+		}
+		group = eg
+	}
+
+	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		return s.startService(ctx, project, service)
+	})
+	if err != nil {
+		return err
+	}
+	if group != nil {
+		return group.Wait()
+	}
+	return nil
+}
+
+func (s *composeService) attach(ctx context.Context, project *types.Project, w io.Writer) (*errgroup.Group, error) {
+	consumer := formatter.NewLogConsumer(ctx, w)
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+		),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, c := range containers {
+		names = append(names, getContainerName(c))
+	}
+	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
+
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, c := range containers {
+		container := c
+		eg.Go(func() error {
+			return s.attachContainer(ctx, container, consumer, project)
+		})
+	}
+	return eg, nil
+}
+
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer formatter.LogConsumer, project *types.Project) error {
+	serviceName := container.Labels[serviceLabel]
+	w := consumer.GetWriter(serviceName, container.ID)
+	service, err := project.GetService(serviceName)
+	if err != nil {
+		return err
+	}
+
+	reader, err := s.getContainerStdout(ctx, container)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		<-ctx.Done()
+		reader.Close() //nolint:errcheck
+	}()
+
+	if service.Tty {
+		_, err = io.Copy(w, reader)
+	} else {
+		_, err = stdcopy.StdCopy(w, w, reader)
+	}
 	return err
+}
+
+func (s *composeService) getContainerStdout(ctx context.Context, container moby.Container) (io.ReadCloser, error) {
+	var reader io.ReadCloser
+	if container.State == containerRunning {
+		logs, err := s.apiClient.ContainerLogs(ctx, container.ID, moby.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		reader = logs
+	} else {
+		cnx, err := s.apiClient.ContainerAttach(ctx, container.ID, moby.ContainerAttachOptions{
+			Stream: true,
+			Stdin:  true,
+			Stdout: true,
+			Stderr: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		reader = containerStdout{cnx}
+
+		err = s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return reader, nil
 }
 
 func getContainerName(c moby.Container) string {
@@ -467,7 +580,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writ
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(w)
+	consumer := formatter.NewLogConsumer(ctx, w)
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		service := c.Labels[serviceLabel]
@@ -521,7 +634,7 @@ func containersToServiceStatus(containers []moby.Container) ([]compose.ServiceSt
 		containers := containersByLabel[service]
 		runnningContainers := []moby.Container{}
 		for _, container := range containers {
-			if container.State == "running" {
+			if container.State == containerRunning {
 				runnningContainers = append(runnningContainers, container)
 			}
 		}

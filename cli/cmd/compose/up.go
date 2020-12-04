@@ -18,8 +18,13 @@ package compose
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
 
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -32,7 +37,12 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd := &cobra.Command{
 		Use: "up [SERVICE...]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUp(cmd.Context(), opts, args)
+			switch contextType {
+			case store.LocalContextType:
+				return runCreateStart(cmd.Context(), opts, args)
+			default:
+				return runUp(cmd.Context(), opts, args)
+			}
 		},
 	}
 	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -49,30 +59,68 @@ func upCommand(contextType string) *cobra.Command {
 }
 
 func runUp(ctx context.Context, opts composeOptions, services []string) error {
-	c, err := client.New(ctx)
+	c, project, err := setup(ctx, opts, services)
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		options, err := opts.toProjectOptions()
-		if err != nil {
-			return "", err
-		}
-		project, err := cli.ProjectFromOptions(options)
-		if err != nil {
-			return "", err
-		}
-		if opts.DomainName != "" {
-			// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
-			project.Services[0].DomainName = opts.DomainName
-		}
-
-		err = filter(project, services)
-		if err != nil {
-			return "", err
-		}
 		return "", c.ComposeService().Up(ctx, project, opts.Detach)
 	})
 	return err
+}
+
+func runCreateStart(ctx context.Context, opts composeOptions, services []string) error {
+	c, project, err := setup(ctx, opts, services)
+	if err != nil {
+		return err
+	}
+
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return "", c.ComposeService().Create(ctx, project)
+	})
+	if err != nil {
+		return err
+	}
+
+	var w io.Writer
+	if !opts.Detach {
+		w = os.Stdout
+	}
+
+	err = c.ComposeService().Start(ctx, project, w)
+	if errors.Is(ctx.Err(), context.Canceled) {
+		fmt.Println("Gracefully stopping...")
+		ctx = context.Background()
+		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+			return "", c.ComposeService().Down(ctx, project.Name)
+		})
+	}
+	return err
+}
+
+func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
+	c, err := client.New(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	options, err := opts.toProjectOptions()
+	if err != nil {
+		return nil, nil, err
+	}
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	if opts.DomainName != "" {
+		// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
+		project.Services[0].DomainName = opts.DomainName
+	}
+
+	err = filter(project, services)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c, project, nil
 }
