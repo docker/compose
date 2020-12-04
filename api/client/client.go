@@ -32,6 +32,15 @@ import (
 
 // New returns a backend client associated with current context
 func New(ctx context.Context) (*Client, error) {
+	return newWithDefaultBackend(ctx, "")
+}
+
+// NewWithDefaultLocalBackend returns a backend client associated with current context or local backend if on default context type
+func NewWithDefaultLocalBackend(ctx context.Context) (*Client, error) {
+	return newWithDefaultBackend(ctx, store.LocalContextType)
+}
+
+func newWithDefaultBackend(ctx context.Context, defaultBackend string) (*Client, error) {
 	currentContext := apicontext.CurrentContext(ctx)
 	s := store.ContextStore(ctx)
 
@@ -40,7 +49,12 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	service, err := backend.Get(ctx, cc.Type())
+	backendName := cc.Type()
+	if backendName == store.DefaultContextType && defaultBackend != "" {
+		backendName = defaultBackend
+	}
+
+	service, err := backend.Get(ctx, backendName)
 	if err != nil {
 		return nil, err
 	}

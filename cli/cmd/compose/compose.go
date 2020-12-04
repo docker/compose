@@ -17,16 +17,12 @@
 package compose
 
 import (
-	"context"
-
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 type composeOptions struct {
@@ -76,9 +72,6 @@ func Command(contextType string) *cobra.Command {
 	command := &cobra.Command{
 		Short: "Docker Compose",
 		Use:   "compose",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return checkComposeSupport(cmd.Context())
-		},
 	}
 
 	command.AddCommand(
@@ -90,7 +83,7 @@ func Command(contextType string) *cobra.Command {
 		convertCommand(),
 	)
 
-	if contextType == store.LocalContextType {
+	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
 		command.AddCommand(
 			buildCommand(),
 			pushCommand(),
@@ -99,15 +92,6 @@ func Command(contextType string) *cobra.Command {
 	}
 
 	return command
-}
-
-func checkComposeSupport(ctx context.Context) error {
-	_, err := client.New(ctx)
-	if errdefs.IsNotFoundError(err) {
-		return errdefs.ErrNotImplemented
-	}
-
-	return err
 }
 
 //

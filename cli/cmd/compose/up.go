@@ -38,7 +38,7 @@ func upCommand(contextType string) *cobra.Command {
 		Use: "up [SERVICE...]",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
-			case store.LocalContextType:
+			case store.LocalContextType, store.DefaultContextType:
 				return runCreateStart(cmd.Context(), opts, args)
 			default:
 				return runUp(cmd.Context(), opts, args)
@@ -100,7 +100,7 @@ func runCreateStart(ctx context.Context, opts composeOptions, services []string)
 }
 
 func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
-	c, err := client.New(ctx)
+	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

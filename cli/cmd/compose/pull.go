@@ -46,7 +46,7 @@ func pullCommand() *cobra.Command {
 }
 
 func runPull(ctx context.Context, opts pullOptions, services []string) error {
-	c, err := client.New(ctx)
+	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}
