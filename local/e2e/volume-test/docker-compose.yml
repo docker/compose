@@ -1,0 +1,7 @@
+services:
+  nginx:
+    image: nginx
+    volumes:
+      - ./static:/usr/share/nginx/html
+    ports:
+      - 8090:80

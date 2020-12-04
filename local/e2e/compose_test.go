@@ -28,7 +28,7 @@ import (
 	. "github.com/docker/compose-cli/tests/framework"
 )
 
-func TestLocalBackendComposeUp(t *testing.T) {
+func TestLocalComposeUp(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 	c.RunDockerCmd("context", "create", "local", "test-context").Assert(t, icmd.Success)
 	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
@@ -45,7 +45,7 @@ func TestLocalBackendComposeUp(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "up", "-d", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -84,5 +84,22 @@ func TestLocalBackendComposeUp(t *testing.T) {
 	t.Run("check compose labels", func(t *testing.T) {
 		networksAfterDown := c.RunDockerCmd("--context", "default", "network", "ls")
 		assert.Equal(t, networkList.Stdout(), networksAfterDown.Stdout())
+	})
+}
+
+func TestLocalComposeVolume(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	c.RunDockerCmd("context", "create", "local", "test-context").Assert(t, icmd.Success)
+	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
+
+	const projectName = "compose-e2e-volume"
+
+	t.Run("up with volume", func(t *testing.T) {
+		c.RunDockerCmd("compose", "up", "-d", "--workdir", "volume-test", "--project-name", projectName)
+
+		output := HTTPGetWithRetry(t, "http://localhost:8090", http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
+
+		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
 	})
 }
