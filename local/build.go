@@ -56,7 +56,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			if imageName == "" {
 				imageName = project.Name + "_" + service.Name
 			}
-			opts[imageName] = s.toBuildOptions(service, project.WorkingDir)
+			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 			continue
 		}
 
@@ -116,11 +116,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	return err
 }
 
-func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string) build.Options {
+func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string, imageTag string) build.Options {
 	var tags []string
-	if service.Image != "" {
-		tags = append(tags, service.Image)
-	}
+	tags = append(tags, imageTag)
 
 	if service.Build.Dockerfile == "" {
 		service.Build.Dockerfile = "Dockerfile"
