@@ -35,8 +35,6 @@ func TestLocalComposeUp(t *testing.T) {
 
 	const projectName = "compose-e2e-demo"
 
-	networkList := c.RunDockerCmd("--context", "default", "network", "ls")
-
 	t.Run("build", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "build", "-f", "../../tests/composefiles/demo_multi_port.yaml")
 		res.Assert(t, icmd.Expected{Out: "COPY words.sql /docker-entrypoint-initdb.d/"})
@@ -57,7 +55,7 @@ func TestLocalComposeUp(t *testing.T) {
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
 		res = c.RunDockerCmd("--context", "default", "network", "ls")
-		assert.Equal(t, len(Lines(res.Stdout())), len(Lines(networkList.Stdout()))+1)
+		res.Assert(t, icmd.Expected{Out: projectName + "_default"})
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
@@ -81,9 +79,14 @@ func TestLocalComposeUp(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
 	})
 
-	t.Run("check compose labels", func(t *testing.T) {
-		networksAfterDown := c.RunDockerCmd("--context", "default", "network", "ls")
-		assert.Equal(t, networkList.Stdout(), networksAfterDown.Stdout())
+	t.Run("check containers after down", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
+	})
+
+	t.Run("check networks after down", func(t *testing.T) {
+		res := c.RunDockerCmd("--context", "default", "network", "ls")
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
 
