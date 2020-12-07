@@ -5,3 +5,13 @@ services:
       - ./static:/usr/share/nginx/html
     ports:
       - 8090:80
+
+  nginx2:
+    build: nginx-build
+    volumes:
+      - staticVol:/usr/share/nginx/html
+    ports:
+      - 9090:80
+
+volumes:
+  staticVol:

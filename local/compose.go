@@ -1086,24 +1086,24 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 	// TODO could identify volume by label vs name
 	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
-		if errdefs.IsNotFound(err) {
-			eventName := fmt.Sprintf("Volume %q", volume.Name)
-			w := progress.ContextWriter(ctx)
-			w.Event(progress.CreatingEvent(eventName))
-			// TODO we miss support for driver_opts and labels
-			_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
-				Labels:     volume.Labels,
-				Name:       volume.Name,
-				Driver:     volume.Driver,
-				DriverOpts: volume.DriverOpts,
-			})
-			if err != nil {
-				w.Event(progress.ErrorEvent(eventName))
-				return err
-			}
-			w.Event(progress.CreatedEvent(eventName))
+		if !errdefs.IsNotFound(err) {
+			return err
 		}
-		return err
+		eventName := fmt.Sprintf("Volume %q", volume.Name)
+		w := progress.ContextWriter(ctx)
+		w.Event(progress.CreatingEvent(eventName))
+		// TODO we miss support for driver_opts and labels
+		_, err := s.apiClient.VolumeCreate(ctx, mobyvolume.VolumeCreateBody{
+			Labels:     volume.Labels,
+			Name:       volume.Name,
+			Driver:     volume.Driver,
+			DriverOpts: volume.DriverOpts,
+		})
+		if err != nil {
+			w.Event(progress.ErrorEvent(eventName))
+			return err
+		}
+		w.Event(progress.CreatedEvent(eventName))
 	}
 	return nil
 }
