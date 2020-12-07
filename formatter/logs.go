@@ -23,11 +23,13 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/docker/compose-cli/api/compose"
 )
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(ctx context.Context, w io.Writer) LogConsumer {
-	return LogConsumer{
+func NewLogConsumer(ctx context.Context, w io.Writer) compose.LogConsumer {
+	return &logConsumer{
 		ctx:    ctx,
 		colors: map[string]colorFunc{},
 		width:  0,
@@ -36,7 +38,7 @@ func NewLogConsumer(ctx context.Context, w io.Writer) LogConsumer {
 }
 
 // Log formats a log message as received from service/container
-func (l *LogConsumer) Log(service, container, message string) {
+func (l *logConsumer) Log(service, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
@@ -54,16 +56,7 @@ func (l *LogConsumer) Log(service, container, message string) {
 	}
 }
 
-// GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func (l *LogConsumer) GetWriter(service, container string) io.Writer {
-	return splitBuffer{
-		service:   service,
-		container: container,
-		consumer:  l,
-	}
-}
-
-func (l *LogConsumer) computeWidth() {
+func (l *logConsumer) computeWidth() {
 	width := 0
 	for n := range l.colors {
 		if len(n) > width {
@@ -74,25 +67,9 @@ func (l *LogConsumer) computeWidth() {
 }
 
 // LogConsumer consume logs from services and format them
-type LogConsumer struct {
+type logConsumer struct {
 	ctx    context.Context
 	colors map[string]colorFunc
 	width  int
 	writer io.Writer
-}
-
-type splitBuffer struct {
-	service   string
-	container string
-	consumer  *LogConsumer
-}
-
-func (s splitBuffer) Write(b []byte) (n int, err error) {
-	split := bytes.Split(b, []byte{'\n'})
-	for _, line := range split {
-		if len(line) != 0 {
-			s.consumer.Log(s.service, s.container, string(line))
-		}
-	}
-	return len(b), nil
 }

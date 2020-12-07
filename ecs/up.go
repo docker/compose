@@ -19,13 +19,14 @@ package ecs
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
+
+	"github.com/compose-spec/compose-go/types"
 )
 
 func (b *ecsAPIService) Build(ctx context.Context, project *types.Project) error {
@@ -44,7 +45,7 @@ func (b *ecsAPIService) Create(ctx context.Context, project *types.Project) erro
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 

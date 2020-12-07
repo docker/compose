@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,7 +55,7 @@ func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project) 
 	return errdefs.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -181,7 +180,7 @@ services:
 	return cmd.Run()
 }
 
-func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, w io.Writer) error {
+func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
 	list, err := e.moby.ContainerList(ctx, types2.ContainerListOptions{
 		Filters: filters.NewArgs(filters.Arg("label", "com.docker.compose.project="+projectName)),
 	})

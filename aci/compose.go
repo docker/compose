@@ -19,7 +19,6 @@ package aci
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/compose-spec/compose-go/types"
@@ -60,7 +59,7 @@ func (cs *aciComposeService) Create(ctx context.Context, project *types.Project)
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -176,7 +175,7 @@ func (cs *aciComposeService) List(ctx context.Context, project string) ([]compos
 	return stacks, nil
 }
 
-func (cs *aciComposeService) Logs(ctx context.Context, project string, w io.Writer) error {
+func (cs *aciComposeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 
