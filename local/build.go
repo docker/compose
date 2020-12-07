@@ -130,6 +130,7 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		},
 		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
 		Tags:      tags,
+		Target:    service.Build.Target,
 	}
 }
 
