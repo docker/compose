@@ -1,6 +1,59 @@
 Change log
 ==========
 
+1.28.0 (2020-12-03)
+-------------------
+
+### Features
+
+- Support for Nvidia GPUs via device requests
+
+- Support for service profiles
+
+- Change the SSH conneciton approach to the Docker CLI's via shellout to the local SSH client (old behaviour enabled by setting `COMPOSE_PARAMIKO_SSH` environment variable)
+
+- Add flag to disable log prefix
+
+### Bugs
+
+- Make `parallel_pull=True` by default
+
+- Bring back warning for configs in non-swarm mode
+
+- Take `--file` in account when defining `project_dir`
+
+### Miscellaneous
+
+- Improve failure report for missing mandatory environment variables
+
+- Bump attrs to 20.3.0
+
+- Bump more_itertools to 8.6.0
+
+- Bump cryptograhy to 3.2.1
+
+- Bump cffi to 1.14.4
+
+- Bump virtualenv to 20.2.2
+
+- Bump bcrypt to 3.2.0
+
+- Bump gitpython to 3.1.11
+
+- Bump docker-py to 4.4.0
+
+- Bump Python to 3.9
+
+- Linux: bump Debian base image from stretch to buster (required for Python 3.9)
+
+- macOS: OpenSSL 1.1.1g to 1.1.1h, Python 3.7.7 to 3.9.0
+
+- Bump pyinstaller 4.1
+
+- Loosen restriction on base images to latest minor
+
+- Updates of READMEs
+
 1.27.4 (2020-09-24)
 -------------------
 
