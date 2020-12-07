@@ -22,9 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-
-	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
@@ -34,6 +31,8 @@ import (
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/context/cloud"
 	"github.com/docker/compose-cli/errdefs"
+
+	"github.com/compose-spec/compose-go/types"
 )
 
 type apiService struct {
@@ -155,7 +154,7 @@ func (cs *composeService) Create(ctx context.Context, project *types.Project) er
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (cs *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -176,7 +175,7 @@ func (cs *composeService) Ps(ctx context.Context, project string) ([]compose.Ser
 func (cs *composeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
 	return nil, errdefs.ErrNotImplemented
 }
-func (cs *composeService) Logs(ctx context.Context, project string, w io.Writer) error {
+func (cs *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 

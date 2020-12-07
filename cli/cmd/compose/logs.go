@@ -20,9 +20,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/formatter"
+
+	"github.com/spf13/cobra"
 )
 
 func logsCommand() *cobra.Command {
@@ -50,5 +51,6 @@ func runLogs(ctx context.Context, opts composeOptions) error {
 	if err != nil {
 		return err
 	}
-	return c.ComposeService().Logs(ctx, projectName, os.Stdout)
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
+	return c.ComposeService().Logs(ctx, projectName, consumer)
 }

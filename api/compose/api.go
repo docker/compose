@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"io"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -34,13 +33,13 @@ type Service interface {
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project) error
 	// Start executes the equivalent to a `compose start`
-	Start(ctx context.Context, project *types.Project, w io.Writer) error
+	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, detach bool) error
 	// Down executes the equivalent to a `compose down`
 	Down(ctx context.Context, projectName string) error
 	// Logs executes the equivalent to a `compose logs`
-	Logs(ctx context.Context, projectName string, w io.Writer) error
+	Logs(ctx context.Context, projectName string, consumer LogConsumer) error
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string) ([]ServiceStatus, error)
 	// List executes the equivalent to a `docker stack ls`
@@ -88,4 +87,9 @@ type Stack struct {
 	Name   string
 	Status string
 	Reason string
+}
+
+// LogConsumer is a callback to process log messages from services
+type LogConsumer interface {
+	Log(service, container, message string)
 }

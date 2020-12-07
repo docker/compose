@@ -20,16 +20,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+
+	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/progress"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
-
-	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/progress"
 )
 
 func upCommand(contextType string) *cobra.Command {
@@ -83,12 +84,12 @@ func runCreateStart(ctx context.Context, opts composeOptions, services []string)
 		return err
 	}
 
-	var w io.Writer
+	var consumer compose.LogConsumer
 	if !opts.Detach {
-		w = os.Stdout
+		consumer = formatter.NewLogConsumer(ctx, os.Stdout)
 	}
 
-	err = c.ComposeService().Start(ctx, project, w)
+	err = c.ComposeService().Start(ctx, project, consumer)
 	if errors.Is(ctx.Err(), context.Canceled) {
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()

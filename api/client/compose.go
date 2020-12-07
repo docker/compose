@@ -18,12 +18,11 @@ package client
 
 import (
 	"context"
-	"io"
-
-	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
+
+	"github.com/compose-spec/compose-go/types"
 )
 
 type composeService struct {
@@ -45,7 +44,7 @@ func (c *composeService) Create(ctx context.Context, project *types.Project) err
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (c *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -57,7 +56,7 @@ func (c *composeService) Down(context.Context, string) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Logs(context.Context, string, io.Writer) error {
+func (c *composeService) Logs(context.Context, string, compose.LogConsumer) error {
 	return errdefs.ErrNotImplemented
 }
 

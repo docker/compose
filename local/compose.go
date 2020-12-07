@@ -19,6 +19,7 @@
 package local
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -54,7 +55,6 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/config"
 	errdefs2 "github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/formatter"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -341,10 +341,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 	})
 }
 
-func (s *composeService) Start(ctx context.Context, project *types.Project, w io.Writer) error {
+func (s *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
 	var group *errgroup.Group
-	if w != nil {
-		eg, err := s.attach(ctx, project, w)
+	if consumer != nil {
+		eg, err := s.attach(ctx, project, consumer)
 		if err != nil {
 			return err
 		}
@@ -363,8 +363,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, w io
 	return nil
 }
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, w io.Writer) (*errgroup.Group, error) {
-	consumer := formatter.NewLogConsumer(ctx, w)
+func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.LogConsumer) (*errgroup.Group, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
@@ -391,34 +390,49 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, w i
 	return eg, nil
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer formatter.LogConsumer, project *types.Project) error {
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.LogConsumer, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := consumer.GetWriter(serviceName, container.ID)
+	w := getWriter(serviceName, container.ID, consumer)
+
 	service, err := project.GetService(serviceName)
 	if err != nil {
 		return err
 	}
 
-	reader, err := s.getContainerStdout(ctx, container)
+	return s.attachContainerStreams(ctx, container, service.Tty, nil, w)
+}
+
+func (s *composeService) attachContainerStreams(ctx context.Context, container moby.Container, tty bool, r io.Reader, w io.Writer) error {
+	stdin, stdout, err := s.getContainerStreams(ctx, container)
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		<-ctx.Done()
-		reader.Close() //nolint:errcheck
+		stdout.Close() //nolint:errcheck
+		stdin.Close()  //nolint:errcheck
 	}()
 
-	if service.Tty {
-		_, err = io.Copy(w, reader)
-	} else {
-		_, err = stdcopy.StdCopy(w, w, reader)
+	if r != nil && stdin != nil {
+		go func() {
+			io.Copy(stdin, r) //nolint:errcheck
+		}()
+	}
+
+	if w != nil {
+		if tty {
+			_, err = io.Copy(w, stdout)
+		} else {
+			_, err = stdcopy.StdCopy(w, w, stdout)
+		}
 	}
 	return err
 }
 
-func (s *composeService) getContainerStdout(ctx context.Context, container moby.Container) (io.ReadCloser, error) {
-	var reader io.ReadCloser
+func (s *composeService) getContainerStreams(ctx context.Context, container moby.Container) (io.WriteCloser, io.ReadCloser, error) {
+	var stdout io.ReadCloser
+	var stdin io.WriteCloser
 	if container.State == containerRunning {
 		logs, err := s.apiClient.ContainerLogs(ctx, container.ID, moby.ContainerLogsOptions{
 			ShowStdout: true,
@@ -426,9 +440,9 @@ func (s *composeService) getContainerStdout(ctx context.Context, container moby.
 			Follow:     true,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		reader = logs
+		stdout = logs
 	} else {
 		cnx, err := s.apiClient.ContainerAttach(ctx, container.ID, moby.ContainerAttachOptions{
 			Stream: true,
@@ -437,16 +451,12 @@ func (s *composeService) getContainerStdout(ctx context.Context, container moby.
 			Stderr: true,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		reader = containerStdout{cnx}
-
-		err = s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
-		if err != nil {
-			return nil, err
-		}
+		stdout = containerStdout{cnx}
+		stdin = containerStdin{cnx}
 	}
-	return reader, nil
+	return stdin, stdout, nil
 }
 
 func getContainerName(c moby.Container) string {
@@ -575,7 +585,7 @@ func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error)
 		cli.WithName(c.Labels[projectLabel]))
 }
 
-func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writer) error {
+func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
 	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
@@ -584,7 +594,6 @@ func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writ
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(ctx, w)
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		service := c.Labels[serviceLabel]
@@ -604,7 +613,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writ
 			if err != nil {
 				return err
 			}
-			w := consumer.GetWriter(service, container.ID)
+			w := getWriter(service, container.ID, consumer)
 			if container.Config.Tty {
 				_, err = io.Copy(w, r)
 			} else {
@@ -614,6 +623,31 @@ func (s *composeService) Logs(ctx context.Context, projectName string, w io.Writ
 		})
 	}
 	return eg.Wait()
+}
+
+type splitBuffer struct {
+	service   string
+	container string
+	consumer  compose.LogConsumer
+}
+
+// getWriter creates a io.Writer that will actually split by line and format by LogConsumer
+func getWriter(service, container string, l compose.LogConsumer) io.Writer {
+	return splitBuffer{
+		service:   service,
+		container: container,
+		consumer:  l,
+	}
+}
+
+func (s splitBuffer) Write(b []byte) (n int, err error) {
+	split := bytes.Split(b, []byte{'\n'})
+	for _, line := range split {
+		if len(line) != 0 {
+			s.consumer.Log(s.service, s.container, string(line))
+		}
+	}
+	return len(b), nil
 }
 
 func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
@@ -804,7 +838,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		StopTimeout: toSeconds(s.StopGracePeriod),
 	}
 
-	mountOptions, err := buildContainerMountOptions(p, s, inherit)
+	mountOptions, err := buildContainerMountOptions(s, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -851,7 +885,7 @@ func buildContainerBindingOptions(s types.ServiceConfig) nat.PortMap {
 	return bindings
 }
 
-func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	var inherited []string
 	if inherit != nil {

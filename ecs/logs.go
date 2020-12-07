@@ -18,13 +18,11 @@ package ecs
 
 import (
 	"context"
-	"io"
 
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/api/compose"
 )
 
-func (b *ecsAPIService) Logs(ctx context.Context, project string, w io.Writer) error {
-	consumer := formatter.NewLogConsumer(ctx, w)
-	err := b.aws.GetLogs(ctx, project, consumer.Log)
+func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
+	err := b.aws.GetLogs(ctx, projectName, consumer.Log)
 	return err
 }
