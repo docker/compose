@@ -207,7 +207,7 @@ func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consum
 	return cmd.Run()
 }
 
-func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
+func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
 	return nil, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose ps")
 }
 func (e ecsLocalSimulation) List(ctx context.Context, projectName string) ([]compose.Stack, error) {

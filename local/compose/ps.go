@@ -28,8 +28,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
-	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -37,7 +37,33 @@ func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.
 	if err != nil {
 		return nil, err
 	}
-	return containersToServiceStatus(list)
+
+	var summary []compose.ContainerSummary
+	for _, c := range containers {
+		var publishers []compose.PortPublisher
+		for _, p := range c.Ports {
+			var url string
+			if p.PublicPort != 0 {
+				url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
+			}
+			publishers = append(publishers, compose.PortPublisher{
+				URL:           url,
+				TargetPort:    int(p.PrivatePort),
+				PublishedPort: int(p.PublicPort),
+				Protocol:      p.Type,
+			})
+		}
+
+		summary = append(summary, compose.ContainerSummary{
+			ID:         c.ID,
+			Name:       getContainerName(c),
+			Project:    c.Labels[projectLabel],
+			Service:    c.Labels[serviceLabel],
+			State:      c.State,
+			Publishers: publishers,
+		})
+	}
+	return summary, nil
 }
 
 func containersToServiceStatus(containers []moby.Container) ([]compose.ServiceStatus, error) {

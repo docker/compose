@@ -63,6 +63,7 @@ type API interface {
 	DeleteSecret(ctx context.Context, id string, recover bool) error
 	GetLogs(ctx context.Context, name string, consumer func(service, container, message string)) error
 	DescribeService(ctx context.Context, cluster string, arn string) (compose.ServiceStatus, error)
+	DescribeServiceTasks(ctx context.Context, cluster string, project string, service string) ([]compose.ContainerSummary, error)
 	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)
 	ListTasks(ctx context.Context, cluster string, family string) ([]string, error)
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
 )
 
@@ -54,44 +54,34 @@ func runPs(ctx context.Context, opts composeOptions) error {
 	if err != nil {
 		return err
 	}
-	serviceList, err := c.ComposeService().Ps(ctx, projectName)
+	containers, err := c.ComposeService().Ps(ctx, projectName)
 	if err != nil {
 		return err
 	}
 	if opts.Quiet {
-		for _, s := range serviceList {
+		for _, s := range containers {
 			fmt.Println(s.ID)
 		}
 		return nil
 	}
-	view := viewFromServiceStatusList(serviceList)
-	return formatter.Print(view, opts.Format, os.Stdout,
+
+	sort.Slice(containers, func(i, j int) bool {
+		return containers[i].Name < containers[j].Name
+	})
+
+	return formatter.Print(containers, opts.Format, os.Stdout,
 		func(w io.Writer) {
-			for _, service := range view {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%s\n", service.ID, service.Name, service.Replicas, service.Desired, strings.Join(service.Ports, ", "))
+			for _, container := range containers {
+				var ports []string
+				for _, p := range container.Publishers {
+					if p.URL == "" {
+						ports = append(ports, fmt.Sprintf("%d/%s", p.TargetPort, p.Protocol))
+					} else {
+						ports = append(ports, fmt.Sprintf("%s->%d/%s", p.URL, p.TargetPort, p.Protocol))
+					}
+				}
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", container.Name, container.State, strings.Join(ports, ", "))
 			}
 		},
-		"ID", "NAME", "REPLICAS", "PORTS")
-}
-
-type serviceStatusView struct {
-	ID       string
-	Name     string
-	Replicas int
-	Desired  int
-	Ports    []string
-}
-
-func viewFromServiceStatusList(serviceStatusList []compose.ServiceStatus) []serviceStatusView {
-	retList := make([]serviceStatusView, len(serviceStatusList))
-	for i, s := range serviceStatusList {
-		retList[i] = serviceStatusView{
-			ID:       s.ID,
-			Name:     s.Name,
-			Replicas: s.Replicas,
-			Desired:  s.Desired,
-			Ports:    s.Ports,
-		}
-	}
-	return retList
+		"NAME", "STATE", "PORTS")
 }

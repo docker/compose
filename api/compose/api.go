@@ -41,7 +41,7 @@ type Service interface {
 	// Logs executes the equivalent to a `compose logs`
 	Logs(ctx context.Context, projectName string, consumer LogConsumer) error
 	// Ps executes the equivalent to a `compose ps`
-	Ps(ctx context.Context, projectName string) ([]ServiceStatus, error)
+	Ps(ctx context.Context, projectName string) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, projectName string) ([]Stack, error)
 	// Convert translate compose model into backend's native format
@@ -54,6 +54,16 @@ type PortPublisher struct {
 	TargetPort    int
 	PublishedPort int
 	Protocol      string
+}
+
+// ContainerSummary hold high-level description of a container
+type ContainerSummary struct {
+	ID         string
+	Name       string
+	Project    string
+	Service    string
+	State      string
+	Publishers []PortPublisher
 }
 
 // ServiceStatus hold status about a service

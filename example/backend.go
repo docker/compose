@@ -169,7 +169,7 @@ func (cs *composeService) Down(ctx context.Context, project string) error {
 	return nil
 }
 
-func (cs *composeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
+func (cs *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 func (cs *composeService) List(ctx context.Context, project string) ([]compose.Stack, error) {

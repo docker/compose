@@ -819,6 +819,69 @@ func (s sdk) DescribeService(ctx context.Context, cluster string, arn string) (c
 	}, nil
 }
 
+func (s sdk) DescribeServiceTasks(ctx context.Context, cluster string, project string, service string) ([]compose.ContainerSummary, error) {
+	var summary []compose.ContainerSummary
+	familly := fmt.Sprintf("%s-%s", project, service)
+	var token *string
+	for {
+		list, err := s.ECS.ListTasks(&ecs.ListTasksInput{
+			Cluster:    aws.String(cluster),
+			Family:     aws.String(familly),
+			LaunchType: nil,
+			MaxResults: nil,
+			NextToken:  token,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if len(list.TaskArns) == 0 {
+			break
+		}
+		tasks, err := s.ECS.DescribeTasksWithContext(ctx, &ecs.DescribeTasksInput{
+			Cluster: aws.String(cluster),
+			Include: aws.StringSlice([]string{"TAGS"}),
+			Tasks:   list.TaskArns,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, t := range tasks.Tasks {
+			var project string
+			var service string
+			for _, tag := range t.Tags {
+				switch aws.StringValue(tag.Key) {
+				case compose.ProjectTag:
+					project = aws.StringValue(tag.Value)
+				case compose.ServiceTag:
+					service = aws.StringValue(tag.Value)
+				}
+			}
+
+			id, err := arn.Parse(aws.StringValue(t.TaskArn))
+			if err != nil {
+				return nil, err
+			}
+
+			summary = append(summary, compose.ContainerSummary{
+				ID:      id.String(),
+				Name:    id.Resource,
+				Project: project,
+				Service: service,
+				State:   aws.StringValue(t.LastStatus),
+			})
+		}
+
+		if list.NextToken == token {
+			break
+		}
+		token = list.NextToken
+	}
+
+	return summary, nil
+}
+
 func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error) {
 	if len(targetGroupArns) == 0 {
 		return nil, nil
@@ -861,10 +924,10 @@ func (s sdk) getURLWithPortMapping(ctx context.Context, targetGroupArns []string
 				continue
 			}
 			loadBalancers = append(loadBalancers, compose.PortPublisher{
-				URL:           aws.StringValue(lb.DNSName),
+				URL:           fmt.Sprintf("%s:%d", aws.StringValue(lb.DNSName), aws.Int64Value(tg.Port)),
 				TargetPort:    int(aws.Int64Value(tg.Port)),
 				PublishedPort: int(aws.Int64Value(tg.Port)),
-				Protocol:      aws.StringValue(tg.Protocol),
+				Protocol:      strings.ToLower(aws.StringValue(tg.Protocol)),
 			})
 
 		}

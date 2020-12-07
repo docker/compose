@@ -692,7 +692,7 @@ func TestUpUpdate(t *testing.T) {
 		for _, l := range out {
 			if strings.Contains(l, serverContainer) {
 				webRunning = true
-				strings.Contains(l, ":80->80/tcp")
+				assert.Check(t, strings.Contains(l, ":80->80/tcp"))
 			}
 		}
 		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
@@ -738,10 +738,10 @@ func TestUpUpdate(t *testing.T) {
 			switch containerID {
 			case wordsContainer:
 				wordsDisplayed = true
-				assert.DeepEqual(t, fields, []string{containerID, "words", "1/1"})
+				assert.DeepEqual(t, fields, []string{containerID, "words", "Running"})
 			case dbContainer:
 				dbDisplayed = true
-				assert.DeepEqual(t, fields, []string{containerID, "db", "1/1"})
+				assert.DeepEqual(t, fields, []string{containerID, "db", "Running"})
 			case serverContainer:
 				webDisplayed = true
 				assert.Equal(t, fields[1], "web")
