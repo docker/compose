@@ -46,7 +46,7 @@ func pushCommand() *cobra.Command {
 }
 
 func runPush(ctx context.Context, opts pushOptions, services []string) error {
-	c, err := client.New(ctx)
+	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,3 @@
-// +build local
-
 /*
    Copyright 2020 Docker Compose CLI authors
 

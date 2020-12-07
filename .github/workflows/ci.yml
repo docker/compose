@@ -60,12 +60,12 @@ jobs:
 
       - name: Test
         env:
-          BUILD_TAGS: example,local
+          BUILD_TAGS: example
         run: make -f builder.Makefile test
 
       - name: Build for local E2E
         env:
-          BUILD_TAGS: example,local,e2e
+          BUILD_TAGS: example,e2e
         run: make -f builder.Makefile cli
 
       - name: E2E Test

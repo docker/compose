@@ -30,8 +30,6 @@ import (
 
 func TestLocalComposeUp(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	c.RunDockerCmd("context", "create", "local", "test-context").Assert(t, icmd.Success)
-	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
 
 	const projectName = "compose-e2e-demo"
 
@@ -54,12 +52,12 @@ func TestLocalComposeUp(t *testing.T) {
 		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
-		res = c.RunDockerCmd("--context", "default", "network", "ls")
+		res = c.RunDockerCmd("network", "ls")
 		res.Assert(t, icmd.Expected{Out: projectName + "_default"})
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
-		res := c.RunDockerCmd("--context", "default", "inspect", projectName+"_web_1")
+		res := c.RunDockerCmd("inspect", projectName+"_web_1")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
@@ -69,7 +67,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
 
-		res = c.RunDockerCmd("--context", "default", "network", "inspect", projectName+"_default")
+		res = c.RunDockerCmd("network", "inspect", projectName+"_default")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.network": "default"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": `})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version": `})
@@ -85,15 +83,13 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check networks after down", func(t *testing.T) {
-		res := c.RunDockerCmd("--context", "default", "network", "ls")
+		res := c.RunDockerCmd("network", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
 
 func TestLocalComposeVolume(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	c.RunDockerCmd("context", "create", "local", "test-context").Assert(t, icmd.Success)
-	c.RunDockerCmd("context", "use", "test-context").Assert(t, icmd.Success)
 
 	const projectName = "compose-e2e-volume"
 

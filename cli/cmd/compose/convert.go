@@ -46,7 +46,7 @@ func convertCommand() *cobra.Command {
 
 func runConvert(ctx context.Context, opts composeOptions) error {
 	var json []byte
-	c, err := client.New(ctx)
+	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}
