@@ -113,13 +113,13 @@ class Environment(dict):
             )
         return super().get(key, *args, **kwargs)
 
-    def get_boolean(self, key):
+    def get_boolean(self, key, default=False):
         # Convert a value to a boolean using "common sense" rules.
         # Unset, empty, "0" and "false" (i-case) yield False.
         # All other values yield True.
         value = self.get(key)
         if not value:
-            return False
+            return default
         if value.lower() in ['0', 'false']:
             return False
         return True

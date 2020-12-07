@@ -783,7 +783,11 @@ services:
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
 
+    @mock.patch.dict(os.environ)
     def test_build_log_level(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
+        os.environ['DOCKER_BUILDKIT'] = '0'
+        self.test_env_file_relative_to_compose_file()
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         result = self.dispatch(['--log-level', 'warning', 'build', 'simple'])
         assert result.stderr == ''
@@ -845,13 +849,17 @@ services:
         for c in self.project.client.containers(all=True):
             self.addCleanup(self.project.client.remove_container, c, force=True)
 
+    @mock.patch.dict(os.environ)
     def test_build_shm_size_build_option(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-shm-size'
         result = self.dispatch(['build', '--no-cache'], None)
         assert 'shm_size: 96' in result.stdout
 
+    @mock.patch.dict(os.environ)
     def test_build_memory_build_option(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-memory'
         result = self.dispatch(['build', '--no-cache', '--memory', '96m', 'service'], None)
