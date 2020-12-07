@@ -502,6 +502,7 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, filter filters.Args) error {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filter,
+		All: true,
 	})
 	if err != nil {
 		return err
@@ -533,6 +534,7 @@ func (s *composeService) projectFromContainerLabels(ctx context.Context, project
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
+		All: true,
 	})
 	if err != nil {
 		return nil, err
