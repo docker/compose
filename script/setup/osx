@@ -6,7 +6,7 @@ set -ex
 
 DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET:-"$(macos_version)"}
 SDK_FETCH=
-if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
+if ! [ -d "$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX${DEPLOYMENT_TARGET}.sdk" ]; then
   SDK_FETCH=1
   # SDK URL from https://github.com/docker/golang-cross/blob/master/osx-cross.sh
   SDK_URL=https://s3.dockerproject.org/darwin/v2/MacOSX${DEPLOYMENT_TARGET}.sdk.tar.xz
