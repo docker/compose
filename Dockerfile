@@ -95,7 +95,7 @@ COPY --from=make-cli /out/* .
 FROM scratch AS cross
 COPY --from=make-cross /out/* .
 
-FROM base as test
+FROM base AS test
 ENV CGO_ENABLED=0
 ARG BUILD_TAGS
 ARG GIT_TAG
@@ -106,11 +106,20 @@ RUN --mount=target=. \
     GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile test
 
-FROM base as check-license-headers
+FROM base AS check-license-headers
 RUN go get -u github.com/kunalkushwaha/ltag
 RUN --mount=target=. \
     make -f builder.Makefile check-license-headers
 
-FROM base as check-go-mod
+FROM base AS make-go-mod-tidy
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod tidy
+
+FROM scratch AS go-mod-tidy
+COPY --from=make-go-mod-tidy /compose-cli/go.mod .
+COPY --from=make-go-mod-tidy /compose-cli/go.sum .
+
+FROM base AS check-go-mod
 COPY . .
 RUN make -f builder.Makefile check-go-mod
