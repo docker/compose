@@ -472,7 +472,7 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 	w := progress.ContextWriter(ctx)
 
 	project, err := s.projectFromContainerLabels(ctx, projectName)
-	if err != nil || project == nil {
+	if err != nil {
 		return err
 	}
 
@@ -547,17 +547,17 @@ func (s *composeService) projectFromContainerLabels(ctx context.Context, project
 	if err != nil {
 		return nil, err
 	}
+	fakeProject := &types.Project{
+		Name: projectName,
+	}
 	if len(containers) == 0 {
-		return nil, nil
+		return fakeProject, nil
 	}
 	options, err := loadProjectOptionsFromLabels(containers[0])
 	if err != nil {
 		return nil, err
 	}
 	if options.ConfigPaths[0] == "-" {
-		fakeProject := &types.Project{
-			Name: projectName,
-		}
 		for _, container := range containers {
 			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
 				Name: container.Labels[serviceLabel],
