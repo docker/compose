@@ -1,5 +1,3 @@
-// +build local
-
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -502,7 +500,7 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, filter filters.Args) error {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filter,
-		All: true,
+		All:     true,
 	})
 	if err != nil {
 		return err
