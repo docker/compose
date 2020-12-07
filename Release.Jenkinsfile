@@ -1,8 +1,8 @@
 #!groovy
 
-def dockerVersions = ['19.03.8', '18.09.9']
+def dockerVersions = ['19.03.13', '18.09.9']
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py37']
+def pythonVersions = ['py39']
 
 pipeline {
     agent none
@@ -12,6 +12,9 @@ pipeline {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         timeout(time: 2, unit: 'HOURS')
         timestamps()
+    }
+    environment {
+        DOCKER_BUILDKIT="1"
     }
 
     stages {
@@ -81,7 +84,7 @@ pipeline {
                     steps {
                         checkout scm
                         sh './script/setup/osx'
-                        sh 'tox -e py37 -- tests/unit'
+                        sh 'tox -e py39 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
                           checksum('docker-compose-Darwin-x86_64')
@@ -114,11 +117,11 @@ pipeline {
                         label 'windows-python'
                     }
                     environment {
-                        PATH = "$PATH;C:\\Python37;C:\\Python37\\Scripts"
+                        PATH = "C:\\Python39;C:\\Python39\\Scripts;$PATH"
                     }
                     steps {
                         checkout scm
-                        bat 'tox.exe -e py37 -- tests/unit'
+                        bat 'tox.exe -e py39 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
                             checksum('docker-compose-Windows-x86_64.exe')
@@ -229,7 +232,7 @@ def buildImage(baseImage) {
             ansiColor('xterm') {
                 sh """docker build -t ${imageName} \\
                     --target build \\
-                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg DISTRO="${baseImage}" \\
                     --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
                     .\\
                 """
@@ -276,7 +279,7 @@ def buildRuntimeImage(baseImage) {
     def imageName = "docker/compose:${baseImage}-${env.BRANCH_NAME}"
     ansiColor('xterm') {
         sh """docker build -t ${imageName} \\
-            --build-arg BUILD_PLATFORM="${baseImage}" \\
+            --build-arg DISTRO="${baseImage}" \\
             --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}" \\
             .
         """

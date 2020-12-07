@@ -6,17 +6,17 @@
 #
 #        http://git-scm.com/download/win
 #
-# 2. Install Python 3.7.x:
+# 2. Install Python 3.9.x:
 #
 #        https://www.python.org/downloads/
 #
-# 3. Append ";C:\Python37;C:\Python37\Scripts" to the "Path" environment variable:
+# 3. Append ";C:\Python39;C:\Python39\Scripts" to the "Path" environment variable:
 #
 #        https://www.microsoft.com/resources/documentation/windows/xp/all/proddocs/en-us/sysdm_advancd_environmnt_addchange_variable.mspx?mfr=true
 #
 # 4. In Powershell, run the following commands:
 #
-#        $ pip install 'virtualenv==20.0.30'
+#        $ pip install 'virtualenv==20.2.2'
 #        $ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #
 # 5. Clone the repository:
@@ -39,7 +39,7 @@ if (Test-Path venv) {
 Get-ChildItem -Recurse -Include *.pyc | foreach ($_) { Remove-Item $_.FullName }
 
 # Create virtualenv
-virtualenv -p C:\Python37\python.exe .\venv
+virtualenv -p C:\Python39\python.exe .\venv
 
 # pip and pyinstaller generate lots of warnings, so we need to ignore them
 $ErrorActionPreference = "Continue"

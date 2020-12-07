@@ -39,6 +39,7 @@ from ..service import ImageType
 from ..service import NeedsBuildError
 from ..service import OperationFailedError
 from .command import get_config_from_options
+from .command import get_project_dir
 from .command import project_from_options
 from .docopt_command import DocoptDispatcher
 from .docopt_command import get_handler
@@ -182,7 +183,7 @@ class TopLevelCommand:
     """Define and run multi-container applications with Docker.
 
     Usage:
-      docker-compose [-f <arg>...] [options] [--] [COMMAND] [ARGS...]
+      docker-compose [-f <arg>...] [--profile <name>...] [options] [--] [COMMAND] [ARGS...]
       docker-compose -h|--help
 
     Options:
@@ -190,6 +191,7 @@ class TopLevelCommand:
                                   (default: docker-compose.yml)
       -p, --project-name NAME     Specify an alternate project name
                                   (default: directory name)
+      --profile NAME              Specify a profile to enable
       -c, --context NAME          Specify a context name
       --verbose                   Show more output
       --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
@@ -214,7 +216,7 @@ class TopLevelCommand:
       build              Build or rebuild services
       config             Validate and view the Compose file
       create             Create services
-      down               Stop and remove containers, networks, images, and volumes
+      down               Stop and remove resources
       events             Receive real time events from containers
       exec               Execute a command in a running container
       help               Get help on a command
@@ -244,7 +246,7 @@ class TopLevelCommand:
 
     @property
     def project_dir(self):
-        return self.toplevel_options.get('--project-directory') or '.'
+        return get_project_dir(self.toplevel_options)
 
     @property
     def toplevel_environment(self):
@@ -430,6 +432,7 @@ class TopLevelCommand:
         Options:
             --json      Output events as a stream of json objects
         """
+
         def format_event(event):
             attributes = ["%s=%s" % item for item in event['attributes'].items()]
             return ("{time} {type} {action} {id} ({attrs})").format(
@@ -610,11 +613,12 @@ class TopLevelCommand:
         Usage: logs [options] [--] [SERVICE...]
 
         Options:
-            --no-color          Produce monochrome output.
-            -f, --follow        Follow log output.
-            -t, --timestamps    Show timestamps.
-            --tail="all"        Number of lines to show from the end of the logs
-                                for each container.
+            --no-color              Produce monochrome output.
+            -f, --follow            Follow log output.
+            -t, --timestamps        Show timestamps.
+            --tail="all"            Number of lines to show from the end of the logs
+                                    for each container.
+            --no-log-prefix    Don't print prefix in logs.
         """
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
@@ -635,7 +639,8 @@ class TopLevelCommand:
             containers,
             set_no_color_if_clicolor(options['--no-color']),
             log_args,
-            event_stream=self.project.events(service_names=options['SERVICE'])).run()
+            event_stream=self.project.events(service_names=options['SERVICE']),
+            keep_prefix=not options['--no-log-prefix']).run()
 
     def pause(self, options):
         """
@@ -1017,6 +1022,7 @@ class TopLevelCommand:
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
+            --no-log-prefix       Don't print prefix in logs.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -1028,6 +1034,7 @@ class TopLevelCommand:
         detached = options.get('--detach')
         no_start = options.get('--no-start')
         attach_dependencies = options.get('--attach-dependencies')
+        keep_prefix = not options['--no-log-prefix']
 
         if detached and (cascade_stop or exit_value_from or attach_dependencies):
             raise UserError(
@@ -1094,7 +1101,8 @@ class TopLevelCommand:
                 set_no_color_if_clicolor(options['--no-color']),
                 {'follow': True},
                 cascade_stop,
-                event_stream=self.project.events(service_names=service_names))
+                event_stream=self.project.events(service_names=service_names),
+                keep_prefix=keep_prefix)
             print("Attaching to", list_containers(log_printer.containers))
             cascade_starter = log_printer.run()
 
@@ -1376,16 +1384,17 @@ def get_docker_start_call(container_options, container_id):
 
 
 def log_printer_from_project(
-    project,
-    containers,
-    monochrome,
-    log_args,
-    cascade_stop=False,
-    event_stream=None,
+        project,
+        containers,
+        monochrome,
+        log_args,
+        cascade_stop=False,
+        event_stream=None,
+        keep_prefix=True,
 ):
     return LogPrinter(
         containers,
-        build_log_presenters(project.service_names, monochrome),
+        build_log_presenters(project.service_names, monochrome, keep_prefix),
         event_stream or project.events(),
         cascade_stop=cascade_stop,
         log_args=log_args)

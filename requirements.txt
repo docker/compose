@@ -4,7 +4,7 @@ certifi==2020.6.20
 chardet==3.0.4
 colorama==0.4.3; sys_platform == 'win32'
 distro==1.5.0
-docker==4.3.1
+docker==4.4.0
 docker-pycreds==0.4.0
 dockerpty==0.4.1
 docopt==0.6.2
@@ -12,10 +12,9 @@ idna==2.10
 ipaddress==1.0.23
 jsonschema==3.2.0
 paramiko==2.7.1
-pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
-pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
 PySocks==1.7.1
 python-dotenv==0.14.0
+pywin32==227; sys_platform == 'win32'
 PyYAML==5.3.1
 requests==2.24.0
 texttable==1.6.2

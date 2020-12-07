@@ -1,15 +1,15 @@
 altgraph==0.17
 appdirs==1.4.4
-attrs==20.1.0
-bcrypt==3.1.7
-cffi==1.14.1
-cryptography==3.0
+attrs==20.3.0
+bcrypt==3.2.0
+cffi==1.14.4
+cryptography==3.2.1
 distlib==0.3.1
 entrypoints==0.3
 filelock==3.0.12
 gitdb2==4.0.2
 mccabe==0.6.1
-more-itertools==8.4.0; python_version >= '3.5'
+more-itertools==8.6.0; python_version >= '3.5'
 more-itertools==5.0.0; python_version < '3.5'
 packaging==20.4
 pluggy==0.13.1
@@ -23,6 +23,6 @@ pyrsistent==0.16.0
 smmap==3.0.4
 smmap2==3.0.1
 toml==0.10.1
-tox==3.19.0
-virtualenv==20.0.30
+tox==3.20.1
+virtualenv==20.2.2
 wcwidth==0.2.5

@@ -166,8 +166,8 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         kwargs['credstore_env'] = {
             'LD_LIBRARY_PATH': environment.get('LD_LIBRARY_PATH_ORIG'),
         }
-
-    client = APIClient(**kwargs)
+    use_paramiko_ssh = int(environment.get('COMPOSE_PARAMIKO_SSH', 0))
+    client = APIClient(use_ssh_client=not use_paramiko_ssh, **kwargs)
     client._original_base_url = kwargs.get('base_url')
 
     return client

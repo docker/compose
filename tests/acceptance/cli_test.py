@@ -1719,6 +1719,98 @@ services:
         shareable_mode_container = self.project.get_service('shareable').containers()[0]
         assert shareable_mode_container.get('HostConfig.IpcMode') == 'shareable'
 
+    def test_profiles_up_with_no_profile(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert len(containers) == 1
+
+    def test_profiles_up_with_profile(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'test', 'up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert len(containers) == 3
+
+    def test_profiles_up_invalid_dependency(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        result = self.dispatch(['--profile', 'debug', 'up'], returncode=1)
+
+        assert ('Service "bar" was pulled in as a dependency of service "zot" '
+                'but is not enabled by the active profiles.') in result.stderr
+
+    def test_profiles_up_with_multiple_profiles(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'debug', '--profile', 'test', 'up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 4
+
+    def test_profiles_up_with_profile_enabled_by_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up', 'bar'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert len(containers) == 1
+
+    def test_profiles_up_with_dependency_and_profile_enabled_by_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up', 'baz'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert len(containers) == 2
+
+    def test_profiles_up_with_invalid_dependency_for_target_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        result = self.dispatch(['up', 'zot'], returncode=1)
+
+        assert ('Service "bar" was pulled in as a dependency of service "zot" '
+                'but is not enabled by the active profiles.') in result.stderr
+
+    def test_profiles_up_with_profile_for_dependency(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'test', 'up', 'zot'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 2
+
+    def test_profiles_up_with_merged_profiles(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['-f', 'docker-compose.yml', '-f', 'merge-profiles.yml', 'up', 'zot'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 2
+
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
         self.dispatch(['up', '-d', 'console'])
@@ -3034,3 +3126,12 @@ services:
         another = self.project.get_service('--log-service')
         assert len(service.containers()) == 1
         assert len(another.containers()) == 1
+
+    def test_up_no_log_prefix(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-log-prefix'])
+
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with code 0' in result.stdout
+        assert 'exited with code 0' in result.stdout

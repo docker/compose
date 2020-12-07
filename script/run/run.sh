@@ -41,13 +41,34 @@ fi
 if [ -n "${COMPOSE_PROJECT_NAME}" ]; then
     COMPOSE_OPTIONS="-e COMPOSE_PROJECT_NAME ${COMPOSE_OPTIONS}"
 fi
-# TODO: also check --file argument
 if [ -n "${COMPOSE_DIR}" ]; then
     VOLUMES="${VOLUMES} -v ${COMPOSE_DIR}:${COMPOSE_DIR}"
 fi
 if [ -n "${HOME}" ]; then
     VOLUMES="${VOLUMES} -v ${HOME}:${HOME} -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
 fi
+i=$#
+while [ ${i} -gt 0 ]; do
+    ARG=${1}
+    i=$((i - 1))
+    shift
+
+    case "${ARG}" in
+        -f|--file)
+            VALUE=${1}
+            i=$((i - 1))
+            shift
+            set -- "$@" "${ARG}" "${VALUE}"
+
+            FILE_DIR=$(realpath "$(dirname "${VALUE}")")
+            VOLUMES="$VOLUMES -v ${FILE_DIR}:${FILE_DIR}"
+        ;;
+        *) set -- "$@" "${ARG}" ;;
+    esac
+done
+
+# Setup environment variables for compose config and context
+ENV_OPTIONS=$(printenv | sed -E "/^PATH=.*/d; s/^/-e /g; s/=.*//g; s/\n/ /g")
 
 # Only allocate tty if we detect one
 if [ -t 0 ] && [ -t 1 ]; then
@@ -68,4 +89,4 @@ if docker info --format '{{json .SecurityOptions}}' 2> /dev/null | grep -q 'name
 fi
 
 # shellcheck disable=SC2086
-exec docker run --rm ${DOCKER_RUN_OPTIONS} ${DOCKER_ADDR} ${COMPOSE_OPTIONS} ${VOLUMES} -w "${PWD}" "${DOCKER_COMPOSE_IMAGE_TAG:-docker/compose:1.27.4}" "$@"
+exec docker run --rm ${DOCKER_RUN_OPTIONS} ${DOCKER_ADDR} ${COMPOSE_OPTIONS} ${ENV_OPTIONS} ${VOLUMES} -w "${PWD}" "${DOCKER_COMPOSE_IMAGE_TAG:-docker/compose:1.27.4}" "$@"
