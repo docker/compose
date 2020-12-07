@@ -804,7 +804,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		StopTimeout: toSeconds(s.StopGracePeriod),
 	}
 
-	mountOptions, err := buildContainerMountOptions(p, s, inherit)
+	mountOptions, err := buildContainerMountOptions(s, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -851,7 +851,7 @@ func buildContainerBindingOptions(s types.ServiceConfig) nat.PortMap {
 	return bindings
 }
 
-func buildContainerMountOptions(p *types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	var inherited []string
 	if inherit != nil {
