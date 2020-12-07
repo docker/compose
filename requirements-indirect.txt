@@ -11,7 +11,7 @@ gitdb2==4.0.2
 mccabe==0.6.1
 more-itertools==8.6.0; python_version >= '3.5'
 more-itertools==5.0.0; python_version < '3.5'
-packaging==20.4
+packaging==20.7
 pluggy==0.13.1
 py==1.9.0
 pycodestyle==2.6.0
