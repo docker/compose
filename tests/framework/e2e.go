@@ -19,10 +19,12 @@ package framework
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -104,38 +106,70 @@ func SetupExistingCLI() (string, func(), error) {
 			return "", nil, errors.New("existing CLI not found in PATH")
 		}
 	}
+
 	d, err := ioutil.TempDir("", "")
 	if err != nil {
 		return "", nil, err
 	}
+
 	if err := CopyFile(p, filepath.Join(d, existingExectuableName)); err != nil {
 		return "", nil, err
 	}
-	bin, err := filepath.Abs("../../bin/" + DockerExecutableName)
+
+	bin, err := findExecutable([]string{"../../bin", "../../../bin"})
 	if err != nil {
 		return "", nil, err
 	}
+
 	if err := CopyFile(bin, filepath.Join(d, DockerExecutableName)); err != nil {
 		return "", nil, err
 	}
+
 	cleanup := func() {
 		_ = os.RemoveAll(d)
 	}
+
 	return d, cleanup, nil
 }
 
-// CopyFile copies a file from a path to a path setting permissions to 0777
+func findExecutable(paths []string) (string, error) {
+	for _, p := range paths {
+		bin, err := filepath.Abs(path.Join(p, DockerExecutableName))
+		if err != nil {
+			return "", err
+		}
+
+		if _, err := os.Stat(bin); os.IsNotExist(err) {
+			continue
+		}
+
+		return bin, nil
+	}
+
+	return "", errors.New("executable not found")
+}
+
+// CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
 func CopyFile(sourceFile string, destinationFile string) error {
-	input, err := ioutil.ReadFile(sourceFile)
+	src, err := os.Open(sourceFile)
 	if err != nil {
+		return err
+	}
+	// nolint: errcheck
+	defer src.Close()
+
+	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	// nolint: errcheck
+	defer dst.Close()
+
+	if _, err = io.Copy(dst, src); err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(destinationFile, input, 0777)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // NewCmd creates a cmd object configured with the test environment set

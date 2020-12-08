@@ -17,7 +17,9 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,20 +30,34 @@ import (
 	. "github.com/docker/compose-cli/tests/framework"
 )
 
+var binDir string
+
+func TestMain(m *testing.M) {
+	p, cleanup, err := SetupExistingCLI()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	binDir = p
+	exitCode := m.Run()
+	cleanup()
+	os.Exit(exitCode)
+}
+
 func TestLocalComposeUp(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	const projectName = "compose-e2e-demo"
 
 	t.Run("build", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "build", "-f", "../../tests/composefiles/demo_multi_port.yaml")
+		res := c.RunDockerCmd("compose", "build", "-f", "../../../tests/composefiles/demo_multi_port.yaml")
 		res.Assert(t, icmd.Expected{Out: "COPY words.sql /docker-entrypoint-initdb.d/"})
 		res.Assert(t, icmd.Expected{Out: "COPY pom.xml ."})
 		res.Assert(t, icmd.Expected{Out: "COPY static /static/"})
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "up", "-d", "-f", "../../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -62,7 +78,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../../tests/composefiles/demo_multi_port.yaml"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../../../tests/composefiles/demo_multi_port.yaml"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
