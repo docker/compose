@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package local
+package compose
 
 import (
 	"os"
@@ -113,7 +113,7 @@ func TestStacksMixedStatus(t *testing.T) {
 func TestBuildBindMount(t *testing.T) {
 	volume := composetypes.ServiceVolumeConfig{
 		Type:   composetypes.VolumeTypeBind,
-		Source: "compose/e2e/volume-test",
+		Source: "e2e/volume-test",
 		Target: "/data",
 	}
 	mount, err := buildMount(volume)

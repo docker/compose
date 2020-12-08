@@ -14,27 +14,35 @@
    limitations under the License.
 */
 
-package local
+package compose
 
 import (
-	"encoding/json"
+	"context"
 
-	"github.com/opencontainers/go-digest"
+	"github.com/docker/compose-cli/api/compose"
+
+	"github.com/compose-spec/compose-go/types"
+	"golang.org/x/sync/errgroup"
 )
 
-func jsonHash(o interface{}) (string, error) {
-	bytes, err := json.Marshal(o)
-	if err != nil {
-		return "", err
-	}
-	return digest.SHA256.FromBytes(bytes).String(), nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
+func (s *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	var group *errgroup.Group
+	if consumer != nil {
+		eg, err := s.attach(ctx, project, consumer)
+		if err != nil {
+			return err
 		}
+		group = eg
 	}
-	return false
+
+	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		return s.startService(ctx, project, service)
+	})
+	if err != nil {
+		return err
+	}
+	if group != nil {
+		return group.Wait()
+	}
+	return nil
 }

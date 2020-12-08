@@ -28,12 +28,13 @@ import (
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/backend"
 	"github.com/docker/compose-cli/context/cloud"
+	local_compose "github.com/docker/compose-cli/local/compose"
 )
 
 type local struct {
-	*containerService
-	*volumeService
-	*composeService
+	containerService *containerService
+	volumeService    *volumeService
+	composeService   compose.Service
 }
 
 func init() {
@@ -49,7 +50,7 @@ func service(ctx context.Context) (backend.Service, error) {
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
-		composeService:   &composeService{apiClient},
+		composeService:   local_compose.NewComposeService(apiClient),
 	}, nil
 }
 

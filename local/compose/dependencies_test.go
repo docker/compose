@@ -14,15 +14,14 @@
    limitations under the License.
 */
 
-package local
+package compose
 
 import (
 	"context"
 	"testing"
 
-	"gotest.tools/v3/assert"
-
 	"github.com/compose-spec/compose-go/types"
+	"gotest.tools/v3/assert"
 )
 
 var project = types.Project{

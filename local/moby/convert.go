@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package local
+package moby
 
 import (
 	"fmt"
@@ -31,7 +31,8 @@ import (
 	"github.com/docker/compose-cli/api/containers"
 )
 
-func toRuntimeConfig(m *types.ContainerJSON) *containers.RuntimeConfig {
+// ToRuntimeConfig convert into containers.RuntimeConfig
+func ToRuntimeConfig(m *types.ContainerJSON) *containers.RuntimeConfig {
 	if m.Config == nil {
 		return nil
 	}
@@ -66,7 +67,8 @@ func toRuntimeConfig(m *types.ContainerJSON) *containers.RuntimeConfig {
 	}
 }
 
-func toHostConfig(m *types.ContainerJSON) *containers.HostConfig {
+// ToHostConfig convert into containers.HostConfig
+func ToHostConfig(m *types.ContainerJSON) *containers.HostConfig {
 	if m.HostConfig == nil {
 		return nil
 	}
@@ -79,7 +81,8 @@ func toHostConfig(m *types.ContainerJSON) *containers.HostConfig {
 	}
 }
 
-func toPorts(ports []types.Port) []containers.Port {
+// ToPorts convert into containers.Port
+func ToPorts(ports []types.Port) []containers.Port {
 	result := []containers.Port{}
 	for _, port := range ports {
 		result = append(result, containers.Port{
@@ -93,7 +96,8 @@ func toPorts(ports []types.Port) []containers.Port {
 	return result
 }
 
-func toMobyEnv(environment compose.MappingWithEquals) []string {
+// ToMobyEnv convert into []string
+func ToMobyEnv(environment compose.MappingWithEquals) []string {
 	var env []string
 	for k, v := range environment {
 		if v == nil {
@@ -105,7 +109,8 @@ func toMobyEnv(environment compose.MappingWithEquals) []string {
 	return env
 }
 
-func toMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig {
+// ToMobyHealthCheck convert into container.HealthConfig
+func ToMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig {
 	if check == nil {
 		return nil
 	}
@@ -136,7 +141,8 @@ func toMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig
 	}
 }
 
-func toSeconds(d *compose.Duration) *int {
+// ToSeconds convert into seconds
+func ToSeconds(d *compose.Duration) *int {
 	if d == nil {
 		return nil
 	}
@@ -144,7 +150,8 @@ func toSeconds(d *compose.Duration) *int {
 	return &s
 }
 
-func fromPorts(ports []containers.Port) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, error) {
+// FromPorts convert to nat.Port / nat.PortBinding
+func FromPorts(ports []containers.Port) (map[nat.Port]struct{}, map[nat.Port][]nat.PortBinding, error) {
 	var (
 		exposedPorts = make(map[nat.Port]struct{}, len(ports))
 		bindings     = make(map[nat.Port][]nat.PortBinding)
@@ -187,7 +194,8 @@ func fromRestartPolicyName(m string) string {
 	}
 }
 
-func toRestartPolicy(p string) container.RestartPolicy {
+// ToRestartPolicy convert to container.RestartPolicy
+func ToRestartPolicy(p string) container.RestartPolicy {
 	switch p {
 	case containers.RestartPolicyAny:
 		return container.RestartPolicy{Name: "always"}

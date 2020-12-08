@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package local
+package compose
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
 
+	status "github.com/docker/compose-cli/local/moby"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -99,10 +100,10 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 
 		w := progress.ContextWriter(ctx)
 		switch container.State {
-		case containerRunning:
+		case status.ContainerRunning:
 			w.Event(progress.RunningEvent(name))
-		case containerCreated:
-		case containerRestarting:
+		case status.ContainerCreated:
+		case status.ContainerRestarting:
 			w.Event(progress.CreatedEvent(name))
 		default:
 			eg.Go(func() error {
@@ -304,7 +305,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		container := c
-		if container.State == containerRunning {
+		if container.State == status.ContainerRunning {
 			continue
 		}
 		eg.Go(func() error {

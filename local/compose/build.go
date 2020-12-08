@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package local
+package compose
 
 import (
 	"context"
@@ -23,14 +23,28 @@ import (
 	"path"
 	"strings"
 
-	"github.com/docker/docker/errdefs"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
+	"github.com/docker/docker/errdefs"
 )
+
+func (s *composeService) Build(ctx context.Context, project *types.Project) error {
+	opts := map[string]build.Options{}
+	for _, service := range project.Services {
+		if service.Build != nil {
+			imageName := service.Image
+			if imageName == "" {
+				imageName = project.Name + "_" + service.Name
+			}
+			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
+		}
+	}
+
+	return s.build(ctx, project, opts)
+}
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
