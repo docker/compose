@@ -869,7 +869,7 @@ func (s sdk) DescribeServiceTasks(ctx context.Context, cluster string, project s
 				Name:    id.Resource,
 				Project: project,
 				Service: service,
-				State:   aws.StringValue(t.LastStatus),
+				State:   strings.Title(strings.ToLower(aws.StringValue(t.LastStatus))),
 			})
 		}
 

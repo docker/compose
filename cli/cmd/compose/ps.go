@@ -80,8 +80,8 @@ func runPs(ctx context.Context, opts composeOptions) error {
 						ports = append(ports, fmt.Sprintf("%s->%d/%s", p.URL, p.TargetPort, p.Protocol))
 					}
 				}
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", container.Name, container.State, strings.Join(ports, ", "))
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", container.Name, container.Service, container.State, strings.Join(ports, ", "))
 			}
 		},
-		"NAME", "STATE", "PORTS")
+		"NAME", "SERVICE", "STATE", "PORTS")
 }

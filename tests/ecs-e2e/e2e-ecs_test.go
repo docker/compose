@@ -100,7 +100,7 @@ func TestCompose(t *testing.T) {
 			switch serviceName {
 			case "db":
 				dbDisplayed = true
-				assert.DeepEqual(t, fields, []string{containerID, serviceName, "1/1"})
+				assert.DeepEqual(t, fields, []string{containerID, serviceName, "Running"})
 			case "words":
 				wordsDisplayed = true
 				assert.Check(t, strings.Contains(fields[3], ":8080->8080/tcp"))

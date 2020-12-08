@@ -150,9 +150,10 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 				Protocol:      string(p.Protocol),
 			})
 		}
+		id := getContainerID(group, container)
 		res = append(res, compose.ContainerSummary{
-			ID:         *container.Name,
-			Name:       *container.Name,
+			ID:         id,
+			Name:       id,
 			Project:    project,
 			Service:    *container.Name,
 			State:      convert.GetStatus(container, group),
