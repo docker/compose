@@ -50,14 +50,14 @@ func TestLocalComposeUp(t *testing.T) {
 	const projectName = "compose-e2e-demo"
 
 	t.Run("build", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "build", "-f", "../../../tests/composefiles/demo_multi_port.yaml")
+		res := c.RunDockerCmd("compose", "build", "-f", "../composefiles/demo_multi_port.yaml")
 		res.Assert(t, icmd.Expected{Out: "COPY words.sql /docker-entrypoint-initdb.d/"})
 		res.Assert(t, icmd.Expected{Out: "COPY pom.xml ."})
 		res.Assert(t, icmd.Expected{Out: "COPY static /static/"})
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "../../../tests/composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "up", "-d", "-f", "../composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../../../tests/composefiles/demo_multi_port.yaml"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../composefiles/demo_multi_port.yaml"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -87,6 +87,12 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.network": "default"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": `})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version": `})
+	})
+
+	t.Run("check user labels", func(t *testing.T) {
+		res := c.RunDockerCmd("inspect", projectName+"_web_1")
+		res.Assert(t, icmd.Expected{Out: `"my-label": "test"`})
+
 	})
 
 	t.Run("down", func(t *testing.T) {

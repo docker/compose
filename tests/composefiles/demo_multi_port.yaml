@@ -13,3 +13,5 @@ services:
     image: gtardif/sentences-web
     ports:
       - "80:80"
+    labels:
+      - "my-label=test"

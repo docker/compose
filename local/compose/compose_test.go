@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -119,7 +118,5 @@ func TestBuildBindMount(t *testing.T) {
 	mount, err := buildMount(volume)
 	assert.NilError(t, err)
 	assert.Assert(t, filepath.IsAbs(mount.Source))
-	_, err = os.Stat(mount.Source)
-	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeBind)
 }
