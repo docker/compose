@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"sort"
 
-	convert "github.com/docker/compose-cli/local/moby"
-
 	"github.com/docker/compose-cli/api/compose"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -64,30 +62,6 @@ func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.
 		})
 	}
 	return summary, nil
-}
-
-func containersToServiceStatus(containers []moby.Container) ([]compose.ServiceStatus, error) {
-	containersByLabel, keys, err := groupContainerByLabel(containers, serviceLabel)
-	if err != nil {
-		return nil, err
-	}
-	var services []compose.ServiceStatus
-	for _, service := range keys {
-		containers := containersByLabel[service]
-		runnningContainers := []moby.Container{}
-		for _, container := range containers {
-			if container.State == convert.ContainerRunning {
-				runnningContainers = append(runnningContainers, container)
-			}
-		}
-		services = append(services, compose.ServiceStatus{
-			ID:       service,
-			Name:     service,
-			Desired:  len(containers),
-			Replicas: len(runnningContainers),
-		})
-	}
-	return services, nil
 }
 
 func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {
