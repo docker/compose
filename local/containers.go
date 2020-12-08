@@ -35,6 +35,7 @@ import (
 
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/local/moby"
 )
 
 type containerService struct {
@@ -58,8 +59,8 @@ func (cs *containerService) Inspect(ctx context.Context, id string) (containers.
 		command = strings.Join(c.Config.Cmd, " ")
 	}
 
-	rc := toRuntimeConfig(&c)
-	hc := toHostConfig(&c)
+	rc := moby.ToRuntimeConfig(&c)
+	hc := moby.ToHostConfig(&c)
 
 	return containers.Container{
 		ID:         stringid.TruncateID(c.ID),
@@ -92,7 +93,7 @@ func (cs *containerService) List(ctx context.Context, all bool) ([]containers.Co
 			// statuses. We also need to add a `Created` property on the gRPC side.
 			Status:  container.Status,
 			Command: container.Command,
-			Ports:   toPorts(container.Ports),
+			Ports:   moby.ToPorts(container.Ports),
 		})
 	}
 
@@ -100,7 +101,7 @@ func (cs *containerService) List(ctx context.Context, all bool) ([]containers.Co
 }
 
 func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfig) error {
-	exposedPorts, hostBindings, err := fromPorts(r.Ports)
+	exposedPorts, hostBindings, err := moby.FromPorts(r.Ports)
 	if err != nil {
 		return err
 	}
@@ -127,7 +128,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 		PortBindings:  hostBindings,
 		Mounts:        mounts,
 		AutoRemove:    r.AutoRemove,
-		RestartPolicy: toRestartPolicy(r.RestartPolicyCondition),
+		RestartPolicy: moby.ToRestartPolicy(r.RestartPolicyCondition),
 		Resources: container.Resources{
 			NanoCPUs: int64(r.CPULimit * 1e9),
 			Memory:   int64(r.MemLimit),

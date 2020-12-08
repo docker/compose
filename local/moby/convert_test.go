@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package local
+package moby
 
 import (
 	"testing"
@@ -34,7 +34,7 @@ func TestToRuntimeConfig(t *testing.T) {
 			Labels: map[string]string{"foo1": "bar1", "foo2": "bar2"},
 		},
 	}
-	rc := toRuntimeConfig(m)
+	rc := ToRuntimeConfig(m)
 	res := &containers.RuntimeConfig{
 		Env:    map[string]string{"FOO1": "BAR1", "FOO2": "BAR2"},
 		Labels: []string{"foo1=bar1", "foo2=bar2"},
@@ -63,7 +63,7 @@ func TestToHostConfig(t *testing.T) {
 		},
 		ContainerJSONBase: base,
 	}
-	hc := toHostConfig(m)
+	hc := ToHostConfig(m)
 	res := &containers.HostConfig{
 		AutoRemove:    true,
 		RestartPolicy: containers.RestartPolicyNone,
@@ -96,6 +96,6 @@ func TestToRestartPolicy(t *testing.T) {
 		{Name: "no"},
 	}
 	for i, p := range ours {
-		assert.Equal(t, toRestartPolicy(p), moby[i])
+		assert.Equal(t, ToRestartPolicy(p), moby[i])
 	}
 }
