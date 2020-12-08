@@ -82,17 +82,21 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// TODO: change oneoffLabel value for containers started with `docker compose run`
-	labels := map[string]string{
-		projectLabel:         p.Name,
-		serviceLabel:         s.Name,
-		versionLabel:         ComposeVersion,
-		oneoffLabel:          "False",
-		configHashLabel:      hash,
-		workingDirLabel:      p.WorkingDir,
-		configFilesLabel:     strings.Join(p.ComposeFiles, ","),
-		containerNumberLabel: strconv.Itoa(number),
+
+	labels := map[string]string{}
+	for k, v := range s.Labels {
+		labels[k] = v
 	}
+
+	// TODO: change oneoffLabel value for containers started with `docker compose run`
+	labels[projectLabel] = p.Name
+	labels[serviceLabel] = s.Name
+	labels[versionLabel] = ComposeVersion
+	labels[oneoffLabel] = "False"
+	labels[configHashLabel] = hash
+	labels[workingDirLabel] = p.WorkingDir
+	labels[configFilesLabel] = strings.Join(p.ComposeFiles, ",")
+	labels[containerNumberLabel] = strconv.Itoa(number)
 
 	var (
 		runCmd     strslice.StrSlice
