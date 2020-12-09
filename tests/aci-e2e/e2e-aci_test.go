@@ -692,7 +692,7 @@ func TestUpUpdate(t *testing.T) {
 		for _, l := range out {
 			if strings.Contains(l, serverContainer) {
 				webRunning = true
-				strings.Contains(l, ":80->80/tcp")
+				assert.Check(t, strings.Contains(l, ":80->80/tcp"))
 			}
 		}
 		assert.Assert(t, webRunning, "web container not running ; ps:\n"+res.Stdout())
@@ -734,20 +734,23 @@ func TestUpUpdate(t *testing.T) {
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
 		for _, line := range l {
 			fields := strings.Fields(line)
-			containerID := fields[0]
-			switch containerID {
+			name := fields[0]
+			switch name {
 			case wordsContainer:
 				wordsDisplayed = true
-				assert.DeepEqual(t, fields, []string{containerID, "words", "1/1"})
+				assert.Equal(t, fields[2], "Running")
 			case dbContainer:
 				dbDisplayed = true
-				assert.DeepEqual(t, fields, []string{containerID, "db", "1/1"})
+				assert.Equal(t, fields[2], "Running")
 			case serverContainer:
 				webDisplayed = true
-				assert.Equal(t, fields[1], "web")
+				assert.Equal(t, fields[2], "Running")
 				assert.Check(t, strings.Contains(fields[3], ":80->80/tcp"))
 			}
 		}
+		assert.Check(t, webDisplayed, "webDisplayed"+res.Stdout())
+		assert.Check(t, wordsDisplayed, "wordsDisplayed"+res.Stdout())
+		assert.Check(t, dbDisplayed, "dbDisplayed"+res.Stdout())
 		assert.Check(t, webDisplayed && wordsDisplayed && dbDisplayed, "\n%s\n", res.Stdout())
 	})
 

@@ -29,6 +29,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/utils/formatter"
 )
 
 type aciComposeService struct {
@@ -119,7 +120,7 @@ func (cs *aciComposeService) Down(ctx context.Context, project string) error {
 	return err
 }
 
-func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
+func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.ContainerSummary, error) {
 	groupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return nil, err
@@ -134,12 +135,30 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 		return nil, fmt.Errorf("no containers found in ACI container group %s", project)
 	}
 
-	res := []compose.ServiceStatus{}
+	res := []compose.ContainerSummary{}
 	for _, container := range *group.Containers {
 		if isContainerVisible(container, group, false) {
 			continue
 		}
-		res = append(res, convert.ContainerGroupToServiceStatus(getContainerID(group, container), group, container, cs.ctx.Location))
+		var publishers []compose.PortPublisher
+		urls := formatter.PortsToStrings(convert.ToPorts(group.IPAddress, *container.Ports), convert.FQDN(group, cs.ctx.Location))
+		for i, p := range *container.Ports {
+			publishers = append(publishers, compose.PortPublisher{
+				URL:           urls[i],
+				TargetPort:    int(*p.Port),
+				PublishedPort: int(*p.Port),
+				Protocol:      string(p.Protocol),
+			})
+		}
+		id := getContainerID(group, container)
+		res = append(res, compose.ContainerSummary{
+			ID:         id,
+			Name:       id,
+			Project:    project,
+			Service:    *container.Name,
+			State:      convert.GetStatus(container, group),
+			Publishers: publishers,
+		})
 	}
 	return res, nil
 }

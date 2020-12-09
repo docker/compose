@@ -314,13 +314,14 @@ func ContainerGroupToServiceStatus(containerID string, group containerinstance.C
 	return compose.ServiceStatus{
 		ID:       containerID,
 		Name:     *container.Name,
-		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports), fqdn(group, region)),
+		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports), FQDN(group, region)),
 		Replicas: replicas,
 		Desired:  1,
 	}
 }
 
-func fqdn(group containerinstance.ContainerGroup, region string) string {
+// FQDN retrieve the fully qualified domain name for a ContainerGroup
+func FQDN(group containerinstance.ContainerGroup, region string) string {
 	fqdn := ""
 	if group.IPAddress != nil && group.IPAddress.DNSNameLabel != nil && *group.IPAddress.DNSNameLabel != "" {
 		fqdn = *group.IPAddress.DNSNameLabel + "." + region + ".azurecontainer.io"
@@ -348,7 +349,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 
 	hostConfig := ToHostConfig(cc, cg)
 	config := &containers.RuntimeConfig{
-		FQDN: fqdn(cg, region),
+		FQDN: FQDN(cg, region),
 		Env:  envVars,
 	}
 

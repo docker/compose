@@ -54,11 +54,12 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServices
 		}
 		projectName = project.Name
 	}
-	services, err := Client(ctx).ComposeService().Ps(ctx, projectName)
+	response := []*composev1.Service{}
+	_, err := Client(ctx).ComposeService().Ps(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
-	response := []*composev1.Service{}
+	/* FIXME need to create `docker service ls` command to re-introduce this feature
 	for _, service := range services {
 		response = append(response, &composev1.Service{
 			Id:       service.ID,
@@ -67,7 +68,7 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServices
 			Desired:  uint32(service.Desired),
 			Ports:    service.Ports,
 		})
-	}
+	}*/
 	return &composev1.ComposeServicesResponse{Services: response}, nil
 }
 

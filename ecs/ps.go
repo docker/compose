@@ -18,13 +18,11 @@ package ecs
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
 )
 
-func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ServiceStatus, error) {
+func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ContainerSummary, error) {
 	cluster, err := b.aws.GetStackClusterID(ctx, project)
 	if err != nil {
 		return nil, err
@@ -38,23 +36,23 @@ func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.Servi
 		return nil, nil
 	}
 
-	status := []compose.ServiceStatus{}
+	summary := []compose.ContainerSummary{}
 	for _, arn := range servicesARN {
-		state, err := b.aws.DescribeService(ctx, cluster, arn)
+		service, err := b.aws.DescribeService(ctx, cluster, arn)
 		if err != nil {
 			return nil, err
 		}
-		ports := []string{}
-		for _, lb := range state.Publishers {
-			ports = append(ports, fmt.Sprintf(
-				"%s:%d->%d/%s",
-				lb.URL,
-				lb.PublishedPort,
-				lb.TargetPort,
-				strings.ToLower(lb.Protocol)))
+
+		tasks, err := b.aws.DescribeServiceTasks(ctx, cluster, project, service.Name)
+		if err != nil {
+			return nil, err
 		}
-		state.Ports = ports
-		status = append(status, state)
+
+		for i, t := range tasks {
+			t.Publishers = service.Publishers
+			tasks[i] = t
+		}
+		summary = append(summary, tasks...)
 	}
-	return status, nil
+	return summary, nil
 }

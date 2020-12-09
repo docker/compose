@@ -224,6 +224,21 @@ func (mr *MockAPIMockRecorder) DescribeService(arg0, arg1, arg2 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeService", reflect.TypeOf((*MockAPI)(nil).DescribeService), arg0, arg1, arg2)
 }
 
+// DescribeServiceTasks mocks base method
+func (m *MockAPI) DescribeServiceTasks(arg0 context.Context, arg1, arg2, arg3 string) ([]compose.ContainerSummary, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeServiceTasks", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].([]compose.ContainerSummary)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeServiceTasks indicates an expected call of DescribeServiceTasks
+func (mr *MockAPIMockRecorder) DescribeServiceTasks(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeServiceTasks", reflect.TypeOf((*MockAPI)(nil).DescribeServiceTasks), arg0, arg1, arg2, arg3)
+}
+
 // DescribeStackEvents mocks base method
 func (m *MockAPI) DescribeStackEvents(arg0 context.Context, arg1 string) ([]*cloudformation.StackEvent, error) {
 	m.ctrl.T.Helper()

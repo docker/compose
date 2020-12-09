@@ -21,15 +21,13 @@ import (
 	"fmt"
 	"sort"
 
-	convert "github.com/docker/compose-cli/local/moby"
-
 	"github.com/docker/compose-cli/api/compose"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ServiceStatus, error) {
-	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
@@ -37,31 +35,33 @@ func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.
 	if err != nil {
 		return nil, err
 	}
-	return containersToServiceStatus(list)
-}
 
-func containersToServiceStatus(containers []moby.Container) ([]compose.ServiceStatus, error) {
-	containersByLabel, keys, err := groupContainerByLabel(containers, serviceLabel)
-	if err != nil {
-		return nil, err
-	}
-	var services []compose.ServiceStatus
-	for _, service := range keys {
-		containers := containersByLabel[service]
-		runnningContainers := []moby.Container{}
-		for _, container := range containers {
-			if container.State == convert.ContainerRunning {
-				runnningContainers = append(runnningContainers, container)
+	var summary []compose.ContainerSummary
+	for _, c := range containers {
+		var publishers []compose.PortPublisher
+		for _, p := range c.Ports {
+			var url string
+			if p.PublicPort != 0 {
+				url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
 			}
+			publishers = append(publishers, compose.PortPublisher{
+				URL:           url,
+				TargetPort:    int(p.PrivatePort),
+				PublishedPort: int(p.PublicPort),
+				Protocol:      p.Type,
+			})
 		}
-		services = append(services, compose.ServiceStatus{
-			ID:       service,
-			Name:     service,
-			Desired:  len(containers),
-			Replicas: len(runnningContainers),
+
+		summary = append(summary, compose.ContainerSummary{
+			ID:         c.ID,
+			Name:       getContainerName(c),
+			Project:    c.Labels[projectLabel],
+			Service:    c.Labels[serviceLabel],
+			State:      c.State,
+			Publishers: publishers,
 		})
 	}
-	return services, nil
+	return summary, nil
 }
 
 func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {

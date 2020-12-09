@@ -60,7 +60,7 @@ func (c *composeService) Logs(context.Context, string, compose.LogConsumer) erro
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Ps(context.Context, string) ([]compose.ServiceStatus, error) {
+func (c *composeService) Ps(context.Context, string) ([]compose.ContainerSummary, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
