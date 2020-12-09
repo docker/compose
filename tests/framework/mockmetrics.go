@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo"
 )
@@ -53,7 +54,10 @@ func (s *MockMetricsServer) hello(c echo.Context) error {
 }
 
 // GetUsage get usage
-func (s *MockMetricsServer) GetUsage() []string {
+func (s *MockMetricsServer) GetUsage(expectedCommands int) []string {
+	if len(s.usage) < expectedCommands {
+		time.Sleep(1 * time.Second) // a simple sleep 1s here should be enough, if not there are real issues
+	}
 	return s.usage
 }
 
