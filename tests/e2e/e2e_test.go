@@ -151,7 +151,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("--help")
 		c.RunDockerCmd("run", "--help")
 
-		usage := s.GetUsage()
+		usage := s.GetUsage(3)
 		assert.DeepEqual(t, []string{
 			`{"command":"help run","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"--help","context":"moby","source":"cli","status":"success"}`,
@@ -166,7 +166,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("version")
 		c.RunDockerOrExitError("version", "--xxx")
 
-		usage := s.GetUsage()
+		usage := s.GetUsage(3)
 		assert.DeepEqual(t, []string{
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"version","context":"moby","source":"cli","status":"success"}`,
@@ -185,7 +185,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("context", "use", "default")
 		c.RunDockerCmd("--context", "test-example", "ps")
 
-		usage := s.GetUsage()
+		usage := s.GetUsage(7)
 		assert.DeepEqual(t, []string{
 			`{"command":"context create","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
