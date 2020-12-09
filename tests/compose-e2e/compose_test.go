@@ -49,15 +49,8 @@ func TestLocalComposeUp(t *testing.T) {
 
 	const projectName = "compose-e2e-demo"
 
-	t.Run("build", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "build", "-f", "../composefiles/demo_multi_port.yaml")
-		res.Assert(t, icmd.Expected{Out: "COPY words.sql /docker-entrypoint-initdb.d/"})
-		res.Assert(t, icmd.Expected{Out: "COPY pom.xml ."})
-		res.Assert(t, icmd.Expected{Out: "COPY static /static/"})
-	})
-
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "../composefiles/demo_multi_port.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "up", "-d", "-f", "./fixtures/sentences/docker-compose.yaml", "--project-name", projectName, "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
@@ -78,7 +71,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "../composefiles/demo_multi_port.yaml"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "./fixtures/sentences/docker-compose.yaml"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -119,7 +112,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		//ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
-		c.RunDockerCmd("compose", "up", "-d", "--workdir", "volume-test", "--project-name", projectName)
+		c.RunDockerCmd("compose", "up", "-d", "--workdir", "fixtures/volume-test", "--project-name", projectName)
 	})
 
 	t.Run("access bind mount data", func(t *testing.T) {
