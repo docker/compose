@@ -103,6 +103,42 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 }
 
+func TestLocalComposeBuild(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("build named and unnamed images", func(t *testing.T) {
+		//ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("rmi", "build-test_nginx")
+		c.RunDockerOrExitError("rmi", "custom-nginx")
+
+		res := c.RunDockerCmd("compose", "build", "--workdir", "fixtures/build-test")
+
+		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+		c.RunDockerCmd("image", "inspect", "build-test_nginx")
+		c.RunDockerCmd("image", "inspect", "custom-nginx")
+	})
+
+	t.Run("build as part of up", func(t *testing.T) {
+		c.RunDockerOrExitError("rmi", "build-test_nginx")
+		c.RunDockerOrExitError("rmi", "custom-nginx")
+
+		res := c.RunDockerCmd("compose", "up", "-d", "--workdir", "fixtures/build-test")
+
+		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+
+		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
+
+		c.RunDockerCmd("image", "inspect", "build-test_nginx")
+		c.RunDockerCmd("image", "inspect", "custom-nginx")
+	})
+
+	t.Run("cleanup build project", func(t *testing.T) {
+		c.RunDockerCmd("compose", "down", "--workdir", "fixtures/build-test")
+		c.RunDockerCmd("rmi", "build-test_nginx")
+		c.RunDockerCmd("rmi", "custom-nginx")
+	})
+}
 func TestLocalComposeVolume(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
@@ -127,7 +163,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
-		_ = c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
+		c.RunDockerCmd("compose", "down", "--project-name", projectName)
+		c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
 	})
 }

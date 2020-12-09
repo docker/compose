@@ -1,0 +1,9 @@
+services:
+  nginx:
+    build: nginx-build
+    ports:
+      - 8070:80
+
+  nginx2:
+    build: nginx-build
+    image: custom-nginx
