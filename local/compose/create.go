@@ -144,7 +144,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		StopTimeout: convert.ToSeconds(s.StopGracePeriod),
 	}
 
-	mountOptions, err := buildContainerMountOptions(s, inherit)
+	mountOptions, err := buildContainerMountOptions(*p, s, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -191,7 +191,7 @@ func buildContainerBindingOptions(s types.ServiceConfig) nat.PortMap {
 	return bindings
 }
 
-func buildContainerMountOptions(s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerMountOptions(p types.Project, s types.ServiceConfig, inherit *moby.Container) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	var inherited []string
 	if inherit != nil {
@@ -217,7 +217,7 @@ func buildContainerMountOptions(s types.ServiceConfig, inherit *moby.Container) 
 		if contains(inherited, v.Target) {
 			continue
 		}
-		mount, err := buildMount(v)
+		mount, err := buildMount(p, v)
 		if err != nil {
 			return nil, err
 		}
@@ -226,14 +226,20 @@ func buildContainerMountOptions(s types.ServiceConfig, inherit *moby.Container) 
 	return mounts, nil
 }
 
-func buildMount(volume types.ServiceVolumeConfig) (mount.Mount, error) {
+func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
-	if volume.Type == "bind" && !filepath.IsAbs(source) {
+	if volume.Type == types.VolumeTypeBind && !filepath.IsAbs(source) {
 		// volume source has already been prefixed with workdir if required, by compose-go project loader
 		var err error
 		source, err = filepath.Abs(source)
 		if err != nil {
 			return mount.Mount{}, err
+		}
+	}
+	if volume.Type == types.VolumeTypeVolume {
+		pVolume, ok := project.Volumes[volume.Source]
+		if ok {
+			source = pVolume.Name
 		}
 	}
 

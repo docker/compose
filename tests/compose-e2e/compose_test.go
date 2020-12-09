@@ -120,10 +120,20 @@ func TestLocalComposeVolume(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
 		c.RunDockerCmd("compose", "up", "-d", "--workdir", "volume-test", "--project-name", projectName)
+	})
 
+	t.Run("access bind mount data", func(t *testing.T) {
 		output := HTTPGetWithRetry(t, "http://localhost:8090", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
+	})
 
+	t.Run("check container volume specs", func(t *testing.T) {
+		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .HostConfig.Mounts }}")
+		//nolint
+		res.Assert(t, icmd.Expected{Out: `[{"Type":"volume","Source":"compose-e2e-volume_staticVol","Target":"/usr/share/nginx/html","ReadOnly":true},{"Type":"volume","Target":"/usr/src/app/node_modules"}]`})
+	})
+
+	t.Run("cleanup volume project", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
 		_ = c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
 	})

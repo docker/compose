@@ -110,13 +110,34 @@ func TestStacksMixedStatus(t *testing.T) {
 }
 
 func TestBuildBindMount(t *testing.T) {
+	project := composetypes.Project{}
 	volume := composetypes.ServiceVolumeConfig{
 		Type:   composetypes.VolumeTypeBind,
 		Source: "e2e/volume-test",
 		Target: "/data",
 	}
-	mount, err := buildMount(volume)
+	mount, err := buildMount(project, volume)
 	assert.NilError(t, err)
 	assert.Assert(t, filepath.IsAbs(mount.Source))
 	assert.Equal(t, mount.Type, mountTypes.TypeBind)
+}
+
+func TestBuildVolumeMount(t *testing.T) {
+	project := composetypes.Project{
+		Name: "myProject",
+		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
+			"myVolume": {
+				Name: "myProject_myVolume",
+			},
+		}),
+	}
+	volume := composetypes.ServiceVolumeConfig{
+		Type:   composetypes.VolumeTypeVolume,
+		Source: "myVolume",
+		Target: "/data",
+	}
+	mount, err := buildMount(project, volume)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Source, "myProject_myVolume")
+	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
 }

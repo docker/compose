@@ -9,7 +9,8 @@ services:
   nginx2:
     build: nginx-build
     volumes:
-      - staticVol:/usr/share/nginx/html
+      - staticVol:/usr/share/nginx/html:ro
+      - /usr/src/app/node_modules
     ports:
       - 9090:80
 
