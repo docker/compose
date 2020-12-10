@@ -130,6 +130,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
+	errW := w.Wait()
+	if err == nil {
+		err = errW
+	}
 	return err
 }
 
