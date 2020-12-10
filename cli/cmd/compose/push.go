@@ -33,7 +33,8 @@ type pushOptions struct {
 func pushCommand() *cobra.Command {
 	opts := pushOptions{}
 	pushCmd := &cobra.Command{
-		Use: "push [SERVICE...]",
+		Use:   "push [SERVICE...]",
+		Short: "Push service images",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPush(cmd.Context(), opts, args)
 		},

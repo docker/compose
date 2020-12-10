@@ -33,7 +33,8 @@ type pullOptions struct {
 func pullCommand() *cobra.Command {
 	opts := pullOptions{}
 	pullCmd := &cobra.Command{
-		Use: "pull [SERVICE...]",
+		Use:   "pull [SERVICE...]",
+		Short: "Pull service images",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPull(cmd.Context(), opts, args)
 		},

@@ -36,7 +36,8 @@ import (
 func upCommand(contextType string) *cobra.Command {
 	opts := composeOptions{}
 	upCmd := &cobra.Command{
-		Use: "up [SERVICE...]",
+		Use:   "up [SERVICE...]",
+		Short: "Create and start containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType:

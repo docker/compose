@@ -28,7 +28,8 @@ import (
 func downCommand() *cobra.Command {
 	opts := composeOptions{}
 	downCmd := &cobra.Command{
-		Use: "down",
+		Use:   "down",
+		Short: "Stop and remove containers, networks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDown(cmd.Context(), opts)
 		},
