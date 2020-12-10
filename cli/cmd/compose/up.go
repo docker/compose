@@ -51,7 +51,8 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
-	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, " Detached mode: Run containers in the background")
+	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
+	upCmd.Flags().BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 
 	if contextType == store.AciContextType {
 		upCmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
@@ -118,6 +119,11 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 	if opts.DomainName != "" {
 		// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
 		project.Services[0].DomainName = opts.DomainName
+	}
+	if opts.Build {
+		for _, service := range project.Services {
+			service.PullPolicy = types.PullPolicyBuild
+		}
 	}
 
 	err = filter(project, services)

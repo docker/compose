@@ -35,6 +35,7 @@ type composeOptions struct {
 	Environment []string
 	Format      string
 	Detach      bool
+	Build       bool
 	Quiet       bool
 }
 
