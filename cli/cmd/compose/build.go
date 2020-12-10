@@ -33,7 +33,8 @@ type buildOptions struct {
 func buildCommand() *cobra.Command {
 	opts := buildOptions{}
 	buildCmd := &cobra.Command{
-		Use: "build [SERVICE...]",
+		Use:   "build [SERVICE...]",
+		Short: "Build or rebuild services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runBuild(cmd.Context(), opts, args)
 		},

@@ -29,7 +29,8 @@ import (
 func logsCommand() *cobra.Command {
 	opts := composeOptions{}
 	logsCmd := &cobra.Command{
-		Use: "logs",
+		Use:   "logs",
+		Short: "View output from containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLogs(cmd.Context(), opts)
 		},

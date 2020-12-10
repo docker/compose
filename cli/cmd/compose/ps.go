@@ -33,7 +33,8 @@ import (
 func psCommand() *cobra.Command {
 	opts := composeOptions{}
 	psCmd := &cobra.Command{
-		Use: "ps",
+		Use:   "ps",
+		Short: "List containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPs(cmd.Context(), opts)
 		},

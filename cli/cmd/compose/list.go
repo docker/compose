@@ -33,7 +33,8 @@ import (
 func listCommand() *cobra.Command {
 	opts := composeOptions{}
 	lsCmd := &cobra.Command{
-		Use: "ls",
+		Use:   "ls",
+		Short: "List running compose projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd.Context(), opts)
 		},
