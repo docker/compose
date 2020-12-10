@@ -156,8 +156,8 @@ github.com/cloudflare/cfssl v0.0.0-20181213083726-b94e044bb51e h1:Qux+lbuMaRzkQy
 github.com/cloudflare/cfssl v0.0.0-20181213083726-b94e044bb51e/go.mod h1:yMWuSON2oQp+43nFtAV/uvKQIFpSPerB57DCt9t8sSA=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20201208135325-bcfd1e07a97e h1:sfRp4eLv+F9ml4Yh49DPkIlEj07N0p/56FzCLbbROJ0=
-github.com/compose-spec/compose-go v0.0.0-20201208135325-bcfd1e07a97e/go.mod h1:rz7rjxJGA/pWpLdBmDdqymGm2okEDYgBE7yx569xW+I=
+github.com/compose-spec/compose-go v0.0.0-20201210155915-b5ef325e9175 h1:6ZE967wCKnx4h+OIUsjnS113itBlncF3ls/Ia7rKcbc=
+github.com/compose-spec/compose-go v0.0.0-20201210155915-b5ef325e9175/go.mod h1:rz7rjxJGA/pWpLdBmDdqymGm2okEDYgBE7yx569xW+I=
 github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/containerd/cgroups v0.0.0-20200217135630-d732e370d46d/go.mod h1:CStdkl05lBnJej94BPFoJ7vB8cELKXwViS+dgfW0/M8=
 github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 h1:qWj4qVYZ95vLWwqyNJCQg7rDsG5wPdze0UaPolH7DUk=

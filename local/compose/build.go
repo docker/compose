@@ -35,15 +35,20 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 	opts := map[string]build.Options{}
 	for _, service := range project.Services {
 		if service.Build != nil {
-			imageName := service.Image
-			if imageName == "" {
-				imageName = project.Name + "_" + service.Name
-			}
+			imageName := getImageName(service, project)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 		}
 	}
 
 	return s.build(ctx, project, opts)
+}
+
+func getImageName(service types.ServiceConfig, project *types.Project) string {
+	imageName := service.Image
+	if imageName == "" {
+		imageName = project.Name + "_" + service.Name
+	}
+	return imageName
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
@@ -53,20 +58,20 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
 
+		imageName := getImageName(service, project)
+		localImagePresent, err := s.localImagePresent(ctx, imageName)
+		if err != nil {
+			return err
+		}
 		// TODO build vs pull should be controlled by pull policy, see https://github.com/compose-spec/compose-spec/issues/26
 		if service.Image != "" {
-			needPull, err := s.needPull(ctx, service)
-			if err != nil {
-				return err
-			}
-			if !needPull {
+			if localImagePresent {
 				continue
 			}
 		}
 		if service.Build != nil {
-			imageName := service.Image
-			if imageName == "" {
-				imageName = project.Name + "_" + service.Name
+			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
+				continue
 			}
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 			continue
@@ -89,15 +94,15 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return s.build(ctx, project, opts)
 }
 
-func (s *composeService) needPull(ctx context.Context, service types.ServiceConfig) (bool, error) {
-	_, _, err := s.apiClient.ImageInspectWithRaw(ctx, service.Image)
+func (s *composeService) localImagePresent(ctx context.Context, imageName string) (bool, error) {
+	_, _, err := s.apiClient.ImageInspectWithRaw(ctx, imageName)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			return true, nil
+			return false, nil
 		}
 		return false, err
 	}
-	return false, nil
+	return true, nil
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options) error {
