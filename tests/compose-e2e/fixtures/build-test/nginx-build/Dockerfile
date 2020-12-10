@@ -13,3 +13,5 @@
 #   limitations under the License.
 
 FROM nginx
+
+COPY static /usr/share/nginx/html
