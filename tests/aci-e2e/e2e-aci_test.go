@@ -485,7 +485,11 @@ func TestContainerRunAttached(t *testing.T) {
 	t.Run("prune dry run", func(t *testing.T) {
 		res := c.RunDockerCmd("prune", "--dry-run")
 		assert.Equal(t, "Resources that would be deleted:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
-		res = c.RunDockerCmd("prune", "--dry-run", "--force")
+		res = c.RunDockerOrExitError("prune", "--dry-run", "--force")
+		if strings.Contains(res.Stderr(), "unsupported protocol scheme") { //Flaky strange error on azure SDK call happening only during prune --force
+			time.Sleep(1 * time.Second)
+			res = c.RunDockerCmd("prune", "--dry-run", "--force")
+		}
 		assert.Equal(t, "Resources that would be deleted:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 	})
 
