@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
 	. "github.com/docker/compose-cli/tests/framework"
@@ -148,6 +148,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerCmd("rmi", "custom-nginx")
 	})
 }
+
 func TestLocalComposeVolume(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
@@ -175,4 +176,14 @@ func TestLocalComposeVolume(t *testing.T) {
 		c.RunDockerCmd("compose", "down", "--project-name", projectName)
 		c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
 	})
+}
+
+func TestComposePull(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	res := c.RunDockerOrExitError("compose", "pull", "--workdir", "fixtures/simple-composefile")
+	output := res.Combined()
+
+	assert.Assert(t, strings.Contains(output, "simple Pulled"))
+	assert.Assert(t, strings.Contains(output, "another Pulled"))
 }
