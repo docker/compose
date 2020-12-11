@@ -38,6 +38,7 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.0 // indirect
+	github.com/moby/buildkit v0.8.1-0.20201205083753-0af7b1b9c693
 	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0

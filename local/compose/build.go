@@ -29,6 +29,7 @@ import (
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
 	"github.com/docker/docker/errdefs"
+	bclient "github.com/moby/buildkit/client"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project) error {
@@ -154,6 +155,7 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
 		Tags:      tags,
 		Target:    service.Build.Target,
+		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
 	}
 }
 
