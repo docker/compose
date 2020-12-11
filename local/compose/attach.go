@@ -80,7 +80,9 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container m
 	go func() {
 		<-ctx.Done()
 		stdout.Close() //nolint:errcheck
-		stdin.Close()  //nolint:errcheck
+		if stdin != nil {
+			stdin.Close() //nolint:errcheck
+		}
 	}()
 
 	if r != nil && stdin != nil {
