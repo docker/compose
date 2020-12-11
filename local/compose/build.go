@@ -29,6 +29,7 @@ import (
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
 	"github.com/docker/docker/errdefs"
+	bclient "github.com/moby/buildkit/client"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project) error {
@@ -110,7 +111,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 		return nil
 	}
 	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, "", nil, project.WorkingDir)
+	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, nil, "", nil, project.WorkingDir)
 	if err != nil {
 		return err
 	}
@@ -130,6 +131,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
+	errW := w.Wait()
+	if err == nil {
+		err = errW
+	}
 	return err
 }
 
@@ -150,6 +155,7 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
 		Tags:      tags,
 		Target:    service.Build.Target,
+		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
 	}
 }
 
