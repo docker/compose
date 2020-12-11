@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 export DOCKER_BUILDKIT=1
+export BUILDX_NO_DEFAULT_LOAD=1
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
