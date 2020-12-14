@@ -32,6 +32,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 		ports = append(ports, types.ServicePortConfig{
 			Target:    p.ContainerPort,
 			Published: p.HostPort,
+			Protocol:  p.Protocol,
 		})
 	}
 

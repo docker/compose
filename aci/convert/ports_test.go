@@ -173,3 +173,85 @@ func TestPortConvert(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertTCPPortsToAci(t *testing.T) {
+	service := types.ServiceConfig{
+		Name: "myService",
+		Ports: []types.ServicePortConfig{
+			{
+				Protocol:  "",
+				Target:    80,
+				Published: 80,
+			},
+			{
+				Protocol:  "tcp",
+				Target:    90,
+				Published: 90,
+			},
+		},
+	}
+	containerPorts, groupPports, _, err := convertPortsToAci(serviceConfigAciHelper(service))
+	assert.NilError(t, err)
+	assert.DeepEqual(t, containerPorts, []containerinstance.ContainerPort{
+		{
+			Port:     to.Int32Ptr(80),
+			Protocol: containerinstance.ContainerNetworkProtocolTCP,
+		},
+		{
+			Port:     to.Int32Ptr(90),
+			Protocol: containerinstance.ContainerNetworkProtocolTCP,
+		},
+	})
+	assert.DeepEqual(t, groupPports, []containerinstance.Port{
+		{
+			Port:     to.Int32Ptr(80),
+			Protocol: containerinstance.TCP,
+		},
+		{
+			Port:     to.Int32Ptr(90),
+			Protocol: containerinstance.TCP,
+		},
+	})
+}
+
+func TestConvertUDPPortsToAci(t *testing.T) {
+	service := types.ServiceConfig{
+		Name: "myService",
+		Ports: []types.ServicePortConfig{
+			{
+				Protocol:  "udp",
+				Target:    80,
+				Published: 80,
+			},
+		},
+	}
+	containerPorts, groupPports, _, err := convertPortsToAci(serviceConfigAciHelper(service))
+	assert.NilError(t, err)
+	assert.DeepEqual(t, containerPorts, []containerinstance.ContainerPort{
+		{
+			Port:     to.Int32Ptr(80),
+			Protocol: containerinstance.ContainerNetworkProtocolUDP,
+		},
+	})
+	assert.DeepEqual(t, groupPports, []containerinstance.Port{
+		{
+			Port:     to.Int32Ptr(80),
+			Protocol: containerinstance.UDP,
+		},
+	})
+}
+
+func TestConvertErrorOnMappingPorts(t *testing.T) {
+	service := types.ServiceConfig{
+		Name: "myService",
+		Ports: []types.ServicePortConfig{
+			{
+				Protocol:  "",
+				Target:    80,
+				Published: 90,
+			},
+		},
+	}
+	_, _, _, err := convertPortsToAci(serviceConfigAciHelper(service))
+	assert.Error(t, err, "Port mapping is not supported with ACI, cannot map port 90 to 80 for container myService")
+}

@@ -37,12 +37,25 @@ func convertPortsToAci(service serviceConfigAciHelper) ([]containerinstance.Cont
 			return nil, nil, nil, errors.New(msg)
 		}
 		portNumber := int32(portConfig.Target)
+		var groupProtocol containerinstance.ContainerGroupNetworkProtocol
+		var containerProtocol containerinstance.ContainerNetworkProtocol
+		switch portConfig.Protocol {
+		case "tcp", "":
+			groupProtocol = containerinstance.TCP
+			containerProtocol = containerinstance.ContainerNetworkProtocolTCP
+		case "udp":
+			groupProtocol = containerinstance.UDP
+			containerProtocol = containerinstance.ContainerNetworkProtocolUDP
+		default:
+			return nil, nil, nil, fmt.Errorf("unknown protocol %q in exposed port for service %q", portConfig.Protocol, service.Name)
+		}
 		containerPorts = append(containerPorts, containerinstance.ContainerPort{
-			Port: to.Int32Ptr(portNumber),
+			Port:     to.Int32Ptr(portNumber),
+			Protocol: containerProtocol,
 		})
 		groupPorts = append(groupPorts, containerinstance.Port{
 			Port:     to.Int32Ptr(portNumber),
-			Protocol: containerinstance.TCP,
+			Protocol: groupProtocol,
 		})
 	}
 	var dnsLabelName *string = nil
