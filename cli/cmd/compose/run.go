@@ -26,8 +26,6 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -35,6 +33,7 @@ type runOptions struct {
 	Name        string
 	Command     []string
 	WorkingDir  string
+	ConfigPaths []string
 	Environment []string
 	Detach      bool
 	Publish     []string
@@ -51,17 +50,6 @@ func runCommand() *cobra.Command {
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s := store.ContextStore(cmd.Context())
-			currentCtx, err := s.Get(apicontext.CurrentContext(cmd.Context()))
-			if err != nil {
-				return err
-			}
-			switch currentCtx.Type() {
-			case store.DefaultContextType:
-			default:
-				return fmt.Errorf(`Command "run" is not yet implemented for %q context type`, currentCtx.Type())
-			}
-
 			if len(args) > 1 {
 				opts.Command = args[1:]
 			}
@@ -70,7 +58,7 @@ func runCommand() *cobra.Command {
 		},
 	}
 	runCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-
+	runCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	runCmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
 	runCmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
 	runCmd.Flags().BoolVar(&opts.NoDeps, "no-deps", false, "Don't start linked services.")
@@ -85,10 +73,11 @@ func runCommand() *cobra.Command {
 }
 
 func runRun(ctx context.Context, opts runOptions) error {
-	// target service
-	services := []string{opts.Name}
-
-	projectOpts := composeOptions{}
+	projectOpts := composeOptions{
+		ConfigPaths: opts.ConfigPaths,
+		WorkingDir:  opts.WorkingDir,
+		Environment: opts.Environment,
+	}
 	options, err := projectOpts.toProjectOptions()
 	if err != nil {
 		return err
@@ -98,7 +87,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
-	err = filter(project, services)
+	err = filter(project, []string{opts.Name})
 	if err != nil {
 		return err
 	}
