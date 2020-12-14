@@ -80,8 +80,6 @@ func runCommand() *cobra.Command {
 	runCmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	runCmd.Flags().BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
 
-	//addComposeCommonFlags(runCmd.Flags(), &opts.ComposeOpts)
-
 	runCmd.Flags().SetInterspersed(false)
 	return runCmd
 }
