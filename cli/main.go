@@ -147,8 +147,8 @@ func main() {
 
 	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
 	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
-	opts.AddConfigFlags(root.PersistentFlags())
 	opts.AddContextFlags(root.PersistentFlags())
+	opts.AddConfigFlags(root.PersistentFlags())
 	root.Flags().BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
 	walk(root, func(c *cobra.Command) {
@@ -157,6 +157,7 @@ func main() {
 
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
+	_ = root.Flags().Parse(os.Args[1:])
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
