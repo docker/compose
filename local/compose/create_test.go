@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
 	mountTypes "github.com/docker/docker/api/types/mount"
 	"gotest.tools/v3/assert"
@@ -59,4 +60,9 @@ func TestBuildVolumeMount(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Source, "myProject_myVolume")
 	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
+}
+
+func TestServiceImageName(t *testing.T) {
+	assert.Equal(t, getImageName(types.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, getImageName(types.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
 }

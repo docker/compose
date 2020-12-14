@@ -123,6 +123,14 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
+func getImageName(service types.ServiceConfig, projectName string) string {
+	imageName := service.Image
+	if imageName == "" {
+		imageName = projectName + "_" + service.Name
+	}
+	return imageName
+}
+
 func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container, autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 	hash, err := jsonHash(s)
 	if err != nil {
@@ -155,10 +163,6 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 	if len(s.Entrypoint) > 0 {
 		entrypoint = strslice.StrSlice(s.Entrypoint)
 	}
-	image := s.Image
-	if s.Image == "" {
-		image = fmt.Sprintf("%s_%s", p.Name, s.Name)
-	}
 
 	var (
 		tty         = s.Tty
@@ -178,7 +182,7 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
-		Image:           image,
+		Image:           getImageName(s, p.Name),
 		WorkingDir:      s.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: s.NetworkMode == "disabled",

@@ -36,20 +36,12 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 	opts := map[string]build.Options{}
 	for _, service := range project.Services {
 		if service.Build != nil {
-			imageName := getImageName(service, project)
+			imageName := getImageName(service, project.Name)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 		}
 	}
 
 	return s.build(ctx, project, opts)
-}
-
-func getImageName(service types.ServiceConfig, project *types.Project) string {
-	imageName := service.Image
-	if imageName == "" {
-		imageName = project.Name + "_" + service.Name
-	}
-	return imageName
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
@@ -59,7 +51,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
 
-		imageName := getImageName(service, project)
+		imageName := getImageName(service, project.Name)
 		localImagePresent, err := s.localImagePresent(ctx, imageName)
 		if err != nil {
 			return err
