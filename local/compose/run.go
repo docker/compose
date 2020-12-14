@@ -30,8 +30,11 @@ import (
 )
 
 func (s *composeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
-	name := opts.Name
-	service, err := project.GetService(name)
+	service, err := project.GetService(opts.Name)
+	if err != nil {
+		return "", err
+	}
+	err = s.ensureImagesExists(ctx, project)
 	if err != nil {
 		return "", err
 	}
@@ -133,12 +136,7 @@ func updateOneOffServiceConfig(service *types.ServiceConfig, projectName string,
 }
 
 func (s *composeService) ensureRequiredServices(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	err := s.ensureImagesExists(ctx, project)
-	if err != nil {
-		return err
-	}
-
-	err = InDependencyOrder(ctx, project, func(c context.Context, svc types.ServiceConfig) error {
+	err := InDependencyOrder(ctx, project, func(c context.Context, svc types.ServiceConfig) error {
 		if svc.Name != service.Name { // only start dependencies, not service to run one-off
 			return s.ensureService(c, project, svc)
 		}
