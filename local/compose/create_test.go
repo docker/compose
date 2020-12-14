@@ -66,3 +66,16 @@ func TestServiceImageName(t *testing.T) {
 	assert.Equal(t, getImageName(types.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
 	assert.Equal(t, getImageName(types.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
 }
+
+func TestPrepareNetworkLabels(t *testing.T) {
+	project := types.Project{
+		Name:     "myProject",
+		Networks: types.Networks(map[string]types.NetworkConfig{"skynet": {}}),
+	}
+	prepareNetworks(&project)
+	assert.DeepEqual(t, project.Networks["skynet"].Labels, types.Labels(map[string]string{
+		"com.docker.compose.network": "skynet",
+		"com.docker.compose.project": "myProject",
+		"com.docker.compose.version": "1.0-alpha",
+	}))
+}

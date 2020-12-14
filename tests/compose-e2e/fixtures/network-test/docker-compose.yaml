@@ -1,0 +1,25 @@
+services:
+  db:
+    image: gtardif/sentences-db
+    networks:
+      - dbnet
+  words:
+    image: gtardif/sentences-api
+    ports:
+      - "8080:8080"
+    networks:
+      - dbnet
+      - servicenet
+  web:
+    image: gtardif/sentences-web
+    ports:
+      - "80:80"
+    labels:
+      - "my-label=test"
+    networks:
+      - servicenet
+
+networks:
+  dbnet:
+  servicenet:
+    name: microservices
