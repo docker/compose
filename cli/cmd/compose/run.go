@@ -20,10 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/progress"
@@ -69,24 +67,11 @@ func runRun(ctx context.Context, opts runOptions) error {
 		WorkingDir:  opts.WorkingDir,
 		Environment: opts.Environment,
 	}
-	options, err := projectOpts.toProjectOptions()
-	if err != nil {
-		return err
-	}
-	project, err := cli.ProjectFromOptions(options)
+	c, project, err := setup(ctx, projectOpts, []string{opts.Name})
 	if err != nil {
 		return err
 	}
 
-	err = filter(project, []string{opts.Name})
-	if err != nil {
-		return err
-	}
-
-	c, err := client.NewWithDefaultLocalBackend(ctx)
-	if err != nil {
-		return err
-	}
 	containerID, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return c.ComposeService().CreateOneOffContainer(ctx, project, compose.RunOptions{
 			Name:    opts.Name,
