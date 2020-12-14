@@ -36,10 +36,6 @@ type runOptions struct {
 	ConfigPaths []string
 	Environment []string
 	Detach      bool
-	Publish     []string
-	Labels      []string
-	Volumes     []string
-	NoDeps      bool
 	Remove      bool
 }
 
@@ -59,11 +55,6 @@ func runCommand() *cobra.Command {
 	}
 	runCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	runCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	runCmd.Flags().StringArrayVarP(&opts.Publish, "publish", "p", []string{}, "Publish a container's port(s). [HOST_PORT:]CONTAINER_PORT")
-	runCmd.Flags().StringVar(&opts.Name, "name", "", "Assign a name to the container")
-	runCmd.Flags().BoolVar(&opts.NoDeps, "no-deps", false, "Don't start linked services.")
-	runCmd.Flags().StringArrayVarP(&opts.Labels, "label", "l", []string{}, "Set meta data on a container")
-	runCmd.Flags().StringArrayVarP(&opts.Volumes, "volume", "v", []string{}, "Volume. Ex: storageaccount/my_share[:/absolute/path/to/target][:ro]")
 	runCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	runCmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	runCmd.Flags().BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")

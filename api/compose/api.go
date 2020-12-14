@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"io"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -73,21 +72,8 @@ type ConvertOptions struct {
 
 // RunOptions holds all flags for compose run
 type RunOptions struct {
-	Name        string
-	Command     []string
-	WorkingDir  string
-	Environment []string
-	Publish     []string
-	Labels      []string
-	Volumes     []string
-	Remove      bool
-	NoDeps      bool
-	LogConsumer LogConsumer
-
-	Detach bool
-
-	Stdout io.ReadCloser
-	Stdin  io.WriteCloser
+	Name    string
+	Command []string
 }
 
 // PortPublisher hold status about published port

@@ -62,7 +62,6 @@ func (s *composeService) CreateOneOffContainer(ctx context.Context, project *typ
 
 func (s *composeService) Run(ctx context.Context, container string, detach bool) error {
 	if detach {
-		// start container
 		return s.apiClient.ContainerStart(ctx, container, apitypes.ContainerStartOptions{})
 	}
 
