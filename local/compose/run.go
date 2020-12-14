@@ -34,25 +34,19 @@ func (s *composeService) CreateOneOffContainer(ctx context.Context, project *typ
 	if err != nil {
 		return "", err
 	}
-	err = s.ensureImagesExists(ctx, project)
-	if err != nil {
+	if err = s.ensureImagesExists(ctx, project); err != nil {
 		return "", err
 	}
-
 	if err := s.ensureProjectNetworks(ctx, project); err != nil {
 		return "", err
 	}
-
 	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return "", err
 	}
-	// ensure required services are up and running before creating the oneoff container
-	err = s.ensureRequiredServices(ctx, project, service)
-	if err != nil {
+	if err = s.ensureRequiredServices(ctx, project, service); err != nil {
 		return "", err
 	}
 
-	//apply options to service config
 	updateOneOffServiceConfig(&service, project.Name, opts)
 
 	err = s.createContainer(ctx, project, service, service.ContainerName, 1)
@@ -120,10 +114,8 @@ func (s *composeService) Run(ctx context.Context, container string, detach bool)
 
 func updateOneOffServiceConfig(service *types.ServiceConfig, projectName string, opts compose.RunOptions) {
 	if len(opts.Command) > 0 {
-		// custom command to run
 		service.Command = opts.Command
 	}
-	//service.Environment = opts.Environment
 	slug := moby.GenerateRandomID()
 	service.Scale = 1
 	service.ContainerName = fmt.Sprintf("%s_%s_run_%s", projectName, service.Name, moby.TruncateID(slug))

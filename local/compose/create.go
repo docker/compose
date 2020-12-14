@@ -105,10 +105,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 	labels[projectLabel] = p.Name
 	labels[serviceLabel] = s.Name
 	labels[versionLabel] = ComposeVersion
-	if _, ok := s.Labels[oneoffLabel]; ok {
-		labels[oneoffLabel] = s.Labels[oneoffLabel]
-		labels[slugLabel] = s.Labels[slugLabel]
-	} else {
+	if _, ok := s.Labels[oneoffLabel]; !ok {
 		labels[oneoffLabel] = "False"
 	}
 	labels[configHashLabel] = hash
