@@ -169,6 +169,10 @@ class ConfigDetails(namedtuple('_ConfigDetails', 'working_dir config_files envir
     def __new__(cls, working_dir, config_files, environment=None):
         if environment is None:
             environment = Environment.from_env_file(working_dir)
+        base_filename = environment.get("COMPOSE_BASE_FILE")
+        if base_filename:
+            base = ConfigFile.from_filename(base_filename)
+            config_files = [base] + config_files
         return super().__new__(
             cls, working_dir, config_files, environment
         )
