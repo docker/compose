@@ -38,14 +38,3 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
-
-func unique(s []string) []string {
-	items := []string{}
-	for _, item := range s {
-		if contains(items, item) {
-			continue
-		}
-		items = append(items, item)
-	}
-	return items
-}

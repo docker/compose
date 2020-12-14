@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
@@ -37,12 +36,11 @@ func (s *composeService) CreateOneOffContainer(ctx context.Context, project *typ
 		return "", err
 	}
 
-	err = s.ensureRequiredNetworks(ctx, project, service)
-	if err != nil {
+	if err := s.ensureProjectNetworks(ctx, project); err != nil {
 		return "", err
 	}
-	err = s.ensureRequiredVolumes(ctx, project, service)
-	if err != nil {
+
+	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return "", err
 	}
 	// ensure required services are up and running before creating the oneoff container
@@ -128,123 +126,27 @@ func updateOneOffServiceConfig(service *types.ServiceConfig, projectName string,
 	service.Scale = 1
 	service.ContainerName = fmt.Sprintf("%s_%s_run_%s", projectName, service.Name, moby.TruncateID(slug))
 	service.Labels = types.Labels{
-		"com.docker.compose.slug":   slug,
-		"com.docker.compose.oneoff": "True",
+		slugLabel:   slug,
+		oneoffLabel: "True",
 	}
 	service.Tty = true
 	service.StdinOpen = true
 }
 
 func (s *composeService) ensureRequiredServices(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	requiredServices := getDependencyNames(project, service, func() []string {
-		return service.GetDependencies()
-	})
-	if len(requiredServices) > 0 {
-		// dependencies here
-		services, err := project.GetServices(requiredServices)
-		if err != nil {
-			return err
-		}
-		project.Services = services
-		err = s.ensureImagesExists(ctx, project)
-		if err != nil {
-			return err
-		}
+	err := s.ensureImagesExists(ctx, project)
+	if err != nil {
+		return err
+	}
 
-		err = InDependencyOrder(ctx, project, func(c context.Context, svc types.ServiceConfig) error {
+	err = InDependencyOrder(ctx, project, func(c context.Context, svc types.ServiceConfig) error {
+		if svc.Name != service.Name { // only start dependencies, not service to run one-off
 			return s.ensureService(c, project, svc)
-		})
-		if err != nil {
-			return err
 		}
-		return s.Start(ctx, project, nil)
-	}
-	return nil
-}
-
-func (s *composeService) ensureRequiredNetworks(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	networks := getDependentNetworkNames(project, service)
-	for k, network := range project.Networks {
-		if !contains(networks, network.Name) {
-			continue
-		}
-		if !network.External.External && network.Name != "" {
-			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
-			project.Networks[k] = network
-		}
-		network.Labels = network.Labels.Add(networkLabel, k)
-		network.Labels = network.Labels.Add(projectLabel, project.Name)
-		network.Labels = network.Labels.Add(versionLabel, ComposeVersion)
-
-		err := s.ensureNetwork(ctx, network)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *composeService) ensureRequiredVolumes(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	volumes := getDependentVolumeNames(project, service)
-
-	for k, volume := range project.Volumes {
-		if !contains(volumes, volume.Name) {
-			continue
-		}
-		if !volume.External.External && volume.Name != "" {
-			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
-			project.Volumes[k] = volume
-		}
-		volume.Labels = volume.Labels.Add(volumeLabel, k)
-		volume.Labels = volume.Labels.Add(projectLabel, project.Name)
-		volume.Labels = volume.Labels.Add(versionLabel, ComposeVersion)
-		err := s.ensureVolume(ctx, volume)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type filterDependency func() []string
-
-func getDependencyNames(project *types.Project, service types.ServiceConfig, f filterDependency) []string {
-	names := f()
-	serviceNames := service.GetDependencies()
-	if len(serviceNames) == 0 {
-		return names
-	}
-	if len(serviceNames) > 0 {
-		services, _ := project.GetServices(serviceNames)
-		for _, s := range services {
-			svc := getDependencyNames(project, s, f)
-			names = append(names, svc...)
-		}
-	}
-	sort.Strings(names)
-	return unique(names)
-}
-
-func getDependentNetworkNames(project *types.Project, service types.ServiceConfig) []string {
-	return getDependencyNames(project, service, func() []string {
-		names := []string{}
-		for n := range service.Networks {
-			if contains(project.NetworkNames(), n) {
-				names = append(names, n)
-			}
-		}
-		return names
+		return nil
 	})
-}
-
-func getDependentVolumeNames(project *types.Project, service types.ServiceConfig) []string {
-	return getDependencyNames(project, service, func() []string {
-		names := []string{}
-		for _, v := range service.Volumes {
-			if contains(project.VolumeNames(), v.Source) {
-				names = append(names, v.Source)
-			}
-		}
-		return names
-	})
+	if err != nil {
+		return err
+	}
+	return s.Start(ctx, project, nil)
 }

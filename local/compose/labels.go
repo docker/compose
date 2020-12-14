@@ -25,6 +25,7 @@ import (
 const (
 	containerNumberLabel = "com.docker.compose.container-number"
 	oneoffLabel          = "com.docker.compose.oneoff"
+	slugLabel            = "com.docker.compose.slug"
 	projectLabel         = "com.docker.compose.project"
 	volumeLabel          = "com.docker.compose.volume"
 	workingDirLabel      = "com.docker.compose.project.working_dir"
