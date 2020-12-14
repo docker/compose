@@ -18,7 +18,7 @@ services:
     networks:
       - frontnet
 networks:
-  frontnet: {}
-  backnet: {}
+  frontnet:
+  backnet:
 volumes:
-  data: {}
+  data:

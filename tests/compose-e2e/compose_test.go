@@ -138,8 +138,8 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --rm", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "--rm", "back")
-		res.Assert(t, icmd.Expected{Out: "Hello there!!"})
+		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "--rm", "back", "echo", "Hello again")
+		res.Assert(t, icmd.Expected{Out: "Hello again"})
 	})
 
 	t.Run("check run container removed", func(t *testing.T) {
