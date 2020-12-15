@@ -19,6 +19,8 @@ package local
 import (
 	"context"
 
+	local_compose "github.com/docker/compose-cli/local/compose"
+
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -38,17 +40,19 @@ func init() {
 }
 
 type ecsLocalSimulation struct {
-	moby *client.Client
+	moby    *client.Client
+	compose compose.Service
 }
 
 func service(ctx context.Context) (backend.Service, error) {
-	apiClient, err := client.NewClientWithOpts(client.FromEnv)
+	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
 
 	return &ecsLocalSimulation{
-		moby: apiClient,
+		moby:    apiClient,
+		compose: local_compose.NewComposeService(apiClient),
 	}, nil
 }
 

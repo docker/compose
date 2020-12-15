@@ -40,7 +40,7 @@ func upCommand(contextType string) *cobra.Command {
 		Short: "Create and start containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
-			case store.LocalContextType, store.DefaultContextType:
+			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 				return runCreateStart(cmd.Context(), opts, args)
 			default:
 				return runUp(cmd.Context(), opts, args)
