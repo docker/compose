@@ -22,7 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -112,9 +112,7 @@ func IsDefaultContextCommand(dockerCommand string) bool {
 	if e != nil {
 		fmt.Println(e)
 	}
-	output := string(b)
-	contains := strings.Contains(output, "Usage:\tdocker "+dockerCommand)
-	return contains
+	return regexp.MustCompile("Usage:\\s*docker\\s*" + dockerCommand).Match(b)
 }
 
 // ExecSilent executes a command and do redirect output to stdOut, return output
