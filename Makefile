@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 export DOCKER_BUILDKIT=1
-export BUILDX_NO_DEFAULT_LOAD=1
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -45,10 +44,10 @@ cli: ## Compile the cli
 	--output ./bin
 
 e2e-local: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e ./tests/skip-win-ci-e2e ./local/e2e
+	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e ./tests/compose-e2e ./tests/skip-win-ci-e2e ./local/e2e
 
 e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux containers available ATM. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e
+	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e ./tests/compose-e2e
 
 e2e-aci: ## Run End to end ACI tests. Set E2E_TEST=TestName to run a single test
 	go test -count=1 -v $(TEST_FLAGS) ./tests/aci-e2e
