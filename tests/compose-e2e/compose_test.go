@@ -57,7 +57,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
 		res.Assert(t, icmd.Expected{Out: `web`})
 
-		endpoint := "http://localhost:80"
+		endpoint := "http://localhost:90"
 		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, `"word":`))
 

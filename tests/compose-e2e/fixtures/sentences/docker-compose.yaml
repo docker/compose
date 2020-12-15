@@ -4,10 +4,10 @@ services:
   words:
     image: gtardif/sentences-api
     ports:
-      - "8080:8080"
+      - "95:8080"
   web:
     image: gtardif/sentences-web
     ports:
-      - "80:80"
+      - "90:80"
     labels:
       - "my-label=test"
