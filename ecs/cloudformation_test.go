@@ -591,6 +591,8 @@ func useDefaultVPC(m *MockAPIMockRecorder) {
 		existingAWSResource{id: "subnet1"},
 		existingAWSResource{id: "subnet2"},
 	}, nil)
+	m.IsPublicSubnet(gomock.Any(), "subnet1").Return(true, nil)
+	m.IsPublicSubnet(gomock.Any(), "subnet2").Return(true, nil)
 }
 
 func useGPU(m *MockAPIMockRecorder) {
