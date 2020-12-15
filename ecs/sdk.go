@@ -211,6 +211,37 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error
 	return ids, nil
 }
 
+func (s sdk) IsPublicSubnet(ctx context.Context, vpcID string, subNetID string) (bool, error) {
+	tables, err := s.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("association.subnet-id"),
+				Values: []*string{aws.String(subNetID)},
+			},
+		},
+	})
+	if err != nil {
+		return false, err
+	}
+	if len(tables.RouteTables) == 0 {
+		// If a subnet is not explicitly associated with any route table, it is implicitly associated with the main route table.
+		// https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-route-tables.html
+		return true, nil
+	}
+	for _, routeTable := range tables.RouteTables {
+		for _, route := range routeTable.Routes {
+			if aws.StringValue(route.State) != "active" {
+				continue
+			}
+			if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw-") {
+				// Connected to an internet Gateway
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func (s sdk) GetRoleArn(ctx context.Context, name string) (string, error) {
 	role, err := s.IAM.GetRoleWithContext(ctx, &iam.GetRoleInput{
 		RoleName: aws.String(name),

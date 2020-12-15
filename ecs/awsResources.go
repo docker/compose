@@ -185,10 +185,22 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 	if err != nil {
 		return "", nil, err
 	}
-	if len(subNets) < 2 {
-		return "", nil, fmt.Errorf("VPC %s should have at least 2 associated subnets in different availability zones", vpc)
+
+	var publicSubNets []awsResource
+	for _, subNet := range subNets {
+		isPublic, err := b.aws.IsPublicSubnet(ctx, vpc, subNet.ID())
+		if err != nil {
+			return "", nil, err
+		}
+		if isPublic {
+			publicSubNets = append(publicSubNets, subNet)
+		}
 	}
-	return vpc, subNets, nil
+
+	if len(publicSubNets) < 2 {
+		return "", nil, fmt.Errorf("VPC %s should have at least 2 associated public subnets in different availability zones", vpc)
+	}
+	return vpc, publicSubNets, nil
 }
 
 func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (awsResource, string, error) {
