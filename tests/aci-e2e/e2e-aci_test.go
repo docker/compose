@@ -500,7 +500,12 @@ func TestContainerRunAttached(t *testing.T) {
 		l := Lines(res.Stdout())
 		assert.Equal(t, 2, len(l))
 
-		res = c.RunDockerCmd("prune", "--force")
+		res = c.RunDockerOrExitError("prune", "--force")
+		if strings.Contains(res.Stderr(), "unsupported protocol scheme") { //Flaky strange error on azure SDK call happening only during prune --force
+			time.Sleep(1 * time.Second)
+			res = c.RunDockerCmd("prune", "--force")
+		}
+
 		assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--all")
