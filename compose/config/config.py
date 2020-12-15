@@ -1138,6 +1138,7 @@ def merge_build(output, base, override):
     md.merge_field('cache_from', merge_unique_items_lists, default=[])
     md.merge_mapping('labels', parse_labels)
     md.merge_mapping('extra_hosts', parse_extra_hosts)
+    md.merge_scalar('extra_cli_build_args')
     return dict(md)
 
 

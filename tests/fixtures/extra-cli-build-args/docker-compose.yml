@@ -1,0 +1,8 @@
+version: "3"
+services:
+  web:
+    build:
+      context: .
+      extra_cli_build_args:
+        - --build-arg
+        - favorite_th_character=mariya.kirisame

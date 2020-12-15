@@ -881,6 +881,12 @@ services:
         result = self.dispatch(['build', '--build-arg', 'favorite_th_character=sakuya.izayoi'], None)
         assert 'Favorite Touhou Character: sakuya.izayoi' in result.stdout
 
+    def test_build_with_buildarg_from_extra_cli_arguments(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/extra-cli-build-args'
+        result = self.dispatch(['build'], None)
+        assert 'Favorite Touhou Character: mariya.kirisame' in result.stdout
+
     @mock.patch.dict(os.environ)
     def test_build_with_buildarg_old_api_version(self):
         pull_busybox(self.client)
