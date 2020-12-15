@@ -111,7 +111,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 		return nil
 	}
 	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, nil, "", nil, project.WorkingDir)
+	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, nil, "", nil, nil, project.WorkingDir)
 	if err != nil {
 		return err
 	}
