@@ -147,8 +147,8 @@ func (e ecsLocalSimulation) enhanceForLocalSimulation(project *types.Project) (*
 	return project, nil
 }
 
-func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
-	return e.compose.Down(ctx, projectName)
+func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+	return e.compose.Down(ctx, projectName, true)
 }
 
 func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options componse.LogOptions) error {

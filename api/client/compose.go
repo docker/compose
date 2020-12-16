@@ -52,7 +52,7 @@ func (c *composeService) Up(context.Context, *types.Project, bool) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Down(context.Context, string) error {
+func (c *composeService) Down(context.Context, string, bool) error {
 	return errdefs.ErrNotImplemented
 }
 

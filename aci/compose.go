@@ -102,14 +102,14 @@ func (cs aciComposeService) warnKeepVolumeOnDown(ctx context.Context, projectNam
 	return nil
 }
 
-func (cs *aciComposeService) Down(ctx context.Context, project string) error {
-	logrus.Debugf("Down on project with name %q", project)
+func (cs *aciComposeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+	logrus.Debugf("Down on projectName with name %q", projectName)
 
-	if err := cs.warnKeepVolumeOnDown(ctx, project); err != nil {
+	if err := cs.warnKeepVolumeOnDown(ctx, projectName); err != nil {
 		return err
 	}
 
-	cg, err := deleteACIContainerGroup(ctx, cs.ctx, project)
+	cg, err := deleteACIContainerGroup(ctx, cs.ctx, projectName)
 	if err != nil {
 		return err
 	}

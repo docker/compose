@@ -52,7 +52,7 @@ func runDown(ctx context.Context, opts composeOptions) error {
 		if err != nil {
 			return "", err
 		}
-		return projectName, c.ComposeService().Down(ctx, projectName)
+		return projectName, c.ComposeService().Down(ctx, projectName, false)
 	})
 	return err
 }

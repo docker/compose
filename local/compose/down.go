@@ -30,7 +30,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Down(ctx context.Context, projectName string) error {
+func (s *composeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 
@@ -39,10 +39,27 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 		return err
 	}
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		filter := filters.NewArgs(projectFilter(project.Name), serviceFilter(service.Name))
-		return s.removeContainers(ctx, w, eg, filter)
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(project.Name)),
+		All:     true,
 	})
+	if err != nil {
+		return err
+	}
+
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		serviceContainers, others := split(containers, isService(service.Name))
+		err := s.removeContainers(ctx, w, eg, serviceContainers)
+		containers = others
+		return err
+	})
+
+	if removeOrphans {
+		err := s.removeContainers(ctx, w, eg, containers)
+		if err != nil {
+			return err
+		}
+	}
 
 	if err != nil {
 		return err
@@ -70,14 +87,7 @@ func (s *composeService) Down(ctx context.Context, projectName string) error {
 	return eg.Wait()
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, filter filters.Args) error {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filter,
-		All:     true,
-	})
-	if err != nil {
-		return err
-	}
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, containers []moby.Container) error {
 	for _, container := range containers {
 		eg.Go(func() error {
 			eventName := "Container " + getContainerName(container)
@@ -146,4 +156,26 @@ func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error)
 		cli.WithOsEnv,
 		cli.WithWorkingDirectory(c.Labels[workingDirLabel]),
 		cli.WithName(c.Labels[projectLabel]))
+}
+
+type containerPredicate func(c moby.Container) bool
+
+func isService(service string) containerPredicate {
+	return func(c moby.Container) bool {
+		return c.Labels[serviceLabel] == service
+	}
+}
+
+// split return a container slice with elements to match predicate
+func split(containers []moby.Container, predicate containerPredicate) ([]moby.Container, []moby.Container) {
+	var right []moby.Container
+	var left []moby.Container
+	for _, c := range containers {
+		if predicate(c) {
+			right = append(right, c)
+		} else {
+			left = append(left, c)
+		}
+	}
+	return right, left
 }

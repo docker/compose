@@ -90,7 +90,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 	go func() {
 		<-signalChan
 		fmt.Println("user interrupted deployment. Deleting stack...")
-		b.Down(ctx, project.Name) // nolint:errcheck
+		b.Down(ctx, project.Name, false) // nolint:errcheck
 	}()
 
 	err = b.WaitStackCompletion(ctx, project.Name, operation)

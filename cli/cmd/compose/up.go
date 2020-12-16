@@ -96,7 +96,7 @@ func runCreateStart(ctx context.Context, opts composeOptions, services []string)
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Down(ctx, project.Name)
+			return "", c.ComposeService().Down(ctx, project.Name, false)
 		})
 	}
 	return err

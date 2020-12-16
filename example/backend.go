@@ -164,8 +164,8 @@ func (cs *composeService) Up(ctx context.Context, project *types.Project, detach
 	return nil
 }
 
-func (cs *composeService) Down(ctx context.Context, project string) error {
-	fmt.Printf("Down command on project %q", project)
+func (cs *composeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+	fmt.Printf("Down command on project %q", projectName)
 	return nil
 }
 

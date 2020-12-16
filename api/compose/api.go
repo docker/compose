@@ -37,7 +37,7 @@ type Service interface {
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, detach bool) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, projectName string) error
+	Down(ctx context.Context, projectName string, removeOrphans bool) error
 	// Logs executes the equivalent to a `compose logs`
 	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	// Ps executes the equivalent to a `compose ps`

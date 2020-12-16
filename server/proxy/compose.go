@@ -42,7 +42,7 @@ func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest)
 		}
 		projectName = project.Name
 	}
-	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName)
+	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName, false)
 }
 
 func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServicesRequest) (*composev1.ComposeServicesResponse, error) {
