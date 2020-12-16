@@ -48,7 +48,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 		return err
 	}
 
-	if err := s.ensureProjectNetworks(ctx, project); err != nil {
+	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return err
 	}
 

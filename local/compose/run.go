@@ -30,31 +30,36 @@ import (
 )
 
 func (s *composeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
-	service, err := project.GetService(opts.Name)
+	originalServices := project.Services
+	dependencies := []types.ServiceConfig{}
+	var requestedService types.ServiceConfig
+	for _, service := range originalServices {
+		if service.Name != opts.Name {
+			dependencies = append(dependencies, service)
+		} else {
+			requestedService = service
+		}
+	}
+	project.Services = types.Services(dependencies)
+	if err := s.Create(ctx, project); err != nil {
+		return "", err
+	}
+	if err := s.Start(ctx, project, nil); err != nil {
+		return "", err
+	}
+
+	project.Services = originalServices
+	updateOneOffServiceConfig(&requestedService, project.Name, opts)
+
+	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
+		return "", err
+	}
+	err := s.createContainer(ctx, project, requestedService, requestedService.ContainerName, 1)
 	if err != nil {
 		return "", err
 	}
-	if err = s.ensureImagesExists(ctx, project); err != nil {
-		return "", err
-	}
-	if err := s.ensureProjectNetworks(ctx, project); err != nil {
-		return "", err
-	}
-	if err := s.ensureProjectVolumes(ctx, project); err != nil {
-		return "", err
-	}
-	if err = s.ensureRequiredServices(ctx, project, service); err != nil {
-		return "", err
-	}
 
-	updateOneOffServiceConfig(&service, project.Name, opts)
-
-	err = s.createContainer(ctx, project, service, service.ContainerName, 1)
-	if err != nil {
-		return "", err
-	}
-
-	return service.ContainerName, err
+	return requestedService.ContainerName, err
 }
 
 func (s *composeService) Run(ctx context.Context, container string, detach bool) error {
@@ -125,17 +130,4 @@ func updateOneOffServiceConfig(service *types.ServiceConfig, projectName string,
 	}
 	service.Tty = true
 	service.StdinOpen = true
-}
-
-func (s *composeService) ensureRequiredServices(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	err := InDependencyOrder(ctx, project, func(c context.Context, svc types.ServiceConfig) error {
-		if svc.Name != service.Name { // only start dependencies, not service to run one-off
-			return s.ensureService(c, project, svc)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return s.Start(ctx, project, nil)
 }
