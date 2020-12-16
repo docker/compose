@@ -543,6 +543,23 @@ services:
 	assert.Equal(t, template.Metadata["Cluster"], "arn:aws:ecs:region:account:cluster/name")
 }
 
+func TestARNUsedAsVpcID(t *testing.T) {
+	convertYaml(t, `
+x-aws-vpc: "arn:aws:ec2:us-west-1:EXAMPLE:vpc/vpc-1234acbd"
+services:
+  test:
+    image: nginx
+`, func(m *MockAPIMockRecorder) {
+		m.CheckVPC(gomock.Any(), "vpc-1234acbd").Return(nil)
+		m.GetSubNets(gomock.Any(), "vpc-1234acbd").Return([]awsResource{
+			existingAWSResource{id: "subnet1"},
+			existingAWSResource{id: "subnet2"},
+		}, nil)
+		m.IsPublicSubnet(gomock.Any(), "subnet1").Return(true, nil)
+		m.IsPublicSubnet(gomock.Any(), "subnet2").Return(true, nil)
+	})
+}
+
 func convertYaml(t *testing.T, yaml string, fn ...func(m *MockAPIMockRecorder)) *cloudformation.Template {
 	project := loadConfig(t, yaml)
 	ctrl := gomock.NewController(t)
