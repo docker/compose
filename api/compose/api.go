@@ -39,7 +39,7 @@ type Service interface {
 	// Down executes the equivalent to a `compose down`
 	Down(ctx context.Context, projectName string) error
 	// Logs executes the equivalent to a `compose logs`
-	Logs(ctx context.Context, projectName string, consumer LogConsumer) error
+	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
@@ -74,6 +74,11 @@ type ServiceStatus struct {
 	Desired    int
 	Ports      []string
 	Publishers []PortPublisher
+}
+
+// LogOptions defines optional parameters for the `Log` API
+type LogOptions struct {
+	Services []string
 }
 
 const (

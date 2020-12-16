@@ -180,7 +180,7 @@ services:
 	return cmd.Run()
 }
 
-func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
+func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	list, err := e.moby.ContainerList(ctx, types2.ContainerListOptions{
 		Filters: filters.NewArgs(filters.Arg("label", "com.docker.compose.project="+projectName)),
 	})

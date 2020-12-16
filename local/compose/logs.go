@@ -29,18 +29,31 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
+func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	list, err := s.apiClient.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
 	})
+
+	ignore := func(string) bool {
+		return false
+	}
+	if len(options.Services) > 0 {
+		ignore = func(s string) bool {
+			return !contains(options.Services, s)
+		}
+	}
+
 	if err != nil {
 		return err
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		service := c.Labels[serviceLabel]
+		if ignore(service) {
+			continue
+		}
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return err
