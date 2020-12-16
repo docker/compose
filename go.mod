@@ -20,10 +20,10 @@ require (
 	github.com/containerd/console v1.0.1
 	github.com/containerd/containerd v1.4.3
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
-	github.com/docker/buildx v0.5.0-rc1
-	github.com/docker/cli v20.10.0+incompatible
+	github.com/docker/buildx v0.5.1
+	github.com/docker/cli v20.10.1+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v20.10.0+incompatible
+	github.com/docker/docker v20.10.1+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
