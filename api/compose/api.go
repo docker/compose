@@ -70,9 +70,10 @@ type ConvertOptions struct {
 
 // RunOptions holds all flags for compose run
 type RunOptions struct {
-	Name    string
-	Command []string
-	Detach  bool
+	Name       string
+	Command    []string
+	Detach     bool
+	AutoRemove bool
 }
 
 // PortPublisher hold status about published port

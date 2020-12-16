@@ -23,7 +23,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/utils"
 	apitypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"golang.org/x/sync/errgroup"
@@ -56,8 +55,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
 		return "", err
 	}
-	err := s.createContainer(ctx, project, requestedService, requestedService.ContainerName, 1)
-	if err != nil {
+	if err := s.createContainer(ctx, project, requestedService, requestedService.ContainerName, 1, opts.AutoRemove); err != nil {
 		return "", err
 	}
 
@@ -69,19 +67,14 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
 		Filters: filters.NewArgs(
-			projectFilter(project.Name),
+			filters.Arg("label", fmt.Sprintf("%s=%s", slugLabel, slug)),
 		),
 		All: true,
 	})
 	if err != nil {
 		return "", err
 	}
-	var oneoffContainer apitypes.Container
-	for _, container := range containers {
-		if utils.StringContains(container.Names, "/"+containerID) {
-			oneoffContainer = container
-		}
-	}
+	oneoffContainer := containers[0]
 	eg := errgroup.Group{}
 	eg.Go(func() error {
 		return s.attachContainerStreams(ctx, oneoffContainer, true, os.Stdin, os.Stdout)
@@ -90,8 +83,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return "", err
 	}
 
-	err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
-	if err != nil {
+	if err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{}); err != nil {
 		return "", err
 	}
 	err = eg.Wait()

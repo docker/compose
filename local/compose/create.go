@@ -91,7 +91,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
-func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container, autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 	hash, err := jsonHash(s)
 	if err != nil {
 		return nil, nil, nil, err
@@ -167,6 +167,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 
 	networkMode := getNetworkMode(p, s)
 	hostConfig := container.HostConfig{
+		AutoRemove:     autoRemove,
 		Mounts:         mountOptions,
 		CapAdd:         strslice.StrSlice(s.CapAdd),
 		CapDrop:        strslice.StrSlice(s.CapDrop),

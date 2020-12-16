@@ -62,7 +62,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 			number := next + i
 			name := fmt.Sprintf("%s_%s_%d", project.Name, service.Name, number)
 			eg.Go(func() error {
-				return s.createContainer(ctx, project, service, name, number)
+				return s.createContainer(ctx, project, service, name, number, false)
 			})
 		}
 	}
@@ -163,10 +163,10 @@ func getScale(config types.ServiceConfig) int {
 	return 1
 }
 
-func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int) error {
+func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(name))
-	err := s.runContainer(ctx, project, service, name, number, nil)
+	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	err = s.runContainer(ctx, project, service, name, number, &container)
+	err = s.createMobyContainer(ctx, project, service, name, number, &container, false)
 	if err != nil {
 		return err
 	}
@@ -228,8 +228,8 @@ func (s *composeService) restartContainer(ctx context.Context, container moby.Co
 	return nil
 }
 
-func (s *composeService) runContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container) error {
-	containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service, number, container)
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container, autoRemove bool) error {
+	containerConfig, hostConfig, networkingConfig, err := getContainerCreateOptions(project, service, number, container, autoRemove)
 	if err != nil {
 		return err
 	}

@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/progress"
 )
 
@@ -73,15 +72,15 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
-	dependencies := []types.ServiceConfig{}
 	originalServices := project.Services
-	containerID, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+		dependencies := types.Services{}
 		for _, service := range originalServices {
 			if service.Name != opts.Name {
 				dependencies = append(dependencies, service)
 			}
 		}
-		project.Services = types.Services(dependencies)
+		project.Services = dependencies
 		if err := c.ComposeService().Create(ctx, project); err != nil {
 			return "", err
 		}
@@ -96,18 +95,13 @@ func runRun(ctx context.Context, opts runOptions) error {
 
 	project.Services = originalServices
 	// start container and attach to container streams
-	containerID, err = c.ComposeService().RunOneOffContainer(ctx, project, compose.RunOptions{Name: opts.Name, Command: opts.Command, Detach: opts.Detach})
+	runOpts := compose.RunOptions{Name: opts.Name, Command: opts.Command, Detach: opts.Detach, AutoRemove: opts.Remove}
+	containerID, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
 	if err != nil {
 		return err
 	}
 	if opts.Detach {
 		fmt.Printf("%s", containerID)
-		return nil
-	}
-	if opts.Remove {
-		return c.ContainerService().Delete(ctx, containerID, containers.DeleteRequest{
-			Force: true,
-		})
 	}
 	return nil
 }
