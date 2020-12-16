@@ -3,6 +3,7 @@ from threading import Lock
 
 from docker.errors import APIError
 
+from compose.cli.colors import AnsiMode
 from compose.parallel import GlobalLimit
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
@@ -156,7 +157,7 @@ def test_parallel_execute_alignment(capsys):
 
 def test_parallel_execute_ansi(capsys):
     ParallelStreamWriter.instance = None
-    ParallelStreamWriter.set_noansi(value=False)
+    ParallelStreamWriter.set_default_ansi_mode(AnsiMode.ALWAYS)
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,
@@ -172,7 +173,7 @@ def test_parallel_execute_ansi(capsys):
 
 def test_parallel_execute_noansi(capsys):
     ParallelStreamWriter.instance = None
-    ParallelStreamWriter.set_noansi()
+    ParallelStreamWriter.set_default_ansi_mode(AnsiMode.NEVER)
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,

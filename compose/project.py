@@ -789,7 +789,9 @@ class Project:
                 return
 
             try:
-                writer = parallel.get_stream_writer()
+                writer = parallel.ParallelStreamWriter.get_instance()
+                if writer is None:
+                    raise RuntimeError('ParallelStreamWriter has not yet been instantiated')
                 for event in strm:
                     if 'status' not in event:
                         continue
