@@ -62,7 +62,6 @@ if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
 
 log = logging.getLogger(__name__)
-console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():  # noqa: C901
@@ -139,7 +138,9 @@ def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1)
 
 
 def dispatch():
-    setup_logging()
+    console_stream = sys.stderr
+    console_handler = logging.StreamHandler(console_stream)
+    setup_logging(console_handler)
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
         {'options_first': True, 'version': get_version_info('compose')})
@@ -172,7 +173,7 @@ def perform_command(options, handler, command_options):
         handler(command, command_options)
 
 
-def setup_logging():
+def setup_logging(console_handler):
     root_logger = logging.getLogger()
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.DEBUG)
