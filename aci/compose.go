@@ -64,7 +64,7 @@ func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, 
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 
 	if err := autocreateFileshares(ctx, project); err != nil {
@@ -102,7 +102,7 @@ func (cs aciComposeService) warnKeepVolumeOnDown(ctx context.Context, projectNam
 	return nil
 }
 
-func (cs *aciComposeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+func (cs *aciComposeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	logrus.Debugf("Down on projectName with name %q", projectName)
 
 	if err := cs.warnKeepVolumeOnDown(ctx, projectName); err != nil {
@@ -198,6 +198,6 @@ func (cs *aciComposeService) Logs(ctx context.Context, projectName string, consu
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

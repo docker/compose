@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -52,7 +54,9 @@ func runDown(ctx context.Context, opts composeOptions) error {
 		if err != nil {
 			return "", err
 		}
-		return projectName, c.ComposeService().Down(ctx, projectName, false)
+		return projectName, c.ComposeService().Down(ctx, projectName, compose.DownOptions{
+			RemoveOrphans: false,
+		})
 	})
 	return err
 }

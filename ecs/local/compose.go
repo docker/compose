@@ -55,11 +55,11 @@ func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, c
 	return e.compose.Start(ctx, project, consumer)
 }
 
-func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	enhanced, err := e.enhanceForLocalSimulation(project)
 	if err != nil {
 		return nil, err
@@ -73,13 +73,13 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project,
 		"secrets":  enhanced.Secrets,
 		"configs":  enhanced.Configs,
 	}
-	switch format {
+	switch options.Format {
 	case "json":
 		return json.MarshalIndent(config, "", "  ")
 	case "yaml":
 		return yaml.Marshal(config)
 	default:
-		return nil, fmt.Errorf("unsupported format %q", format)
+		return nil, fmt.Errorf("unsupported format %q", options)
 	}
 
 }
@@ -147,11 +147,12 @@ func (e ecsLocalSimulation) enhanceForLocalSimulation(project *types.Project) (*
 	return project, nil
 }
 
-func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, removeOrphans bool) error {
-	return e.compose.Down(ctx, projectName, true)
+func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+	options.RemoveOrphans = true
+	return e.compose.Down(ctx, projectName, options)
 }
 
-func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options componse.LogOptions) error {
+func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	return e.compose.Logs(ctx, projectName, consumer, options)
 }
 

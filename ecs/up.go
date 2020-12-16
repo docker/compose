@@ -49,14 +49,14 @@ func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consu
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 
 	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
 	}
 
-	template, err := b.Convert(ctx, project, "yaml")
+	template, err := b.Convert(ctx, project, compose.ConvertOptions{Format: "yaml"})
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 			return err
 		}
 	}
-	if detach {
+	if options.Detach {
 		return nil
 	}
 	signalChan := make(chan os.Signal, 1)
@@ -90,7 +90,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, detach b
 	go func() {
 		<-signalChan
 		fmt.Println("user interrupted deployment. Deleting stack...")
-		b.Down(ctx, project.Name, false) // nolint:errcheck
+		b.Down(ctx, project.Name, compose.DownOptions{}) // nolint:errcheck
 	}()
 
 	err = b.WaitStackCompletion(ctx, project.Name, operation)

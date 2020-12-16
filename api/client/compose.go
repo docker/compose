@@ -48,11 +48,11 @@ func (c *composeService) Start(ctx context.Context, project *types.Project, cons
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Up(context.Context, *types.Project, bool) error {
+func (c *composeService) Up(context.Context, *types.Project, compose.UpOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Down(context.Context, string, bool) error {
+func (c *composeService) Down(context.Context, string, compose.DownOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
@@ -68,6 +68,6 @@ func (c *composeService) List(context.Context, string) ([]compose.Stack, error) 
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Convert(context.Context, *types.Project, string) ([]byte, error) {
+func (c *composeService) Convert(context.Context, *types.Project, compose.ConvertOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }

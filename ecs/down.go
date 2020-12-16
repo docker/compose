@@ -19,10 +19,12 @@ package ecs
 import (
 	"context"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/docker/compose-cli/progress"
 )
 
-func (b *ecsAPIService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+func (b *ecsAPIService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	resources, err := b.aws.ListStackResources(ctx, projectName)
 	if err != nil {
 		return err

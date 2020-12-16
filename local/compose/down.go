@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/docker/compose-cli/progress"
 
 	"github.com/compose-spec/compose-go/cli"
@@ -30,7 +32,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 
@@ -54,7 +56,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, removeOrp
 		return err
 	})
 
-	if removeOrphans {
+	if options.RemoveOrphans {
 		err := s.removeContainers(ctx, w, eg, containers)
 		if err != nil {
 			return err

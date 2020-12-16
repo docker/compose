@@ -158,13 +158,13 @@ func (cs *composeService) Start(ctx context.Context, project *types.Project, con
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (cs *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 
 	fmt.Printf("Up command on project %q", project.Name)
 	return nil
 }
 
-func (cs *composeService) Down(ctx context.Context, projectName string, removeOrphans bool) error {
+func (cs *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	fmt.Printf("Down command on project %q", projectName)
 	return nil
 }
@@ -179,6 +179,6 @@ func (cs *composeService) Logs(ctx context.Context, projectName string, consumer
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (cs *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
