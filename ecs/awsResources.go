@@ -25,6 +25,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
 
+	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/ec2"
@@ -168,7 +169,15 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
 		vpc = x.(string)
-		err := b.aws.CheckVPC(ctx, vpc)
+		ARN, err := arn.Parse(vpc)
+		if err == nil {
+			// User has set an ARN, like the one Terraform shows as output, while we expect an ID
+			id := ARN.Resource
+			i := strings.LastIndex(id, "/")
+			vpc = id[i+1:]
+		}
+
+		err = b.aws.CheckVPC(ctx, vpc)
 		if err != nil {
 			return "", nil, err
 		}
