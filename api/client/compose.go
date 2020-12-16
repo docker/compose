@@ -72,10 +72,6 @@ func (c *composeService) Convert(context.Context, *types.Project, compose.Conver
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (c *composeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+func (c *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
 	return "", errdefs.ErrNotImplemented
-}
-
-func (c *composeService) Run(ctx context.Context, container string, detach bool) error {
-	return errdefs.ErrNotImplemented
 }

@@ -163,9 +163,6 @@ func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compo
 func (e ecsLocalSimulation) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
 	return e.compose.List(ctx, projectName)
 }
-func (e ecsLocalSimulation) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+func (e ecsLocalSimulation) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
 	return "", errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose run")
-}
-func (e ecsLocalSimulation) Run(ctx context.Context, container string, detach bool) error {
-	return errdefs.ErrNotImplemented
 }

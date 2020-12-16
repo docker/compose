@@ -24,10 +24,6 @@ import (
 	"github.com/docker/compose-cli/errdefs"
 )
 
-func (b *ecsAPIService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+func (b *ecsAPIService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
 	return "", errdefs.ErrNotImplemented
-}
-
-func (b *ecsAPIService) Run(ctx context.Context, container string, detach bool) error {
-	return errdefs.ErrNotImplemented
 }

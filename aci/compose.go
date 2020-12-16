@@ -202,9 +202,6 @@ func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
 	return "", errdefs.ErrNotImplemented
-}
-func (cs *aciComposeService) Run(ctx context.Context, container string, detach bool) error {
-	return errdefs.ErrNotImplemented
 }

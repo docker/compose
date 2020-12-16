@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -72,17 +73,30 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
+	dependencies := []types.ServiceConfig{}
+	originalServices := project.Services
 	containerID, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return c.ComposeService().CreateOneOffContainer(ctx, project, compose.RunOptions{
-			Name:    opts.Name,
-			Command: opts.Command,
-		})
+		for _, service := range originalServices {
+			if service.Name != opts.Name {
+				dependencies = append(dependencies, service)
+			}
+		}
+		project.Services = types.Services(dependencies)
+		if err := c.ComposeService().Create(ctx, project); err != nil {
+			return "", err
+		}
+		if err := c.ComposeService().Start(ctx, project, nil); err != nil {
+			return "", err
+		}
+		return "", nil
 	})
 	if err != nil {
 		return err
 	}
+
+	project.Services = originalServices
 	// start container and attach to container streams
-	err = c.ComposeService().Run(ctx, containerID, opts.Detach)
+	containerID, err = c.ComposeService().RunOneOffContainer(ctx, project, compose.RunOptions{Name: opts.Name, Command: opts.Command, Detach: opts.Detach})
 	if err != nil {
 		return err
 	}

@@ -29,27 +29,27 @@ import (
 	moby "github.com/docker/docker/pkg/stringid"
 )
 
-func (s *composeService) CreateOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
+func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
 	originalServices := project.Services
-	dependencies := []types.ServiceConfig{}
 	var requestedService types.ServiceConfig
 	for _, service := range originalServices {
-		if service.Name != opts.Name {
-			dependencies = append(dependencies, service)
-		} else {
+		if service.Name == opts.Name {
 			requestedService = service
 		}
 	}
-	project.Services = types.Services(dependencies)
-	if err := s.Create(ctx, project); err != nil {
-		return "", err
-	}
-	if err := s.Start(ctx, project, nil); err != nil {
-		return "", err
-	}
 
 	project.Services = originalServices
-	updateOneOffServiceConfig(&requestedService, project.Name, opts)
+	if len(opts.Command) > 0 {
+		requestedService.Command = opts.Command
+	}
+	requestedService.Scale = 1
+	requestedService.Tty = true
+	requestedService.StdinOpen = true
+
+	slug := moby.GenerateRandomID()
+	requestedService.ContainerName = fmt.Sprintf("%s_%s_run_%s", project.Name, requestedService.Name, moby.TruncateID(slug))
+	requestedService.Labels = requestedService.Labels.Add(slugLabel, slug)
+	requestedService.Labels = requestedService.Labels.Add(oneoffLabel, "True")
 
 	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
 		return "", err
@@ -59,15 +59,13 @@ func (s *composeService) CreateOneOffContainer(ctx context.Context, project *typ
 		return "", err
 	}
 
-	return requestedService.ContainerName, err
-}
+	containerID := requestedService.ContainerName
 
-func (s *composeService) Run(ctx context.Context, container string, detach bool) error {
-	if detach {
-		return s.apiClient.ContainerStart(ctx, container, apitypes.ContainerStartOptions{})
+	if opts.Detach {
+		return containerID, s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
 	}
 
-	cnx, err := s.apiClient.ContainerAttach(ctx, container, apitypes.ContainerAttachOptions{
+	cnx, err := s.apiClient.ContainerAttach(ctx, containerID, apitypes.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  true,
 		Stdout: true,
@@ -75,7 +73,7 @@ func (s *composeService) Run(ctx context.Context, container string, detach bool)
 		Logs:   true,
 	})
 	if err != nil {
-		return err
+		return containerID, err
 	}
 	defer cnx.Close()
 
@@ -102,32 +100,17 @@ func (s *composeService) Run(ctx context.Context, container string, detach bool)
 	}()
 
 	// start container
-	err = s.apiClient.ContainerStart(ctx, container, apitypes.ContainerStartOptions{})
+	err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
 	if err != nil {
-		return err
+		return containerID, err
 	}
 
 	for {
 		select {
 		case err := <-readChannel:
-			return err
+			return containerID, err
 		case err := <-writeChannel:
-			return err
+			return containerID, err
 		}
 	}
-}
-
-func updateOneOffServiceConfig(service *types.ServiceConfig, projectName string, opts compose.RunOptions) {
-	if len(opts.Command) > 0 {
-		service.Command = opts.Command
-	}
-	slug := moby.GenerateRandomID()
-	service.Scale = 1
-	service.ContainerName = fmt.Sprintf("%s_%s_run_%s", projectName, service.Name, moby.TruncateID(slug))
-	service.Labels = types.Labels{
-		slugLabel:   slug,
-		oneoffLabel: "True",
-	}
-	service.Tty = true
-	service.StdinOpen = true
 }
