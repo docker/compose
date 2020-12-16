@@ -18,11 +18,12 @@ package compose
 
 import (
 	"context"
-	"fmt"
+	"os"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/progress"
 )
@@ -74,20 +75,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 
 	originalServices := project.Services
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		dependencies := types.Services{}
-		for _, service := range originalServices {
-			if service.Name != opts.Name {
-				dependencies = append(dependencies, service)
-			}
-		}
-		project.Services = dependencies
-		if err := c.ComposeService().Create(ctx, project); err != nil {
-			return "", err
-		}
-		if err := c.ComposeService().Start(ctx, project, nil); err != nil {
-			return "", err
-		}
-		return "", nil
+		return "", startDependencies(ctx, c, project, opts.Name)
 	})
 	if err != nil {
 		return err
@@ -95,13 +83,32 @@ func runRun(ctx context.Context, opts runOptions) error {
 
 	project.Services = originalServices
 	// start container and attach to container streams
-	runOpts := compose.RunOptions{Name: opts.Name, Command: opts.Command, Detach: opts.Detach, AutoRemove: opts.Remove}
-	containerID, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
-	if err != nil {
+	runOpts := compose.RunOptions{
+		Name:       opts.Name,
+		Command:    opts.Command,
+		Detach:     opts.Detach,
+		AutoRemove: opts.Remove,
+		Writer:     os.Stdout,
+		Reader:     os.Stdin,
+	}
+	return c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
+}
+
+func startDependencies(ctx context.Context, c *client.Client, project *types.Project, requestedService string) error {
+	originalServices := project.Services
+	dependencies := types.Services{}
+	for _, service := range originalServices {
+		if service.Name != requestedService {
+			dependencies = append(dependencies, service)
+		}
+	}
+	project.Services = dependencies
+	if err := c.ComposeService().Create(ctx, project); err != nil {
 		return err
 	}
-	if opts.Detach {
-		fmt.Printf("%s", containerID)
+	if err := c.ComposeService().Start(ctx, project, nil); err != nil {
+		return err
 	}
 	return nil
+
 }

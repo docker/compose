@@ -202,6 +202,6 @@ func (cs *aciComposeService) Convert(ctx context.Context, project *types.Project
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (string, error) {
-	return "", errdefs.ErrNotImplemented
+func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+	return errdefs.ErrNotImplemented
 }
