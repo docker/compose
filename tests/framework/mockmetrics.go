@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo"
 )
@@ -78,7 +77,4 @@ func (s *MockMetricsServer) Start() {
 		s.e.POST("/usage", s.handlePostUsage)
 		_ = s.e.Start(":1323")
 	}()
-
-	// wait a bit for the mock metrics server to actually listen
-	time.Sleep(500 * time.Millisecond)
 }

@@ -144,6 +144,18 @@ func TestContextMetrics(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
+	started := false
+	for i := 0; i < 30; i++ {
+		c.RunDockerCmd("help", "ps")
+		if len(s.GetUsage()) > 0 {
+			started = true
+			fmt.Printf("	[%s] Server up in %d ms\n", t.Name(), i*100)
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	assert.Assert(t, started, "Metrics mock server not available after 3 secs")
+
 	t.Run("send metrics on help commands", func(t *testing.T) {
 		s.ResetUsage()
 
