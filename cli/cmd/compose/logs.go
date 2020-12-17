@@ -21,18 +21,18 @@ import (
 	"os"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
-
 	"github.com/spf13/cobra"
 )
 
 func logsCommand() *cobra.Command {
 	opts := composeOptions{}
 	logsCmd := &cobra.Command{
-		Use:   "logs",
+		Use:   "logs [service...]",
 		Short: "View output from containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLogs(cmd.Context(), opts)
+			return runLogs(cmd.Context(), opts, args)
 		},
 	}
 	logsCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
@@ -42,7 +42,7 @@ func logsCommand() *cobra.Command {
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, opts composeOptions) error {
+func runLogs(ctx context.Context, opts composeOptions, services []string) error {
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
@@ -53,5 +53,7 @@ func runLogs(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
-	return c.ComposeService().Logs(ctx, projectName, consumer)
+	return c.ComposeService().Logs(ctx, projectName, consumer, compose.LogOptions{
+		Services: services,
+	})
 }

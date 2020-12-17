@@ -56,7 +56,7 @@ func (c *composeService) Down(context.Context, string) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Logs(context.Context, string, compose.LogConsumer) error {
+func (c *composeService) Logs(context.Context, string, compose.LogConsumer, compose.LogOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

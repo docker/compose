@@ -175,7 +175,7 @@ func (cs *composeService) Ps(ctx context.Context, projectName string) ([]compose
 func (cs *composeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
 	return nil, errdefs.ErrNotImplemented
 }
-func (cs *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
+func (cs *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

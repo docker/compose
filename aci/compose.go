@@ -194,7 +194,7 @@ func (cs *aciComposeService) List(ctx context.Context, project string) ([]compos
 	return stacks, nil
 }
 
-func (cs *aciComposeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer) error {
+func (cs *aciComposeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
