@@ -35,9 +35,9 @@ type Service interface {
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
 	// Up executes the equivalent to a `compose up`
-	Up(ctx context.Context, project *types.Project, detach bool) error
+	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, projectName string) error
+	Down(ctx context.Context, projectName string, options DownOptions) error
 	// Logs executes the equivalent to a `compose logs`
 	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	// Ps executes the equivalent to a `compose ps`
@@ -45,7 +45,25 @@ type Service interface {
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, projectName string) ([]Stack, error)
 	// Convert translate compose model into backend's native format
-	Convert(ctx context.Context, project *types.Project, format string) ([]byte, error)
+	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+}
+
+// UpOptions group options of the Up API
+type UpOptions struct {
+	// Detach will create services and return immediately
+	Detach bool
+}
+
+// DownOptions group options of the Down API
+type DownOptions struct {
+	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
+	RemoveOrphans bool
+}
+
+// ConvertOptions group options of the Convert API
+type ConvertOptions struct {
+	// Format define the output format used to dump converted application model (json|yaml)
+	Format string
 }
 
 // PortPublisher hold status about published port

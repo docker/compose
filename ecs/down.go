@@ -19,11 +19,13 @@ package ecs
 import (
 	"context"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/docker/compose-cli/progress"
 )
 
-func (b *ecsAPIService) Down(ctx context.Context, project string) error {
-	resources, err := b.aws.ListStackResources(ctx, project)
+func (b *ecsAPIService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+	resources, err := b.aws.ListStackResources(ctx, projectName)
 	if err != nil {
 		return err
 	}
@@ -38,16 +40,16 @@ func (b *ecsAPIService) Down(ctx context.Context, project string) error {
 		return err
 	}
 
-	previousEvents, err := b.previousStackEvents(ctx, project)
+	previousEvents, err := b.previousStackEvents(ctx, projectName)
 	if err != nil {
 		return err
 	}
 
-	err = b.aws.DeleteStack(ctx, project)
+	err = b.aws.DeleteStack(ctx, projectName)
 	if err != nil {
 		return err
 	}
-	return b.WaitStackCompletion(ctx, project, stackDelete, previousEvents...)
+	return b.WaitStackCompletion(ctx, projectName, stackDelete, previousEvents...)
 }
 
 func (b *ecsAPIService) previousStackEvents(ctx context.Context, project string) ([]string, error) {

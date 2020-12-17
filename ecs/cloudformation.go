@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
@@ -37,13 +39,13 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	template, err := b.convert(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
-	return marshall(template, format)
+	return marshall(template, options.Format)
 }
 
 func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*cloudformation.Template, error) {

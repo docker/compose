@@ -17,80 +17,76 @@
 package local
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/compose-spec/compose-go/types"
-	types2 "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/pkg/errors"
-	"github.com/sanathkr/go-yaml"
-	"golang.org/x/mod/semver"
-
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
+	"github.com/sanathkr/go-yaml"
 )
 
 func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project) error {
-	return errdefs.ErrNotImplemented
+	return e.compose.Build(ctx, project)
 }
 
 func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project) error {
-	return errdefs.ErrNotImplemented
+	return e.compose.Push(ctx, project)
 }
 
 func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) error {
-	return errdefs.ErrNotImplemented
+	return e.compose.Pull(ctx, project)
 }
 
 func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project) error {
-	return errdefs.ErrNotImplemented
-}
-
-func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
-	return errdefs.ErrNotImplemented
-}
-
-func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, detach bool) error {
-
-	cmd := exec.Command("docker-compose", "version", "--short")
-	b := bytes.Buffer{}
-	b.WriteString("v")
-	cmd.Stdout = bufio.NewWriter(&b)
-	err := cmd.Run()
-	if err != nil {
-		return errors.Wrap(err, "ECS simulation mode require Docker-compose 1.27")
-	}
-	version := semver.MajorMinor(strings.TrimSpace(b.String()))
-	if version == "" {
-		return fmt.Errorf("can't parse docker-compose version: %s", b.String())
-	}
-	if semver.Compare(version, "v1.27") < 0 {
-		return fmt.Errorf("ECS simulation mode require Docker-compose 1.27, found %s", version)
-	}
-
-	converted, err := e.Convert(ctx, project, "json")
+	enhanced, err := e.enhanceForLocalSimulation(project)
 	if err != nil {
 		return err
 	}
 
-	cmd = exec.Command("docker-compose", "--context", "default", "--project-directory", project.WorkingDir, "--project-name", project.Name, "-f", "-", "up")
-	cmd.Stdin = strings.NewReader(string(converted))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return e.compose.Create(ctx, enhanced)
 }
 
-func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
+func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	return e.compose.Start(ctx, project, consumer)
+}
+
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+	enhanced, err := e.enhanceForLocalSimulation(project)
+	if err != nil {
+		return nil, err
+	}
+
+	delete(enhanced.Networks, "default")
+	config := map[string]interface{}{
+		"services": enhanced.Services,
+		"networks": enhanced.Networks,
+		"volumes":  enhanced.Volumes,
+		"secrets":  enhanced.Secrets,
+		"configs":  enhanced.Configs,
+	}
+	switch options.Format {
+	case "json":
+		return json.MarshalIndent(config, "", "  ")
+	case "yaml":
+		return yaml.Marshal(config)
+	default:
+		return nil, fmt.Errorf("unsupported format %q", options)
+	}
+
+}
+
+func (e ecsLocalSimulation) enhanceForLocalSimulation(project *types.Project) (*types.Project, error) {
 	project.Networks["credentials_network"] = types.NetworkConfig{
+		Name:   "credentials_network",
 		Driver: "bridge",
 		Ipam: types.IPAMConfig{
 			Config: []*types.IPAMPool{
@@ -148,68 +144,21 @@ func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project,
 			},
 		},
 	})
-
-	delete(project.Networks, "default")
-	config := map[string]interface{}{
-		"services": project.Services,
-		"networks": project.Networks,
-		"volumes":  project.Volumes,
-		"secrets":  project.Secrets,
-		"configs":  project.Configs,
-	}
-	switch format {
-	case "json":
-		return json.MarshalIndent(config, "", "  ")
-	case "yaml":
-		return yaml.Marshal(config)
-	default:
-		return nil, fmt.Errorf("unsupported format %q", format)
-	}
-
+	return project, nil
 }
 
-func (e ecsLocalSimulation) Down(ctx context.Context, projectName string) error {
-	cmd := exec.Command("docker-compose", "--context", "default", "--project-name", projectName, "-f", "-", "down", "--remove-orphans")
-	cmd.Stdin = strings.NewReader(string(`
-services:
-   ecs-local-endpoints:
-      image: "amazon/amazon-ecs-local-container-endpoints"
-`))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+	options.RemoveOrphans = true
+	return e.compose.Down(ctx, projectName, options)
 }
 
 func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
-	list, err := e.moby.ContainerList(ctx, types2.ContainerListOptions{
-		Filters: filters.NewArgs(filters.Arg("label", "com.docker.compose.project="+projectName)),
-	})
-	if err != nil {
-		return err
-	}
-	services := map[string]types.ServiceConfig{}
-	for _, c := range list {
-		services[c.Labels["com.docker.compose.service"]] = types.ServiceConfig{
-			Image: "unused",
-		}
-	}
-
-	marshal, err := yaml.Marshal(map[string]interface{}{
-		"services": services,
-	})
-	if err != nil {
-		return err
-	}
-	cmd := exec.Command("docker-compose", "--context", "default", "--project-name", projectName, "-f", "-", "logs", "-f")
-	cmd.Stdin = strings.NewReader(string(marshal))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return e.compose.Logs(ctx, projectName, consumer, options)
 }
 
 func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
-	return nil, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose ps")
+	return e.compose.Ps(ctx, projectName)
 }
 func (e ecsLocalSimulation) List(ctx context.Context, projectName string) ([]compose.Stack, error) {
-	return nil, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose ls")
+	return e.compose.List(ctx, projectName)
 }

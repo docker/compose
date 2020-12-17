@@ -40,7 +40,7 @@ func upCommand(contextType string) *cobra.Command {
 		Short: "Create and start containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
-			case store.LocalContextType, store.DefaultContextType:
+			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 				return runCreateStart(cmd.Context(), opts, args)
 			default:
 				return runUp(cmd.Context(), opts, args)
@@ -68,7 +68,9 @@ func runUp(ctx context.Context, opts composeOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Up(ctx, project, opts.Detach)
+		return "", c.ComposeService().Up(ctx, project, compose.UpOptions{
+			Detach: opts.Detach,
+		})
 	})
 	return err
 }
@@ -96,7 +98,7 @@ func runCreateStart(ctx context.Context, opts composeOptions, services []string)
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Down(ctx, project.Name)
+			return "", c.ComposeService().Down(ctx, project.Name, compose.DownOptions{})
 		})
 	}
 	return err

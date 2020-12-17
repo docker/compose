@@ -40,7 +40,7 @@ type composeService struct {
 	apiClient *client.Client
 }
 
-func (s *composeService) Up(ctx context.Context, project *types.Project, detach bool) error {
+func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	return errdefs2.ErrNotImplemented
 }
 
@@ -54,13 +54,13 @@ func getContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
-func (s *composeService) Convert(ctx context.Context, project *types.Project, format string) ([]byte, error) {
-	switch format {
+func (s *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+	switch options.Format {
 	case "json":
 		return json.MarshalIndent(project, "", "  ")
 	case "yaml":
 		return yaml.Marshal(project)
 	default:
-		return nil, fmt.Errorf("unsupported format %q", format)
+		return nil, fmt.Errorf("unsupported format %q", options)
 	}
 }

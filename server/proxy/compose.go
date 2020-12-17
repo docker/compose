@@ -19,6 +19,8 @@ package proxy
 import (
 	"context"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 
@@ -30,7 +32,8 @@ func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*c
 	if err != nil {
 		return nil, err
 	}
-	return &composev1.ComposeUpResponse{ProjectName: project.Name}, Client(ctx).ComposeService().Up(ctx, project, true)
+	err = Client(ctx).ComposeService().Up(ctx, project, compose.UpOptions{Detach: true})
+	return &composev1.ComposeUpResponse{ProjectName: project.Name}, err
 }
 
 func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest) (*composev1.ComposeDownResponse, error) {
@@ -42,7 +45,8 @@ func (p *proxy) Down(ctx context.Context, request *composev1.ComposeDownRequest)
 		}
 		projectName = project.Name
 	}
-	return &composev1.ComposeDownResponse{ProjectName: projectName}, Client(ctx).ComposeService().Down(ctx, projectName)
+	err := Client(ctx).ComposeService().Down(ctx, projectName, compose.DownOptions{})
+	return &composev1.ComposeDownResponse{ProjectName: projectName}, err
 }
 
 func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServicesRequest) (*composev1.ComposeServicesResponse, error) {

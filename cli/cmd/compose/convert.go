@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
@@ -61,7 +63,9 @@ func runConvert(ctx context.Context, opts composeOptions) error {
 		return err
 	}
 
-	json, err = c.ComposeService().Convert(ctx, project, opts.Format)
+	json, err = c.ComposeService().Convert(ctx, project, compose.ConvertOptions{
+		Format: opts.Format,
+	})
 	if err != nil {
 		return err
 	}
