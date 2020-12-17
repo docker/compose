@@ -108,7 +108,8 @@ func TestLocalComposeRun(t *testing.T) {
 
 	t.Run("compose run", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "back")
-		res.Assert(t, icmd.Expected{Out: "Hello there!!"})
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
 	})
 
 	t.Run("check run container exited", func(t *testing.T) {
@@ -142,7 +143,7 @@ func TestLocalComposeRun(t *testing.T) {
 	t.Run("compose run --rm", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "--rm", "back", "/bin/sh", "-c", "echo Hello again")
 		lines := Lines(res.Stdout())
-		assert.Equal(t, lines[len(lines)-1], "Hello again")
+		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 	})
 
 	t.Run("check run container removed", func(t *testing.T) {
@@ -151,7 +152,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "down", "-f", "./fixtures/run-test/docker-compose.yml")
+		c.RunDockerCmd("compose", "down", "-f", "./fixtures/run-test/docker-compose.yml")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
