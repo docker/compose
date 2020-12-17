@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo"
 )
@@ -42,8 +41,7 @@ func NewMetricsServer(socket string) *MockMetricsServer {
 	}
 }
 
-// Handler
-func (s *MockMetricsServer) hello(c echo.Context) error {
+func (s *MockMetricsServer) handlePostUsage(c echo.Context) error {
 	body, error := ioutil.ReadAll(c.Request().Body)
 	if error != nil {
 		return error
@@ -54,10 +52,7 @@ func (s *MockMetricsServer) hello(c echo.Context) error {
 }
 
 // GetUsage get usage
-func (s *MockMetricsServer) GetUsage(expectedCommands int) []string {
-	if len(s.usage) < expectedCommands {
-		time.Sleep(1 * time.Second) // a simple sleep 1s here should be enough, if not there are real issues
-	}
+func (s *MockMetricsServer) GetUsage() []string {
 	return s.usage
 }
 
@@ -79,7 +74,7 @@ func (s *MockMetricsServer) Start() {
 			log.Fatal(err)
 		}
 		s.e.Listener = listener
-		s.e.POST("/usage", s.hello)
+		s.e.POST("/usage", s.handlePostUsage)
 		_ = s.e.Start(":1323")
 	}()
 }

@@ -144,6 +144,18 @@ func TestContextMetrics(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 
+	started := false
+	for i := 0; i < 30; i++ {
+		c.RunDockerCmd("help", "ps")
+		if len(s.GetUsage()) > 0 {
+			started = true
+			fmt.Printf("	[%s] Server up in %d ms\n", t.Name(), i*100)
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	assert.Assert(t, started, "Metrics mock server not available after 3 secs")
+
 	t.Run("send metrics on help commands", func(t *testing.T) {
 		s.ResetUsage()
 
@@ -151,7 +163,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("--help")
 		c.RunDockerCmd("run", "--help")
 
-		usage := s.GetUsage(3)
+		usage := s.GetUsage()
 		assert.DeepEqual(t, []string{
 			`{"command":"help run","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"--help","context":"moby","source":"cli","status":"success"}`,
@@ -166,7 +178,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("version")
 		c.RunDockerOrExitError("version", "--xxx")
 
-		usage := s.GetUsage(3)
+		usage := s.GetUsage()
 		assert.DeepEqual(t, []string{
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"version","context":"moby","source":"cli","status":"success"}`,
@@ -185,7 +197,7 @@ func TestContextMetrics(t *testing.T) {
 		c.RunDockerCmd("context", "use", "default")
 		c.RunDockerCmd("--context", "test-example", "ps")
 
-		usage := s.GetUsage(7)
+		usage := s.GetUsage()
 		assert.DeepEqual(t, []string{
 			`{"command":"context create","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
