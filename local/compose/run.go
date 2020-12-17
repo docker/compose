@@ -51,6 +51,9 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	requestedService.Labels = requestedService.Labels.Add(slugLabel, slug)
 	requestedService.Labels = requestedService.Labels.Add(oneoffLabel, "True")
 
+	if err := s.ensureImagesExists(ctx, project); err != nil { // all dependencies already checked, but might miss requestedService img
+		return err
+	}
 	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
 		return err
 	}
