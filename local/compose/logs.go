@@ -34,6 +34,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
+		All: true,
 	})
 
 	ignore := func(string) bool {
