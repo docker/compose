@@ -44,6 +44,20 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 		return err
 	}
 
+	if err := s.ensureProjectNetworks(ctx, project); err != nil {
+		return err
+	}
+
+	if err := s.ensureProjectVolumes(ctx, project); err != nil {
+		return err
+	}
+
+	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+		return s.ensureService(c, project, service)
+	})
+}
+
+func (s *composeService) ensureProjectNetworks(ctx context.Context, project *types.Project) error {
 	for k, network := range project.Networks {
 		if !network.External.External && network.Name != "" {
 			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
@@ -57,7 +71,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 			return err
 		}
 	}
+	return nil
+}
 
+func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
 	for k, volume := range project.Volumes {
 		if !volume.External.External && volume.Name != "" {
 			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
@@ -71,13 +88,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 			return err
 		}
 	}
-
-	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.ensureService(c, project, service)
-	})
+	return nil
 }
 
-func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container, autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 	hash, err := jsonHash(s)
 	if err != nil {
 		return nil, nil, nil, err
@@ -88,11 +102,12 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 		labels[k] = v
 	}
 
-	// TODO: change oneoffLabel value for containers started with `docker compose run`
 	labels[projectLabel] = p.Name
 	labels[serviceLabel] = s.Name
 	labels[versionLabel] = ComposeVersion
-	labels[oneoffLabel] = "False"
+	if _, ok := s.Labels[oneoffLabel]; !ok {
+		labels[oneoffLabel] = "False"
+	}
 	labels[configHashLabel] = hash
 	labels[workingDirLabel] = p.WorkingDir
 	labels[configFilesLabel] = strings.Join(p.ComposeFiles, ",")
@@ -152,6 +167,7 @@ func getContainerCreateOptions(p *types.Project, s types.ServiceConfig, number i
 
 	networkMode := getNetworkMode(p, s)
 	hostConfig := container.HostConfig{
+		AutoRemove:     autoRemove,
 		Mounts:         mountOptions,
 		CapAdd:         strslice.StrSlice(s.CapAdd),
 		CapDrop:        strslice.StrSlice(s.CapDrop),

@@ -182,3 +182,6 @@ func (cs *composeService) Logs(ctx context.Context, projectName string, consumer
 func (cs *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	return nil, errdefs.ErrNotImplemented
 }
+func (cs *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+	return errdefs.ErrNotImplemented
+}

@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  back:
+    image: alpine
+    command: echo "Hello there!!"
+    depends_on:
+      - db
+    networks:
+      - backnet
+  db:
+    image: nginx
+    networks:
+      - backnet
+    volumes:
+      - data:/test
+  front:
+    image: nginx
+    networks:
+      - frontnet
+networks:
+  frontnet:
+  backnet:
+volumes:
+  data:

@@ -103,6 +103,61 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 }
 
+func TestLocalComposeRun(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("compose run", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "back")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
+	})
+
+	t.Run("check run container exited", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", "--all")
+		lines := Lines(res.Stdout())
+		var runContainerID string
+		var truncatedSlug string
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			containerID := fields[len(fields)-1]
+			assert.Assert(t, !strings.HasPrefix(containerID, "run-test_front"))
+			if strings.HasPrefix(containerID, "run-test_back") {
+				//only the one-off container for back service
+				assert.Assert(t, strings.HasPrefix(containerID, "run-test_back_run_"), containerID)
+				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
+				runContainerID = containerID
+				assert.Assert(t, strings.Contains(line, "Exited"), line)
+			}
+			if strings.HasPrefix(containerID, "run-test_db_1") {
+				assert.Assert(t, strings.Contains(line, "Up"), line)
+			}
+		}
+		assert.Assert(t, runContainerID != "")
+		res = c.RunDockerCmd("inspect", runContainerID)
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "run-test"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "True",`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.slug": "` + truncatedSlug})
+	})
+
+	t.Run("compose run --rm", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "--rm", "back", "/bin/sh", "-c", "echo Hello again")
+		lines := Lines(res.Stdout())
+		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
+	})
+
+	t.Run("check run container removed", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+	})
+
+	t.Run("down", func(t *testing.T) {
+		c.RunDockerCmd("compose", "down", "-f", "./fixtures/run-test/docker-compose.yml")
+		res := c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
+	})
+}
+
 func TestLocalComposeBuild(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
