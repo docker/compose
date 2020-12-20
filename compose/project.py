@@ -39,6 +39,7 @@ from .service import Service
 from .service import ServiceIpcMode
 from .service import ServiceNetworkMode
 from .service import ServicePidMode
+from .utils import filter_attached_for_up
 from .utils import microseconds_from_time_nano
 from .utils import truncate_string
 from .volume import ProjectVolumes
@@ -645,6 +646,7 @@ class Project:
            silent=False,
            cli=False,
            one_off=False,
+           attach_dependencies=False,
            override_options=None,
            ):
 
@@ -671,12 +673,17 @@ class Project:
             one_off=service_names if one_off else [],
         )
 
-        def do(service):
+        services_to_attach = filter_attached_for_up(
+            services,
+            service_names,
+            attach_dependencies,
+            lambda service: service.name)
 
+        def do(service):
             return service.execute_convergence_plan(
                 plans[service.name],
                 timeout=timeout,
-                detached=detached,
+                detached=detached or (service not in services_to_attach),
                 scale_override=scale_override.get(service.name),
                 rescale=rescale,
                 start=start,
