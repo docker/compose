@@ -174,3 +174,18 @@ def truncate_string(s, max_chars=35):
     if len(s) > max_chars:
         return s[:max_chars - 2] + '...'
     return s
+
+
+def filter_attached_for_up(items, service_names, attach_dependencies=False,
+                           item_to_service_name=lambda x: x):
+    """This function contains the logic of choosing which services to
+    attach when doing docker-compose up. It may be used both with containers
+    and services, and any other entities that map to service names -
+    this mapping is provided by item_to_service_name."""
+    if attach_dependencies or not service_names:
+        return items
+
+    return [
+        item
+        for item in items if item_to_service_name(item) in service_names
+    ]
