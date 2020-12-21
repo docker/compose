@@ -1,5 +1,5 @@
 Click==7.1.2
-coverage==5.2.1
+coverage==5.3.1
 ddt==1.4.1
 flake8==3.8.3
 gitpython==3.1.11
