@@ -467,6 +467,15 @@ func TestUnsupportedCommand(t *testing.T) {
 	})
 }
 
+func TestBackendMetadata(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("backend-metadata", func(t *testing.T) {
+		res := c.RunDockerCmd("backend-metadata")
+		res.Assert(t, icmd.Expected{Out: `{"Name":"Cloud integration","Version":"`})
+	})
+}
+
 func TestVersion(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 

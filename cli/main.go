@@ -57,12 +57,13 @@ import (
 
 var (
 	contextAgnosticCommands = map[string]struct{}{
-		"compose": {},
-		"context": {},
-		"login":   {},
-		"logout":  {},
-		"serve":   {},
-		"version": {},
+		"compose":          {},
+		"context":          {},
+		"login":            {},
+		"logout":           {},
+		"serve":            {},
+		"version":          {},
+		"backend-metadata": {},
 	}
 	unknownCommandRegexp = regexp.MustCompile(`unknown command "([^"]*)"`)
 )
@@ -132,6 +133,7 @@ func main() {
 		cmd.KillCommand(),
 		cmd.SecretCommand(),
 		cmd.PruneCommand(),
+		cmd.MetadataCommand(),
 
 		// Place holders
 		cmd.EcsCommand(),
