@@ -26,6 +26,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	"golang.org/x/sync/errgroup"
 
 	status "github.com/docker/compose-cli/local/moby"
@@ -35,11 +36,25 @@ import (
 const (
 	extLifecycle  = "x-lifecycle"
 	forceRecreate = "force_recreate"
+
+	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
+		"Docker requires each container to have a unique name. " +
+		"Remove the custom name to scale the service.\n"
 )
+
+func containerExists(ctx context.Context, c *client.Client, name string) bool {
+	container, err := c.ContainerInspect(ctx, name)
+	return err == nil && container.ContainerJSONBase != nil && container.Name == "/"+name
+}
 
 func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
 	scale := getScale(service)
 	actual := observedState.filter(isService(service.Name))
+	if scale > 1 && service.ContainerName != "" {
+		return fmt.Errorf(doubledContainerNameWarning,
+			service.Name,
+			service.ContainerName)
+	}
 
 	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {
@@ -50,8 +65,13 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		missing := scale - len(actual)
 		for i := 0; i < missing; i++ {
 			number := next + i
-			name := fmt.Sprintf("%s_%s_%d", project.Name, service.Name, number)
+			name := getContainerLogPrefix(project.Name, service, number)
 			eg.Go(func() error {
+				if containerExists(ctx, s.apiClient, name) {
+					return fmt.Errorf(doubledContainerNameWarning,
+						service.Name,
+						name)
+				}
 				return s.createContainer(ctx, project, service, name, number, false)
 			})
 		}
@@ -102,6 +122,14 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		}
 	}
 	return eg.Wait()
+}
+
+func getContainerLogPrefix(projectName string, service types.ServiceConfig, number int) string {
+	name := fmt.Sprintf("%s_%s_%d", projectName, service.Name, number)
+	if service.ContainerName != "" {
+		name = service.ContainerName
+	}
+	return name
 }
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {

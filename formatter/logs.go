@@ -48,7 +48,7 @@ func (l *logConsumer) Log(service, container, message string) {
 		l.colors[service] = cf
 		l.computeWidth()
 	}
-	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", service)
+	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", container)
 
 	for _, line := range strings.Split(message, "\n") {
 		buf := bytes.NewBufferString(fmt.Sprintf("%s %s\n", cf(prefix), line))

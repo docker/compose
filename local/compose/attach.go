@@ -61,7 +61,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.LogConsumer, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := getWriter(serviceName, container.ID, consumer)
+	w := getWriter(serviceName, getContainerName(container), consumer)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
