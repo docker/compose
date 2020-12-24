@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.15.5-alpine
+ARG GO_VERSION=1.15.6-alpine
 ARG GOLANGCI_LINT_VERSION=v1.33.0-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
