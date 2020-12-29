@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/compose"
 	apitypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/compose"
 
 	moby "github.com/docker/docker/pkg/stringid"
 )
@@ -33,7 +34,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	originalServices := project.Services
 	var requestedService types.ServiceConfig
 	for _, service := range originalServices {
-		if service.Name == opts.Name {
+		if service.Name == opts.Service {
 			requestedService = service
 		}
 	}

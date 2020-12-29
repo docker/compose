@@ -28,7 +28,7 @@ import (
 )
 
 type composeOptions struct {
-	Name        string
+	ProjectName string
 	DomainName  string
 	WorkingDir  string
 	ConfigPaths []string
@@ -40,14 +40,14 @@ type composeOptions struct {
 }
 
 func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
-	f.StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	f.StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
 	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	f.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 }
 
 func (o *composeOptions) toProjectName() (string, error) {
-	if o.Name != "" {
-		return o.Name, nil
+	if o.ProjectName != "" {
+		return o.ProjectName, nil
 	}
 
 	options, err := o.toProjectOptions()
@@ -68,7 +68,7 @@ func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithDotEnv,
 		cli.WithEnv(o.Environment),
 		cli.WithWorkingDirectory(o.WorkingDir),
-		cli.WithName(o.Name))
+		cli.WithName(o.ProjectName))
 }
 
 // Command returns the compose command with its child commands

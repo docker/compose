@@ -71,7 +71,7 @@ type ConvertOptions struct {
 
 // RunOptions options to execute compose run
 type RunOptions struct {
-	Name       string
+	Service    string
 	Command    []string
 	Detach     bool
 	AutoRemove bool

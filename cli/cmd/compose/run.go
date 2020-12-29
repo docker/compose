@@ -30,6 +30,7 @@ import (
 
 type runOptions struct {
 	Name        string
+	Service     string
 	Command     []string
 	WorkingDir  string
 	ConfigPaths []string
@@ -48,7 +49,7 @@ func runCommand() *cobra.Command {
 			if len(args) > 1 {
 				opts.Command = args[1:]
 			}
-			opts.Name = args[0]
+			opts.Service = args[0]
 			return runRun(cmd.Context(), opts)
 		},
 	}
@@ -68,14 +69,14 @@ func runRun(ctx context.Context, opts runOptions) error {
 		WorkingDir:  opts.WorkingDir,
 		Environment: opts.Environment,
 	}
-	c, project, err := setup(ctx, projectOpts, []string{opts.Name})
+	c, project, err := setup(ctx, projectOpts, []string{opts.Service})
 	if err != nil {
 		return err
 	}
 
 	originalServices := project.Services
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", startDependencies(ctx, c, project, opts.Name)
+		return "", startDependencies(ctx, c, project, opts.Service)
 	})
 	if err != nil {
 		return err
@@ -84,7 +85,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 	project.Services = originalServices
 	// start container and attach to container streams
 	runOpts := compose.RunOptions{
-		Name:       opts.Name,
+		Service:    opts.Service,
 		Command:    opts.Command,
 		Detach:     opts.Detach,
 		AutoRemove: opts.Remove,

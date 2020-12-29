@@ -20,10 +20,11 @@ import (
 	"context"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/formatter"
-	"github.com/spf13/cobra"
 )
 
 func logsCommand() *cobra.Command {
@@ -35,7 +36,7 @@ func logsCommand() *cobra.Command {
 			return runLogs(cmd.Context(), opts, args)
 		},
 	}
-	logsCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	logsCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
 	logsCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	logsCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 

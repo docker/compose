@@ -37,7 +37,7 @@ func convertCommand() *cobra.Command {
 			return runConvert(cmd.Context(), opts)
 		},
 	}
-	convertCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	convertCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
 	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	convertCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")

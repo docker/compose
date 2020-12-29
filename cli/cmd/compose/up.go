@@ -47,7 +47,7 @@ func upCommand(contextType string) *cobra.Command {
 			}
 		},
 	}
-	upCmd.Flags().StringVarP(&opts.Name, "project-name", "p", "", "Project name")
+	upCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
 	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")

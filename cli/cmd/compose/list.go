@@ -48,7 +48,7 @@ func runList(ctx context.Context, opts composeOptions) error {
 	if err != nil {
 		return err
 	}
-	stackList, err := c.ComposeService().List(ctx, opts.Name)
+	stackList, err := c.ComposeService().List(ctx, opts.ProjectName)
 	if err != nil {
 		return err
 	}

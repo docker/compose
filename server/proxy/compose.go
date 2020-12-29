@@ -66,11 +66,11 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServices
 	/* FIXME need to create `docker service ls` command to re-introduce this feature
 	for _, service := range services {
 		response = append(response, &composev1.Service{
-			Id:       service.ID,
-			Name:     service.Name,
-			Replicas: uint32(service.Replicas),
-			Desired:  uint32(service.Desired),
-			Ports:    service.Ports,
+			Id:              service.ID,
+			ProjectName:     service.ProjectName,
+			Replicas:        uint32(service.Replicas),
+			Desired:         uint32(service.Desired),
+			Ports:           service.Ports,
 		})
 	}*/
 	return &composev1.ComposeServicesResponse{Services: response}, nil
