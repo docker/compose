@@ -23,6 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
 
@@ -50,7 +52,7 @@ func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consu
 }
 
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
-
+	logrus.Debugf("deploying on AWS with region=%q", b.Region)
 	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {
 		return err
