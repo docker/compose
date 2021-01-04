@@ -65,6 +65,7 @@ func (o *composeOptions) toProjectName() (string, error) {
 func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		cli.WithOsEnv,
+		cli.WithDotEnv,
 		cli.WithEnv(o.Environment),
 		cli.WithWorkingDirectory(o.WorkingDir),
 		cli.WithName(o.Name))
