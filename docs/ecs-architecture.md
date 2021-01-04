@@ -1,3 +1,8 @@
+---
+title: ECS integration architecture
+description: Mapping of Docker compose entities to Amazon constructs
+keywords: Docker, Amazon, Integration, ECS, Compose, architecture, mapping
+---
 # Architecture
 
 ECS integration relies on CloudFormation to manage AWS resrouces as an atomic operation.
@@ -12,13 +17,13 @@ This diagram shows compose model and on same line AWS components that get create
 | Project  |  . . . . . . . . . . . . . .   | Cluster     |    . . . . . . .             | LoadBalancer      |
 +-+--------+                                +-------------+                              +-------------------+
   |
-  |    +----------+                         +-------------++-------------------+         +-------------------+  
-  +----+ Service  |   . . . . . . . . . .   | Service     || TaskDefinition    |         | TargetGroup       |  
-  |    +--+-------+                         +-------------++-------------------+-+       +-------------------+  
-  |       |                                                  | TaskRole          |                          
-  |       |                                                  +-------------------+-+                         
-  |       |  x-aws-role, x-aws-policies     . . . . . . . .    | TaskExecutionRole |                        
-  |       |                                                    +-------------------+                        
+  |    +----------+                         +-------------++-------------------+         +-------------------+
+  +----+ Service  |   . . . . . . . . . .   | Service     || TaskDefinition    |         | TargetGroup       |
+  |    +--+-------+                         +-------------++-------------------+-+       +-------------------+
+  |       |                                                  | TaskRole          |
+  |       |                                                  +-------------------+-+
+  |       |  x-aws-role, x-aws-policies     . . . . . . . .    | TaskExecutionRole |
+  |       |                                                    +-------------------+
   |       |  +---------+
   |       +--+ Deploy  |
   |       |  +---------+                    +-------------------+
@@ -54,11 +59,11 @@ This diagram shows compose model and on same line AWS components that get create
       +------------+                        +---------------+
 ```
 
-Each compose application service is mapped to an ECS `Service`. A `TaksDefinition` is created according to compose definition. 
+Each compose application service is mapped to an ECS `Service`. A `TaksDefinition` is created according to compose definition.
 Actual mapping is constrained by both Cloud platform and Fargate limitations. Such a `TaskDefinition` is set with a single container,
 according to the compose model which doesn't offer a syntax to support sidecar containers.
 
-An IAM Role is created and configured as `TaskRole` to grant service access to additional AWS resources when required. For this 
+An IAM Role is created and configured as `TaskRole` to grant service access to additional AWS resources when required. For this
 purpose, user can set `x-aws-policies` or define a fine grained `x-aws-role` IAM role document.
 
 Service's ports get mapped into security group's `IngressRule`s and load balancer `Listener`s.
@@ -75,5 +80,3 @@ Services using a GPU (`DeviceRequest`) get the `Cluster` extended with an EC2 `C
 EC2 resources allocation based on a `LaunchConfiguration`. The latter uses ECS recommended AMI and machine type for GPU.
 
 Service to declare `deploy.x-aws-autoscaling` get a `ScalingPolicy` created targeting specified the configured CPU usage metric
-
-

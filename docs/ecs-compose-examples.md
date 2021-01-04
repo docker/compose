@@ -1,8 +1,13 @@
+---
+title: ECS integration composefile examples
+description: Examples of ECS compose files
+keywords: Docker, Amazon, Integration, ECS, Compose, cli, deploy, cloud, sample
+---
 # Compose file samples - ECS specific
 
 
 
-## Service 
+## Service
 
 A service mapping may define a Docker image and runtime constraints and container requirements.
 
@@ -206,7 +211,7 @@ services:
   test:
     image: nginx
 volumes:
-  db-data: 
+  db-data:
     driver_opts:
         backup_policy: ENABLED
         lifecycle_policy: AFTER_30_DAYS
@@ -248,7 +253,7 @@ services:
       - mysecret
 
 secrets:
-  mysecret: 
+  mysecret:
     file: ./secrets/mysecret.txt
 ```
 
@@ -294,6 +299,3 @@ services:
     ports:
       - 80:80
 ```
-
-
-

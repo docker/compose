@@ -1,3 +1,9 @@
+---
+title: Compose cli architecture
+description: General Compose cli architecture
+keywords: Docker, Amazon, Azure, Integration, ECS, ACI, Compose, architecture, mapping
+---
+
 # Architecture
 
 This CLI has the following high level design goals:
