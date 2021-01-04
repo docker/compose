@@ -1,3 +1,8 @@
+---
+title: ECS integration Compose features
+description: Reference list of compose ECS features
+keywords: Docker, Amazon, Integration, ECS, Compose, cli, deploy, cloud
+---
 # Compose - Amazon ECS mapping
 
 This document outlines the conversion of an application defined in a Compose file to AWS resources.
@@ -18,10 +23,10 @@ __Legend:__
 | __Service__                    | ✓ |
 | service.service.build          | x |  Ignored. No image build support on AWS.
 | service.cap_add, cap_drop      | ✓ |  Supported with [Fargate limitations](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_KernelCapabilities.html)
-| service.command                | ✓ |  
+| service.command                | ✓ |
 | service.configs                | x |
 | service.cgroup_parent          | x |
-| service.container_name         | x |  
+| service.container_name         | x |
 | service.credential_spec        | x |
 | service.deploy                 | ✓ |
 | service.deploy.endpoint_mode   | x |
@@ -30,15 +35,15 @@ __Legend:__
 | service.deploy.placement       | ✓ |  Used with EC2 support to select a machine type and AMI
 | service.deploy.update_config   | ✓ |
 | service.deploy.resources       | ✓ |  Fargate resource is selected with the lowest instance type for configured memory and cpu
-| service.deploy.restart_policy  | ✓ |  
-| service.deploy.labels          | ✓ |  
+| service.deploy.restart_policy  | ✓ |
+| service.deploy.labels          | ✓ |
 | service.devices                | x |
 | service.depends_on             | ✓ |  Implemented using CloudFormation Depends_on
 | service.dns                    | x |
 | service.dns_search             | x |
-| service.domainname             | x |  
+| service.domainname             | x |
 | service.tmpfs                  | x |  Not supported on Fargate, see https://github.com/docker/compose-cli/issues/839
-| service.entrypoint             | ✓ | 
+| service.entrypoint             | ✓ |
 | service.env_file               | ✓ |
 | service.environment            | ✓ |
 | service.expose                 | x |
@@ -50,7 +55,7 @@ __Legend:__
 | service.hostname               | x |
 | service.image                  | ✓ |  Private images will be accessible by passing x-aws-pull_policy with ARN of a username+password secret
 | service.isolation              | x |
-| service.labels                 | x |  
+| service.labels                 | x |
 | service.links                  | x |
 | service.logging                | ✓ |  Can be used to customize CloudWatch Logs configuration
 | service.network_mode           | x |
@@ -101,7 +106,7 @@ by passing configuration attributes prefixed with `awslogs-`.
 When one or more services expose ports, a Load Balancer is created for the application.
 As all services are expose through the same Load Balancer, only one service can expose a given port number.
 The source and target ports defined in the Compose file MUST be the same, as service-to-service communication don't go trought the Load Balancer and could not
-benefit from Listeners abstraction to assign a distinct published port. 
+benefit from Listeners abstraction to assign a distinct published port.
 
 If services in the Compose file only expose ports 80 or 443, an Application Load Balancer is created, otherwise ECS integration will provision a Network Load Balancer.
 HTTP services using distinct ports can force use of an ALB by claiming the http protocol with `x-aws-protocol` custom extension within the port declaration:
@@ -134,7 +139,7 @@ services:
 volumes:
   mydata:
     driver_opts:
-      performance-mode: maxIO 
+      performance-mode: maxIO
       throughput-mode: bursting
       uid: 0
       gid: 0
@@ -173,4 +178,4 @@ services:
             limits:
               cpu: 0.5
               memory: 2Gb
-```          
+```
