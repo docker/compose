@@ -22,6 +22,8 @@ Change log
 
 - Take `--file` in account when defining `project_dir`
 
+- On `compose up`, attach only to services we read logs from
+
 ### Miscellaneous
 
 - Improve failure report for missing mandatory environment variables
@@ -40,7 +42,7 @@ Change log
 
 - Bump gitpython to 3.1.11
 
-- Bump docker-py to 4.4.0
+- Bump docker-py to 4.4.1
 
 - Bump Python to 3.9
 
