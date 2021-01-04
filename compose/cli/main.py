@@ -38,6 +38,7 @@ from ..service import ConvergenceStrategy
 from ..service import ImageType
 from ..service import NeedsBuildError
 from ..service import OperationFailedError
+from ..utils import filter_attached_for_up
 from .command import get_config_from_options
 from .command import get_project_dir
 from .command import project_from_options
@@ -1071,6 +1072,7 @@ class TopLevelCommand:
                     renew_anonymous_volumes=options.get('--renew-anon-volumes'),
                     silent=options.get('--quiet-pull'),
                     cli=native_builder,
+                    attach_dependencies=attach_dependencies,
                 )
 
             try:
@@ -1401,13 +1403,11 @@ def log_printer_from_project(
 
 
 def filter_attached_containers(containers, service_names, attach_dependencies=False):
-    if attach_dependencies or not service_names:
-        return containers
-
-    return [
-        container
-        for container in containers if container.service in service_names
-    ]
+    return filter_attached_for_up(
+        containers,
+        service_names,
+        attach_dependencies,
+        lambda container: container.service)
 
 
 @contextlib.contextmanager
