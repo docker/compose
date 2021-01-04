@@ -10,7 +10,7 @@ Change log
 
 - Support for service profiles
 
-- Change the SSH conneciton approach to the Docker CLI's via shellout to the local SSH client (old behaviour enabled by setting `COMPOSE_PARAMIKO_SSH` environment variable)
+- Change the SSH connection approach to the Docker CLI's via shellout to the local SSH client (old behaviour enabled by setting `COMPOSE_PARAMIKO_SSH` environment variable)
 
 - Add flag to disable log prefix
 
