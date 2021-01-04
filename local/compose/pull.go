@@ -55,6 +55,14 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project) error
 
 	for _, srv := range project.Services {
 		service := srv
+		if service.Image == "" {
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   "Skipped",
+			})
+			continue
+		}
 		eg.Go(func() error {
 			w.Event(progress.Event{
 				ID:     service.Name,
