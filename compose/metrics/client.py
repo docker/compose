@@ -7,6 +7,9 @@ from docker.transport import UnixHTTPAdapter
 
 from compose.const import IS_WINDOWS_PLATFORM
 
+if IS_WINDOWS_PLATFORM:
+    from docker.transport import NpipeHTTPAdapter
+
 
 class Status(Enum):
     SUCCESS = "success"
@@ -19,9 +22,9 @@ class MetricsSource:
 
 
 if IS_WINDOWS_PLATFORM:
-    METRICS_SOCKET_FILE = 'http+unix://\\\\.\\pipe\\docker_cli'
+    METRICS_SOCKET_FILE = 'npipe://\\\\.\\pipe\\docker_cli'
 else:
-    METRICS_SOCKET_FILE = 'http+unix:///var/run/metrics-docker-cli.sock'
+    METRICS_SOCKET_FILE = 'http+unix:///var/run/docker-cli.sock'
 
 
 class MetricsCommand(requests.Session):
@@ -38,11 +41,17 @@ class MetricsCommand(requests.Session):
         self.source = source
         self.status = status.value
         self.uri = uri or os.environ.get("METRICS_SOCKET_FILE", METRICS_SOCKET_FILE)
-        self.mount("http+unix://", UnixHTTPAdapter(self.uri))
+        if IS_WINDOWS_PLATFORM:
+            self.mount("http+unix://", NpipeHTTPAdapter(self.uri))
+        else:
+            self.mount("http+unix://", UnixHTTPAdapter(self.uri))
 
     def send_metrics(self):
         try:
-            return self.post("http+unix://localhost/", json=self.to_map(), timeout=.05)
+            return self.post("http+unix://localhost/usage",
+                             json=self.to_map(),
+                             timeout=.05,
+                             headers={'Content-Type': 'application/json'})
         except Exception as e:
             return e
 
