@@ -1,0 +1,67 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check-optional-tests:
+    name: Check if needs to run Windows build and tests
+    runs-on: ubuntu-latest
+    outputs:
+      trigger-windows: ${{steps.runwindowstest.outputs.triggered}}
+    steps:
+      - uses: khan/pull-request-comment-trigger@master
+        name: Check if test Windows
+        if: github.event_name == 'pull_request'
+        id: runwindowstest
+        with:
+          trigger: '/test-windows'
+
+
+  windows-build:
+    name: Windows Build
+    runs-on: windows-latest
+    env:
+      GO111MODULE: "on"
+    needs: check-optional-tests
+    if: github.ref == 'refs/heads/main' || needs.check-optional-tests.outputs.trigger-windows == 'true'
+    steps:
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      - name: Test
+        env:
+          BUILD_TAGS: example,local
+        run: make -f builder.Makefile test
+
+      - name: Build
+        env:
+          BUILD_TAGS: example,local,e2e
+        run: make -f builder.Makefile cli
+
+      - name: E2E Test
+        run: make e2e-win-ci
+
+      - name: ACI e2e Test
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        # need to docker logout on windows nodes, it seems GHActions does a `docker login --user githubactions` specifically on windows nodes
+        run: |
+          docker logout
+          make e2e-aci
