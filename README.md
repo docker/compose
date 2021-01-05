@@ -1,7 +1,7 @@
 # Docker Compose CLI
 
 [![Actions Status](https://github.com/docker/compose-cli/workflows/Continuous%20integration/badge.svg)](https://github.com/docker/compose-cli/actions)
-[![Actions Status](https://github.com/docker/compose-cli/workflows/Cloud%20integration%20tests/badge.svg)](https://github.com/docker/compose-cli/actions)
+[![Actions Status](https://github.com/docker/compose-cli/workflows/Windows%20CI/badge.svg)](https://github.com/docker/compose-cli/actions)
 
 This CLI tool makes it easy to run Docker containers and Docker Compose applications in the cloud using either Amazon
 Elastic Container Service
