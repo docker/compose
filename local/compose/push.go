@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/docker/buildx/driver"
+
 	"github.com/docker/compose-cli/config"
 	"github.com/docker/compose-cli/progress"
 
@@ -51,62 +53,70 @@ func (s *composeService) Push(ctx context.Context, project *types.Project) error
 		info.IndexServerAddress = registry.IndexServer
 	}
 
+	w := progress.ContextWriter(ctx)
 	for _, service := range project.Services {
-		if service.Build == nil {
+		if service.Build == nil || service.Image == "" {
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   "Skipped",
+			})
 			continue
 		}
 		service := service
 		eg.Go(func() error {
-			w := progress.ContextWriter(ctx)
-
-			ref, err := reference.ParseNormalizedNamed(service.Image)
-			if err != nil {
-				return err
-			}
-
-			repoInfo, err := registry.ParseRepositoryInfo(ref)
-			if err != nil {
-				return err
-			}
-
-			key := repoInfo.Index.Name
-			if repoInfo.Index.Official {
-				key = info.IndexServerAddress
-			}
-			authConfig, err := configFile.GetAuthConfig(key)
-			if err != nil {
-				return err
-			}
-
-			buf, err := json.Marshal(authConfig)
-			if err != nil {
-				return err
-			}
-
-			stream, err := s.apiClient.ImagePush(ctx, service.Image, moby.ImagePushOptions{
-				RegistryAuth: base64.URLEncoding.EncodeToString(buf),
-			})
-			if err != nil {
-				return err
-			}
-			dec := json.NewDecoder(stream)
-			for {
-				var jm jsonmessage.JSONMessage
-				if err := dec.Decode(&jm); err != nil {
-					if err == io.EOF {
-						break
-					}
-					return err
-				}
-				if jm.Error != nil {
-					return errors.New(jm.Error.Message)
-				}
-				toPushProgressEvent("Pushing "+service.Name, jm, w)
-			}
-			return nil
+			return s.pullServiceImage(ctx, service, info, configFile, w)
 		})
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
+	ref, err := reference.ParseNormalizedNamed(service.Image)
+	if err != nil {
+		return err
+	}
+
+	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return err
+	}
+
+	key := repoInfo.Index.Name
+	if repoInfo.Index.Official {
+		key = info.IndexServerAddress
+	}
+	authConfig, err := configFile.GetAuthConfig(key)
+	if err != nil {
+		return err
+	}
+
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return err
+	}
+
+	stream, err := s.apiClient.ImagePush(ctx, service.Image, moby.ImagePushOptions{
+		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+	})
+	if err != nil {
+		return err
+	}
+	dec := json.NewDecoder(stream)
+	for {
+		var jm jsonmessage.JSONMessage
+		if err := dec.Decode(&jm); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if jm.Error != nil {
+			return errors.New(jm.Error.Message)
+		}
+		toPushProgressEvent("Pushing "+service.Name, jm, w)
+	}
+	return nil
 }
 
 func toPushProgressEvent(prefix string, jm jsonmessage.JSONMessage, w progress.Writer) {
