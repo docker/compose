@@ -57,23 +57,27 @@ func TestSecrets(t *testing.T) {
 		err := ioutil.WriteFile(secretFile, []byte("pass1"), 0644)
 		assert.Check(t, err == nil)
 		res := cmd.RunDockerCmd("secret", "create", secretName, secretFile)
-		assert.Check(t, strings.Contains(res.Stdout(), secretName))
+		assert.Check(t, strings.Contains(res.Stdout(), secretName), res.Stdout())
 	})
 
 	t.Run("list secrets", func(t *testing.T) {
 		res := cmd.RunDockerCmd("secret", "list")
-		assert.Check(t, strings.Contains(res.Stdout(), secretName))
+		if !strings.Contains(res.Stdout(), secretName) { // test sometimes fail, it seems things might need a bit of time on the AWS side, trying once morez
+			time.Sleep(1 * time.Second)
+			res = cmd.RunDockerCmd("secret", "list")
+		}
+		assert.Check(t, strings.Contains(res.Stdout(), secretName), res.Stdout())
 	})
 
 	t.Run("inspect secret", func(t *testing.T) {
 		res := cmd.RunDockerCmd("secret", "inspect", secretName)
-		assert.Check(t, strings.Contains(res.Stdout(), `"Name": "`+secretName+`"`))
+		assert.Check(t, strings.Contains(res.Stdout(), `"Name": "`+secretName+`"`), res.Stdout())
 	})
 
 	t.Run("rm secret", func(t *testing.T) {
 		cmd.RunDockerCmd("secret", "rm", secretName)
 		res := cmd.RunDockerCmd("secret", "list")
-		assert.Check(t, !strings.Contains(res.Stdout(), secretName))
+		assert.Check(t, !strings.Contains(res.Stdout(), secretName), res.Stdout())
 	})
 }
 
