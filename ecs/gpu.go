@@ -132,7 +132,7 @@ type resourceRequirements struct {
 func getResourceRequirements(project *types.Project) (*resourceRequirements, error) {
 	return toResourceRequirementsSlice(project).
 		filter(func(requirements *resourceRequirements) bool {
-			return requirements.gpus != 0
+			return requirements != nil && requirements.gpus != 0
 		}).
 		max()
 }
@@ -180,6 +180,23 @@ func toResourceRequirements(service types.ServiceConfig) (*resourceRequirements,
 	for _, r := range reservations.GenericResources {
 		if r.DiscreteResourceSpec.Kind == "gpus" {
 			requiredGPUs = r.DiscreteResourceSpec.Value
+			break
+		}
+	}
+
+	for _, r := range reservations.Devices {
+		requiresGpus := false
+		for _, c := range r.Capabilities {
+			if c == "gpu" {
+				requiresGpus = true
+				break
+			}
+		}
+		if requiresGpus {
+			requiredGPUs = r.Count
+			if requiredGPUs <= 0 {
+				requiredGPUs = 1
+			}
 			break
 		}
 	}

@@ -181,6 +181,25 @@ func toTaskResourceRequirements(reservations *types.Resource) []ecs.TaskDefiniti
 			})
 		}
 	}
+	for _, r := range reservations.Devices {
+		hasGpuCap := false
+		for _, c := range r.Capabilities {
+			if c == "gpu" {
+				hasGpuCap = true
+				break
+			}
+		}
+		if hasGpuCap {
+			count := r.Count
+			if count <= 0 {
+				count = 1
+			}
+			requirements = append(requirements, ecs.TaskDefinition_ResourceRequirement{
+				Type:  ecsapi.ResourceTypeGpu,
+				Value: fmt.Sprint(count),
+			})
+		}
+	}
 	return requirements
 }
 
