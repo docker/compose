@@ -478,6 +478,11 @@ func TestContainerRunAttached(t *testing.T) {
 
 	t.Run("restart container", func(t *testing.T) {
 		res := c.RunDockerCmd("start", container)
+		//Flaky errors on restart : Code="ContainerGroupTransitioning" Message="The container group 'test-container' is still transitioning, please retry later."
+		if res.ExitCode != 0 && strings.Contains(res.Stderr(), `Code="ContainerGroupTransitioning"`) {
+			time.Sleep(3 * time.Second)
+			res = c.RunDockerCmd("start", container)
+		}
 		res.Assert(t, icmd.Expected{Out: container})
 		waitForStatus(t, c, container, convert.StatusRunning)
 	})
@@ -504,9 +509,12 @@ func TestContainerRunAttached(t *testing.T) {
 		if strings.Contains(res.Stderr(), "unsupported protocol scheme") { //Flaky strange error on azure SDK call happening only during prune --force
 			time.Sleep(1 * time.Second)
 			res = c.RunDockerCmd("prune", "--force")
+			// After the retry, it seems prune has sometimes actually been executed, and we get zero thigs to delete again...
+			assert.Assert(t, res.Stdout() == "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n" ||
+				res.Stdout() == "Deleted resources:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
+		} else {
+			assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 		}
-
-		assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--all")
 		l = Lines(res.Stdout())
