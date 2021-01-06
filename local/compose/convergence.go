@@ -47,31 +47,18 @@ func containerExists(ctx context.Context, c *client.Client, name string) bool {
 	return err == nil && container.ContainerJSONBase != nil && container.Name == "/"+name
 }
 
-func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
-	scale := getScale(service)
-	actual := observedState.filter(isService(service.Name))
-	if scale > 1 && service.ContainerName != "" {
-		return fmt.Errorf(doubledContainerNameWarning,
-			service.Name,
-			service.ContainerName)
-	}
-
+func (s *composeService) ensureScale(ctx context.Context, actual []moby.Container, scale int, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {
 		next, err := nextContainerNumber(actual)
 		if err != nil {
-			return err
+			return nil, actual, err
 		}
 		missing := scale - len(actual)
 		for i := 0; i < missing; i++ {
 			number := next + i
 			name := getContainerLogPrefix(project.Name, service, number)
 			eg.Go(func() error {
-				if containerExists(ctx, s.apiClient, name) {
-					return fmt.Errorf(doubledContainerNameWarning,
-						service.Name,
-						name)
-				}
 				return s.createContainer(ctx, project, service, name, number, false)
 			})
 		}
@@ -89,6 +76,30 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 			})
 		}
 		actual = actual[:scale]
+	}
+	return eg, actual, nil
+}
+
+func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
+	actual, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+			serviceFilter(service.Name),
+		),
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	scale, err := getScale(service)
+	if err != nil {
+		return err
+	}
+
+	eg, actual, err := s.ensureScale(ctx, actual, scale, project, service)
+	if err != nil {
+		return err
 	}
 
 	expected, err := jsonHash(service)
@@ -171,17 +182,30 @@ func nextContainerNumber(containers []moby.Container) (int, error) {
 
 }
 
-func getScale(config types.ServiceConfig) int {
+func getScale(config types.ServiceConfig) (int, error) {
+	scale := 1
+	var err error
 	if config.Deploy != nil && config.Deploy.Replicas != nil {
-		return int(*config.Deploy.Replicas)
+		scale = int(*config.Deploy.Replicas)
 	}
 	if config.Scale != 0 {
-		return config.Scale
+		scale = config.Scale
 	}
-	return 1
+	if scale > 1 && config.ContainerName != "" {
+		scale = -1
+		err = fmt.Errorf(doubledContainerNameWarning,
+			config.Name,
+			config.ContainerName)
+	}
+	return scale, err
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
+	if containerExists(ctx, s.apiClient, name) {
+		return fmt.Errorf(doubledContainerNameWarning,
+			service.Name,
+			name)
+	}
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(name))
 	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove)
