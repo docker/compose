@@ -101,7 +101,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{})
+			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{Force: true})
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
