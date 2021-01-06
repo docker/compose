@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go v1.35.33
 	github.com/awslabs/goformation/v4 v4.15.6
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/compose-spec/compose-go v0.0.0-20201210155915-b5ef325e9175
+	github.com/compose-spec/compose-go v0.0.0-20210106202047-687be5e0e320
 	github.com/containerd/console v1.0.1
 	github.com/containerd/containerd v1.4.3
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect

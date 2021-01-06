@@ -165,6 +165,7 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 	}
 	bindings := buildContainerBindingOptions(s)
 
+	resources := getDeployResources(s)
 	networkMode := getNetworkMode(p, s)
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
@@ -177,10 +178,34 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 		// ShmSize: , TODO
 		Sysctls:      s.Sysctls,
 		PortBindings: bindings,
+		Resources:    resources,
 	}
 
 	networkConfig := buildDefaultNetworkConfig(s, networkMode)
 	return &containerConfig, &hostConfig, networkConfig, nil
+}
+
+func getDeployResources(s types.ServiceConfig) container.Resources {
+	resources := container.Resources{}
+	if s.Deploy == nil {
+		return resources
+	}
+
+	reservations := s.Deploy.Resources.Reservations
+
+	if reservations == nil || len(reservations.Devices) == 0 {
+		return resources
+	}
+
+	for _, device := range reservations.Devices {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Capabilities: [][]string{device.Capabilities},
+			Count:        int(device.Count),
+			DeviceIDs:    device.IDs,
+			Driver:       device.Driver,
+		})
+	}
+	return resources
 }
 
 func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
