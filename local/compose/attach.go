@@ -45,7 +45,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 
 	var names []string
 	for _, c := range containers {
-		names = append(names, getContainerName(c))
+		names = append(names, getCanonicalContainerName(c))
 	}
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
 
@@ -61,7 +61,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.LogConsumer, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := getWriter(serviceName, getContainerName(container), consumer)
+	w := getWriter(serviceName, getCanonicalContainerName(container), consumer)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
