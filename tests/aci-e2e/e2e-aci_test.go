@@ -504,9 +504,12 @@ func TestContainerRunAttached(t *testing.T) {
 		if strings.Contains(res.Stderr(), "unsupported protocol scheme") { //Flaky strange error on azure SDK call happening only during prune --force
 			time.Sleep(1 * time.Second)
 			res = c.RunDockerCmd("prune", "--force")
+			// After the retry, it seems prune has sometimes actually been executed, and we get zero thigs to delete again...
+			assert.Assert(t, res.Stdout() == "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n" ||
+				res.Stdout() == "Deleted resources:\nTotal CPUs reclaimed: 0.00, total memory reclaimed: 0.00 GB\n", res.Stdout())
+		} else {
+			assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 		}
-
-		assert.Equal(t, "Deleted resources:\n"+container+"\nTotal CPUs reclaimed: 0.10, total memory reclaimed: 0.10 GB\n", res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--all")
 		l = Lines(res.Stdout())

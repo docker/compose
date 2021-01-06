@@ -11,6 +11,7 @@ or Microsoft Azure Container Instances
 using the Docker commands you already know.
 
 To get started, all you need is:
+
 * An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
   account
 * Windows: The Stable or Edge release of
