@@ -32,7 +32,7 @@ type Service interface {
 	// Pull executes the equivalent of a `compose pull`
 	Pull(ctx context.Context, project *types.Project) error
 	// Create executes the equivalent to a `compose create`
-	Create(ctx context.Context, project *types.Project) error
+	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
 	// Up executes the equivalent to a `compose up`
@@ -49,6 +49,12 @@ type Service interface {
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) error
+}
+
+// CreateOptions group options of the Create API
+type CreateOptions struct {
+	// Remove legacy containers for services that are not defined in the project
+	RemoveOrphans bool
 }
 
 // UpOptions group options of the Up API

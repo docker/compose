@@ -33,8 +33,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type upOptions struct {
+	composeOptions
+	removeOrphans bool
+}
+
 func upCommand(contextType string) *cobra.Command {
-	opts := composeOptions{}
+	opts := upOptions{}
 	upCmd := &cobra.Command{
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
@@ -53,6 +58,7 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	upCmd.Flags().BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
+	upCmd.Flags().BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
 	if contextType == store.AciContextType {
 		upCmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
@@ -61,8 +67,8 @@ func upCommand(contextType string) *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts composeOptions, services []string) error {
-	c, project, err := setup(ctx, opts, services)
+func runUp(ctx context.Context, opts upOptions, services []string) error {
+	c, project, err := setup(ctx, opts.composeOptions, services)
 	if err != nil {
 		return err
 	}
@@ -75,14 +81,16 @@ func runUp(ctx context.Context, opts composeOptions, services []string) error {
 	return err
 }
 
-func runCreateStart(ctx context.Context, opts composeOptions, services []string) error {
-	c, project, err := setup(ctx, opts, services)
+func runCreateStart(ctx context.Context, opts upOptions, services []string) error {
+	c, project, err := setup(ctx, opts.composeOptions, services)
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Create(ctx, project)
+		return "", c.ComposeService().Create(ctx, project, compose.CreateOptions{
+			RemoveOrphans: opts.removeOrphans,
+		})
 	})
 	if err != nil {
 		return err

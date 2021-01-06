@@ -43,7 +43,7 @@ func (b *ecsAPIService) Pull(ctx context.Context, project *types.Project) error 
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Create(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

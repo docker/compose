@@ -40,7 +40,7 @@ func (c *composeService) Pull(ctx context.Context, project *types.Project) error
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Create(ctx context.Context, project *types.Project) error {
+func (c *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
