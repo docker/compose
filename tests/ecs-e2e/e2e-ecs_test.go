@@ -62,10 +62,6 @@ func TestSecrets(t *testing.T) {
 
 	t.Run("list secrets", func(t *testing.T) {
 		res := cmd.RunDockerCmd("secret", "list")
-		if !strings.Contains(res.Stdout(), secretName) { // test sometimes fail, it seems things might need a bit of time on the AWS side, trying once morez
-			time.Sleep(1 * time.Second)
-			res = cmd.RunDockerCmd("secret", "list")
-		}
 		assert.Check(t, strings.Contains(res.Stdout(), secretName), res.Stdout())
 	})
 
@@ -91,7 +87,6 @@ func TestCompose(t *testing.T) {
 	var webURL, wordsURL, secretsURL string
 	t.Run("compose ps", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
-		fmt.Println(strings.TrimSpace(res.Stdout()))
 		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 
 		assert.Equal(t, 5, len(lines))
