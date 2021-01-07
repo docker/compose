@@ -66,7 +66,9 @@ var compatibleComposeAttributes = []string{
 	"services.deploy.resources.reservations.cpus",
 	"services.deploy.resources.reservations.memory",
 	"services.deploy.resources.reservations.devices",
+	"services.deploy.resources.reservations.devices.capabilities",
 	"services.deploy.resources.reservations.devices.count",
+	"services.deploy.resources.reservations.devices.driver",
 	"services.deploy.resources.reservations.generic_resources",
 	"services.deploy.resources.reservations.generic_resources.discrete_resource_spec",
 	"services.deploy.update_config",
@@ -165,5 +167,11 @@ func (c *fargateCompatibilityChecker) CheckDeployResourcesDevicesCapabilities(s 
 		if cap != "gpu" {
 			c.Unsupported("services.deploy.resources.%s.devices.capabilities = %s", s, cap)
 		}
+	}
+}
+
+func (c *fargateCompatibilityChecker) CheckDeployResourcesDevicesDriver(s string, r types.DeviceRequest) {
+	if r.Driver != "" && r.Driver != "nvidia" {
+		c.Unsupported("services.deploy.resources.%s.devices.driver = %s", s, r.Driver)
 	}
 }

@@ -108,9 +108,9 @@ services:
           memory: 32Gb
           cpus: "32"
           generic_resources:
-          - discrete_resource_spec:
-            kind: gpus
-            value: 2
+            - discrete_resource_spec:
+                kind: gpus
+                value: 2
 ```
 
 
