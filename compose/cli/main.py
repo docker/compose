@@ -862,7 +862,7 @@ class TopLevelCommand:
         if len(stopped_containers) > 0:
             print("Going to remove", list_containers(stopped_containers))
             if options.get('--force') \
-                    or yesno("Are you sure? [yN] ", default=False):
+                    or yesno("Are you sure? [y/N] ", default=False):
                 self.project.remove_stopped(
                     service_names=options['SERVICE'],
                     v=options.get('-v', False),
@@ -1152,7 +1152,7 @@ class TopLevelCommand:
                     "If you continue, volume data could be lost. Consider backing up your data "
                     "before continuing.\n"
                 )
-                res = yesno("Continue with the new image? [yN]", False)
+                res = yesno("Continue with the new image? [y/N]", False)
                 if res is None or not res:
                     raise e
 
