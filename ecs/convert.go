@@ -564,7 +564,7 @@ func gpuRequirements(s types.ServiceConfig) int64 {
 			}
 			for _, device := range reservations.Devices {
 				if len(device.Capabilities) == 1 && device.Capabilities[0] == "gpu" {
-					return int64(device.Count)
+					return device.Count
 				}
 			}
 		}
