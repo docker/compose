@@ -150,7 +150,7 @@ func (cs *composeService) Pull(ctx context.Context, project *types.Project) erro
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *composeService) Create(ctx context.Context, project *types.Project) error {
+func (cs *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

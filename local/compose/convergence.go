@@ -37,19 +37,9 @@ const (
 	forceRecreate = "force_recreate"
 )
 
-func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	actual, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(service.Name),
-		),
-		All: true,
-	})
-	if err != nil {
-		return err
-	}
-
+func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
 	scale := getScale(service)
+	actual := observedState.filter(isService(service.Name))
 
 	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {

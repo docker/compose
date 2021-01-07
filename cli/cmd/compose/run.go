@@ -104,7 +104,7 @@ func startDependencies(ctx context.Context, c *client.Client, project *types.Pro
 		}
 	}
 	project.Services = dependencies
-	if err := c.ComposeService().Create(ctx, project); err != nil {
+	if err := c.ComposeService().Create(ctx, project, compose.CreateOptions{}); err != nil {
 		return err
 	}
 	if err := c.ComposeService().Start(ctx, project, nil); err != nil {

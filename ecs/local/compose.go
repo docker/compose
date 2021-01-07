@@ -43,13 +43,13 @@ func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) er
 	return e.compose.Pull(ctx, project)
 }
 
-func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project) error {
+func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
 	enhanced, err := e.enhanceForLocalSimulation(project)
 	if err != nil {
 		return err
 	}
 
-	return e.compose.Create(ctx, enhanced)
+	return e.compose.Create(ctx, enhanced, opts)
 }
 
 func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {

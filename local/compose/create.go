@@ -23,12 +23,10 @@ import (
 	"strconv"
 	"strings"
 
-	convert "github.com/docker/compose-cli/local/moby"
-	"github.com/docker/compose-cli/progress"
-
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -36,9 +34,15 @@ import (
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/compose"
+	convert "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/progress"
 )
 
-func (s *composeService) Create(ctx context.Context, project *types.Project) error {
+func (s *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
 	err := s.ensureImagesExists(ctx, project)
 	if err != nil {
 		return err
@@ -52,8 +56,36 @@ func (s *composeService) Create(ctx context.Context, project *types.Project) err
 		return err
 	}
 
+	var observedState Containers
+	observedState, err = s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+		),
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	orphans := observedState.filter(isNotService(project.ServiceNames()...))
+	if len(orphans) > 0 {
+		if opts.RemoveOrphans {
+			eg, _ := errgroup.WithContext(ctx)
+			w := progress.ContextWriter(ctx)
+			s.removeContainers(ctx, w, eg, orphans)
+			if eg.Wait() != nil {
+				return err
+			}
+		} else {
+			logrus.Warnf("Found orphan containers (%s) for this project. If "+
+				"you removed or renamed this service in your compose "+
+				"file, you can run this command with the "+
+				"--remove-orphans flag to clean it up.", orphans.names())
+		}
+	}
+
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.ensureService(c, project, service)
+		return s.ensureService(c, observedState, project, service)
 	})
 }
 
