@@ -25,10 +25,11 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
-	errdefs2 "github.com/docker/compose-cli/errdefs"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/sanathkr/go-yaml"
+
+	errdefs2 "github.com/docker/compose-cli/errdefs"
 )
 
 // NewComposeService create a local implementation of the compose.Service API
@@ -44,7 +45,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	return errdefs2.ErrNotImplemented
 }
 
-func getContainerName(c moby.Container) string {
+func getCanonicalContainerName(c moby.Container) string {
 	// Names return container canonical name /foo  + link aliases /linked_by/foo
 	for _, name := range c.Names {
 		if strings.LastIndex(name, "/") == 0 {

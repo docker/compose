@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/docker/compose-cli/api/compose"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose-cli/api/compose"
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
@@ -54,7 +55,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.
 
 		summary = append(summary, compose.ContainerSummary{
 			ID:         c.ID,
-			Name:       getContainerName(c),
+			Name:       getCanonicalContainerName(c),
 			Project:    c.Labels[projectLabel],
 			Service:    c.Labels[serviceLabel],
 			State:      c.State,

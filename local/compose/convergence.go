@@ -35,22 +35,23 @@ import (
 const (
 	extLifecycle  = "x-lifecycle"
 	forceRecreate = "force_recreate"
+
+	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
+		"Docker requires each container to have a unique name. " +
+		"Remove the custom name to scale the service.\n"
 )
 
-func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
-	scale := getScale(service)
-	actual := observedState.filter(isService(service.Name))
-
+func (s *composeService) ensureScale(ctx context.Context, actual []moby.Container, scale int, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {
 		next, err := nextContainerNumber(actual)
 		if err != nil {
-			return err
+			return nil, actual, err
 		}
 		missing := scale - len(actual)
 		for i := 0; i < missing; i++ {
 			number := next + i
-			name := fmt.Sprintf("%s_%s_%d", project.Name, service.Name, number)
+			name := getContainerName(project.Name, service, number)
 			eg.Go(func() error {
 				return s.createContainer(ctx, project, service, name, number, false)
 			})
@@ -70,6 +71,21 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		}
 		actual = actual[:scale]
 	}
+	return eg, actual, nil
+}
+
+func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
+	actual := observedState.filter(isService(service.Name))
+
+	scale, err := getScale(service)
+	if err != nil {
+		return err
+	}
+
+	eg, actual, err := s.ensureScale(ctx, actual, scale, project, service)
+	if err != nil {
+		return err
+	}
 
 	expected, err := jsonHash(service)
 	if err != nil {
@@ -78,7 +94,7 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 
 	for _, container := range actual {
 		container := container
-		name := getContainerName(container)
+		name := getCanonicalContainerName(container)
 
 		diverged := container.Labels[configHashLabel] != expected
 		if diverged || service.Extensions[extLifecycle] == forceRecreate {
@@ -102,6 +118,14 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		}
 	}
 	return eg.Wait()
+}
+
+func getContainerName(projectName string, service types.ServiceConfig, number int) string {
+	name := fmt.Sprintf("%s_%s_%d", projectName, service.Name, number)
+	if service.ContainerName != "" {
+		name = service.ContainerName
+	}
+	return name
 }
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
@@ -143,14 +167,22 @@ func nextContainerNumber(containers []moby.Container) (int, error) {
 
 }
 
-func getScale(config types.ServiceConfig) int {
+func getScale(config types.ServiceConfig) (int, error) {
+	scale := 1
+	var err error
 	if config.Deploy != nil && config.Deploy.Replicas != nil {
-		return int(*config.Deploy.Replicas)
+		scale = int(*config.Deploy.Replicas)
 	}
 	if config.Scale != 0 {
-		return config.Scale
+		scale = config.Scale
 	}
-	return 1
+	if scale > 1 && config.ContainerName != "" {
+		scale = -1
+		err = fmt.Errorf(doubledContainerNameWarning,
+			config.Name,
+			config.ContainerName)
+	}
+	return scale, err
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
@@ -166,12 +198,12 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.NewEvent(getContainerName(container), progress.Working, "Recreate"))
+	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Working, "Recreate"))
 	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 	if err != nil {
 		return err
 	}
-	name := getContainerName(container)
+	name := getCanonicalContainerName(container)
 	tmpName := fmt.Sprintf("%s_%s", container.ID[:12], name)
 	err = s.apiClient.ContainerRename(ctx, container.ID, tmpName)
 	if err != nil {
@@ -189,7 +221,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	w.Event(progress.NewEvent(getContainerName(container), progress.Done, "Recreated"))
+	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Done, "Recreated"))
 	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
 }
@@ -209,12 +241,12 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 
 func (s *composeService) restartContainer(ctx context.Context, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.NewEvent(getContainerName(container), progress.Working, "Restart"))
+	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Working, "Restart"))
 	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
-	w.Event(progress.NewEvent(getContainerName(container), progress.Done, "Restarted"))
+	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Done, "Restarted"))
 	return nil
 }
 
@@ -229,8 +261,8 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	}
 	id := created.ID
 	for netName := range service.Networks {
-		network := project.Networks[netName]
-		err = s.connectContainerToNetwork(ctx, id, service.Name, network.Name)
+		netwrk := project.Networks[netName]
+		err = s.connectContainerToNetwork(ctx, id, netwrk.Name, service.Name, getContainerName(project.Name, service, number))
 		if err != nil {
 			return err
 		}
@@ -238,9 +270,9 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	return nil
 }
 
-func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, service string, n string) error {
-	err := s.apiClient.NetworkConnect(ctx, n, id, &network.EndpointSettings{
-		Aliases: []string{service},
+func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, aliases ...string) error {
+	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
+		Aliases: aliases,
 	})
 	if err != nil {
 		return err
@@ -300,10 +332,10 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		}
 		eg.Go(func() error {
 			w := progress.ContextWriter(ctx)
-			w.Event(progress.StartingEvent(getContainerName(container)))
+			w.Event(progress.StartingEvent(getCanonicalContainerName(container)))
 			err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 			if err == nil {
-				w.Event(progress.StartedEvent(getContainerName(container)))
+				w.Event(progress.StartedEvent(getCanonicalContainerName(container)))
 			}
 			return err
 		})

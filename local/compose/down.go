@@ -94,7 +94,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	for _, container := range containers {
 		toDelete := container
 		eg.Go(func() error {
-			eventName := "Container " + getContainerName(toDelete)
+			eventName := "Container " + getCanonicalContainerName(toDelete)
 			w.Event(progress.StoppingEvent(eventName))
 			err := s.apiClient.ContainerStop(ctx, toDelete.ID, nil)
 			if err != nil {

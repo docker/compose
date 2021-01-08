@@ -213,7 +213,7 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 		Resources:    resources,
 	}
 
-	networkConfig := buildDefaultNetworkConfig(s, networkMode)
+	networkConfig := buildDefaultNetworkConfig(s, networkMode, getContainerName(p.Name, s, number))
 	return &containerConfig, &hostConfig, networkConfig, nil
 }
 
@@ -359,11 +359,11 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	}
 }
 
-func buildDefaultNetworkConfig(s types.ServiceConfig, networkMode container.NetworkMode) *network.NetworkingConfig {
+func buildDefaultNetworkConfig(s types.ServiceConfig, networkMode container.NetworkMode, containerName string) *network.NetworkingConfig {
 	config := map[string]*network.EndpointSettings{}
 	net := string(networkMode)
 	config[net] = &network.EndpointSettings{
-		Aliases: getAliases(s, s.Networks[net]),
+		Aliases: append(getAliases(s, s.Networks[net]), containerName),
 	}
 
 	return &network.NetworkingConfig{

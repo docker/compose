@@ -66,7 +66,7 @@ func (containers Containers) split(predicate containerPredicate) (Containers, Co
 func (containers Containers) names() []string {
 	var names []string
 	for _, c := range containers {
-		names = append(names, getContainerName(c))
+		names = append(names, getCanonicalContainerName(c))
 	}
 	return names
 }
