@@ -39,12 +39,14 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.3.0 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/moby/buildkit v0.8.1-0.20201205083753-0af7b1b9c693
 	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/procfs v0.2.0 // indirect
 	github.com/prometheus/tsdb v0.10.0
 	github.com/sanathkr/go-yaml v0.0.0-20170819195128-ed9d249f429b
 	github.com/sirupsen/logrus v1.7.0
@@ -55,11 +57,14 @@ require (
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/ini.v1 v1.62.0
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.3
+	k8s.io/client-go v0.20.1 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.10.5
 )
 
 replace (

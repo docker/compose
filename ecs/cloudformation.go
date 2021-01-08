@@ -23,14 +23,8 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
-	"github.com/cnabio/cnab-to-oci/remotes"
-	cliconfig "github.com/docker/cli/cli/config"
-	"github.com/docker/compose-cli/config"
-	"github.com/docker/distribution/reference"
-
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/config"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
@@ -43,7 +37,13 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/logs"
 	"github.com/awslabs/goformation/v4/cloudformation/secretsmanager"
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
+	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/types"
+	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/distribution/reference"
+	"golang.org/x/sync/errgroup"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
+	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
@@ -57,7 +57,45 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, opt
 		return nil, err
 	}
 
-	return marshall(template, options.Format)
+	bytes, err := marshall(template, options.Format)
+	if err != nil {
+		return nil, err
+	}
+
+	x, ok := project.Extensions[extensionCloudFormation]
+	if !ok {
+		return bytes, nil
+	}
+	if options.Format != "yaml" {
+		return nil, fmt.Errorf("format %q with overlays is not supported", options.Format)
+	}
+
+	nodes, err := yaml.Parse(string(bytes))
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err = yaml.Marshal(x)
+	if err != nil {
+		return nil, err
+	}
+	overlay, err := yaml.Parse(string(bytes))
+	if err != nil {
+		return nil, err
+	}
+	nodes, err = merge2.Merge(overlay, nodes, yaml.MergeOptions{
+		ListIncreaseDirection: yaml.MergeOptionsListPrepend,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := nodes.String()
+	if err != nil {
+		return nil, err
+	}
+	bytes = []byte(s)
+	return bytes, err
 }
 
 func (b *ecsAPIService) resolveServiceImagesDigests(ctx context.Context, project *types.Project) error {
