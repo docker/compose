@@ -17,6 +17,7 @@
 package metrics
 
 import (
+	"os"
 	"strings"
 
 	"github.com/docker/compose-cli/utils"
@@ -24,6 +25,9 @@ import (
 
 // Track sends the tracking analytics to Docker Desktop
 func Track(context string, args []string, status string) {
+	if isInvokedAsCliBackend() {
+		return
+	}
 	command := GetCommand(args)
 	if command != "" {
 		c := NewClient()
@@ -34,6 +38,11 @@ func Track(context string, args []string, status string) {
 			Status:  status,
 		})
 	}
+}
+
+func isInvokedAsCliBackend() bool {
+	executable := os.Args[0]
+	return strings.HasSuffix(executable, "-backend")
 }
 
 func isCommand(word string) bool {
