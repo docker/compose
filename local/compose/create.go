@@ -310,6 +310,16 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, inherit 
 		if definedSecret.External.External {
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
 		}
+
+		if contains(inherited, target) {
+			// remove inherited mount
+			pos := indexOf(inherited, target)
+			if pos >= 0 {
+				mounts = append(mounts[:pos], mounts[pos+1])
+				inherited = append(inherited[:pos], inherited[pos+1])
+			}
+		}
+
 		mount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:   types.VolumeTypeBind,
 			Source: definedSecret.File,
