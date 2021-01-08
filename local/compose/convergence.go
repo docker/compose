@@ -26,7 +26,6 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
 	"golang.org/x/sync/errgroup"
 
 	status "github.com/docker/compose-cli/local/moby"
@@ -41,11 +40,6 @@ const (
 		"Docker requires each container to have a unique name. " +
 		"Remove the custom name to scale the service.\n"
 )
-
-func containerExists(ctx context.Context, c *client.Client, name string) bool {
-	container, err := c.ContainerInspect(ctx, name)
-	return err == nil && container.ContainerJSONBase != nil && container.Name == "/"+name
-}
 
 func (s *composeService) ensureScale(ctx context.Context, actual []moby.Container, scale int, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
 	eg, _ := errgroup.WithContext(ctx)
@@ -81,16 +75,7 @@ func (s *composeService) ensureScale(ctx context.Context, actual []moby.Containe
 }
 
 func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
-	actual, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(service.Name),
-		),
-		All: true,
-	})
-	if err != nil {
-		return err
-	}
+	actual := observedState.filter(isService(service.Name))
 
 	scale, err := getScale(service)
 	if err != nil {
@@ -201,11 +186,6 @@ func getScale(config types.ServiceConfig) (int, error) {
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
-	if containerExists(ctx, s.apiClient, name) {
-		return fmt.Errorf(doubledContainerNameWarning,
-			service.Name,
-			name)
-	}
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(name))
 	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove)
