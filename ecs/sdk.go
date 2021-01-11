@@ -31,7 +31,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -274,40 +273,32 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 		return fn(aws.String(string(template)), nil)
 	}
 
-	logrus.Debug("Create s3 bucket to store cloudformation template")
+	key, err := uuid.GenerateUUID()
+	if err != nil {
+		return "", err
+	}
+	bucket := "com.docker.compose." + key
+	logrus.Debugf("Create s3 bucket %q to store cloudformation template", bucket)
+
 	var configuration *s3.CreateBucketConfiguration
 	if region != "us-east-1" {
 		configuration = &s3.CreateBucketConfiguration{
 			LocationConstraint: aws.String(region),
 		}
 	}
-	// CloudFormation will only allow URL from a same-region bucket
-	// to avoid conflicts we suffix bucket name by region, so we can create comparable buckets in other regions.
-	bucket := "com.docker.compose." + region
-	_, err := s.S3.CreateBucket(&s3.CreateBucketInput{
+	_, err = s.S3.CreateBucket(&s3.CreateBucketInput{
 		Bucket:                    aws.String(bucket),
 		CreateBucketConfiguration: configuration,
 	})
-	if err != nil {
-		ae, ok := err.(awserr.Error)
-		if !ok {
-			return "", err
-		}
-		if ae.Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
-			return "", err
-		}
-	}
-
-	key, err := uuid.GenerateUUID()
 	if err != nil {
 		return "", err
 	}
 
 	upload, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
-		Key:         aws.String(key),
+		Key:         aws.String("template.yaml"),
 		Body:        bytes.NewReader(template),
 		Bucket:      aws.String(bucket),
-		ContentType: aws.String("application/json"),
+		ContentType: aws.String("application/x-yaml"),
 		Tagging:     aws.String(name),
 	})
 
@@ -315,17 +306,22 @@ func (s sdk) withTemplate(ctx context.Context, name string, template []byte, reg
 		return "", err
 	}
 
-	defer s.S3.DeleteObjects(&s3.DeleteObjectsInput{ //nolint: errcheck
-		Bucket: aws.String(bucket),
-		Delete: &s3.Delete{
-			Objects: []*s3.ObjectIdentifier{
-				{
-					Key:       aws.String(key),
-					VersionId: upload.VersionID,
-				},
-			},
-		},
-	})
+	defer func() {
+		_, err := s.S3.DeleteObjectWithContext(ctx, &s3.DeleteObjectInput{
+			Bucket:    aws.String(bucket),
+			Key:       aws.String("template.yaml"),
+			VersionId: upload.VersionID,
+		})
+		if err != nil {
+			logrus.Warnf("Failed to remove S3 bucket: %s", err)
+		}
+		_, err = s.S3.DeleteBucketWithContext(ctx, &s3.DeleteBucketInput{
+			Bucket: aws.String(bucket),
+		})
+		if err != nil {
+			logrus.Warnf("Failed to remove S3 bucket: %s", err)
+		}
+	}()
 
 	return fn(nil, aws.String(upload.Location))
 }
