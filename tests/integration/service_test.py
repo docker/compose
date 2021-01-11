@@ -948,7 +948,12 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        service = self.create_service('web', build={'context': base_dir})
+        service = self.create_service('web',
+                                      build={'context': base_dir},
+                                      environment={
+                                          'COMPOSE_DOCKER_CLI_BUILD': '0',
+                                          'DOCKER_BUILDKIT': '0',
+                                      })
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
 
@@ -964,7 +969,6 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web',
                                       build={'context': base_dir},
                                       environment={
-                                          'COMPOSE_DOCKER_CLI_BUILD': '1',
                                           'DOCKER_BUILDKIT': '1',
                                       })
         service.build(cli=True)
@@ -1015,7 +1019,6 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web',
                                   build={'context': base_dir},
                                   environment={
-                                      'COMPOSE_DOCKER_CLI_BUILD': '1',
                                       'DOCKER_BUILDKIT': '1',
                                   })
         project = Project('composetest', [web], self.client)
