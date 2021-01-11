@@ -251,7 +251,7 @@ func (s *composeService) restartContainer(ctx context.Context, container moby.Co
 }
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container, autoRemove bool) error {
-	containerConfig, hostConfig, networkingConfig, err := getCreateOptions(project, service, number, container, autoRemove)
+	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, container, autoRemove)
 	if err != nil {
 		return err
 	}
