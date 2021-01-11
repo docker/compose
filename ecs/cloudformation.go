@@ -23,6 +23,13 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/cnabio/cnab-to-oci/remotes"
+	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/compose-cli/config"
+	"github.com/docker/distribution/reference"
+
 	"github.com/docker/compose-cli/api/compose"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
@@ -40,12 +47,53 @@ import (
 )
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+	err := b.resolveServiceImagesDigests(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+
 	template, err := b.convert(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
 	return marshall(template, options.Format)
+}
+
+func (b *ecsAPIService) resolveServiceImagesDigests(ctx context.Context, project *types.Project) error {
+	configFile, err := cliconfig.Load(config.Dir(ctx))
+	if err != nil {
+		return err
+	}
+
+	resolver := remotes.CreateResolver(configFile)
+	eg := errgroup.Group{}
+	for i, s := range project.Services {
+		idx := i
+		service := s
+		eg.Go(func() error {
+			named, err := reference.ParseDockerRef(service.Image)
+			if err != nil {
+				return err
+			}
+
+			_, desc, err := resolver.Resolve(ctx, named.String())
+			if err != nil {
+				return err
+			}
+
+			digested, err := reference.WithDigest(named, desc.Digest)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("%s resolved to %s\n", service.Image, digested)
+			service.Image = digested.String()
+			project.Services[idx] = service
+			return nil
+		})
+	}
+	return eg.Wait()
 }
 
 func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*cloudformation.Template, error) {
