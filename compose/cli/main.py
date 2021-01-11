@@ -26,6 +26,7 @@ from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
+from ..metrics.decorator import metrics
 from ..progress_stream import StreamOutputError
 from ..project import get_image_digests
 from ..project import MissingDigests
@@ -53,6 +54,8 @@ from .log_printer import LogPrinter
 from .utils import get_version_info
 from .utils import human_readable_file_size
 from .utils import yesno
+from compose.metrics.client import MetricsCommand
+from compose.metrics.client import Status
 
 
 if not IS_WINDOWS_PLATFORM:
@@ -62,36 +65,77 @@ log = logging.getLogger(__name__)
 console_handler = logging.StreamHandler(sys.stderr)
 
 
-def main():
+def main():  # noqa: C901
     signals.ignore_sigpipe()
+    command = None
     try:
-        command = dispatch()
-        command()
+        _, opts, command = DocoptDispatcher.get_command_and_options(
+            TopLevelCommand,
+            get_filtered_args(sys.argv[1:]),
+            {'options_first': True, 'version': get_version_info('compose')})
+    except Exception:
+        pass
+    try:
+        command_func = dispatch()
+        command_func()
     except (KeyboardInterrupt, signals.ShutdownException):
-        log.error("Aborting.")
-        sys.exit(1)
+        exit_with_metrics(command, "Aborting.", status=Status.FAILURE)
     except (UserError, NoSuchService, ConfigurationError,
             ProjectError, OperationFailedError) as e:
-        log.error(e.msg)
-        sys.exit(1)
+        exit_with_metrics(command, e.msg, status=Status.FAILURE)
     except BuildError as e:
         reason = ""
         if e.reason:
             reason = " : " + e.reason
-        log.error("Service '{}' failed to build{}".format(e.service.name, reason))
-        sys.exit(1)
+        exit_with_metrics(command,
+                          "Service '{}' failed to build{}".format(e.service.name, reason),
+                          status=Status.FAILURE)
     except StreamOutputError as e:
-        log.error(e)
-        sys.exit(1)
+        exit_with_metrics(command, e, status=Status.FAILURE)
     except NeedsBuildError as e:
-        log.error("Service '{}' needs to be built, but --no-build was passed.".format(e.service.name))
-        sys.exit(1)
+        exit_with_metrics(command,
+                          "Service '{}' needs to be built, but --no-build was passed.".format(
+                              e.service.name), status=Status.FAILURE)
     except NoSuchCommand as e:
         commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
-        log.error("No such command: %s\n\n%s", e.command, commands)
-        sys.exit(1)
+        exit_with_metrics(e.command, "No such command: {}\n\n{}".format(e.command, commands))
     except (errors.ConnectionError, StreamParseError):
-        sys.exit(1)
+        exit_with_metrics(command, status=Status.FAILURE)
+    except SystemExit as e:
+        status = Status.SUCCESS
+        if len(sys.argv) > 1 and '--help' not in sys.argv:
+            status = Status.FAILURE
+
+        if command and len(sys.argv) >= 3 and sys.argv[2] == '--help':
+            command = '--help ' + command
+
+        if not command and len(sys.argv) >= 2 and sys.argv[1] == '--help':
+            command = '--help'
+
+        msg = e.args[0] if len(e.args) else ""
+        code = 0
+        if isinstance(e.code, int):
+            code = e.code
+        exit_with_metrics(command, log_msg=msg, status=status,
+                          exit_code=code)
+
+
+def get_filtered_args(args):
+    if args[0] in ('-h', '--help'):
+        return []
+    if args[0] == '--version':
+        return ['version']
+
+
+def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1):
+    if log_msg:
+        if not exit_code:
+            log.info(log_msg)
+        else:
+            log.error(log_msg)
+
+    MetricsCommand(command, status=status).send_metrics()
+    sys.exit(exit_code)
 
 
 def dispatch():
@@ -133,8 +177,10 @@ def setup_logging():
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.DEBUG)
 
-    # Disable requests logging
+    # Disable requests and docker-py logging
+    logging.getLogger("urllib3").propagate = False
     logging.getLogger("requests").propagate = False
+    logging.getLogger("docker").propagate = False
 
 
 def setup_parallel_logger(noansi):
@@ -254,6 +300,7 @@ class TopLevelCommand:
         environment_file = self.toplevel_options.get('--env-file')
         return Environment.from_env_file(self.project_dir, environment_file)
 
+    @metrics()
     def build(self, options):
         """
         Build or rebuild services.
@@ -273,8 +320,6 @@ class TopLevelCommand:
             --no-rm                 Do not remove intermediate containers after a successful build.
             --parallel              Build images in parallel.
             --progress string       Set type of progress output (auto, plain, tty).
-                                    EXPERIMENTAL flag for native builder.
-                                    To enable, run with COMPOSE_DOCKER_CLI_BUILD=1)
             --pull                  Always attempt to pull a newer version of the image.
             -q, --quiet             Don't print anything to STDOUT
         """
@@ -288,7 +333,7 @@ class TopLevelCommand:
                 )
             build_args = resolve_build_args(build_args, self.toplevel_environment)
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD', True)
 
         self.project.build(
             service_names=options['SERVICE'],
@@ -305,6 +350,7 @@ class TopLevelCommand:
             progress=options.get('--progress'),
         )
 
+    @metrics()
     def config(self, options):
         """
         Validate and view the Compose file.
@@ -354,6 +400,7 @@ class TopLevelCommand:
 
         print(serialize_config(compose_config, image_digests, not options['--no-interpolate']))
 
+    @metrics()
     def create(self, options):
         """
         Creates containers for a service.
@@ -382,6 +429,7 @@ class TopLevelCommand:
             do_build=build_action_from_opts(options),
         )
 
+    @metrics()
     def down(self, options):
         """
         Stops containers and removes containers, networks, volumes, and images
@@ -450,6 +498,7 @@ class TopLevelCommand:
             print(formatter(event))
             sys.stdout.flush()
 
+    @metrics("exec")
     def exec_command(self, options):
         """
         Execute a command in a running container
@@ -526,6 +575,7 @@ class TopLevelCommand:
         sys.exit(exit_code)
 
     @classmethod
+    @metrics()
     def help(cls, options):
         """
         Get help on a command.
@@ -539,6 +589,7 @@ class TopLevelCommand:
 
         print(getdoc(subject))
 
+    @metrics()
     def images(self, options):
         """
         List images used by the created containers.
@@ -593,6 +644,7 @@ class TopLevelCommand:
             ])
         print(Formatter.table(headers, rows))
 
+    @metrics()
     def kill(self, options):
         """
         Force stop service containers.
@@ -607,6 +659,7 @@ class TopLevelCommand:
 
         self.project.kill(service_names=options['SERVICE'], signal=signal)
 
+    @metrics()
     def logs(self, options):
         """
         View output from containers.
@@ -643,6 +696,7 @@ class TopLevelCommand:
             event_stream=self.project.events(service_names=options['SERVICE']),
             keep_prefix=not options['--no-log-prefix']).run()
 
+    @metrics()
     def pause(self, options):
         """
         Pause services.
@@ -652,6 +706,7 @@ class TopLevelCommand:
         containers = self.project.pause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to pause', 1)
 
+    @metrics()
     def port(self, options):
         """
         Print the public port for a port binding.
@@ -673,6 +728,7 @@ class TopLevelCommand:
             options['PRIVATE_PORT'],
             protocol=options.get('--protocol') or 'tcp') or '')
 
+    @metrics()
     def ps(self, options):
         """
         List containers.
@@ -729,6 +785,7 @@ class TopLevelCommand:
                 ])
             print(Formatter.table(headers, rows))
 
+    @metrics()
     def pull(self, options):
         """
         Pulls images for services defined in a Compose file, but does not start the containers.
@@ -752,6 +809,7 @@ class TopLevelCommand:
             include_deps=options.get('--include-deps'),
         )
 
+    @metrics()
     def push(self, options):
         """
         Pushes images for services.
@@ -766,6 +824,7 @@ class TopLevelCommand:
             ignore_push_failures=options.get('--ignore-push-failures')
         )
 
+    @metrics()
     def rm(self, options):
         """
         Removes stopped service containers.
@@ -810,6 +869,7 @@ class TopLevelCommand:
         else:
             print("No stopped containers")
 
+    @metrics()
     def run(self, options):
         """
         Run a one-off command on a service.
@@ -870,6 +930,7 @@ class TopLevelCommand:
             self.toplevel_options, self.toplevel_environment
         )
 
+    @metrics()
     def scale(self, options):
         """
         Set number of containers to run for a service.
@@ -898,6 +959,7 @@ class TopLevelCommand:
         for service_name, num in parse_scale_args(options['SERVICE=NUM']).items():
             self.project.get_service(service_name).scale(num, timeout=timeout)
 
+    @metrics()
     def start(self, options):
         """
         Start existing containers.
@@ -907,6 +969,7 @@ class TopLevelCommand:
         containers = self.project.start(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to start', 1)
 
+    @metrics()
     def stop(self, options):
         """
         Stop running containers without removing them.
@@ -922,6 +985,7 @@ class TopLevelCommand:
         timeout = timeout_from_opts(options)
         self.project.stop(service_names=options['SERVICE'], timeout=timeout)
 
+    @metrics()
     def restart(self, options):
         """
         Restart running containers.
@@ -936,6 +1000,7 @@ class TopLevelCommand:
         containers = self.project.restart(service_names=options['SERVICE'], timeout=timeout)
         exit_if(not containers, 'No containers to restart', 1)
 
+    @metrics()
     def top(self, options):
         """
         Display the running processes
@@ -963,6 +1028,7 @@ class TopLevelCommand:
             print(container.name)
             print(Formatter.table(headers, rows))
 
+    @metrics()
     def unpause(self, options):
         """
         Unpause services.
@@ -972,6 +1038,7 @@ class TopLevelCommand:
         containers = self.project.unpause(service_names=options['SERVICE'])
         exit_if(not containers, 'No containers to unpause', 1)
 
+    @metrics()
     def up(self, options):
         """
         Builds, (re)creates, starts, and attaches to containers for a service.
@@ -1050,7 +1117,7 @@ class TopLevelCommand:
         for excluded in [x for x in opts if options.get(x) and no_start]:
             raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
-        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD')
+        native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD', True)
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)
@@ -1122,6 +1189,7 @@ class TopLevelCommand:
                 sys.exit(exit_code)
 
     @classmethod
+    @metrics()
     def version(cls, options):
         """
         Show version information and quit.
