@@ -296,6 +296,41 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, inherit 
 		}
 		mounts = append(mounts, mount)
 	}
+
+	secretsDir := "/run/secrets"
+	for _, secret := range s.Secrets {
+		target := secret.Target
+		if secret.Target == "" {
+			target = filepath.Join(secretsDir, secret.Source)
+		} else if !filepath.IsAbs(secret.Target) {
+			target = filepath.Join(secretsDir, secret.Target)
+		}
+
+		definedSecret := p.Secrets[secret.Source]
+		if definedSecret.External.External {
+			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
+		}
+
+		if contains(inherited, target) {
+			// remove inherited mount
+			pos := indexOf(inherited, target)
+			if pos >= 0 {
+				mounts = append(mounts[:pos], mounts[pos+1])
+				inherited = append(inherited[:pos], inherited[pos+1])
+			}
+		}
+
+		mount, err := buildMount(p, types.ServiceVolumeConfig{
+			Type:   types.VolumeTypeBind,
+			Source: definedSecret.File,
+			Target: target,
+		})
+		if err != nil {
+			return nil, err
+		}
+		mounts = append(mounts, mount)
+	}
+
 	return mounts, nil
 }
 
