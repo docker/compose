@@ -477,7 +477,7 @@ func TestContainerRunAttached(t *testing.T) {
 	})
 
 	t.Run("restart container", func(t *testing.T) {
-		res := c.RunDockerCmd("start", container)
+		res := c.RunDockerOrExitError("start", container)
 		//Flaky errors on restart : Code="ContainerGroupTransitioning" Message="The container group 'test-container' is still transitioning, please retry later."
 		if res.ExitCode != 0 && strings.Contains(res.Stderr(), `Code="ContainerGroupTransitioning"`) {
 			time.Sleep(3 * time.Second)
