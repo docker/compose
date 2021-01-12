@@ -3,7 +3,8 @@ services:
     build: aci-demo/db
     image: gtardif/sentences-db
 
-  words:
+  service1:
+    container_name: words
     build: aci-demo/words
     image: gtardif/sentences-api
     ports:

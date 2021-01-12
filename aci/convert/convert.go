@@ -120,8 +120,8 @@ func ToContainerGroup(ctx context.Context, aciContext store.AciContext, p types.
 			DNSNameLabel: dnsLabelName,
 		}
 	}
-	if len(ctnrs) > 1 {
-		dnsSideCar := getDNSSidecar(ctnrs)
+	if len(project.Services) > 1 {
+		dnsSideCar := getDNSSidecar(project.Services)
 		ctnrs = append(ctnrs, dnsSideCar)
 	}
 	groupDefinition.ContainerGroupProperties.Containers = &ctnrs
@@ -137,10 +137,13 @@ func durationToSeconds(d *types.Duration) *int32 {
 	return &v
 }
 
-func getDNSSidecar(containers []containerinstance.Container) containerinstance.Container {
+func getDNSSidecar(services types.Services) containerinstance.Container {
 	names := []string{"/hosts"}
-	for _, container := range containers {
-		names = append(names, *container.Name)
+	for _, service := range services {
+		names = append(names, service.Name)
+		if service.ContainerName != "" {
+			names = append(names, service.ContainerName)
+		}
 	}
 	dnsSideCar := containerinstance.Container{
 		Name: to.StringPtr(ComposeDNSSidecarName),
@@ -182,8 +185,13 @@ func (s serviceConfigAciHelper) getAciContainer() (containerinstance.Container, 
 		return containerinstance.Container{}, err
 	}
 
+	containerName := s.Name
+	if s.ContainerName != "" {
+		containerName = s.ContainerName
+	}
+
 	return containerinstance.Container{
-		Name: to.StringPtr(s.Name),
+		Name: to.StringPtr(containerName),
 		ContainerProperties: &containerinstance.ContainerProperties{
 			Image:                to.StringPtr(s.Image),
 			Command:              to.StringSlicePtr(s.Command),

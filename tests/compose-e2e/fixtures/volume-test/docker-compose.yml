@@ -16,3 +16,4 @@ services:
 
 volumes:
   staticVol:
+    name: myVolume
