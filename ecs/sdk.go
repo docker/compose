@@ -210,7 +210,7 @@ func (s sdk) GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error
 	return ids, nil
 }
 
-func (s sdk) IsPublicSubnet(ctx context.Context, vpcID string, subNetID string) (bool, error) {
+func (s sdk) IsPublicSubnet(ctx context.Context, subNetID string) (bool, error) {
 	tables, err := s.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
 			{
@@ -1045,14 +1045,14 @@ func (s sdk) GetPublicIPs(ctx context.Context, interfaces ...string) (map[string
 	}
 }
 
-func (s sdk) ResolveLoadBalancer(ctx context.Context, nameOrarn string) (awsResource, string, error) {
-	logrus.Debug("Check if LoadBalancer exists: ", nameOrarn)
+func (s sdk) ResolveLoadBalancer(ctx context.Context, nameOrArn string) (awsResource, string, string, []awsResource, error) {
+	logrus.Debug("Check if LoadBalancer exists: ", nameOrArn)
 	var arns []*string
 	var names []*string
-	if arn.IsARN(nameOrarn) {
-		arns = append(arns, aws.String(nameOrarn))
+	if arn.IsARN(nameOrArn) {
+		arns = append(arns, aws.String(nameOrArn))
 	} else {
-		names = append(names, aws.String(nameOrarn))
+		names = append(names, aws.String(nameOrArn))
 	}
 
 	lbs, err := s.ELB.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
@@ -1060,16 +1060,22 @@ func (s sdk) ResolveLoadBalancer(ctx context.Context, nameOrarn string) (awsReso
 		Names:            names,
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", nil, err
 	}
 	if len(lbs.LoadBalancers) == 0 {
-		return nil, "", errors.Wrapf(errdefs.ErrNotFound, "load balancer %q does not exist", nameOrarn)
+		return nil, "", "", nil, errors.Wrapf(errdefs.ErrNotFound, "load balancer %q does not exist", nameOrArn)
 	}
 	it := lbs.LoadBalancers[0]
+	var subNets []awsResource
+	for _, az := range it.AvailabilityZones {
+		subNets = append(subNets, existingAWSResource{
+			id: aws.StringValue(az.SubnetId),
+		})
+	}
 	return existingAWSResource{
 		arn: aws.StringValue(it.LoadBalancerArn),
 		id:  aws.StringValue(it.LoadBalancerName),
-	}, aws.StringValue(it.Type), nil
+	}, aws.StringValue(it.Type), aws.StringValue(it.VpcId), subNets, nil
 }
 
 func (s sdk) GetLoadBalancerURL(ctx context.Context, arn string) (string, error) {

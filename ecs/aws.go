@@ -40,7 +40,7 @@ type API interface {
 	CheckVPC(ctx context.Context, vpcID string) error
 	GetDefaultVPC(ctx context.Context) (string, error)
 	GetSubNets(ctx context.Context, vpcID string) ([]awsResource, error)
-	IsPublicSubnet(ctx context.Context, vpcID string, subNetID string) (bool, error)
+	IsPublicSubnet(ctx context.Context, subNetID string) (bool, error)
 	GetRoleArn(ctx context.Context, name string) (string, error)
 	StackExists(ctx context.Context, name string) (bool, error)
 	CreateStack(ctx context.Context, name string, region string, template []byte) error
@@ -68,7 +68,7 @@ type API interface {
 	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)
 	ListTasks(ctx context.Context, cluster string, family string) ([]string, error)
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
-	ResolveLoadBalancer(ctx context.Context, nameOrArn string) (awsResource, string, error)
+	ResolveLoadBalancer(ctx context.Context, nameOrArn string) (awsResource, string, string, []awsResource, error)
 	GetLoadBalancerURL(ctx context.Context, arn string) (string, error)
 	GetParameter(ctx context.Context, name string) (string, error)
 	SecurityGroupExists(ctx context.Context, sg string) (bool, error)

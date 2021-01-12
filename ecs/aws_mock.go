@@ -6,13 +6,12 @@ package ecs
 
 import (
 	context "context"
-	reflect "reflect"
-
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	ecs "github.com/aws/aws-sdk-go/service/ecs"
 	compose "github.com/docker/compose-cli/api/compose"
 	secrets "github.com/docker/compose-cli/api/secrets"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -455,7 +454,7 @@ func (mr *MockAPIMockRecorder) InspectSecret(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // IsPublicSubnet mocks base method
-func (m *MockAPI) IsPublicSubnet(ctx context.Context, arg0 string, arg1 string) (bool, error) {
+func (m *MockAPI) IsPublicSubnet(arg0 context.Context, arg1 string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsPublicSubnet", arg0, arg1)
 	ret0, _ := ret[0].(bool)
@@ -605,13 +604,15 @@ func (mr *MockAPIMockRecorder) ResolveFileSystem(arg0, arg1 interface{}) *gomock
 }
 
 // ResolveLoadBalancer mocks base method
-func (m *MockAPI) ResolveLoadBalancer(arg0 context.Context, arg1 string) (awsResource, string, error) {
+func (m *MockAPI) ResolveLoadBalancer(arg0 context.Context, arg1 string) (awsResource, string, string, []awsResource, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResolveLoadBalancer", arg0, arg1)
 	ret0, _ := ret[0].(awsResource)
 	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret2, _ := ret[2].(string)
+	ret3, _ := ret[3].([]awsResource)
+	ret4, _ := ret[4].(error)
+	return ret0, ret1, ret2, ret3, ret4
 }
 
 // ResolveLoadBalancer indicates an expected call of ResolveLoadBalancer

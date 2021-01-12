@@ -129,11 +129,11 @@ func (b *ecsAPIService) parse(ctx context.Context, project *types.Project, templ
 	if err != nil {
 		return r, err
 	}
-	r.vpc, r.subnets, err = b.parseVPCExtension(ctx, project)
+	err = b.parseLoadBalancerExtension(ctx, project, &r)
 	if err != nil {
 		return r, err
 	}
-	r.loadBalancer, r.loadBalancerType, err = b.parseLoadBalancerExtension(ctx, project)
+	err = b.parseVPCExtension(ctx, project, &r)
 	if err != nil {
 		return r, err
 	}
@@ -165,7 +165,7 @@ func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *type
 	return nil, nil
 }
 
-func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project) (string, []awsResource, error) {
+func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Project, r *awsResources) error {
 	var vpc string
 	if x, ok := project.Extensions[extensionVPC]; ok {
 		vpc = x.(string)
@@ -177,29 +177,40 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 			vpc = id[i+1:]
 		}
 
+		if r.vpc != "" {
+			if r.vpc != vpc {
+				return fmt.Errorf("load balancer set by %s is attached to VPC %s", extensionLoadBalancer, r.vpc)
+			}
+			return nil
+		}
+
 		err = b.aws.CheckVPC(ctx, vpc)
 		if err != nil {
-			return "", nil, err
+			return err
 		}
 
 	} else {
+		if r.vpc != "" {
+			return nil
+		}
+
 		defaultVPC, err := b.aws.GetDefaultVPC(ctx)
 		if err != nil {
-			return "", nil, err
+			return err
 		}
 		vpc = defaultVPC
 	}
 
 	subNets, err := b.aws.GetSubNets(ctx, vpc)
 	if err != nil {
-		return "", nil, err
+		return err
 	}
 
 	var publicSubNets []awsResource
 	for _, subNet := range subNets {
-		isPublic, err := b.aws.IsPublicSubnet(ctx, vpc, subNet.ID())
+		isPublic, err := b.aws.IsPublicSubnet(ctx, subNet.ID())
 		if err != nil {
-			return "", nil, err
+			return err
 		}
 		if isPublic {
 			publicSubNets = append(publicSubNets, subNet)
@@ -207,27 +218,34 @@ func (b *ecsAPIService) parseVPCExtension(ctx context.Context, project *types.Pr
 	}
 
 	if len(publicSubNets) < 2 {
-		return "", nil, fmt.Errorf("VPC %s should have at least 2 associated public subnets in different availability zones", vpc)
+		return fmt.Errorf("VPC %s should have at least 2 associated public subnets in different availability zones", vpc)
 	}
-	return vpc, publicSubNets, nil
+
+	r.vpc = vpc
+	r.subnets = subNets
+	return nil
 }
 
-func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project) (awsResource, string, error) {
+func (b *ecsAPIService) parseLoadBalancerExtension(ctx context.Context, project *types.Project, r *awsResources) error {
 	if x, ok := project.Extensions[extensionLoadBalancer]; ok {
 		nameOrArn := x.(string)
-		loadBalancer, loadBalancerType, err := b.aws.ResolveLoadBalancer(ctx, nameOrArn)
+		loadBalancer, loadBalancerType, vpc, subnets, err := b.aws.ResolveLoadBalancer(ctx, nameOrArn)
 		if err != nil {
-			return nil, "", err
+			return err
 		}
 
 		required := getRequiredLoadBalancerType(project)
 		if loadBalancerType != required {
-			return nil, "", fmt.Errorf("load balancer %q is of type %s, project require a %s", nameOrArn, loadBalancerType, required)
+			return fmt.Errorf("load balancer %q is of type %s, project require a %s", nameOrArn, loadBalancerType, required)
 		}
 
-		return loadBalancer, loadBalancerType, err
+		r.loadBalancer = loadBalancer
+		r.loadBalancerType = loadBalancerType
+		r.vpc = vpc
+		r.subnets = subnets
+		return err
 	}
-	return nil, "", nil
+	return nil
 }
 
 func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *types.Project) (map[string]string, error) {
