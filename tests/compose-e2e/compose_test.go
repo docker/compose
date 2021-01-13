@@ -126,7 +126,6 @@ func TestLocalComposeRun(t *testing.T) {
 				assert.Assert(t, strings.HasPrefix(containerID, "run-test_back_run_"), containerID)
 				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
 				runContainerID = containerID
-				assert.Assert(t, strings.Contains(line, "Exited"), line)
 			}
 			if strings.HasPrefix(containerID, "run-test_db_1") {
 				assert.Assert(t, strings.Contains(line, "Up"), line)
@@ -134,6 +133,7 @@ func TestLocalComposeRun(t *testing.T) {
 		}
 		assert.Assert(t, runContainerID != "")
 		res = c.RunDockerCmd("inspect", runContainerID)
+		res.Assert(t, icmd.Expected{Out: ` "Status": "exited"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "run-test"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "True",`})
