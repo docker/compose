@@ -512,7 +512,6 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		eventName := fmt.Sprintf("Volume %q", volume.Name)
 		w := progress.ContextWriter(ctx)
 		w.Event(progress.CreatingEvent(eventName))
-		// TODO we miss support for driver_opts and labels
 		_, err := s.apiClient.VolumeCreate(ctx, volume_api.VolumeCreateBody{
 			Labels:     volume.Labels,
 			Name:       volume.Name,
