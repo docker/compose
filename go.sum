@@ -271,8 +271,8 @@ github.com/cnabio/cnab-to-oci v0.3.1-beta1/go.mod h1:8BomA5Vye+3V/Kd2NSFblCBmp1r
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20210106202047-687be5e0e320 h1:PjwzjUYqjto8PLdHLtPX2/JtCbYYsKMs1Zof7/h29YA=
-github.com/compose-spec/compose-go v0.0.0-20210106202047-687be5e0e320/go.mod h1:rz7rjxJGA/pWpLdBmDdqymGm2okEDYgBE7yx569xW+I=
+github.com/compose-spec/compose-go v0.0.0-20210113150448-e0b1ffe70cc5 h1:YBR7Ds5WrY+FNxN2aRRZyEB1E86PD+g1O5RjK++acx8=
+github.com/compose-spec/compose-go v0.0.0-20210113150448-e0b1ffe70cc5/go.mod h1:rz7rjxJGA/pWpLdBmDdqymGm2okEDYgBE7yx569xW+I=
 github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59/go.mod h1:pA0z1pT8KYB3TCXK/ocprsh7MAkoW8bZVzPdih9snmM=
 github.com/containerd/cgroups v0.0.0-20200710171044-318312a37340 h1:9atoWyI9RtXFwf7UDbme/6M8Ud0rFrx+Q3ZWgSnsxtw=

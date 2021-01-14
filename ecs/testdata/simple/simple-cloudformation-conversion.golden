@@ -30,7 +30,7 @@ Resources:
       - Key: com.docker.compose.project
         Value: TestSimpleConvert
       - Key: com.docker.compose.network
-        Value: default
+        Value: TestSimpleConvert_default
       VpcId: vpc-123
     Type: AWS::EC2::SecurityGroup
   DefaultNetworkIngress:

@@ -72,7 +72,7 @@ func (b *ecsAPIService) createAccessPoints(project *types.Project, r awsResource
 				},
 				{
 					Key:   "Name",
-					Value: fmt.Sprintf("%s_%s", project.Name, name),
+					Value: volume.Name,
 				},
 			},
 			FileSystemId: r.filesystems[name].ID(),

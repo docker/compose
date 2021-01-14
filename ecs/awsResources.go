@@ -406,7 +406,7 @@ func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, t
 				},
 				{
 					Key:   "Name",
-					Value: fmt.Sprintf("%s_%s", project.Name, name),
+					Value: volume.Name,
 				},
 			},
 			KmsKeyId:                        kmsKeyID,

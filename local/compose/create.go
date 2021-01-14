@@ -48,7 +48,9 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	if err := s.ensureProjectNetworks(ctx, project); err != nil {
+	prepareNetworks(project)
+
+	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
 	}
 
@@ -89,15 +91,17 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	})
 }
 
-func (s *composeService) ensureProjectNetworks(ctx context.Context, project *types.Project) error {
+func prepareNetworks(project *types.Project) {
 	for k, network := range project.Networks {
-		if !network.External.External && network.Name != "" {
-			network.Name = fmt.Sprintf("%s_%s", project.Name, k)
-			project.Networks[k] = network
-		}
 		network.Labels = network.Labels.Add(networkLabel, k)
 		network.Labels = network.Labels.Add(projectLabel, project.Name)
 		network.Labels = network.Labels.Add(versionLabel, ComposeVersion)
+		project.Networks[k] = network
+	}
+}
+
+func (s *composeService) ensureNetworks(ctx context.Context, networks types.Networks) error {
+	for _, network := range networks {
 		err := s.ensureNetwork(ctx, network)
 		if err != nil {
 			return err
@@ -108,10 +112,6 @@ func (s *composeService) ensureProjectNetworks(ctx context.Context, project *typ
 
 func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
 	for k, volume := range project.Volumes {
-		if !volume.External.External && volume.Name != "" {
-			volume.Name = fmt.Sprintf("%s_%s", project.Name, k)
-			project.Volumes[k] = volume
-		}
 		volume.Labels = volume.Labels.Add(volumeLabel, k)
 		volume.Labels = volume.Labels.Add(projectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(versionLabel, ComposeVersion)
@@ -121,6 +121,14 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		}
 	}
 	return nil
+}
+
+func getImageName(service types.ServiceConfig, projectName string) string {
+	imageName := service.Image
+	if imageName == "" {
+		imageName = projectName + "_" + service.Name
+	}
+	return imageName
 }
 
 func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container, autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
@@ -155,10 +163,6 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 	if len(s.Entrypoint) > 0 {
 		entrypoint = strslice.StrSlice(s.Entrypoint)
 	}
-	image := s.Image
-	if s.Image == "" {
-		image = fmt.Sprintf("%s_%s", p.Name, s.Name)
-	}
 
 	var (
 		tty         = s.Tty
@@ -178,7 +182,7 @@ func getCreateOptions(p *types.Project, s types.ServiceConfig, number int, inher
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
-		Image:           image,
+		Image:           getImageName(s, p.Name),
 		WorkingDir:      s.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: s.NetworkMode == "disabled",
