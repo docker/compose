@@ -28,7 +28,6 @@ import (
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 )
@@ -118,11 +117,7 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		return nil, nil, err
 	}
 
-	options, err := opts.toProjectOptions()
-	if err != nil {
-		return nil, nil, err
-	}
-	project, err := cli.ProjectFromOptions(options)
+	project, err := opts.toProject()
 	if err != nil {
 		return nil, nil, err
 	}

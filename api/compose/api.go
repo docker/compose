@@ -67,6 +67,8 @@ type UpOptions struct {
 type DownOptions struct {
 	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
 	RemoveOrphans bool
+	// Project is the compose project used to define this app. Might be nil if user ran `down` just with project name
+	Project *types.Project
 }
 
 // ConvertOptions group options of the Convert API
