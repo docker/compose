@@ -131,7 +131,8 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 	return imageName
 }
 
-func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project, s types.ServiceConfig, number int, inherit *moby.Container, autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig, number int, inherit *moby.Container,
+	autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
 	hash, err := jsonHash(s)
 	if err != nil {
@@ -139,14 +140,14 @@ func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project
 	}
 
 	labels := map[string]string{}
-	for k, v := range s.Labels {
+	for k, v := range service.Labels {
 		labels[k] = v
 	}
 
 	labels[projectLabel] = p.Name
-	labels[serviceLabel] = s.Name
+	labels[serviceLabel] = service.Name
 	labels[versionLabel] = ComposeVersion
-	if _, ok := s.Labels[oneoffLabel]; !ok {
+	if _, ok := service.Labels[oneoffLabel]; !ok {
 		labels[oneoffLabel] = "False"
 	}
 	labels[configHashLabel] = hash
@@ -158,33 +159,30 @@ func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project
 		runCmd     strslice.StrSlice
 		entrypoint strslice.StrSlice
 	)
-	if len(s.Command) > 0 {
-		runCmd = strslice.StrSlice(s.Command)
+	if len(service.Command) > 0 {
+		runCmd = strslice.StrSlice(service.Command)
 	}
-	if len(s.Entrypoint) > 0 {
-		entrypoint = strslice.StrSlice(s.Entrypoint)
+	if len(service.Entrypoint) > 0 {
+		entrypoint = strslice.StrSlice(service.Entrypoint)
 	}
 
 	var (
-		tty         = s.Tty
-		stdinOpen   = s.StdinOpen
+		tty         = service.Tty
+		stdinOpen   = service.StdinOpen
 		attachStdin = false
 	)
-	image := getImageName(s, p.Name)
-	imgInspect, _, err := cs.apiClient.ImageInspectWithRaw(ctx, image)
+	image := getImageName(service, p.Name)
+	imgInspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, image)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	mountOptions, err := buildContainerMountOptions(*p, s, imgInspect, inherit)
+	mountOptions, err := buildContainerMountOptions(*p, service, imgInspect, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	volumeMounts := map[string]struct{}{}
 	binds := []string{}
 	for _, m := range mountOptions {
-		if m.Type == mount.TypeVolume {
-
-		}
 		if m.Type == mount.TypeVolume {
 			volumeMounts[m.Target] = struct{}{}
 			if m.Source != "" {
@@ -194,10 +192,10 @@ func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project
 	}
 
 	containerConfig := container.Config{
-		Hostname:        s.Hostname,
-		Domainname:      s.DomainName,
-		User:            s.User,
-		ExposedPorts:    buildContainerPorts(s),
+		Hostname:        service.Hostname,
+		Domainname:      service.DomainName,
+		User:            service.User,
+		ExposedPorts:    buildContainerPorts(service),
 		Tty:             tty,
 		OpenStdin:       stdinOpen,
 		StdinOnce:       true,
@@ -206,21 +204,21 @@ func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project
 		AttachStdout:    true,
 		Cmd:             runCmd,
 		Image:           image,
-		WorkingDir:      s.WorkingDir,
+		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
-		NetworkDisabled: s.NetworkMode == "disabled",
-		MacAddress:      s.MacAddress,
+		NetworkDisabled: service.NetworkMode == "disabled",
+		MacAddress:      service.MacAddress,
 		Labels:          labels,
-		StopSignal:      s.StopSignal,
-		Env:             convert.ToMobyEnv(s.Environment),
-		Healthcheck:     convert.ToMobyHealthCheck(s.HealthCheck),
+		StopSignal:      service.StopSignal,
+		Env:             convert.ToMobyEnv(service.Environment),
+		Healthcheck:     convert.ToMobyHealthCheck(service.HealthCheck),
 		// Volumes:         // FIXME unclear to me the overlap with HostConfig.Mounts
 		Volumes:     volumeMounts,
-		StopTimeout: convert.ToSeconds(s.StopGracePeriod),
+		StopTimeout: convert.ToSeconds(service.StopGracePeriod),
 	}
 
 	// append secrets mounts
-	bindMounts, err := buildContainerSecretMounts(*p, s, imgInspect, inherit)
+	bindMounts, err := buildContainerSecretMounts(*p, service)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -229,26 +227,26 @@ func (cs *composeService) getCreateOptions(ctx context.Context, p *types.Project
 			bindMounts = append(bindMounts, m)
 		}
 	}
-	portBindings := buildContainerPortBindingOptions(s)
+	portBindings := buildContainerPortBindingOptions(service)
 
-	resources := getDeployResources(s)
-	networkMode := getNetworkMode(p, s)
+	resources := getDeployResources(service)
+	networkMode := getNetworkMode(p, service)
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
 		Binds:          binds,
 		Mounts:         bindMounts,
-		CapAdd:         strslice.StrSlice(s.CapAdd),
-		CapDrop:        strslice.StrSlice(s.CapDrop),
+		CapAdd:         strslice.StrSlice(service.CapAdd),
+		CapDrop:        strslice.StrSlice(service.CapDrop),
 		NetworkMode:    networkMode,
-		Init:           s.Init,
-		ReadonlyRootfs: s.ReadOnly,
+		Init:           service.Init,
+		ReadonlyRootfs: service.ReadOnly,
 		// ShmSize: , TODO
-		Sysctls:      s.Sysctls,
+		Sysctls:      service.Sysctls,
 		PortBindings: portBindings,
 		Resources:    resources,
 	}
 
-	networkConfig := buildDefaultNetworkConfig(s, networkMode, getContainerName(p.Name, s, number))
+	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
 	return &containerConfig, &hostConfig, networkConfig, nil
 }
 
@@ -319,7 +317,7 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 		}
 	}
 	if img.ContainerConfig != nil {
-		for k, _ := range img.ContainerConfig.Volumes {
+		for k := range img.ContainerConfig.Volumes {
 
 			mount, err := buildMount(p, types.ServiceVolumeConfig{
 				Type:   types.VolumeTypeVolume,
@@ -346,7 +344,7 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 	return values, nil
 }
 
-func buildContainerSecretMounts(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
+func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 
 	secretsDir := "/run/secrets"
