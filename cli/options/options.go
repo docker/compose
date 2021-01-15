@@ -17,8 +17,8 @@
 package options
 
 import (
+	apicontext "github.com/docker/compose-cli/api/context"
 	cliconfig "github.com/docker/compose-cli/cli/config"
-	apicontext "github.com/docker/compose-cli/context"
 )
 
 // GlobalOpts contains the global CLI options

@@ -32,6 +32,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	apicontext "github.com/docker/compose-cli/api/context"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/cmd/compose"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
@@ -43,8 +45,6 @@ import (
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 	"github.com/docker/compose-cli/config"
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 
 	// Backend registrations

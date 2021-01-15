@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/prompt"
 
 	"github.com/golang/mock/gomock"

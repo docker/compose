@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/api/context/store"
 )
 
 type dirKey struct{}
