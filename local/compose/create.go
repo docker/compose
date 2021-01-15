@@ -50,6 +50,11 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 
 	prepareNetworks(project)
 
+	err = prepareVolumes(project)
+	if err != nil {
+		return err
+	}
+
 	if err := s.ensureNetworks(ctx, project.Networks); err != nil {
 		return err
 	}
@@ -89,6 +94,29 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.ensureService(c, observedState, project, service)
 	})
+}
+
+func prepareVolumes(p *types.Project) error {
+	for i := range p.Services {
+		volumesFrom, dependServices, err := getVolumesFrom(p, p.Services[i].VolumesFrom)
+		if err != nil {
+			return err
+		}
+		p.Services[i].VolumesFrom = volumesFrom
+		if len(dependServices) > 0 {
+			if p.Services[i].DependsOn == nil {
+				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
+			}
+			for _, service := range p.Services {
+				if contains(dependServices, service.Name) {
+					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
+						Condition: types.ServiceConditionStarted,
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -134,7 +162,7 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig, number int, inherit *moby.Container,
 	autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	hash, err := jsonHash(s)
+	hash, err := jsonHash(service)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -171,24 +199,10 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		stdinOpen   = service.StdinOpen
 		attachStdin = false
 	)
-	image := getImageName(service, p.Name)
-	imgInspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, image)
+
+	volumeMounts, binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
 	if err != nil {
 		return nil, nil, nil, err
-	}
-	mountOptions, err := buildContainerMountOptions(*p, service, imgInspect, inherit)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	volumeMounts := map[string]struct{}{}
-	binds := []string{}
-	for _, m := range mountOptions {
-		if m.Type == mount.TypeVolume {
-			volumeMounts[m.Target] = struct{}{}
-			if m.Source != "" {
-				binds = append(binds, fmt.Sprintf("%s:%s:%s", m.Source, m.Target, "rw"))
-			}
-		}
 	}
 
 	containerConfig := container.Config{
@@ -203,7 +217,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
-		Image:           image,
+		Image:           getImageName(service, p.Name),
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
@@ -212,21 +226,11 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		StopSignal:      service.StopSignal,
 		Env:             convert.ToMobyEnv(service.Environment),
 		Healthcheck:     convert.ToMobyHealthCheck(service.HealthCheck),
-		// Volumes:         // FIXME unclear to me the overlap with HostConfig.Mounts
-		Volumes:     volumeMounts,
+		Volumes:         volumeMounts,
+
 		StopTimeout: convert.ToSeconds(service.StopGracePeriod),
 	}
 
-	// append secrets mounts
-	bindMounts, err := buildContainerSecretMounts(*p, service)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	for _, m := range mountOptions {
-		if m.Type == mount.TypeBind || m.Type == mount.TypeTmpfs {
-			bindMounts = append(bindMounts, m)
-		}
-	}
 	portBindings := buildContainerPortBindingOptions(service)
 
 	resources := getDeployResources(service)
@@ -234,7 +238,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
 		Binds:          binds,
-		Mounts:         bindMounts,
+		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
 		CapDrop:        strslice.StrSlice(service.CapDrop),
 		NetworkMode:    networkMode,
@@ -244,6 +248,8 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Sysctls:      service.Sysctls,
 		PortBindings: portBindings,
 		Resources:    resources,
+		VolumeDriver: service.VolumeDriver,
+		VolumesFrom:  service.VolumesFrom,
 	}
 
 	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
@@ -297,6 +303,69 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 	return bindings
 }
 
+func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []string, error) {
+	var volumes = []string{}
+	var services = []string{}
+	// parse volumes_from
+	if len(volumesFrom) == 0 {
+		return volumes, services, nil
+	}
+	for _, vol := range volumesFrom {
+		spec := strings.Split(vol, ":")
+		if spec[0] == "container" {
+			volumes = append(volumes, strings.Join(spec[1:], ":"))
+			continue
+		}
+		serviceName := spec[0]
+		services = append(services, serviceName)
+		service, err := project.GetService(serviceName)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		firstContainer := getContainerName(project.Name, service, 1)
+		v := fmt.Sprintf("%s:%s", firstContainer, strings.Join(spec[1:], ":"))
+		volumes = append(volumes, v)
+	}
+	return volumes, services, nil
+
+}
+
+func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Project, service types.ServiceConfig,
+	inherit *moby.Container) (map[string]struct{}, []string, []mount.Mount, error) {
+	var mounts = []mount.Mount{}
+
+	image := getImageName(service, p.Name)
+	imgInspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, image)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	mountOptions, err := buildContainerMountOptions(p, service, imgInspect, inherit)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// filter binds and volumes mount targets
+	volumeMounts := map[string]struct{}{}
+	binds := []string{}
+	for _, m := range mountOptions {
+
+		if m.Type == mount.TypeVolume {
+			volumeMounts[m.Target] = struct{}{}
+			if m.Source != "" {
+				binds = append(binds, fmt.Sprintf("%s:%s:rw", m.Source, m.Target))
+			}
+		}
+	}
+	for _, m := range mountOptions {
+		if m.Type == mount.TypeBind || m.Type == mount.TypeTmpfs {
+			mounts = append(mounts, m)
+		}
+	}
+	return volumeMounts, binds, mounts, nil
+}
+
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 	if inherit != nil {
@@ -318,7 +387,6 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 	}
 	if img.ContainerConfig != nil {
 		for k := range img.ContainerConfig.Volumes {
-
 			mount, err := buildMount(p, types.ServiceVolumeConfig{
 				Type:   types.VolumeTypeVolume,
 				Target: k,
@@ -327,6 +395,7 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 				return nil, err
 			}
 			mounts[k] = mount
+
 		}
 	}
 	for _, v := range s.Volumes {
@@ -335,6 +404,17 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 			return nil, err
 		}
 		mounts[mount.Target] = mount
+	}
+
+	secrets, err := buildContainerSecretMounts(p, s)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range secrets {
+		if _, found := mounts[s.Target]; found {
+			continue
+		}
+		mounts[s.Target] = s
 	}
 
 	values := make([]mount.Mount, 0, len(mounts))
@@ -362,9 +442,10 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		}
 
 		mount, err := buildMount(p, types.ServiceVolumeConfig{
-			Type:   types.VolumeTypeBind,
-			Source: definedSecret.File,
-			Target: target,
+			Type:     types.VolumeTypeBind,
+			Source:   definedSecret.File,
+			Target:   target,
+			ReadOnly: true,
 		})
 		if err != nil {
 			return nil, err

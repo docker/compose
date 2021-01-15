@@ -93,7 +93,6 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 	}
 
 	for _, container := range actual {
-		container := container
 		name := getCanonicalContainerName(container)
 
 		diverged := container.Labels[configHashLabel] != expected
