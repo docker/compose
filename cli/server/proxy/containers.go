@@ -25,9 +25,9 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/cli/server/proxy/streams"
 	"github.com/docker/compose-cli/formatter"
 	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
-	"github.com/docker/compose-cli/server/proxy/streams"
 )
 
 func portsToGrpc(ports []containers.Port) []*containersv1.Port {

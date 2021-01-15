@@ -22,7 +22,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/docker/compose-cli/cli/metrics"
-	"github.com/docker/compose-cli/server/proxy"
+	"github.com/docker/compose-cli/cli/server/proxy"
 )
 
 var (
