@@ -21,7 +21,7 @@ import (
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/volumes"
-	volumesv1 "github.com/docker/compose-cli/protos/volumes/v1"
+	volumesv1 "github.com/docker/compose-cli/cli/server/protos/volumes/v1"
 )
 
 // VolumesCreate creates a volume.

@@ -17,7 +17,7 @@ syntax = "proto3";
 
 package com.docker.api.protos.context.v1;
 
-option go_package = "github.com/docker/compose-cli/protos/context/v1;v1";
+option go_package = "github.com/docker/compose-cli/cli/server/protos/context/v1;v1";
 
 service Contexts {
 	// Sets the current request for all calls

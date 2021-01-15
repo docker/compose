@@ -21,8 +21,8 @@ import (
 
 	"gotest.tools/v3/assert"
 
+	contextsv1 "github.com/docker/compose-cli/cli/server/protos/contexts/v1"
 	"github.com/docker/compose-cli/context/store"
-	contextsv1 "github.com/docker/compose-cli/protos/contexts/v1"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 

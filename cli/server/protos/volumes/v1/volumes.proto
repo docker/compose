@@ -19,7 +19,7 @@ package com.docker.api.protos.volumes.v1;
 
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/docker/compose-cli/protos/volumes/v1;v1";
+option go_package = "github.com/docker/compose-cli/cli/server/protos/volumes/v1;v1";
 
 service Volumes {
 	rpc VolumesCreate(VolumesCreateRequest) returns (VolumesCreateResponse);

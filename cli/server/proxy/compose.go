@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 
-	composev1 "github.com/docker/compose-cli/protos/compose/v1"
+	composev1 "github.com/docker/compose-cli/cli/server/protos/compose/v1"
 )
 
 func (p *proxy) Up(ctx context.Context, request *composev1.ComposeUpRequest) (*composev1.ComposeUpResponse, error) {

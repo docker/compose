@@ -19,7 +19,7 @@ package streams
 import (
 	"sync"
 
-	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
+	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
 )
 
 // Stream is a bidirectional stream for container IO

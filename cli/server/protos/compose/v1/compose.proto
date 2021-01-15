@@ -17,7 +17,7 @@ syntax = "proto3";
 
 package com.docker.api.protos.compose.v1;
 
-option go_package = "github.com/docker/compose-cli/protos/compose/v1;v1";
+option go_package = "github.com/docker/compose-cli/cli/server/protos/compose/v1;v1";
 
 service Compose {
   rpc Up(ComposeUpRequest) returns (ComposeUpResponse);

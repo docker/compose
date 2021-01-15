@@ -21,7 +21,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	containersv1 "github.com/docker/compose-cli/protos/containers/v1"
+	containersv1 "github.com/docker/compose-cli/cli/server/protos/containers/v1"
 )
 
 // Log implements an io.Writer that proxies logs over a gRPC stream

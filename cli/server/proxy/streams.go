@@ -21,8 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 
+	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
 	"github.com/docker/compose-cli/cli/server/proxy/streams"
-	streamsv1 "github.com/docker/compose-cli/protos/streams/v1"
 )
 
 func (p *proxy) NewStream(stream streamsv1.Streaming_NewStreamServer) error {
