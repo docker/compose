@@ -30,9 +30,9 @@ import (
 
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 type aciVolumeService struct {

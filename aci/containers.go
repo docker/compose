@@ -33,7 +33,7 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 )
 
 type aciContainerService struct {

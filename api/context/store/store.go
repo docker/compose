@@ -28,7 +28,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 )
 
 const (

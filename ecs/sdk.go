@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/docker/compose-cli/internal"
 
 	"github.com/aws/aws-sdk-go/aws"

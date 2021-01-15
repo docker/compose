@@ -29,7 +29,7 @@ import (
 	"github.com/sanathkr/go-yaml"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 )
 
 func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project) error {

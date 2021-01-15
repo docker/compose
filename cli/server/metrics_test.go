@@ -31,6 +31,7 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/cli/metrics"
@@ -40,7 +41,6 @@ import (
 	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
 	volumesv1 "github.com/docker/compose-cli/cli/server/protos/volumes/v1"
 	"github.com/docker/compose-cli/cli/server/proxy"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 func TestAllMethodsHaveCorrespondingCliCommand(t *testing.T) {

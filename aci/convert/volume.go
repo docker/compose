@@ -30,7 +30,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/aci/login"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 )
 
 const (

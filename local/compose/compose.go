@@ -29,7 +29,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/sanathkr/go-yaml"
 
-	errdefs2 "github.com/docker/compose-cli/errdefs"
+	errdefs2 "github.com/docker/compose-cli/api/errdefs"
 )
 
 // NewComposeService create a local implementation of the compose.Service API

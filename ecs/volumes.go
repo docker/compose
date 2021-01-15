@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/efs"

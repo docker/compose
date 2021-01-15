@@ -24,9 +24,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 	"github.com/docker/compose-cli/cli/mobycli"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 // Command returns the login command

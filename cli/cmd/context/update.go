@@ -21,8 +21,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/mobycli"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 func updateCommand() *cobra.Command {
