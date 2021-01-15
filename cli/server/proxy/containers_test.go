@@ -19,11 +19,12 @@ package proxy
 import (
 	"testing"
 
+	"github.com/docker/compose-cli/utils"
+
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose-cli/api/containers"
 	containersv1 "github.com/docker/compose-cli/cli/server/protos/containers/v1"
-	"github.com/docker/compose-cli/formatter"
 )
 
 func TestGrpcContainerToContainerConfig(t *testing.T) {
@@ -53,7 +54,7 @@ func TestGrpcContainerToContainerConfig(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, cc.ID, "myId")
 	assert.Equal(t, cc.Image, "myImage")
-	assert.Equal(t, cc.MemLimit, formatter.MemBytes(41))
+	assert.Equal(t, cc.MemLimit, utils.MemBytes(41))
 	assert.Equal(t, cc.CPULimit, float64(42))
 	assert.DeepEqual(t, cc.Volumes, []string{"myvolume"})
 	assert.DeepEqual(t, cc.Ports, []containers.Port{

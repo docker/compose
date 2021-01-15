@@ -24,7 +24,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/cli/formatter"
 )
 
 func logsCommand() *cobra.Command {

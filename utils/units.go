@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package formatter
+package utils
 
 import (
 	"github.com/docker/go-units"

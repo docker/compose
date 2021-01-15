@@ -26,7 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/cli/formatter"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"

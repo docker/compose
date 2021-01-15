@@ -23,7 +23,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/utils"
 )
 
 const (
@@ -102,7 +102,7 @@ type ContainerConfig struct {
 	// Volumes to be mounted
 	Volumes []string
 	// Memlimit
-	MemLimit formatter.MemBytes
+	MemLimit utils.MemBytes
 	// CPUlimit
 	CPULimit float64
 	// Environment variables

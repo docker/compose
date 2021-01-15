@@ -25,8 +25,8 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
+	formatter2 "github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/ecs"
-	formatter2 "github.com/docker/compose-cli/formatter"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"

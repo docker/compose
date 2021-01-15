@@ -26,7 +26,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/cli/formatter"
 )
 
 // SecretCommand manage secrets

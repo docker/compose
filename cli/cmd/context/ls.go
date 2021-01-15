@@ -28,8 +28,8 @@ import (
 
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/mobycli"
-	"github.com/docker/compose-cli/formatter"
 )
 
 type lsOpts struct {

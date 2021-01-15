@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/docker/compose-cli/utils"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -27,7 +29,6 @@ import (
 	"github.com/docker/compose-cli/api/containers"
 	containersv1 "github.com/docker/compose-cli/cli/server/protos/containers/v1"
 	"github.com/docker/compose-cli/cli/server/proxy/streams"
-	"github.com/docker/compose-cli/formatter"
 )
 
 func portsToGrpc(ports []containers.Port) []*containersv1.Port {
@@ -185,7 +186,7 @@ func grpcContainerToContainerConfig(request *containersv1.RunRequest) (container
 		Ports:                  ports,
 		Labels:                 request.GetLabels(),
 		Volumes:                request.GetVolumes(),
-		MemLimit:               formatter.MemBytes(request.GetMemoryLimit()),
+		MemLimit:               utils.MemBytes(request.GetMemoryLimit()),
 		CPULimit:               float64(request.GetCpuLimit()),
 		RestartPolicyCondition: request.RestartPolicyCondition,
 		Environment:            request.Environment,
