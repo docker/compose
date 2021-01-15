@@ -25,7 +25,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/formatter"
+	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type listVolumeOpts struct {

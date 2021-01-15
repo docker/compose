@@ -20,13 +20,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
-
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/store"
 )
 
 // TestCLI is a helper struct for CLI tests.
@@ -34,33 +27,6 @@ type TestCLI struct {
 	ctx    context.Context
 	writer *os.File
 	reader *os.File
-}
-
-// NewTestCLI returns a CLI testing helper.
-func NewTestCLI(t *testing.T) *TestCLI {
-	dir, err := ioutil.TempDir("", "store")
-	assert.Check(t, cmp.Nil(err))
-
-	originalStdout := os.Stdout
-
-	t.Cleanup(func() {
-		os.Stdout = originalStdout
-		_ = os.RemoveAll(dir)
-	})
-
-	s, err := store.New(dir)
-	assert.Check(t, cmp.Nil(err))
-	err = s.Create("example", "example", "", store.ContextMetadata{})
-	assert.Check(t, cmp.Nil(err))
-
-	ctx := context.Background()
-	ctx = store.WithContextStore(ctx, s)
-	ctx = apicontext.WithCurrentContext(ctx, "example")
-
-	r, w, err := os.Pipe()
-	os.Stdout = w
-	assert.Check(t, cmp.Nil(err))
-	return &TestCLI{ctx, w, r}
 }
 
 // Context returns a configured context

@@ -1,0 +1,71 @@
+//
+//  Copyright 2020 Docker Compose CLI authors
+
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http://www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
+syntax = "proto3";
+
+package com.docker.api.protos.volumes.v1;
+
+import "google/protobuf/any.proto";
+
+option go_package = "github.com/docker/compose-cli/cli/server/protos/volumes/v1;v1";
+
+service Volumes {
+	rpc VolumesCreate(VolumesCreateRequest) returns (VolumesCreateResponse);
+	rpc VolumesList(VolumesListRequest) returns (VolumesListResponse);
+	rpc VolumesDelete(VolumesDeleteRequest) returns (VolumesDeleteResponse);
+	rpc VolumesInspect(VolumesInspectRequest) returns (VolumesInspectResponse);
+}
+
+message Volume {
+	string id = 1;
+	string description = 2;
+}
+
+message AciVolumeCreateOptions {
+	string storage_account = 1;
+}
+
+message VolumesCreateRequest {
+	string name = 1;
+	oneof options {
+		AciVolumeCreateOptions aci_option = 2;
+	}
+}
+
+message VolumesCreateResponse {
+	Volume volume = 1;
+}
+
+message VolumesListRequest {
+}
+
+message VolumesListResponse {
+	repeated Volume volumes = 1;
+}
+
+message VolumesDeleteRequest {
+	string id = 1;
+}
+
+message VolumesDeleteResponse {
+}
+
+message VolumesInspectRequest {
+	string id = 1;
+}
+
+message VolumesInspectResponse {
+	Volume volume = 1;
+}

@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ecs"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/secrets"
 )

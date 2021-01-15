@@ -23,14 +23,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/docker/compose-cli/api/backend"
+	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/backend"
-	"github.com/docker/compose-cli/context/cloud"
-	"github.com/docker/compose-cli/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
 )

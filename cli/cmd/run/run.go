@@ -28,9 +28,9 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/options/run"
-	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/progress"
 )
 
 // Command runs a container

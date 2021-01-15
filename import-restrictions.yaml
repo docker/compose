@@ -5,29 +5,21 @@
     - github.com/docker/compose-cli/ecs
     - github.com/docker/compose-cli/example
     - github.com/docker/compose-cli/local
-    - github.com/docker/compose-cli/metrics
-    - github.com/docker/compose-cli/server
 - path: ./ecs
   forbiddenImports:
     - github.com/docker/compose-cli/aci
     - github.com/docker/compose-cli/cli
     - github.com/docker/compose-cli/example
     - github.com/docker/compose-cli/local
-    - github.com/docker/compose-cli/metrics
-    - github.com/docker/compose-cli/server
 - path: ./example
   forbiddenImports:
     - github.com/docker/compose-cli/aci
     - github.com/docker/compose-cli/cli
     - github.com/docker/compose-cli/ecs
     - github.com/docker/compose-cli/local
-    - github.com/docker/compose-cli/metrics
-    - github.com/docker/compose-cli/server
 - path: ./local
   forbiddenImports:
     - github.com/docker/compose-cli/aci
     - github.com/docker/compose-cli/cli
     - github.com/docker/compose-cli/ecs
     - github.com/docker/compose-cli/example
-    - github.com/docker/compose-cli/metrics
-    - github.com/docker/compose-cli/server

@@ -19,8 +19,8 @@ package client
 import (
 	"context"
 
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 type resourceService struct {

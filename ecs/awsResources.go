@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/elbv2"

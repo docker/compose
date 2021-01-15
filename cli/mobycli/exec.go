@@ -26,10 +26,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	apicontext "github.com/docker/compose-cli/api/context"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli/resolvepath"
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/metrics"
 )
 
 var delegatedContextTypes = []string{store.DefaultContextType}

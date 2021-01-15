@@ -26,10 +26,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	apicontext "github.com/docker/compose-cli/api/context"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/mobycli"
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/store"
-	"github.com/docker/compose-cli/formatter"
 )
 
 type lsOpts struct {

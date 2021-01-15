@@ -1,0 +1,68 @@
+//
+//  Copyright 2020 Docker Compose CLI authors
+
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http://www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
+syntax = "proto3";
+
+package com.docker.api.protos.context.v1;
+
+option go_package = "github.com/docker/compose-cli/cli/server/protos/context/v1;v1";
+
+service Contexts {
+	// Sets the current request for all calls
+	rpc SetCurrent(SetCurrentRequest) returns (SetCurrentResponse);
+    // Returns the list of existing contexts
+    rpc List(ListRequest) returns (ListResponse);
+}
+
+message Context {
+    string name = 1;
+	string contextType = 2;
+	bool current = 3;
+	string description = 4;
+	oneof Endpoint {
+		DockerEndpoint docker_endpoint = 5;
+		AciEndpoint aci_endpoint = 6;
+		EcsEndpoint ecs_endpoint = 7;
+	}
+}
+
+message DockerEndpoint {
+	string host = 1;
+}
+
+message AciEndpoint {
+	string region = 1;
+	string resource_group = 2;
+	string subscription_id = 3;
+}
+
+message EcsEndpoint {
+	string profile = 1;
+	bool from_environment = 2;
+}
+
+message SetCurrentRequest {
+	string name = 1;
+}
+
+message SetCurrentResponse {
+}
+
+message ListRequest {
+}
+
+message ListResponse {
+    repeated Context contexts = 1;
+}

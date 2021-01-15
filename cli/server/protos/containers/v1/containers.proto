@@ -1,0 +1,158 @@
+//
+//  Copyright 2020 Docker Compose CLI authors
+
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+
+//      http://www.apache.org/licenses/LICENSE-2.0
+
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
+syntax = "proto3";
+
+package com.docker.api.protos.containers.v1;
+
+option go_package = "github.com/docker/compose-cli/cli/server/protos/containers/v1;v1";
+
+service Containers {
+	rpc List(ListRequest) returns (ListResponse);
+	rpc Start(StartRequest) returns (StartResponse);
+	rpc Stop(StopRequest) returns (StopResponse);
+	rpc Kill(KillRequest) returns (KillResponse);
+	rpc Run(RunRequest) returns (RunResponse);
+	rpc Exec(ExecRequest) returns (ExecResponse);
+	rpc Logs(LogsRequest) returns (stream LogsResponse);
+	rpc Delete(DeleteRequest) returns (DeleteResponse);
+	rpc Inspect(InspectRequest) returns (InspectResponse);
+}
+
+message Port {
+	uint32 host_port = 1;
+	uint32 container_port = 2;
+	string protocol = 3;
+	string host_ip = 4;
+}
+
+message Container {
+	string id = 1;
+	string image = 2;
+	string status = 3;
+	string command = 4;
+	uint64 cpu_time = 5;
+	uint64 memory_usage = 6;
+	uint64 pids_current = 8;
+	uint64 pids_limit = 9;
+	repeated string labels = 10;
+	repeated Port ports = 11;
+	string platform = 13;
+	HostConfig host_config = 15;
+	Healthcheck healthcheck = 16;
+}
+
+message HostConfig {
+	uint64 memory_reservation = 1;
+	uint64 memory_limit = 2;
+	uint64 cpu_reservation = 3;
+	uint64 cpu_limit = 4;
+	string restart_policy = 5;
+	bool auto_remove = 6;
+}
+
+message Healthcheck {
+	bool disable = 1;
+	repeated string test = 2;
+	int64 interval = 3;
+}
+
+message InspectRequest {
+	string id = 1;
+}
+
+message InspectResponse {
+	Container container = 1;
+}
+
+message DeleteRequest {
+	string id = 1;
+	bool force = 2;
+}
+
+message DeleteResponse {
+}
+
+message StartRequest {
+	string id = 1;
+}
+
+message StartResponse {
+}
+
+message StopRequest {
+	string id = 1;
+	uint32 timeout = 2;
+}
+
+message StopResponse {
+}
+
+message KillRequest {
+	string id = 1;
+	string signal = 2;
+}
+
+message KillResponse {
+}
+
+message RunRequest {
+	string id = 1;
+	string image = 2;
+	repeated Port ports = 3;
+	map<string, string> labels = 4;
+	repeated string volumes = 5;
+	uint64 memory_limit = 6;
+	uint64 cpu_limit = 7;
+	string restart_policy_condition = 8;
+	repeated string command = 9;
+	repeated string environment = 10;
+	bool auto_remove = 11;
+	Healthcheck  healthcheck = 12;
+	string platform = 13;
+}
+
+message RunResponse {
+}
+
+message ExecRequest {
+	string id = 1;
+	string command = 2;
+	string stream_id = 3;
+	repeated string args = 4;
+	repeated string env = 5;
+	bool tty = 6;
+}
+
+message ExecResponse {
+	bytes output = 1;
+}
+
+message ListRequest {
+	bool all = 1;
+}
+
+message ListResponse {
+	repeated Container containers = 1;
+}
+
+message LogsRequest {
+	string container_id = 1;
+	bool follow = 3;
+}
+
+message LogsResponse {
+	bytes value = 1;
+}

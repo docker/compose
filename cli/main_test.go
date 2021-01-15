@@ -24,11 +24,11 @@ import (
 
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/run"
-	"github.com/docker/compose-cli/config"
 )
 
 var contextSetConfig = []byte(`{

@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/context/store"
+	"github.com/docker/compose-cli/api/context/store"
 )
 
 type composeOptions struct {

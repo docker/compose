@@ -26,7 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
 )

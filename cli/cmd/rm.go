@@ -26,8 +26,8 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 type rmOpts struct {

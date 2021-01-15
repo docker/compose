@@ -26,15 +26,16 @@ import (
 
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/backend"
-	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/cloud"
-	"github.com/docker/compose-cli/context/store"
+
+	"github.com/docker/compose-cli/api/cloud"
+	apicontext "github.com/docker/compose-cli/api/context"
+	"github.com/docker/compose-cli/api/context/store"
 )
 
 const (

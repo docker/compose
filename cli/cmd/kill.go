@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
-	"github.com/docker/compose-cli/errdefs"
 )
 
 type killOpts struct {

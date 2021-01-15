@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/compose-cli/utils"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/cli/opts"
@@ -30,7 +32,6 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/formatter"
 )
 
 // Opts contain run command options
@@ -41,7 +42,7 @@ type Opts struct {
 	Labels                 []string
 	Volumes                []string
 	Cpus                   float64
-	Memory                 formatter.MemBytes
+	Memory                 utils.MemBytes
 	Detach                 bool
 	Environment            []string
 	EnvironmentFiles       []string

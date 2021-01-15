@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/errdefs"
+	"github.com/docker/compose-cli/api/errdefs"
 )
 
 type containerService struct {

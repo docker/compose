@@ -21,7 +21,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 
-	"github.com/docker/compose-cli/progress"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 func (b *ecsAPIService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
