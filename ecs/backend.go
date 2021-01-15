@@ -28,7 +28,7 @@ import (
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 

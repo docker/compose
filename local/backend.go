@@ -27,7 +27,7 @@ import (
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/context/cloud"
+	"github.com/docker/compose-cli/api/cloud"
 	local_compose "github.com/docker/compose-cli/local/compose"
 )
 
