@@ -26,7 +26,7 @@ import (
 
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/prompt"
+	"github.com/docker/compose-cli/utils/prompt"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/aws/aws-sdk-go/aws"

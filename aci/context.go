@@ -29,7 +29,7 @@ import (
 
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/prompt"
+	"github.com/docker/compose-cli/utils/prompt"
 )
 
 // ContextParams options for creating ACI context
