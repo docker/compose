@@ -26,7 +26,7 @@ import (
 	"github.com/docker/buildx/driver"
 
 	"github.com/docker/compose-cli/config"
-	"github.com/docker/compose-cli/progress"
+	"github.com/docker/compose-cli/api/progress"
 
 	"github.com/compose-spec/compose-go/types"
 	cliconfig "github.com/docker/cli/cli/config"

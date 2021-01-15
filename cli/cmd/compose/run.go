@@ -25,7 +25,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/progress"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 type runOptions struct {

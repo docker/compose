@@ -29,7 +29,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	status "github.com/docker/compose-cli/local/moby"
-	"github.com/docker/compose-cli/progress"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 const (
