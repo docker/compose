@@ -28,8 +28,8 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
 
-	status "github.com/docker/compose-cli/local/moby"
 	"github.com/docker/compose-cli/api/progress"
+	status "github.com/docker/compose-cli/local/moby"
 )
 
 const (

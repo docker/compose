@@ -19,6 +19,7 @@ package ecs
 import (
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/api/compose"
 )
 

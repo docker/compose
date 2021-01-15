@@ -25,10 +25,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/errdefs"
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
+
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/errdefs"
 )
 
 func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project) error {

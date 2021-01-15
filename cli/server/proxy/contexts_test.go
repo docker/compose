@@ -21,9 +21,10 @@ import (
 
 	"gotest.tools/v3/assert"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	contextsv1 "github.com/docker/compose-cli/cli/server/protos/contexts/v1"
 	"github.com/docker/compose-cli/context/store"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestConvertContext(t *testing.T) {

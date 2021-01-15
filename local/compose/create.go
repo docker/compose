@@ -38,8 +38,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
-	convert "github.com/docker/compose-cli/local/moby"
 	"github.com/docker/compose-cli/api/progress"
+	convert "github.com/docker/compose-cli/local/moby"
 )
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {

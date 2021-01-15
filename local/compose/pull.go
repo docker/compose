@@ -32,8 +32,8 @@ import (
 	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/config"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/config"
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project) error {

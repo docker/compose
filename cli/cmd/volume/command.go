@@ -22,11 +22,11 @@ import (
 
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/ecs"
 	formatter2 "github.com/docker/compose-cli/formatter"
-	"github.com/docker/compose-cli/api/progress"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"

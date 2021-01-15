@@ -33,8 +33,8 @@ import (
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 
-	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/api/cloud"
+	apicontext "github.com/docker/compose-cli/context"
 	"github.com/docker/compose-cli/context/store"
 )
 

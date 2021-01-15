@@ -29,10 +29,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 
 	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/api/volumes"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type aciVolumeService struct {

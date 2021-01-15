@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/errdefs"
 )

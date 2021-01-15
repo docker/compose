@@ -22,13 +22,13 @@ import (
 
 	"github.com/docker/compose-cli/api/backend"
 
+	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	apicontext "github.com/docker/compose-cli/context"
-	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/context/store"
 	"github.com/docker/compose-cli/errdefs"
 
