@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/config"
+	"github.com/docker/compose-cli/api/config"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"

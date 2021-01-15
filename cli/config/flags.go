@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/config"
+	"github.com/docker/compose-cli/api/config"
 )
 
 // ConfigFlags are the global CLI flags
