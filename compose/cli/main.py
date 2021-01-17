@@ -1090,7 +1090,8 @@ class TopLevelCommand:
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
-            --no-log-prefix       Don't print prefix in logs.
+            --no-log-prefix            Don't print prefix in logs.
+            --timestamps               Show timestamps.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -1164,11 +1165,15 @@ class TopLevelCommand:
                 service_names,
                 attach_dependencies)
 
+            log_args = {
+                'follow': True,
+                'timestamps': options['--timestamps']
+            }
             log_printer = log_printer_from_project(
                 self.project,
                 attached_containers,
                 set_no_color_if_clicolor(options['--no-color']),
-                {'follow': True},
+                log_args,
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names),
                 keep_prefix=keep_prefix)
