@@ -1,3 +1,3 @@
 NAME                TYPE                DESCRIPTION                               DOCKER ENDPOINT               KUBERNETES ENDPOINT   ORCHESTRATOR
 default             moby                Current DOCKER_HOST based configuration   unix:///var/run/docker.sock                         swarm
-test-example *      example                                                                                                           
+test-local *        local                                                                                                             

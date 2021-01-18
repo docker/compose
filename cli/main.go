@@ -51,7 +51,6 @@ import (
 	_ "github.com/docker/compose-cli/aci"
 	_ "github.com/docker/compose-cli/ecs"
 	_ "github.com/docker/compose-cli/ecs/local"
-	_ "github.com/docker/compose-cli/example"
 	_ "github.com/docker/compose-cli/local"
 )
 

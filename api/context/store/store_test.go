@@ -64,8 +64,8 @@ func TestGetEndpoint(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, ctx.Location, "eu")
 
-	var exampleCtx ExampleContext
-	err = s.GetEndpoint("aci", &exampleCtx)
+	var localCtx LocalContext
+	err = s.GetEndpoint("aci", &localCtx)
 	assert.Error(t, err, "wrong context type")
 }
 

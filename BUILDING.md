@@ -35,22 +35,6 @@ This will create a symbolic link from the existing Docker CLI to
 You can statically cross compile the CLI for Windows, macOS, and Linux using the
 `cross` target.
 
-### Building with specific backends
-
-You can specify which backends are build using the `BUILD_TAGS` variable.
-The available backends are:
-* `aci`: For ACI support (always built)
-* `ecs`: For ECS support (always built)
-* `example`: Testing backend (off by default)
-* `local`: Beginnings of a [moby](https://github.com/moby/moby) backend
-  (off by default)
-
-If you want the ACI, ECS and example backends, then you can build as follows:
-
-```console
-make BUILD_TAGS=example cli
-```
-
 ### Updating the API code
 
 The API provided by the CLI is defined using protobuf. If you make changes to
