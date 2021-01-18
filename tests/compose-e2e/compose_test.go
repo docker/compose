@@ -261,9 +261,18 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("check container volume specs", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .HostConfig.Mounts }}")
+		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .Mounts }}")
+		output := res.Stdout()
 		//nolint
-		res.Assert(t, icmd.Expected{Out: `[{"Type":"volume","Source":"compose-e2e-volume_staticVol","Target":"/usr/share/nginx/html","ReadOnly":true},{"Type":"volume","Target":"/usr/src/app/node_modules"},{"Type":"volume","Source":"myVolume","Target":"/usr/share/nginx/test"}]`})
+		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"","RW":true,"Propagation":""`))
+	})
+
+	t.Run("check container bind-mounts specs", func(t *testing.T) {
+		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx_1", "--format", "{{ json .HostConfig.Mounts }}")
+		output := res.Stdout()
+		//nolint
+		assert.Assert(t, strings.Contains(output, `"Type":"bind"`))
+		assert.Assert(t, strings.Contains(output, `"Target":"/usr/share/nginx/html"`))
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {
