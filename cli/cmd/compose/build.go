@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -52,11 +51,7 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		options, err := opts.toProjectOptions()
-		if err != nil {
-			return "", err
-		}
-		project, err := cli.ProjectFromOptions(options)
+		project, err := opts.toProject()
 		if err != nil {
 			return "", err
 		}

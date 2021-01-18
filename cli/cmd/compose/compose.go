@@ -50,16 +50,24 @@ func (o *composeOptions) toProjectName() (string, error) {
 		return o.ProjectName, nil
 	}
 
-	options, err := o.toProjectOptions()
-	if err != nil {
-		return "", err
-	}
-
-	project, err := cli.ProjectFromOptions(options)
+	project, err := o.toProject()
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
+}
+
+func (o *composeOptions) toProject() (*types.Project, error) {
+	options, err := o.toProjectOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	project, err := cli.ProjectFromOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	return project, nil
 }
 
 func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {

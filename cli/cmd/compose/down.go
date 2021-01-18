@@ -19,6 +19,8 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/spf13/cobra"
@@ -50,12 +52,20 @@ func runDown(ctx context.Context, opts composeOptions) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		projectName, err := opts.toProjectName()
-		if err != nil {
-			return "", err
+		name := opts.ProjectName
+		var project *types.Project
+		if opts.ProjectName == "" {
+			p, err := opts.toProject()
+			if err != nil {
+				return "", err
+			}
+			project = p
+			name = p.Name
 		}
-		return projectName, c.ComposeService().Down(ctx, projectName, compose.DownOptions{
+
+		return name, c.ComposeService().Down(ctx, name, compose.DownOptions{
 			RemoveOrphans: false,
+			Project:       project,
 		})
 	})
 	return err

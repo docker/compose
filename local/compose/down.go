@@ -36,21 +36,24 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 
-	project, err := s.projectFromContainerLabels(ctx, projectName)
-	if err != nil {
-		return err
+	if options.Project == nil {
+		project, err := s.projectFromContainerLabels(ctx, projectName)
+		if err != nil {
+			return err
+		}
+		options.Project = project
 	}
 
 	var containers Containers
-	containers, err = s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(project.Name)),
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(options.Project.Name)),
 		All:     true,
 	})
 	if err != nil {
 		return err
 	}
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers, others := containers.split(isService(service.Name))
 		s.removeContainers(ctx, w, eg, serviceContainers)
 		containers = others
