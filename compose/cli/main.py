@@ -2,7 +2,6 @@ import contextlib
 import functools
 import json
 import logging
-import os
 import pipes
 import re
 import subprocess
@@ -27,6 +26,7 @@ from ..config.types import VolumeSpec
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..metrics.decorator import metrics
+from ..parallel import ParallelStreamWriter
 from ..progress_stream import StreamOutputError
 from ..project import get_image_digests
 from ..project import MissingDigests
@@ -40,6 +40,7 @@ from ..service import ImageType
 from ..service import NeedsBuildError
 from ..service import OperationFailedError
 from ..utils import filter_attached_for_up
+from .colors import AnsiMode
 from .command import get_config_from_options
 from .command import get_project_dir
 from .command import project_from_options
@@ -62,7 +63,6 @@ if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
 
 log = logging.getLogger(__name__)
-console_handler = logging.StreamHandler(sys.stderr)
 
 
 def main():  # noqa: C901
@@ -139,18 +139,38 @@ def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1)
 
 
 def dispatch():
-    setup_logging()
+    console_stream = sys.stderr
+    console_handler = logging.StreamHandler(console_stream)
+    setup_logging(console_handler)
     dispatcher = DocoptDispatcher(
         TopLevelCommand,
         {'options_first': True, 'version': get_version_info('compose')})
 
     options, handler, command_options = dispatcher.parse(sys.argv[1:])
+
+    ansi_mode = AnsiMode.AUTO
+    try:
+        if options.get("--ansi"):
+            ansi_mode = AnsiMode(options.get("--ansi"))
+    except ValueError:
+        raise UserError(
+            'Invalid value for --ansi: {}. Expected one of {}.'.format(
+                options.get("--ansi"),
+                ', '.join(m.value for m in AnsiMode)
+            )
+        )
+    if options.get("--no-ansi"):
+        if options.get("--ansi"):
+            raise UserError("--no-ansi and --ansi cannot be combined.")
+        log.warning('--no-ansi option is deprecated and will be removed in future versions.')
+        ansi_mode = AnsiMode.NEVER
+
     setup_console_handler(console_handler,
                           options.get('--verbose'),
-                          set_no_color_if_clicolor(options.get('--no-ansi')),
+                          ansi_mode.use_ansi_codes(console_handler.stream),
                           options.get("--log-level"))
-    setup_parallel_logger(set_no_color_if_clicolor(options.get('--no-ansi')))
-    if options.get('--no-ansi'):
+    setup_parallel_logger(ansi_mode)
+    if ansi_mode is AnsiMode.NEVER:
         command_options['--no-color'] = True
     return functools.partial(perform_command, options, handler, command_options)
 
@@ -172,7 +192,7 @@ def perform_command(options, handler, command_options):
         handler(command, command_options)
 
 
-def setup_logging():
+def setup_logging(console_handler):
     root_logger = logging.getLogger()
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.DEBUG)
@@ -183,14 +203,12 @@ def setup_logging():
     logging.getLogger("docker").propagate = False
 
 
-def setup_parallel_logger(noansi):
-    if noansi:
-        import compose.parallel
-        compose.parallel.ParallelStreamWriter.set_noansi()
+def setup_parallel_logger(ansi_mode):
+    ParallelStreamWriter.set_default_ansi_mode(ansi_mode)
 
 
-def setup_console_handler(handler, verbose, noansi=False, level=None):
-    if handler.stream.isatty() and noansi is False:
+def setup_console_handler(handler, verbose, use_console_formatter=True, level=None):
+    if use_console_formatter:
         format_class = ConsoleWarningFormatter
     else:
         format_class = logging.Formatter
@@ -242,7 +260,8 @@ class TopLevelCommand:
       -c, --context NAME          Specify a context name
       --verbose                   Show more output
       --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-      --no-ansi                   Do not print ANSI control characters
+      --ansi (never|always|auto)  Control when to print ANSI control characters
+      --no-ansi                   Do not print ANSI control characters (DEPRECATED)
       -v, --version               Print version and exit
       -H, --host HOST             Daemon socket to connect to
 
@@ -691,7 +710,7 @@ class TopLevelCommand:
         log_printer_from_project(
             self.project,
             containers,
-            set_no_color_if_clicolor(options['--no-color']),
+            options['--no-color'],
             log_args,
             event_stream=self.project.events(service_names=options['SERVICE']),
             keep_prefix=not options['--no-log-prefix']).run()
@@ -1167,7 +1186,7 @@ class TopLevelCommand:
             log_printer = log_printer_from_project(
                 self.project,
                 attached_containers,
-                set_no_color_if_clicolor(options['--no-color']),
+                options['--no-color'],
                 {'follow': True},
                 cascade_stop,
                 event_stream=self.project.events(service_names=service_names),
@@ -1651,7 +1670,3 @@ def warn_for_swarm_mode(client):
             "To deploy your application across the swarm, "
             "use `docker stack deploy`.\n"
         )
-
-
-def set_no_color_if_clicolor(no_color_flag):
-    return no_color_flag or os.environ.get('CLICOLOR') == "0"
