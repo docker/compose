@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -24,10 +25,10 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-	"gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
+	"github.com/docker/compose-cli/cli/cmd"
 	. "github.com/docker/compose-cli/tests/framework"
 )
 
@@ -80,15 +81,38 @@ func TestLocalBackendRun(t *testing.T) {
 	})
 
 	t.Run("run with ports", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "-p", "80", "nginx")
+		res := c.RunDockerCmd("run", "-d", "-p", "85:80", "nginx")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrExitError("rm", "-f", containerName)
 		})
 		res = c.RunDockerCmd("inspect", containerName)
-		res.Assert(t, icmd.Expected{Out: `"Status": "running"`})
+
+		inspect := &cmd.ContainerInspectView{}
+		err := json.Unmarshal([]byte(res.Stdout()), inspect)
+		assert.NilError(t, err)
+		assert.Equal(t, inspect.Status, "running")
+		nginxID := inspect.ID
+
 		res = c.RunDockerCmd("ps")
-		assert.Assert(t, cmp.Regexp(`0\.0\.0\.0:\d*->80/tcp`, res.Stdout()))
+		nginxFound := false
+		lines := Lines(res.Stdout())
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if fields[0] == nginxID {
+				nginxFound = true
+				assert.Equal(t, fields[1], "nginx")
+				assert.Equal(t, fields[2], "/docker-entrypoint.sh")
+				assert.Equal(t, fields[len(fields)-1], "0.0.0.0:85->80/tcp")
+			}
+		}
+		assert.Assert(t, nginxFound, res.Stdout())
+
+		res = c.RunDockerCmd("ps", "--format", "json")
+		res.Assert(t, icmd.Expected{Out: `"Image":"nginx","Status":"Up Less than a second","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Ports":["0.0.0.0:85->80/tcp"`})
+
+		res = c.RunDockerCmd("ps", "--quiet")
+		res.Assert(t, icmd.Expected{Out: nginxID + "\n"})
 	})
 
 	t.Run("run with volume", func(t *testing.T) {

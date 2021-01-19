@@ -64,7 +64,6 @@ jobs:
         run: make -f builder.Makefile cross
 
       - name: Test
-        env:
         run: make -f builder.Makefile test
 
       - name: Build for local E2E

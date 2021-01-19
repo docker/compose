@@ -44,16 +44,16 @@ cli: ## Compile the cli
 	--output ./bin
 
 e2e-local: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e ./tests/compose-e2e ./tests/skip-win-ci-e2e ./local/e2e
+	go test -count=1 -v $(TEST_FLAGS) ./local/e2e/compose ./local/e2e/container ./local/e2e/cli-only
 
 e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux containers available ATM. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./tests/e2e
+	go test -count=1 -v $(TEST_FLAGS) ./local/e2e/cli-only
 
 e2e-aci: ## Run End to end ACI tests. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./tests/aci-e2e
+	go test -count=1 -v $(TEST_FLAGS) ./aci/e2e
 
 e2e-ecs: ## Run End to end ECS tests. Set E2E_TEST=TestName to run a single test
-	go test -timeout 20m -count=1 -v $(TEST_FLAGS) ./tests/ecs-e2e
+	go test -timeout 20m -count=1 -v $(TEST_FLAGS) ./ecs/e2e/ecs ./ecs/e2e/ecs-local
 
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \

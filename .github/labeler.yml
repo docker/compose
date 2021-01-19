@@ -10,15 +10,15 @@ local:
 cli:
   - cli/**/*
 
+metrics:
+  - cli/metrics/**/*
+
 api:
   - api/**/*
-  - protos/**/*
+  - cli/server/protos/**/*
 
 ci:
   - .github/**/*
 
 documentation:
   - docs/**/*
-
-metrics:
-  - metrics/**/*
