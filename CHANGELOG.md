@@ -14,6 +14,8 @@ Change log
 
 - Add flag to disable log prefix
 
+- Add flag for ansi output control
+
 ### Bugs
 
 - Make `parallel_pull=True` by default
