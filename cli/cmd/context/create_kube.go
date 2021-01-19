@@ -33,16 +33,16 @@ import (
 func init() {
 	extraCommands = append(extraCommands, createKubeCommand)
 	extraHelp = append(extraHelp, `
-Create a Kube context:
-$ docker context create kube CONTEXT [flags]
-(see docker context create kube --help)
+Create a Kubernetes context:
+$ docker context create kubernetes CONTEXT [flags]
+(see docker context create kubernetes --help)
 `)
 }
 
 func createKubeCommand() *cobra.Command {
 	var opts kube.ContextParams
 	cmd := &cobra.Command{
-		Use:   "kube CONTEXT [flags]",
+		Use:   "kubernetes CONTEXT [flags]",
 		Short: "Create context for a Kubernetes Cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
