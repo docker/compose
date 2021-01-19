@@ -33,6 +33,7 @@ type composeOptions struct {
 	WorkingDir  string
 	ConfigPaths []string
 	Environment []string
+	EnvFile     string
 	Format      string
 	Detach      bool
 	Build       bool
@@ -73,6 +74,7 @@ func (o *composeOptions) toProject() (*types.Project, error) {
 func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		cli.WithOsEnv,
+		cli.WithEnvFile(o.EnvFile),
 		cli.WithDotEnv,
 		cli.WithEnv(o.Environment),
 		cli.WithWorkingDirectory(o.WorkingDir),

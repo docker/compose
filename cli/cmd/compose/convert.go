@@ -40,6 +40,7 @@ func convertCommand() *cobra.Command {
 	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	convertCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
+	convertCmd.Flags().StringVar(&opts.EnvFile, "env-file", "", "Specify an alternate environment file.")
 	convertCmd.Flags().StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 
 	return convertCmd
