@@ -21,8 +21,6 @@ elif [ "$DOCKER_VERSIONS" == "all" ]; then
   DOCKER_VERSIONS=$($get_versions -n 2 recent)
 fi
 
-DOCKER_VERSIONS=19.03.14
-
 BUILD_NUMBER=${BUILD_NUMBER-$USER}
 PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py39}
 
