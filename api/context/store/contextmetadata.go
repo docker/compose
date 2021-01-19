@@ -61,9 +61,6 @@ type AwsContext EcsContext
 // LocalContext is the context for the local backend
 type LocalContext struct{}
 
-// ExampleContext is the context for the example backend
-type ExampleContext struct{}
-
 // MarshalJSON implements custom JSON marshalling
 func (dc ContextMetadata) MarshalJSON() ([]byte, error) {
 	s := map[string]interface{}{}

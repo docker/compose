@@ -20,7 +20,6 @@ These constraints resulted in the following architecture:
 What follows is a list of useful links to help navigate the code:
 * The CLI UX code is in [`cli/`](../cli)
 * The backend interface is defined in [`backend/`](../backend)
-  * An example backend can be found in [`example/`](../example)
 * The API is defined by protobufs that can be found in [`protos/`](../protos)
 * The API server is in [`server/`](../server)
 * The context management and interface can be found in [`context/`](../api/context)

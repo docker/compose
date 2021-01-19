@@ -55,9 +55,6 @@ const (
 	// LocalContextType is the endpoint key in the context endpoints for a new
 	// local backend
 	LocalContextType = "local"
-	// ExampleContextType is the endpoint key in the context endpoints for an
-	// example backend
-	ExampleContextType = "example"
 )
 
 const (
@@ -330,9 +327,6 @@ func getters() map[string]func() interface{} {
 		},
 		LocalContextType: func() interface{} {
 			return &LocalContext{}
-		},
-		ExampleContextType: func() interface{} {
-			return &ExampleContext{}
 		},
 	}
 }

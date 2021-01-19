@@ -189,23 +189,25 @@ func TestContextMetrics(t *testing.T) {
 	t.Run("metrics on other context type", func(t *testing.T) {
 		s.ResetUsage()
 
-		c.RunDockerCmd("context", "create", "example", "test-example")
+		c.RunDockerCmd("context", "create", "local", "test-local")
 		c.RunDockerCmd("ps")
-		c.RunDockerCmd("context", "use", "test-example")
+		c.RunDockerCmd("context", "use", "test-local")
 		c.RunDockerCmd("ps")
 		c.RunDockerOrExitError("stop", "unknown")
 		c.RunDockerCmd("context", "use", "default")
-		c.RunDockerCmd("--context", "test-example", "ps")
+		c.RunDockerCmd("--context", "test-local", "ps")
+		c.RunDockerCmd("context", "ls")
 
 		usage := s.GetUsage()
 		assert.DeepEqual(t, []string{
 			`{"command":"context create","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"context use","context":"moby","source":"cli","status":"success"}`,
-			`{"command":"ps","context":"example","source":"cli","status":"success"}`,
-			`{"command":"stop","context":"example","source":"cli","status":"failure"}`,
-			`{"command":"context use","context":"example","source":"cli","status":"success"}`,
-			`{"command":"ps","context":"example","source":"cli","status":"success"}`,
+			`{"command":"ps","context":"local","source":"cli","status":"success"}`,
+			`{"command":"stop","context":"local","source":"cli","status":"failure"}`,
+			`{"command":"context use","context":"local","source":"cli","status":"success"}`,
+			`{"command":"ps","context":"local","source":"cli","status":"success"}`,
+			`{"command":"context ls","context":"moby","source":"cli","status":"success"}`,
 		}, usage)
 	})
 }
@@ -418,16 +420,15 @@ func TestLegacy(t *testing.T) {
 	})
 
 	t.Run("host flag overrides context", func(t *testing.T) {
-		c.RunDockerCmd("context", "create", "example", "test-example")
-		c.RunDockerCmd("context", "use", "test-example")
+		c.RunDockerCmd("context", "create", "local", "test-local")
+		c.RunDockerCmd("context", "use", "test-local")
 		endpoint := "unix:///var/run/docker.sock"
 		if runtime.GOOS == "windows" {
 			endpoint = "npipe:////./pipe/docker_engine"
 		}
-		res := c.RunDockerCmd("-H", endpoint, "ps")
-		// Example backend's ps output includes these strings
-		assert.Assert(t, !strings.Contains(res.Stdout(), "id"), "%q does not contains %q", res.Stdout(), "id")
-		assert.Assert(t, !strings.Contains(res.Stdout(), "1234"), "%q does not contains %q", res.Stdout(), "1234")
+		res := c.RunDockerCmd("-H", endpoint, "images")
+		// Local backend does not have images command
+		assert.Assert(t, strings.Contains(res.Stdout(), "IMAGE ID"), res.Stdout())
 	})
 }
 
@@ -459,11 +460,11 @@ func TestLegacyLogin(t *testing.T) {
 func TestUnsupportedCommand(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	c.RunDockerCmd("context", "create", "example", "test-example")
-	res := c.RunDockerOrExitError("--context", "test-example", "images")
+	c.RunDockerCmd("context", "create", "local", "test-local")
+	res := c.RunDockerOrExitError("--context", "test-local", "images")
 	res.Assert(t, icmd.Expected{
 		ExitCode: 1,
-		Err:      `Command "images" not available in current context (test-example), you can use the "default" context to run this command`,
+		Err:      `Command "images" not available in current context (test-local), you can use the "default" context to run this command`,
 	})
 }
 
@@ -519,57 +520,10 @@ func TestVersion(t *testing.T) {
 	})
 
 	t.Run("delegate version flag", func(t *testing.T) {
-		c.RunDockerCmd("context", "create", "example", "test-example")
-		c.RunDockerCmd("context", "use", "test-example")
+		c.RunDockerCmd("context", "create", "local", "test-local")
+		c.RunDockerCmd("context", "use", "test-local")
 		res := c.RunDockerCmd("-v")
 		res.Assert(t, icmd.Expected{Out: "Docker version"})
-	})
-}
-
-func TestMockBackend(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-	c.RunDockerCmd("context", "create", "example", "test-example")
-	res := c.RunDockerCmd("context", "use", "test-example")
-	res.Assert(t, icmd.Expected{Out: "test-example"})
-
-	t.Run("use", func(t *testing.T) {
-		res := c.RunDockerCmd("context", "show")
-		res.Assert(t, icmd.Expected{Out: "test-example"})
-		res = c.RunDockerCmd("context", "ls")
-		golden.Assert(t, res.Stdout(), GoldenFile("ls-out-test-example"))
-	})
-
-	t.Run("ps", func(t *testing.T) {
-		res := c.RunDockerCmd("ps")
-		golden.Assert(t, res.Stdout(), "ps-out-example.golden")
-
-		res = c.RunDockerCmd("ps", "--format", "pretty")
-		golden.Assert(t, res.Stdout(), "ps-out-example.golden")
-
-		res = c.RunDockerCmd("ps", "--format", "json")
-		golden.Assert(t, res.Stdout(), "ps-out-example-json.golden")
-	})
-
-	t.Run("ps quiet", func(t *testing.T) {
-		res := c.RunDockerCmd("ps", "-q")
-		golden.Assert(t, res.Stdout(), "ps-quiet-out-example.golden")
-	})
-
-	t.Run("ps quiet all", func(t *testing.T) {
-		res := c.RunDockerCmd("ps", "-q", "--all")
-		golden.Assert(t, res.Stdout(), "ps-quiet-all-out-example.golden")
-	})
-
-	t.Run("inspect", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", "id")
-		golden.Assert(t, res.Stdout(), "inspect-id.golden")
-	})
-
-	t.Run("run", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "nginx", "-p", "80:80")
-		res.Assert(t, icmd.Expected{
-			Out: `Running container "nginx" with name`,
-		})
 	})
 }
 

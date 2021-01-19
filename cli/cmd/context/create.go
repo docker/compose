@@ -39,7 +39,7 @@ func createCommand() *cobra.Command {
 
 	longHelp := fmt.Sprintf(`Create a new context
 
-Create docker engine context: 
+Create docker engine context:
 $ docker context create CONTEXT [flags]
 
 %s
@@ -78,7 +78,6 @@ $ docker context create my-context --description "some description" --docker "ho
 
 	cmd.AddCommand(
 		createLocalCommand(),
-		createExampleCommand(),
 	)
 	for _, command := range extraCommands {
 		cmd.AddCommand(command())
@@ -107,22 +106,6 @@ func createLocalCommand() *cobra.Command {
 			return createDockerContext(cmd.Context(), args[0], store.LocalContextType, opts.description, store.LocalContext{})
 		},
 	}
-	addDescriptionFlag(cmd, &opts.description)
-	return cmd
-}
-
-func createExampleCommand() *cobra.Command {
-	var opts descriptionCreateOpts
-	cmd := &cobra.Command{
-		Use:    "example CONTEXT",
-		Short:  "Create a test context returning fixed output",
-		Args:   cobra.ExactArgs(1),
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDockerContext(cmd.Context(), args[0], store.ExampleContextType, opts.description, store.ExampleContext{})
-		},
-	}
-
 	addDescriptionFlag(cmd, &opts.description)
 	return cmd
 }

@@ -3,23 +3,14 @@
   forbiddenImports:
     - github.com/docker/compose-cli/cli
     - github.com/docker/compose-cli/ecs
-    - github.com/docker/compose-cli/example
     - github.com/docker/compose-cli/local
 - path: ./ecs
   forbiddenImports:
     - github.com/docker/compose-cli/aci
     - github.com/docker/compose-cli/cli
-    - github.com/docker/compose-cli/example
-    - github.com/docker/compose-cli/local
-- path: ./example
-  forbiddenImports:
-    - github.com/docker/compose-cli/aci
-    - github.com/docker/compose-cli/cli
-    - github.com/docker/compose-cli/ecs
     - github.com/docker/compose-cli/local
 - path: ./local
   forbiddenImports:
     - github.com/docker/compose-cli/aci
     - github.com/docker/compose-cli/cli
     - github.com/docker/compose-cli/ecs
-    - github.com/docker/compose-cli/example
