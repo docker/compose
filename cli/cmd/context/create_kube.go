@@ -20,7 +20,6 @@ package context
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -74,13 +73,8 @@ func runCreateKube(ctx context.Context, contextName string, opts kube.ContextPar
 }
 
 func createContextData(ctx context.Context, opts kube.ContextParams) (interface{}, string, error) {
-	description := ""
-	if opts.Description != "" {
-		description = fmt.Sprintf("%s (%s)", opts.Description, description)
-	}
-
 	return store.KubeContext{
 		Endpoint:        opts.Endpoint,
 		FromEnvironment: opts.FromEnvironment,
-	}, description, nil
+	}, opts.Description, nil
 }

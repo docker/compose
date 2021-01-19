@@ -44,7 +44,6 @@ func init() {
 }
 
 func service(ctx context.Context) (backend.Service, error) {
-
 	contextStore := store.ContextStore(ctx)
 	currentContext := apicontext.CurrentContext(ctx)
 	var kubeContext store.KubeContext
