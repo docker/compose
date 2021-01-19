@@ -29,7 +29,7 @@ import (
 	"gotest.tools/v3/poll"
 
 	"github.com/docker/compose-cli/cli/cmd"
-	. "github.com/docker/compose-cli/tests/framework"
+	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 var binDir string
