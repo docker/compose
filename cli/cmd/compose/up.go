@@ -55,6 +55,7 @@ func upCommand(contextType string) *cobra.Command {
 	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
 	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
+	upCmd.Flags().StringVar(&opts.EnvFile, "env-file", "", "Specify an alternate environment file.")
 	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	upCmd.Flags().BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 	upCmd.Flags().BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
