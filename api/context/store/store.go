@@ -55,6 +55,9 @@ const (
 	// LocalContextType is the endpoint key in the context endpoints for a new
 	// local backend
 	LocalContextType = "local"
+	// KubeContextType is the endpoint key in the context endpoints for a new
+	// kube backend
+	KubeContextType = "kube"
 )
 
 const (
@@ -327,6 +330,9 @@ func getters() map[string]func() interface{} {
 		},
 		LocalContextType: func() interface{} {
 			return &LocalContext{}
+		},
+		KubeContextType: func() interface{} {
+			return &KubeContext{}
 		},
 	}
 }
