@@ -1,3 +1,6 @@
+import enum
+import os
+
 from ..const import IS_WINDOWS_PLATFORM
 
 NAMES = [
@@ -10,6 +13,21 @@ NAMES = [
     'cyan',
     'white'
 ]
+
+
+@enum.unique
+class AnsiMode(enum.Enum):
+    """Enumeration for when to output ANSI colors."""
+    NEVER = "never"
+    ALWAYS = "always"
+    AUTO = "auto"
+
+    def use_ansi_codes(self, stream):
+        if self is AnsiMode.ALWAYS:
+            return True
+        if self is AnsiMode.NEVER or os.environ.get('CLICOLOR') == '0':
+            return False
+        return stream.isatty()
 
 
 def get_pairs():

@@ -137,21 +137,20 @@ class TestCLIMainTestCase:
 
 class TestSetupConsoleHandlerTestCase:
 
-    def test_with_tty_verbose(self, logging_handler):
+    def test_with_console_formatter_verbose(self, logging_handler):
         setup_console_handler(logging_handler, True)
         assert type(logging_handler.formatter) == ConsoleWarningFormatter
         assert '%(name)s' in logging_handler.formatter._fmt
         assert '%(funcName)s' in logging_handler.formatter._fmt
 
-    def test_with_tty_not_verbose(self, logging_handler):
+    def test_with_console_formatter_not_verbose(self, logging_handler):
         setup_console_handler(logging_handler, False)
         assert type(logging_handler.formatter) == ConsoleWarningFormatter
         assert '%(name)s' not in logging_handler.formatter._fmt
         assert '%(funcName)s' not in logging_handler.formatter._fmt
 
-    def test_with_not_a_tty(self, logging_handler):
-        logging_handler.stream.isatty.return_value = False
-        setup_console_handler(logging_handler, False)
+    def test_without_console_formatter(self, logging_handler):
+        setup_console_handler(logging_handler, False, use_console_formatter=False)
         assert type(logging_handler.formatter) == logging.Formatter
 
 

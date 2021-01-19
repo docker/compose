@@ -164,6 +164,10 @@ _docker_compose_docker_compose() {
 			_filedir "y?(a)ml"
 			return
 			;;
+		--ansi)
+			COMPREPLY=( $( compgen -W "never always auto" -- "$cur" ) )
+			return
+			;;
 		--log-level)
 			COMPREPLY=( $( compgen -W "debug info warning error critical" -- "$cur" ) )
 			return
@@ -616,6 +620,7 @@ _docker_compose() {
 
 	# These options are require special treatment when searching the command.
 	local top_level_options_with_args="
+		--ansi
 		--log-level
 	"
 
