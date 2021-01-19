@@ -17,7 +17,7 @@ GOARCH?=$(shell go env GOARCH)
 
 PKG_NAME := github.com/docker/compose-cli
 
-PROTOS=$(shell find protos -name \*.proto)
+PROTOS=$(shell find cli/server/protos -name \*.proto)
 
 EXTENSION:=
 ifeq ($(GOOS),windows)

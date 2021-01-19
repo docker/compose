@@ -34,7 +34,7 @@ all: cli
 
 protos: ## Generate go code from .proto files
 	@docker build . --target protos \
-	--output ./protos
+	--output ./cli/server/protos
 
 cli: ## Compile the cli
 	@docker build . --target cli \
