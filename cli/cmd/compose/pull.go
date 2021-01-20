@@ -26,11 +26,14 @@ import (
 )
 
 type pullOptions struct {
+	*projectOptions
 	composeOptions
 }
 
-func pullCommand() *cobra.Command {
-	opts := pullOptions{}
+func pullCommand(p *projectOptions) *cobra.Command {
+	opts := pullOptions{
+		projectOptions: p,
+	}
 	pullCmd := &cobra.Command{
 		Use:   "pull [SERVICE...]",
 		Short: "Pull service images",
@@ -38,10 +41,6 @@ func pullCommand() *cobra.Command {
 			return runPull(cmd.Context(), opts, args)
 		},
 	}
-
-	pullCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	pullCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-
 	return pullCmd
 }
 

@@ -27,8 +27,15 @@ import (
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
-func logsCommand() *cobra.Command {
-	opts := composeOptions{}
+type logsOptions struct {
+	*projectOptions
+	composeOptions
+}
+
+func logsCommand(p *projectOptions) *cobra.Command {
+	opts := logsOptions{
+		projectOptions: p,
+	}
 	logsCmd := &cobra.Command{
 		Use:   "logs [service...]",
 		Short: "View output from containers",
@@ -36,14 +43,10 @@ func logsCommand() *cobra.Command {
 			return runLogs(cmd.Context(), opts, args)
 		},
 	}
-	logsCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
-	logsCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	logsCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, opts composeOptions, services []string) error {
+func runLogs(ctx context.Context, opts logsOptions, services []string) error {
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err

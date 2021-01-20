@@ -30,8 +30,13 @@ import (
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
+type lsOptions struct {
+	Format string
+	Quiet  bool
+}
+
 func listCommand() *cobra.Command {
-	opts := composeOptions{}
+	opts := lsOptions{}
 	lsCmd := &cobra.Command{
 		Use:   "ls",
 		Short: "List running compose projects",
@@ -39,16 +44,17 @@ func listCommand() *cobra.Command {
 			return runList(cmd.Context(), opts)
 		},
 	}
-	addComposeCommonFlags(lsCmd.Flags(), &opts)
+	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
+	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return lsCmd
 }
 
-func runList(ctx context.Context, opts composeOptions) error {
+func runList(ctx context.Context, opts lsOptions) error {
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}
-	stackList, err := c.ComposeService().List(ctx, opts.ProjectName)
+	stackList, err := c.ComposeService().List(ctx, "")
 	if err != nil {
 		return err
 	}

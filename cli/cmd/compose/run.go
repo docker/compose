@@ -29,18 +29,20 @@ import (
 )
 
 type runOptions struct {
-	Name        string
+	*composeOptions
 	Service     string
 	Command     []string
-	WorkingDir  string
-	ConfigPaths []string
 	Environment []string
 	Detach      bool
 	Remove      bool
 }
 
-func runCommand() *cobra.Command {
-	opts := runOptions{}
+func runCommand(p *projectOptions) *cobra.Command {
+	opts := runOptions{
+		composeOptions: &composeOptions{
+			projectOptions: p,
+		},
+	}
 	runCmd := &cobra.Command{
 		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
@@ -53,8 +55,6 @@ func runCommand() *cobra.Command {
 			return runRun(cmd.Context(), opts)
 		},
 	}
-	runCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	runCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	runCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	runCmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
 	runCmd.Flags().BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
@@ -64,12 +64,7 @@ func runCommand() *cobra.Command {
 }
 
 func runRun(ctx context.Context, opts runOptions) error {
-	projectOpts := composeOptions{
-		ConfigPaths: opts.ConfigPaths,
-		WorkingDir:  opts.WorkingDir,
-		Environment: opts.Environment,
-	}
-	c, project, err := setup(ctx, projectOpts, []string{opts.Service})
+	c, project, err := setup(ctx, *opts.composeOptions, []string{opts.Service})
 	if err != nil {
 		return err
 	}

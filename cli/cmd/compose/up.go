@@ -32,13 +32,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// composeOptions hold options common to `up` and `run` to run compose project
+type composeOptions struct {
+	*projectOptions
+	Build bool
+	// ACI only
+	DomainName string
+}
+
 type upOptions struct {
-	composeOptions
+	*composeOptions
+	Detach        bool
+	Environment   []string
 	removeOrphans bool
 }
 
-func upCommand(contextType string) *cobra.Command {
-	opts := upOptions{}
+func upCommand(p *projectOptions, contextType string) *cobra.Command {
+	opts := upOptions{
+		composeOptions: &composeOptions{
+			projectOptions: p,
+		},
+	}
 	upCmd := &cobra.Command{
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
@@ -51,24 +65,21 @@ func upCommand(contextType string) *cobra.Command {
 			}
 		},
 	}
-	upCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
-	upCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	upCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	upCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
-	upCmd.Flags().StringVar(&opts.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	upCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
-	upCmd.Flags().BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
-	upCmd.Flags().BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags := upCmd.Flags()
+	flags.StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
+	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
+	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
 	if contextType == store.AciContextType {
-		upCmd.Flags().StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
+		flags.StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	}
 
 	return upCmd
 }
 
 func runUp(ctx context.Context, opts upOptions, services []string) error {
-	c, project, err := setup(ctx, opts.composeOptions, services)
+	c, project, err := setup(ctx, *opts.composeOptions, services)
 	if err != nil {
 		return err
 	}
@@ -82,7 +93,7 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 }
 
 func runCreateStart(ctx context.Context, opts upOptions, services []string) error {
-	c, project, err := setup(ctx, opts.composeOptions, services)
+	c, project, err := setup(ctx, *opts.composeOptions, services)
 	if err != nil {
 		return err
 	}

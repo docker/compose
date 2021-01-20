@@ -30,8 +30,16 @@ import (
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
-func psCommand() *cobra.Command {
-	opts := composeOptions{}
+type psOptions struct {
+	*projectOptions
+	Format string
+	Quiet  bool
+}
+
+func psCommand(p *projectOptions) *cobra.Command {
+	opts := psOptions{
+		projectOptions: p,
+	}
 	psCmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List containers",
@@ -39,13 +47,12 @@ func psCommand() *cobra.Command {
 			return runPs(cmd.Context(), opts)
 		},
 	}
-	psCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	psCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	addComposeCommonFlags(psCmd.Flags(), &opts)
+	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
+	psCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return psCmd
 }
 
-func runPs(ctx context.Context, opts composeOptions) error {
+func runPs(ctx context.Context, opts psOptions) error {
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err

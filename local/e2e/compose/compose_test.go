@@ -50,11 +50,11 @@ func TestLocalComposeUp(t *testing.T) {
 	const projectName = "compose-e2e-demo"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "./fixtures/sentences/docker-compose.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
+		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:90"
@@ -71,7 +71,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "./fixtures/sentences/docker-compose.yaml"`})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "./fixtures/sentences/compose.yaml"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -89,7 +89,7 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 
 	t.Run("check containers after down", func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestLocalComposeRun(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("compose run", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "back")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "back")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
 	})
@@ -141,7 +141,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --rm", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "run", "-f", "./fixtures/run-test/docker-compose.yml", "--rm", "back", "/bin/sh", "-c", "echo Hello again")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "--rm", "back", "/bin/sh", "-c", "echo Hello again")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 	})
@@ -152,7 +152,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "down", "-f", "./fixtures/run-test/docker-compose.yml")
+		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "down")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
@@ -169,11 +169,11 @@ func TestNetworks(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "./fixtures/network-test/docker-compose.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
+		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:80"
@@ -186,7 +186,7 @@ func TestNetworks(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 
 	t.Run("check networks after down", func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
 
-		res := c.RunDockerCmd("compose", "build", "--workdir", "fixtures/build-test")
+		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "build")
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 		c.RunDockerCmd("image", "inspect", "build-test_nginx")
@@ -215,9 +215,9 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
 
-		res := c.RunDockerCmd("compose", "up", "-d", "--workdir", "fixtures/build-test")
+		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d")
 		t.Cleanup(func() {
-			c.RunDockerCmd("compose", "down", "--workdir", "fixtures/build-test")
+			c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "down")
 		})
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
@@ -230,13 +230,13 @@ func TestLocalComposeBuild(t *testing.T) {
 	})
 
 	t.Run("no rebuild when up again", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "up", "-d", "--workdir", "fixtures/build-test")
+		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d")
 
 		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static /usr/share/nginx/html"), res.Stdout())
 	})
 
 	t.Run("cleanup build project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "down", "--workdir", "fixtures/build-test")
+		c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "down")
 		c.RunDockerCmd("rmi", "build-test_nginx")
 		c.RunDockerCmd("rmi", "custom-nginx")
 	})
@@ -252,7 +252,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
 		c.RunDockerOrExitError("volume", "rm", "myvolume")
-		c.RunDockerCmd("compose", "up", "-d", "--workdir", "fixtures/volume-test", "--project-name", projectName)
+		c.RunDockerCmd("compose", "--workdir", "fixtures/volume-test", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("access bind mount data", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "down", "--project-name", projectName)
+		c.RunDockerCmd("compose", "--project-name", projectName, "down")
 		c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
 	})
 }
@@ -284,7 +284,7 @@ func TestLocalComposeVolume(t *testing.T) {
 func TestComposePull(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	res := c.RunDockerOrExitError("compose", "pull", "--workdir", "fixtures/simple-composefile")
+	res := c.RunDockerOrExitError("compose", "--workdir", "fixtures/simple-composefile", "pull")
 	output := res.Combined()
 
 	assert.Assert(t, strings.Contains(output, "simple Pulled"))
