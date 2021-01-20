@@ -55,13 +55,13 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers, others := containers.split(isService(service.Name))
-		s.removeContainers(ctx, w, eg, serviceContainers)
+		err := s.removeContainers(ctx, w, eg, serviceContainers)
 		containers = others
 		return err
 	})
 
 	if options.RemoveOrphans {
-		s.removeContainers(ctx, w, eg, containers)
+		err := s.removeContainers(ctx, w, eg, containers)
 		if err != nil {
 			return err
 		}
@@ -93,17 +93,27 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	return eg.Wait()
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, containers []moby.Container) {
+func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container) error {
+	for _, container := range containers {
+		toStop := container
+		eventName := "Container " + getCanonicalContainerName(toStop)
+		w.Event(progress.StoppingEvent(eventName))
+		err := s.apiClient.ContainerStop(ctx, toStop.ID, nil)
+		if err != nil {
+			w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
+			return err
+		}
+		w.Event(progress.StoppedEvent(eventName))
+	}
+	return nil
+}
+
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, containers []moby.Container) error {
 	for _, container := range containers {
 		toDelete := container
 		eg.Go(func() error {
 			eventName := "Container " + getCanonicalContainerName(toDelete)
-			w.Event(progress.StoppingEvent(eventName))
-			err := s.apiClient.ContainerStop(ctx, toDelete.ID, nil)
-			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
-				return err
-			}
+			err := s.stopContainers(ctx, w, []moby.Container{container})
 			w.Event(progress.RemovingEvent(eventName))
 			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{Force: true})
 			if err != nil {
@@ -114,6 +124,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 			return nil
 		})
 	}
+	return eg.Wait()
 }
 
 func (s *composeService) projectFromContainerLabels(ctx context.Context, projectName string) (*types.Project, error) {

@@ -51,6 +51,10 @@ func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consu
 	return errdefs.ErrNotImplemented
 }
 
+func (b *ecsAPIService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("deploying on AWS with region=%q", b.Region)
 	err := b.aws.CheckRequirements(ctx, b.Region)

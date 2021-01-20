@@ -64,6 +64,10 @@ func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, 
 	return errdefs.ErrNotImplemented
 }
 
+func (cs *aciComposeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 
