@@ -27,7 +27,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
-	. "github.com/docker/compose-cli/tests/framework"
+	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 var binDir string
@@ -264,7 +264,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
 		//nolint
-		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"","RW":true,"Propagation":""`))
+		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"","RW":true,"Propagation":""`), output)
 	})
 
 	t.Run("check container bind-mounts specs", func(t *testing.T) {

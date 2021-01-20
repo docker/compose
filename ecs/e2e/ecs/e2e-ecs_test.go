@@ -31,7 +31,7 @@ import (
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
-	. "github.com/docker/compose-cli/tests/framework"
+	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 var binDir string
@@ -81,7 +81,7 @@ func TestCompose(t *testing.T) {
 	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "../composefiles/ecs_e2e/multi_port_secrets.yaml")
+		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "./multi_port_secrets.yaml")
 	})
 
 	var webURL, wordsURL, secretsURL string
@@ -133,7 +133,7 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("Words GET validating cross service connection", func(t *testing.T) {
-		out := HTTPGetWithRetry(t, wordsURL, http.StatusOK, 5*time.Second, 240*time.Second)
+		out := HTTPGetWithRetry(t, wordsURL, http.StatusOK, 5*time.Second, 300*time.Second)
 		assert.Assert(t, strings.Contains(out, `"word":`))
 	})
 

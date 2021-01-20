@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package framework
+package e2e
 
 import (
 	"errors"
@@ -51,6 +51,7 @@ func init() {
 }
 
 // E2eCLI is used to wrap the CLI for end to end testing
+// nolint stutter
 type E2eCLI struct {
 	BinDir    string
 	ConfigDir string

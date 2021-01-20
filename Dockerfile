@@ -87,7 +87,7 @@ RUN --mount=target=. \
     make BINARY=/out/docker  -f builder.Makefile cross
 
 FROM scratch AS protos
-COPY --from=make-protos /compose-cli/protos .
+COPY --from=make-protos /compose-cli/cli/server/protos .
 
 FROM scratch AS cli
 COPY --from=make-cli /out/* .

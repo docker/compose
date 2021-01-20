@@ -54,7 +54,7 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/cmd"
-	. "github.com/docker/compose-cli/tests/framework"
+	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 const (
@@ -542,10 +542,9 @@ func TestUpSecretsResources(t *testing.T) {
 		secret2Name  = "mysecret2"
 		secret2Value = "another_password\n"
 	)
-	var (
-		basefilePath    = filepath.Join("..", "composefiles", "aci_secrets_resources")
-		composefilePath = filepath.Join(basefilePath, "compose.yml")
-	)
+
+	composefilePath := filepath.Join("aci_secrets_resources", "compose.yml")
+
 	c := NewParallelE2eCLI(t, binDir)
 	_, _, _ = setupTestResourceGroup(t, c)
 
@@ -660,13 +659,12 @@ func TestUpUpdate(t *testing.T) {
 	composeAccountName := strings.ToLower(strings.ReplaceAll(groupID, "-", "") + "sa")
 
 	dstDir := filepath.Join(os.TempDir(), "e2e-aci-volume-"+composeAccountName)
-	srcDir := filepath.Join("..", "composefiles", "aci-demo")
-	err := fileutil.CopyDirs(srcDir, dstDir)
+	err := fileutil.CopyDirs("aci-demo", dstDir)
 	assert.NilError(t, err)
 	t.Cleanup(func() {
 		assert.NilError(t, os.RemoveAll(dstDir))
 	})
-	_, err = fileutils.CopyFile(filepath.Join(filepath.Join("..", "composefiles"), multiPortComposefile), filepath.Join(dstDir, multiPortComposefile))
+	_, err = fileutils.CopyFile(filepath.Join(filepath.Join("aci-demo"), multiPortComposefile), filepath.Join(dstDir, multiPortComposefile))
 	assert.NilError(t, err)
 
 	singlePortVolumesComposefile = filepath.Join(dstDir, singlePortVolumesComposefile)
