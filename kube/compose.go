@@ -30,19 +30,19 @@ import (
 
 // NewComposeService create a kubernetes implementation of the compose.Service API
 func NewComposeService(ctx store.KubeContext) (compose.Service, error) {
-	apiclient, err := charts.NewSDK(ctx)
+	chartsApi, err := charts.NewSDK(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &composeService{
 		ctx: ctx,
-		sdk: apiclient,
+		sdk: chartsApi,
 	}, nil
 }
 
 type composeService struct {
 	ctx store.KubeContext
-	sdk charts.API
+	sdk charts.SDK
 }
 
 // Up executes the equivalent to a `compose up`

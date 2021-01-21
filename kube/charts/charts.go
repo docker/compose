@@ -19,7 +19,6 @@
 package charts
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,40 +33,20 @@ import (
 	helmenv "helm.sh/helm/v3/pkg/cli"
 )
 
-// API defines management methods for helm charts
-type API interface {
-	GetDefaultEnv() *helmenv.EnvSettings
-	Connect(ctx context.Context) error
-	GenerateChart(project *types.Project, dirname string) error
-	GetChartInMemory(project *types.Project) (*chart.Chart, error)
-	SaveChart(project *types.Project, dest string) error
-
-	Install(project *types.Project) error
-	Uninstall(projectName string) error
-	List(projectName string) ([]compose.Stack, error)
-}
-
-type sdk struct {
+type SDK struct {
 	h           *helm.HelmActions
 	environment map[string]string
 }
 
-// sdk implement API
-var _ API = sdk{}
-
-func NewSDK(ctx store.KubeContext) (sdk, error) {
-	return sdk{
+func NewSDK(ctx store.KubeContext) (SDK, error) {
+	return SDK{
 		environment: environment(),
 		h:           helm.NewHelmActions(nil),
 	}, nil
 }
 
-func (s sdk) Connect(ctx context.Context) error {
-	return nil
-}
-
 // Install deploys a Compose stack
-func (s sdk) Install(project *types.Project) error {
+func (s SDK) Install(project *types.Project) error {
 	chart, err := s.GetChartInMemory(project)
 	if err != nil {
 		return err
@@ -76,21 +55,21 @@ func (s sdk) Install(project *types.Project) error {
 }
 
 // Uninstall removes a runnign compose stack
-func (s sdk) Uninstall(projectName string) error {
+func (s SDK) Uninstall(projectName string) error {
 	return s.h.Uninstall(projectName)
 }
 
 // List returns a list of compose stacks
-func (s sdk) List(projectName string) ([]compose.Stack, error) {
+func (s SDK) List(projectName string) ([]compose.Stack, error) {
 	return s.h.ListReleases()
 }
 
 // GetDefault initializes Helm EnvSettings
-func (s sdk) GetDefaultEnv() *helmenv.EnvSettings {
+func (s SDK) GetDefaultEnv() *helmenv.EnvSettings {
 	return helmenv.New()
 }
 
-func (s sdk) GetChartInMemory(project *types.Project) (*chart.Chart, error) {
+func (s SDK) GetChartInMemory(project *types.Project) (*chart.Chart, error) {
 	// replace _ with - in volume names
 	for k, v := range project.Volumes {
 		volumeName := strings.ReplaceAll(k, "_", "-")
@@ -107,7 +86,7 @@ func (s sdk) GetChartInMemory(project *types.Project) (*chart.Chart, error) {
 	return helm.ConvertToChart(project.Name, objects)
 }
 
-func (s sdk) SaveChart(project *types.Project, dest string) error {
+func (s SDK) SaveChart(project *types.Project, dest string) error {
 	chart, err := s.GetChartInMemory(project)
 	if err != nil {
 		return err
@@ -115,7 +94,7 @@ func (s sdk) SaveChart(project *types.Project, dest string) error {
 	return util.SaveDir(chart, dest)
 }
 
-func (s sdk) GenerateChart(project *types.Project, dirname string) error {
+func (s SDK) GenerateChart(project *types.Project, dirname string) error {
 	if strings.Contains(dirname, ".") {
 		splits := strings.SplitN(dirname, ".", 2)
 		dirname = splits[0]
