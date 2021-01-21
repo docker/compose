@@ -29,8 +29,14 @@ import (
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func downCommand() *cobra.Command {
-	opts := composeOptions{}
+type downOptions struct {
+	*projectOptions
+}
+
+func downCommand(p *projectOptions) *cobra.Command {
+	opts := downOptions{
+		projectOptions: p,
+	}
 	downCmd := &cobra.Command{
 		Use:   "down",
 		Short: "Stop and remove containers, networks",
@@ -38,14 +44,10 @@ func downCommand() *cobra.Command {
 			return runDown(cmd.Context(), opts)
 		},
 	}
-	downCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
-	downCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	downCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-
 	return downCmd
 }
 
-func runDown(ctx context.Context, opts composeOptions) error {
+func runDown(ctx context.Context, opts downOptions) error {
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err

@@ -27,26 +27,22 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 )
 
-type composeOptions struct {
+type projectOptions struct {
 	ProjectName string
-	DomainName  string
-	WorkingDir  string
 	ConfigPaths []string
-	Environment []string
+	WorkingDir  string
 	EnvFile     string
-	Format      string
-	Detach      bool
-	Build       bool
-	Quiet       bool
 }
 
-func addComposeCommonFlags(f *pflag.FlagSet, opts *composeOptions) {
-	f.StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
-	f.StringVar(&opts.Format, "format", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
-	f.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
+func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
+	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
+	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
+	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
+	f.StringVar(&o.WorkingDir, "workdir", "", "Specify an alternate working directory")
+	// TODO make --project-directory an alias
 }
 
-func (o *composeOptions) toProjectName() (string, error) {
+func (o *projectOptions) toProjectName() (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
 	}
@@ -58,7 +54,7 @@ func (o *composeOptions) toProjectName() (string, error) {
 	return project.Name, nil
 }
 
-func (o *composeOptions) toProject() (*types.Project, error) {
+func (o *projectOptions) toProject() (*types.Project, error) {
 	options, err := o.toProjectOptions()
 	if err != nil {
 		return nil, err
@@ -71,18 +67,18 @@ func (o *composeOptions) toProject() (*types.Project, error) {
 	return project, nil
 }
 
-func (o *composeOptions) toProjectOptions() (*cli.ProjectOptions, error) {
+func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		cli.WithOsEnv,
 		cli.WithEnvFile(o.EnvFile),
 		cli.WithDotEnv,
-		cli.WithEnv(o.Environment),
 		cli.WithWorkingDirectory(o.WorkingDir),
 		cli.WithName(o.ProjectName))
 }
 
 // Command returns the compose command with its child commands
 func Command(contextType string) *cobra.Command {
+	opts := projectOptions{}
 	command := &cobra.Command{
 		Short: "Docker Compose",
 		Use:   "compose",
@@ -95,23 +91,24 @@ func Command(contextType string) *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(contextType),
-		downCommand(),
-		psCommand(),
+		upCommand(&opts, contextType),
+		downCommand(&opts),
+		psCommand(&opts),
 		listCommand(),
-		logsCommand(),
-		convertCommand(),
-		runCommand(),
+		logsCommand(&opts),
+		convertCommand(&opts),
+		runCommand(&opts),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
 		command.AddCommand(
-			buildCommand(),
-			pushCommand(),
-			pullCommand(),
+			buildCommand(&opts),
+			pushCommand(&opts),
+			pullCommand(&opts),
 		)
 	}
 	command.Flags().SetInterspersed(false)
+	opts.addProjectFlags(command.PersistentFlags())
 	return command
 }
 

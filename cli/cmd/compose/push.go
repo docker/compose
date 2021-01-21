@@ -26,11 +26,14 @@ import (
 )
 
 type pushOptions struct {
+	*projectOptions
 	composeOptions
 }
 
-func pushCommand() *cobra.Command {
-	opts := pushOptions{}
+func pushCommand(p *projectOptions) *cobra.Command {
+	opts := pushOptions{
+		projectOptions: p,
+	}
 	pushCmd := &cobra.Command{
 		Use:   "push [SERVICE...]",
 		Short: "Push service images",
@@ -38,10 +41,6 @@ func pushCommand() *cobra.Command {
 			return runPush(cmd.Context(), opts, args)
 		},
 	}
-
-	pushCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	pushCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-
 	return pushCmd
 }
 

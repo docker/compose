@@ -27,8 +27,15 @@ import (
 	"github.com/docker/compose-cli/api/client"
 )
 
-func convertCommand() *cobra.Command {
-	opts := composeOptions{}
+type convertOptions struct {
+	*projectOptions
+	Format string
+}
+
+func convertCommand(p *projectOptions) *cobra.Command {
+	opts := convertOptions{
+		projectOptions: p,
+	}
 	convertCmd := &cobra.Command{
 		Use:   "convert",
 		Short: "Converts the compose file to a cloud format (default: cloudformation)",
@@ -36,17 +43,13 @@ func convertCommand() *cobra.Command {
 			return runConvert(cmd.Context(), opts)
 		},
 	}
-	convertCmd.Flags().StringVarP(&opts.ProjectName, "project-name", "p", "", "Project name")
-	convertCmd.Flags().StringVar(&opts.WorkingDir, "workdir", "", "Work dir")
-	convertCmd.Flags().StringArrayVarP(&opts.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
-	convertCmd.Flags().StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
-	convertCmd.Flags().StringVar(&opts.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	convertCmd.Flags().StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
+	flags := convertCmd.Flags()
+	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 
 	return convertCmd
 }
 
-func runConvert(ctx context.Context, opts composeOptions) error {
+func runConvert(ctx context.Context, opts convertOptions) error {
 	var json []byte
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
