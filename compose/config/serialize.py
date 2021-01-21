@@ -110,6 +110,18 @@ def serialize_ns_time_value(value):
     return '{}{}'.format(*result)
 
 
+def validate_depends_on(service_dict, version):
+    """
+    Validates depends_on based on the config version
+    """
+    if 'depends_on' in service_dict:
+        if version >= ComposeVersion(VERSION30) or version < ComposeVersion(VERSION21):
+            service_dict['depends_on'] = sorted([
+                svc for svc in service_dict['depends_on'].keys()
+            ])
+    return service_dict
+
+
 def denormalize_service_dict(service_dict, version, image_digest=None):
     service_dict = service_dict.copy()
 
@@ -124,11 +136,7 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
 
-    if 'depends_on' in service_dict:
-        if version >= ComposeVersion(VERSION30) or version < ComposeVersion(VERSION21):
-            service_dict['depends_on'] = sorted([
-                svc for svc in service_dict['depends_on'].keys()
-            ])
+    service_dict = validate_depends_on(service_dict, version)
 
     if 'healthcheck' in service_dict:
         if 'interval' in service_dict['healthcheck']:
