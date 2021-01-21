@@ -6,14 +6,12 @@ package ecs
 
 import (
 	context "context"
-	reflect "reflect"
-
 	cloudformation "github.com/aws/aws-sdk-go/service/cloudformation"
 	ecs "github.com/aws/aws-sdk-go/service/ecs"
-	gomock "github.com/golang/mock/gomock"
-
 	compose "github.com/docker/compose-cli/api/compose"
 	secrets "github.com/docker/compose-cli/api/secrets"
+	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockAPI is a mock of API interface
@@ -546,18 +544,18 @@ func (mr *MockAPIMockRecorder) ListStackServices(arg0, arg1 interface{}) *gomock
 }
 
 // ListStacks mocks base method
-func (m *MockAPI) ListStacks(arg0 context.Context, arg1 string) ([]compose.Stack, error) {
+func (m *MockAPI) ListStacks(arg0 context.Context) ([]compose.Stack, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListStacks", arg0, arg1)
+	ret := m.ctrl.Call(m, "ListStacks", arg0)
 	ret0, _ := ret[0].([]compose.Stack)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListStacks indicates an expected call of ListStacks
-func (mr *MockAPIMockRecorder) ListStacks(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) ListStacks(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStacks", reflect.TypeOf((*MockAPI)(nil).ListStacks), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStacks", reflect.TypeOf((*MockAPI)(nil).ListStacks), arg0)
 }
 
 // ListTasks mocks base method

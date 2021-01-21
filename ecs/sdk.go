@@ -444,11 +444,8 @@ func (s sdk) GetStackID(ctx context.Context, name string) (string, error) {
 	return *stacks.Stacks[0].StackId, nil
 }
 
-func (s sdk) ListStacks(ctx context.Context, name string) ([]compose.Stack, error) {
+func (s sdk) ListStacks(ctx context.Context) ([]compose.Stack, error) {
 	params := cloudformation.DescribeStacksInput{}
-	if name != "" {
-		params.StackName = &name
-	}
 	var token *string
 	var stacks []compose.Stack
 	for {

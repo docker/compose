@@ -163,18 +163,15 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 	return res, nil
 }
 
-func (cs *aciComposeService) List(ctx context.Context, project string) ([]compose.Stack, error) {
+func (cs *aciComposeService) List(ctx context.Context) ([]compose.Stack, error) {
 	containerGroups, err := getACIContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
 	if err != nil {
 		return nil, err
 	}
 
-	stacks := []compose.Stack{}
+	var stacks []compose.Stack
 	for _, group := range containerGroups {
 		if _, found := group.Tags[composeContainerTag]; !found {
-			continue
-		}
-		if project != "" && *group.Name != project {
 			continue
 		}
 		state := compose.RUNNING

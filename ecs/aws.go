@@ -49,7 +49,7 @@ type API interface {
 	UpdateStack(ctx context.Context, changeset string) error
 	WaitStackComplete(ctx context.Context, name string, operation int) error
 	GetStackID(ctx context.Context, name string) (string, error)
-	ListStacks(ctx context.Context, name string) ([]compose.Stack, error)
+	ListStacks(ctx context.Context) ([]compose.Stack, error)
 	GetStackClusterID(ctx context.Context, stack string) (string, error)
 	GetServiceTaskDefinition(ctx context.Context, cluster string, serviceArns []string) (map[string]string, error)
 	ListStackServices(ctx context.Context, stack string) ([]string, error)

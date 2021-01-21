@@ -122,7 +122,7 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("compose ls", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ls", "--project-name", stack)
+		res := c.RunDockerCmd("compose", "ls", "--filter", "name="+stack)
 		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 
 		assert.Equal(t, 2, len(lines))
