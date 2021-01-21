@@ -20,6 +20,7 @@ package charts
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/kube/charts/helm"
 	"github.com/docker/compose-cli/kube/charts/kubernetes"
-	kubeutils "github.com/docker/compose-cli/kube/utils"
 	chart "helm.sh/helm/v3/pkg/chart"
 	util "helm.sh/helm/v3/pkg/chartutil"
 	helmenv "helm.sh/helm/v3/pkg/cli"
@@ -57,7 +57,7 @@ var _ API = sdk{}
 
 func NewSDK(ctx store.KubeContext) (sdk, error) {
 	return sdk{
-		environment: kubeutils.Environment(),
+		environment: environment(),
 		h:           helm.NewHelmActions(nil),
 	}, nil
 }
@@ -123,4 +123,14 @@ func (s sdk) GenerateChart(project *types.Project, dirname string) error {
 
 	dirname = filepath.Dir(dirname)
 	return s.SaveChart(project, dirname)
+}
+
+func environment() map[string]string {
+	vars := make(map[string]string)
+	env := os.Environ()
+	for _, v := range env {
+		k := strings.SplitN(v, "=", 2)
+		vars[k[0]] = k[1]
+	}
+	return vars
 }
