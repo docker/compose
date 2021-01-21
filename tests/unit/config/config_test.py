@@ -5273,7 +5273,7 @@ def get_config_filename_for_files(filenames, subdir=None):
 
 
 class SerializeTest(unittest.TestCase):
-    def test_denormalize_depends(self):
+    def test_denormalize_depends_on_v3(self):
         service_dict = {
             'image': 'busybox',
             'command': 'true',
@@ -5282,8 +5282,37 @@ class SerializeTest(unittest.TestCase):
                 'service3': {'condition': 'service_started'},
             }
         }
+        assert denormalize_service_dict(service_dict, VERSION) == {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': ['service2', 'service3']
+        }
 
-        assert denormalize_service_dict(service_dict, VERSION) == service_dict
+    def test_denormalize_depends_on_v2_1(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+        assert denormalize_service_dict(service_dict, '2.1') == service_dict
+
+    def test_denormalize_depends_on_v2_0(self):
+        service_dict = {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': {
+                'service2': {'condition': 'service_started'},
+                'service3': {'condition': 'service_started'},
+            }
+        }
+        assert denormalize_service_dict(service_dict, '2.0') == {
+            'image': 'busybox',
+            'command': 'true',
+            'depends_on': ['service2', 'service3']
+        }
 
     def test_serialize_time(self):
         data = {

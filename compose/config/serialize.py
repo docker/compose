@@ -3,6 +3,9 @@ import yaml
 from compose.config import types
 from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
+from compose.version import ComposeVersion
+VERSION30 = '3.0'
+VERSION21 = '2.1'
 
 
 def serialize_config_type(dumper, data):
@@ -48,7 +51,7 @@ def denormalize_config(config, image_digests=None):
     denormalized_services = [
         denormalize_service_dict(
             service_dict,
-            config.version,
+            config.config_version,
             image_digests[service_dict['name']] if image_digests else None)
         for service_dict in config.services
     ]
@@ -120,6 +123,12 @@ def denormalize_service_dict(service_dict, version, image_digest=None):
 
     if version == V1 and 'network_mode' not in service_dict:
         service_dict['network_mode'] = 'bridge'
+
+    if 'depends_on' in service_dict:
+        if version >= ComposeVersion(VERSION30) or version < ComposeVersion(VERSION21):
+            service_dict['depends_on'] = sorted([
+                svc for svc in service_dict['depends_on'].keys()
+            ])
 
     if 'healthcheck' in service_dict:
         if 'interval' in service_dict['healthcheck']:
