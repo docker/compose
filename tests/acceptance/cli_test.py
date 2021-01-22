@@ -237,6 +237,11 @@ class CLITestCase(DockerClientTestCase):
         result = self.dispatch(['-H=tcp://doesnotexist:8000', 'ps'], returncode=1)
         assert "Couldn't connect to Docker daemon" in result.stderr
 
+    def test_config_list_profiles(self):
+        self.base_dir = 'tests/fixtures/config-profiles'
+        result = self.dispatch(['config', '--profiles'])
+        assert set(result.stdout.rstrip().split('\n')) == {'debug', 'frontend', 'gui'}
+
     def test_config_list_services(self):
         self.base_dir = 'tests/fixtures/v2-full'
         result = self.dispatch(['config', '--services'])

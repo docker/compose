@@ -138,7 +138,7 @@ _docker_compose_config() {
 			;;
 	esac
 
-	COMPREPLY=( $( compgen -W "--hash --help --no-interpolate --quiet -q --resolve-image-digests --services --volumes" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "--hash --help --no-interpolate --profiles --quiet -q --resolve-image-digests --services --volumes" -- "$cur" ) )
 }
 
 

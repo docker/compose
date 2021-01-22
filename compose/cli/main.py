@@ -381,6 +381,7 @@ class TopLevelCommand:
             --no-interpolate         Don't interpolate environment variables.
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
+            --profiles               Print the profile names, one per line.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
             --hash="*"               Print the service config hash, one per line.
@@ -398,6 +399,15 @@ class TopLevelCommand:
                 image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
+            return
+
+        if options['--profiles']:
+            profiles = set()
+            for service in compose_config.services:
+                if 'profiles' in service:
+                    for profile in service['profiles']:
+                        profiles.add(profile)
+            print('\n'.join(sorted(profiles)))
             return
 
         if options['--services']:
