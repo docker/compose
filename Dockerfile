@@ -1,13 +1,13 @@
 ARG DOCKER_VERSION=19.03
-ARG PYTHON_VERSION=3.9.0
+ARG PYTHON_VERSION=3.7.9
 
 ARG BUILD_ALPINE_VERSION=3.12
 ARG BUILD_CENTOS_VERSION=7
-ARG BUILD_DEBIAN_VERSION=slim-buster
+ARG BUILD_DEBIAN_VERSION=slim-stretch
 
 ARG RUNTIME_ALPINE_VERSION=3.12
 ARG RUNTIME_CENTOS_VERSION=7
-ARG RUNTIME_DEBIAN_VERSION=buster-slim
+ARG RUNTIME_DEBIAN_VERSION=stretch-slim
 
 ARG DISTRO=alpine
 
@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
     libc-dev \
     libffi-dev \
-    libgcc-8-dev \
+    libgcc-6-dev \
     libssl-dev \
     make \
     openssl \
@@ -68,8 +68,8 @@ WORKDIR /code/
 COPY docker-compose-entrypoint.sh /usr/local/bin/
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 RUN pip install \
-    virtualenv==20.2.2 \
-    tox==3.20.1
+    virtualenv==20.4.0 \
+    tox==3.21.2
 COPY requirements-dev.txt .
 COPY requirements-indirect.txt .
 COPY requirements.txt .
@@ -79,7 +79,7 @@ COPY tox.ini .
 COPY setup.py .
 COPY README.md .
 COPY compose compose/
-RUN tox --notest
+RUN tox -e py37 --notest
 COPY . .
 ARG GIT_COMMIT=unknown
 ENV DOCKER_COMPOSE_GITSHA=$GIT_COMMIT

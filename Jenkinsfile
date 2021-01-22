@@ -2,7 +2,7 @@
 
 def dockerVersions = ['19.03.13']
 def baseImages = ['alpine', 'debian']
-def pythonVersions = ['py39']
+def pythonVersions = ['py37']
 
 pipeline {
     agent none
