@@ -23,8 +23,8 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 )
 
-func (b *ecsAPIService) List(ctx context.Context, project string) ([]compose.Stack, error) {
-	stacks, err := b.aws.ListStacks(ctx, project)
+func (b *ecsAPIService) List(ctx context.Context) ([]compose.Stack, error) {
+	stacks, err := b.aws.ListStacks(ctx)
 	if err != nil {
 		return nil, err
 	}

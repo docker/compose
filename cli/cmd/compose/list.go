@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -33,10 +34,11 @@ import (
 type lsOptions struct {
 	Format string
 	Quiet  bool
+	Filter opts.FilterOpt
 }
 
 func listCommand() *cobra.Command {
-	opts := lsOptions{}
+	opts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls",
 		Short: "List running compose projects",
@@ -45,16 +47,28 @@ func listCommand() *cobra.Command {
 		},
 	}
 	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
-	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
+	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")
+	lsCmd.Flags().Var(&opts.Filter, "filter", "Filter output based on conditions provided.")
+
 	return lsCmd
 }
 
+var acceptedListFilters = map[string]bool{
+	"name": true,
+}
+
 func runList(ctx context.Context, opts lsOptions) error {
+	filters := opts.Filter.Value()
+	err := filters.Validate(acceptedListFilters)
+	if err != nil {
+		return err
+	}
+
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}
-	stackList, err := c.ComposeService().List(ctx, "")
+	stackList, err := c.ComposeService().List(ctx)
 	if err != nil {
 		return err
 	}
@@ -64,6 +78,18 @@ func runList(ctx context.Context, opts lsOptions) error {
 		}
 		return nil
 	}
+
+	if filters.Len() > 0 {
+		var filtered []compose.Stack
+		for _, s := range stackList {
+			if filters.Contains("name") && !filters.Match("name", s.Name) {
+				continue
+			}
+			filtered = append(filtered, s)
+		}
+		stackList = filtered
+	}
+
 	view := viewFromStackList(stackList)
 	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
 		for _, stack := range view {

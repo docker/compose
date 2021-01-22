@@ -44,7 +44,7 @@ type Service interface {
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
-	List(ctx context.Context, projectName string) ([]Stack, error)
+	List(ctx context.Context) ([]Stack, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
