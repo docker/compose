@@ -67,7 +67,7 @@ class OneOffFilter(enum.Enum):
 
 def raise_errors(errors):
     """
-    Raise multiple errors as ProjectError.
+    Raise a dict with error messages as values as a single ProjectError.
     """
     if len(errors):
         combined_errors = '\n'.join([
