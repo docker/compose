@@ -521,6 +521,7 @@ class Project:
                 'Building',
                 limit=5,
             )
+            
             raise_errors(errors)
 
         else:
@@ -714,6 +715,7 @@ class Project:
             None,
             get_deps,
         )
+        
         raise_errors(errors)
 
         return [
@@ -821,11 +823,8 @@ class Project:
             log.warning('Some service image(s) must be built from source by running:\n'
                         '    docker-compose build {}'
                         .format(' '.join(must_build)))
-        if len(errors):
-            combined_errors = '\n'.join([
-                e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
-            ])
-            raise ProjectError(combined_errors)
+
+        raise_errors(errors)
 
     def push(self, service_names=None, ignore_push_failures=False):
         unique_images = set()
