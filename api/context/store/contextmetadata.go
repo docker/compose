@@ -57,7 +57,8 @@ type EcsContext struct {
 
 // KubeContext is the context for a kube backend
 type KubeContext struct {
-	Endpoint        string `json:",omitempty"`
+	ContextName     string `json:",omitempty"`
+	KubeconfigPath  string `json:",omitempty"`
 	FromEnvironment bool
 }
 
