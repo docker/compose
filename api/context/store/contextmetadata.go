@@ -55,6 +55,12 @@ type EcsContext struct {
 	Profile            string `json:",omitempty"`
 }
 
+// KubeContext is the context for a kube backend
+type KubeContext struct {
+	Endpoint        string `json:",omitempty"`
+	FromEnvironment bool
+}
+
 // AwsContext is the context for the ecs plugin
 type AwsContext EcsContext
 

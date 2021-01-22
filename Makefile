@@ -39,7 +39,7 @@ protos: ## Generate go code from .proto files
 cli: ## Compile the cli
 	@docker build . --target cli \
 	--platform local \
-	--build-arg BUILD_TAGS=e2e \
+	--build-arg BUILD_TAGS=e2e,kube \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
