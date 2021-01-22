@@ -172,6 +172,10 @@ _docker_compose_docker_compose() {
 			COMPREPLY=( $( compgen -W "debug info warning error critical" -- "$cur" ) )
 			return
 			;;
+		--profile)
+			COMPREPLY=( $( compgen -W "$(__docker_compose_q config --profiles)" -- "$cur" ) )
+			return
+			;;
 		--project-directory)
 			_filedir -d
 			return
@@ -618,10 +622,11 @@ _docker_compose() {
 		--tlskey
 	"
 
-	# These options are require special treatment when searching the command.
+	# These options require special treatment when searching the command.
 	local top_level_options_with_args="
 		--ansi
 		--log-level
+		--profile
 	"
 
 	COMPREPLY=()
