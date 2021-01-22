@@ -353,12 +353,57 @@ services:
             }
         }
 
-    def test_config_with_dot_env(self):
+    def test_config_with_dot_env_2_4(self):
         self.base_dir = 'tests/fixtures/default-env-file'
         result = self.dispatch(['config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
             'version': '2.4',
+            'services': {
+                'web': {
+                    'command': 'true',
+                    'image': 'alpine:latest',
+                    'ports': ['5643/tcp', '9999/tcp']
+                }
+            }
+        }
+
+    def test_config_with_env_file_2_4(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['--env-file', '.env2', 'config'])
+        json_result = yaml.safe_load(result.stdout)
+        assert json_result == {
+            'version': '2.4',
+            'services': {
+                'web': {
+                    'command': 'false',
+                    'image': 'alpine:latest',
+                    'ports': ['5644/tcp', '9998/tcp']
+                }
+            }
+        }
+
+    def test_config_with_dot_env_and_override_dir_2_4(self):
+        self.base_dir = 'tests/fixtures/default-env-file'
+        result = self.dispatch(['--project-directory', 'alt/', 'config'])
+        json_result = yaml.safe_load(result.stdout)
+        assert json_result == {
+            'version': '2.4',
+            'services': {
+                'web': {
+                    'command': 'echo uwu',
+                    'image': 'alpine:3.10.1',
+                    'ports': ['3341/tcp', '4449/tcp']
+                }
+            }
+        }
+
+    def test_config_with_dot_env(self):
+        self.base_dir = 'tests/fixtures/default-env-file-v3'
+        result = self.dispatch(['config'])
+        json_result = yaml.safe_load(result.stdout)
+        assert json_result == {
+            'version': '3.9',
             'services': {
                 'web': {
                     'command': 'true',
@@ -369,11 +414,11 @@ services:
         }
 
     def test_config_with_env_file(self):
-        self.base_dir = 'tests/fixtures/default-env-file'
+        self.base_dir = 'tests/fixtures/default-env-file-v3'
         result = self.dispatch(['--env-file', '.env2', 'config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
-            'version': '2.4',
+            'version': '3.9',
             'services': {
                 'web': {
                     'command': 'false',
@@ -384,11 +429,11 @@ services:
         }
 
     def test_config_with_dot_env_and_override_dir(self):
-        self.base_dir = 'tests/fixtures/default-env-file'
+        self.base_dir = 'tests/fixtures/default-env-file-v3'
         result = self.dispatch(['--project-directory', 'alt/', 'config'])
         json_result = yaml.safe_load(result.stdout)
         assert json_result == {
-            'version': '2.4',
+            'version': '3.9',
             'services': {
                 'web': {
                     'command': 'echo uwu',

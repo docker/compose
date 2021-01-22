@@ -4,8 +4,8 @@ from compose.config import types
 from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import COMPOSEFILE_V1 as V1
 from compose.version import ComposeVersion
-VERSION30 = '3.0'
-VERSION21 = '2.1'
+VERSION30 = ComposeVersion('3.0')
+VERSION21 = ComposeVersion('2.1')
 
 
 def serialize_config_type(dumper, data):
@@ -115,7 +115,7 @@ def validate_depends_on(service_dict, version):
     Validates depends_on based on the config version
     """
     if 'depends_on' in service_dict:
-        if version >= ComposeVersion(VERSION30) or version < ComposeVersion(VERSION21):
+        if version >= VERSION30 or version < VERSION21:
             service_dict['depends_on'] = sorted([
                 svc for svc in service_dict['depends_on'].keys()
             ])
