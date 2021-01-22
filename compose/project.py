@@ -65,6 +65,17 @@ class OneOffFilter(enum.Enum):
             raise ValueError("Invalid value for one_off: {}".format(repr(value)))
 
 
+def raise_errors(errors):
+    """
+    Raise multiple errors as ProjectError
+    """
+    if len(errors):
+        combined_errors = '\n'.join([
+            e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
+        ])
+        raise ProjectError(combined_errors)
+
+
 class Project:
     """
     A collection of services.
@@ -510,11 +521,7 @@ class Project:
                 'Building',
                 limit=5,
             )
-            if len(errors):
-                combined_errors = '\n'.join([
-                    e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
-                ])
-                raise ProjectError(combined_errors)
+            raise_errors(errors)
 
         else:
             for service in services:
@@ -707,10 +714,7 @@ class Project:
             None,
             get_deps,
         )
-        if errors:
-            raise ProjectError(
-                'Encountered errors while bringing up the project.'
-            )
+        raise_errors(errors)
 
         return [
             container
