@@ -691,7 +691,7 @@ class TopLevelCommand:
             -t, --timestamps        Show timestamps.
             --tail="all"            Number of lines to show from the end of the logs
                                     for each container.
-            --no-log-prefix    Don't print prefix in logs.
+            --no-log-prefix         Don't print prefix in logs.
         """
         containers = self.project.containers(service_names=options['SERVICE'], stopped=True)
 
@@ -1109,7 +1109,7 @@ class TopLevelCommand:
                                        container. Implies --abort-on-container-exit.
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
-            --no-log-prefix       Don't print prefix in logs.
+            --no-log-prefix            Don't print prefix in logs.
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
