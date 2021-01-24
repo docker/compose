@@ -521,7 +521,7 @@ class Project:
                 'Building',
                 limit=5,
             )
-            
+
             raise_errors(errors)
 
         else:
@@ -715,7 +715,7 @@ class Project:
             None,
             get_deps,
         )
-        
+
         raise_errors(errors)
 
         return [
