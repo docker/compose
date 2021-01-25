@@ -23,7 +23,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildImage('alpine')
@@ -31,7 +31,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildImage('debian')
@@ -41,7 +41,7 @@ pipeline {
         }
         stage('Test') {
             agent {
-                label 'linux && docker && ubuntu-2004'
+                label 'linux && docker && ubuntu-2004 && cgroup1'
             }
             steps {
                 // TODO use declarative 1.5.0 `matrix` once available on CI
@@ -61,7 +61,7 @@ pipeline {
         }
         stage('Generate Changelog') {
             agent {
-                label 'linux && docker && ubuntu-2004'
+                label 'linux && docker && ubuntu-2004 && cgroup1'
             }
             steps {
                 checkout scm
@@ -98,7 +98,7 @@ pipeline {
                 }
                 stage('linux binary') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         checkout scm
@@ -134,7 +134,7 @@ pipeline {
                 }
                 stage('alpine image') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildRuntimeImage('alpine')
@@ -142,7 +142,7 @@ pipeline {
                 }
                 stage('debian image') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildRuntimeImage('debian')
@@ -157,7 +157,7 @@ pipeline {
             parallel {
                 stage('Pushing images') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         pushRuntimeImage('alpine')
@@ -166,7 +166,7 @@ pipeline {
                 }
                 stage('Creating Github Release') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     environment {
                         GITHUB_TOKEN = credentials('github-release-token')
@@ -198,7 +198,7 @@ pipeline {
                 }
                 stage('Publishing Python packages') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     environment {
                         PYPIRC = credentials('pypirc-docker-dsg-cibot')
@@ -247,7 +247,7 @@ def buildImage(baseImage) {
 def runTests(dockerVersion, pythonVersion, baseImage) {
     return {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
-            node("linux && docker && ubuntu-2004") {
+            node("linux && docker && ubuntu-2004 && cgroup1") {
                 def scmvar = checkout(scm)
                 def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
