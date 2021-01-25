@@ -3,7 +3,7 @@
 set -ex
 
 CODE_PATH=/code
-VENV="${CODE_PATH}"/.tox/py39
+VENV="${CODE_PATH}"/.tox/py37
 
 cd "${CODE_PATH}"
 mkdir -p dist

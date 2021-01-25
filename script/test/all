@@ -11,7 +11,7 @@ docker run --rm \
   "$TAG" tox -e pre-commit
 
 get_versions="docker run --rm
-    --entrypoint=/code/.tox/py39/bin/python
+    --entrypoint=/code/.tox/py37/bin/python
     $TAG
     /code/script/test/versions.py docker/docker-ce,moby/moby"
 
@@ -22,7 +22,7 @@ elif [ "$DOCKER_VERSIONS" == "all" ]; then
 fi
 
 BUILD_NUMBER=${BUILD_NUMBER-$USER}
-PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py39}
+PY_TEST_VERSIONS=${PY_TEST_VERSIONS:-py37}
 
 for version in $DOCKER_VERSIONS; do
   >&2 echo "Running tests against Docker $version"
