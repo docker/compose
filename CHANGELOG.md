@@ -1,7 +1,17 @@
 Change log
 ==========
 
-1.28.0 (2020-12-03)
+
+1.28.1 (2021-01-25)
+-------------------
+
+### Bugs
+
+- Revert to Python 3.7 bump for Linux static builds
+
+- Add bash completion for `docker-compose logs|up --no-log-prefix`
+
+1.28.0 (2021-01-20)
 -------------------
 
 ### Features
