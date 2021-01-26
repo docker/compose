@@ -41,7 +41,7 @@ $ docker context create k8s CONTEXT [flags]
 func createKubeCommand() *cobra.Command {
 	var opts kube.ContextParams
 	cmd := &cobra.Command{
-		Use:   "k8s CONTEXT [flags]",
+		Use:   "kubernetes CONTEXT [flags]",
 		Short: "Create context for a Kubernetes Cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
