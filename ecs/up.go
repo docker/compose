@@ -51,7 +51,7 @@ func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consu
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (b *ecsAPIService) Stop(ctx context.Context, project *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
 

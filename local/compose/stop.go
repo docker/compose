@@ -22,14 +22,13 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 
 	"github.com/compose-spec/compose-go/types"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (s *composeService) Stop(ctx context.Context, project *types.Project) error {
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 

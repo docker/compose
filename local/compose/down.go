@@ -116,7 +116,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 			w.Event(progress.StoppingEvent(eventName))
 			err := s.stopContainers(ctx, w, []moby.Container{container})
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
+				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
