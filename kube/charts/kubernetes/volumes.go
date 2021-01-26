@@ -37,16 +37,6 @@ type volumeSpec struct {
 	source *apiv1.VolumeSource
 }
 
-func hasPersistentVolumes(s types.ServiceConfig) bool {
-	for _, volume := range s.Volumes {
-		if volume.Type == "volume" {
-			return true
-		}
-	}
-
-	return false
-}
-
 func toVolumeSpecs(project *types.Project, s types.ServiceConfig) ([]volumeSpec, error) {
 	var specs []volumeSpec
 	for i, m := range s.Volumes {

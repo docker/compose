@@ -30,25 +30,27 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 )
 
-type HelmActions struct {
-	Config         *action.Configuration
-	Settings       *env.EnvSettings
-	kube_conn_init bool
+// Actions helm actions
+type Actions struct {
+	Config       *action.Configuration
+	Settings     *env.EnvSettings
+	kubeConnInit bool
 }
 
-func NewHelmActions(settings *env.EnvSettings) *HelmActions {
+// NewHelmActions new helm action
+func NewHelmActions(settings *env.EnvSettings) *Actions {
 	if settings == nil {
 		settings = env.New()
 	}
-	return &HelmActions{
-		Config:         new(action.Configuration),
-		Settings:       settings,
-		kube_conn_init: false,
+	return &Actions{
+		Config:       new(action.Configuration),
+		Settings:     settings,
+		kubeConnInit: false,
 	}
 }
 
-func (hc *HelmActions) initKubeClient() error {
-	if hc.kube_conn_init {
+func (hc *Actions) initKubeClient() error {
+	if hc.kubeConnInit {
 		return nil
 	}
 	if err := hc.Config.Init(
@@ -62,11 +64,12 @@ func (hc *HelmActions) initKubeClient() error {
 	if err := hc.Config.KubeClient.IsReachable(); err != nil {
 		return err
 	}
-	hc.kube_conn_init = true
+	hc.kubeConnInit = true
 	return nil
 }
 
-func (hc *HelmActions) InstallChartFromDir(name string, chartpath string) error {
+//InstallChartFromDir install from dir
+func (hc *Actions) InstallChartFromDir(name string, chartpath string) error {
 	chart, err := loader.Load(chartpath)
 	if err != nil {
 		return err
@@ -74,8 +77,12 @@ func (hc *HelmActions) InstallChartFromDir(name string, chartpath string) error 
 	return hc.InstallChart(name, chart)
 }
 
-func (hc *HelmActions) InstallChart(name string, chart *chart.Chart) error {
-	hc.initKubeClient()
+// InstallChart instal chart
+func (hc *Actions) InstallChart(name string, chart *chart.Chart) error {
+	err := hc.initKubeClient()
+	if err != nil {
+		return err
+	}
 
 	actInstall := action.NewInstall(hc.Config)
 	actInstall.ReleaseName = name
@@ -90,14 +97,19 @@ func (hc *HelmActions) InstallChart(name string, chart *chart.Chart) error {
 	return nil
 }
 
-func (hc *HelmActions) Uninstall(name string) error {
-	hc.initKubeClient()
+// Uninstall uninstall chart
+func (hc *Actions) Uninstall(name string) error {
+	err := hc.initKubeClient()
+	if err != nil {
+		return err
+	}
+
 	release, err := hc.Get(name)
 	if err != nil {
 		return err
 	}
 	if release == nil {
-		return errors.New("No release found with the name provided.")
+		return errors.New("no release found with the name provided")
 	}
 	actUninstall := action.NewUninstall(hc.Config)
 	response, err := actUninstall.Run(name)
@@ -108,16 +120,22 @@ func (hc *HelmActions) Uninstall(name string) error {
 	return nil
 }
 
-func (hc *HelmActions) Get(name string) (*release.Release, error) {
-	hc.initKubeClient()
-
+// Get get released object for a named chart
+func (hc *Actions) Get(name string) (*release.Release, error) {
+	err := hc.initKubeClient()
+	if err != nil {
+		return nil, err
+	}
 	actGet := action.NewGet(hc.Config)
 	return actGet.Run(name)
 }
 
-func (hc *HelmActions) ListReleases() ([]compose.Stack, error) {
-	hc.initKubeClient()
-
+// ListReleases lists chart releases
+func (hc *Actions) ListReleases() ([]compose.Stack, error) {
+	err := hc.initKubeClient()
+	if err != nil {
+		return nil, err
+	}
 	actList := action.NewList(hc.Config)
 	releases, err := actList.Run()
 	if err != nil {

@@ -65,16 +65,13 @@ func runCreateKube(ctx context.Context, contextName string, opts kube.ContextPar
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 
-	contextData, description, err := createContextData(ctx, opts)
-	if err != nil {
-		return err
-	}
+	contextData, description := createContextData(opts)
 	return createDockerContext(ctx, contextName, store.KubeContextType, description, contextData)
 }
 
-func createContextData(ctx context.Context, opts kube.ContextParams) (interface{}, string, error) {
+func createContextData(opts kube.ContextParams) (interface{}, string) {
 	return store.KubeContext{
 		Endpoint:        opts.Endpoint,
 		FromEnvironment: opts.FromEnvironment,
-	}, opts.Description, nil
+	}, opts.Description
 }
