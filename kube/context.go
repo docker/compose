@@ -18,10 +18,84 @@
 
 package kube
 
+import (
+	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/utils/prompt"
+
+	"github.com/docker/compose-cli/kube/charts/kubernetes"
+)
+
 // ContextParams options for creating a Kubernetes context
 type ContextParams struct {
-	Name            string
+	ContextName     string
 	Description     string
-	Endpoint        string
+	KubeconfigPath  string
 	FromEnvironment bool
+}
+
+func (cp ContextParams) CreateContextData() (interface{}, string, error) {
+	if cp.FromEnvironment {
+		// we use the current kubectl context from a $KUBECONFIG path
+		return store.KubeContext{
+			FromEnvironment: cp.FromEnvironment,
+		}, cp.Description, nil
+	}
+	user := prompt.User{}
+	selectContext := func() error {
+		contexts, err := kubernetes.ListAvailableKubeConfigContexts(cp.KubeconfigPath)
+		if err != nil {
+			return err
+		}
+
+		selected, err := user.Select("Select kubeconfig context", contexts)
+		if err != nil {
+			if err == terminal.InterruptErr {
+				return errdefs.ErrCanceled
+			}
+			return err
+		}
+		cp.ContextName = contexts[selected]
+		return nil
+	}
+
+	if cp.KubeconfigPath != "" {
+		err := selectContext()
+		if err != nil {
+			return nil, "", err
+		}
+	} else {
+
+		// interactive
+		var options []string
+		var actions []func() error
+
+		options = append(options, "Context from kubeconfig file")
+		actions = append(actions, selectContext)
+
+		options = append(options, "Kubernetes environment variables")
+		actions = append(actions, func() error {
+			cp.FromEnvironment = true
+			return nil
+		})
+
+		selected, err := user.Select("Create a Docker context using:", options)
+		if err != nil {
+			if err == terminal.InterruptErr {
+				return nil, "", errdefs.ErrCanceled
+			}
+			return nil, "", err
+		}
+
+		err = actions[selected]()
+		if err != nil {
+			return nil, "", err
+		}
+	}
+	return store.KubeContext{
+		ContextName:     cp.ContextName,
+		KubeconfigPath:  cp.KubeconfigPath,
+		FromEnvironment: cp.FromEnvironment,
+	}, cp.Description, nil
 }

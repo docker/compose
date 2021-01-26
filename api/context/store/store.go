@@ -57,7 +57,7 @@ const (
 	LocalContextType = "local"
 	// KubeContextType is the endpoint key in the context endpoints for a new
 	// kube backend
-	KubeContextType = "kubernetes"
+	KubeContextType = "kube"
 )
 
 const (

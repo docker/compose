@@ -33,8 +33,8 @@ func init() {
 	extraCommands = append(extraCommands, createKubeCommand)
 	extraHelp = append(extraHelp, `
 Create a Kubernetes context:
-$ docker context create kubernetes CONTEXT [flags]
-(see docker context create kubernetes --help)
+$ docker context create k8s CONTEXT [flags]
+(see docker context create k8s --help)
 `)
 }
 
@@ -45,18 +45,13 @@ func createKubeCommand() *cobra.Command {
 		Short: "Create context for a Kubernetes Cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Name = args[0]
-
-			if opts.Endpoint != "" {
-				opts.FromEnvironment = false
-			}
 			return runCreateKube(cmd.Context(), args[0], opts)
 		},
 	}
 
 	addDescriptionFlag(cmd, &opts.Description)
-	cmd.Flags().StringVar(&opts.Endpoint, "endpoint", "", "The endpoint of the Kubernetes manager")
-	cmd.Flags().BoolVar(&opts.FromEnvironment, "from-env", true, "Get endpoint and creds from env vars")
+	cmd.Flags().StringVar(&opts.KubeconfigPath, "kubeconfig", "", "The endpoint of the Kubernetes manager")
+	cmd.Flags().BoolVar(&opts.FromEnvironment, "from-env", false, "Get endpoint and creds from env vars")
 	return cmd
 }
 
@@ -65,13 +60,9 @@ func runCreateKube(ctx context.Context, contextName string, opts kube.ContextPar
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 
-	contextData, description := createContextData(opts)
+	contextData, description, err := opts.CreateContextData()
+	if err != nil {
+		return err
+	}
 	return createDockerContext(ctx, contextName, store.KubeContextType, description, contextData)
-}
-
-func createContextData(opts kube.ContextParams) (interface{}, string) {
-	return store.KubeContext{
-		Endpoint:        opts.Endpoint,
-		FromEnvironment: opts.FromEnvironment,
-	}, opts.Description
 }
