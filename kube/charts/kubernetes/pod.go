@@ -138,21 +138,6 @@ func toPodTemplate(project *types.Project, serviceConfig types.ServiceConfig, la
 	return tpl, nil
 }
 
-func toImagePullPolicy(image string, specifiedPolicy string) (apiv1.PullPolicy, error) {
-	if specifiedPolicy == "" {
-		if strings.HasSuffix(image, ":latest") {
-			return apiv1.PullAlways, nil
-		}
-		return apiv1.PullIfNotPresent, nil
-	}
-	switch apiv1.PullPolicy(specifiedPolicy) {
-	case apiv1.PullAlways, apiv1.PullIfNotPresent, apiv1.PullNever:
-		return apiv1.PullPolicy(specifiedPolicy), nil
-	default:
-		return "", errors.Errorf("invalid pull policy %q, must be %q, %q or %q", specifiedPolicy, apiv1.PullAlways, apiv1.PullIfNotPresent, apiv1.PullNever)
-	}
-}
-
 func toHostAliases(extraHosts []string) ([]apiv1.HostAlias, error) {
 	if extraHosts == nil {
 		return nil, nil
@@ -355,13 +340,4 @@ func toCapabilities(list []string) (capabilities []apiv1.Capability) {
 		capabilities = append(capabilities, apiv1.Capability(c))
 	}
 	return
-}
-
-//nolint: unparam
-func forceRestartPolicy(podTemplate apiv1.PodTemplateSpec, forcedRestartPolicy apiv1.RestartPolicy) apiv1.PodTemplateSpec {
-	if podTemplate.Spec.RestartPolicy != "" {
-		podTemplate.Spec.RestartPolicy = forcedRestartPolicy
-	}
-
-	return podTemplate
 }

@@ -31,10 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+//ConvertToChart convert Kube objects to helm chart
 func ConvertToChart(name string, objects map[string]runtime.Object) (*chart.Chart, error) {
 
 	files := []*loader.BufferedFile{
-		&loader.BufferedFile{
+		{
 			Name: "README.md",
 			Data: []byte("This chart was created by converting a Compose file"),
 		}}

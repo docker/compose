@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+//MapToKubernetesObjects maps compose project to Kubernetes objects
 func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
 
@@ -72,7 +73,7 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 	for _, p := range service.Ports {
 		ports = append(ports,
 			core.ServicePort{
-				Name:       fmt.Sprintf("%d-%s", p.Target, strings.ToLower(string(p.Protocol))),
+				Name:       fmt.Sprintf("%d-%s", p.Target, strings.ToLower(p.Protocol)),
 				Port:       int32(p.Target),
 				TargetPort: intstr.FromInt(int(p.Target)),
 				Protocol:   toProtocol(p.Protocol),

@@ -33,11 +33,13 @@ import (
 	helmenv "helm.sh/helm/v3/pkg/cli"
 )
 
+//SDK chart SDK
 type SDK struct {
-	h           *helm.HelmActions
+	h           *helm.Actions
 	environment map[string]string
 }
 
+// NewSDK new chart SDK
 func NewSDK(ctx store.KubeContext) (SDK, error) {
 	return SDK{
 		environment: environment(),
@@ -60,15 +62,16 @@ func (s SDK) Uninstall(projectName string) error {
 }
 
 // List returns a list of compose stacks
-func (s SDK) List(projectName string) ([]compose.Stack, error) {
+func (s SDK) List() ([]compose.Stack, error) {
 	return s.h.ListReleases()
 }
 
-// GetDefault initializes Helm EnvSettings
+// GetDefaultEnv initializes Helm EnvSettings
 func (s SDK) GetDefaultEnv() *helmenv.EnvSettings {
 	return helmenv.New()
 }
 
+// GetChartInMemory get memory representation of helm chart
 func (s SDK) GetChartInMemory(project *types.Project) (*chart.Chart, error) {
 	// replace _ with - in volume names
 	for k, v := range project.Volumes {
@@ -86,6 +89,7 @@ func (s SDK) GetChartInMemory(project *types.Project) (*chart.Chart, error) {
 	return helm.ConvertToChart(project.Name, objects)
 }
 
+// SaveChart converts compose project to helm and saves the chart
 func (s SDK) SaveChart(project *types.Project, dest string) error {
 	chart, err := s.GetChartInMemory(project)
 	if err != nil {
@@ -94,6 +98,7 @@ func (s SDK) SaveChart(project *types.Project, dest string) error {
 	return util.SaveDir(chart, dest)
 }
 
+// GenerateChart generates helm chart from Compose project
 func (s SDK) GenerateChart(project *types.Project, dirname string) error {
 	if strings.Contains(dirname, ".") {
 		splits := strings.SplitN(dirname, ".", 2)
