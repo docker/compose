@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// ListAvailableKubeConfigContexts list kube contexts
 func ListAvailableKubeConfigContexts(kubeconfig string) ([]string, error) {
 	config, err := clientcmd.NewDefaultPathOptions().GetStartingConfig()
 	if err != nil {

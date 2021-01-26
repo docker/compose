@@ -85,6 +85,11 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, cons
 	return errdefs.ErrNotImplemented
 }
 
+// Stop executes the equivalent to a `compose stop`
+func (s *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	return errdefs.ErrNotImplemented
+}
+
 // Logs executes the equivalent to a `compose logs`
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	return errdefs.ErrNotImplemented

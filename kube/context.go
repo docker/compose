@@ -35,6 +35,7 @@ type ContextParams struct {
 	FromEnvironment bool
 }
 
+// CreateContextData create Docker context data
 func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 	if cp.FromEnvironment {
 		// we use the current kubectl context from a $KUBECONFIG path
