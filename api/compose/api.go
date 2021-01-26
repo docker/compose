@@ -35,6 +35,8 @@ type Service interface {
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
+	// Stop executes the equivalent to a `compose stop`
+	Stop(ctx context.Context, project *types.Project, consumer LogConsumer) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`

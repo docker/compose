@@ -48,6 +48,10 @@ func (c *composeService) Start(ctx context.Context, project *types.Project, cons
 	return errdefs.ErrNotImplemented
 }
 
+func (c *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (c *composeService) Up(context.Context, *types.Project, compose.UpOptions) error {
 	return errdefs.ErrNotImplemented
 }

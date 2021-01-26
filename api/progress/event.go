@@ -78,9 +78,14 @@ func CreatedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Created")
 }
 
-// StoppingEvent stops a new Removing in progress Event
+// StoppingEvent stops a new Stopping in progress Event
 func StoppingEvent(ID string) Event {
 	return NewEvent(ID, Working, "Stopping")
+}
+
+// StoppedEvent stops a new Stopping in progress Event
+func StoppedEvent(ID string) Event {
+	return NewEvent(ID, Done, "Stopped")
 }
 
 // RemovingEvent creates a new Removing in progress Event
