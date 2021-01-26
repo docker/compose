@@ -476,6 +476,7 @@ class TopLevelCommand:
                                     Compose file
             -t, --timeout TIMEOUT   Specify a shutdown timeout in seconds.
                                     (default: 10)
+            -f, --force             Don't ask to confirm removal
         """
         ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
@@ -484,12 +485,15 @@ class TopLevelCommand:
 
         image_type = image_type_from_opt('--rmi', options['--rmi'])
         timeout = timeout_from_opts(options)
+        if options.get('--volumes'):
+            if not (options.get('--force')
+                    or yesno("-v option will remove volumes. Are you sure? [yN] ", default=False)):
+                return
         self.project.down(
             image_type,
             options['--volumes'],
             options['--remove-orphans'],
-            timeout=timeout,
-            ignore_orphans=ignore_orphans)
+            timeout=timeout, ignore_orphans=ignore_orphans)
 
     def events(self, options):
         """
