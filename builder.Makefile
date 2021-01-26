@@ -65,7 +65,7 @@ cross:
 
 .PHONY: test
 test:
-	go test $(TAGS) -cover $(shell go list ./... | grep -vE 'e2e')
+	go test $(TAGS) -cover $(shell go list  $(TAGS) ./... | grep -vE 'e2e')
 
 .PHONY: lint
 lint:
