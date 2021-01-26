@@ -285,17 +285,17 @@ func (mr *MockAPIMockRecorder) GetLoadBalancerURL(arg0, arg1 interface{}) *gomoc
 }
 
 // GetLogs mocks base method
-func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 func(string, string, string)) error {
+func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 func(string, string, string), arg3 bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // GetLogs indicates an expected call of GetLogs
-func (mr *MockAPIMockRecorder) GetLogs(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) GetLogs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockAPI)(nil).GetLogs), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogs", reflect.TypeOf((*MockAPI)(nil).GetLogs), arg0, arg1, arg2, arg3)
 }
 
 // GetParameter mocks base method

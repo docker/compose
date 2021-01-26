@@ -64,7 +64,8 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			r, err := s.apiClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
 				ShowStdout: true,
 				ShowStderr: true,
-				Follow:     true,
+				Follow:     options.Follow,
+				Tail:       options.Tail,
 			})
 			defer r.Close() // nolint errcheck
 

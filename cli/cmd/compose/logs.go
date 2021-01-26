@@ -24,15 +24,18 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type logsOptions struct {
 	*projectOptions
 	composeOptions
+	follow bool
+	tail   string
 }
 
-func logsCommand(p *projectOptions) *cobra.Command {
+func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 	opts := logsOptions{
 		projectOptions: p,
 	}
@@ -42,6 +45,10 @@ func logsCommand(p *projectOptions) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLogs(cmd.Context(), opts, args)
 		},
+	}
+	logsCmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
+	if contextType == store.DefaultContextType {
+		logsCmd.Flags().StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
 	}
 	return logsCmd
 }
@@ -59,5 +66,7 @@ func runLogs(ctx context.Context, opts logsOptions, services []string) error {
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
 	return c.ComposeService().Logs(ctx, projectName, consumer, compose.LogOptions{
 		Services: services,
+		Follow:   opts.follow,
+		Tail:     opts.tail,
 	})
 }

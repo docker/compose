@@ -805,7 +805,7 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	return err
 }
 
-func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service, container, message string)) error {
+func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service string, container string, message string), follow bool) error {
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
@@ -836,6 +836,9 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer func(service, co
 					startTime = *event.IngestionTime
 				}
 			}
+		}
+		if !follow {
+			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
