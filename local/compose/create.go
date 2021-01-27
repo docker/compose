@@ -315,6 +315,9 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 	}
 	for _, vol := range volumesFrom {
 		spec := strings.Split(vol, ":")
+		if len(spec) == 0 {
+			continue
+		}
 		if spec[0] == "container" {
 			volumes = append(volumes, strings.Join(spec[1:], ":"))
 			continue
