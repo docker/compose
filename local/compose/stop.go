@@ -48,6 +48,9 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project, consu
 		containers = others
 		return err
 	})
+	if err != nil {
+		return err
+	}
 
 	return eg.Wait()
 }

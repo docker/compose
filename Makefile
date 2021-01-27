@@ -62,7 +62,8 @@ cross: ## Compile the CLI for linux, darwin and windows
 	--output ./bin \
 
 test: ## Run unit tests
-	@docker build . \
+	@docker build --progress=plain . \
+	--build-arg BUILD_TAGS=kube \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target test
 
@@ -71,7 +72,7 @@ cache-clear: ## Clear the builder cache
 
 lint: ## run linter(s)
 	@docker build . \
-	--build-arg BUILD_TAGS=e2e \
+	--build-arg BUILD_TAGS=kube,e2e \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
