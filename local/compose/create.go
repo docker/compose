@@ -35,7 +35,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
@@ -77,13 +76,9 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	orphans := observedState.filter(isNotService(project.ServiceNames()...))
 	if len(orphans) > 0 {
 		if opts.RemoveOrphans {
-			eg, _ := errgroup.WithContext(ctx)
 			w := progress.ContextWriter(ctx)
-			err := s.removeContainers(ctx, w, eg, orphans)
+			err := s.removeContainers(ctx, w, orphans)
 			if err != nil {
-				return err
-			}
-			if eg.Wait() != nil {
 				return err
 			}
 		} else {
