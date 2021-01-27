@@ -46,7 +46,7 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 			return runLogs(cmd.Context(), opts, args)
 		},
 	}
-	logsCmd.Flags().BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
+	logsCmd.Flags().BoolVar(&opts.follow, "follow", false, "Follow log output.")
 	if contextType == store.DefaultContextType {
 		logsCmd.Flags().StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
 	}

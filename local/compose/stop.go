@@ -26,7 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func (s *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (s *composeService) Stop(ctx context.Context, project *types.Project) error {
 	w := progress.ContextWriter(ctx)
 
 	var containers Containers
@@ -39,9 +39,6 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project, consu
 	}
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		serviceContainers, others := containers.split(isService(service.Name))
-		err := s.stopContainers(ctx, w, serviceContainers)
-		containers = others
-		return err
+		return s.stopContainers(ctx, w, containers.filter(isService(service.Name)))
 	})
 }
