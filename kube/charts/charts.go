@@ -19,31 +19,46 @@
 package charts
 
 import (
-	"os"
+	"context"
 	"path/filepath"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/api/compose"
+	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/kube/charts/helm"
 	"github.com/docker/compose-cli/kube/charts/kubernetes"
 	chart "helm.sh/helm/v3/pkg/chart"
 	util "helm.sh/helm/v3/pkg/chartutil"
-	helmenv "helm.sh/helm/v3/pkg/cli"
 )
 
 //SDK chart SDK
 type SDK struct {
-	h           *helm.Actions
-	environment map[string]string
+	action *helm.Actions
 }
 
 // NewSDK new chart SDK
-func NewSDK(ctx store.KubeContext) (SDK, error) {
+func NewSDK(ctx context.Context) (SDK, error) {
+	contextStore := store.ContextStore(ctx)
+	currentContext := apicontext.CurrentContext(ctx)
+	var kubeContext store.KubeContext
+
+	if err := contextStore.GetEndpoint(currentContext, &kubeContext); err != nil {
+		return SDK{}, err
+	}
+
+	config, err := kubernetes.LoadConfig(kubeContext)
+	if err != nil {
+		return SDK{}, err
+	}
+
+	actions, err := helm.NewHelmActions(ctx, config)
+	if err != nil {
+		return SDK{}, err
+	}
 	return SDK{
-		environment: environment(),
-		h:           helm.NewHelmActions(nil),
+		action: actions,
 	}, nil
 }
 
@@ -53,22 +68,17 @@ func (s SDK) Install(project *types.Project) error {
 	if err != nil {
 		return err
 	}
-	return s.h.InstallChart(project.Name, chart)
+	return s.action.InstallChart(project.Name, chart)
 }
 
 // Uninstall removes a runnign compose stack
 func (s SDK) Uninstall(projectName string) error {
-	return s.h.Uninstall(projectName)
+	return s.action.Uninstall(projectName)
 }
 
 // List returns a list of compose stacks
 func (s SDK) List() ([]compose.Stack, error) {
-	return s.h.ListReleases()
-}
-
-// GetDefaultEnv initializes Helm EnvSettings
-func (s SDK) GetDefaultEnv() *helmenv.EnvSettings {
-	return helmenv.New()
+	return s.action.ListReleases()
 }
 
 // GetChartInMemory get memory representation of helm chart
@@ -107,14 +117,4 @@ func (s SDK) GenerateChart(project *types.Project, dirname string) error {
 
 	dirname = filepath.Dir(dirname)
 	return s.SaveChart(project, dirname)
-}
-
-func environment() map[string]string {
-	vars := make(map[string]string)
-	env := os.Environ()
-	for _, v := range env {
-		k := strings.SplitN(v, "=", 2)
-		vars[k[0]] = k[1]
-	}
-	return vars
 }

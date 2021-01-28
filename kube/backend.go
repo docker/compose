@@ -25,7 +25,6 @@ import (
 	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
-	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
@@ -35,7 +34,6 @@ import (
 const backendType = store.KubeContextType
 
 type kubeAPIService struct {
-	ctx            store.KubeContext
 	composeService compose.Service
 }
 
@@ -44,20 +42,11 @@ func init() {
 }
 
 func service(ctx context.Context) (backend.Service, error) {
-	contextStore := store.ContextStore(ctx)
-	currentContext := apicontext.CurrentContext(ctx)
-	var kubeContext store.KubeContext
-
-	if err := contextStore.GetEndpoint(currentContext, &kubeContext); err != nil {
-		return nil, err
-	}
-
-	s, err := NewComposeService(kubeContext)
+	s, err := NewComposeService(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &kubeAPIService{
-		ctx:            kubeContext,
 		composeService: s,
 	}, nil
 }

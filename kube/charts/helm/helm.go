@@ -19,6 +19,7 @@
 package helm
 
 import (
+	"context"
 	"errors"
 	"log"
 
@@ -28,44 +29,38 @@ import (
 	loader "helm.sh/helm/v3/pkg/chart/loader"
 	env "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 // Actions helm actions
 type Actions struct {
-	Config       *action.Configuration
-	Settings     *env.EnvSettings
-	kubeConnInit bool
+	Config    *action.Configuration
+	Namespace string
 }
 
 // NewHelmActions new helm action
-func NewHelmActions(settings *env.EnvSettings) *Actions {
-	if settings == nil {
-		settings = env.New()
+func NewHelmActions(ctx context.Context, getter genericclioptions.RESTClientGetter) (*Actions, error) {
+	if getter == nil {
+		settings := env.New()
+		getter = settings.RESTClientGetter()
 	}
-	return &Actions{
-		Config:       new(action.Configuration),
-		Settings:     settings,
-		kubeConnInit: false,
-	}
-}
 
-func (hc *Actions) initKubeClient() error {
-	if hc.kubeConnInit {
-		return nil
+	namespace := "default"
+	if ns, _, err := getter.ToRawKubeConfigLoader().Namespace(); err == nil {
+		namespace = ns
 	}
-	if err := hc.Config.Init(
-		hc.Settings.RESTClientGetter(),
-		hc.Settings.Namespace(),
-		"configmap",
-		log.Printf,
-	); err != nil {
-		log.Fatal(err)
+	actions := &Actions{
+		Config: &action.Configuration{
+			RESTClientGetter: getter,
+		},
+		Namespace: namespace,
 	}
-	if err := hc.Config.KubeClient.IsReachable(); err != nil {
-		return err
+	err := actions.Config.Init(getter, namespace, "configmap", log.Printf)
+	if err != nil {
+		return nil, err
 	}
-	hc.kubeConnInit = true
-	return nil
+
+	return actions, actions.Config.KubeClient.IsReachable()
 }
 
 //InstallChartFromDir install from dir
@@ -79,14 +74,9 @@ func (hc *Actions) InstallChartFromDir(name string, chartpath string) error {
 
 // InstallChart instal chart
 func (hc *Actions) InstallChart(name string, chart *chart.Chart) error {
-	err := hc.initKubeClient()
-	if err != nil {
-		return err
-	}
-
 	actInstall := action.NewInstall(hc.Config)
 	actInstall.ReleaseName = name
-	actInstall.Namespace = hc.Settings.Namespace()
+	actInstall.Namespace = hc.Namespace
 
 	release, err := actInstall.Run(chart, map[string]interface{}{})
 	if err != nil {
@@ -99,11 +89,6 @@ func (hc *Actions) InstallChart(name string, chart *chart.Chart) error {
 
 // Uninstall uninstall chart
 func (hc *Actions) Uninstall(name string) error {
-	err := hc.initKubeClient()
-	if err != nil {
-		return err
-	}
-
 	release, err := hc.Get(name)
 	if err != nil {
 		return err
@@ -122,20 +107,12 @@ func (hc *Actions) Uninstall(name string) error {
 
 // Get get released object for a named chart
 func (hc *Actions) Get(name string) (*release.Release, error) {
-	err := hc.initKubeClient()
-	if err != nil {
-		return nil, err
-	}
 	actGet := action.NewGet(hc.Config)
 	return actGet.Run(name)
 }
 
 // ListReleases lists chart releases
 func (hc *Actions) ListReleases() ([]compose.Stack, error) {
-	err := hc.initKubeClient()
-	if err != nil {
-		return nil, err
-	}
 	actList := action.NewList(hc.Config)
 	releases, err := actList.Run()
 	if err != nil {

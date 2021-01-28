@@ -22,11 +22,61 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/docker/compose-cli/api/context/store"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 // ListAvailableKubeConfigContexts list kube contexts
 func ListAvailableKubeConfigContexts(kubeconfig string) ([]string, error) {
+	config, err := getKubeConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	contexts := []string{}
+	for k := range config.Contexts {
+		contexts = append(contexts, k)
+	}
+	return contexts, nil
+}
+
+// LoadConfig returns kubeconfig data referenced in the docker context
+func LoadConfig(ctx store.KubeContext) (*genericclioptions.ConfigFlags, error) {
+	if ctx.FromEnvironment {
+		return nil, nil
+	}
+	config, err := getKubeConfig(ctx.KubeconfigPath)
+	if err != nil {
+		return nil, err
+	}
+	contextName := ctx.ContextName
+	if contextName == "" {
+		contextName = config.CurrentContext
+	}
+
+	context, ok := config.Contexts[contextName]
+	if !ok {
+		return nil, fmt.Errorf("context name %s not found in kubeconfig", contextName)
+	}
+	cluster, ok := config.Clusters[context.Cluster]
+	if !ok {
+		return nil, fmt.Errorf("cluster %s not found for context %s", context.Cluster, contextName)
+	}
+	// bind to kubernetes config flags
+	return &genericclioptions.ConfigFlags{
+		Context:    &ctx.ContextName,
+		KubeConfig: &ctx.KubeconfigPath,
+
+		Namespace:   &context.Namespace,
+		ClusterName: &context.Cluster,
+
+		APIServer: &cluster.Server,
+		CAFile:    &cluster.CertificateAuthority,
+	}, nil
+}
+
+func getKubeConfig(kubeconfig string) (*api.Config, error) {
 	config, err := clientcmd.NewDefaultPathOptions().GetStartingConfig()
 	if err != nil {
 		return nil, err
@@ -43,9 +93,5 @@ func ListAvailableKubeConfigContexts(kubeconfig string) ([]string, error) {
 		config = clientcmd.GetConfigFromFileOrDie(kubeconfig)
 	}
 
-	contexts := []string{}
-	for k := range config.Contexts {
-		contexts = append(contexts, k)
-	}
-	return contexts, nil
+	return config, nil
 }
