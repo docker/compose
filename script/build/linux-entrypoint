@@ -24,7 +24,7 @@ if [ ! -z "${BUILD_BOOTLOADER}" ]; then
     git clone --single-branch --branch develop https://github.com/pyinstaller/pyinstaller.git /tmp/pyinstaller
     cd /tmp/pyinstaller/bootloader
     # Checkout commit corresponding to version in requirements-build
-    git checkout v3.6
+    git checkout v4.1
     "${VENV}"/bin/python3 ./waf configure --no-lsb all
     "${VENV}"/bin/pip3 install ..
     cd "${CODE_PATH}"

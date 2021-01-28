@@ -133,6 +133,7 @@ ALLOWED_KEYS = DOCKER_CONFIG_KEYS + [
     'logging',
     'network_mode',
     'platform',
+    'profiles',
     'scale',
     'stop_grace_period',
 ]
@@ -373,6 +374,23 @@ def find_candidates_in_parent_dirs(filenames, path):
     return (candidates, path)
 
 
+def check_swarm_only_config(service_dicts):
+    warning_template = (
+        "Some services ({services}) use the '{key}' key, which will be ignored. "
+        "Compose does not support '{key}' configuration - use "
+        "`docker stack deploy` to deploy to a swarm."
+    )
+    key = 'configs'
+    services = [s for s in service_dicts if s.get(key)]
+    if services:
+        log.warning(
+            warning_template.format(
+                services=", ".join(sorted(s['name'] for s in services)),
+                key=key
+            )
+        )
+
+
 def load(config_details, interpolate=True):
     """Load the configuration from a working directory and a list of
     configuration files.  Files are loaded in order, and merged on top
@@ -408,6 +426,8 @@ def load(config_details, interpolate=True):
     if main_file.version != V1:
         for service_dict in service_dicts:
             match_named_volumes(service_dict, volumes)
+
+    check_swarm_only_config(service_dicts)
 
     return Config(main_file.config_version, main_file.version,
                   service_dicts, volumes, networks, secrets, configs)
@@ -1047,7 +1067,7 @@ def merge_service_dicts(base, override, version):
 
     for field in [
         'cap_add', 'cap_drop', 'expose', 'external_links',
-        'volumes_from', 'device_cgroup_rules',
+        'volumes_from', 'device_cgroup_rules', 'profiles',
     ]:
         md.merge_field(field, merge_unique_items_lists, default=[])
 
@@ -1166,6 +1186,7 @@ def merge_reservations(base, override):
     md.merge_scalar('cpus')
     md.merge_scalar('memory')
     md.merge_sequence('generic_resources', types.GenericResource.parse)
+    md.merge_field('devices', merge_unique_objects_lists, default=[])
     return dict(md)
 
 

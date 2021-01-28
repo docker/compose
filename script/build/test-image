@@ -13,6 +13,6 @@ IMAGE="docker/compose-tests"
 DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
 docker build -t "${IMAGE}:${TAG}" . \
        --target build \
-       --build-arg BUILD_PLATFORM="debian" \
+       --build-arg DISTRO="debian" \
        --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
 docker tag "${IMAGE}":"${TAG}" "${IMAGE}":latest

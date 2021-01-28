@@ -5,14 +5,12 @@ set -ex
 ./script/clean
 
 DOCKER_COMPOSE_GITSHA="$(script/build/write-git-sha)"
-TAG="docker/compose:tmp-glibc-linux-binary-${DOCKER_COMPOSE_GITSHA}"
 
-docker build -t "${TAG}" . \
-       --build-arg BUILD_PLATFORM=debian \
-       --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}"
-TMP_CONTAINER=$(docker create "${TAG}")
-mkdir -p dist
+docker build . \
+       --target bin \
+       --build-arg DISTRO=debian \
+       --build-arg GIT_COMMIT="${DOCKER_COMPOSE_GITSHA}" \
+       --output dist/
 ARCH=$(uname -m)
-docker cp "${TMP_CONTAINER}":/usr/local/bin/docker-compose "dist/docker-compose-Linux-${ARCH}"
-docker container rm -f "${TMP_CONTAINER}"
-docker image rm -f "${TAG}"
+# Ensure that we output the binary with the same name as we did before
+mv dist/docker-compose-linux-amd64 "dist/docker-compose-Linux-${ARCH}"

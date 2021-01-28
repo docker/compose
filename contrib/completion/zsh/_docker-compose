@@ -342,6 +342,7 @@ _docker-compose() {
         '--verbose[Show more output]' \
         '--log-level=[Set log level]:level:(DEBUG INFO WARNING ERROR CRITICAL)' \
         '--no-ansi[Do not print ANSI control characters]' \
+        '--ansi=[Control when to print ANSI control characters]:when:(never always auto)' \
         '(-H --host)'{-H,--host}'[Daemon socket to connect to]:host:' \
         '--tls[Use TLS; implied by --tlsverify]' \
         '--tlscacert=[Trust certs signed only by this CA]:ca path:' \

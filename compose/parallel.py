@@ -11,6 +11,7 @@ from threading import Thread
 from docker.errors import APIError
 from docker.errors import ImageNotFound
 
+from compose.cli.colors import AnsiMode
 from compose.cli.colors import green
 from compose.cli.colors import red
 from compose.cli.signals import ShutdownException
@@ -83,10 +84,7 @@ def parallel_execute(objects, func, get_name, msg, get_deps=None, limit=None, fa
     objects = list(objects)
     stream = sys.stderr
 
-    if ParallelStreamWriter.instance:
-        writer = ParallelStreamWriter.instance
-    else:
-        writer = ParallelStreamWriter(stream)
+    writer = ParallelStreamWriter.get_or_assign_instance(ParallelStreamWriter(stream))
 
     for obj in objects:
         writer.add_object(msg, get_name(obj))
@@ -259,19 +257,37 @@ class ParallelStreamWriter:
     to jump to the correct line, and write over the line.
     """
 
-    noansi = False
-    lock = Lock()
+    default_ansi_mode = AnsiMode.AUTO
+    write_lock = Lock()
+
     instance = None
+    instance_lock = Lock()
 
     @classmethod
-    def set_noansi(cls, value=True):
-        cls.noansi = value
+    def get_instance(cls):
+        return cls.instance
 
-    def __init__(self, stream):
+    @classmethod
+    def get_or_assign_instance(cls, writer):
+        cls.instance_lock.acquire()
+        try:
+            if cls.instance is None:
+                cls.instance = writer
+            return cls.instance
+        finally:
+            cls.instance_lock.release()
+
+    @classmethod
+    def set_default_ansi_mode(cls, ansi_mode):
+        cls.default_ansi_mode = ansi_mode
+
+    def __init__(self, stream, ansi_mode=None):
+        if ansi_mode is None:
+            ansi_mode = self.default_ansi_mode
         self.stream = stream
+        self.use_ansi_codes = ansi_mode.use_ansi_codes(stream)
         self.lines = []
         self.width = 0
-        ParallelStreamWriter.instance = self
 
     def add_object(self, msg, obj_index):
         if msg is None:
@@ -285,7 +301,7 @@ class ParallelStreamWriter:
         return self._write_noansi(msg, obj_index, '')
 
     def _write_ansi(self, msg, obj_index, status):
-        self.lock.acquire()
+        self.write_lock.acquire()
         position = self.lines.index(msg + obj_index)
         diff = len(self.lines) - position
         # move up
@@ -297,7 +313,7 @@ class ParallelStreamWriter:
         # move back down
         self.stream.write("%c[%dB" % (27, diff))
         self.stream.flush()
-        self.lock.release()
+        self.write_lock.release()
 
     def _write_noansi(self, msg, obj_index, status):
         self.stream.write(
@@ -310,17 +326,10 @@ class ParallelStreamWriter:
     def write(self, msg, obj_index, status, color_func):
         if msg is None:
             return
-        if self.noansi:
-            self._write_noansi(msg, obj_index, status)
-        else:
+        if self.use_ansi_codes:
             self._write_ansi(msg, obj_index, color_func(status))
-
-
-def get_stream_writer():
-    instance = ParallelStreamWriter.instance
-    if instance is None:
-        raise RuntimeError('ParallelStreamWriter has not yet been instantiated')
-    return instance
+        else:
+            self._write_noansi(msg, obj_index, status)
 
 
 def parallel_operation(containers, operation, options, message):

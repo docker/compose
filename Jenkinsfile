@@ -1,6 +1,6 @@
 #!groovy
 
-def dockerVersions = ['19.03.8']
+def dockerVersions = ['19.03.13']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py37']
 
@@ -12,6 +12,9 @@ pipeline {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         timeout(time: 2, unit: 'HOURS')
         timestamps()
+    }
+    environment {
+        DOCKER_BUILDKIT="1"
     }
 
     stages {
@@ -69,7 +72,7 @@ def buildImage(baseImage) {
             ansiColor('xterm') {
                 sh """docker build -t ${imageName} \\
                     --target build \\
-                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg DISTRO="${baseImage}" \\
                     --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
                     .\\
                 """

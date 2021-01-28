@@ -13,13 +13,13 @@ if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
   SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
 fi
 
-OPENSSL_VERSION=1.1.1g
+OPENSSL_VERSION=1.1.1h
 OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
-OPENSSL_SHA1=b213a293f2127ec3e323fb3cfc0c9807664fd997
+OPENSSL_SHA1=8d0d099e8973ec851368c8c775e05e1eadca1794
 
-PYTHON_VERSION=3.7.7
+PYTHON_VERSION=3.9.0
 PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
-PYTHON_SHA1=8e9968663a214aea29659ba9dfa959e8a7d82b39
+PYTHON_SHA1=5744a10ba989d2badacbab3c00cdcb83c83106c7
 
 #
 # Install prerequisites.
@@ -36,7 +36,7 @@ if ! [ -x "$(command -v python3)" ]; then
   brew install python3
 fi
 if ! [ -x "$(command -v virtualenv)" ]; then
-  pip3 install virtualenv==20.0.30
+  pip3 install virtualenv==20.2.2
 fi
 
 #

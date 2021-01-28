@@ -17,10 +17,16 @@ class DocoptDispatcher:
         self.command_class = command_class
         self.options = options
 
+    @classmethod
+    def get_command_and_options(cls, doc_entity, argv, options):
+        command_help = getdoc(doc_entity)
+        opt = docopt_full_help(command_help, argv, **options)
+        command = opt['COMMAND']
+        return command_help, opt, command
+
     def parse(self, argv):
-        command_help = getdoc(self.command_class)
-        options = docopt_full_help(command_help, argv, **self.options)
-        command = options['COMMAND']
+        command_help, options, command = DocoptDispatcher.get_command_and_options(
+            self.command_class, argv, self.options)
 
         if command is None:
             raise SystemExit(command_help)

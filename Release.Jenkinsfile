@@ -1,6 +1,6 @@
 #!groovy
 
-def dockerVersions = ['19.03.8', '18.09.9']
+def dockerVersions = ['19.03.13', '18.09.9']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py37']
 
@@ -13,6 +13,9 @@ pipeline {
         timeout(time: 2, unit: 'HOURS')
         timestamps()
     }
+    environment {
+        DOCKER_BUILDKIT="1"
+    }
 
     stages {
         stage('Build test images') {
@@ -20,7 +23,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildImage('alpine')
@@ -28,7 +31,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildImage('debian')
@@ -38,7 +41,7 @@ pipeline {
         }
         stage('Test') {
             agent {
-                label 'linux && docker && ubuntu-2004'
+                label 'linux && docker && ubuntu-2004 && cgroup1'
             }
             steps {
                 // TODO use declarative 1.5.0 `matrix` once available on CI
@@ -58,7 +61,7 @@ pipeline {
         }
         stage('Generate Changelog') {
             agent {
-                label 'linux && docker && ubuntu-2004'
+                label 'linux && docker && ubuntu-2004 && cgroup1'
             }
             steps {
                 checkout scm
@@ -81,7 +84,7 @@ pipeline {
                     steps {
                         checkout scm
                         sh './script/setup/osx'
-                        sh 'tox -e py37 -- tests/unit'
+                        sh 'tox -e py39 -- tests/unit'
                         sh './script/build/osx'
                         dir ('dist') {
                           checksum('docker-compose-Darwin-x86_64')
@@ -95,7 +98,7 @@ pipeline {
                 }
                 stage('linux binary') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         checkout scm
@@ -114,11 +117,11 @@ pipeline {
                         label 'windows-python'
                     }
                     environment {
-                        PATH = "$PATH;C:\\Python37;C:\\Python37\\Scripts"
+                        PATH = "C:\\Python39;C:\\Python39\\Scripts;$PATH"
                     }
                     steps {
                         checkout scm
-                        bat 'tox.exe -e py37 -- tests/unit'
+                        bat 'tox.exe -e py39 -- tests/unit'
                         powershell '.\\script\\build\\windows.ps1'
                         dir ('dist') {
                             checksum('docker-compose-Windows-x86_64.exe')
@@ -131,7 +134,7 @@ pipeline {
                 }
                 stage('alpine image') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildRuntimeImage('alpine')
@@ -139,7 +142,7 @@ pipeline {
                 }
                 stage('debian image') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         buildRuntimeImage('debian')
@@ -154,7 +157,7 @@ pipeline {
             parallel {
                 stage('Pushing images') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     steps {
                         pushRuntimeImage('alpine')
@@ -163,7 +166,7 @@ pipeline {
                 }
                 stage('Creating Github Release') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     environment {
                         GITHUB_TOKEN = credentials('github-release-token')
@@ -195,7 +198,7 @@ pipeline {
                 }
                 stage('Publishing Python packages') {
                     agent {
-                        label 'linux && docker && ubuntu-2004'
+                        label 'linux && docker && ubuntu-2004 && cgroup1'
                     }
                     environment {
                         PYPIRC = credentials('pypirc-docker-dsg-cibot')
@@ -229,7 +232,7 @@ def buildImage(baseImage) {
             ansiColor('xterm') {
                 sh """docker build -t ${imageName} \\
                     --target build \\
-                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg DISTRO="${baseImage}" \\
                     --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
                     .\\
                 """
@@ -244,7 +247,7 @@ def buildImage(baseImage) {
 def runTests(dockerVersion, pythonVersion, baseImage) {
     return {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
-            node("linux && docker && ubuntu-2004") {
+            node("linux && docker && ubuntu-2004 && cgroup1") {
                 def scmvar = checkout(scm)
                 def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
@@ -276,7 +279,7 @@ def buildRuntimeImage(baseImage) {
     def imageName = "docker/compose:${baseImage}-${env.BRANCH_NAME}"
     ansiColor('xterm') {
         sh """docker build -t ${imageName} \\
-            --build-arg BUILD_PLATFORM="${baseImage}" \\
+            --build-arg DISTRO="${baseImage}" \\
             --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT.take(7)}" \\
             .
         """

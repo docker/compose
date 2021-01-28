@@ -44,13 +44,34 @@ fi
 if [ -n "$COMPOSE_PROJECT_NAME" ]; then
     COMPOSE_OPTIONS="-e COMPOSE_PROJECT_NAME $COMPOSE_OPTIONS"
 fi
-# TODO: also check --file argument
 if [ -n "$compose_dir" ]; then
     VOLUMES="$VOLUMES -v $compose_dir:$compose_dir"
 fi
 if [ -n "$HOME" ]; then
     VOLUMES="$VOLUMES -v $HOME:$HOME -e HOME" # Pass in HOME to share docker.config and allow ~/-relative paths to work.
 fi
+i=$#
+while [ $i -gt 0 ]; do
+    arg=$1
+    i=$((i - 1))
+    shift
+
+    case "$arg" in
+        -f|--file)
+            value=$1
+            i=$((i - 1))
+            shift
+            set -- "$@" "$arg" "$value"
+
+            file_dir=$(realpath "$(dirname "$value")")
+            VOLUMES="$VOLUMES -v $file_dir:$file_dir"
+        ;;
+        *) set -- "$@" "$arg" ;;
+    esac
+done
+
+# Setup environment variables for compose config and context
+ENV_OPTIONS=$(printenv | sed -E "/^PATH=.*/d; s/^/-e /g; s/=.*//g; s/\n/ /g")
 
 # Only allocate tty if we detect one
 if [ -t 0 ] && [ -t 1 ]; then
@@ -67,4 +88,4 @@ if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q 'name=
 fi
 
 # shellcheck disable=SC2086
-exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"
+exec docker run --rm $DOCKER_RUN_OPTIONS $DOCKER_ADDR $COMPOSE_OPTIONS $ENV_OPTIONS $VOLUMES -w "$(pwd)" $IMAGE "$@"

@@ -32,7 +32,7 @@ install_requires = [
     'texttable >= 0.9.0, < 2',
     'websocket-client >= 0.32.0, < 1',
     'distro >= 1.5.0, < 2',
-    'docker[ssh] >= 4.3.1, < 5',
+    'docker[ssh] >= 4.4.0, < 5',
     'dockerpty >= 0.4.1, < 1',
     'jsonschema >= 2.5.1, < 4',
     'python-dotenv >= 0.13.0, < 1',
@@ -102,5 +102,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
 )

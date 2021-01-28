@@ -61,6 +61,7 @@ class DockerClientTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.client.close()
         del cls.client
 
     def tearDown(self):

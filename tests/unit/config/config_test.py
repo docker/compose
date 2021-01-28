@@ -238,7 +238,9 @@ class ConfigTest(unittest.TestCase):
                 )
             )
 
-        assert 'Invalid top-level property "web"' in excinfo.exconly()
+        assert "compose.config.errors.ConfigurationError: " \
+               "The Compose file 'filename.yml' is invalid because:\n" \
+               "'web' does not match any of the regexes: '^x-'" in excinfo.exconly()
         assert VERSION_EXPLANATION in excinfo.exconly()
 
     def test_named_volume_config_empty(self):
@@ -667,7 +669,7 @@ class ConfigTest(unittest.TestCase):
 
             assert 'Invalid service name \'mong\\o\'' in excinfo.exconly()
 
-    def test_config_duplicate_cache_from_values_validation_error(self):
+    def test_config_duplicate_cache_from_values_no_validation_error(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(
                 build_config_details({
@@ -679,7 +681,7 @@ class ConfigTest(unittest.TestCase):
                 })
             )
 
-        assert 'build.cache_from contains non-unique items' in exc.exconly()
+        assert 'build.cache_from contains non-unique items' not in exc.exconly()
 
     def test_load_with_multiple_files_v1(self):
         base_file = config.ConfigFile(

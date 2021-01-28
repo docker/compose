@@ -58,13 +58,16 @@ COMPOSE_COMPATIBILITY_DICT = {
 }
 
 
-def start_process(base_dir, options):
+def start_process(base_dir, options, executable=None, env=None):
+    executable = executable or DOCKER_COMPOSE_EXECUTABLE
     proc = subprocess.Popen(
-        [DOCKER_COMPOSE_EXECUTABLE] + options,
+        [executable] + options,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=base_dir)
+        cwd=base_dir,
+        env=env,
+    )
     print("Running process: %s" % proc.pid)
     return proc
 
@@ -78,9 +81,10 @@ def wait_on_process(proc, returncode=0, stdin=None):
     return ProcessResult(stdout.decode('utf-8'), stderr.decode('utf-8'))
 
 
-def dispatch(base_dir, options, project_options=None, returncode=0, stdin=None):
+def dispatch(base_dir, options,
+             project_options=None, returncode=0, stdin=None, executable=None, env=None):
     project_options = project_options or []
-    proc = start_process(base_dir, project_options + options)
+    proc = start_process(base_dir, project_options + options, executable=executable, env=env)
     return wait_on_process(proc, returncode=returncode, stdin=stdin)
 
 
@@ -783,7 +787,11 @@ services:
         assert BUILD_CACHE_TEXT not in result.stdout
         assert BUILD_PULL_TEXT in result.stdout
 
+    @mock.patch.dict(os.environ)
     def test_build_log_level(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
+        os.environ['DOCKER_BUILDKIT'] = '0'
+        self.test_env_file_relative_to_compose_file()
         self.base_dir = 'tests/fixtures/simple-dockerfile'
         result = self.dispatch(['--log-level', 'warning', 'build', 'simple'])
         assert result.stderr == ''
@@ -845,13 +853,17 @@ services:
         for c in self.project.client.containers(all=True):
             self.addCleanup(self.project.client.remove_container, c, force=True)
 
+    @mock.patch.dict(os.environ)
     def test_build_shm_size_build_option(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-shm-size'
         result = self.dispatch(['build', '--no-cache'], None)
         assert 'shm_size: 96' in result.stdout
 
+    @mock.patch.dict(os.environ)
     def test_build_memory_build_option(self):
+        os.environ['COMPOSE_DOCKER_CLI_BUILD'] = '0'
         pull_busybox(self.client)
         self.base_dir = 'tests/fixtures/build-memory'
         result = self.dispatch(['build', '--no-cache', '--memory', '96m', 'service'], None)
@@ -1718,6 +1730,98 @@ services:
 
         shareable_mode_container = self.project.get_service('shareable').containers()[0]
         assert shareable_mode_container.get('HostConfig.IpcMode') == 'shareable'
+
+    def test_profiles_up_with_no_profile(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert len(containers) == 1
+
+    def test_profiles_up_with_profile(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'test', 'up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert len(containers) == 3
+
+    def test_profiles_up_invalid_dependency(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        result = self.dispatch(['--profile', 'debug', 'up'], returncode=1)
+
+        assert ('Service "bar" was pulled in as a dependency of service "zot" '
+                'but is not enabled by the active profiles.') in result.stderr
+
+    def test_profiles_up_with_multiple_profiles(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'debug', '--profile', 'test', 'up'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'foo' in service_names
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 4
+
+    def test_profiles_up_with_profile_enabled_by_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up', 'bar'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert len(containers) == 1
+
+    def test_profiles_up_with_dependency_and_profile_enabled_by_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['up', 'baz'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'baz' in service_names
+        assert len(containers) == 2
+
+    def test_profiles_up_with_invalid_dependency_for_target_service(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        result = self.dispatch(['up', 'zot'], returncode=1)
+
+        assert ('Service "bar" was pulled in as a dependency of service "zot" '
+                'but is not enabled by the active profiles.') in result.stderr
+
+    def test_profiles_up_with_profile_for_dependency(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['--profile', 'test', 'up', 'zot'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 2
+
+    def test_profiles_up_with_merged_profiles(self):
+        self.base_dir = 'tests/fixtures/profiles'
+        self.dispatch(['-f', 'docker-compose.yml', '-f', 'merge-profiles.yml', 'up', 'zot'])
+
+        containers = self.project.containers(stopped=True)
+        service_names = [c.service for c in containers]
+
+        assert 'bar' in service_names
+        assert 'zot' in service_names
+        assert len(containers) == 2
 
     def test_exec_without_tty(self):
         self.base_dir = 'tests/fixtures/links-composefile'
@@ -3034,3 +3138,12 @@ services:
         another = self.project.get_service('--log-service')
         assert len(service.containers()) == 1
         assert len(another.containers()) == 1
+
+    def test_up_no_log_prefix(self):
+        self.base_dir = 'tests/fixtures/echo-services'
+        result = self.dispatch(['up', '--no-log-prefix'])
+
+        assert 'simple' in result.stdout
+        assert 'another' in result.stdout
+        assert 'exited with code 0' in result.stdout
+        assert 'exited with code 0' in result.stdout
