@@ -413,7 +413,7 @@ func TestContainerRunAttached(t *testing.T) {
 			}
 			return poll.Continue("waiting for container to be running, current inspect result: \n%s", res.Combined())
 		}
-		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(90*time.Second))
+		poll.WaitOn(t, checkRunning, poll.WithDelay(5*time.Second), poll.WithTimeout(180*time.Second))
 
 		inspectRes := c.RunDockerCmd("inspect", container)
 
@@ -480,11 +480,19 @@ func TestContainerRunAttached(t *testing.T) {
 		res := c.RunDockerOrExitError("start", container)
 		//Flaky errors on restart : Code="ContainerGroupTransitioning" Message="The container group 'test-container' is still transitioning, please retry later."
 		if res.ExitCode != 0 && strings.Contains(res.Stderr(), `Code="ContainerGroupTransitioning"`) {
-			time.Sleep(3 * time.Second)
-			res = c.RunDockerCmd("start", container)
+			res = c.RunDockerOrExitError("rm", "-f", container)
+			if strings.Contains(res.Stderr(), "unsupported protocol scheme") { // ...
+				time.Sleep(1 * time.Second)
+				c.RunDockerCmd("rm", "-f", container)
+			}
+			c.RunDockerCmd("run",
+				"--name", container,
+				"--memory", "0.1G", "--cpus", "0.1",
+				"nginx")
+		} else {
+			res.Assert(t, icmd.Expected{Out: container})
+			waitForStatus(t, c, container, convert.StatusRunning)
 		}
-		res.Assert(t, icmd.Expected{Out: container})
-		waitForStatus(t, c, container, convert.StatusRunning)
 	})
 
 	t.Run("prune dry run", func(t *testing.T) {
