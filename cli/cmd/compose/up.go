@@ -47,6 +47,7 @@ type upOptions struct {
 	removeOrphans bool
 	forceRecreate bool
 	noRecreate    bool
+	noStart       bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -92,7 +93,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 		flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
-
+		flags.BoolVar(&opts.noStart, "no-start", false, "Don't start the services after creating them.")
 	}
 
 	return upCmd
@@ -133,6 +134,10 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	})
 	if err != nil {
 		return err
+	}
+
+	if opts.noStart {
+		return nil
 	}
 
 	if opts.Detach {

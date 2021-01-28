@@ -107,6 +107,7 @@ func Command(contextType string) *cobra.Command {
 			buildCommand(&opts),
 			pushCommand(&opts),
 			pullCommand(&opts),
+			createCommand(&opts),
 		)
 	}
 	command.Flags().SetInterspersed(false)
