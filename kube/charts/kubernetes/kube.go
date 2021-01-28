@@ -33,6 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	headlessPort      = 55555
+	headlessName      = "headless"
+	clusterIPHeadless = "None"
+)
+
 //MapToKubernetesObjects maps compose project to Kubernetes objects
 func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
@@ -70,7 +76,12 @@ func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, 
 
 func mapToService(project *types.Project, service types.ServiceConfig) *core.Service {
 	ports := []core.ServicePort{}
+	serviceType := core.ServiceTypeClusterIP
+	clusterIP := ""
 	for _, p := range service.Ports {
+		if p.Published != 0 {
+			serviceType = core.ServiceTypeLoadBalancer
+		}
 		ports = append(ports,
 			core.ServicePort{
 				Name:       fmt.Sprintf("%d-%s", p.Target, strings.ToLower(p.Protocol)),
@@ -79,8 +90,14 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 				Protocol:   toProtocol(p.Protocol),
 			})
 	}
-	if len(ports) == 0 {
-		return nil
+	if len(ports) == 0 { // headless service
+		clusterIP = clusterIPHeadless
+		ports = append(ports, core.ServicePort{
+			Name:       headlessName,
+			Port:       headlessPort,
+			TargetPort: intstr.FromInt(headlessPort),
+			Protocol:   core.ProtocolTCP,
+		})
 	}
 	return &core.Service{
 		TypeMeta: meta.TypeMeta{
@@ -91,30 +108,12 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 			Name: service.Name,
 		},
 		Spec: core.ServiceSpec{
-			Selector: map[string]string{"com.docker.compose.service": service.Name},
-			Ports:    ports,
-			Type:     mapServiceToServiceType(project, service),
+			ClusterIP: clusterIP,
+			Selector:  map[string]string{"com.docker.compose.service": service.Name},
+			Ports:     ports,
+			Type:      serviceType,
 		},
 	}
-}
-
-func mapServiceToServiceType(project *types.Project, service types.ServiceConfig) core.ServiceType {
-	serviceType := core.ServiceTypeClusterIP
-	if len(service.Networks) == 0 {
-		// service is implicitly attached to "default" network
-		serviceType = core.ServiceTypeLoadBalancer
-	}
-	for name := range service.Networks {
-		if !project.Networks[name].Internal {
-			serviceType = core.ServiceTypeLoadBalancer
-		}
-	}
-	for _, port := range service.Ports {
-		if port.Published != 0 {
-			serviceType = core.ServiceTypeNodePort
-		}
-	}
-	return serviceType
 }
 
 func mapToDeployment(project *types.Project, service types.ServiceConfig, name string) (*apps.Deployment, error) {

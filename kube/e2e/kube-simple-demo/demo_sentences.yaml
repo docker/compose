@@ -1,0 +1,13 @@
+services:
+  db:
+    build: aci-demo/db
+    image: gtardif/sentences-db
+
+  words:
+    build: aci-demo/words
+    image: gtardif/sentences-api
+  web:
+    build: aci-demo/web
+    image: gtardif/sentences-web
+    ports:
+      - "80:80"
