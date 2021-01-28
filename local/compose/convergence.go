@@ -28,6 +28,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	status "github.com/docker/compose-cli/local/moby"
 )
@@ -74,7 +75,7 @@ func (s *composeService) ensureScale(ctx context.Context, actual []moby.Containe
 	return eg, actual, nil
 }
 
-func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig) error {
+func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig, recreate string) error {
 	actual := observedState.filter(isService(service.Name))
 
 	scale, err := getScale(service)
@@ -87,6 +88,10 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		return err
 	}
 
+	if recreate == compose.RecreateNever {
+		return nil
+	}
+
 	expected, err := jsonHash(service)
 	if err != nil {
 		return err
@@ -96,7 +101,7 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 		name := getCanonicalContainerName(container)
 
 		diverged := container.Labels[configHashLabel] != expected
-		if diverged || service.Extensions[extLifecycle] == forceRecreate {
+		if diverged || recreate == compose.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
 				return s.recreateContainer(ctx, project, service, container)
 			})

@@ -57,6 +57,8 @@ type Service interface {
 type CreateOptions struct {
 	// Remove legacy containers for services that are not defined in the project
 	RemoveOrphans bool
+	// Recreate define the strategy to apply on existing containers
+	Recreate string
 }
 
 // UpOptions group options of the Up API
@@ -135,6 +137,15 @@ const (
 	UNKNOWN string = "Unknown"
 	// FAILED indicates that stack deployment failed
 	FAILED string = "Failed"
+)
+
+const (
+	// RecreateDiverged to recreate services which configuration diverges from compose model
+	RecreateDiverged = "diverged"
+	// RecreateForce to force service container being recreated
+	RecreateForce = "force"
+	// RecreateNever to never recreate existing service containers
+	RecreateNever = "never"
 )
 
 // Stack holds the name and state of a compose application/stack
