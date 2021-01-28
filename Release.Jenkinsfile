@@ -222,7 +222,7 @@ pipeline {
 
 def buildImage(baseImage) {
     def scmvar = checkout(scm)
-    def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+    def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
     image = docker.image(imageName)
 
     withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -249,7 +249,7 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
             node("linux && docker && ubuntu-2004 && cgroup1") {
                 def scmvar = checkout(scm)
-                def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+                def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
                 echo "Using local system's storage driver: ${storageDriver}"
                 withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -259,6 +259,8 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
                       --privileged \\
                       --volume="\$(pwd)/.git:/code/.git" \\
                       --volume="/var/run/docker.sock:/var/run/docker.sock" \\
+                      --volume="\${DOCKER_CONFIG}/config.json:/code/.docker/config.json" \\
+                      -e "DOCKER_TLS_CERTDIR=" \\
                       -e "TAG=${imageName}" \\
                       -e "STORAGE_DRIVER=${storageDriver}" \\
                       -e "DOCKER_VERSIONS=${dockerVersion}" \\
