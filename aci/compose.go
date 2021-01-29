@@ -124,19 +124,19 @@ func (cs *aciComposeService) Down(ctx context.Context, projectName string, optio
 	return err
 }
 
-func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.ContainerSummary, error) {
+func (cs *aciComposeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
 	groupsClient, err := login.NewContainerGroupsClient(cs.ctx.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
 
-	group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, project)
+	group, err := groupsClient.Get(ctx, cs.ctx.ResourceGroup, projectName)
 	if err != nil {
 		return nil, err
 	}
 
 	if group.Containers == nil || len(*group.Containers) == 0 {
-		return nil, fmt.Errorf("no containers found in ACI container group %s", project)
+		return nil, fmt.Errorf("no containers found in ACI container group %s", projectName)
 	}
 
 	res := []compose.ContainerSummary{}
@@ -158,7 +158,7 @@ func (cs *aciComposeService) Ps(ctx context.Context, project string) ([]compose.
 		res = append(res, compose.ContainerSummary{
 			ID:         id,
 			Name:       id,
-			Project:    project,
+			Project:    projectName,
 			Service:    *container.Name,
 			State:      convert.GetStatus(container, group),
 			Publishers: publishers,

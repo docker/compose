@@ -94,7 +94,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 }
 
 // Ps executes the equivalent to a `compose ps`
-func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
+func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 

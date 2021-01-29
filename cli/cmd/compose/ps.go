@@ -27,12 +27,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type psOptions struct {
 	*projectOptions
 	Format string
+	All    bool
 	Quiet  bool
 }
 
@@ -49,6 +51,7 @@ func psCommand(p *projectOptions) *cobra.Command {
 	}
 	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	psCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
+	psCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
 	return psCmd
 }
 
@@ -62,7 +65,9 @@ func runPs(ctx context.Context, opts psOptions) error {
 	if err != nil {
 		return err
 	}
-	containers, err := c.ComposeService().Ps(ctx, projectName)
+	containers, err := c.ComposeService().Ps(ctx, projectName, compose.PsOptions{
+		All: opts.All,
+	})
 	if err != nil {
 		return err
 	}

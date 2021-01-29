@@ -59,7 +59,7 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServices
 		projectName = project.Name
 	}
 	response := []*composev1.Service{}
-	_, err := Client(ctx).ComposeService().Ps(ctx, projectName)
+	_, err := Client(ctx).ComposeService().Ps(ctx, projectName, compose.PsOptions{})
 	if err != nil {
 		return nil, err
 	}

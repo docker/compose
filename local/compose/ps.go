@@ -27,11 +27,12 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 )
 
-func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
+func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 		),
+		All: options.All,
 	})
 	if err != nil {
 		return nil, err

@@ -162,8 +162,8 @@ func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consum
 	return e.compose.Logs(ctx, projectName, consumer, options)
 }
 
-func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string) ([]compose.ContainerSummary, error) {
-	return e.compose.Ps(ctx, projectName)
+func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
+	return e.compose.Ps(ctx, projectName, options)
 }
 func (e ecsLocalSimulation) List(ctx context.Context) ([]compose.Stack, error) {
 	return e.compose.List(ctx)
