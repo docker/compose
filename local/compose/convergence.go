@@ -98,7 +98,7 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 	}
 
 	for _, container := range actual {
-		name := getCanonicalContainerName(container)
+		name := getContainerProgressName(container)
 
 		diverged := container.Labels[configHashLabel] != expected
 		if diverged || recreate == compose.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
@@ -130,6 +130,10 @@ func getContainerName(projectName string, service types.ServiceConfig, number in
 		name = service.ContainerName
 	}
 	return name
+}
+
+func getContainerProgressName(container moby.Container) string {
+	return "Container " + getCanonicalContainerName(container)
 }
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
@@ -191,18 +195,19 @@ func getScale(config types.ServiceConfig) (int, error) {
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.CreatingEvent(name))
+	eventName := "Container " + name
+	w.Event(progress.CreatingEvent(eventName))
 	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove)
 	if err != nil {
 		return err
 	}
-	w.Event(progress.CreatedEvent(name))
+	w.Event(progress.CreatedEvent(eventName))
 	return nil
 }
 
 func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Working, "Recreate"))
+	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Recreate"))
 	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
 	if err != nil {
 		return err
@@ -225,7 +230,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Done, "Recreated"))
+	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Done, "Recreated"))
 	setDependentLifecycle(project, service.Name, forceRecreate)
 	return nil
 }
@@ -245,12 +250,12 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 
 func (s *composeService) restartContainer(ctx context.Context, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
-	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Working, "Restart"))
+	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Restart"))
 	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
-	w.Event(progress.NewEvent(getCanonicalContainerName(container), progress.Done, "Restarted"))
+	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Done, "Restarted"))
 	return nil
 }
 
@@ -336,10 +341,11 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		}
 		eg.Go(func() error {
 			w := progress.ContextWriter(ctx)
-			w.Event(progress.StartingEvent(getCanonicalContainerName(container)))
+			eventName := getContainerProgressName(container)
+			w.Event(progress.StartingEvent(eventName))
 			err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 			if err == nil {
-				w.Event(progress.StartedEvent(getCanonicalContainerName(container)))
+				w.Event(progress.StartedEvent(eventName))
 			}
 			return err
 		})

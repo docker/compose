@@ -92,7 +92,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container) error {
 	for _, container := range containers {
 		toStop := container
-		eventName := "Container " + getCanonicalContainerName(toStop)
+		eventName := getContainerProgressName(toStop)
 		w.Event(progress.StoppingEvent(eventName))
 		err := s.apiClient.ContainerStop(ctx, toStop.ID, nil)
 		if err != nil {
@@ -109,9 +109,11 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	for _, container := range containers {
 		toDelete := container
 		eg.Go(func() error {
-			eventName := "Container " + getCanonicalContainerName(toDelete)
-			err := s.stopContainers(ctx, w, []moby.Container{container})
+			eventName := getContainerProgressName(toDelete)
+			w.Event(progress.StoppingEvent(eventName))
+			err := s.stopContainers(ctx, w, []moby.Container{toDelete})
 			if err != nil {
+				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
