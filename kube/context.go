@@ -26,7 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/utils/prompt"
 
-	"github.com/docker/compose-cli/kube/charts/kubernetes"
+	"github.com/docker/compose-cli/kube/resources"
 )
 
 // ContextParams options for creating a Kubernetes context
@@ -47,7 +47,7 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 	}
 	user := prompt.User{}
 	selectContext := func() error {
-		contexts, err := kubernetes.ListAvailableKubeConfigContexts(cp.KubeConfigPath)
+		contexts, err := resources.ListAvailableKubeConfigContexts(cp.KubeConfigPath)
 		if err != nil {
 			return err
 		}
