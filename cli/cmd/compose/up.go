@@ -45,6 +45,18 @@ type upOptions struct {
 	Detach        bool
 	Environment   []string
 	removeOrphans bool
+	forceRecreate bool
+	noRecreate    bool
+}
+
+func (o upOptions) recreateStrategy() string {
+	if o.noRecreate {
+		return compose.RecreateNever
+	}
+	if o.forceRecreate {
+		return compose.RecreateForce
+	}
+	return compose.RecreateDiverged
 }
 
 func upCommand(p *projectOptions, contextType string) *cobra.Command {
@@ -59,6 +71,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
+				if opts.forceRecreate && opts.noRecreate {
+					return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+				}
 				return runCreateStart(cmd.Context(), opts, args)
 			default:
 				return runUp(cmd.Context(), opts, args)
@@ -71,8 +86,13 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 
-	if contextType == store.AciContextType {
+	switch contextType {
+	case store.AciContextType:
 		flags.StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
+	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
+		flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
+		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
+
 	}
 
 	return upCmd
@@ -101,6 +121,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return "", c.ComposeService().Create(ctx, project, compose.CreateOptions{
 			RemoveOrphans: opts.removeOrphans,
+			Recreate:      opts.recreateStrategy(),
 		})
 	})
 	if err != nil {
