@@ -24,25 +24,22 @@ import (
 	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/kube/charts"
 )
 
 // NewComposeService create a kubernetes implementation of the compose.Service API
-func NewComposeService(ctx store.KubeContext) (compose.Service, error) {
+func NewComposeService(ctx context.Context) (compose.Service, error) {
 	chartsAPI, err := charts.NewSDK(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &composeService{
-		ctx: ctx,
 		sdk: chartsAPI,
 	}, nil
 }
 
 type composeService struct {
-	ctx store.KubeContext
 	sdk charts.SDK
 }
 
