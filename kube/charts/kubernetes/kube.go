@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/api/compose"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -34,8 +35,6 @@ import (
 )
 
 const (
-	headlessPort      = 55555
-	headlessName      = "headless"
 	clusterIPHeadless = "None"
 )
 
@@ -52,13 +51,13 @@ func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, 
 		}
 
 		if service.Deploy != nil && service.Deploy.Mode == "global" {
-			daemonset, err := mapToDaemonset(project, service, project.Name)
+			daemonset, err := mapToDaemonset(project, service)
 			if err != nil {
 				return nil, err
 			}
 			objects[fmt.Sprintf("%s-daemonset.yaml", service.Name)] = daemonset
 		} else {
-			deployment, err := mapToDeployment(project, service, project.Name)
+			deployment, err := mapToDeployment(project, service)
 			if err != nil {
 				return nil, err
 			}
@@ -67,7 +66,7 @@ func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, 
 		for _, vol := range service.Volumes {
 			if vol.Type == "volume" {
 				vol.Source = strings.ReplaceAll(vol.Source, "_", "-")
-				objects[fmt.Sprintf("%s-persistentvolumeclaim.yaml", vol.Source)] = mapToPVC(service, vol)
+				objects[fmt.Sprintf("%s-persistentvolumeclaim.yaml", vol.Source)] = mapToPVC(project, service, vol)
 			}
 		}
 	}
@@ -92,12 +91,6 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 	}
 	if len(ports) == 0 { // headless service
 		clusterIP = clusterIPHeadless
-		ports = append(ports, core.ServicePort{
-			Name:       headlessName,
-			Port:       headlessPort,
-			TargetPort: intstr.FromInt(headlessPort),
-			Protocol:   core.ProtocolTCP,
-		})
 	}
 	return &core.Service{
 		TypeMeta: meta.TypeMeta{
@@ -109,26 +102,23 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: clusterIP,
-			Selector:  map[string]string{"com.docker.compose.service": service.Name},
+			Selector:  selectorLabels(project.Name, service.Name),
 			Ports:     ports,
 			Type:      serviceType,
 		},
 	}
 }
 
-func mapToDeployment(project *types.Project, service types.ServiceConfig, name string) (*apps.Deployment, error) {
-	labels := map[string]string{
-		"com.docker.compose.service": service.Name,
-		"com.docker.compose.project": name,
-	}
-	podTemplate, err := toPodTemplate(project, service, labels)
-	if err != nil {
-		return nil, err
-	}
+func mapToDeployment(project *types.Project, service types.ServiceConfig) (*apps.Deployment, error) {
+	labels := selectorLabels(project.Name, service.Name)
 	selector := new(meta.LabelSelector)
 	selector.MatchLabels = make(map[string]string)
 	for key, val := range labels {
 		selector.MatchLabels[key] = val
+	}
+	podTemplate, err := toPodTemplate(project, service, labels)
+	if err != nil {
+		return nil, err
 	}
 	return &apps.Deployment{
 		TypeMeta: meta.TypeMeta{
@@ -148,11 +138,15 @@ func mapToDeployment(project *types.Project, service types.ServiceConfig, name s
 	}, nil
 }
 
-func mapToDaemonset(project *types.Project, service types.ServiceConfig, name string) (*apps.DaemonSet, error) {
-	labels := map[string]string{
-		"com.docker.compose.service": service.Name,
-		"com.docker.compose.project": name,
+func selectorLabels(projectName string, serviceName string) map[string]string {
+	return map[string]string{
+		compose.ProjectTag: projectName,
+		compose.ServiceTag: serviceName,
 	}
+}
+
+func mapToDaemonset(project *types.Project, service types.ServiceConfig) (*apps.DaemonSet, error) {
+	labels := selectorLabels(project.Name, service.Name)
 	podTemplate, err := toPodTemplate(project, service, labels)
 	if err != nil {
 		return nil, err
@@ -195,7 +189,7 @@ func toDeploymentStrategy(deploy *types.DeployConfig) apps.DeploymentStrategy {
 	}
 }
 
-func mapToPVC(service types.ServiceConfig, vol types.ServiceVolumeConfig) runtime.Object {
+func mapToPVC(project *types.Project, service types.ServiceConfig, vol types.ServiceVolumeConfig) runtime.Object {
 	rwaccess := core.ReadWriteOnce
 	if vol.ReadOnly {
 		rwaccess = core.ReadOnlyMany
@@ -207,7 +201,7 @@ func mapToPVC(service types.ServiceConfig, vol types.ServiceVolumeConfig) runtim
 		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:   vol.Source,
-			Labels: map[string]string{"com.docker.compose.service": service.Name},
+			Labels: selectorLabels(project.Name, service.Name),
 		},
 		Spec: core.PersistentVolumeClaimSpec{
 			VolumeName:  vol.Source,

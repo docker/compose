@@ -48,7 +48,7 @@ services:
 			Name: "nginx",
 		},
 		Spec: core.ServiceSpec{
-			Selector: map[string]string{"com.docker.compose.service": "nginx"},
+			Selector: map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": ""},
 			Ports: []core.ServicePort{
 				{
 					Name:       "80-tcp",
@@ -79,16 +79,9 @@ services:
 			Name: "nginx",
 		},
 		Spec: core.ServiceSpec{
-			Selector:  map[string]string{"com.docker.compose.service": "nginx"},
+			Selector:  map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": ""},
 			ClusterIP: "None",
-			Ports: []core.ServicePort{
-				{
-					Name:       headlessName,
-					Protocol:   core.ProtocolTCP,
-					Port:       headlessPort,
-					TargetPort: intstr.IntOrString{IntVal: 55555},
-				},
-			},
-			Type: core.ServiceTypeClusterIP,
+			Ports:     []core.ServicePort{},
+			Type:      core.ServiceTypeClusterIP,
 		}})
 }
