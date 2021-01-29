@@ -22,6 +22,7 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/types"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
@@ -86,7 +87,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, cons
 }
 
 // Stop executes the equivalent to a `compose stop`
-func (s *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (s *composeService) Stop(ctx context.Context, project *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
 

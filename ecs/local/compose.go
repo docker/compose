@@ -57,8 +57,8 @@ func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, c
 	return e.compose.Start(ctx, project, consumer)
 }
 
-func (e ecsLocalSimulation) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
-	return e.compose.Stop(ctx, project, consumer)
+func (e ecsLocalSimulation) Stop(ctx context.Context, project *types.Project) error {
+	return e.compose.Stop(ctx, project)
 }
 
 func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {

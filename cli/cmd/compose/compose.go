@@ -93,6 +93,8 @@ func Command(contextType string) *cobra.Command {
 	command.AddCommand(
 		upCommand(&opts, contextType),
 		downCommand(&opts),
+		startCommand(&opts),
+		stopCommand(&opts),
 		psCommand(&opts),
 		listCommand(),
 		logsCommand(&opts),

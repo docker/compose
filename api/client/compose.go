@@ -48,7 +48,7 @@ func (c *composeService) Start(ctx context.Context, project *types.Project, cons
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (c *composeService) Stop(ctx context.Context, project *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
 

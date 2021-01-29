@@ -138,7 +138,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Stop(ctx, project, consumer)
+			return "", c.ComposeService().Stop(ctx, project)
 		})
 	}
 	return err
