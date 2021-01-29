@@ -26,7 +26,7 @@ func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer c
 	if len(options.Services) > 0 {
 		consumer = filteredLogConsumer(consumer, options.Services)
 	}
-	err := b.aws.GetLogs(ctx, projectName, consumer.Log)
+	err := b.aws.GetLogs(ctx, projectName, consumer.Log, options.Follow)
 	return err
 }
 

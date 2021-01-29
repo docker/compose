@@ -33,7 +33,6 @@ import (
 )
 
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
-	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 
 	if options.Project == nil {
@@ -55,25 +54,21 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers, others := containers.split(isService(service.Name))
-		err := s.removeContainers(ctx, w, eg, serviceContainers)
+		err := s.removeContainers(ctx, w, serviceContainers)
 		containers = others
 		return err
 	})
+	if err != nil {
+		return err
+	}
 
-	if options.RemoveOrphans {
-		err := s.removeContainers(ctx, w, eg, containers)
+	if options.RemoveOrphans && len(containers) > 0 {
+		err := s.removeContainers(ctx, w, containers)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err != nil {
-		return err
-	}
-	err = eg.Wait()
-	if err != nil {
-		return err
-	}
 	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
@@ -82,6 +77,8 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	if err != nil {
 		return err
 	}
+
+	eg, _ := errgroup.WithContext(ctx)
 	for _, n := range networks {
 		networkID := n.ID
 		networkName := n.Name
@@ -89,7 +86,6 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 			return s.ensureNetworkDown(ctx, networkID, networkName)
 		})
 	}
-
 	return eg.Wait()
 }
 
@@ -108,15 +104,14 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 	return nil
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, eg *errgroup.Group, containers []moby.Container) error {
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container) error {
+	eg, _ := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		toDelete := container
 		eg.Go(func() error {
 			eventName := "Container " + getCanonicalContainerName(toDelete)
-			w.Event(progress.StoppingEvent(eventName))
 			err := s.stopContainers(ctx, w, []moby.Container{container})
 			if err != nil {
-				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
