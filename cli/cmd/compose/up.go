@@ -119,21 +119,27 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Create(ctx, project, compose.CreateOptions{
+		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Recreate:      opts.recreateStrategy(),
 		})
+		if err != nil {
+			return "", err
+		}
+		if opts.Detach {
+			err = c.ComposeService().Start(ctx, project, nil)
+		}
+		return "", err
 	})
 	if err != nil {
 		return err
 	}
 
-	var consumer compose.LogConsumer
-	if !opts.Detach {
-		consumer = formatter.NewLogConsumer(ctx, os.Stdout)
+	if opts.Detach {
+		return nil
 	}
 
-	err = c.ComposeService().Start(ctx, project, consumer)
+	err = c.ComposeService().Start(ctx, project, formatter.NewLogConsumer(ctx, os.Stdout))
 	if errors.Is(ctx.Err(), context.Canceled) {
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()

@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
@@ -54,11 +54,6 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	var consumer compose.LogConsumer
-	if !opts.Detach {
-		consumer = formatter.NewLogConsumer(ctx, os.Stdout)
-	}
-
 	project, err := opts.toProject()
 	if err != nil {
 		return err
@@ -69,5 +64,12 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	return c.ComposeService().Start(ctx, project, consumer)
+	if opts.Detach {
+		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+			return "", c.ComposeService().Start(ctx, project, nil)
+		})
+		return err
+	}
+
+	return c.ComposeService().Start(ctx, project, formatter.NewLogConsumer(ctx, os.Stdout))
 }
