@@ -24,7 +24,6 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
@@ -59,17 +58,16 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 	if !opts.Detach {
 		consumer = formatter.NewLogConsumer(ctx, os.Stdout)
 	}
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		project, err := opts.toProject()
-		if err != nil {
-			return "", err
-		}
 
-		err = filter(project, services)
-		if err != nil {
-			return "", err
-		}
-		return "", c.ComposeService().Start(ctx, project, consumer)
-	})
-	return err
+	project, err := opts.toProject()
+	if err != nil {
+		return err
+	}
+
+	err = filter(project, services)
+	if err != nil {
+		return err
+	}
+
+	return c.ComposeService().Start(ctx, project, consumer)
 }
