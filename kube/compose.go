@@ -103,6 +103,10 @@ func (s *composeService) Convert(ctx context.Context, project *types.Project, op
 	return nil, errdefs.ErrNotImplemented
 }
 
+func (s *composeService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 // RunOneOffContainer creates a service oneoff container and starts its dependencies
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
 	return errdefs.ErrNotImplemented

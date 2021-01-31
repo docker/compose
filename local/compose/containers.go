@@ -70,3 +70,9 @@ func (containers Containers) names() []string {
 	}
 	return names
 }
+
+func (containers Containers) forEach(fn func(moby.Container)) {
+	for _, c := range containers {
+		fn(c)
+	}
+}

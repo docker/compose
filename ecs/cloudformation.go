@@ -25,6 +25,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
+	"github.com/docker/compose-cli/api/errdefs"
 
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
@@ -45,6 +46,10 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 )
+
+func (b *ecsAPIService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
+	return errdefs.ErrNotImplemented
+}
 
 func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	err := b.resolveServiceImagesDigests(ctx, project)

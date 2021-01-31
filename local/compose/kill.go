@@ -22,11 +22,13 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func (s *composeService) Stop(ctx context.Context, project *types.Project) error {
+func (s *composeService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	var containers Containers
@@ -38,9 +40,21 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project) error
 		return err
 	}
 
-	containers = containers.filter(isService(project.ServiceNames()...))
-
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.stopContainers(ctx, w, containers.filter(isService(service.Name)))
-	})
+	eg, ctx := errgroup.WithContext(ctx)
+	containers.
+		filter(isService(project.ServiceNames()...)).
+		forEach(func(container moby.Container) {
+			eg.Go(func() error {
+				eventName := getContainerProgressName(container)
+				w.Event(progress.KillingEvent(eventName))
+				err := s.apiClient.ContainerKill(ctx, container.ID, options.Signal)
+				if err != nil {
+					w.Event(progress.ErrorMessageEvent(eventName, "Error while Killing"))
+					return err
+				}
+				w.Event(progress.KilledEvent(eventName))
+				return nil
+			})
+		})
+	return eg.Wait()
 }
