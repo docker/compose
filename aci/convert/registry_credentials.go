@@ -47,7 +47,7 @@ const (
 
 type registryHelper interface {
 	getAllRegistryCredentials() (map[string]types.AuthConfig, error)
-	autoLoginAcr(registry string) error
+	autoLoginAcr(registry string, loginService login.AzureLoginService) error
 }
 
 type cliRegistryHelper struct {
@@ -65,9 +65,19 @@ func newCliRegistryConfLoader() cliRegistryHelper {
 }
 
 func getRegistryCredentials(project compose.Project, helper registryHelper) ([]containerinstance.ImageRegistryCredential, error) {
-	usedRegistries, acrRegistries := getUsedRegistries(project)
+	loginService, err := login.NewAzureLoginService()
+	if err != nil {
+		return nil, err
+	}
+
+	var cloudEnvironment *login.CloudEnvironment = nil
+	if ce, err := loginService.GetCloudEnvironment(); err != nil {
+		cloudEnvironment = &ce
+	}
+
+	usedRegistries, acrRegistries := getUsedRegistries(project, cloudEnvironment)
 	for _, registry := range acrRegistries {
-		err := helper.autoLoginAcr(registry)
+		err := helper.autoLoginAcr(registry, loginService)
 		if err != nil {
 			fmt.Printf("WARNING: %v\n", err)
 			fmt.Printf("Could not automatically login to %s from your Azure login. Assuming you already logged in to the ACR registry\n", registry)
@@ -116,9 +126,10 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 	return registryCreds, nil
 }
 
-func getUsedRegistries(project compose.Project) (map[string]bool, []string) {
+func getUsedRegistries(project compose.Project, ce *login.CloudEnvironment) (map[string]bool, []string) {
 	usedRegistries := map[string]bool{}
 	acrRegistries := []string{}
+
 	for _, service := range project.Services {
 		imageName := service.Image
 		tokens := strings.Split(imageName, "/")
@@ -127,24 +138,18 @@ func getUsedRegistries(project compose.Project) (map[string]bool, []string) {
 			registry = dockerHub
 		} else if !strings.Contains(registry, ".") {
 			registry = dockerHub
-		} else if strings.HasSuffix(registry, login.AcrRegistrySuffix) {
-			acrRegistries = append(acrRegistries, registry)
+		} else if ce != nil {
+			if suffix, present := ce.Suffixes[login.AcrSuffixKey]; present && strings.HasSuffix(registry, suffix) {
+				acrRegistries = append(acrRegistries, registry)
+			}
 		}
 		usedRegistries[registry] = true
 	}
 	return usedRegistries, acrRegistries
 }
 
-func (c cliRegistryHelper) autoLoginAcr(registry string) error {
-	loginService, err := login.NewAzureLoginService()
-	if err != nil {
-		return err
-	}
-	token, err := loginService.GetValidToken()
-	if err != nil {
-		return err
-	}
-	tenantID, err := loginService.GetTenantID()
+func (c cliRegistryHelper) autoLoginAcr(registry string, loginService login.AzureLoginService) error {
+	token, tenantID, err := loginService.GetValidToken()
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/containers"
+	"golang.org/x/oauth2"
 )
 
 func TestGetContainerName(t *testing.T) {
@@ -82,7 +84,7 @@ func TestLoginParamsValidate(t *testing.T) {
 
 func TestLoginServicePrincipal(t *testing.T) {
 	loginService := mockLoginService{}
-	loginService.On("LoginServicePrincipal", "someID", "secret", "tenant").Return(nil)
+	loginService.On("LoginServicePrincipal", "someID", "secret", "tenant", "someCloud").Return(nil)
 	loginBackend := aciCloudService{
 		loginService: &loginService,
 	}
@@ -91,6 +93,7 @@ func TestLoginServicePrincipal(t *testing.T) {
 		ClientID:     "someID",
 		ClientSecret: "secret",
 		TenantID:     "tenant",
+		CloudName:    "someCloud",
 	})
 
 	assert.NilError(t, err)
@@ -99,13 +102,14 @@ func TestLoginServicePrincipal(t *testing.T) {
 func TestLoginWithTenant(t *testing.T) {
 	loginService := mockLoginService{}
 	ctx := context.Background()
-	loginService.On("Login", ctx, "tenant").Return(nil)
+	loginService.On("Login", ctx, "tenant", "someCloud").Return(nil)
 	loginBackend := aciCloudService{
 		loginService: &loginService,
 	}
 
 	err := loginBackend.Login(ctx, LoginParams{
-		TenantID: "tenant",
+		TenantID:  "tenant",
+		CloudName: "someCloud",
 	})
 
 	assert.NilError(t, err)
@@ -114,12 +118,14 @@ func TestLoginWithTenant(t *testing.T) {
 func TestLoginWithoutTenant(t *testing.T) {
 	loginService := mockLoginService{}
 	ctx := context.Background()
-	loginService.On("Login", ctx, "").Return(nil)
+	loginService.On("Login", ctx, "", "someCloud").Return(nil)
 	loginBackend := aciCloudService{
 		loginService: &loginService,
 	}
 
-	err := loginBackend.Login(ctx, LoginParams{})
+	err := loginBackend.Login(ctx, LoginParams{
+		CloudName: "someCloud",
+	})
 
 	assert.NilError(t, err)
 }
@@ -128,17 +134,32 @@ type mockLoginService struct {
 	mock.Mock
 }
 
-func (s *mockLoginService) Login(ctx context.Context, requestedTenantID string) error {
-	args := s.Called(ctx, requestedTenantID)
+func (s *mockLoginService) Login(ctx context.Context, requestedTenantID string, cloudEnvironment string) error {
+	args := s.Called(ctx, requestedTenantID, cloudEnvironment)
 	return args.Error(0)
 }
 
-func (s *mockLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error {
-	args := s.Called(clientID, clientSecret, tenantID)
+func (s *mockLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string, cloudEnvironment string) error {
+	args := s.Called(clientID, clientSecret, tenantID, cloudEnvironment)
 	return args.Error(0)
 }
 
 func (s *mockLoginService) Logout(ctx context.Context) error {
 	args := s.Called(ctx)
 	return args.Error(0)
+}
+
+func (s *mockLoginService) GetTenantID() (string, error) {
+	args := s.Called()
+	return args.String(0), args.Error(1)
+}
+
+func (s *mockLoginService) GetCloudEnvironment() (login.CloudEnvironment, error) {
+	args := s.Called()
+	return args.Get(0).(login.CloudEnvironment), args.Error(1)
+}
+
+func (s *mockLoginService) GetValidToken() (oauth2.Token, string, error) {
+	args := s.Called()
+	return args.Get(0).(oauth2.Token), args.String(1), args.Error(2)
 }

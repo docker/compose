@@ -23,13 +23,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 
@@ -38,18 +35,6 @@ import (
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
 const (
-	// AcrRegistrySuffix suffix for ACR registry images
-	AcrRegistrySuffix         = ".azurecr.io"
-	activeDirectoryURL        = "https://login.microsoftonline.com"
-	azureManagementURL        = "https://management.core.windows.net/"
-	azureResouceManagementURL = "https://management.azure.com/"
-	authorizeFormat           = activeDirectoryURL + "/organizations/oauth2/v2.0/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&prompt=select_account&response_mode=query&scope=%s"
-	tokenEndpoint             = activeDirectoryURL + "/%s/oauth2/v2.0/token"
-	getTenantURL              = azureResouceManagementURL + "tenants?api-version=2019-11-01"
-
-	// scopes for a multi-tenant app works for openid, email, other common scopes, but fails when trying to add a token
-	// v1 scope like "https://management.azure.com/.default" for ARM access
-	scopes   = "offline_access " + azureResouceManagementURL + ".default"
 	clientID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" // Azure CLI client id
 )
 
@@ -73,39 +58,41 @@ type (
 )
 
 // AzureLoginService Service to log into azure and get authentifier for azure APIs
-type AzureLoginService struct {
-	tokenStore tokenStore
-	apiHelper  apiHelper
-}
-
-// AzureLoginServiceAPI interface for Azure login service
-type AzureLoginServiceAPI interface {
-	LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error
-	Login(ctx context.Context, requestedTenantID string) error
+type AzureLoginService interface {
+	Login(ctx context.Context, requestedTenantID string, cloudEnvironment string) error
+	LoginServicePrincipal(clientID string, clientSecret string, tenantID string, cloudEnvironment string) error
 	Logout(ctx context.Context) error
+	GetCloudEnvironment() (CloudEnvironment, error)
+	GetValidToken() (oauth2.Token, string, error)
+}
+type azureLoginService struct {
+	tokenStore          tokenStore
+	apiHelper           apiHelper
+	cloudEnvironmentSvc CloudEnvironmentService
 }
 
 const tokenStoreFilename = "dockerAccessToken.json"
 
 // NewAzureLoginService creates a NewAzureLoginService
-func NewAzureLoginService() (*AzureLoginService, error) {
-	return newAzureLoginServiceFromPath(GetTokenStorePath(), azureAPIHelper{})
+func NewAzureLoginService() (AzureLoginService, error) {
+	return newAzureLoginServiceFromPath(GetTokenStorePath(), azureAPIHelper{}, CloudEnvironments)
 }
 
-func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper) (*AzureLoginService, error) {
+func newAzureLoginServiceFromPath(tokenStorePath string, helper apiHelper, ces CloudEnvironmentService) (*azureLoginService, error) {
 	store, err := newTokenStore(tokenStorePath)
 	if err != nil {
 		return nil, err
 	}
-	return &AzureLoginService{
-		tokenStore: store,
-		apiHelper:  helper,
+	return &azureLoginService{
+		tokenStore:          store,
+		apiHelper:           helper,
+		cloudEnvironmentSvc: ces,
 	}, nil
 }
 
 // LoginServicePrincipal login with clientId / clientSecret from a service principal.
 // The resulting token does not include a refresh token
-func (login *AzureLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string) error {
+func (login *azureLoginService) LoginServicePrincipal(clientID string, clientSecret string, tenantID string, cloudEnvironment string) error {
 	// Tried with auth2.NewUsernamePasswordConfig() but could not make this work with username / password, setting this for CI with clientID / clientSecret
 	creds := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 
@@ -121,7 +108,7 @@ func (login *AzureLoginService) LoginServicePrincipal(clientID string, clientSec
 	if err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "could not read service principal token expiry: %s", err)
 	}
-	loginInfo := TokenInfo{TenantID: tenantID, Token: token}
+	loginInfo := TokenInfo{TenantID: tenantID, Token: token, CloudEnvironment: cloudEnvironment}
 
 	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
@@ -130,7 +117,7 @@ func (login *AzureLoginService) LoginServicePrincipal(clientID string, clientSec
 }
 
 // Logout remove azure token data
-func (login *AzureLoginService) Logout(ctx context.Context) error {
+func (login *azureLoginService) Logout(ctx context.Context) error {
 	err := login.tokenStore.removeData()
 	if os.IsNotExist(err) {
 		return errors.New("No Azure login data to be removed")
@@ -138,8 +125,14 @@ func (login *AzureLoginService) Logout(ctx context.Context) error {
 	return err
 }
 
-func (login *AzureLoginService) getTenantAndValidateLogin(ctx context.Context, accessToken string, refreshToken string, requestedTenantID string) error {
-	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(ctx, getTenantURL, fmt.Sprintf("Bearer %s", accessToken))
+func (login *azureLoginService) getTenantAndValidateLogin(
+	ctx context.Context,
+	accessToken string,
+	refreshToken string,
+	requestedTenantID string,
+	ce CloudEnvironment,
+) error {
+	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(ctx, ce.GetTenantQueryURL(), fmt.Sprintf("Bearer %s", accessToken))
 	if err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
 	}
@@ -155,11 +148,11 @@ func (login *AzureLoginService) getTenantAndValidateLogin(ctx context.Context, a
 	if err != nil {
 		return errors.Wrap(errdefs.ErrLoginFailed, err.Error())
 	}
-	tToken, err := login.refreshToken(refreshToken, tenantID)
+	tToken, err := login.refreshToken(refreshToken, tenantID, ce)
 	if err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
 	}
-	loginInfo := TokenInfo{TenantID: tenantID, Token: tToken}
+	loginInfo := TokenInfo{TenantID: tenantID, Token: tToken, CloudEnvironment: ce.Name}
 
 	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
 		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
@@ -168,7 +161,12 @@ func (login *AzureLoginService) getTenantAndValidateLogin(ctx context.Context, a
 }
 
 // Login performs an Azure login through a web browser
-func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID string) error {
+func (login *azureLoginService) Login(ctx context.Context, requestedTenantID string, cloudEnvironment string) error {
+	ce, err := login.cloudEnvironmentSvc.Get(cloudEnvironment)
+	if err != nil {
+		return err
+	}
+
 	queryCh := make(chan localResponse, 1)
 	s, err := NewLocalServer(queryCh)
 	if err != nil {
@@ -183,8 +181,8 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 	}
 
 	deviceCodeFlowCh := make(chan deviceCodeFlowResponse, 1)
-	if err = login.apiHelper.openAzureLoginPage(redirectURL); err != nil {
-		login.startDeviceCodeFlow(deviceCodeFlowCh)
+	if err = login.apiHelper.openAzureLoginPage(redirectURL, ce); err != nil {
+		login.startDeviceCodeFlow(deviceCodeFlowCh, ce)
 	}
 
 	select {
@@ -195,7 +193,7 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
 		}
 		token := dcft.token
-		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID, ce)
 	case q := <-queryCh:
 		if q.err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
@@ -208,14 +206,14 @@ func (login *AzureLoginService) Login(ctx context.Context, requestedTenantID str
 			"grant_type":   []string{"authorization_code"},
 			"client_id":    []string{clientID},
 			"code":         code,
-			"scope":        []string{scopes},
+			"scope":        []string{ce.GetTokenScope()},
 			"redirect_uri": []string{redirectURL},
 		}
-		token, err := login.apiHelper.queryToken(data, "organizations")
+		token, err := login.apiHelper.queryToken(ce, data, "organizations")
 		if err != nil {
 			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
 		}
-		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID)
+		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID, ce)
 	}
 }
 
@@ -224,10 +222,10 @@ type deviceCodeFlowResponse struct {
 	err   error
 }
 
-func (login *AzureLoginService) startDeviceCodeFlow(deviceCodeFlowCh chan deviceCodeFlowResponse) {
+func (login *azureLoginService) startDeviceCodeFlow(deviceCodeFlowCh chan deviceCodeFlowResponse, ce CloudEnvironment) {
 	fmt.Println("Could not automatically open a browser, falling back to Azure device code flow authentication")
 	go func() {
-		token, err := login.apiHelper.getDeviceCodeFlowToken()
+		token, err := login.apiHelper.getDeviceCodeFlowToken(ce)
 		if err != nil {
 			deviceCodeFlowCh <- deviceCodeFlowResponse{err: err}
 		}
@@ -276,72 +274,58 @@ func spToOAuthToken(token adal.Token) (oauth2.Token, error) {
 	return oauthToken, nil
 }
 
-// NewAuthorizerFromLogin creates an authorizer based on login access token
-func NewAuthorizerFromLogin() (autorest.Authorizer, error) {
-	return newAuthorizerFromLoginStorePath(GetTokenStorePath())
-}
-
-func newAuthorizerFromLoginStorePath(storeTokenPath string) (autorest.Authorizer, error) {
-	login, err := newAzureLoginServiceFromPath(storeTokenPath, azureAPIHelper{})
-	if err != nil {
-		return nil, err
-	}
-	oauthToken, err := login.GetValidToken()
-	if err != nil {
-		return nil, errors.Wrap(err, "not logged in to azure, you need to run \"docker login azure\" first")
-	}
-
-	token := adal.Token{
-		AccessToken:  oauthToken.AccessToken,
-		Type:         oauthToken.TokenType,
-		ExpiresIn:    json.Number(strconv.Itoa(int(time.Until(oauthToken.Expiry).Seconds()))),
-		ExpiresOn:    json.Number(strconv.Itoa(int(oauthToken.Expiry.Sub(date.UnixEpoch()).Seconds()))),
-		RefreshToken: "",
-		Resource:     "",
-	}
-
-	return autorest.NewBearerAuthorizer(&token), nil
-}
-
-// GetTenantID returns tenantID for current login
-func (login AzureLoginService) GetTenantID() (string, error) {
+// GetValidToken returns an access token and associated tenant ID.
+// Will refresh the token as necessary.
+func (login *azureLoginService) GetValidToken() (oauth2.Token, string, error) {
 	loginInfo, err := login.tokenStore.readToken()
 	if err != nil {
-		return "", err
-	}
-	return loginInfo.TenantID, err
-}
-
-// GetValidToken returns an access token. Refresh token if needed
-func (login *AzureLoginService) GetValidToken() (oauth2.Token, error) {
-	loginInfo, err := login.tokenStore.readToken()
-	if err != nil {
-		return oauth2.Token{}, err
+		return oauth2.Token{}, "", err
 	}
 	token := loginInfo.Token
-	if token.Valid() {
-		return token, nil
-	}
 	tenantID := loginInfo.TenantID
-	token, err = login.refreshToken(token.RefreshToken, tenantID)
-	if err != nil {
-		return oauth2.Token{}, errors.Wrap(err, "access token request failed. Maybe you need to login to azure again.")
+	if token.Valid() {
+		return token, tenantID, nil
 	}
-	err = login.tokenStore.writeLoginInfo(TokenInfo{TenantID: tenantID, Token: token})
+
+	ce, err := login.cloudEnvironmentSvc.Get(loginInfo.CloudEnvironment)
 	if err != nil {
-		return oauth2.Token{}, err
+		return oauth2.Token{}, "", errors.Wrap(err, "access token request failed--cloud environment could not be determined.")
 	}
-	return token, nil
+
+	token, err = login.refreshToken(token.RefreshToken, tenantID, ce)
+	if err != nil {
+		return oauth2.Token{}, "", errors.Wrap(err, "access token request failed. Maybe you need to login to Azure again.")
+	}
+	err = login.tokenStore.writeLoginInfo(TokenInfo{TenantID: tenantID, Token: token, CloudEnvironment: ce.Name})
+	if err != nil {
+		return oauth2.Token{}, "", err
+	}
+	return token, tenantID, nil
 }
 
-func (login *AzureLoginService) refreshToken(currentRefreshToken string, tenantID string) (oauth2.Token, error) {
+// GeCloudEnvironment returns the cloud environment associated with the current authentication token (if we have one)
+func (login *azureLoginService) GetCloudEnvironment() (CloudEnvironment, error) {
+	tokenInfo, err := login.tokenStore.readToken()
+	if err != nil {
+		return CloudEnvironment{}, err
+	}
+
+	cloudEnvironment, err := login.cloudEnvironmentSvc.Get(tokenInfo.CloudEnvironment)
+	if err != nil {
+		return CloudEnvironment{}, err
+	}
+
+	return cloudEnvironment, nil
+}
+
+func (login *azureLoginService) refreshToken(currentRefreshToken string, tenantID string, ce CloudEnvironment) (oauth2.Token, error) {
 	data := url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{clientID},
-		"scope":         []string{scopes},
+		"scope":         []string{ce.GetTokenScope()},
 		"refresh_token": []string{currentRefreshToken},
 	}
-	token, err := login.apiHelper.queryToken(data, tenantID)
+	token, err := login.apiHelper.queryToken(ce, data, tenantID)
 	if err != nil {
 		return oauth2.Token{}, err
 	}

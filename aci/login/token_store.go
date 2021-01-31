@@ -34,8 +34,9 @@ type tokenStore struct {
 
 // TokenInfo data stored in tokenStore
 type TokenInfo struct {
-	Token    oauth2.Token `json:"oauthToken"`
-	TenantID string       `json:"tenantId"`
+	Token            oauth2.Token `json:"oauthToken"`
+	TenantID         string       `json:"tenantId"`
+	CloudEnvironment string       `json:"cloudEnvironment"`
 }
 
 func newTokenStore(path string) (tokenStore, error) {
@@ -81,6 +82,9 @@ func (store tokenStore) readToken() (TokenInfo, error) {
 	loginInfo := TokenInfo{}
 	if err := json.Unmarshal(bytes, &loginInfo); err != nil {
 		return TokenInfo{}, err
+	}
+	if loginInfo.CloudEnvironment == "" {
+		loginInfo.CloudEnvironment = AzurePublicCloudName
 	}
 	return loginInfo, nil
 }

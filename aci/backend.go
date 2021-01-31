@@ -51,6 +51,7 @@ type LoginParams struct {
 	TenantID     string
 	ClientID     string
 	ClientSecret string
+	CloudName    string
 }
 
 // Validate returns an error if options are not used properly

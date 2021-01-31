@@ -40,6 +40,7 @@ func AzureLoginCommand() *cobra.Command {
 	flags.StringVar(&opts.TenantID, "tenant-id", "", "Specify tenant ID to use")
 	flags.StringVar(&opts.ClientID, "client-id", "", "Client ID for Service principal login")
 	flags.StringVar(&opts.ClientSecret, "client-secret", "", "Client secret for Service principal login")
+	flags.StringVar(&opts.CloudName, "cloud-name", "", "Name of a registered Azure cloud")
 
 	return cmd
 }
