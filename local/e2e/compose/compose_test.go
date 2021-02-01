@@ -66,12 +66,13 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
+		wd, _ := os.Getwd()
 		res := c.RunDockerCmd("inspect", projectName+"_web_1")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files": "./fixtures/sentences/compose.yaml"`})
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"com.docker.compose.project.config_files": "%s/fixtures/sentences/compose.yaml"`, wd)})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -122,7 +123,7 @@ func TestLocalComposeRun(t *testing.T) {
 			containerID := fields[len(fields)-1]
 			assert.Assert(t, !strings.HasPrefix(containerID, "run-test_front"))
 			if strings.HasPrefix(containerID, "run-test_back") {
-				//only the one-off container for back service
+				// only the one-off container for back service
 				assert.Assert(t, strings.HasPrefix(containerID, "run-test_back_run_"), containerID)
 				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
 				runContainerID = containerID
@@ -200,7 +201,7 @@ func TestLocalComposeBuild(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("build named and unnamed images", func(t *testing.T) {
-		//ensure local test run does not reuse previously build image
+		// ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
 
@@ -248,7 +249,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	const projectName = "compose-e2e-volume"
 
 	t.Run("up with build and no image name, volume", func(t *testing.T) {
-		//ensure local test run does not reuse previously build image
+		// ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
 		c.RunDockerOrExitError("volume", "rm", "myvolume")
@@ -263,14 +264,14 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("check container volume specs", func(t *testing.T) {
 		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
-		//nolint
+		// nolint
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"","RW":true,"Propagation":""`), output)
 	})
 
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
 		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx_1", "--format", "{{ json .HostConfig.Mounts }}")
 		output := res.Stdout()
-		//nolint
+		// nolint
 		assert.Assert(t, strings.Contains(output, `"Type":"bind"`))
 		assert.Assert(t, strings.Contains(output, `"Target":"/usr/share/nginx/html"`))
 	})
