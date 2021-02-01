@@ -50,7 +50,7 @@ e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux con
 	go test -count=1 -v $(TEST_FLAGS) ./local/e2e/cli-only
 
 e2e-aci: ## Run End to end ACI tests. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./aci/e2e
+	go test -timeout 15m -count=1 -v $(TEST_FLAGS) ./aci/e2e
 
 e2e-ecs: ## Run End to end ECS tests. Set E2E_TEST=TestName to run a single test
 	go test -timeout 20m -count=1 -v $(TEST_FLAGS) ./ecs/e2e/ecs ./ecs/e2e/ecs-local
