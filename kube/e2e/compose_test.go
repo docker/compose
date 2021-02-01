@@ -18,8 +18,8 @@ package e2e
 
 import (
 	"fmt"
-	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -48,31 +48,50 @@ func TestComposeUp(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	const projectName = "compose-kube-demo"
+	kubeconfig := filepath.Join(c.ConfigDir, "kubeconfig")
+	kindClusterName := "e2e"
+	kubeContextName := "kind-" + kindClusterName
+	dockerContextName := "kube-e2e-ctx"
+
+	t.Run("create kube cluster", func(t *testing.T) {
+		c.RunCmd("kind", "create", "cluster", "--name", kindClusterName, "--kubeconfig", kubeconfig, "--wait", "180s")
+	})
+	defer func() {
+		c.RunDockerCmd("context", "use", "default")
+		c.RunCmd("kind", "delete", "cluster", "--name", kindClusterName, "--kubeconfig", kubeconfig)
+	}()
 
 	t.Run("create kube context", func(t *testing.T) {
-		res := c.RunDockerCmd("context", "create", "kubernetes", "--kubeconfig", "/Users/gtardif/.kube/config", "--kubecontext", "docker-desktop", "kube-e2e")
-		res.Assert(t, icmd.Expected{Out: `Successfully created kube context "kube-e2e"`})
-		c.RunDockerCmd("context", "use", "kube-e2e")
+		res := c.RunDockerCmd("context", "create", "kubernetes", "--kubeconfig", kubeconfig, "--kubecontext", kubeContextName, dockerContextName)
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf("Successfully created kube context %q", dockerContextName)})
+		c.RunDockerCmd("context", "use", dockerContextName)
 	})
 
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerCmd("compose", "-f", "./kube-simple-demo/demo_sentences.yaml", "--project-name", projectName, "up", "-d")
 	})
 
-	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `web`})
-
-		endpoint := "http://localhost:95"
-		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
-		assert.Assert(t, strings.Contains(output, `"word":`))
+	t.Run("compose ls", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "ls", "--format", "json")
+		res.Assert(t, icmd.Expected{Out: `[{"Name":"compose-kube-demo","Status":"deployed"}]`})
 	})
+
+	t.Run("check running project", func(t *testing.T) {
+		// Docker Desktop kube cluster automatically exposes ports on the host, this is not the case with kind on Desktop,
+		//we need to connect to the clusterIP, from the kind container
+		res := c.RunCmd("sh", "-c", "kubectl --kubeconfig "+kubeconfig+" get service/web -o json | jq -r '.spec.clusterIP'")
+		clusterIP := strings.ReplaceAll(strings.TrimSpace(res.Stdout()), `"`, "")
+
+		endpoint := fmt.Sprintf("http://%s:80/words/noun", clusterIP)
+		c.WaitForCmdResult(icmd.Command("docker", "--context", "default", "exec", "e2e-control-plane", "curl", endpoint), StdoutContains(`"word":`), 3*time.Minute, 3*time.Second)
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 
-	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd("ps", "--all")
+	t.Run("check stack after down", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
