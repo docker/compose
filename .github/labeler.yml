@@ -7,6 +7,9 @@ ecs:
 local:
   - local/**/*
 
+kube:
+  - kube/**/*
+
 cli:
   - cli/**/*
 

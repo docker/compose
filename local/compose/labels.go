@@ -19,6 +19,7 @@ package compose
 import (
 	"fmt"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/docker/api/types/filters"
 )
 
@@ -26,14 +27,14 @@ const (
 	containerNumberLabel = "com.docker.compose.container-number"
 	oneoffLabel          = "com.docker.compose.oneoff"
 	slugLabel            = "com.docker.compose.slug"
-	projectLabel         = "com.docker.compose.project"
-	volumeLabel          = "com.docker.compose.volume"
+	projectLabel         = compose.ProjectTag
+	volumeLabel          = compose.VolumeTag
 	workingDirLabel      = "com.docker.compose.project.working_dir"
 	configFilesLabel     = "com.docker.compose.project.config_files"
-	serviceLabel         = "com.docker.compose.service"
+	serviceLabel         = compose.ServiceTag
 	versionLabel         = "com.docker.compose.version"
 	configHashLabel      = "com.docker.compose.config-hash"
-	networkLabel         = "com.docker.compose.network"
+	networkLabel         = compose.NetworkTag
 
 	//ComposeVersion Compose version
 	ComposeVersion = "1.0-alpha"
