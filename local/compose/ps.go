@@ -23,6 +23,7 @@ import (
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
 )
@@ -37,32 +38,49 @@ func (s *composeService) Ps(ctx context.Context, projectName string) ([]compose.
 		return nil, err
 	}
 
-	var summary []compose.ContainerSummary
-	for _, c := range containers {
-		var publishers []compose.PortPublisher
-		for _, p := range c.Ports {
-			var url string
-			if p.PublicPort != 0 {
-				url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
+	summary := make([]compose.ContainerSummary, len(containers))
+	eg, ctx := errgroup.WithContext(ctx)
+	for i, c := range containers {
+		container := c
+		i := i
+		eg.Go(func() error {
+			var publishers []compose.PortPublisher
+			for _, p := range container.Ports {
+				var url string
+				if p.PublicPort != 0 {
+					url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
+				}
+				publishers = append(publishers, compose.PortPublisher{
+					URL:           url,
+					TargetPort:    int(p.PrivatePort),
+					PublishedPort: int(p.PublicPort),
+					Protocol:      p.Type,
+				})
 			}
-			publishers = append(publishers, compose.PortPublisher{
-				URL:           url,
-				TargetPort:    int(p.PrivatePort),
-				PublishedPort: int(p.PublicPort),
-				Protocol:      p.Type,
-			})
-		}
 
-		summary = append(summary, compose.ContainerSummary{
-			ID:         c.ID,
-			Name:       getCanonicalContainerName(c),
-			Project:    c.Labels[projectLabel],
-			Service:    c.Labels[serviceLabel],
-			State:      c.State,
-			Publishers: publishers,
+			inspect, err := s.apiClient.ContainerInspect(ctx, container.ID)
+			if err != nil {
+				return err
+			}
+
+			var health string
+			if inspect.State != nil && inspect.State.Health != nil {
+				health = inspect.State.Health.Status
+			}
+
+			summary[i] = compose.ContainerSummary{
+				ID:         container.ID,
+				Name:       getCanonicalContainerName(container),
+				Project:    container.Labels[projectLabel],
+				Service:    container.Labels[serviceLabel],
+				State:      container.State,
+				Health:     health,
+				Publishers: publishers,
+			}
+			return nil
 		})
 	}
-	return summary, nil
+	return summary, eg.Wait()
 }
 
 func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {
