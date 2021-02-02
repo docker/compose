@@ -43,15 +43,15 @@ func TestContextDescriptionIfProvided(t *testing.T) {
 
 func TestContextDescriptionIfConfigFile(t *testing.T) {
 	cp := ContextParams{
-		ContextName:    "my-context",
-		KubeconfigPath: "~/.kube/config",
+		KubeContextName: "my-context",
+		KubeConfigPath:  "~/.kube/config",
 	}
 	description := cp.getDescription()
 	assert.Equal(t, description, "my-context (in ~/.kube/config)")
 }
 func TestContextDescriptionIfDefaultConfigFile(t *testing.T) {
 	cp := ContextParams{
-		ContextName: "my-context",
+		KubeContextName: "my-context",
 	}
 	description := cp.getDescription()
 	assert.Equal(t, description, "my-context (in default kube config)")

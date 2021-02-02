@@ -65,6 +65,8 @@ func TestComposeUp(t *testing.T) {
 		res := c.RunDockerCmd("context", "create", "kubernetes", "--kubeconfig", kubeconfig, "--kubecontext", kubeContextName, dockerContextName)
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf("Successfully created kube context %q", dockerContextName)})
 		c.RunDockerCmd("context", "use", dockerContextName)
+		res = c.RunDockerCmd("context", "ls")
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf("%s *      kube                %s (in %s)", dockerContextName, kubeContextName, kubeconfig)})
 	})
 
 	t.Run("up", func(t *testing.T) {
