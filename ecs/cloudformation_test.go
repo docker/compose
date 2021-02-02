@@ -47,7 +47,7 @@ func TestSimpleConvert(t *testing.T) {
 	resultAsJSON, err := marshall(template, "yaml")
 	assert.NilError(t, err)
 	result := fmt.Sprintf("%s\n", string(resultAsJSON))
-	expected := "simple/simple-cloudformation-conversion.golden"
+	expected := "simple-cloudformation-conversion.golden"
 	golden.Assert(t, result, expected)
 }
 
