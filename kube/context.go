@@ -19,6 +19,8 @@
 package kube
 
 import (
+	"fmt"
+
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
@@ -105,5 +107,19 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 		ContextName:     cp.KubeContextName,
 		KubeconfigPath:  cp.KubeConfigPath,
 		FromEnvironment: cp.FromEnvironment,
-	}, cp.Description, nil
+	}, cp.getDescription(), nil
+}
+
+func (cp ContextParams) getDescription() string {
+	if cp.Description != "" {
+		return cp.Description
+	}
+	if cp.FromEnvironment {
+		return "From environment variables"
+	}
+	configFile := "default kube config"
+	if cp.KubeconfigPath != "" {
+		configFile = cp.KubeconfigPath
+	}
+	return fmt.Sprintf("%s (in %s)", cp.ContextName, configFile)
 }
