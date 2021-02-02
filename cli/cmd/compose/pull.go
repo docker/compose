@@ -50,16 +50,12 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		project, err := opts.toProject()
-		if err != nil {
-			return "", err
-		}
+	project, err := opts.toProject(services)
+	if err != nil {
+		return err
+	}
 
-		err = filter(project, services)
-		if err != nil {
-			return "", err
-		}
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return "", c.ComposeService().Pull(ctx, project)
 	})
 	return err

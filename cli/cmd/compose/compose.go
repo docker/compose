@@ -29,12 +29,14 @@ import (
 
 type projectOptions struct {
 	ProjectName string
+	Profiles    []string
 	ConfigPaths []string
 	WorkingDir  string
 	EnvFile     string
 }
 
 func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
+	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
@@ -47,14 +49,14 @@ func (o *projectOptions) toProjectName() (string, error) {
 		return o.ProjectName, nil
 	}
 
-	project, err := o.toProject()
+	project, err := o.toProject(nil)
 	if err != nil {
 		return "", err
 	}
 	return project.Name, nil
 }
 
-func (o *projectOptions) toProject() (*types.Project, error) {
+func (o *projectOptions) toProject(services []string) (*types.Project, error) {
 	options, err := o.toProjectOptions()
 	if err != nil {
 		return nil, err
@@ -64,7 +66,19 @@ func (o *projectOptions) toProject() (*types.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	return project, nil
+
+	if len(services) != 0 {
+		s, err := project.GetServices(services)
+		if err != nil {
+			return nil, err
+		}
+		o.Profiles = append(o.Profiles, s.GetProfiles()...)
+	}
+
+	project.ApplyProfiles(o.Profiles)
+
+	err = project.ForServices(services)
+	return project, err
 }
 
 func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
@@ -113,41 +127,4 @@ func Command(contextType string) *cobra.Command {
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.PersistentFlags())
 	return command
-}
-
-//
-func filter(project *types.Project, services []string) error {
-	if len(services) == 0 {
-		// All services
-		return nil
-	}
-
-	names := map[string]bool{}
-	err := addServiceNames(project, services, names)
-	if err != nil {
-		return err
-	}
-	var filtered types.Services
-	for _, s := range project.Services {
-		if _, ok := names[s.Name]; ok {
-			filtered = append(filtered, s)
-		}
-	}
-	project.Services = filtered
-	return nil
-}
-
-func addServiceNames(project *types.Project, services []string, names map[string]bool) error {
-	for _, name := range services {
-		names[name] = true
-		service, err := project.GetService(name)
-		if err != nil {
-			return err
-		}
-		err = addServiceNames(project, service.GetDependencies(), names)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -37,10 +37,11 @@ func convertCommand(p *projectOptions) *cobra.Command {
 		projectOptions: p,
 	}
 	convertCmd := &cobra.Command{
-		Use:   "convert",
-		Short: "Converts the compose file to a cloud format (default: cloudformation)",
+		Aliases: []string{"config"},
+		Use:     "convert SERVICES",
+		Short:   "Converts the compose file to platform's canonical format",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runConvert(cmd.Context(), opts)
+			return runConvert(cmd.Context(), opts, args)
 		},
 	}
 	flags := convertCmd.Flags()
@@ -49,14 +50,14 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	return convertCmd
 }
 
-func runConvert(ctx context.Context, opts convertOptions) error {
+func runConvert(ctx context.Context, opts convertOptions, services []string) error {
 	var json []byte
 	c, err := client.NewWithDefaultLocalBackend(ctx)
 	if err != nil {
 		return err
 	}
 
-	project, err := opts.toProject()
+	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
