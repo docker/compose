@@ -24,7 +24,7 @@ import (
 )
 
 func TestFilterServices(t *testing.T) {
-	p := types.Project{
+	p := &types.Project{
 		Services: []types.ServiceConfig{
 			{
 				Name:  "foo",
@@ -42,7 +42,7 @@ func TestFilterServices(t *testing.T) {
 			},
 		},
 	}
-	err := filter(&p, []string{"bar"})
+	err := p.ForServices([]string{"bar"})
 	assert.NilError(t, err)
 
 	assert.Equal(t, len(p.Services), 2)

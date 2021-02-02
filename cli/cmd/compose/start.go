@@ -54,12 +54,7 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	project, err := opts.toProject()
-	if err != nil {
-		return err
-	}
-
-	err = filter(project, services)
+	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}

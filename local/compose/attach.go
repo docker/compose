@@ -42,6 +42,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	if err != nil {
 		return nil, err
 	}
+	containers = Containers(containers).filter(isService(project.ServiceNames()...))
 
 	var names []string
 	for _, c := range containers {

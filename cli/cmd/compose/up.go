@@ -161,10 +161,11 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		return nil, nil, err
 	}
 
-	project, err := opts.toProject()
+	project, err := opts.toProject(services)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if opts.DomainName != "" {
 		// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
 		project.Services[0].DomainName = opts.DomainName
@@ -175,9 +176,5 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		}
 	}
 
-	err = filter(project, services)
-	if err != nil {
-		return nil, nil, err
-	}
 	return c, project, nil
 }

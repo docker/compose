@@ -57,7 +57,7 @@ func runDown(ctx context.Context, opts downOptions) error {
 		name := opts.ProjectName
 		var project *types.Project
 		if opts.ProjectName == "" {
-			p, err := opts.toProject()
+			p, err := opts.toProject(nil)
 			if err != nil {
 				return "", err
 			}
