@@ -111,6 +111,7 @@ type ContainerSummary struct {
 	Project    string
 	Service    string
 	State      string
+	Health     string
 	Publishers []PortPublisher
 }
 
