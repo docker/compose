@@ -58,7 +58,6 @@ from .utils import yesno
 from compose.metrics.client import MetricsCommand
 from compose.metrics.client import Status
 
-
 if not IS_WINDOWS_PLATFORM:
     from dockerpty.pty import PseudoTerminal, RunOperation, ExecOperation
 
@@ -242,6 +241,20 @@ def parse_doc_section(name, source):
     pattern = re.compile('^([^\n]*' + name + '[^\n]*\n?(?:[ \t].*?(?:\n|$))*)',
                          re.IGNORECASE | re.MULTILINE)
     return [s.strip() for s in pattern.findall(source)]
+
+
+def check_up_options(attach_dependencies, cascade_stop, detached, exit_value_from, no_start, options,
+                     remove_orphans, ignore_orphans):
+    if detached and (cascade_stop or exit_value_from or attach_dependencies):
+        raise UserError(
+            "-d cannot be combined with --abort-on-container-exit or --attach-dependencies.")
+
+    if ignore_orphans and remove_orphans:
+        raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
+
+    opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--attach-dependencies']
+    for excluded in [x for x in opts if options.get(x) and no_start]:
+        raise UserError('--no-start and {} cannot be combined.'.format(excluded))
 
 
 class TopLevelCommand:
@@ -1110,6 +1123,7 @@ class TopLevelCommand:
             --scale SERVICE=NUM        Scale SERVICE to NUM instances. Overrides the
                                        `scale` setting in the Compose file if present.
             --no-log-prefix            Don't print prefix in logs.
+            --exclude                  Exclude the specified services
         """
         start_deps = not options['--no-deps']
         always_recreate_deps = options['--always-recreate-deps']
@@ -1122,21 +1136,19 @@ class TopLevelCommand:
         no_start = options.get('--no-start')
         attach_dependencies = options.get('--attach-dependencies')
         keep_prefix = not options['--no-log-prefix']
-
-        if detached and (cascade_stop or exit_value_from or attach_dependencies):
-            raise UserError(
-                "-d cannot be combined with --abort-on-container-exit or --attach-dependencies.")
+        exclude_services = options['--exclude']
 
         ignore_orphans = self.toplevel_environment.get_boolean('COMPOSE_IGNORE_ORPHANS')
 
-        if ignore_orphans and remove_orphans:
-            raise UserError("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined.")
-
-        opts = ['--detach', '--abort-on-container-exit', '--exit-code-from', '--attach-dependencies']
-        for excluded in [x for x in opts if options.get(x) and no_start]:
-            raise UserError('--no-start and {} cannot be combined.'.format(excluded))
+        check_up_options(attach_dependencies, cascade_stop, detached, exit_value_from, no_start, options,
+                         remove_orphans, ignore_orphans)
 
         native_builder = self.toplevel_environment.get_boolean('COMPOSE_DOCKER_CLI_BUILD', True)
+
+        if exclude_services:
+            service_names = [s.name for s in self.project.get_complement_services(service_names)]
+            if len(service_names) == 0:
+                return
 
         with up_shutdown_context(self.project, service_names, timeout, detached):
             warn_for_swarm_mode(self.project.client)

@@ -175,6 +175,25 @@ class ProjectTest(unittest.TestCase):
         project = Project('test', [web, db], None)
         assert project.get_services(['web', 'db'], include_deps=True) == [db, web]
 
+    def test_get_complement_services(self):
+        db = Service(
+            project='composetest',
+            name='db',
+            image=BUSYBOX_IMAGE_WITH_TAG,
+        )
+        web = Service(
+            project='composetest',
+            name='web',
+            image='foo',
+        )
+        proxy = Service(
+            project='composetest',
+            name='proxy',
+            image='bar',
+        )
+        project = Project('test', [web, db, proxy], None)
+        assert project.get_complement_services(['proxy']) == [web, db]
+
     def test_use_volumes_from_container(self):
         container_id = 'aabbccddee'
         container_dict = dict(Name='aaa', Id=container_id)

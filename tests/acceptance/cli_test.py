@@ -3147,3 +3147,10 @@ services:
         assert 'another' in result.stdout
         assert 'exited with code 0' in result.stdout
         assert 'exited with code 0' in result.stdout
+
+    def test_up_with_exclude_flag(self):
+        self.base_dir = 'tests/fixtures/v2-simple'
+        self.dispatch(['up', '-d', '--exclude', 'another'], None)
+        services = self.project.get_services()
+        assert services[0].containers()[0].is_running
+        assert len(services[1].containers()) == 0

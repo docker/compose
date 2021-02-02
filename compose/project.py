@@ -244,6 +244,11 @@ class Project:
             service.remove_duplicate_containers()
         return services
 
+    def get_complement_services(self, service_names=None):
+        if service_names is None:
+            service_names = []
+        return [s for s in self.services if s.name not in service_names]
+
     def get_links(self, service_dict):
         links = []
         if 'links' in service_dict:

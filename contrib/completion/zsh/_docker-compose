@@ -296,6 +296,7 @@ __docker-compose_subcommand() {
                 '(-t --timeout)'{-t,--timeout}"[Use this timeout in seconds for container shutdown when attached or when containers are already running. (default: 10)]:seconds: " \
                 '--scale[SERVICE=NUM Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.]:service scale SERVICE=NUM: ' \
                 '--exit-code-from=[Return the exit code of the selected service container. Implies --abort-on-container-exit]:service:__docker-compose_services' \
+                '--exclude[Flag to exclude services]' \
                 $opts_remove_orphans \
                 '*:services:__docker-compose_services' && ret=0
             ;;
