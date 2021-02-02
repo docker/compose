@@ -29,9 +29,9 @@ import (
 
 // ContextParams options for creating a Kubernetes context
 type ContextParams struct {
-	ContextName     string
+	KubeContextName string
 	Description     string
-	KubeconfigPath  string
+	KubeConfigPath  string
 	FromEnvironment bool
 }
 
@@ -45,7 +45,7 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 	}
 	user := prompt.User{}
 	selectContext := func() error {
-		contexts, err := kubernetes.ListAvailableKubeConfigContexts(cp.KubeconfigPath)
+		contexts, err := kubernetes.ListAvailableKubeConfigContexts(cp.KubeConfigPath)
 		if err != nil {
 			return err
 		}
@@ -57,11 +57,18 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 			}
 			return err
 		}
-		cp.ContextName = contexts[selected]
+		cp.KubeContextName = contexts[selected]
 		return nil
 	}
 
-	if cp.KubeconfigPath != "" {
+	if cp.KubeConfigPath != "" {
+		if cp.KubeContextName != "" {
+			return store.KubeContext{
+				ContextName:     cp.KubeContextName,
+				KubeconfigPath:  cp.KubeConfigPath,
+				FromEnvironment: cp.FromEnvironment,
+			}, cp.Description, nil
+		}
 		err := selectContext()
 		if err != nil {
 			return nil, "", err
@@ -95,8 +102,8 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 		}
 	}
 	return store.KubeContext{
-		ContextName:     cp.ContextName,
-		KubeconfigPath:  cp.KubeconfigPath,
+		ContextName:     cp.KubeContextName,
+		KubeconfigPath:  cp.KubeConfigPath,
 		FromEnvironment: cp.FromEnvironment,
 	}, cp.Description, nil
 }

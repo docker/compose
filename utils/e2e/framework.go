@@ -203,11 +203,42 @@ func (c *E2eCLI) RunDockerOrExitError(args ...string) *icmd.Result {
 	return icmd.RunCmd(c.NewDockerCmd(args...))
 }
 
+// RunCmd runs a command, expects no error and returns a result
+func (c *E2eCLI) RunCmd(args ...string) *icmd.Result {
+	fmt.Printf("	[%s] %s\n", c.test.Name(), strings.Join(args, " "))
+	assert.Assert(c.test, len(args) >= 1, "require at least one command in parameters")
+	res := icmd.RunCmd(c.NewCmd(args[0], args[1:]...))
+	res.Assert(c.test, icmd.Success)
+	return res
+}
+
 // RunDockerCmd runs a docker command, expects no error and returns a result
 func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 	res := c.RunDockerOrExitError(args...)
 	res.Assert(c.test, icmd.Success)
 	return res
+}
+
+// StdoutContains returns a predicate on command result expecting a string in stdout
+func StdoutContains(expected string) func(*icmd.Result) bool {
+	return func(res *icmd.Result) bool {
+		return strings.Contains(res.Stdout(), expected)
+	}
+}
+
+// WaitForCmdResult try to execute a cmd until resulting output matches given predicate
+func (c *E2eCLI) WaitForCmdResult(command icmd.Cmd, predicate func(*icmd.Result) bool, timeout time.Duration, delay time.Duration) {
+	assert.Assert(c.test, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
+	var res *icmd.Result
+	checkStopped := func(logt poll.LogT) poll.Result {
+		fmt.Printf("	[%s] %s\n", c.test.Name(), strings.Join(command.Command, " "))
+		res = icmd.RunCmd(command)
+		if !predicate(res) {
+			return poll.Continue("Cmd output did not match requirement: %q", res.Combined())
+		}
+		return poll.Success()
+	}
+	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
 }
 
 // PathEnvVar returns path (os sensitive) for running test

@@ -50,7 +50,8 @@ func createKubeCommand() *cobra.Command {
 	}
 
 	addDescriptionFlag(cmd, &opts.Description)
-	cmd.Flags().StringVar(&opts.KubeconfigPath, "kubeconfig", "", "The endpoint of the Kubernetes manager")
+	cmd.Flags().StringVar(&opts.KubeConfigPath, "kubeconfig", "", "The endpoint of the Kubernetes manager")
+	cmd.Flags().StringVar(&opts.KubeContextName, "kubecontext", "", "The name of the context to use in kubeconfig")
 	cmd.Flags().BoolVar(&opts.FromEnvironment, "from-env", false, "Get endpoint and creds from env vars")
 	return cmd
 }
