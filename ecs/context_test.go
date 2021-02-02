@@ -65,15 +65,15 @@ func TestCreateContextDataByKeys(t *testing.T) {
 	assert.Equal(t, data.(store.EcsContext).Profile, "default")
 
 	s := golden.Get(t, dir.Join("config"))
-	golden.Assert(t, string(s), "context/by-keys/config.golden")
+	golden.Assert(t, string(s), "context-by-keys-config.golden")
 
 	s = golden.Get(t, dir.Join("credentials"))
-	golden.Assert(t, string(s), "context/by-keys/credentials.golden")
+	golden.Assert(t, string(s), "context-by-keys-credentials.golden")
 }
 
 func TestCreateContextDataFromProfile(t *testing.T) {
-	os.Setenv("AWS_CONFIG_FILE", "testdata/context/by-profile/config.golden")                  // nolint:errcheck
-	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "testdata/context/by-profile/credentials.golden") // nolint:errcheck
+	os.Setenv("AWS_CONFIG_FILE", "testdata/context-by-profile-config.golden")                  // nolint:errcheck
+	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "testdata/context-by-profile-credentials.golden") // nolint:errcheck
 
 	defer os.Unsetenv("AWS_CONFIG_FILE")             // nolint:errcheck
 	defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE") // nolint:errcheck
@@ -144,15 +144,15 @@ func TestCreateContextDataByKeysInteractive(t *testing.T) {
 	assert.Equal(t, data.(store.EcsContext).Profile, "default")
 
 	s := golden.Get(t, dir.Join("config"))
-	golden.Assert(t, string(s), "context/by-keys/config.golden")
+	golden.Assert(t, string(s), "context-by-keys-config.golden")
 
 	s = golden.Get(t, dir.Join("credentials"))
-	golden.Assert(t, string(s), "context/by-keys/credentials.golden")
+	golden.Assert(t, string(s), "context-by-keys-credentials.golden")
 }
 
 func TestCreateContextDataByProfileInteractive(t *testing.T) {
-	os.Setenv("AWS_CONFIG_FILE", "testdata/context/by-profile/config.golden")                  // nolint:errcheck
-	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "testdata/context/by-profile/credentials.golden") // nolint:errcheck
+	os.Setenv("AWS_CONFIG_FILE", "testdata/context-by-profile-config.golden")                  // nolint:errcheck
+	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "testdata/context-by-profile-credentials.golden") // nolint:errcheck
 
 	defer os.Unsetenv("AWS_CONFIG_FILE")             // nolint:errcheck
 	defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE") // nolint:errcheck
