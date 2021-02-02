@@ -22,12 +22,12 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 )
 
-func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.ContainerSummary, error) {
-	cluster, err := b.aws.GetStackClusterID(ctx, project)
+func (b *ecsAPIService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
+	cluster, err := b.aws.GetStackClusterID(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
-	servicesARN, err := b.aws.ListStackServices(ctx, project)
+	servicesARN, err := b.aws.ListStackServices(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, project string) ([]compose.Conta
 			return nil, err
 		}
 
-		tasks, err := b.aws.DescribeServiceTasks(ctx, cluster, project, service.Name)
+		tasks, err := b.aws.DescribeServiceTasks(ctx, cluster, projectName, service.Name)
 		if err != nil {
 			return nil, err
 		}

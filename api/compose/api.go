@@ -44,7 +44,7 @@ type Service interface {
 	// Logs executes the equivalent to a `compose logs`
 	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	// Ps executes the equivalent to a `compose ps`
-	Ps(ctx context.Context, projectName string) ([]ContainerSummary, error)
+	Ps(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context) ([]Stack, error)
 	// Convert translate compose model into backend's native format
@@ -89,6 +89,11 @@ type RunOptions struct {
 	AutoRemove bool
 	Writer     io.Writer
 	Reader     io.Reader
+}
+
+// PsOptions group options of the Ps API
+type PsOptions struct {
+	All bool
 }
 
 // PortPublisher hold status about published port
