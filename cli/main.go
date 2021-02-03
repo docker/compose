@@ -102,9 +102,10 @@ func isContextAgnosticCommand(cmd *cobra.Command) bool {
 func main() {
 	var opts cliopts.GlobalOpts
 	root := &cobra.Command{
-		Use:           "docker",
-		SilenceErrors: true,
-		SilenceUsage:  true,
+		Use:              "docker",
+		SilenceErrors:    true,
+		SilenceUsage:     true,
+		TraverseChildren: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if !isContextAgnosticCommand(cmd) {
 				mobycli.ExecIfDefaultCtxType(cmd.Context(), cmd.Root())
@@ -112,7 +113,10 @@ func main() {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			return fmt.Errorf("unknown command %q", args[0])
 		},
 	}
 
@@ -146,20 +150,20 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
-	root.PersistentFlags().StringVarP(&opts.LogLevel, "log-level", "l", "info", "Set the logging level (\"debug\"|\"info\"|\"warn\"|\"error\"|\"fatal\")")
-	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
-	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
-	opts.AddContextFlags(root.PersistentFlags())
-	opts.AddConfigFlags(root.PersistentFlags())
-	root.Flags().BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
+	flags := root.Flags()
+	flags.StringVarP(&opts.LogLevel, "log-level", "l", "info", "Set the logging level (\"debug\"|\"info\"|\"warn\"|\"error\"|\"fatal\")")
+	flags.BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
+	flags.StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
+	opts.AddContextFlags(flags)
+	opts.AddConfigFlags(flags)
+	flags.BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
 	walk(root, func(c *cobra.Command) {
 		c.Flags().BoolP("help", "h", false, "Help for "+c.Name())
 	})
 
 	// populate the opts with the global flags
-	_ = root.PersistentFlags().Parse(os.Args[1:])
-	_ = root.Flags().Parse(os.Args[1:])
+	flags.Parse(os.Args[1:]) //nolint: errcheck
 
 	level, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
@@ -208,28 +212,32 @@ func main() {
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
-		// if user canceled request, simply exit without any error message
-		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
-			metrics.Track(ctype, os.Args[1:], metrics.CanceledStatus)
-			os.Exit(130)
-		}
-		if ctype == store.AwsContextType {
-			exit(currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running:
-$ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
-		}
-
-		// Context should always be handled by new CLI
-		requiredCmd, _, _ := root.Find(os.Args[1:])
-		if requiredCmd != nil && isContextAgnosticCommand(requiredCmd) {
-			exit(currentContext, err, ctype)
-		}
-		mobycli.ExecIfDefaultCtxType(ctx, root)
-
-		checkIfUnknownCommandExistInDefaultContext(err, currentContext, ctype)
-
-		exit(currentContext, err, ctype)
+		handleError(ctx, err, ctype, currentContext, cc, root)
 	}
 	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+}
+
+func handleError(ctx context.Context, err error, ctype string, currentContext string, cc *store.DockerContext, root *cobra.Command) {
+	// if user canceled request, simply exit without any error message
+	if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+		metrics.Track(ctype, os.Args[1:], metrics.CanceledStatus)
+		os.Exit(130)
+	}
+	if ctype == store.AwsContextType {
+		exit(currentContext, errors.Errorf(`%q context type has been renamed. Recreate the context by running:
+$ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
+	}
+
+	// Context should always be handled by new CLI
+	requiredCmd, _, _ := root.Find(os.Args[1:])
+	if requiredCmd != nil && isContextAgnosticCommand(requiredCmd) {
+		exit(currentContext, err, ctype)
+	}
+	mobycli.ExecIfDefaultCtxType(ctx, root)
+
+	checkIfUnknownCommandExistInDefaultContext(err, currentContext, ctype)
+
+	exit(currentContext, err, ctype)
 }
 
 func exit(ctx string, err error, ctype string) {
