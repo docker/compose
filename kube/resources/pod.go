@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package kubernetes
+package resources
 
 import (
 	"fmt"

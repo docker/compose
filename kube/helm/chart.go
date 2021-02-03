@@ -23,11 +23,15 @@ import (
 	"encoding/json"
 	"html/template"
 	"path/filepath"
+	"strings"
 
+	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/kube/resources"
 	"gopkg.in/yaml.v3"
 
 	chart "helm.sh/helm/v3/pkg/chart"
 	loader "helm.sh/helm/v3/pkg/chart/loader"
+	util "helm.sh/helm/v3/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -106,4 +110,42 @@ func jsonToYaml(j []byte, spaces int) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+// GetChartInMemory get memory representation of helm chart
+func GetChartInMemory(project *types.Project) (*chart.Chart, error) {
+	// replace _ with - in volume names
+	for k, v := range project.Volumes {
+		volumeName := strings.ReplaceAll(k, "_", "-")
+		if volumeName != k {
+			project.Volumes[volumeName] = v
+			delete(project.Volumes, k)
+		}
+	}
+	objects, err := resources.MapToKubernetesObjects(project)
+	if err != nil {
+		return nil, err
+	}
+	//in memory files
+	return ConvertToChart(project.Name, objects)
+}
+
+// SaveChart converts compose project to helm and saves the chart
+func SaveChart(project *types.Project, dest string) error {
+	chart, err := GetChartInMemory(project)
+	if err != nil {
+		return err
+	}
+	return util.SaveDir(chart, dest)
+}
+
+// GenerateChart generates helm chart from Compose project
+func GenerateChart(project *types.Project, dirname string) error {
+	if strings.Contains(dirname, ".") {
+		splits := strings.SplitN(dirname, ".", 2)
+		dirname = splits[0]
+	}
+
+	dirname = filepath.Dir(dirname)
+	return SaveChart(project, dirname)
 }

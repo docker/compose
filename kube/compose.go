@@ -20,42 +20,98 @@ package kube
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose-cli/api/compose"
+	apicontext "github.com/docker/compose-cli/api/context"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
-	"github.com/docker/compose-cli/kube/charts"
+	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/kube/helm"
+	"github.com/docker/compose-cli/kube/resources"
 )
+
+type composeService struct {
+	sdk *helm.Actions
+}
 
 // NewComposeService create a kubernetes implementation of the compose.Service API
 func NewComposeService(ctx context.Context) (compose.Service, error) {
-	chartsAPI, err := charts.NewSDK(ctx)
+	contextStore := store.ContextStore(ctx)
+	currentContext := apicontext.CurrentContext(ctx)
+	var kubeContext store.KubeContext
+
+	if err := contextStore.GetEndpoint(currentContext, &kubeContext); err != nil {
+		return nil, err
+	}
+	config, err := resources.LoadConfig(kubeContext)
+	if err != nil {
+		return nil, err
+	}
+	actions, err := helm.NewActions(config)
 	if err != nil {
 		return nil, err
 	}
 	return &composeService{
-		sdk: chartsAPI,
+		sdk: actions,
 	}, nil
-}
-
-type composeService struct {
-	sdk charts.SDK
 }
 
 // Up executes the equivalent to a `compose up`
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
-	return s.sdk.Install(project)
+	w := progress.ContextWriter(ctx)
+
+	eventName := "Convert to Helm charts"
+	w.Event(progress.CreatingEvent(eventName))
+
+	chart, err := helm.GetChartInMemory(project)
+	if err != nil {
+		return err
+	}
+	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+
+	eventName = "Install Helm charts"
+	w.Event(progress.CreatingEvent(eventName))
+
+	err = s.sdk.InstallChart(project.Name, chart, func(format string, v ...interface{}) {
+		message := fmt.Sprintf(format, v...)
+		w.Event(progress.NewEvent(eventName, progress.Done, message))
+	})
+
+	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+	return err
 }
 
 // Down executes the equivalent to a `compose down`
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
-	return s.sdk.Uninstall(projectName)
+	w := progress.ContextWriter(ctx)
+
+	eventName := fmt.Sprintf("Remove %s", projectName)
+	w.Event(progress.CreatingEvent(eventName))
+
+	logger := func(format string, v ...interface{}) {
+		message := fmt.Sprintf(format, v...)
+		if strings.Contains(message, "Starting delete") {
+			action := strings.Replace(message, "Starting delete for", "Delete", 1)
+
+			w.Event(progress.CreatingEvent(action))
+			w.Event(progress.NewEvent(action, progress.Done, ""))
+			return
+		}
+		w.Event(progress.NewEvent(eventName, progress.Working, message))
+	}
+	err := s.sdk.Uninstall(projectName, logger)
+	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+
+	return err
 }
 
 // List executes the equivalent to a `docker stack ls`
 func (s *composeService) List(ctx context.Context) ([]compose.Stack, error) {
-	return s.sdk.List()
+	return s.sdk.ListReleases()
 }
 
 // Build executes the equivalent to a `compose build`

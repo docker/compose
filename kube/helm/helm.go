@@ -19,27 +19,25 @@
 package helm
 
 import (
-	"context"
 	"errors"
-	"log"
 
 	"github.com/docker/compose-cli/api/compose"
-	action "helm.sh/helm/v3/pkg/action"
-	chart "helm.sh/helm/v3/pkg/chart"
-	loader "helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	env "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// Actions helm actions
+// Actions implements charts installation management
 type Actions struct {
-	Config    *action.Configuration
-	Namespace string
+	Config     *action.Configuration
+	Namespace  string
+	initialize func(f func(format string, v ...interface{})) error
 }
 
-// NewHelmActions new helm action
-func NewHelmActions(ctx context.Context, getter genericclioptions.RESTClientGetter) (*Actions, error) {
+// NewActions new helm action
+func NewActions(getter genericclioptions.RESTClientGetter) (*Actions, error) {
 	if getter == nil {
 		settings := env.New()
 		getter = settings.RESTClientGetter()
@@ -55,40 +53,38 @@ func NewHelmActions(ctx context.Context, getter genericclioptions.RESTClientGett
 		},
 		Namespace: namespace,
 	}
-	err := actions.Config.Init(getter, namespace, "configmap", log.Printf)
-	if err != nil {
-		return nil, err
-	}
 
-	return actions, actions.Config.KubeClient.IsReachable()
+	actions.initialize = func(f func(format string, v ...interface{})) error {
+		err := actions.Config.Init(getter, namespace, "configmap", f)
+		if err != nil {
+			return err
+		}
+		return actions.Config.KubeClient.IsReachable()
+	}
+	return actions, nil
 }
 
-//InstallChartFromDir install from dir
-func (hc *Actions) InstallChartFromDir(name string, chartpath string) error {
-	chart, err := loader.Load(chartpath)
+// InstallChart installs chart
+func (hc *Actions) InstallChart(name string, chart *chart.Chart, logger func(format string, v ...interface{})) error {
+	err := hc.initialize(logger)
 	if err != nil {
 		return err
 	}
-	return hc.InstallChart(name, chart)
-}
 
-// InstallChart instal chart
-func (hc *Actions) InstallChart(name string, chart *chart.Chart) error {
 	actInstall := action.NewInstall(hc.Config)
 	actInstall.ReleaseName = name
 	actInstall.Namespace = hc.Namespace
-
-	release, err := actInstall.Run(chart, map[string]interface{}{})
-	if err != nil {
-		return err
-	}
-	log.Println("Release status: ", release.Info.Status)
-	log.Println(release.Info.Description)
-	return nil
+	_, err = actInstall.Run(chart, map[string]interface{}{})
+	return err
 }
 
 // Uninstall uninstall chart
-func (hc *Actions) Uninstall(name string) error {
+func (hc *Actions) Uninstall(name string, logger func(format string, v ...interface{})) error {
+	err := hc.initialize(logger)
+	if err != nil {
+		return err
+	}
+
 	release, err := hc.Get(name)
 	if err != nil {
 		return err
@@ -97,12 +93,8 @@ func (hc *Actions) Uninstall(name string) error {
 		return errors.New("no release found with the name provided")
 	}
 	actUninstall := action.NewUninstall(hc.Config)
-	response, err := actUninstall.Run(name)
-	if err != nil {
-		return err
-	}
-	log.Println(response.Release.Info.Description)
-	return nil
+	_, err = actUninstall.Run(name)
+	return err
 }
 
 // Get get released object for a named chart
@@ -113,6 +105,10 @@ func (hc *Actions) Get(name string) (*release.Release, error) {
 
 // ListReleases lists chart releases
 func (hc *Actions) ListReleases() ([]compose.Stack, error) {
+	err := hc.initialize(nil)
+	if err != nil {
+		return nil, err
+	}
 	actList := action.NewList(hc.Config)
 	releases, err := actList.Run()
 	if err != nil {
