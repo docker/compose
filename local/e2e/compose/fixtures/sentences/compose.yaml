@@ -11,3 +11,6 @@ services:
       - "90:80"
     labels:
       - "my-label=test"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 5s

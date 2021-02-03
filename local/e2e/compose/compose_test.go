@@ -53,7 +53,7 @@ func TestLocalComposeUp(t *testing.T) {
 		c.RunDockerCmd("compose", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
-	t.Run("check running project", func(t *testing.T) {
+	t.Run("check accessing running app", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
@@ -87,6 +87,12 @@ func TestLocalComposeUp(t *testing.T) {
 		res := c.RunDockerCmd("inspect", projectName+"_web_1")
 		res.Assert(t, icmd.Expected{Out: `"my-label": "test"`})
 
+	})
+
+	t.Run("check healthcheck display", func(t *testing.T) {
+		c.WaitForCmdResult(c.NewDockerCmd("compose", "-p", projectName, "ps", "--format", "json"),
+			StdoutContains(`"Name":"compose-e2e-demo_web_1","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
+			5*time.Second, 1*time.Second)
 	})
 
 	t.Run("down", func(t *testing.T) {
