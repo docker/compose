@@ -154,7 +154,10 @@ func (w *ttyWriter) print() {
 func lineText(event Event, pad string, terminalWidth, statusPadding int, color bool) string {
 	endTime := time.Now()
 	if event.Status != Working {
-		endTime = event.endTime
+		endTime = event.startTime
+		if (event.endTime != time.Time{}) {
+			endTime = event.endTime
+		}
 	}
 
 	elapsed := endTime.Sub(event.startTime).Seconds()
