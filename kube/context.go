@@ -19,6 +19,8 @@
 package kube
 
 import (
+	"fmt"
+
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
@@ -41,7 +43,7 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 		// we use the current kubectl context from a $KUBECONFIG path
 		return store.KubeContext{
 			FromEnvironment: cp.FromEnvironment,
-		}, cp.Description, nil
+		}, cp.getDescription(), nil
 	}
 	user := prompt.User{}
 	selectContext := func() error {
@@ -67,7 +69,7 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 				ContextName:     cp.KubeContextName,
 				KubeconfigPath:  cp.KubeConfigPath,
 				FromEnvironment: cp.FromEnvironment,
-			}, cp.Description, nil
+			}, cp.getDescription(), nil
 		}
 		err := selectContext()
 		if err != nil {
@@ -105,5 +107,19 @@ func (cp ContextParams) CreateContextData() (interface{}, string, error) {
 		ContextName:     cp.KubeContextName,
 		KubeconfigPath:  cp.KubeConfigPath,
 		FromEnvironment: cp.FromEnvironment,
-	}, cp.Description, nil
+	}, cp.getDescription(), nil
+}
+
+func (cp ContextParams) getDescription() string {
+	if cp.Description != "" {
+		return cp.Description
+	}
+	if cp.FromEnvironment {
+		return "From environment variables"
+	}
+	configFile := "default kube config"
+	if cp.KubeConfigPath != "" {
+		configFile = cp.KubeConfigPath
+	}
+	return fmt.Sprintf("%s (in %s)", cp.KubeContextName, configFile)
 }
