@@ -31,6 +31,7 @@ import (
 
 type downOptions struct {
 	*projectOptions
+	removeOrphans bool
 }
 
 func downCommand(p *projectOptions) *cobra.Command {
@@ -44,6 +45,9 @@ func downCommand(p *projectOptions) *cobra.Command {
 			return runDown(cmd.Context(), opts)
 		},
 	}
+	flags := downCmd.Flags()
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+
 	return downCmd
 }
 
@@ -66,7 +70,7 @@ func runDown(ctx context.Context, opts downOptions) error {
 		}
 
 		return name, c.ComposeService().Down(ctx, name, compose.DownOptions{
-			RemoveOrphans: false,
+			RemoveOrphans: opts.removeOrphans,
 			Project:       project,
 		})
 	})
