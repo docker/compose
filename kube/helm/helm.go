@@ -36,6 +36,8 @@ type Actions struct {
 	initialize func(f func(format string, v ...interface{})) error
 }
 
+const helmDriver = "configmap"
+
 // NewActions new helm action
 func NewActions(getter genericclioptions.RESTClientGetter) (*Actions, error) {
 	if getter == nil {
@@ -55,11 +57,15 @@ func NewActions(getter genericclioptions.RESTClientGetter) (*Actions, error) {
 	}
 
 	actions.initialize = func(f func(format string, v ...interface{})) error {
-		err := actions.Config.Init(getter, namespace, "configmap", f)
+		err := actions.Config.Init(getter, namespace, helmDriver, f)
 		if err != nil {
 			return err
 		}
 		return actions.Config.KubeClient.IsReachable()
+	}
+	err := actions.initialize(nil) // by default no logger, users might re-initialize with another logger function
+	if err != nil {
+		return nil, err
 	}
 	return actions, nil
 }
@@ -105,10 +111,6 @@ func (hc *Actions) Get(name string) (*release.Release, error) {
 
 // ListReleases lists chart releases
 func (hc *Actions) ListReleases() ([]compose.Stack, error) {
-	err := hc.initialize(nil)
-	if err != nil {
-		return nil, err
-	}
 	actList := action.NewList(hc.Config)
 	releases, err := actList.Run()
 	if err != nil {
