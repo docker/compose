@@ -453,7 +453,7 @@ func TestLegacyLogin(t *testing.T) {
 
 	t.Run("login help global flags", func(t *testing.T) {
 		res := c.RunDockerCmd("login", "--help")
-		assert.Assert(t, !strings.Contains(res.Combined(), "--log-level"))
+		assert.Assert(t, strings.Contains(res.Combined(), "--log-level"))
 	})
 }
 

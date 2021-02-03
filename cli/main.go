@@ -146,6 +146,7 @@ func main() {
 		helpFunc(cmd, args)
 	})
 
+	root.PersistentFlags().StringVarP(&opts.LogLevel, "log-level", "l", "info", "Set the logging level (\"debug\"|\"info\"|\"warn\"|\"error\"|\"fatal\")")
 	root.PersistentFlags().BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
 	root.PersistentFlags().StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
 	opts.AddContextFlags(root.PersistentFlags())
@@ -159,6 +160,13 @@ func main() {
 	// populate the opts with the global flags
 	_ = root.PersistentFlags().Parse(os.Args[1:])
 	_ = root.Flags().Parse(os.Args[1:])
+
+	level, err := logrus.ParseLevel(opts.LogLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n", opts.LogLevel)
+		os.Exit(1)
+	}
+	logrus.SetLevel(level)
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
 	}

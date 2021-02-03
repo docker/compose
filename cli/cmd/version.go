@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/mobycli"
 	"github.com/docker/compose-cli/internal"
@@ -45,7 +44,6 @@ func VersionCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringP(formatOpt, "f", "", "Format the output. Values: [pretty | json]. (Default: pretty)")
 	flags.String("kubeconfig", "", "Kubernetes config file")
-	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 
 	return cmd
 }

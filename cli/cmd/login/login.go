@@ -25,7 +25,6 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/errdefs"
-	"github.com/docker/compose-cli/cli/cmd/mobyflags"
 	"github.com/docker/compose-cli/cli/mobycli"
 )
 
@@ -43,7 +42,6 @@ func Command() *cobra.Command {
 	flags.StringP("username", "u", "", "username")
 	flags.StringP("password", "p", "", "password")
 	flags.BoolP("password-stdin", "", false, "Take the password from stdin")
-	mobyflags.AddMobyFlagsForRetrocompatibility(flags)
 
 	cmd.AddCommand(AzureLoginCommand())
 	return cmd
