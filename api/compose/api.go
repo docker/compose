@@ -49,6 +49,8 @@ type Service interface {
 	List(ctx context.Context) ([]Stack, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
+	// Kill executes the equivalent to a `compose kill`
+	Kill(ctx context.Context, project *types.Project, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) error
 }
@@ -79,6 +81,12 @@ type DownOptions struct {
 type ConvertOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
+}
+
+// KillOptions group options of the Kill API
+type KillOptions struct {
+	// Signal to send to containers
+	Signal string
 }
 
 // RunOptions options to execute compose run
