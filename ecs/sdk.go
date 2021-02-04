@@ -173,7 +173,7 @@ func (s sdk) GetDefaultVPC(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if len(vpcs.Vpcs) == 0 {
-		return "", fmt.Errorf("account has not default VPC")
+		return "", fmt.Errorf("account has no default VPC. Set VPC to deploy to using 'x-aws-vpc'")
 	}
 	return *vpcs.Vpcs[0].VpcId, nil
 }
