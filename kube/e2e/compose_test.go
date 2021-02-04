@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
@@ -76,6 +77,18 @@ func TestComposeUp(t *testing.T) {
 	t.Run("compose ls", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ls", "--format", "json")
 		res.Assert(t, icmd.Expected{Out: `[{"Name":"compose-kube-demo","Status":"deployed"}]`})
+	})
+
+	t.Run("compose ps", func(t *testing.T) {
+		getServiceRegx := func(project string, service string) string {
+			// match output with random hash / spaces like:
+			// myproject-db-698f4dd798-jd9gw      db                  Running
+			return fmt.Sprintf("%s-%s-.*\\s+%s\\s+Pending\\s+", project, service, service)
+		}
+		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
+		testify.Regexp(t, getServiceRegx(projectName, "db"), res.Stdout())
+		testify.Regexp(t, getServiceRegx(projectName, "words"), res.Stdout())
+		testify.Regexp(t, getServiceRegx(projectName, "web"), res.Stdout())
 	})
 
 	t.Run("check running project", func(t *testing.T) {

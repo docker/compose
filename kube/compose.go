@@ -54,6 +54,9 @@ func NewComposeService(ctx context.Context) (compose.Service, error) {
 		return nil, err
 	}
 	actions, err := helm.NewActions(config)
+	if err != nil {
+		return nil, err
+	}
 	apiClient, err := client.NewKubeClient(config)
 	if err != nil {
 		return nil, err
@@ -156,7 +159,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 
 // Ps executes the equivalent to a `compose ps`
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
-	return nil, errdefs.ErrNotImplemented
+	return s.client.GetContainers(ctx, projectName, options.All)
 }
 
 // Convert translate compose model into backend's native format
