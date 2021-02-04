@@ -33,6 +33,7 @@ import (
 	"github.com/docker/compose-cli/kube/client"
 	"github.com/docker/compose-cli/kube/helm"
 	"github.com/docker/compose-cli/kube/resources"
+	"github.com/docker/compose-cli/utils"
 )
 
 type composeService struct {
@@ -154,7 +155,10 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project) error
 
 // Logs executes the equivalent to a `compose logs`
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
-	return errdefs.ErrNotImplemented
+	if len(options.Services) > 0 {
+		consumer = utils.FilteredLogConsumer(consumer, options.Services)
+	}
+	return s.client.GetLogs(ctx, projectName, consumer, options.Follow)
 }
 
 // Ps executes the equivalent to a `compose ps`
