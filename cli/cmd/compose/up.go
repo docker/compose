@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
@@ -174,6 +175,23 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		for _, service := range project.Services {
 			service.PullPolicy = types.PullPolicyBuild
 		}
+	}
+	if opts.EnvFile != "" {
+		var services types.Services
+		for _, s := range project.Services {
+			ef := opts.EnvFile
+			if ef != "" {
+				if !filepath.IsAbs(ef) {
+					ef = filepath.Join(project.WorkingDir, opts.EnvFile)
+				}
+				if s.Labels == nil {
+					s.Labels = make(map[string]string)
+				}
+				s.Labels[compose.EnvironmentFileLabel] = ef
+				services = append(services, s)
+			}
+		}
+		project.Services = services
 	}
 
 	return c, project, nil

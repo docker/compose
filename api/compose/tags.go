@@ -25,4 +25,6 @@ const (
 	ServiceTag = "com.docker.compose.service"
 	// VolumeTag allow to track resource related to a compose volume
 	VolumeTag = "com.docker.compose.volume"
+	// EnvironmentFileLabel is set in containers with the option "--env-file" when set
+	EnvironmentFileLabel = "com.docker.compose.project.environment_file"
 )
