@@ -45,7 +45,7 @@ func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, 
 	for _, service := range project.Services {
 		svcObject := mapToService(project, service)
 		if svcObject != nil {
-			objects[fmt.Sprintf("%s-service.yaml", service.Name)] = svcObject
+			objects[fmt.Sprintf("%s-service.yaml", getProjectServiceName(project, service))] = svcObject
 		} else {
 			log.Println("Missing port mapping from service config.")
 		}
@@ -55,13 +55,13 @@ func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, 
 			if err != nil {
 				return nil, err
 			}
-			objects[fmt.Sprintf("%s-daemonset.yaml", service.Name)] = daemonset
+			objects[fmt.Sprintf("%s-daemonset.yaml", getProjectServiceName(project, service))] = daemonset
 		} else {
 			deployment, err := mapToDeployment(project, service)
 			if err != nil {
 				return nil, err
 			}
-			objects[fmt.Sprintf("%s-deployment.yaml", service.Name)] = deployment
+			objects[fmt.Sprintf("%s-deployment.yaml", getProjectServiceName(project, service))] = deployment
 		}
 		for _, vol := range service.Volumes {
 			if vol.Type == "volume" {
@@ -98,7 +98,7 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name: service.Name,
+			Name: getProjectServiceName(project, service),
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: clusterIP,
@@ -126,7 +126,7 @@ func mapToDeployment(project *types.Project, service types.ServiceConfig) (*apps
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:   service.Name,
+			Name:   getProjectServiceName(project, service),
 			Labels: labels,
 		},
 		Spec: apps.DeploymentSpec{
@@ -136,6 +136,10 @@ func mapToDeployment(project *types.Project, service types.ServiceConfig) (*apps
 			Template: podTemplate,
 		},
 	}, nil
+}
+
+func getProjectServiceName(project *types.Project, service types.ServiceConfig) string {
+	return fmt.Sprintf("%s-%s", project.Name, service.Name)
 }
 
 func selectorLabels(projectName string, serviceName string) map[string]string {
@@ -154,7 +158,7 @@ func mapToDaemonset(project *types.Project, service types.ServiceConfig) (*apps.
 
 	return &apps.DaemonSet{
 		ObjectMeta: meta.ObjectMeta{
-			Name:   service.Name,
+			Name:   getProjectServiceName(project, service),
 			Labels: labels,
 		},
 		Spec: apps.DaemonSetSpec{
