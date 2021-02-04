@@ -272,6 +272,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		output := res.Stdout()
 		// nolint
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"","RW":true,"Propagation":""`), output)
+		assert.Assert(t, strings.Contains(output, `"Destination":"/myconfig","Mode":"","RW":false,"Propagation":"rprivate"`), output)
 	})
 
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
