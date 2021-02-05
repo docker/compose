@@ -33,6 +33,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	list, err := s.apiClient.ContainerList(ctx, types.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
+			oneOffFilter(false),
 		),
 		All: true,
 	})
@@ -72,7 +73,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			if err != nil {
 				return err
 			}
-			w := getWriter(service, container.ID, consumer)
+			w := getWriter(service, container.Name[1:], consumer)
 			if container.Config.Tty {
 				_, err = io.Copy(w, r)
 			} else {
