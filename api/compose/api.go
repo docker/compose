@@ -81,6 +81,8 @@ type DownOptions struct {
 type ConvertOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
+	// Output defines the path to save the application model
+	Output string
 }
 
 // KillOptions group options of the Kill API

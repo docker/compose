@@ -22,16 +22,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"html/template"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/kube/resources"
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
 	chart "helm.sh/helm/v3/pkg/chart"
 	loader "helm.sh/helm/v3/pkg/chart/loader"
-	util "helm.sh/helm/v3/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -130,22 +131,38 @@ func GetChartInMemory(project *types.Project) (*chart.Chart, error) {
 	return ConvertToChart(project.Name, objects)
 }
 
-// SaveChart converts compose project to helm and saves the chart
-func SaveChart(project *types.Project, dest string) error {
-	chart, err := GetChartInMemory(project)
+// SaveChart saves the chart to directory
+func SaveChart(c *chart.Chart, dest string) (string, error) {
+	dir, err := filepath.Abs(dest)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return util.SaveDir(chart, dest)
-}
+	for _, file := range c.Raw {
+		filename := filepath.Join(dir, file.Name)
+		filedir := filepath.Dir(filename)
 
-// GenerateChart generates helm chart from Compose project
-func GenerateChart(project *types.Project, dirname string) error {
-	if strings.Contains(dirname, ".") {
-		splits := strings.SplitN(dirname, ".", 2)
-		dirname = splits[0]
+		stat, err := os.Stat(filedir)
+
+		if err != nil {
+			if os.IsNotExist(err) {
+				if err2 := os.MkdirAll(filedir, 0755); err2 != nil {
+					return "", err2
+				}
+			} else {
+				return "", err
+			}
+		} else if !stat.IsDir() {
+			return "", errors.Errorf("%s: not a directory", dest)
+		}
+
+		f, err := os.Create(filename)
+		if err != nil {
+			return "", err
+		}
+		_, err = f.Write(file.Data)
+		if err != nil {
+			return "", err
+		}
 	}
-
-	dirname = filepath.Dir(dirname)
-	return SaveChart(project, dirname)
+	return dir, nil
 }
