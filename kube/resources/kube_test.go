@@ -29,7 +29,7 @@ import (
 )
 
 func TestServiceWithExposedPort(t *testing.T) {
-	model, err := loadYAML("myproject", `
+	model, err := loadYAML(`
 services:
   nginx:
     image: nginx
@@ -45,10 +45,10 @@ services:
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name: "myproject-nginx",
+			Name: "nginx",
 		},
 		Spec: core.ServiceSpec{
-			Selector: map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": "myproject"},
+			Selector: map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": ""},
 			Ports: []core.ServicePort{
 				{
 					Name:       "80-tcp",
@@ -62,7 +62,7 @@ services:
 }
 
 func TestServiceWithoutExposedPort(t *testing.T) {
-	model, err := loadYAML("myproject", `
+	model, err := loadYAML(`
 services:
   nginx:
     image: nginx
@@ -76,10 +76,10 @@ services:
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name: "myproject-nginx",
+			Name: "nginx",
 		},
 		Spec: core.ServiceSpec{
-			Selector:  map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": "myproject"},
+			Selector:  map[string]string{"com.docker.compose.service": "nginx", "com.docker.compose.project": ""},
 			ClusterIP: "None",
 			Ports:     []core.ServicePort{},
 			Type:      core.ServiceTypeClusterIP,
