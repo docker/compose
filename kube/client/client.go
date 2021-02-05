@@ -94,8 +94,8 @@ func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
 }
 
 // GetLogs retrieves pod logs
-func (c *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
-	pods, err := c.client.CoreV1().Pods(c.namespace).List(ctx, metav1.ListOptions{
+func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
+	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName),
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func (c *KubeClient) GetLogs(ctx context.Context, projectName string, consumer c
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, pod := range pods.Items {
-		request := c.client.CoreV1().Pods(c.namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow})
+		request := kc.client.CoreV1().Pods(kc.namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow})
 		service := pod.Labels[compose.ServiceTag]
 		w := utils.GetWriter(service, pod.Name, consumer)
 

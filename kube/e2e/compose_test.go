@@ -108,6 +108,11 @@ func TestComposeUp(t *testing.T) {
 		c.WaitForCmdResult(icmd.Command("docker", "--context", "default", "exec", "e2e-control-plane", "curl", endpoint), StdoutContains(`"word":`), 3*time.Minute, 3*time.Second)
 	})
 
+	t.Run("compose logs web", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "--project-name", projectName, "logs", "web")
+		assert.Assert(t, strings.Contains(res.Stdout(), "Listening on port 80"), res.Stdout())
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
