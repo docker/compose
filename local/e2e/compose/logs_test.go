@@ -33,28 +33,28 @@ func TestLocalComposeLogs(t *testing.T) {
 	const projectName = "compose-e2e-logs"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-d", "-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "-d")
+		c.RunDockerCmd("compose", "-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "logs", "--project-name", projectName)
+		res := c.RunDockerCmd("compose", "--project-name", projectName, "logs")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		res.Assert(t, icmd.Expected{Out: `hello`})
 	})
 
 	t.Run("logs ping", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "logs", "--project-name", projectName, "ping")
+		res := c.RunDockerCmd("compose", "--project-name", projectName, "logs", "ping")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		assert.Assert(t, !strings.Contains(res.Stdout(), "hello"))
 	})
 
 	t.Run("logs hello", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "logs", "--project-name", projectName, "hello", "ping")
+		res := c.RunDockerCmd("compose", "--project-name", projectName, "logs", "hello", "ping")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		res.Assert(t, icmd.Expected{Out: `hello`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "down", "--project-name", projectName)
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 }

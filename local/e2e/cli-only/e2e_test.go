@@ -450,11 +450,6 @@ func TestLegacyLogin(t *testing.T) {
 			Err:      "WARNING! Using --password via the CLI is insecure",
 		})
 	})
-
-	t.Run("login help global flags", func(t *testing.T) {
-		res := c.RunDockerCmd("login", "--help")
-		assert.Assert(t, !strings.Contains(res.Combined(), "--log-level"))
-	})
 }
 
 func TestUnsupportedCommand(t *testing.T) {
