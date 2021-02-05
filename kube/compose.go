@@ -30,12 +30,14 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/kube/client"
 	"github.com/docker/compose-cli/kube/helm"
 	"github.com/docker/compose-cli/kube/resources"
 )
 
 type composeService struct {
-	sdk *helm.Actions
+	sdk    *helm.Actions
+	client *client.KubeClient
 }
 
 // NewComposeService create a kubernetes implementation of the compose.Service API
@@ -55,8 +57,14 @@ func NewComposeService(ctx context.Context) (compose.Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	apiClient, err := client.NewKubeClient(config)
+	if err != nil {
+		return nil, err
+	}
+
 	return &composeService{
-		sdk: actions,
+		sdk:    actions,
+		client: apiClient,
 	}, nil
 }
 
@@ -151,7 +159,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 
 // Ps executes the equivalent to a `compose ps`
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
-	return nil, errdefs.ErrNotImplemented
+	return s.client.GetContainers(ctx, projectName, options.All)
 }
 
 // Convert translate compose model into backend's native format
