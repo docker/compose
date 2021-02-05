@@ -32,7 +32,8 @@ import (
 
 // KubeClient API to access kube objects
 type KubeClient struct {
-	client *kubernetes.Clientset
+	client    *kubernetes.Clientset
+	namespace string
 }
 
 // NewKubeClient new kubernetes client
@@ -46,8 +47,15 @@ func NewKubeClient(config genericclioptions.RESTClientGetter) (*KubeClient, erro
 	if err != nil {
 		return nil, err
 	}
+
+	namespace, _, err := config.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
 	return &KubeClient{
-		client: clientset,
+		client:    clientset,
+		namespace: namespace,
 	}, nil
 }
 
@@ -58,7 +66,7 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 		fieldSelector = "status.phase=Running"
 	}
 
-	pods, err := kc.client.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName),
 		FieldSelector: fieldSelector,
 	})
