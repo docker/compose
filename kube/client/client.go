@@ -20,7 +20,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -54,14 +53,18 @@ func NewKubeClient(config genericclioptions.RESTClientGetter) (*KubeClient, erro
 
 // GetContainers get containers for a given compose project
 func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all bool) ([]compose.ContainerSummary, error) {
-	pods, err := kc.client.CoreV1().Pods("").List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName)})
+	fieldSelector := ""
+	if !all {
+		fieldSelector = "status.phase=Running"
+	}
 
+	pods, err := kc.client.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName),
+		FieldSelector: fieldSelector,
+	})
 	if err != nil {
 		return nil, err
 	}
-	json, _ := json.MarshalIndent(pods, "", " ")
-	fmt.Println(string(json))
-	fmt.Printf("containers: %d\n", len(pods.Items))
 	result := []compose.ContainerSummary{}
 	for _, pod := range pods.Items {
 		result = append(result, podToContainerSummary(pod))

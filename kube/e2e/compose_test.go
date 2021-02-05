@@ -79,16 +79,23 @@ func TestComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `[{"Name":"compose-kube-demo","Status":"deployed"}]`})
 	})
 
-	t.Run("compose ps", func(t *testing.T) {
-		getServiceRegx := func(project string, service string) string {
+	t.Run("compose ps --all", func(t *testing.T) {
+		getServiceRegx := func(service string) string {
 			// match output with random hash / spaces like:
-			// myproject-db-698f4dd798-jd9gw      db                  Running
-			return fmt.Sprintf("%s-%s-.*\\s+%s\\s+Pending\\s+", project, service, service)
+			// db-698f4dd798-jd9gw      db                  Running
+			return fmt.Sprintf("%s-.*\\s+%s\\s+Pending\\s+", service, service)
 		}
+		res := c.RunDockerCmd("compose", "ps", "-p", projectName, "--all")
+		testify.Regexp(t, getServiceRegx("db"), res.Stdout())
+		testify.Regexp(t, getServiceRegx("words"), res.Stdout())
+		testify.Regexp(t, getServiceRegx("web"), res.Stdout())
+
+		assert.Equal(t, len(Lines(res.Stdout())), 4, res.Stdout())
+	})
+
+	t.Run("compose ps hides non running containers", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
-		testify.Regexp(t, getServiceRegx(projectName, "db"), res.Stdout())
-		testify.Regexp(t, getServiceRegx(projectName, "words"), res.Stdout())
-		testify.Regexp(t, getServiceRegx(projectName, "web"), res.Stdout())
+		assert.Equal(t, len(Lines(res.Stdout())), 1, res.Stdout())
 	})
 
 	t.Run("check running project", func(t *testing.T) {
