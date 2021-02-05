@@ -388,23 +388,37 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 	}
 	if img.ContainerConfig != nil {
 		for k := range img.ContainerConfig.Volumes {
-			mount, err := buildMount(p, types.ServiceVolumeConfig{
+			m, err := buildMount(p, types.ServiceVolumeConfig{
 				Type:   types.VolumeTypeVolume,
 				Target: k,
 			})
 			if err != nil {
 				return nil, err
 			}
-			mounts[k] = mount
+			mounts[k] = m
 
 		}
 	}
+
+	mounts, err := fillBindMounts(p, s, mounts)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]mount.Mount, 0, len(mounts))
+	for _, v := range mounts {
+		values = append(values, v)
+	}
+	return values, nil
+}
+
+func fillBindMounts(p types.Project, s types.ServiceConfig, m map[string]mount.Mount) (map[string]mount.Mount, error) {
 	for _, v := range s.Volumes {
-		mount, err := buildMount(p, v)
+		bindMount, err := buildMount(p, v)
 		if err != nil {
 			return nil, err
 		}
-		mounts[mount.Target] = mount
+		m[bindMount.Target] = bindMount
 	}
 
 	secrets, err := buildContainerSecretMounts(p, s)
@@ -412,12 +426,53 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 		return nil, err
 	}
 	for _, s := range secrets {
-		if _, found := mounts[s.Target]; found {
+		if _, found := m[s.Target]; found {
 			continue
 		}
-		mounts[s.Target] = s
+		m[s.Target] = s
 	}
 
+	configs, err := buildContainerConfigMounts(p, s)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range configs {
+		if _, found := m[c.Target]; found {
+			continue
+		}
+		m[c.Target] = c
+	}
+	return m, nil
+}
+
+func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
+	var mounts = map[string]mount.Mount{}
+
+	configsBaseDir := "/"
+	for _, config := range s.Configs {
+		target := config.Target
+		if config.Target == "" {
+			target = filepath.Join(configsBaseDir, config.Source)
+		} else if !filepath.IsAbs(config.Target) {
+			target = filepath.Join(configsBaseDir, config.Target)
+		}
+
+		definedConfig := p.Configs[config.Source]
+		if definedConfig.External.External {
+			return nil, fmt.Errorf("unsupported external config %s", definedConfig.Name)
+		}
+
+		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
+			Type:     types.VolumeTypeBind,
+			Source:   definedConfig.File,
+			Target:   target,
+			ReadOnly: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		mounts[target] = bindMount
+	}
 	values := make([]mount.Mount, 0, len(mounts))
 	for _, v := range mounts {
 		values = append(values, v)

@@ -14,8 +14,14 @@ services:
       - otherVol:/usr/share/nginx/test
     ports:
       - 9090:80
+    configs:
+      - myconfig
 
 volumes:
   staticVol:
   otherVol:
     name: myVolume
+
+configs:
+  myconfig:
+    file: ./static/index.html
