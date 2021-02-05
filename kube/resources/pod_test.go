@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func loadYAML(projectName string, yaml string) (*types.Project, error) {
+func loadYAML(yaml string) (*types.Project, error) {
 	dict, err := loader.ParseYAML([]byte(yaml))
 	if err != nil {
 		return nil, err
@@ -51,12 +51,7 @@ func loadYAML(projectName string, yaml string) (*types.Project, error) {
 		ConfigFiles: configs,
 		Environment: nil,
 	}
-	project, err := loader.Load(config)
-	if err != nil {
-		return nil, err
-	}
-	project.Name = projectName
-	return project, nil
+	return loader.Load(config)
 }
 
 func podTemplate(t *testing.T, yaml string) apiv1.PodTemplateSpec {
@@ -66,7 +61,7 @@ func podTemplate(t *testing.T, yaml string) apiv1.PodTemplateSpec {
 }
 
 func podTemplateWithError(yaml string) (apiv1.PodTemplateSpec, error) {
-	model, err := loadYAML("myproject", yaml)
+	model, err := loadYAML(yaml)
 	if err != nil {
 		return apiv1.PodTemplateSpec{}, err
 	}
