@@ -21,8 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose-cli/api/compose"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 	configHashLabel      = "com.docker.compose.config-hash"
 	networkLabel         = compose.NetworkTag
 
-	//ComposeVersion Compose version
+	// ComposeVersion Compose version
 	ComposeVersion = "1.0-alpha"
 )
 
