@@ -18,11 +18,12 @@ package compose
 
 import (
 	"context"
-	"github.com/docker/docker/api/types/container"
+	"fmt"
 
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/docker/api/types/container"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -60,7 +61,14 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 			statusC, errC := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNotRunning)
 			select {
 			case status := <-statusC:
-				options.Attach.Exit(c.Labels[serviceLabel], getContainerNameWithoutProject(c), int(status.StatusCode))
+				service := c.Labels[serviceLabel]
+				options.Attach.Status(service, getContainerNameWithoutProject(c), fmt.Sprintf("exited with code %d", status.StatusCode))
+				if options.Listener != nil {
+					options.Listener <- compose.Event{
+						Service: service,
+						Status:  int(status.StatusCode),
+					}
+				}
 				return nil
 			case err := <-errC:
 				return err

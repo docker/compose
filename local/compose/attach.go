@@ -44,7 +44,10 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
 
 	for _, container := range containers {
-		s.attachContainer(ctx, container, consumer, project)
+		err := s.attachContainer(ctx, container, consumer, project)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return containers, nil
 }

@@ -49,6 +49,7 @@ type upOptions struct {
 	forceRecreate bool
 	noRecreate    bool
 	noStart       bool
+	cascadeStop   bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -73,6 +74,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
+				if opts.cascadeStop && opts.Detach {
+					return fmt.Errorf("--abort-on-container-exit and --detach are incompatible")
+				}
 				if opts.forceRecreate && opts.noRecreate {
 					return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
 				}
@@ -95,6 +99,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 		flags.BoolVar(&opts.noStart, "no-start", false, "Don't start the services after creating them.")
+		flags.BoolVar(&opts.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 	}
 
 	return upCmd
@@ -145,9 +150,25 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return nil
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	listener := make(chan compose.Event)
+	go func() {
+		var aborting bool
+		for {
+			<-listener
+			if opts.cascadeStop && !aborting {
+				aborting = true
+				fmt.Println("Aborting on container exit...")
+				cancel()
+			}
+		}
+	}()
+
 	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
-		Attach: formatter.NewLogConsumer(ctx, os.Stdout),
+		Attach:   formatter.NewLogConsumer(ctx, os.Stdout),
+		Listener: listener,
 	})
+
 	if errors.Is(ctx.Err(), context.Canceled) {
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()

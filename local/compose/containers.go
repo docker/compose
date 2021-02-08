@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"

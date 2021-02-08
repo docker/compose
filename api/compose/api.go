@@ -67,8 +67,8 @@ type CreateOptions struct {
 type StartOptions struct {
 	// Attach will attach to container and pipe stdout/stderr to LogConsumer
 	Attach LogConsumer
-	// CascadeStop will run `Stop` on any container exit
-	CascadeStop bool
+	// Listener will get notified on container events
+	Listener Listener
 }
 
 // UpOptions group options of the Up API
@@ -185,5 +185,14 @@ type Stack struct {
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
 	Log(service, container, message string)
-	Exit(service, container string, exitCode int)
+	Status(service, container, message string)
+}
+
+// Listener get notified on container Events
+type Listener chan Event
+
+// Event let us know a Container exited
+type Event struct {
+	Service string
+	Status  int
 }

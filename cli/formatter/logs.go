@@ -51,9 +51,10 @@ func (l *logConsumer) Log(service, container, message string) {
 	}
 }
 
-func (l *logConsumer) Exit(service, container string, exitCode int) {
-	msg := fmt.Sprintf("%s exited with code %d\n", container, exitCode)
-	l.writer.Write([]byte(l.getColorFunc(service)(msg)))
+func (l *logConsumer) Status(service, container, msg string) {
+	cf := l.getColorFunc(service)
+	buf := bytes.NewBufferString(fmt.Sprintf("%s %s \n", cf(container), cf(msg)))
+	l.writer.Write(buf.Bytes()) // nolint:errcheck
 }
 
 func (l *logConsumer) getColorFunc(service string) colorFunc {
