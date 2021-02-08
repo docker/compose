@@ -17,11 +17,11 @@
 package compose
 
 import (
-	"bytes"
 	"context"
 	"io"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -73,7 +73,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			if err != nil {
 				return err
 			}
-			w := getWriter(service, container.Name[1:], consumer)
+			w := utils.GetWriter(service, container.Name[1:], consumer)
 			if container.Config.Tty {
 				_, err = io.Copy(w, r)
 			} else {
@@ -83,29 +83,4 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 		})
 	}
 	return eg.Wait()
-}
-
-type splitBuffer struct {
-	service   string
-	container string
-	consumer  compose.LogConsumer
-}
-
-// getWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func getWriter(service, container string, l compose.LogConsumer) io.Writer {
-	return splitBuffer{
-		service:   service,
-		container: container,
-		consumer:  l,
-	}
-}
-
-func (s splitBuffer) Write(b []byte) (n int, err error) {
-	split := bytes.Split(b, []byte{'\n'})
-	for _, line := range split {
-		if len(line) != 0 {
-			s.consumer.Log(s.service, s.container, string(line))
-		}
-	}
-	return len(b), nil
 }

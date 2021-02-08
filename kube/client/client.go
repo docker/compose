@@ -21,13 +21,15 @@ package client
 import (
 	"context"
 	"fmt"
+	"io"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
+	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/docker/compose-cli/api/compose"
 )
 
 // KubeClient API to access kube objects
@@ -81,7 +83,7 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 	return result, nil
 }
 
-func podToContainerSummary(pod v1.Pod) compose.ContainerSummary {
+func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
 	return compose.ContainerSummary{
 		ID:      pod.GetObjectMeta().GetName(),
 		Name:    pod.GetObjectMeta().GetName(),
@@ -89,4 +91,31 @@ func podToContainerSummary(pod v1.Pod) compose.ContainerSummary {
 		State:   string(pod.Status.Phase),
 		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectTag],
 	}
+}
+
+// GetLogs retrieves pod logs
+func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
+	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName),
+	})
+	if err != nil {
+		return err
+	}
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, pod := range pods.Items {
+		request := kc.client.CoreV1().Pods(kc.namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow})
+		service := pod.Labels[compose.ServiceTag]
+		w := utils.GetWriter(service, pod.Name, consumer)
+
+		eg.Go(func() error {
+			r, err := request.Stream(ctx)
+			defer r.Close() // nolint errcheck
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(w, r)
+			return err
+		})
+	}
+	return eg.Wait()
 }
