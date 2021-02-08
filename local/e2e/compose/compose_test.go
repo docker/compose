@@ -280,6 +280,16 @@ func TestLocalComposeVolume(t *testing.T) {
 		assert.Assert(t, strings.Contains(output, `"Destination":"/myconfig","Mode":"","RW":false,"Propagation":"rprivate"`), output)
 	})
 
+	t.Run("check config content", func(t *testing.T) {
+		output := c.RunDockerCmd("exec", "compose-e2e-volume_nginx2_1", "cat", "/myconfig").Stdout()
+		assert.Assert(t, strings.Contains(output, `Hello from Nginx container`), output)
+	})
+
+	t.Run("check secrets content", func(t *testing.T) {
+		output := c.RunDockerCmd("exec", "compose-e2e-volume_nginx2_1", "cat", "/run/secrets/mysecret").Stdout()
+		assert.Assert(t, strings.Contains(output, `Hello from Nginx container`), output)
+	})
+
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
 		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx_1", "--format", "{{ json .HostConfig.Mounts }}")
 		output := res.Stdout()

@@ -16,6 +16,8 @@ services:
       - 9090:80
     configs:
       - myconfig
+    secrets:
+      - mysecret
 
 volumes:
   staticVol:
@@ -24,4 +26,8 @@ volumes:
 
 configs:
   myconfig:
+    file: ./static/index.html
+
+secrets:
+  mysecret:
     file: ./static/index.html
