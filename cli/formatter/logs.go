@@ -42,18 +42,28 @@ func (l *logConsumer) Log(service, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
-	cf, ok := l.colors[service]
-	if !ok {
-		cf = <-loop
-		l.colors[service] = cf
-		l.computeWidth()
-	}
+	cf := l.getColorFunc(service)
 	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", container)
 
 	for _, line := range strings.Split(message, "\n") {
 		buf := bytes.NewBufferString(fmt.Sprintf("%s %s\n", cf(prefix), line))
 		l.writer.Write(buf.Bytes()) // nolint:errcheck
 	}
+}
+
+func (l *logConsumer) Exit(service, container string, exitCode int) {
+	msg := fmt.Sprintf("%s exited with code %d\n", container, exitCode)
+	l.writer.Write([]byte(l.getColorFunc(service)(msg)))
+}
+
+func (l *logConsumer) getColorFunc(service string) colorFunc {
+	cf, ok := l.colors[service]
+	if !ok {
+		cf = <-loop
+		l.colors[service] = cf
+		l.computeWidth()
+	}
+	return cf
 }
 
 func (l *logConsumer) computeWidth() {

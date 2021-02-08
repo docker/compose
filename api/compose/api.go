@@ -34,7 +34,7 @@ type Service interface {
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
-	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
+	Start(ctx context.Context, project *types.Project, options StartOptions) error
 	// Stop executes the equivalent to a `compose stop`
 	Stop(ctx context.Context, project *types.Project) error
 	// Up executes the equivalent to a `compose up`
@@ -61,6 +61,14 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Recreate define the strategy to apply on existing containers
 	Recreate string
+}
+
+// StartOptions group options of the Start API
+type StartOptions struct {
+	// Attach will attach to container and pipe stdout/stderr to LogConsumer
+	Attach LogConsumer
+	// CascadeStop will run `Stop` on any container exit
+	CascadeStop bool
 }
 
 // UpOptions group options of the Up API
@@ -177,4 +185,5 @@ type Stack struct {
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
 	Log(service, container, message string)
+	Exit(service, container string, exitCode int)
 }

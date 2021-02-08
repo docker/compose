@@ -54,3 +54,9 @@ func (a *allowListLogConsumer) Log(service, container, message string) {
 		a.delegate.Log(service, container, message)
 	}
 }
+
+func (a *allowListLogConsumer) Exit(service, container string, exitCode int) {
+	if a.allowList[service] {
+		a.delegate.Exit(service, container, exitCode)
+	}
+}

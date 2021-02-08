@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"github.com/docker/docker/api/types/container"
 
 	"github.com/docker/compose-cli/api/compose"
 
@@ -25,14 +26,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
-	var group *errgroup.Group
-	if consumer != nil {
-		eg, err := s.attach(ctx, project, consumer)
+func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+	var containers Containers
+	if options.Attach != nil {
+		c, err := s.attach(ctx, project, options.Attach)
 		if err != nil {
 			return err
 		}
-		group = eg
+		containers = c
+	} else {
+		c, err := s.getContainers(ctx, project)
+		if err != nil {
+			return err
+		}
+		containers = c
 	}
 
 	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
@@ -41,8 +48,24 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, cons
 	if err != nil {
 		return err
 	}
-	if group != nil {
-		return group.Wait()
+
+	if options.Attach == nil {
+		return nil
 	}
-	return nil
+
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, c := range containers {
+		c := c
+		eg.Go(func() error {
+			statusC, errC := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNotRunning)
+			select {
+			case status := <-statusC:
+				options.Attach.Exit(c.Labels[serviceLabel], getContainerNameWithoutProject(c), int(status.StatusCode))
+				return nil
+			case err := <-errC:
+				return err
+			}
+		})
+	}
+	return eg.Wait()
 }

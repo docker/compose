@@ -129,7 +129,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 			return "", err
 		}
 		if opts.Detach {
-			err = c.ComposeService().Start(ctx, project, nil)
+			err = c.ComposeService().Start(ctx, project, compose.StartOptions{})
 		}
 		return "", err
 	})
@@ -145,7 +145,9 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return nil
 	}
 
-	err = c.ComposeService().Start(ctx, project, formatter.NewLogConsumer(ctx, os.Stdout))
+	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
+		Attach: formatter.NewLogConsumer(ctx, os.Stdout),
+	})
 	if errors.Is(ctx.Err(), context.Canceled) {
 		fmt.Println("Gracefully stopping...")
 		ctx = context.Background()

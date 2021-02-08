@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"github.com/docker/compose-cli/api/compose"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -61,10 +62,12 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 
 	if opts.Detach {
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Start(ctx, project, nil)
+			return "", c.ComposeService().Start(ctx, project, compose.StartOptions{})
 		})
 		return err
 	}
 
-	return c.ComposeService().Start(ctx, project, formatter.NewLogConsumer(ctx, os.Stdout))
+	return c.ComposeService().Start(ctx, project, compose.StartOptions{
+		Attach: formatter.NewLogConsumer(ctx, os.Stdout),
+	})
 }
