@@ -85,7 +85,7 @@ func TestComposeUp(t *testing.T) {
 			// db-698f4dd798-jd9gw      db                  Running
 			return fmt.Sprintf("%s-.*\\s+%s\\s+Pending\\s+", service, service)
 		}
-		res := c.RunDockerCmd("compose", "ps", "-p", projectName, "--all")
+		res := c.RunDockerCmd("compose", "-p", projectName, "ps", "--all")
 		testify.Regexp(t, getServiceRegx("db"), res.Stdout())
 		testify.Regexp(t, getServiceRegx("words"), res.Stdout())
 		testify.Regexp(t, getServiceRegx("web"), res.Stdout())
@@ -94,7 +94,7 @@ func TestComposeUp(t *testing.T) {
 	})
 
 	t.Run("compose ps hides non running containers", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "-p", projectName)
+		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
 		assert.Equal(t, len(Lines(res.Stdout())), 1, res.Stdout())
 	})
 

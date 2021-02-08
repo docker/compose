@@ -557,7 +557,7 @@ func TestUpSecretsResources(t *testing.T) {
 	_, _, _ = setupTestResourceGroup(t, c)
 
 	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", composefilePath, "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "-f", composefilePath, "--project-name", composeProjectName, "up")
 		res := c.RunDockerCmd("ps")
 		out := Lines(res.Stdout())
 		// Check 2 containers running
@@ -565,7 +565,7 @@ func TestUpSecretsResources(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "--project-name", composeProjectName, "down")
 		res := c.RunDockerCmd("ps")
 		out := Lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
@@ -696,7 +696,7 @@ func TestUpUpdate(t *testing.T) {
 			Location:       location,
 			ResourceGroup:  groupID,
 		}
-		c.RunDockerCmd("compose", "up", "-f", singlePortVolumesComposefile, "--domainname", dnsLabelName, "--project-name", projectName)
+		c.RunDockerCmd("compose", "-f", singlePortVolumesComposefile, "--project-name", projectName, "up", "--domainname", dnsLabelName)
 
 		// Volume should be autocreated by the "compose up"
 		uploadTestFile(t, aciContext, composeAccountName, fileshareName, testFileName, testFileContent)
@@ -747,11 +747,11 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("compose ps", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName, "--quiet")
+		res := c.RunDockerCmd("compose", "--project-name", composeProjectName, "ps", "--quiet")
 		l := Lines(res.Stdout())
 		assert.Assert(t, is.Len(l, 3))
 
-		res = c.RunDockerCmd("compose", "ps", "--project-name", composeProjectName)
+		res = c.RunDockerCmd("compose", "--project-name", composeProjectName, "ps")
 		l = Lines(res.Stdout())
 		assert.Assert(t, is.Len(l, 4))
 		var wordsDisplayed, webDisplayed, dbDisplayed bool
@@ -797,7 +797,7 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "-f", multiPortComposefile, "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "-f", multiPortComposefile, "--project-name", composeProjectName, "up")
 		res := c.RunDockerCmd("ps")
 		out := Lines(res.Stdout())
 		// Check three containers are running
@@ -832,7 +832,7 @@ func TestUpUpdate(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "down", "--project-name", composeProjectName)
+		c.RunDockerCmd("compose", "--project-name", composeProjectName, "down")
 		res := c.RunDockerCmd("ps")
 		out := Lines(res.Stdout())
 		assert.Equal(t, len(out), 1)
