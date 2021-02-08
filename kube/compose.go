@@ -178,8 +178,8 @@ func (s *composeService) Convert(ctx context.Context, project *types.Project, op
 	}
 
 	if options.Output != "" {
-		fullpath, err := helm.SaveChart(chart, options.Output)
-		return []byte(fullpath), err
+		_, err := helm.SaveChart(chart, options.Output)
+		return nil, err
 	}
 
 	buff := []byte{}

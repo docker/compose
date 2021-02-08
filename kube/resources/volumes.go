@@ -84,16 +84,23 @@ func toVolumeSpecs(project *types.Project, s types.ServiceConfig) ([]volumeSpec,
 		})
 	}
 
-	for i, s := range s.Secrets {
-		name := fmt.Sprintf("secret-%d", i)
+	for _, s := range s.Secrets {
+		name := fmt.Sprintf("%s-%s", project.Name, s.Source)
 
 		target := path.Join("/run/secrets", or(s.Target, s.Source))
-		subPath := name
 		readOnly := true
 
 		specs = append(specs, volumeSpec{
-			source: secretVolume(s, project.Secrets[name], subPath),
-			mount:  volumeMount(name, target, readOnly, subPath),
+			source: &apiv1.VolumeSource{
+				Secret: &apiv1.SecretVolumeSource{
+					SecretName: name,
+				},
+			},
+			mount: apiv1.VolumeMount{
+				Name:      name,
+				MountPath: target,
+				ReadOnly:  readOnly,
+			},
 		})
 	}
 
@@ -181,7 +188,7 @@ func defaultMode(mode *uint32) *int32 {
 func secretVolume(config types.ServiceSecretConfig, topLevelConfig types.SecretConfig, subPath string) *apiv1.VolumeSource {
 	return &apiv1.VolumeSource{
 		Secret: &apiv1.SecretVolumeSource{
-			SecretName: config.Source,
+			SecretName: topLevelConfig.Name,
 			Items: []apiv1.KeyToPath{
 				{
 					Key:  toKey(topLevelConfig.File),

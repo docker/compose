@@ -117,15 +117,13 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 
 // WaitForRunningPodState blocks until pods are in running state
 func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, services []string, status string, timeout int) error {
+	var t time.Duration = 60
 
 	if timeout > 0 {
-		var t time.Duration
 		t = time.Duration(timeout) * time.Second
-		fmt.Println("Timeout ", t)
 	}
 
 	selector := fmt.Sprintf("%s=%s", compose.ProjectTag, projectName)
-
 	waitingForPhase := corev1.PodRunning
 
 	switch status {
@@ -135,49 +133,58 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, se
 		waitingForPhase = corev1.PodUnknown
 	}
 
-	//fieldSelector := "status.phase=Running"
-	for {
-		time.Sleep(time.Duration(1) * time.Second)
-		timeout = timeout - 1
-		if timeout <= 0 {
-			return fmt.Errorf("Deployment time out. Pods did not reach expected state.")
-		}
+	errch := make(chan error, 1)
+	done := make(chan bool)
 
-		pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: selector,
-		})
+	go func() {
+		for {
+			time.Sleep(500 * time.Millisecond)
+
+			pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: selector,
+			})
+			if err != nil {
+				errch <- err
+			}
+
+			servicePods := 0
+			stateReached := true
+			for _, pod := range pods.Items {
+
+				if status == compose.REMOVING {
+					if contains(services, pod.Labels[compose.ServiceTag]) {
+						servicePods = servicePods + 1
+					}
+					continue
+				}
+
+				if pod.Status.Phase != waitingForPhase {
+					stateReached = false
+
+				}
+			}
+
+			if status == compose.REMOVING {
+				if servicePods > 0 {
+					stateReached = false
+				}
+			}
+
+			if stateReached {
+				done <- true
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(t):
+		return fmt.Errorf("timeout: pods did not reach expected state.")
+	case err := <-errch:
 		if err != nil {
 			return err
 		}
-
-		servicePods := 0
-		stateReached := true
-		for _, pod := range pods.Items {
-
-			if status == compose.REMOVING {
-				if contains(services, pod.Labels[compose.ServiceTag]) {
-					servicePods = servicePods + 1
-				}
-
-				continue
-			}
-
-			if pod.Status.Phase != waitingForPhase {
-				stateReached = false
-
-			}
-		}
-
-		if status == compose.REMOVING {
-			if len(pods.Items) > 0 {
-				continue
-			}
-			return nil
-		}
-
-		if !stateReached {
-			continue
-		}
+	case <-done:
 		return nil
 	}
+	return nil
 }
