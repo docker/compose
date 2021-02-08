@@ -130,7 +130,7 @@ func TestGetCommand(t *testing.T) {
 		},
 		{
 			name:     "compose up -f xxx",
-			args:     []string{"compose", "up", "-f", "titi.yaml"},
+			args:     []string{"compose", "-f", "up", "titi.yaml"},
 			expected: "compose up",
 		},
 		{

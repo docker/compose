@@ -81,12 +81,12 @@ func TestCompose(t *testing.T) {
 	c, stack := setupTest(t)
 
 	t.Run("compose up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "up", "--project-name", stack, "-f", "./multi_port_secrets.yaml")
+		c.RunDockerCmd("compose", "--project-name", stack, "-f", "./multi_port_secrets.yaml", "up")
 	})
 
 	var webURL, wordsURL, secretsURL string
 	t.Run("compose ps", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "ps", "--project-name", stack)
+		res := c.RunDockerCmd("compose", "--project-name", stack, "ps")
 		lines := strings.Split(strings.TrimSpace(res.Stdout()), "\n")
 
 		assert.Equal(t, 5, len(lines))
@@ -152,7 +152,7 @@ func TestCompose(t *testing.T) {
 	})
 
 	t.Run("compose down", func(t *testing.T) {
-		cmd := c.NewDockerCmd("compose", "down", "--project-name", stack)
+		cmd := c.NewDockerCmd("compose", "--project-name", stack, "down")
 		res := icmd.StartCmd(cmd)
 
 		checkUp := func(t poll.LogT) poll.Result {
