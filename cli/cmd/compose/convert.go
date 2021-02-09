@@ -30,7 +30,10 @@ import (
 type convertOptions struct {
 	*projectOptions
 	Format string
+	Output string
 }
+
+var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
 
 func convertCommand(p *projectOptions) *cobra.Command {
 	opts := convertOptions{
@@ -47,6 +50,10 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	flags := convertCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 
+	// add flags for hidden backends
+	for _, f := range addFlagsFuncs {
+		f(convertCmd, &opts)
+	}
 	return convertCmd
 }
 
@@ -64,11 +71,14 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 
 	json, err = c.ComposeService().Convert(ctx, project, compose.ConvertOptions{
 		Format: opts.Format,
+		Output: opts.Output,
 	})
 	if err != nil {
 		return err
 	}
-
+	if opts.Output != "" {
+		fmt.Print("model saved to ")
+	}
 	fmt.Println(string(json))
 	return nil
 }

@@ -168,7 +168,25 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 
 // Convert translate compose model into backend's native format
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
-	return nil, errdefs.ErrNotImplemented
+
+	chart, err := helm.GetChartInMemory(project)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.Output != "" {
+		fullpath, err := helm.SaveChart(chart, options.Output)
+		return []byte(fullpath), err
+	}
+
+	buff := []byte{}
+	for _, f := range chart.Raw {
+		header := "\n" + f.Name + "\n" + strings.Repeat("-", len(f.Name)) + "\n"
+		buff = append(buff, []byte(header)...)
+		buff = append(buff, f.Data...)
+		buff = append(buff, []byte("\n")...)
+	}
+	return buff, nil
 }
 
 func (s *composeService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
