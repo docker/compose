@@ -30,6 +30,16 @@ import (
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	observedState, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(project.Name)),
+		All:     true,
+	})
+	if err != nil {
+		return 0, err
+	}
+	containerState := NewContainersState(observedState)
+	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
+
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return 0, err

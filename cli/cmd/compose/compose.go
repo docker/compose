@@ -69,7 +69,7 @@ func (o *projectOptions) toProject(services []string) (*types.Project, error) {
 	}
 
 	if len(services) != 0 {
-		s, err := project.GetServices(services)
+		s, err := project.GetServices(services...)
 		if err != nil {
 			return nil, err
 		}

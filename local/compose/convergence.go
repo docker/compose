@@ -42,7 +42,17 @@ const (
 		"Remove the custom name to scale the service.\n"
 )
 
-func (s *composeService) ensureScale(ctx context.Context, actual []moby.Container, scale int, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
+func (s *composeService) ensureScale(ctx context.Context, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
+	cState, err := GetContextContainerState(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	observedState := cState.GetContainers()
+	actual := observedState.filter(isService(service.Name))
+	scale, err := getScale(service)
+	if err != nil {
+		return nil, nil, err
+	}
 	eg, _ := errgroup.WithContext(ctx)
 	if len(actual) < scale {
 		next, err := nextContainerNumber(actual)
@@ -75,15 +85,8 @@ func (s *composeService) ensureScale(ctx context.Context, actual []moby.Containe
 	return eg, actual, nil
 }
 
-func (s *composeService) ensureService(ctx context.Context, observedState Containers, project *types.Project, service types.ServiceConfig, recreate string) error {
-	actual := observedState.filter(isService(service.Name))
-
-	scale, err := getScale(service)
-	if err != nil {
-		return err
-	}
-
-	eg, actual, err := s.ensureScale(ctx, actual, scale, project, service)
+func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string) error {
+	eg, actual, err := s.ensureScale(ctx, project, service)
 	if err != nil {
 		return err
 	}
@@ -260,7 +263,12 @@ func (s *composeService) restartContainer(ctx context.Context, container moby.Co
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container, autoRemove bool) error {
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container,
+	autoRemove bool) error {
+	cState, err := GetContextContainerState(ctx)
+	if err != nil {
+		return err
+	}
 	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, container, autoRemove)
 	if err != nil {
 		return err
@@ -269,10 +277,14 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	if err != nil {
 		return err
 	}
-	id := created.ID
+	createdContainer := moby.Container{
+		ID:     created.ID,
+		Labels: containerConfig.Labels,
+	}
+	cState.Add(createdContainer)
 	for netName := range service.Networks {
 		netwrk := project.Networks[netName]
-		err = s.connectContainerToNetwork(ctx, id, netwrk.Name, service.Name, getContainerName(project.Name, service, number))
+		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, service.Name, getContainerName(project.Name, service, number))
 		if err != nil {
 			return err
 		}
