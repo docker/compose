@@ -64,7 +64,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 				service := c.Labels[serviceLabel]
 				options.Attach.Status(service, getCanonicalContainerName(c), fmt.Sprintf("exited with code %d", status.StatusCode))
 				if options.Listener != nil {
-					options.Listener <- compose.Event{
+					options.Listener <- compose.ContainerExited{
 						Service: service,
 						Status:  int(status.StatusCode),
 					}

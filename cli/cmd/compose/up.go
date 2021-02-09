@@ -151,7 +151,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	listener := make(chan compose.Event)
+	listener := make(chan compose.ContainerExited)
 	go func() {
 		var aborting bool
 		for {

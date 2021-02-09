@@ -68,7 +68,7 @@ type StartOptions struct {
 	// Attach will attach to container and pipe stdout/stderr to LogConsumer
 	Attach LogConsumer
 	// Listener will get notified on container events
-	Listener Listener
+	Listener chan ContainerExited
 }
 
 // UpOptions group options of the Up API
@@ -188,11 +188,8 @@ type LogConsumer interface {
 	Status(service, container, message string)
 }
 
-// Listener get notified on container Events
-type Listener chan Event
-
-// Event let us know a Container exited
-type Event struct {
+// ContainerExited let us know a Container exited
+type ContainerExited struct {
 	Service string
 	Status  int
 }
