@@ -52,6 +52,7 @@ type upOptions struct {
 	noRecreate    bool
 	noStart       bool
 	cascadeStop   bool
+	exitCodeFrom  string
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -76,6 +77,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
+				if opts.exitCodeFrom != "" {
+					opts.cascadeStop = true
+				}
 				if opts.cascadeStop && opts.Detach {
 					return fmt.Errorf("--abort-on-container-exit and --detach are incompatible")
 				}
@@ -102,6 +106,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 		flags.BoolVar(&opts.noStart, "no-start", false, "Don't start the services after creating them.")
 		flags.BoolVar(&opts.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
+		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 	}
 
 	return upCmd
@@ -179,7 +184,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
-	_, err = printer.run(ctx, opts.cascadeStop, stopFunc)
+	_, err = printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, stopFunc)
 	// FIXME os.Exit
 	return err
 }
@@ -229,21 +234,32 @@ type printer struct {
 	queue chan compose.ContainerEvent
 }
 
-func (p printer) run(ctx context.Context, cascadeStop bool, stopFn func() error) (int, error) { //nolint:unparam
+func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) { //nolint:unparam
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
+	var aborting bool
 	for {
 		event := <-p.queue
 		switch event.Type {
 		case compose.ContainerEventExit:
-			consumer.Status(event.Service, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
-			if cascadeStop {
+			if !aborting {
+				consumer.Status(event.Service, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+			}
+			if cascadeStop && !aborting {
+				aborting = true
 				fmt.Println("Aborting on container exit...")
 				err := stopFn()
+				if err != nil {
+					return 0, err
+				}
+			}
+			if exitCodeFrom == "" || exitCodeFrom == event.Service {
 				logrus.Error(event.ExitCode)
-				return event.ExitCode, err
+				return event.ExitCode, nil
 			}
 		case compose.ContainerEventLog:
-			consumer.Log(event.Service, event.Source, event.Line)
+			if !aborting {
+				consumer.Log(event.Service, event.Source, event.Line)
+			}
 		}
 	}
 }
