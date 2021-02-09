@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 
@@ -152,14 +153,15 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 
 	ctx, cancel := context.WithCancel(ctx)
 	listener := make(chan compose.ContainerExited)
+	exitCode := make(chan int)
 	go func() {
 		var aborting bool
 		for {
-			<-listener
+			exit := <-listener
 			if opts.cascadeStop && !aborting {
 				aborting = true
-				fmt.Println("Aborting on container exit...")
 				cancel()
+				exitCode <- exit.Status
 			}
 		}
 	}()
@@ -170,12 +172,26 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	})
 
 	if errors.Is(ctx.Err(), context.Canceled) {
-		fmt.Println("Gracefully stopping...")
-		ctx = context.Background()
-		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Stop(ctx, project)
-		})
+		select {
+		case exit := <-exitCode:
+			fmt.Println("Aborting on container exit...")
+			err = stop(c, project)
+			logrus.Error(exit)
+			// os.Exit(exit)
+		default:
+			// cancelled by user
+			fmt.Println("Gracefully stopping...")
+			err = stop(c, project)
+		}
 	}
+	return err
+}
+
+func stop(c *client.Client, project *types.Project) error {
+	ctx := context.Background()
+	_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return "", c.ComposeService().Stop(ctx, project)
+	})
 	return err
 }
 
