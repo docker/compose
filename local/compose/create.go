@@ -73,7 +73,12 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	orphans := observedState.filter(isNotService(project.ServiceNames()...))
+	allServices := project.AllServices()
+	allServiceNames := []string{}
+	for _, service := range allServices {
+		allServiceNames = append(allServiceNames, service.Name)
+	}
+	orphans := observedState.filter(isNotService(allServiceNames...))
 	if len(orphans) > 0 {
 		if opts.RemoveOrphans {
 			w := progress.ContextWriter(ctx)
