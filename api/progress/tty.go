@@ -84,6 +84,9 @@ func (w *ttyWriter) Event(e Event) {
 	} else {
 		e.startTime = time.Now()
 		e.spinner = newSpinner()
+		if e.Status == Done || e.Status == Error {
+			e.stop()
+		}
 		w.events[e.ID] = e
 	}
 }

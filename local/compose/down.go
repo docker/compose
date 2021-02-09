@@ -34,6 +34,7 @@ import (
 
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	w := progress.ContextWriter(ctx)
+	resourceToRemove := false
 
 	if options.Project == nil {
 		project, err := s.projectFromContainerLabels(ctx, projectName)
@@ -50,6 +51,9 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	})
 	if err != nil {
 		return err
+	}
+	if len(containers) > 0 {
+		resourceToRemove = true
 	}
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
@@ -80,11 +84,15 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 
 	eg, _ := errgroup.WithContext(ctx)
 	for _, n := range networks {
+		resourceToRemove = true
 		networkID := n.ID
 		networkName := n.Name
 		eg.Go(func() error {
 			return s.ensureNetworkDown(ctx, networkID, networkName)
 		})
+	}
+	if !resourceToRemove {
+		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
 	}
 	return eg.Wait()
 }
