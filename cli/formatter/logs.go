@@ -53,7 +53,7 @@ func (l *logConsumer) Log(service, container, message string) {
 
 func (l *logConsumer) Status(service, container, msg string) {
 	cf := l.getColorFunc(service)
-	buf := bytes.NewBufferString(fmt.Sprintf("%s %s \n", cf(container), cf(msg)))
+	buf := bytes.NewBufferString(cf(fmt.Sprintf("%s %s\n", container, msg)))
 	l.writer.Write(buf.Bytes()) // nolint:errcheck
 }
 

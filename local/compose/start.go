@@ -62,7 +62,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 			select {
 			case status := <-statusC:
 				service := c.Labels[serviceLabel]
-				options.Attach.Status(service, getContainerNameWithoutProject(c), fmt.Sprintf("exited with code %d", status.StatusCode))
+				options.Attach.Status(service, getCanonicalContainerName(c), fmt.Sprintf("exited with code %d", status.StatusCode))
 				if options.Listener != nil {
 					options.Listener <- compose.Event{
 						Service: service,

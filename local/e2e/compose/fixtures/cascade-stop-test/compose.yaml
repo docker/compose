@@ -1,0 +1,4 @@
+services:
+  ping:
+    image: busybox:1.27.2
+    command: ping localhost -c 1
