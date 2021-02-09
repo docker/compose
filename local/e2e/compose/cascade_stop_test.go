@@ -31,6 +31,8 @@ func TestCascadeStop(t *testing.T) {
 
 	res := c.RunDockerCmd("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
 	res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
-	res.Assert(t, icmd.Expected{Out: `ping_1 exited with code 0`})
+	res.Assert(t, icmd.Expected{Out: `/does_not_exist: No such file or directory`})
+	res.Assert(t, icmd.Expected{Out: `should_fail_1 exited with code 1`})
 	res.Assert(t, icmd.Expected{Out: `Aborting on container exit...`})
+	// FIXME res.Assert(t, icmd.Expected{ExitCode: 1})
 }

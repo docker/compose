@@ -24,14 +24,13 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	convert "github.com/docker/compose-cli/local/moby"
-	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.LogConsumer) (Containers, error) {
+func (s *composeService) attach(ctx context.Context, project *types.Project, consumer chan compose.ContainerEvent) (Containers, error) {
 	containers, err := s.getContainers(ctx, project)
 	if err != nil {
 		return nil, err
@@ -52,7 +51,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	return containers, nil
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.LogConsumer, project *types.Project) error {
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer chan compose.ContainerEvent, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
 	w := getWriter(serviceName, getContainerNameWithoutProject(container), consumer)
 

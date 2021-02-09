@@ -58,6 +58,12 @@ func (a *allowListLogConsumer) Log(service, container, message string) {
 	}
 }
 
+func (a *allowListLogConsumer) Status(service, container, message string) {
+	if a.allowList[service] {
+		a.delegate.Status(service, container, message)
+	}
+}
+
 type splitBuffer struct {
 	service   string
 	container string

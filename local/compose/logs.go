@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -52,6 +53,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
+		c := c
 		service := c.Labels[serviceLabel]
 		if ignore(service) {
 			continue
@@ -73,7 +75,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			if err != nil {
 				return err
 			}
-			w := utils.GetWriter(service, container.Name[1:], consumer)
+			w := utils.GetWriter(service, getContainerNameWithoutProject(c), consumer)
 			if container.Config.Tty {
 				_, err = io.Copy(w, r)
 			} else {
@@ -83,4 +85,34 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 		})
 	}
 	return eg.Wait()
+}
+
+type splitBuffer struct {
+	service   string
+	container string
+	consumer  chan compose.ContainerEvent
+}
+
+// getWriter creates a io.Writer that will actually split by line and format by LogConsumer
+func getWriter(service, container string, events chan compose.ContainerEvent) io.Writer {
+	return splitBuffer{
+		service:   service,
+		container: container,
+		consumer:  events,
+	}
+}
+
+func (s splitBuffer) Write(b []byte) (n int, err error) {
+	split := bytes.Split(b, []byte{'\n'})
+	for _, line := range split {
+		if len(line) != 0 {
+			s.consumer <- compose.ContainerEvent{
+				Type:    compose.ContainerEventLog,
+				Service: s.service,
+				Source:  s.container,
+				Line:    string(line),
+			}
+		}
+	}
+	return len(b), nil
 }

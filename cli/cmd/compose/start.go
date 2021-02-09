@@ -18,14 +18,12 @@ package compose
 
 import (
 	"context"
-	"os"
-
-	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/cli/formatter"
+
+	"github.com/spf13/cobra"
 )
 
 type startOptions struct {
@@ -67,7 +65,23 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	return c.ComposeService().Start(ctx, project, compose.StartOptions{
-		Attach: formatter.NewLogConsumer(ctx, os.Stdout),
+	queue := make(chan compose.ContainerEvent)
+	printer := printer{
+		queue: queue,
+	}
+	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
+		Attach: queue,
 	})
+	if err != nil {
+		return err
+	}
+
+	_, err = printer.run(ctx, false, func() error {
+		ctx := context.Background()
+		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+			return "", c.ComposeService().Stop(ctx, project)
+		})
+		return err
+	})
+	return err
 }

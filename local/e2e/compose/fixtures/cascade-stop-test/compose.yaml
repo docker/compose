@@ -1,4 +1,7 @@
 services:
+  should_fail:
+    image: busybox:1.27.2
+    command: ls /does_not_exist
   ping:
     image: busybox:1.27.2
-    command: ping localhost -c 1
+    command: ping localhost

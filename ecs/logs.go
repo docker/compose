@@ -20,43 +20,13 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 )
 
 func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	if len(options.Services) > 0 {
-		consumer = filteredLogConsumer(consumer, options.Services)
+		consumer = utils.FilteredLogConsumer(consumer, options.Services)
 	}
 	err := b.aws.GetLogs(ctx, projectName, consumer.Log, options.Follow)
 	return err
-}
-
-func filteredLogConsumer(consumer compose.LogConsumer, services []string) compose.LogConsumer {
-	if len(services) == 0 {
-		return consumer
-	}
-	allowed := map[string]bool{}
-	for _, s := range services {
-		allowed[s] = true
-	}
-	return &allowListLogConsumer{
-		allowList: allowed,
-		delegate:  consumer,
-	}
-}
-
-type allowListLogConsumer struct {
-	allowList map[string]bool
-	delegate  compose.LogConsumer
-}
-
-func (a *allowListLogConsumer) Log(service, container, message string) {
-	if a.allowList[service] {
-		a.delegate.Log(service, container, message)
-	}
-}
-
-func (a *allowListLogConsumer) Status(service, container, message string) {
-	if a.allowList[service] {
-		a.delegate.Status(service, container, message)
-	}
 }
