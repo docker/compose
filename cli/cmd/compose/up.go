@@ -28,6 +28,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/formatter"
 
 	"github.com/compose-spec/compose-go/types"
@@ -178,14 +179,18 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	}()
 
 	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
-		Attach: queue,
+		Attach: func(event compose.ContainerEvent) {
+			queue <- event
+		},
 	})
 	if err != nil {
 		return err
 	}
 
-	_, err = printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, stopFunc)
-	// FIXME os.Exit
+	exitCode, err := printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, stopFunc)
+	if exitCode != 0 {
+		return cmd.ExitCodeError{ExitCode: exitCode}
+	}
 	return err
 }
 

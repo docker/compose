@@ -70,7 +70,9 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		queue: queue,
 	}
 	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
-		Attach: queue,
+		Attach: func(event compose.ContainerEvent) {
+			queue <- event
+		},
 	})
 	if err != nil {
 		return err

@@ -30,7 +30,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, consumer chan compose.ContainerEvent) (Containers, error) {
+func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.ContainerEventListener) (Containers, error) {
 	containers, err := s.getContainers(ctx, project)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	return containers, nil
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer chan compose.ContainerEvent, project *types.Project) error {
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
 	w := getWriter(serviceName, getContainerNameWithoutProject(container), consumer)
 

@@ -66,7 +66,7 @@ type CreateOptions struct {
 // StartOptions group options of the Start API
 type StartOptions struct {
 	// Attach will attach to service containers and pipe stdout/stderr to channel
-	Attach chan ContainerEvent
+	Attach ContainerEventListener
 }
 
 // UpOptions group options of the Up API
@@ -185,6 +185,9 @@ type LogConsumer interface {
 	Log(service, container, message string)
 	Status(service, container, msg string)
 }
+
+// ContainerEventListener is a callback to process ContainerEvent from services
+type ContainerEventListener func(event ContainerEvent)
 
 // ContainerEvent notify an event has been collected on Source container implementing Service
 type ContainerEvent struct {

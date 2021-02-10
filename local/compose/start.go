@@ -53,12 +53,12 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 			statusC, errC := s.apiClient.ContainerWait(context.Background(), c.ID, container.WaitConditionNotRunning)
 			select {
 			case status := <-statusC:
-				options.Attach <- compose.ContainerEvent{
+				options.Attach(compose.ContainerEvent{
 					Type:     compose.ContainerEventExit,
 					Source:   getCanonicalContainerName(c),
 					Service:  c.Labels[serviceLabel],
 					ExitCode: int(status.StatusCode),
-				}
+				})
 			case err := <-errC:
 				logrus.Warnf("Unexpected API error for %s : %s\n", getCanonicalContainerName(c), err.Error())
 			}
