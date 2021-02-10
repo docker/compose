@@ -33,12 +33,12 @@ import (
 )
 
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(apiClient *client.Client) compose.Service {
+func NewComposeService(apiClient client.APIClient) compose.Service {
 	return &composeService{apiClient: apiClient}
 }
 
 type composeService struct {
-	apiClient *client.Client
+	apiClient client.APIClient
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
