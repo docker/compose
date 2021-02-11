@@ -30,10 +30,8 @@ import (
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-		All: options.All,
+		Filters: filters.NewArgs(projectFilter(projectName)),
+		All:     options.All,
 	})
 	if err != nil {
 		return nil, err

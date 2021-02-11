@@ -20,40 +20,36 @@ import (
 	"context"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
-	apitypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/compose-spec/compose-go/types"
+	apitypes "github.com/docker/docker/api/types"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/local/mocks"
 )
 
-var (
-	s               = composeService{}
-	projectListOpts = apitypes.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter("myProject")),
-		All:     true,
-	}
-)
+const testProject = "testProject"
+
+var tested = composeService{}
 
 func TestKillAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	api := mocks.NewMockAPIClient(mockCtrl)
-	s.apiClient = api
+	tested.apiClient = api
 
-	project := types.Project{Name: "myProject", Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
+	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectListOpts).Return([]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
+		[]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
 
-	err := s.Kill(ctx, &project, compose.KillOptions{})
+	err := tested.Kill(ctx, &project, compose.KillOptions{})
 	assert.NilError(t, err)
 }
 
@@ -61,15 +57,15 @@ func TestKillSignal(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	api := mocks.NewMockAPIClient(mockCtrl)
-	s.apiClient = api
+	tested.apiClient = api
 
-	project := types.Project{Name: "myProject", Services: []types.ServiceConfig{testService("service1")}}
+	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectListOpts).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
-	err := s.Kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
+	err := tested.Kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
 	assert.NilError(t, err)
 }
 
@@ -81,7 +77,7 @@ func testContainer(service string, id string) apitypes.Container {
 	return apitypes.Container{
 		ID:     id,
 		Names:  []string{id},
-		Labels: map[string]string{compose.ServiceTag: service},
+		Labels: map[string]string{serviceLabel: service, configFilesLabel: "testdata/docker-compose.yml", workingDirLabel: "testdata", projectLabel: testProject},
 	}
 }
 
