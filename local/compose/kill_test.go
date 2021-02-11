@@ -77,8 +77,12 @@ func testContainer(service string, id string) apitypes.Container {
 	return apitypes.Container{
 		ID:     id,
 		Names:  []string{id},
-		Labels: map[string]string{serviceLabel: service, configFilesLabel: "testdata/docker-compose.yml", workingDirLabel: "testdata", projectLabel: testProject},
+		Labels: containerLabels(service),
 	}
+}
+
+func containerLabels(service string) map[string]string {
+	return map[string]string{serviceLabel: service, configFilesLabel: "testdata/docker-compose.yml", workingDirLabel: "testdata", projectLabel: testProject}
 }
 
 func anyCancellableContext() gomock.Matcher {

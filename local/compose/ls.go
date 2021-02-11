@@ -84,3 +84,23 @@ func combinedStatus(statuses []string) string {
 	}
 	return result
 }
+
+func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {
+	containersByLabel := map[string][]moby.Container{}
+	keys := []string{}
+	for _, c := range containers {
+		label, ok := c.Labels[labelName]
+		if !ok {
+			return nil, nil, fmt.Errorf("No label %q set on container %q of compose project", labelName, c.ID)
+		}
+		labelContainers, ok := containersByLabel[label]
+		if !ok {
+			labelContainers = []moby.Container{}
+			keys = append(keys, label)
+		}
+		labelContainers = append(labelContainers, c)
+		containersByLabel[label] = labelContainers
+	}
+	sort.Strings(keys)
+	return containersByLabel, keys, nil
+}
