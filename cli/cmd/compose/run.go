@@ -69,15 +69,13 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
-	originalServices := project.Services
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", startDependencies(ctx, c, project, opts.Service)
+		return "", startDependencies(ctx, c, *project, opts.Service)
 	})
 	if err != nil {
 		return err
 	}
 
-	project.Services = originalServices
 	// start container and attach to container streams
 	runOpts := compose.RunOptions{
 		Service:    opts.Service,
@@ -90,21 +88,24 @@ func runRun(ctx context.Context, opts runOptions) error {
 	return c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
 }
 
-func startDependencies(ctx context.Context, c *client.Client, project *types.Project, requestedService string) error {
-	originalServices := project.Services
+func startDependencies(ctx context.Context, c *client.Client, project types.Project, requestedServiceName string) error {
 	dependencies := types.Services{}
-	for _, service := range originalServices {
-		if service.Name != requestedService {
+	var requestedService types.ServiceConfig
+	for _, service := range project.Services {
+		if service.Name != requestedServiceName {
 			dependencies = append(dependencies, service)
+		} else {
+			requestedService = service
 		}
 	}
+
 	project.Services = dependencies
-	if err := c.ComposeService().Create(ctx, project, compose.CreateOptions{}); err != nil {
+	project.DisabledServices = append(project.DisabledServices, requestedService)
+	if err := c.ComposeService().Create(ctx, &project, compose.CreateOptions{}); err != nil {
 		return err
 	}
-	if err := c.ComposeService().Start(ctx, project, compose.StartOptions{}); err != nil {
+	if err := c.ComposeService().Start(ctx, &project, compose.StartOptions{}); err != nil {
 		return err
 	}
 	return nil
-
 }
