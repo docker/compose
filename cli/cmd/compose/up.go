@@ -133,6 +133,13 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
+	if opts.exitCodeFrom != "" {
+		_, err := project.GetService(opts.exitCodeFrom)
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
 			RemoveOrphans: opts.removeOrphans,

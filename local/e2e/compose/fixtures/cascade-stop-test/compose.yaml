@@ -4,4 +4,4 @@ services:
     command: ls /does_not_exist
   sleep: # will be killed
     image: busybox:1.27.2
-    command: sleep 10
+    command: ping localhost

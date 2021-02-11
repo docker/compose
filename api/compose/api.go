@@ -65,7 +65,7 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
-	// Attach will attach to service containers and pipe stdout/stderr to channel
+	// Attach will attach to service containers and send container logs and events
 	Attach ContainerEventListener
 }
 
