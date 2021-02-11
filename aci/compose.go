@@ -60,7 +60,7 @@ func (cs *aciComposeService) Create(ctx context.Context, project *types.Project,
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

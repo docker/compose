@@ -34,7 +34,7 @@ type Service interface {
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
-	Start(ctx context.Context, project *types.Project, consumer LogConsumer) error
+	Start(ctx context.Context, project *types.Project, options StartOptions) error
 	// Stop executes the equivalent to a `compose stop`
 	Stop(ctx context.Context, project *types.Project) error
 	// Up executes the equivalent to a `compose up`
@@ -61,6 +61,12 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Recreate define the strategy to apply on existing containers
 	Recreate string
+}
+
+// StartOptions group options of the Start API
+type StartOptions struct {
+	// Attach will attach to service containers and send container logs and events
+	Attach ContainerEventListener
 }
 
 // UpOptions group options of the Up API
@@ -177,4 +183,24 @@ type Stack struct {
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
 	Log(service, container, message string)
+	Status(service, container, msg string)
 }
+
+// ContainerEventListener is a callback to process ContainerEvent from services
+type ContainerEventListener func(event ContainerEvent)
+
+// ContainerEvent notify an event has been collected on Source container implementing Service
+type ContainerEvent struct {
+	Type     int
+	Source   string
+	Service  string
+	Line     string
+	ExitCode int
+}
+
+const (
+	// ContainerEventLog is a ContainerEvent of type log. Line is set
+	ContainerEventLog = iota
+	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
+	ContainerEventExit
+)

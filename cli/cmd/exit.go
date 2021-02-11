@@ -14,19 +14,15 @@
    limitations under the License.
 */
 
-package ecs
+package cmd
 
-import (
-	"context"
+import "strconv"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/utils"
-)
+// ExitCodeError reports an exit code set by command.
+type ExitCodeError struct {
+	ExitCode int
+}
 
-func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
-	if len(options.Services) > 0 {
-		consumer = utils.FilteredLogConsumer(consumer, options.Services)
-	}
-	err := b.aws.GetLogs(ctx, projectName, consumer.Log, options.Follow)
-	return err
+func (e ExitCodeError) Error() string {
+	return strconv.Itoa(e.ExitCode)
 }

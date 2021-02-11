@@ -24,26 +24,17 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	convert "github.com/docker/compose-cli/local/moby"
-	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
-	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.LogConsumer) (*errgroup.Group, error) {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-		),
-		All: true,
-	})
+func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.ContainerEventListener) (Containers, error) {
+	containers, err := s.getContainers(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-	containers = Containers(containers).filter(isService(project.ServiceNames()...))
 
 	var names []string
 	for _, c := range containers {
@@ -51,19 +42,18 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	}
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
 
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		container := c
-		eg.Go(func() error {
-			return s.attachContainer(ctx, container, consumer, project)
-		})
+	for _, container := range containers {
+		err := s.attachContainer(ctx, container, consumer, project)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return eg, nil
+	return containers, nil
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.LogConsumer, project *types.Project) error {
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := utils.GetWriter(serviceName, getCanonicalContainerName(container), consumer)
+	w := getWriter(serviceName, getContainerNameWithoutProject(container), consumer)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
@@ -94,13 +84,15 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container m
 	}
 
 	if w != nil {
-		if tty {
-			_, err = io.Copy(w, stdout)
-		} else {
-			_, err = stdcopy.StdCopy(w, w, stdout)
-		}
+		go func() {
+			if tty {
+				io.Copy(w, stdout) // nolint:errcheck
+			} else {
+				stdcopy.StdCopy(w, w, stdout) // nolint:errcheck
+			}
+		}()
 	}
-	return err
+	return nil
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container moby.Container) (io.WriteCloser, io.ReadCloser, error) {

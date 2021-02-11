@@ -47,7 +47,7 @@ func (b *ecsAPIService) Create(ctx context.Context, project *types.Project, opts
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

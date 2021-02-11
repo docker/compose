@@ -16,10 +16,31 @@
 
 package compose
 
-import moby "github.com/docker/docker/api/types"
+import (
+	"context"
+
+	"github.com/compose-spec/compose-go/types"
+	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+)
 
 // Containers is a set of moby Container
 type Containers []moby.Container
+
+func (s *composeService) getContainers(ctx context.Context, project *types.Project) (Containers, error) {
+	var containers Containers
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+		),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	containers = containers.filter(isService(project.ServiceNames()...))
+	return containers, nil
+}
 
 // containerPredicate define a predicate we want container to satisfy for filtering operations
 type containerPredicate func(c moby.Container) bool

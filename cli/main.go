@@ -170,6 +170,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unable to parse logging level: %s\n", opts.LogLevel)
 		os.Exit(1)
 	}
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp:       true,
+		DisableLevelTruncation: true,
+	})
 	logrus.SetLevel(level)
 	if opts.Debug {
 		logrus.SetLevel(logrus.DebugLevel)
@@ -241,6 +245,11 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 }
 
 func exit(ctx string, err error, ctype string) {
+	if exit, ok := err.(cmd.ExitCodeError); ok {
+		metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+		os.Exit(exit.ExitCode)
+	}
+
 	metrics.Track(ctype, os.Args[1:], metrics.FailureStatus)
 
 	if errors.Is(err, errdefs.ErrLoginRequired) {

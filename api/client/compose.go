@@ -44,7 +44,7 @@ func (c *composeService) Create(ctx context.Context, project *types.Project, opt
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
+func (c *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

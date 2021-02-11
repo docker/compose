@@ -55,6 +55,16 @@ func getCanonicalContainerName(c moby.Container) string {
 	return c.Names[0][1:]
 }
 
+func getContainerNameWithoutProject(c moby.Container) string {
+	name := getCanonicalContainerName(c)
+	project := c.Labels[projectLabel]
+	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[serviceLabel])
+	if strings.HasPrefix(name, prefix) {
+		return name[len(project)+1:]
+	}
+	return name
+}
+
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
 	switch options.Format {
 	case "json":

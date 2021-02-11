@@ -22,17 +22,18 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
-	"golang.org/x/sync/errgroup"
+	"github.com/docker/docker/api/types/container"
+	"github.com/sirupsen/logrus"
 )
 
-func (s *composeService) Start(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
-	var group *errgroup.Group
-	if consumer != nil {
-		eg, err := s.attach(ctx, project, consumer)
+func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+	var containers Containers
+	if options.Attach != nil {
+		c, err := s.attach(ctx, project, options.Attach)
 		if err != nil {
 			return err
 		}
-		group = eg
+		containers = c
 	}
 
 	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
@@ -41,8 +42,27 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, cons
 	if err != nil {
 		return err
 	}
-	if group != nil {
-		return group.Wait()
+
+	if options.Attach == nil {
+		return nil
+	}
+
+	for _, c := range containers {
+		c := c
+		go func() {
+			statusC, errC := s.apiClient.ContainerWait(context.Background(), c.ID, container.WaitConditionNotRunning)
+			select {
+			case status := <-statusC:
+				options.Attach(compose.ContainerEvent{
+					Type:     compose.ContainerEventExit,
+					Source:   getCanonicalContainerName(c),
+					Service:  c.Labels[serviceLabel],
+					ExitCode: int(status.StatusCode),
+				})
+			case err := <-errC:
+				logrus.Warnf("Unexpected API error for %s : %s\n", getCanonicalContainerName(c), err.Error())
+			}
+		}()
 	}
 	return nil
 }
