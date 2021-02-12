@@ -17,7 +17,6 @@
 package formatter
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -28,13 +27,39 @@ import (
 )
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(ctx context.Context, w io.Writer) compose.LogConsumer {
+func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) compose.LogConsumer {
 	return &logConsumer{
-		ctx:    ctx,
-		colors: map[string]colorFunc{},
-		width:  0,
-		writer: w,
+		ctx:        ctx,
+		presenters: map[string]*presenter{},
+		width:      0,
+		writer:     w,
+		color:      color,
+		prefix:     prefix,
 	}
+}
+
+func (l *logConsumer) Register(service string, source string) {
+	l.register(service, source)
+}
+
+func (l *logConsumer) register(service string, source string) *presenter {
+	cf := monochrome
+	if l.color {
+		cf = <-loop
+	}
+	p := &presenter{
+		colors:    cf,
+		service:   service,
+		container: source,
+	}
+	l.presenters[source] = p
+	if l.prefix {
+		l.computeWidth()
+		for _, p := range l.presenters {
+			p.setPrefix(l.width)
+		}
+	}
+	return p
 }
 
 // Log formats a log message as received from service/container
@@ -42,45 +67,51 @@ func (l *logConsumer) Log(service, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
-	cf := l.getColorFunc(service)
-	prefix := fmt.Sprintf("%-"+strconv.Itoa(l.width)+"s |", container)
-
+	p, ok := l.presenters[container]
+	if !ok { // should have been registered, but ¯\_(ツ)_/¯
+		p = l.register(service, container)
+	}
 	for _, line := range strings.Split(message, "\n") {
-		buf := bytes.NewBufferString(fmt.Sprintf("%s %s\n", cf(prefix), line))
-		l.writer.Write(buf.Bytes()) // nolint:errcheck
+		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck
 	}
 }
 
 func (l *logConsumer) Status(service, container, msg string) {
-	cf := l.getColorFunc(service)
-	buf := bytes.NewBufferString(cf(fmt.Sprintf("%s %s\n", container, msg)))
-	l.writer.Write(buf.Bytes()) // nolint:errcheck
-}
-
-func (l *logConsumer) getColorFunc(service string) colorFunc {
-	cf, ok := l.colors[service]
+	p, ok := l.presenters[container]
 	if !ok {
-		cf = <-loop
-		l.colors[service] = cf
-		l.computeWidth()
+		p = l.register(service, container)
 	}
-	return cf
+	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
+	l.writer.Write([]byte(s)) // nolint:errcheck
 }
 
 func (l *logConsumer) computeWidth() {
 	width := 0
-	for n := range l.colors {
+	for n := range l.presenters {
 		if len(n) > width {
 			width = len(n)
 		}
 	}
-	l.width = width + 3
+	l.width = width + 1
 }
 
 // LogConsumer consume logs from services and format them
 type logConsumer struct {
-	ctx    context.Context
-	colors map[string]colorFunc
-	width  int
-	writer io.Writer
+	ctx        context.Context
+	presenters map[string]*presenter
+	width      int
+	writer     io.Writer
+	color      bool
+	prefix     bool
+}
+
+type presenter struct {
+	colors    colorFunc
+	service   string
+	container string
+	prefix    string
+}
+
+func (p *presenter) setPrefix(width int) {
+	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.container))
 }

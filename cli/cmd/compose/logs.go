@@ -31,8 +31,10 @@ import (
 type logsOptions struct {
 	*projectOptions
 	composeOptions
-	follow bool
-	tail   string
+	follow   bool
+	tail     string
+	noColor  bool
+	noPrefix bool
 }
 
 func logsCommand(p *projectOptions, contextType string) *cobra.Command {
@@ -46,9 +48,13 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 			return runLogs(cmd.Context(), opts, args)
 		},
 	}
-	logsCmd.Flags().BoolVar(&opts.follow, "follow", false, "Follow log output.")
+	flags := logsCmd.Flags()
+	flags.BoolVar(&opts.follow, "follow", false, "Follow log output.")
+	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
+	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
+
 	if contextType == store.DefaultContextType {
-		logsCmd.Flags().StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
+		flags.StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
 	}
 	return logsCmd
 }
@@ -63,7 +69,7 @@ func runLogs(ctx context.Context, opts logsOptions, services []string) error {
 	if err != nil {
 		return err
 	}
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
 	return c.ComposeService().Logs(ctx, projectName, consumer, compose.LogOptions{
 		Services: services,
 		Follow:   opts.follow,

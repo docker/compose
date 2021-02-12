@@ -35,6 +35,10 @@ var names = []string{
 // colorFunc use ANSI codes to render colored text on console
 type colorFunc func(s string) string
 
+var monochrome = func(s string) string {
+	return s
+}
+
 func ansiColor(code, s string) string {
 	return fmt.Sprintf("%s%s%s", ansi(code), s, ansi("0"))
 }

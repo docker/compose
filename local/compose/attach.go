@@ -36,13 +36,21 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 		return nil, err
 	}
 
+	containers.sorted() // This enforce predictable colors assignment
+
 	var names []string
 	for _, c := range containers {
 		names = append(names, getCanonicalContainerName(c))
 	}
+
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
 
 	for _, container := range containers {
+		consumer(compose.ContainerEvent{
+			Type:    compose.ContainerEventAttach,
+			Source:  getContainerNameWithoutProject(container),
+			Service: container.Labels[serviceLabel],
+		})
 		err := s.attachContainer(ctx, container, consumer, project)
 		if err != nil {
 			return nil, err

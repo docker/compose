@@ -184,6 +184,7 @@ type Stack struct {
 type LogConsumer interface {
 	Log(service, container, message string)
 	Status(service, container, msg string)
+	Register(service string, source string)
 }
 
 // ContainerEventListener is a callback to process ContainerEvent from services
@@ -201,6 +202,8 @@ type ContainerEvent struct {
 const (
 	// ContainerEventLog is a ContainerEvent of type log. Line is set
 	ContainerEventLog = iota
+	// ContainerEventAttach is a ContainerEvent of type attach. First event sent about a container
+	ContainerEventAttach
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
 )
