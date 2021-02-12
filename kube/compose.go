@@ -194,6 +194,6 @@ func (s *composeService) Kill(ctx context.Context, project *types.Project, optio
 }
 
 // RunOneOffContainer creates a service oneoff container and starts its dependencies
-func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }

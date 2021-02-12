@@ -207,6 +207,6 @@ func (cs *aciComposeService) Kill(ctx context.Context, project *types.Project, o
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }

@@ -80,6 +80,6 @@ func (c *composeService) Kill(ctx context.Context, project *types.Project, optio
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (c *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }

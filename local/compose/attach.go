@@ -114,7 +114,7 @@ func (s *composeService) getContainerStreams(ctx context.Context, container moby
 			Stdin:  true,
 			Stdout: true,
 			Stderr: true,
-			Logs:   true,
+			Logs:   false,
 		})
 		if err != nil {
 			return nil, nil, err
