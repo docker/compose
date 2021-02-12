@@ -18,17 +18,14 @@ package compose
 
 import (
 	"context"
-
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
-
 	"github.com/spf13/cobra"
 )
 
 type startOptions struct {
 	*projectOptions
-	Detach bool
 }
 
 func startCommand(p *projectOptions) *cobra.Command {
@@ -42,8 +39,6 @@ func startCommand(p *projectOptions) *cobra.Command {
 			return runStart(cmd.Context(), opts, args)
 		},
 	}
-
-	startCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	return startCmd
 }
 
@@ -58,32 +53,8 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	if opts.Detach {
-		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Start(ctx, project, compose.StartOptions{})
-		})
-		return err
-	}
-
-	queue := make(chan compose.ContainerEvent)
-	printer := printer{
-		queue: queue,
-	}
-	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
-		Attach: func(event compose.ContainerEvent) {
-			queue <- event
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	_, err = printer.run(ctx, false, "", nil, func() error {
-		ctx := context.Background()
-		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Stop(ctx, project)
-		})
-		return err
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return "", c.ComposeService().Start(ctx, project, compose.StartOptions{})
 	})
 	return err
 }
