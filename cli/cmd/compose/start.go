@@ -78,7 +78,7 @@ func runStart(ctx context.Context, opts startOptions, services []string) error {
 		return err
 	}
 
-	_, err = printer.run(ctx, false, "", func() error {
+	_, err = printer.run(ctx, false, "", nil, func() error {
 		ctx := context.Background()
 		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
 			return "", c.ComposeService().Stop(ctx, project)

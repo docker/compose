@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -57,6 +58,8 @@ type upOptions struct {
 	cascadeStop   bool
 	exitCodeFrom  string
 	scale         []string
+	noColor       bool
+	noPrefix      bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -102,6 +105,8 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
+	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 
 	switch contextType {
 	case store.AciContextType:
@@ -199,6 +204,16 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		stopFunc() // nolint:errcheck
 	}()
 
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
+
+	var exitCode int
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		code, err := printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, consumer, stopFunc)
+		exitCode = code
+		return err
+	})
+
 	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
 		Attach: func(event compose.ContainerEvent) {
 			queue <- event
@@ -208,7 +223,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
-	exitCode, err := printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, stopFunc)
+	eg.Wait()
 	if exitCode != 0 {
 		return cmd.ExitCodeError{ExitCode: exitCode}
 	}
@@ -298,12 +313,13 @@ type printer struct {
 	queue chan compose.ContainerEvent
 }
 
-func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) { //nolint:unparam
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout)
+func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string, consumer compose.LogConsumer, stopFn func() error) (int, error) { //nolint:unparam
 	var aborting bool
 	for {
 		event := <-p.queue
 		switch event.Type {
+		case compose.ContainerEventAttach:
+			consumer.Register(event.Service, event.Source)
 		case compose.ContainerEventExit:
 			if !aborting {
 				consumer.Status(event.Service, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
