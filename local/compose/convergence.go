@@ -114,6 +114,7 @@ func (s *composeService) ensureService(ctx context.Context, observedState Contai
 			w.Event(progress.RunningEvent(name))
 		case status.ContainerCreated:
 		case status.ContainerRestarting:
+		case status.ContainerExited:
 			w.Event(progress.CreatedEvent(name))
 		default:
 			eg.Go(func() error {
