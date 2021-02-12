@@ -22,6 +22,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/docker/compose-cli/api/client"
@@ -54,6 +56,7 @@ type upOptions struct {
 	noStart       bool
 	cascadeStop   bool
 	exitCodeFrom  string
+	scale         []string
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -98,6 +101,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 
 	switch contextType {
 	case store.AciContextType:
@@ -119,6 +123,11 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 		return err
 	}
 
+	err = applyScale(opts.scale, project)
+	if err != nil {
+		return err
+	}
+
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return "", c.ComposeService().Up(ctx, project, compose.UpOptions{
 			Detach: opts.Detach,
@@ -129,6 +138,11 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 
 func runCreateStart(ctx context.Context, opts upOptions, services []string) error {
 	c, project, err := setup(ctx, *opts.composeOptions, services)
+	if err != nil {
+		return err
+	}
+
+	err = applyScale(opts.scale, project)
 	if err != nil {
 		return err
 	}
@@ -199,6 +213,38 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return cmd.ExitCodeError{ExitCode: exitCode}
 	}
 	return err
+}
+
+func applyScale(opts []string, project *types.Project) error {
+SCALE:
+	for _, scale := range opts {
+		split := strings.Split(scale, "=")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
+		}
+		name := split[0]
+		replicas, err := strconv.Atoi(split[1])
+		if err != nil {
+			return err
+		}
+		for i, s := range project.Services {
+			if s.Name == name {
+				service, err := project.GetService(name)
+				if err != nil {
+					return err
+				}
+				if service.Deploy == nil {
+					service.Deploy = &types.DeployConfig{}
+				}
+				count := uint64(replicas)
+				service.Deploy.Replicas = &count
+				project.Services[i] = service
+				continue SCALE
+			}
+		}
+		return fmt.Errorf("unknown service %q", name)
+	}
+	return nil
 }
 
 func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
