@@ -57,17 +57,17 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	}
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
-		serviceContainers, others := containers.split(isService(service.Name))
+		serviceContainers := containers.filter(isService(service.Name))
 		err := s.removeContainers(ctx, w, serviceContainers)
-		containers = others
 		return err
 	})
 	if err != nil {
 		return err
 	}
 
-	if options.RemoveOrphans && len(containers) > 0 {
-		err := s.removeContainers(ctx, w, containers)
+	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
+	if options.RemoveOrphans && len(orphans) > 0 {
+		err := s.removeContainers(ctx, w, orphans)
 		if err != nil {
 			return err
 		}

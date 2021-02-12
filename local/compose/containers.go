@@ -70,20 +70,6 @@ func (containers Containers) filter(predicate containerPredicate) Containers {
 	return filtered
 }
 
-// split return Containers with elements to match and those not to match predicate
-func (containers Containers) split(predicate containerPredicate) (Containers, Containers) {
-	var right Containers
-	var left Containers
-	for _, c := range containers {
-		if predicate(c) {
-			right = append(right, c)
-		} else {
-			left = append(left, c)
-		}
-	}
-	return right, left
-}
-
 func (containers Containers) names() []string {
 	var names []string
 	for _, c := range containers {
