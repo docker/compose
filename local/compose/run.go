@@ -20,17 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/compose-spec/compose-go/types"
-	apitypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/docker/compose-cli/api/compose"
 
+	"github.com/compose-spec/compose-go/types"
+	apitypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	moby "github.com/docker/docker/pkg/stringid"
 )
 
-func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
 	originalServices := project.Services
 	var requestedService types.ServiceConfig
 	for _, service := range originalServices {
@@ -53,23 +52,23 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	requestedService.Labels = requestedService.Labels.Add(oneoffLabel, "True")
 
 	if err := s.ensureImagesExists(ctx, project); err != nil { // all dependencies already checked, but might miss requestedService img
-		return err
+		return 0, err
 	}
 	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
-		return err
+		return 0, err
 	}
 	if err := s.createContainer(ctx, project, requestedService, requestedService.ContainerName, 1, opts.AutoRemove); err != nil {
-		return err
+		return 0, err
 	}
 	containerID := requestedService.ContainerName
 
 	if opts.Detach {
 		err := s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
 		if err != nil {
-			return err
+			return 0, err
 		}
 		fmt.Fprintln(opts.Writer, containerID)
-		return nil
+		return 0, nil
 	}
 
 	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
@@ -79,16 +78,25 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		All: true,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	oneoffContainer := containers[0]
-	eg := errgroup.Group{}
-	eg.Go(func() error {
-		return s.attachContainerStreams(ctx, oneoffContainer, true, opts.Reader, opts.Writer)
-	})
-
-	if err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{}); err != nil {
-		return err
+	err = s.attachContainerStreams(ctx, oneoffContainer, true, opts.Reader, opts.Writer)
+	if err != nil {
+		return 0, err
 	}
-	return eg.Wait()
+
+	err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	statusC, errC := s.apiClient.ContainerWait(context.Background(), oneoffContainer.ID, container.WaitConditionNotRunning)
+	select {
+	case status := <-statusC:
+		return int(status.StatusCode), nil
+	case err := <-errC:
+		return 0, err
+	}
+
 }

@@ -52,7 +52,7 @@ type Service interface {
 	// Kill executes the equivalent to a `compose kill`
 	Kill(ctx context.Context, project *types.Project, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
-	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) error
+	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 }
 
 // CreateOptions group options of the Create API

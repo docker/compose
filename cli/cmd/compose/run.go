@@ -26,6 +26,7 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/cli/cmd"
 )
 
 type runOptions struct {
@@ -85,7 +86,11 @@ func runRun(ctx context.Context, opts runOptions) error {
 		Writer:     os.Stdout,
 		Reader:     os.Stdin,
 	}
-	return c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
+	exitCode, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
+	if exitCode != 0 {
+		return cmd.ExitCodeError{ExitCode: exitCode}
+	}
+	return err
 }
 
 func startDependencies(ctx context.Context, c *client.Client, project types.Project, requestedServiceName string) error {
