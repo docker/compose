@@ -1929,7 +1929,7 @@ class _CommandBuilder:
                 self.add_cli_build_args([name, val])
 
     def add_cli_build_args(self, *args):
-        if value:
+        if args:
             self._args.extend(args)
 
     def build(self, args):
