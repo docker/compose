@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -30,10 +29,8 @@ import (
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-		All: options.All,
+		Filters: filters.NewArgs(projectFilter(projectName)),
+		All:     options.All,
 	})
 	if err != nil {
 		return nil, err
@@ -82,24 +79,4 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 		})
 	}
 	return summary, eg.Wait()
-}
-
-func groupContainerByLabel(containers []moby.Container, labelName string) (map[string][]moby.Container, []string, error) {
-	containersByLabel := map[string][]moby.Container{}
-	keys := []string{}
-	for _, c := range containers {
-		label, ok := c.Labels[labelName]
-		if !ok {
-			return nil, nil, fmt.Errorf("No label %q set on container %q of compose project", labelName, c.ID)
-		}
-		labelContainers, ok := containersByLabel[label]
-		if !ok {
-			labelContainers = []moby.Container{}
-			keys = append(keys, label)
-		}
-		labelContainers = append(labelContainers, c)
-		containersByLabel[label] = labelContainers
-	}
-	sort.Strings(keys)
-	return containersByLabel, keys, nil
 }

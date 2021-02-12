@@ -1,0 +1,5 @@
+services:
+  service1:
+    image: nginx
+  service2:
+    image: mysql

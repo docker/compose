@@ -57,27 +57,23 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	}
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
-		serviceContainers, others := containers.split(isService(service.Name))
+		serviceContainers := containers.filter(isService(service.Name))
 		err := s.removeContainers(ctx, w, serviceContainers)
-		containers = others
 		return err
 	})
 	if err != nil {
 		return err
 	}
 
-	if options.RemoveOrphans && len(containers) > 0 {
-		err := s.removeContainers(ctx, w, containers)
+	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
+	if options.RemoveOrphans && len(orphans) > 0 {
+		err := s.removeContainers(ctx, w, orphans)
 		if err != nil {
 			return err
 		}
 	}
 
-	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-	})
+	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
 	if err != nil {
 		return err
 	}
@@ -137,13 +133,15 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
+func projectFilterListOpt(projectName string) moby.ContainerListOptions {
+	return moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+		All:     true,
+	}
+}
+
 func (s *composeService) projectFromContainerLabels(ctx context.Context, projectName string) (*types.Project, error) {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-		All: true,
-	})
+	containers, err := s.apiClient.ContainerList(ctx, projectFilterListOpt(projectName))
 	if err != nil {
 		return nil, err
 	}

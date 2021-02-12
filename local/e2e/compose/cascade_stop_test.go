@@ -27,7 +27,7 @@ import (
 func TestCascadeStop(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	const projectName = "compose-e2e-logs"
+	const projectName = "e2e-cascade-stop"
 
 	t.Run("abort-on-container-exit", func(t *testing.T) {
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")

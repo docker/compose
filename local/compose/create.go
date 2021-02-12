@@ -64,10 +64,8 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 
 	var observedState Containers
 	observedState, err = s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-		),
-		All: true,
+		Filters: filters.NewArgs(projectFilter(project.Name)),
+		All:     true,
 	})
 	if err != nil {
 		return err

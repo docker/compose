@@ -101,9 +101,9 @@ func TestLocalBackendRun(t *testing.T) {
 			fields := strings.Fields(line)
 			if fields[0] == nginxID {
 				nginxFound = true
-				assert.Equal(t, fields[1], "nginx")
-				assert.Equal(t, fields[2], "/docker-entrypoint.sh")
-				assert.Equal(t, fields[len(fields)-1], "0.0.0.0:85->80/tcp")
+				assert.Equal(t, fields[1], "nginx", res.Combined())
+				assert.Equal(t, fields[2], "/docker-entrypoint.sh", res.Combined())
+				assert.Equal(t, fields[len(fields)-1], "0.0.0.0:85->80/tcp", res.Combined())
 			}
 		}
 		assert.Assert(t, nginxFound, res.Stdout())
