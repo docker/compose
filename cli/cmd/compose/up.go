@@ -315,26 +315,35 @@ type printer struct {
 
 func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string, consumer compose.LogConsumer, stopFn func() error) (int, error) { //nolint:unparam
 	var aborting bool
+	var count int
 	for {
 		event := <-p.queue
 		switch event.Type {
 		case compose.ContainerEventAttach:
 			consumer.Register(event.Service, event.Source)
+			count++
 		case compose.ContainerEventExit:
 			if !aborting {
 				consumer.Status(event.Service, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
 			}
-			if cascadeStop && !aborting {
-				aborting = true
-				fmt.Println("Aborting on container exit...")
-				err := stopFn()
-				if err != nil {
-					return 0, err
+			if cascadeStop {
+				if !aborting {
+					aborting = true
+					fmt.Println("Aborting on container exit...")
+					err := stopFn()
+					if err != nil {
+						return 0, err
+					}
+				}
+				if exitCodeFrom == "" || exitCodeFrom == event.Service {
+					logrus.Error(event.ExitCode)
+					return event.ExitCode, nil
 				}
 			}
-			if exitCodeFrom == "" || exitCodeFrom == event.Service {
-				logrus.Error(event.ExitCode)
-				return event.ExitCode, nil
+			count--
+			if count == 0 {
+				// Last container terminated, done
+				return 0, nil
 			}
 		case compose.ContainerEventLog:
 			if !aborting {
