@@ -64,7 +64,9 @@ func TestDownRemoveOrphans(t *testing.T) {
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil).Times(2)
+		[]apitypes.Container{testContainer("service1", "123"),
+			testContainer("service2", "789"),
+			testContainer("service_orphan", "321")}, nil).Times(2)
 
 	api.EXPECT().ContainerStop(ctx, "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(ctx, "789", nil).Return(nil)
