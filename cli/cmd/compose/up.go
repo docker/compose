@@ -123,7 +123,7 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 		return err
 	}
 
-	err = applyScale(opts.scale, project)
+	err = applyScaleOpt(opts.scale, project)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
-	err = applyScale(opts.scale, project)
+	err = applyScaleOpt(opts.scale, project)
 	if err != nil {
 		return err
 	}
@@ -215,8 +215,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	return err
 }
 
-func applyScale(opts []string, project *types.Project) error {
-SCALE:
+func applyScaleOpt(opts []string, project *types.Project) error {
 	for _, scale := range opts {
 		split := strings.Split(scale, "=")
 		if len(split) != 2 {
@@ -227,24 +226,31 @@ SCALE:
 		if err != nil {
 			return err
 		}
-		for i, s := range project.Services {
-			if s.Name == name {
-				service, err := project.GetService(name)
-				if err != nil {
-					return err
-				}
-				if service.Deploy == nil {
-					service.Deploy = &types.DeployConfig{}
-				}
-				count := uint64(replicas)
-				service.Deploy.Replicas = &count
-				project.Services[i] = service
-				continue SCALE
-			}
+		err = setServiceScale(project, name, replicas)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("unknown service %q", name)
 	}
 	return nil
+}
+
+func setServiceScale(project *types.Project, name string, replicas int) error {
+	for i, s := range project.Services {
+		if s.Name == name {
+			service, err := project.GetService(name)
+			if err != nil {
+				return err
+			}
+			if service.Deploy == nil {
+				service.Deploy = &types.DeployConfig{}
+			}
+			count := uint64(replicas)
+			service.Deploy.Replicas = &count
+			project.Services[i] = service
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown service %q", name)
 }
 
 func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
