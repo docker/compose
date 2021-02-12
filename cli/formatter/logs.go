@@ -30,7 +30,7 @@ import (
 func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) compose.LogConsumer {
 	return &logConsumer{
 		ctx:        ctx,
-		presenters: map[string]*Presenter{},
+		presenters: map[string]*presenter{},
 		width:      0,
 		writer:     w,
 		color:      color,
@@ -42,12 +42,12 @@ func (l *logConsumer) Register(service string, source string) {
 	l.register(service, source)
 }
 
-func (l *logConsumer) register(service string, source string) *Presenter {
+func (l *logConsumer) register(service string, source string) *presenter {
 	cf := monochrome
 	if l.color {
 		cf = <-loop
 	}
-	p := &Presenter{
+	p := &presenter{
 		colors:    cf,
 		service:   service,
 		container: source,
@@ -98,20 +98,20 @@ func (l *logConsumer) computeWidth() {
 // LogConsumer consume logs from services and format them
 type logConsumer struct {
 	ctx        context.Context
-	presenters map[string]*Presenter
+	presenters map[string]*presenter
 	width      int
 	writer     io.Writer
 	color      bool
 	prefix     bool
 }
 
-type Presenter struct {
+type presenter struct {
 	colors    colorFunc
 	service   string
 	container string
 	prefix    string
 }
 
-func (p *Presenter) setPrefix(width int) {
+func (p *presenter) setPrefix(width int) {
 	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.container))
 }

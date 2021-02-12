@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,6 +36,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project
@@ -223,7 +223,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
-	eg.Wait()
+	err = eg.Wait()
 	if exitCode != 0 {
 		return cmd.ExitCodeError{ExitCode: exitCode}
 	}

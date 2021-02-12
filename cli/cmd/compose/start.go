@@ -18,9 +18,11 @@ package compose
 
 import (
 	"context"
+
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+
 	"github.com/spf13/cobra"
 )
 
