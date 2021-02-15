@@ -334,6 +334,8 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	if err != nil {
 		return err
 	}
+
+	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		container := c
@@ -341,7 +343,6 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 			continue
 		}
 		eg.Go(func() error {
-			w := progress.ContextWriter(ctx)
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StartingEvent(eventName))
 			err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})

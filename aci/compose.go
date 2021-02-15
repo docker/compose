@@ -210,3 +210,7 @@ func (cs *aciComposeService) Kill(ctx context.Context, project *types.Project, o
 func (cs *aciComposeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
 	return 0, errdefs.ErrNotImplemented
 }
+
+func (cs *aciComposeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
+	return nil, errdefs.ErrNotImplemented
+}

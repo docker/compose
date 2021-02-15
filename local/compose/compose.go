@@ -23,18 +23,19 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/sanathkr/go-yaml"
-
-	errdefs2 "github.com/docker/compose-cli/api/errdefs"
 )
 
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(apiClient client.APIClient) compose.Service {
-	return &composeService{apiClient: apiClient}
+	return &composeService{
+		apiClient: apiClient,
+	}
 }
 
 type composeService struct {
@@ -42,7 +43,7 @@ type composeService struct {
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
-	return errdefs2.ErrNotImplemented
+	return errdefs.ErrNotImplemented
 }
 
 func getCanonicalContainerName(c moby.Container) string {
