@@ -8,7 +8,6 @@ from docker.errors import APIError
 
 from compose.cli.log_printer import build_log_generator
 from compose.cli.log_printer import build_log_presenters
-from compose.cli.log_printer import build_no_log_generator
 from compose.cli.log_printer import consume_queue
 from compose.cli.log_printer import QueueItem
 from compose.cli.log_printer import wait_on_exit
@@ -73,14 +72,6 @@ def test_wait_on_exit_raises():
         mock_container.name, status_code,
     )
     assert expected in wait_on_exit(mock_container)
-
-
-def test_build_no_log_generator(mock_container):
-    mock_container.has_api_logs = False
-    mock_container.log_driver = 'none'
-    output, = build_no_log_generator(mock_container, None)
-    assert "WARNING: no logs are available with the 'none' log driver\n" in output
-    assert "exited with code" not in output
 
 
 class TestBuildLogGenerator:

@@ -158,10 +158,8 @@ class QueueItem(namedtuple('_QueueItem', 'item is_stop exc')):
 
 
 def tail_container_logs(container, presenter, queue, log_args):
-    generator = get_log_generator(container)
-
     try:
-        for item in generator(container, log_args):
+        for item in build_log_generator(container, log_args):
             queue.put(QueueItem.new(presenter.present(container, item)))
     except Exception as e:
         queue.put(QueueItem.exception(e))
@@ -169,20 +167,6 @@ def tail_container_logs(container, presenter, queue, log_args):
     if log_args.get('follow'):
         queue.put(QueueItem.new(presenter.color_func(wait_on_exit(container))))
     queue.put(QueueItem.stop(container.name))
-
-
-def get_log_generator(container):
-    if container.has_api_logs:
-        return build_log_generator
-    return build_no_log_generator
-
-
-def build_no_log_generator(container, log_args):
-    """Return a generator that prints a warning about logs and waits for
-    container to exit.
-    """
-    yield "WARNING: no logs are available with the '{}' log driver\n".format(
-        container.log_driver)
 
 
 def build_log_generator(container, log_args):
