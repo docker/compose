@@ -22,6 +22,8 @@ import (
 
 type createOptions struct {
 	*composeOptions
+	forceRecreate bool
+	noRecreate    bool
 }
 
 func createCommand(p *projectOptions) *cobra.Command {
@@ -37,11 +39,15 @@ func createCommand(p *projectOptions) *cobra.Command {
 					projectOptions: p,
 					Build:          opts.Build,
 				},
-				noStart: true,
+				noStart:       true,
+				forceRecreate: opts.forceRecreate,
+				noRecreate:    opts.noRecreate,
 			}, args)
 		},
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
+	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
+	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	return cmd
 }
