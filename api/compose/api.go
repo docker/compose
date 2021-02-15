@@ -55,6 +55,8 @@ type Service interface {
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
 	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
+	// Exec executes a command in a running service container
+	Exec(ctx context.Context, project *types.Project, opts RunOptions) error
 }
 
 // CreateOptions group options of the Create API
@@ -117,6 +119,14 @@ type RunOptions struct {
 	AutoRemove bool
 	Writer     io.Writer
 	Reader     io.Reader
+
+	// used by exec
+	Tty         bool
+	WorkingDir  string
+	User        string
+	Environment []string
+	Privileged  bool
+	Index       int
 }
 
 // PsOptions group options of the Ps API
