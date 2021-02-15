@@ -55,7 +55,8 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 			case status := <-statusC:
 				options.Attach(compose.ContainerEvent{
 					Type:     compose.ContainerEventExit,
-					Source:   getCanonicalContainerName(c),
+					Source:   c.ID,
+					Name:     getCanonicalContainerName(c),
 					Service:  c.Labels[serviceLabel],
 					ExitCode: int(status.StatusCode),
 				})

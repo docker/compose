@@ -320,11 +320,11 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 		event := <-p.queue
 		switch event.Type {
 		case compose.ContainerEventAttach:
-			consumer.Register(event.Service, event.Source)
+			consumer.Register(event.Name, event.Source)
 			count++
 		case compose.ContainerEventExit:
 			if !aborting {
-				consumer.Status(event.Service, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+				consumer.Status(event.Name, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
 			}
 			if cascadeStop {
 				if !aborting {
@@ -347,7 +347,7 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 			}
 		case compose.ContainerEventLog:
 			if !aborting {
-				consumer.Log(event.Service, event.Source, event.Line)
+				consumer.Log(event.Name, event.Source, event.Line)
 			}
 		}
 	}
