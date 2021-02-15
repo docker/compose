@@ -20,6 +20,7 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/docker/compose-cli/api/compose"
 
@@ -58,7 +59,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers := containers.filter(isService(service.Name))
-		err := s.removeContainers(ctx, w, serviceContainers)
+		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout)
 		return err
 	})
 	if err != nil {
@@ -67,7 +68,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 
 	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
 	if options.RemoveOrphans && len(orphans) > 0 {
-		err := s.removeContainers(ctx, w, orphans)
+		err := s.removeContainers(ctx, w, orphans, options.Timeout)
 		if err != nil {
 			return err
 		}
@@ -93,12 +94,12 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	return eg.Wait()
 }
 
-func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container) error {
+func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {
 	for _, container := range containers {
 		toStop := container
 		eventName := getContainerProgressName(toStop)
 		w.Event(progress.StoppingEvent(eventName))
-		err := s.apiClient.ContainerStop(ctx, toStop.ID, nil)
+		err := s.apiClient.ContainerStop(ctx, toStop.ID, timeout)
 		if err != nil {
 			w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 			return err
@@ -108,14 +109,14 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 	return nil
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container) error {
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		toDelete := container
 		eg.Go(func() error {
 			eventName := getContainerProgressName(toDelete)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.stopContainers(ctx, w, []moby.Container{toDelete})
+			err := s.stopContainers(ctx, w, []moby.Container{toDelete}, timeout)
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err

@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -36,7 +37,7 @@ type Service interface {
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, project *types.Project, options StartOptions) error
 	// Stop executes the equivalent to a `compose stop`
-	Stop(ctx context.Context, project *types.Project) error
+	Stop(ctx context.Context, project *types.Project, options StopOptions) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`
@@ -71,6 +72,12 @@ type StartOptions struct {
 	Attach ContainerEventListener
 }
 
+// StopOptions group options of the Stop API
+type StopOptions struct {
+	// Timeout override container stop timeout
+	Timeout *time.Duration
+}
+
 // UpOptions group options of the Up API
 type UpOptions struct {
 	// Detach will create services and return immediately
@@ -83,6 +90,8 @@ type DownOptions struct {
 	RemoveOrphans bool
 	// Project is the compose project used to define this app. Might be nil if user ran `down` just with project name
 	Project *types.Project
+	// Timeout override container stop timeout
+	Timeout *time.Duration
 }
 
 // ConvertOptions group options of the Convert API

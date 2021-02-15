@@ -18,29 +18,37 @@ package compose
 
 import (
 	"context"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
 type stopOptions struct {
 	*projectOptions
+	timeChanged bool
+	timeout     int
 }
 
 func stopCommand(p *projectOptions) *cobra.Command {
 	opts := stopOptions{
 		projectOptions: p,
 	}
-	stopCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "stop [SERVICE...]",
 		Short: "Stop services",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.timeChanged = cmd.Flags().Changed("timeout")
 			return runStop(cmd.Context(), opts, args)
 		},
 	}
-	return stopCmd
+	flags := cmd.Flags()
+	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
+
+	return cmd
 }
 
 func runStop(ctx context.Context, opts stopOptions, services []string) error {
@@ -54,8 +62,15 @@ func runStop(ctx context.Context, opts stopOptions, services []string) error {
 		return err
 	}
 
+	var timeout *time.Duration
+	if opts.timeChanged {
+		timeoutValue := time.Duration(opts.timeout) * time.Second
+		timeout = &timeoutValue
+	}
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Stop(ctx, project)
+		return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{
+			Timeout: timeout,
+		})
 	})
 	return err
 }

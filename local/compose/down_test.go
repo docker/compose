@@ -20,14 +20,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"gotest.tools/v3/assert"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/local/mocks"
 
 	apitypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/local/mocks"
+	"github.com/golang/mock/gomock"
+	"gotest.tools/v3/assert"
 )
 
 func TestDown(t *testing.T) {
