@@ -88,15 +88,17 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 }
 
 type splitBuffer struct {
+	buffer    bytes.Buffer
 	name      string
+	service   string
 	container string
 	consumer  compose.ContainerEventListener
-	service   string
 }
 
 // getWriter creates a io.Writer that will actually split by line and format by LogConsumer
 func getWriter(name, service, container string, events compose.ContainerEventListener) io.Writer {
-	return splitBuffer{
+	return &splitBuffer{
+		buffer:    bytes.Buffer{},
 		name:      name,
 		service:   service,
 		container: container,
@@ -104,18 +106,26 @@ func getWriter(name, service, container string, events compose.ContainerEventLis
 	}
 }
 
-func (s splitBuffer) Write(b []byte) (n int, err error) {
-	split := bytes.Split(b, []byte{'\n'})
-	for _, line := range split {
-		if len(line) != 0 {
-			s.consumer(compose.ContainerEvent{
-				Type:    compose.ContainerEventLog,
-				Name:    s.name,
-				Service: s.service,
-				Source:  s.container,
-				Line:    string(line),
-			})
-		}
+// Write implements io.Writer. joins all input, splits on the separator and yields each chunk
+func (s *splitBuffer) Write(b []byte) (int, error) {
+	n, err := s.buffer.Write(b)
+	if err != nil {
+		return n, err
 	}
-	return len(b), nil
+	for {
+		b = s.buffer.Bytes()
+		index := bytes.Index(b, []byte{'\n'})
+		if index < 0 {
+			break
+		}
+		line := s.buffer.Next(index + 1)
+		s.consumer(compose.ContainerEvent{
+			Type:    compose.ContainerEventLog,
+			Name:    s.name,
+			Service: s.service,
+			Source:  s.container,
+			Line:    string(line[:len(line)-1]),
+		})
+	}
+	return n, nil
 }
