@@ -46,6 +46,8 @@ jobs:
         with:
           go-version: 1.15
         id: go
+        run: |
+          go get -u gotest.tools/gotestsum
 
       - name: Setup docker CLI
         run: |
