@@ -28,3 +28,7 @@ import (
 func (b *ecsAPIService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
 	return 0, errdefs.ErrNotImplemented
 }
+
+func (b *ecsAPIService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
+	return errdefs.ErrNotImplemented
+}

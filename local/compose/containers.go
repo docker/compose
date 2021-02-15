@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/compose-spec/compose-go/types"
@@ -28,13 +29,29 @@ import (
 // Containers is a set of moby Container
 type Containers []moby.Container
 
-func (s *composeService) getContainers(ctx context.Context, project *types.Project) (Containers, error) {
+type oneOff int
+
+const (
+	oneOffInclude = oneOff(iota)
+	oneOffExclude
+	oneOffOnly
+)
+
+func (s *composeService) getContainers(ctx context.Context, project *types.Project, oneOff oneOff) (Containers, error) {
 	var containers Containers
+	f := filters.NewArgs(
+		projectFilter(project.Name),
+	)
+	switch oneOff {
+	case oneOffOnly:
+		f.Add("label", fmt.Sprintf("%s=%s", oneoffLabel, "True"))
+	case oneOffExclude:
+		f.Add("label", fmt.Sprintf("%s=%s", oneoffLabel, "False"))
+	case oneOffInclude:
+	}
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-		),
-		All: true,
+		Filters: f,
+		All:     true,
 	})
 	if err != nil {
 		return nil, err

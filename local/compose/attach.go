@@ -31,7 +31,7 @@ import (
 )
 
 func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.ContainerEventListener) (Containers, error) {
-	containers, err := s.getContainers(ctx, project)
+	containers, err := s.getContainers(ctx, project, oneOffExclude)
 	if err != nil {
 		return nil, err
 	}
