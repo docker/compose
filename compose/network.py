@@ -71,6 +71,9 @@ class Network:
             data = self.inspect(legacy=self.legacy)
             check_remote_network_config(data, self)
         except NotFound:
+            if self.name == 'default':
+                self._set_host_binding_ipv4()
+
             driver_name = 'the default driver'
             if self.driver:
                 driver_name = 'driver "{}"'.format(self.driver)
@@ -145,6 +148,23 @@ class Network:
             self.legacy = data is not None
         except NotFound:
             self.legacy = False
+
+    def _set_host_binding_ipv4(self):
+        if self.driver and self.driver != 'bridge':
+            return
+        option = 'com.docker.network.bridge.host_binding_ipv4'
+        if self.driver_opts and option in self.driver_opts:
+            return
+        try:
+            data = self.client.inspect_network('bridge')
+        except NotFound:
+            return
+        host_binding_ipv4 = data.get('Options', {}).get(option, None)
+        if not host_binding_ipv4:
+            return
+        if not self.driver_opts:
+            self.driver_opts = {}
+        self.driver_opts[option] = host_binding_ipv4
 
 
 def create_ipam_config_from_dict(ipam_dict):
