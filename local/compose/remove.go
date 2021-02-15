@@ -18,22 +18,20 @@ package compose
 
 import (
 	"context"
-	"fmt"
-	"strings"
-
-	"github.com/compose-spec/compose-go/types"
-	moby "github.com/docker/docker/api/types"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	status "github.com/docker/compose-cli/local/moby"
+
+	"github.com/compose-spec/compose-go/types"
+	moby "github.com/docker/docker/api/types"
+	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
+func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
 	containers, err := s.getContainers(ctx, project, oneOffInclude)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	stoppedContainers := containers.filter(func(c moby.Container) bool {
@@ -45,21 +43,8 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 		names = append(names, getCanonicalContainerName(c))
 	})
 
-	if len(stoppedContainers) == 0 {
-		fmt.Println("No stopped containers")
-		return nil
-	}
-	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
-	if options.Force {
-		fmt.Println(msg)
-	} else {
-		confirm, err := s.ui.Confirm(msg, false)
-		if err != nil {
-			return err
-		}
-		if !confirm {
-			return nil
-		}
+	if options.DryRun {
+		return names, nil
 	}
 
 	w := progress.ContextWriter(ctx)
@@ -79,5 +64,5 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 			return err
 		})
 	}
-	return eg.Wait()
+	return nil, eg.Wait()
 }

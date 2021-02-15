@@ -18,10 +18,13 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/utils/prompt"
 
 	"github.com/spf13/cobra"
 )
@@ -68,17 +71,46 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		if opts.stop {
+	if opts.stop {
+		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 			err := c.ComposeService().Stop(ctx, project)
-			if err != nil {
-				return "", err
-			}
+			return "", err
+		})
+		if err != nil {
+			return err
 		}
-		return "", c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
+	}
+
+	reosurces, err := c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
+		DryRun: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(reosurces) == 0 {
+		fmt.Println("No stopped containers")
+		return nil
+	}
+	msg := fmt.Sprintf("Going to remove %s", strings.Join(reosurces, ", "))
+	if opts.force {
+		fmt.Println(msg)
+	} else {
+		confirm, err := prompt.User{}.Confirm(msg, false)
+		if err != nil {
+			return err
+		}
+		if !confirm {
+			return nil
+		}
+	}
+
+	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+		_, err = c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
 			Volumes: opts.volumes,
 			Force:   opts.force,
 		})
+		return "", err
 	})
 	return err
 }

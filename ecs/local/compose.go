@@ -176,6 +176,6 @@ func (e ecsLocalSimulation) RunOneOffContainer(ctx context.Context, project *typ
 	return 0, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose run")
 }
 
-func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
+func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
 	return e.compose.Remove(ctx, project, options)
 }

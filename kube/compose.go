@@ -198,6 +198,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	return 0, errdefs.ErrNotImplemented
 }
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
-	return errdefs.ErrNotImplemented
+func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
+	return nil, errdefs.ErrNotImplemented
 }

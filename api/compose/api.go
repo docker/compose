@@ -54,7 +54,7 @@ type Service interface {
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
-	Remove(ctx context.Context, project *types.Project, options RemoveOptions) error
+	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
 }
 
 // CreateOptions group options of the Create API
@@ -101,6 +101,8 @@ type KillOptions struct {
 
 // RemoveOptions group options of the Remove API
 type RemoveOptions struct {
+	// DryRun just list removable resources
+	DryRun bool
 	// Volumes remove anonymous volumes
 	Volumes bool
 	// Force don't ask to confirm removal
