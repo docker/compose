@@ -302,14 +302,4 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 	return wmw, nil
 }
 
-func isDir(pth string) (bool, error) {
-	fi, err := os.Lstat(pth)
-	if os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return fi.IsDir(), nil
-}
-
 var _ Notify = &naiveNotify{}
