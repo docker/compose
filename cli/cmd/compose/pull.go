@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -28,20 +27,22 @@ import (
 type pullOptions struct {
 	*projectOptions
 	composeOptions
+	quiet bool
 }
 
 func pullCommand(p *projectOptions) *cobra.Command {
 	opts := pullOptions{
 		projectOptions: p,
 	}
-	pullCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "pull [SERVICE...]",
 		Short: "Pull service images",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPull(cmd.Context(), opts, args)
 		},
 	}
-	return pullCmd
+	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
+	return cmd
 }
 
 func runPull(ctx context.Context, opts pullOptions, services []string) error {
@@ -53,6 +54,10 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
+	}
+
+	if opts.quiet {
+		return c.ComposeService().Pull(ctx, project)
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
