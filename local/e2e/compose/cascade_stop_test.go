@@ -45,4 +45,8 @@ func TestCascadeStop(t *testing.T) {
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=unknown")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: `no such service: unknown`})
 	})
+
+	t.Run("down", func(t *testing.T) {
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+	})
 }
