@@ -201,3 +201,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
 	return nil, errdefs.ErrNotImplemented
 }
+
+// Exec executes a command in a running service container
+func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+	return errdefs.ErrNotImplemented
+}

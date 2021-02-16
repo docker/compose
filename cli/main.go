@@ -158,6 +158,8 @@ func main() {
 	opts.AddConfigFlags(flags)
 	flags.BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
+	flags.SetInterspersed(false)
+
 	walk(root, func(c *cobra.Command) {
 		c.Flags().BoolP("help", "h", false, "Help for "+c.Name())
 	})

@@ -179,3 +179,7 @@ func (e ecsLocalSimulation) RunOneOffContainer(ctx context.Context, project *typ
 func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
 	return e.compose.Remove(ctx, project, options)
 }
+
+func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+	return errdefs.ErrNotImplemented
+}
