@@ -89,6 +89,11 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	if err != nil {
 		return err
 	}
+
+	if opts.quiet {
+		return nil
+	}
+
 	var out io.Writer = os.Stdout
 	if opts.Output != "" {
 		file, err := os.Create(opts.Output)
