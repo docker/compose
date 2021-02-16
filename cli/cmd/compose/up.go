@@ -192,7 +192,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	stopFunc := func() error {
 		ctx := context.Background()
 		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
-			return "", c.ComposeService().Stop(ctx, project)
+			return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{})
 		})
 		return err
 	}

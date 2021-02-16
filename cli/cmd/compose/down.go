@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"time"
 
 	"github.com/compose-spec/compose-go/types"
 
@@ -32,6 +33,8 @@ import (
 type downOptions struct {
 	*projectOptions
 	removeOrphans bool
+	timeChanged   bool
+	timeout       int
 }
 
 func downCommand(p *projectOptions) *cobra.Command {
@@ -42,11 +45,13 @@ func downCommand(p *projectOptions) *cobra.Command {
 		Use:   "down",
 		Short: "Stop and remove containers, networks",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.timeChanged = cmd.Flags().Changed("timeout")
 			return runDown(cmd.Context(), opts)
 		},
 	}
 	flags := downCmd.Flags()
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
 
 	return downCmd
 }
@@ -69,9 +74,15 @@ func runDown(ctx context.Context, opts downOptions) error {
 			name = p.Name
 		}
 
+		var timeout *time.Duration
+		if opts.timeChanged {
+			timeoutValue := time.Duration(opts.timeout) * time.Second
+			timeout = &timeoutValue
+		}
 		return name, c.ComposeService().Down(ctx, name, compose.DownOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Project:       project,
+			Timeout:       timeout,
 		})
 	})
 	return err

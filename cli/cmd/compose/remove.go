@@ -73,7 +73,7 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 
 	if opts.stop {
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			err := c.ComposeService().Stop(ctx, project)
+			err := c.ComposeService().Stop(ctx, project, compose.StopOptions{})
 			return "", err
 		})
 		if err != nil {

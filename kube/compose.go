@@ -149,7 +149,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 }
 
 // Stop executes the equivalent to a `compose stop`
-func (s *composeService) Stop(ctx context.Context, project *types.Project) error {
+func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
