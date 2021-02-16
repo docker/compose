@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package utils
 
 import (
 	"testing"
@@ -26,7 +26,7 @@ import (
 
 func TestSplitWriter(t *testing.T) {
 	var lines []string
-	w := getWriter("service", "container", func(event compose.ContainerEvent) {
+	w := GetWriter("name", "service", "container", func(event compose.ContainerEvent) {
 		lines = append(lines, event.Line)
 	})
 	w.Write([]byte("h"))        //nolint: errcheck

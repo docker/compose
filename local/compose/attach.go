@@ -24,6 +24,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	convert "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -62,7 +63,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := getWriter(getContainerNameWithoutProject(container), serviceName, container.ID, consumer)
+	w := utils.GetWriter(getContainerNameWithoutProject(container), serviceName, container.ID, consumer)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
