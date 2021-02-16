@@ -13,9 +13,9 @@ if ! [ ${DEPLOYMENT_TARGET} == "$(macos_version)" ]; then
   SDK_SHA1=dd228a335194e3392f1904ce49aff1b1da26ca62
 fi
 
-OPENSSL_VERSION=1.1.1h
+OPENSSL_VERSION=1.1.1j
 OPENSSL_URL=https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
-OPENSSL_SHA1=8d0d099e8973ec851368c8c775e05e1eadca1794
+OPENSSL_SHA1=327a400b8bb58058604f83c7e839fea11bba095e
 
 PYTHON_VERSION=3.9.0
 PYTHON_URL=https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz

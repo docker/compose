@@ -41,8 +41,13 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libgcc-6-dev \
     libssl-dev \
     make \
-    openssl \
     zlib1g-dev
+
+# FIXME: to be removed when updating the base image to one with newer version that matches the cryptography's openssl version
+RUN curl --output openssl-OpenSSL_1_1_1j.tar.gz https://codeload.github.com/openssl/openssl/tar.gz/OpenSSL_1_1_1j && \
+    echo -n "327a400b8bb58058604f83c7e839fea11bba095e *openssl-OpenSSL_1_1_1j.tar.gz" | sha1sum -c - && \
+    tar xfz openssl-OpenSSL_1_1_1j.tar.gz && cd openssl-OpenSSL_1_1_1j && \
+    ./config -Wl,-Bsymbolic-functions -fPIC shared && make && make install && ldconfig -v
 
 FROM centos:${BUILD_CENTOS_VERSION} AS build-centos
 RUN yum install -y \
