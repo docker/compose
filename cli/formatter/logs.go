@@ -38,21 +38,20 @@ func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) c
 	}
 }
 
-func (l *logConsumer) Register(service string, source string) {
-	l.register(service, source)
+func (l *logConsumer) Register(name string, id string) {
+	l.register(name, id)
 }
 
-func (l *logConsumer) register(service string, source string) *presenter {
+func (l *logConsumer) register(name string, id string) *presenter {
 	cf := monochrome
 	if l.color {
 		cf = <-loop
 	}
 	p := &presenter{
-		colors:    cf,
-		service:   service,
-		container: source,
+		colors: cf,
+		name:   name,
 	}
-	l.presenters[source] = p
+	l.presenters[id] = p
 	if l.prefix {
 		l.computeWidth()
 		for _, p := range l.presenters {
@@ -62,34 +61,34 @@ func (l *logConsumer) register(service string, source string) *presenter {
 	return p
 }
 
-// Log formats a log message as received from service/container
-func (l *logConsumer) Log(service, container, message string) {
+// Log formats a log message as received from name/container
+func (l *logConsumer) Log(name, id, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
-	p, ok := l.presenters[container]
+	p, ok := l.presenters[id]
 	if !ok { // should have been registered, but ¯\_(ツ)_/¯
-		p = l.register(service, container)
+		p = l.register(name, id)
 	}
 	for _, line := range strings.Split(message, "\n") {
 		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck
 	}
 }
 
-func (l *logConsumer) Status(service, container, msg string) {
-	p, ok := l.presenters[container]
+func (l *logConsumer) Status(name, id, msg string) {
+	p, ok := l.presenters[id]
 	if !ok {
-		p = l.register(service, container)
+		p = l.register(name, id)
 	}
-	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
+	s := p.colors(fmt.Sprintf("%s %s\n", name, msg))
 	l.writer.Write([]byte(s)) // nolint:errcheck
 }
 
 func (l *logConsumer) computeWidth() {
 	width := 0
-	for n := range l.presenters {
-		if len(n) > width {
-			width = len(n)
+	for _, p := range l.presenters {
+		if len(p.name) > width {
+			width = len(p.name)
 		}
 	}
 	l.width = width + 1
@@ -106,12 +105,11 @@ type logConsumer struct {
 }
 
 type presenter struct {
-	colors    colorFunc
-	service   string
-	container string
-	prefix    string
+	colors colorFunc
+	name   string
+	prefix string
 }
 
 func (p *presenter) setPrefix(width int) {
-	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.container))
+	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.name))
 }

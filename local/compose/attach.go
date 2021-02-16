@@ -48,7 +48,8 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 	for _, container := range containers {
 		consumer(compose.ContainerEvent{
 			Type:    compose.ContainerEventAttach,
-			Source:  getContainerNameWithoutProject(container),
+			Source:  container.ID,
+			Name:    getContainerNameWithoutProject(container),
 			Service: container.Labels[serviceLabel],
 		})
 		err := s.attachContainer(ctx, container, consumer, project)
@@ -61,7 +62,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, con
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, consumer compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := getWriter(serviceName, getContainerNameWithoutProject(container), consumer)
+	w := getWriter(getContainerNameWithoutProject(container), serviceName, container.ID, consumer)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
