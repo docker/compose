@@ -16,6 +16,7 @@ from compose.cli.colors import green
 from compose.cli.colors import red
 from compose.cli.signals import ShutdownException
 from compose.const import PARALLEL_LIMIT
+from compose.errors import CompletedUnsuccessfully
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
 from compose.errors import OperationFailedError
@@ -61,7 +62,8 @@ def parallel_execute_watch(events, writer, errors, results, msg, get_name, fail_
         elif isinstance(exception, APIError):
             errors[get_name(obj)] = exception.explanation
             writer.write(msg, get_name(obj), 'error', red)
-        elif isinstance(exception, (OperationFailedError, HealthCheckFailed, NoHealthCheckConfigured)):
+        elif isinstance(exception, (OperationFailedError, HealthCheckFailed, NoHealthCheckConfigured,
+                                    CompletedUnsuccessfully)):
             errors[get_name(obj)] = exception.msg
             writer.write(msg, get_name(obj), 'error', red)
         elif isinstance(exception, UpstreamError):
@@ -238,6 +240,12 @@ def feed_queue(objects, func, get_deps, results, state, limiter):
         except (HealthCheckFailed, NoHealthCheckConfigured) as e:
             log.debug(
                 'Healthcheck for service(s) upstream of {} failed - '
+                'not processing'.format(obj)
+            )
+            results.put((obj, None, e))
+        except CompletedUnsuccessfully as e:
+            log.debug(
+                'Service(s) upstream of {} did not completed successfully - '
                 'not processing'.format(obj)
             )
             results.put((obj, None, e))
