@@ -129,7 +129,7 @@ def get_profiles_from_options(options, environment):
     if profile_option:
         return profile_option
 
-    profiles = environment.get('COMPOSE_PROFILE')
+    profiles = environment.get('COMPOSE_PROFILES')
     if profiles:
         return profiles.split(',')
 

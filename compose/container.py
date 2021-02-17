@@ -187,11 +187,6 @@ class Container:
         return self.get('HostConfig.LogConfig.Type')
 
     @property
-    def has_api_logs(self):
-        log_type = self.log_driver
-        return not log_type or log_type in ('json-file', 'journald', 'local')
-
-    @property
     def human_readable_health_status(self):
         """ Generate UP status string with up time and health
         """
@@ -204,11 +199,7 @@ class Container:
         return status_string
 
     def attach_log_stream(self):
-        """A log stream can only be attached if the container uses a
-        json-file, journald or local log driver.
-        """
-        if self.has_api_logs:
-            self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
+        self.log_stream = self.attach(stdout=True, stderr=True, stream=True)
 
     def get(self, key):
         """Return a value from the container or None if the value is not set.

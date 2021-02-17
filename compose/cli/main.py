@@ -1121,7 +1121,7 @@ class TopLevelCommand:
         detached = options.get('--detach')
         no_start = options.get('--no-start')
         attach_dependencies = options.get('--attach-dependencies')
-        keep_prefix = not options['--no-log-prefix']
+        keep_prefix = not options.get('--no-log-prefix')
 
         if detached and (cascade_stop or exit_value_from or attach_dependencies):
             raise UserError(
