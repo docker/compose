@@ -8,10 +8,10 @@ jobs:
   upload-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.15
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.16
         id: go
 
       - name: Setup docker CLI

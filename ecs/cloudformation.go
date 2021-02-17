@@ -40,9 +40,9 @@ import (
 	cloudmap "github.com/awslabs/goformation/v4/cloudformation/servicediscovery"
 	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
 	cliconfig "github.com/docker/cli/cli/config"
-	"github.com/docker/distribution/reference"
-	"golang.org/x/sync/errgroup"
+	"github.com/opencontainers/go-digest"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 )
@@ -110,33 +110,10 @@ func (b *ecsAPIService) resolveServiceImagesDigests(ctx context.Context, project
 	}
 
 	resolver := remotes.CreateResolver(configFile)
-	eg := errgroup.Group{}
-	for i, s := range project.Services {
-		idx := i
-		service := s
-		eg.Go(func() error {
-			named, err := reference.ParseDockerRef(service.Image)
-			if err != nil {
-				return err
-			}
-
-			_, desc, err := resolver.Resolve(ctx, named.String())
-			if err != nil {
-				return err
-			}
-
-			digested, err := reference.WithDigest(named, desc.Digest)
-			if err != nil {
-				return err
-			}
-
-			fmt.Printf("%s resolved to %s\n", service.Image, digested)
-			service.Image = digested.String()
-			project.Services[idx] = service
-			return nil
-		})
-	}
-	return eg.Wait()
+	return project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+		_, desc, err := resolver.Resolve(ctx, named.String())
+		return desc.Digest, err
+	})
 }
 
 func (b *ecsAPIService) convert(ctx context.Context, project *types.Project) (*cloudformation.Template, error) {
