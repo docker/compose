@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"github.com/docker/docker/errdefs"
 	"path/filepath"
 	"strings"
 	"time"
@@ -88,10 +90,51 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 			return s.ensureNetworkDown(ctx, networkID, networkName)
 		})
 	}
+
+	if options.Images != "" {
+		for image := range s.getServiceImages(options, projectName) {
+			image := image
+			eg.Go(func() error {
+				resourceToRemove = true
+				return s.removeImage(image, w, err, ctx)
+			})
+		}
+	}
+
 	if !resourceToRemove {
 		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) getServiceImages(options compose.DownOptions, projectName string) map[string]struct{} {
+	images := map[string]struct{}{}
+	for _, service := range options.Project.Services {
+		image := service.Image
+		if options.Images == "local" && image != "" {
+			continue
+		}
+		if image == "" {
+			image = getImageName(service, projectName)
+		}
+		images[image] = struct{}{}
+	}
+	return images
+}
+
+func (s *composeService) removeImage(image string, w progress.Writer, err error, ctx context.Context) error {
+	id := fmt.Sprintf("Image %s", image)
+	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
+	_, err = s.apiClient.ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	if err == nil {
+		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
+		return nil
+	}
+	if errdefs.IsNotFound(err) {
+		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
+		return nil
+	}
+	return err
 }
 
 func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {

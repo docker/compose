@@ -94,6 +94,10 @@ type DownOptions struct {
 	Project *types.Project
 	// Timeout override container stop timeout
 	Timeout *time.Duration
+	// Images remove image used by services. 'all': Remove all images. 'local': Remove only images that don't have a tag
+	Images string
+	// Volumes remove volumes, both declared in the `volumes` section and anonymous ones
+	Volumes bool
 }
 
 // ConvertOptions group options of the Convert API

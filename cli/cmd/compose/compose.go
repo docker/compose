@@ -107,7 +107,7 @@ func Command(contextType string) *cobra.Command {
 
 	command.AddCommand(
 		upCommand(&opts, contextType),
-		downCommand(&opts),
+		downCommand(&opts, contextType),
 		startCommand(&opts),
 		stopCommand(&opts),
 		psCommand(&opts),
