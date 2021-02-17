@@ -17,8 +17,11 @@
 package compose
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/docker/compose-cli/api/compose"
 
@@ -31,6 +34,7 @@ type convertOptions struct {
 	*projectOptions
 	Format string
 	Output string
+	quiet  bool
 }
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
@@ -39,22 +43,31 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	opts := convertOptions{
 		projectOptions: p,
 	}
-	convertCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Aliases: []string{"config"},
 		Use:     "convert SERVICES",
 		Short:   "Converts the compose file to platform's canonical format",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.quiet {
+				devnull, err := os.Open(os.DevNull)
+				if err != nil {
+					return err
+				}
+				os.Stdout = devnull
+			}
+			opts.Output = os.DevNull
 			return runConvert(cmd.Context(), opts, args)
 		},
 	}
-	flags := convertCmd.Flags()
+	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 
 	// add flags for hidden backends
 	for _, f := range addFlagsFuncs {
-		f(convertCmd, &opts)
+		f(cmd, &opts)
 	}
-	return convertCmd
+	return cmd
 }
 
 func runConvert(ctx context.Context, opts convertOptions, services []string) error {
@@ -76,9 +89,19 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	if err != nil {
 		return err
 	}
-	if opts.Output != "" {
-		fmt.Print("model saved to ")
+
+	if opts.quiet {
+		return nil
 	}
-	fmt.Println(string(json))
-	return nil
+
+	var out io.Writer = os.Stdout
+	if opts.Output != "" {
+		file, err := os.Create(opts.Output)
+		if err != nil {
+			return err
+		}
+		out = bufio.NewWriter(file)
+	}
+	_, err = fmt.Fprint(out, string(json))
+	return err
 }

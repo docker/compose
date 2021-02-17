@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -28,20 +29,29 @@ import (
 type buildOptions struct {
 	*projectOptions
 	composeOptions
+	quiet bool
 }
 
 func buildCommand(p *projectOptions) *cobra.Command {
 	opts := buildOptions{
 		projectOptions: p,
 	}
-	buildCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "build [SERVICE...]",
 		Short: "Build or rebuild services",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.quiet {
+				devnull, err := os.Open(os.DevNull)
+				if err != nil {
+					return err
+				}
+				os.Stdout = devnull
+			}
 			return runBuild(cmd.Context(), opts, args)
 		},
 	}
-	return buildCmd
+	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
+	return cmd
 }
 
 func runBuild(ctx context.Context, opts buildOptions, services []string) error {

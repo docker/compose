@@ -37,7 +37,7 @@ func (p *plainWriter) Start(ctx context.Context) error {
 }
 
 func (p *plainWriter) Event(e Event) {
-	fmt.Println(e.ID, e.Text, e.StatusText)
+	fmt.Fprintln(p.out, e.ID, e.Text, e.StatusText)
 }
 
 func (p *plainWriter) Stop() {
