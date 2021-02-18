@@ -23,18 +23,23 @@ import (
 	"io"
 	"os"
 
-	"github.com/docker/compose-cli/api/compose"
-
+	"github.com/cnabio/cnab-to-oci/remotes"
+	"github.com/distribution/distribution/v3/reference"
+	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/config"
 )
 
 type convertOptions struct {
 	*projectOptions
-	Format string
-	Output string
-	quiet  bool
+	Format  string
+	Output  string
+	quiet   bool
+	resolve bool
 }
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
@@ -60,6 +65,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
+	flags.BoolVar(&opts.resolve, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 
 	// add flags for hidden backends
@@ -79,6 +85,22 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
+	}
+
+	if opts.resolve {
+		configFile, err := cliconfig.Load(config.Dir(ctx))
+		if err != nil {
+			return err
+		}
+
+		resolver := remotes.CreateResolver(configFile)
+		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+			_, desc, err := resolver.Resolve(ctx, named.String())
+			return desc.Digest, err
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	json, err = c.ComposeService().Convert(ctx, project, compose.ConvertOptions{

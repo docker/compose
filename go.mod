@@ -1,6 +1,6 @@
 module github.com/docker/compose-cli
 
-go 1.15
+go 1.16
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.2.3
@@ -17,10 +17,11 @@ require (
 	github.com/awslabs/goformation/v4 v4.15.6
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
-	github.com/compose-spec/compose-go v0.0.0-20210202093933-d648aac758f9
+	github.com/compose-spec/compose-go v0.0.0-20210217144939-9f2c61fe6b14
 	github.com/containerd/console v1.0.1
 	github.com/containerd/containerd v1.4.3
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
+	github.com/distribution/distribution/v3 v3.0.0-20210209042832-22c074842eaa
 	github.com/docker/buildx v0.5.1
 	github.com/docker/cli v20.10.1+incompatible
 	github.com/docker/distribution v2.7.1+incompatible

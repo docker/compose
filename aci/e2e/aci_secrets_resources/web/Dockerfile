@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM golang:1.15-alpine AS build
+FROM golang:1.16-alpine AS build
 COPY main.go .
 RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server main.go

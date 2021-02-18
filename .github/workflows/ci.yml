@@ -13,10 +13,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.15
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.16
         id: go
 
       - name: Checkout code into the Go module directory
@@ -41,10 +41,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.15
-        uses: actions/setup-go@v1
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.16
         id: go
         run: |
           go get -u gotest.tools/gotestsum
