@@ -23,7 +23,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('alpine')
@@ -31,7 +31,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('debian')
