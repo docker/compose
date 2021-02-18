@@ -55,7 +55,6 @@ func convertCommand(p *projectOptions) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
-			opts.Output = os.DevNull
 			return runConvert(cmd.Context(), opts, args)
 		},
 	}
