@@ -19,16 +19,14 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/docker/compose-cli/api/context/store"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
-
-	"github.com/docker/compose-cli/api/compose"
-
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
 )
 

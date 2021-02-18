@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"

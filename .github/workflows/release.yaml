@@ -16,13 +16,13 @@ jobs:
 
       - name: Setup docker CLI
         run: |
-          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.2.tgz | tar xz
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
           sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
 
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
