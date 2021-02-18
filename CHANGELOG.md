@@ -8,7 +8,7 @@ Change log
 
 ### Bugs
 
-- Fix SSH hostname parsing when it contains leading s/h, and removes the quiet option that was hiding the error (via docker-py bump to 4.4.2)
+- Fix SSH hostname parsing when it contains leading s/h, and remove the quiet option that was hiding the error (via docker-py bump to 4.4.2)
 
 - Fix key error for '--no-log-prefix' option
 
