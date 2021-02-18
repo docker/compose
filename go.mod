@@ -24,7 +24,6 @@ require (
 	github.com/distribution/distribution/v3 v3.0.0-20210209042832-22c074842eaa
 	github.com/docker/buildx v0.5.1
 	github.com/docker/cli v20.10.1+incompatible
-	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.1+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
@@ -67,14 +66,9 @@ require (
 	k8s.io/apimachinery v0.20.1
 	k8s.io/cli-runtime v0.20.1
 	k8s.io/client-go v0.20.1
+	rsc.io/letsencrypt v0.0.3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.10.5
 )
 
-replace (
-	// the distribution version from ecs plugin is quite old and it breaks containerd
-	// we need to create a new release tag for docker/distribution
-	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20200708230824-53e18a9d9bfe
-
-	// (for buildx)
-	github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
-)
+// (for buildx)
+replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305

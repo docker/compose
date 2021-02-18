@@ -23,19 +23,18 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/buildx/driver"
-
-	"github.com/docker/compose-cli/api/config"
-	"github.com/docker/compose-cli/api/progress"
-
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
+	"github.com/docker/buildx/driver"
 	cliconfig "github.com/docker/cli/cli/config"
-	"github.com/docker/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/config"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project) error {
