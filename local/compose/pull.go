@@ -25,8 +25,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
 	cliconfig "github.com/docker/cli/cli/config"
-	"github.com/docker/distribution/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
