@@ -178,9 +178,10 @@ type ServiceStatus struct {
 
 // LogOptions defines optional parameters for the `Log` API
 type LogOptions struct {
-	Services []string
-	Tail     string
-	Follow   bool
+	Services   []string
+	Tail       string
+	Follow     bool
+	Timestamps bool
 }
 
 const (

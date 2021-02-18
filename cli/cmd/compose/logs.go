@@ -31,10 +31,11 @@ import (
 type logsOptions struct {
 	*projectOptions
 	composeOptions
-	follow   bool
-	tail     string
-	noColor  bool
-	noPrefix bool
+	follow     bool
+	tail       string
+	noColor    bool
+	noPrefix   bool
+	timestamps bool
 }
 
 func logsCommand(p *projectOptions, contextType string) *cobra.Command {
@@ -52,6 +53,7 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 	flags.BoolVar(&opts.follow, "follow", false, "Follow log output.")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
+	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps.")
 
 	if contextType == store.DefaultContextType {
 		flags.StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
@@ -74,5 +76,6 @@ func runLogs(ctx context.Context, opts logsOptions, services []string) error {
 		Services: services,
 		Follow:   opts.follow,
 		Tail:     opts.tail,
+		Timestamps: opts.timestamps,
 	})
 }
