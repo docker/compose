@@ -18,6 +18,8 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"github.com/docker/compose-cli/api/context/store"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -35,9 +37,11 @@ type downOptions struct {
 	removeOrphans bool
 	timeChanged   bool
 	timeout       int
+	volumes       bool
+	images        string
 }
 
-func downCommand(p *projectOptions) *cobra.Command {
+func downCommand(p *projectOptions, contextType string) *cobra.Command {
 	opts := downOptions{
 		projectOptions: p,
 	}
@@ -46,6 +50,11 @@ func downCommand(p *projectOptions) *cobra.Command {
 		Short: "Stop and remove containers, networks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
+			if opts.images != "" {
+				if opts.images != "all" && opts.images != "local" {
+					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
+				}
+			}
 			return runDown(cmd.Context(), opts)
 		},
 	}
@@ -53,6 +62,11 @@ func downCommand(p *projectOptions) *cobra.Command {
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
 
+	switch contextType {
+	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
+		flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
+		flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
+	}
 	return downCmd
 }
 
@@ -83,6 +97,8 @@ func runDown(ctx context.Context, opts downOptions) error {
 			RemoveOrphans: opts.removeOrphans,
 			Project:       project,
 			Timeout:       timeout,
+			Images:        opts.images,
+			Volumes:       opts.volumes,
 		})
 	})
 	return err
