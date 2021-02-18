@@ -19,20 +19,19 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/errdefs"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/docker/compose-cli/api/compose"
-
-	"github.com/docker/compose-cli/api/progress"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
@@ -96,7 +95,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 			image := image
 			eg.Go(func() error {
 				resourceToRemove = true
-				return s.removeImage(image, w, err, ctx)
+				return s.removeImage(ctx, image, w)
 			})
 		}
 	}
@@ -122,10 +121,10 @@ func (s *composeService) getServiceImages(options compose.DownOptions, projectNa
 	return images
 }
 
-func (s *composeService) removeImage(image string, w progress.Writer, err error, ctx context.Context) error {
+func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
 	id := fmt.Sprintf("Image %s", image)
 	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
-	_, err = s.apiClient.ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	_, err := s.apiClient.ImageRemove(ctx, image, moby.ImageRemoveOptions{})
 	if err == nil {
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
