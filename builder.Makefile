@@ -60,7 +60,9 @@ cli:
 .PHONY: cross
 cross:
 	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
+	GOOS=linux   GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-arm64 ./cli
 	GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
+	GOOS=darwin  GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-arm64 ./cli
 	GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
 
 .PHONY: test
@@ -87,7 +89,9 @@ check-go-mod:
 package: cross
 	mkdir -p dist
 	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64
+	tar -czf dist/docker-linux-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-arm64
 	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64
+	tar -czf dist/docker-darwin-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-arm64
 	cp $(BINARY)-windows-amd64.exe $(WORK_DIR)/docker.exe
 	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe
 	rm -r $(WORK_DIR)
