@@ -33,9 +33,10 @@ import (
 
 type psOptions struct {
 	*projectOptions
-	Format string
-	All    bool
-	Quiet  bool
+	Format   string
+	All      bool
+	Quiet    bool
+	Services bool
 }
 
 func psCommand(p *projectOptions) *cobra.Command {
@@ -51,6 +52,7 @@ func psCommand(p *projectOptions) *cobra.Command {
 	}
 	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	psCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
+	psCmd.Flags().BoolVar(&opts.Services, "services", false, "Display services")
 	psCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
 	return psCmd
 }
@@ -70,6 +72,17 @@ func runPs(ctx context.Context, opts psOptions) error {
 	})
 	if err != nil {
 		return err
+	}
+
+	if opts.Services {
+		services := []string{}
+		for _, s := range containers {
+			if !contains(services, s.Service) {
+				services = append(services, s.Service)
+			}
+		}
+		fmt.Println(strings.Join(services, "\n"))
+		return nil
 	}
 	if opts.Quiet {
 		for _, s := range containers {
@@ -101,4 +114,13 @@ func runPs(ctx context.Context, opts psOptions) error {
 			}
 		},
 		"NAME", "SERVICE", "STATUS", "PORTS")
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
