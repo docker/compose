@@ -259,7 +259,7 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
                       --privileged \\
                       --volume="\$(pwd)/.git:/code/.git" \\
                       --volume="/var/run/docker.sock:/var/run/docker.sock" \\
-                      --volume="\${DOCKER_CONFIG}/config.json:/code/.docker/config.json" \\
+                      --volume="\${DOCKER_CONFIG}/config.json:/root/.docker/config.json" \\
                       -e "DOCKER_TLS_CERTDIR=" \\
                       -e "TAG=${imageName}" \\
                       -e "STORAGE_DRIVER=${storageDriver}" \\
