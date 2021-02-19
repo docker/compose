@@ -1,6 +1,19 @@
 Change log
 ==========
 
+1.28.4 (2021-02-18)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/54?closed=1)
+
+### Bugs
+
+- Fix SSH port parsing by bumping docker-py to 4.4.3
+
+### Miscellaneous
+
+- Bump Python to 3.7.10
+
 1.28.3 (2021-02-17)
 -------------------
 
