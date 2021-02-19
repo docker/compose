@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/utils"
@@ -83,16 +84,6 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 	return result, nil
 }
 
-func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
-	return compose.ContainerSummary{
-		ID:      pod.GetObjectMeta().GetName(),
-		Name:    pod.GetObjectMeta().GetName(),
-		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceTag],
-		State:   string(pod.Status.Phase),
-		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectTag],
-	}
-}
-
 // GetLogs retrieves pod logs
 func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
@@ -111,13 +102,81 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 
 		eg.Go(func() error {
 			r, err := request.Stream(ctx)
-			defer r.Close() // nolint errcheck
 			if err != nil {
 				return err
 			}
+
+			defer r.Close() // nolint errcheck
 			_, err = io.Copy(w, r)
 			return err
 		})
 	}
 	return eg.Wait()
+}
+
+// WaitForRunningPodState blocks until pods are in running state
+func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, services []string, status string, timeout int) error {
+
+	if timeout > 0 {
+		var t time.Duration
+		t = time.Duration(timeout) * time.Second
+		fmt.Println("Timeout ", t)
+	}
+
+	selector := fmt.Sprintf("%s=%s", compose.ProjectTag, projectName)
+
+	waitingForPhase := corev1.PodRunning
+
+	switch status {
+	case compose.STARTING:
+		waitingForPhase = corev1.PodPending
+	case compose.UNKNOWN:
+		waitingForPhase = corev1.PodUnknown
+	}
+
+	//fieldSelector := "status.phase=Running"
+	for {
+		time.Sleep(time.Duration(1) * time.Second)
+		timeout = timeout - 1
+		if timeout <= 0 {
+			return fmt.Errorf("Deployment time out. Pods did not reach expected state.")
+		}
+
+		pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: selector,
+		})
+		if err != nil {
+			return err
+		}
+
+		servicePods := 0
+		stateReached := true
+		for _, pod := range pods.Items {
+
+			if status == compose.REMOVING {
+				if contains(services, pod.Labels[compose.ServiceTag]) {
+					servicePods = servicePods + 1
+				}
+
+				continue
+			}
+
+			if pod.Status.Phase != waitingForPhase {
+				stateReached = false
+
+			}
+		}
+
+		if status == compose.REMOVING {
+			if len(pods.Items) > 0 {
+				continue
+			}
+			return nil
+		}
+
+		if !stateReached {
+			continue
+		}
+		return nil
+	}
 }

@@ -91,7 +91,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	})
 
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
-	return err
+
+	eventName = "Wait for pods to be running"
+
+	return s.client.WaitForPodState(ctx, project.Name, project.ServiceNames(), compose.RUNNING, 10)
 }
 
 // Down executes the equivalent to a `compose down`
