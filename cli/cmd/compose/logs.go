@@ -50,7 +50,7 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 		},
 	}
 	flags := logsCmd.Flags()
-	flags.BoolVar(&opts.follow, "follow", false, "Follow log output.")
+	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps.")
