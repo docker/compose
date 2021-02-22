@@ -347,7 +347,7 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 			}
 		case compose.ContainerEventLog:
 			if !aborting {
-				consumer.Log(event.Name, event.Source, event.Line)
+				consumer.Log(event.Name, event.Service, event.Source, event.Line)
 			}
 		}
 	}
