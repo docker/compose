@@ -183,3 +183,11 @@ func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, 
 func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (e ecsLocalSimulation) Pause(ctx context.Context, project *types.Project) error {
+	return e.compose.Pause(ctx, project)
+}
+
+func (e ecsLocalSimulation) UnPause(ctx context.Context, project *types.Project) error {
+	return e.compose.UnPause(ctx, project)
+}

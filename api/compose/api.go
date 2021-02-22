@@ -58,6 +58,10 @@ type Service interface {
 	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project *types.Project, opts RunOptions) error
+	// Pause executes the equivalent to a `compose pause`
+	Pause(ctx context.Context, project *types.Project) error
+	// UnPause executes the equivalent to a `compose unpause`
+	UnPause(ctx context.Context, project *types.Project) error
 }
 
 // CreateOptions group options of the Create API
