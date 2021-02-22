@@ -206,3 +206,11 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (s *composeService) Pause(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (s *composeService) UnPause(ctx context.Context, project *types.Project) error {
+	return errdefs.ErrNotImplemented
+}
