@@ -156,7 +156,7 @@ func TestCompose(t *testing.T) {
 		res := icmd.StartCmd(cmd)
 
 		checkUp := func(t poll.LogT) poll.Result {
-			out := res.Stdout()
+			out := res.Combined()
 			if !strings.Contains(out, "DeleteComplete") {
 				return poll.Continue("current status \n%s\n", out)
 			}
