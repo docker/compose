@@ -73,9 +73,9 @@ func runLogs(ctx context.Context, opts logsOptions, services []string) error {
 	}
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
 	return c.ComposeService().Logs(ctx, projectName, consumer, compose.LogOptions{
-		Services: services,
-		Follow:   opts.follow,
-		Tail:     opts.tail,
+		Services:   services,
+		Follow:     opts.follow,
+		Tail:       opts.tail,
 		Timestamps: opts.timestamps,
 	})
 }
