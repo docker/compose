@@ -62,13 +62,13 @@ func (l *logConsumer) register(name string, id string) *presenter {
 }
 
 // Log formats a log message as received from name/container
-func (l *logConsumer) Log(name, id, message string) {
+func (l *logConsumer) Log(name, service, container, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
-	p, ok := l.presenters[id]
+	p, ok := l.presenters[container]
 	if !ok { // should have been registered, but ¯\_(ツ)_/¯
-		p = l.register(name, id)
+		p = l.register(name, container)
 	}
 	for _, line := range strings.Split(message, "\n") {
 		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck

@@ -43,9 +43,9 @@ type allowListLogConsumer struct {
 	delegate  compose.LogConsumer
 }
 
-func (a *allowListLogConsumer) Log(name, container, message string) {
-	if a.allowList[name] {
-		a.delegate.Log(name, container, message)
+func (a *allowListLogConsumer) Log(name, service, container, message string) {
+	if a.allowList[service] {
+		a.delegate.Log(name, service, container, message)
 	}
 }
 

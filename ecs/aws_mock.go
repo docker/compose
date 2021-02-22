@@ -285,7 +285,7 @@ func (mr *MockAPIMockRecorder) GetLoadBalancerURL(arg0, arg1 interface{}) *gomoc
 }
 
 // GetLogs mocks base method
-func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 func(string, string, string), arg3 bool) error {
+func (m *MockAPI) GetLogs(arg0 context.Context, arg1 string, arg2 func(string, string, string, string), arg3 bool) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)

@@ -218,7 +218,7 @@ type Stack struct {
 
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
-	Log(name, container, message string)
+	Log(name, service, container, message string)
 	Status(name, container, msg string)
 	Register(name string, source string)
 }
