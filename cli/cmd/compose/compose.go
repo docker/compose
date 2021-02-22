@@ -83,9 +83,9 @@ func (o *projectOptions) toProject(services []string) (*types.Project, error) {
 
 func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
-		cli.WithOsEnv,
 		cli.WithEnvFile(o.EnvFile),
 		cli.WithDotEnv,
+		cli.WithOsEnv,
 		cli.WithWorkingDirectory(o.WorkingDir),
 		cli.WithName(o.ProjectName))
 }
