@@ -22,6 +22,7 @@ ifeq ($(UNAME_S),Darwin)
 	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
 endif
 
+BINARY_FOLDER=$(shell pwd)/bin
 GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
 TEST_FLAGS?=
 E2E_TEST?=
@@ -91,6 +92,9 @@ serve: cli ## start server
 
 moby-cli-link: ## Create com.docker.cli symlink if does not already exist
 	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
+
+install: ## Link /usr/local/bin/ to current binary
+	ln -fs $(BINARY_FOLDER)/docker /usr/local/bin/docker
 
 validate-headers: ## Check license header for all files
 	@docker build . --target check-license-headers
