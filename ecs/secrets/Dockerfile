@@ -15,7 +15,7 @@
 FROM golang:1.16 AS builder
 WORKDIR $GOPATH/src/github.com/docker/compose-cli/ecs/secrets
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/secrets main/main.go
+RUN GO111MODULE=auto CGO_ENABLED=0 go build -ldflags="-w -s" -o /go/bin/secrets main/main.go
 
 FROM scratch
 COPY --from=builder /go/bin/secrets /secrets
