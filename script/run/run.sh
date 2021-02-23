@@ -87,7 +87,7 @@ done
 
 # Setup environment variables for compose config and context
 # shellcheck disable=SC1117
-ENV_OPTIONS=$(printenv | sed -E "/^PATH=.*/d; /^DOCKER_HOST=.*/d; s/^/-e /g; s/=.*//g; s/\n/ /g")
+ENV_OPTIONS=$(printenv | sed -E "/^PATH=.*/d; /^DOCKER_HOST=.*/d; /[^=]/d; s/^/-e /g; s/=.*//g; s/\n/ /g")
 
 # Only allocate tty if we detect one
 if [ -t 0 ] && [ -t 1 ]; then
