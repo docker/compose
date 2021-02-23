@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
@@ -61,6 +62,9 @@ type upOptions struct {
 	scale         []string
 	noColor       bool
 	noPrefix      bool
+	timeChanged   bool
+	timeout       int
+	noDeps        bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -83,6 +87,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.timeChanged = cmd.Flags().Changed("timeout")
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 				if opts.exitCodeFrom != "" {
@@ -122,6 +127,8 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.noStart, "no-start", false, "Don't start the services after creating them.")
 		flags.BoolVar(&opts.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
+		flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
+		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
 	}
 
 	return upCmd
@@ -152,6 +159,15 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
+	if opts.noDeps {
+		enabled, err := project.GetServices(services)
+		if err != nil {
+			return err
+		}
+		project.DisabledServices = append(project.DisabledServices, project.Services...)
+		project.Services = enabled
+	}
+
 	err = applyScaleOpt(opts.scale, project)
 	if err != nil {
 		return err
@@ -161,6 +177,14 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		_, err := project.GetService(opts.exitCodeFrom)
 		if err != nil {
 			return err
+		}
+	}
+
+	if opts.timeChanged {
+		timeoutValue := types.Duration(time.Duration(opts.timeout) * time.Second)
+		for i, s := range project.Services {
+			s.StopGracePeriod = &timeoutValue
+			project.Services[i] = s
 		}
 	}
 
