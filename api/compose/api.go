@@ -266,4 +266,6 @@ const (
 	ContainerEventAttach
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
+	// UserCancel user cancelled compose up, we are stopping containers
+	UserCancel
 )
