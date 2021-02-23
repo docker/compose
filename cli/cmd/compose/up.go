@@ -205,6 +205,9 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signalChan
+		queue <- compose.ContainerEvent{
+			Type: compose.UserCancel,
+		}
 		fmt.Println("Gracefully stopping...")
 		stopFunc() // nolint:errcheck
 	}()
@@ -332,6 +335,8 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 	for {
 		event := <-p.queue
 		switch event.Type {
+		case compose.UserCancel:
+			aborting = true
 		case compose.ContainerEventAttach:
 			consumer.Register(event.Name, event.Source)
 			count++
