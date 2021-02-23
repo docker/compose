@@ -63,6 +63,7 @@ type upOptions struct {
 	noPrefix      bool
 	timeChanged   bool
 	timeout       int
+	noDeps        bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -122,6 +123,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
 		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 		flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
+		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
 	}
 
 	return upCmd
@@ -150,6 +152,15 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	c, project, err := setup(ctx, *opts.composeOptions, services)
 	if err != nil {
 		return err
+	}
+
+	if opts.noDeps {
+		enabled, err := project.GetServices(services)
+		if err != nil {
+			return err
+		}
+		project.DisabledServices = append(project.DisabledServices, project.Services...)
+		project.Services = enabled
 	}
 
 	err = applyScaleOpt(opts.scale, project)

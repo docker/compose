@@ -45,6 +45,7 @@ type runOptions struct {
 	entrypoint  string
 	labels      []string
 	name        string
+	noDeps      bool
 }
 
 func runCommand(p *projectOptions) *cobra.Command {
@@ -75,6 +76,7 @@ func runCommand(p *projectOptions) *cobra.Command {
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
 	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
+	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
 
 	flags.SetInterspersed(false)
 	return cmd
@@ -84,6 +86,15 @@ func runRun(ctx context.Context, opts runOptions) error {
 	c, project, err := setup(ctx, *opts.composeOptions, []string{opts.Service})
 	if err != nil {
 		return err
+	}
+
+	if opts.noDeps {
+		enabled, err := project.GetService(opts.Service)
+		if err != nil {
+			return err
+		}
+		project.DisabledServices = append(project.DisabledServices, project.Services...)
+		project.Services = types.Services{enabled}
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
