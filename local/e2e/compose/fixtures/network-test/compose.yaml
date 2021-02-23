@@ -1,4 +1,9 @@
 services:
+  mydb:
+    image: mysql
+    network_mode: "service:db"
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
   db:
     image: gtardif/sentences-db
     networks:

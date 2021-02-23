@@ -32,7 +32,7 @@ func TestFilterServices(t *testing.T) {
 			},
 			{
 				Name:        "bar",
-				NetworkMode: "service:zot",
+				NetworkMode: types.NetworkModeServicePrefix + "zot",
 			},
 			{
 				Name: "zot",
