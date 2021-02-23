@@ -116,17 +116,16 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 }
 
 // WaitForRunningPodState blocks until pods are in running state
-func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, services []string, status string, timeout int) error {
-	var t time.Duration = 60
-
-	if timeout > 0 {
-		t = time.Duration(timeout) * time.Second
+func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOptions) error {
+	var timeout time.Duration = time.Duration(60) * time.Second
+	if opts.Timeout > 0 {
+		timeout = time.Duration(opts.Timeout) * time.Second
 	}
 
-	selector := fmt.Sprintf("%s=%s", compose.ProjectTag, projectName)
+	selector := fmt.Sprintf("%s=%s", compose.ProjectTag, opts.ProjectName)
 	waitingForPhase := corev1.PodRunning
 
-	switch status {
+	switch opts.Status {
 	case compose.STARTING:
 		waitingForPhase = corev1.PodPending
 	case compose.UNKNOWN:
@@ -135,7 +134,7 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, se
 
 	errch := make(chan error, 1)
 	done := make(chan bool)
-
+	status := opts.Status
 	go func() {
 		for {
 			time.Sleep(500 * time.Millisecond)
@@ -147,26 +146,29 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, se
 				errch <- err
 			}
 
-			servicePods := 0
+			servicePods := map[string]string{}
 			stateReached := true
 			for _, pod := range pods.Items {
-
+				service := pod.Labels[compose.ServiceTag]
+				if opts.Services == nil || utils.StringContains(opts.Services, service) {
+					servicePods[service] = pod.Status.Message
+				}
 				if status == compose.REMOVING {
-					if contains(services, pod.Labels[compose.ServiceTag]) {
-						servicePods = servicePods + 1
-					}
 					continue
 				}
 
 				if pod.Status.Phase != waitingForPhase {
 					stateReached = false
-
 				}
 			}
-
 			if status == compose.REMOVING {
-				if servicePods > 0 {
+				if len(servicePods) > 0 {
 					stateReached = false
+				}
+			}
+			if opts.Log != nil {
+				for p, m := range servicePods {
+					opts.Log(p, stateReached, m)
 				}
 			}
 
@@ -177,8 +179,8 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, projectName string, se
 	}()
 
 	select {
-	case <-time.After(t):
-		return fmt.Errorf("timeout: pods did not reach expected state.")
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout: pods did not reach expected state")
 	case err := <-errch:
 		if err != nil {
 			return err

@@ -33,11 +33,13 @@ func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
 	}
 }
 
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
+type LogFunc func(pod string, stateReached bool, message string)
+
+// ServiceStatus hold status about a service
+type WaitForStatusOptions struct {
+	ProjectName string
+	Services    []string
+	Status      string
+	Timeout     int
+	Log         LogFunc
 }

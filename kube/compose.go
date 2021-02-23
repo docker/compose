@@ -92,9 +92,21 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
-	eventName = "Wait for pods to be running"
+	logF := func(pod string, stateReached bool, message string) {
+		state := progress.Done
+		if !stateReached {
+			state = progress.Working
+		}
+		w.Event(progress.NewEvent(pod, state, message))
+	}
 
-	return s.client.WaitForPodState(ctx, project.Name, project.ServiceNames(), compose.RUNNING, 10)
+	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
+		ProjectName: project.Name,
+		Services:    project.ServiceNames(),
+		Status:      compose.RUNNING,
+		Timeout:     60,
+		Log:         logF,
+	})
 }
 
 // Down executes the equivalent to a `compose down`
@@ -116,9 +128,37 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 		w.Event(progress.NewEvent(eventName, progress.Working, message))
 	}
 	err := s.sdk.Uninstall(projectName, logger)
-	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+	if err != nil {
+		return err
+	}
 
-	return err
+	events := []string{}
+	logF := func(pod string, stateReached bool, message string) {
+		state := progress.Done
+		if !stateReached {
+			state = progress.Working
+		}
+		w.Event(progress.NewEvent(pod, state, message))
+		if !utils.StringContains(events, pod) {
+			events = append(events, pod)
+		}
+	}
+
+	err = s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
+		ProjectName: projectName,
+		Services:    nil,
+		Status:      compose.REMOVING,
+		Timeout:     60,
+		Log:         logF,
+	})
+	if err != nil {
+		return err
+	}
+	for _, e := range events {
+		w.Event(progress.NewEvent(e, progress.Done, ""))
+	}
+	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+	return nil
 }
 
 // List executes the equivalent to a `docker stack ls`
