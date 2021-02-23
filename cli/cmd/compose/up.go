@@ -160,7 +160,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	}
 
 	if opts.noDeps {
-		enabled, err := project.GetServices(services)
+		enabled, err := project.GetServices(services...)
 		if err != nil {
 			return err
 		}
