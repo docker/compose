@@ -87,18 +87,27 @@ func toVolumeSpecs(project *types.Project, s types.ServiceConfig) ([]volumeSpec,
 	for _, s := range s.Secrets {
 		name := fmt.Sprintf("%s-%s", project.Name, s.Source)
 
-		target := path.Join("/run/secrets", or(s.Target, s.Source))
+		target := path.Join("/run/secrets", or(s.Target, path.Join(s.Source, s.Source)))
 		readOnly := true
+
+		filename := filepath.Base(target)
+		dir := filepath.Dir(target)
 
 		specs = append(specs, volumeSpec{
 			source: &apiv1.VolumeSource{
 				Secret: &apiv1.SecretVolumeSource{
 					SecretName: name,
+					Items: []apiv1.KeyToPath{
+						{
+							Key:  name,
+							Path: filename,
+						},
+					},
 				},
 			},
 			mount: apiv1.VolumeMount{
-				Name:      name,
-				MountPath: target,
+				Name:      filename,
+				MountPath: dir,
 				ReadOnly:  readOnly,
 			},
 		})
