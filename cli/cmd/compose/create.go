@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -34,10 +36,17 @@ func createCommand(p *projectOptions) *cobra.Command {
 		Use:   "create [SERVICE...]",
 		Short: "Creates containers for a service.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.Build && opts.noBuild {
+				return fmt.Errorf("--build and --no-build are incompatible")
+			}
+			if opts.forceRecreate && opts.noRecreate {
+				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+			}
 			return runCreateStart(cmd.Context(), upOptions{
 				composeOptions: &composeOptions{
 					projectOptions: p,
 					Build:          opts.Build,
+					noBuild:        opts.noBuild,
 				},
 				noStart:       true,
 				forceRecreate: opts.forceRecreate,
@@ -47,6 +56,7 @@ func createCommand(p *projectOptions) *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
+	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
 	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	return cmd

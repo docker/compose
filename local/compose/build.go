@@ -56,7 +56,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		if err != nil {
 			return err
 		}
-		// TODO build vs pull should be controlled by pull policy, see https://github.com/compose-spec/compose-spec/issues/26
+
 		if service.Image != "" {
 			if localImagePresent {
 				continue
