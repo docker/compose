@@ -19,6 +19,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/docker/compose-cli/api/compose"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -40,6 +42,6 @@ type WaitForStatusOptions struct {
 	ProjectName string
 	Services    []string
 	Status      string
-	Timeout     int
+	Timeout     *time.Duration
 	Log         LogFunc
 }

@@ -92,20 +92,17 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
-	logF := func(pod string, stateReached bool, message string) {
-		state := progress.Done
-		if !stateReached {
-			state = progress.Working
-		}
-		w.Event(progress.NewEvent(pod, state, message))
-	}
-
 	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
 		ProjectName: project.Name,
 		Services:    project.ServiceNames(),
 		Status:      compose.RUNNING,
-		Timeout:     60,
-		Log:         logF,
+		Log: func(pod string, stateReached bool, message string) {
+			state := progress.Done
+			if !stateReached {
+				state = progress.Working
+			}
+			w.Event(progress.NewEvent(pod, state, message))
+		},
 	})
 }
 
@@ -133,23 +130,21 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	}
 
 	events := []string{}
-	logF := func(pod string, stateReached bool, message string) {
-		state := progress.Done
-		if !stateReached {
-			state = progress.Working
-		}
-		w.Event(progress.NewEvent(pod, state, message))
-		if !utils.StringContains(events, pod) {
-			events = append(events, pod)
-		}
-	}
-
 	err = s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
 		ProjectName: projectName,
 		Services:    nil,
 		Status:      compose.REMOVING,
-		Timeout:     60,
-		Log:         logF,
+		Timeout:     options.Timeout,
+		Log: func(pod string, stateReached bool, message string) {
+			state := progress.Done
+			if !stateReached {
+				state = progress.Working
+			}
+			w.Event(progress.NewEvent(pod, state, message))
+			if !utils.StringContains(events, pod) {
+				events = append(events, pod)
+			}
+		},
 	})
 	if err != nil {
 		return err

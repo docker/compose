@@ -118,8 +118,8 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 // WaitForRunningPodState blocks until pods are in running state
 func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOptions) error {
 	var timeout time.Duration = time.Duration(60) * time.Second
-	if opts.Timeout > 0 {
-		timeout = time.Duration(opts.Timeout) * time.Second
+	if opts.Timeout != nil {
+		timeout = *opts.Timeout
 	}
 
 	selector := fmt.Sprintf("%s=%s", compose.ProjectTag, opts.ProjectName)
