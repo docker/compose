@@ -42,7 +42,8 @@ import (
 // composeOptions hold options common to `up` and `run` to run compose project
 type composeOptions struct {
 	*projectOptions
-	Build bool
+	Build   bool
+	noBuild bool
 	// ACI only
 	DomainName string
 }
@@ -87,6 +88,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 				if opts.exitCodeFrom != "" {
 					opts.cascadeStop = true
 				}
+				if opts.Build && opts.noBuild {
+					return fmt.Errorf("--build and --no-build are incompatible")
+				}
 				if opts.cascadeStop && opts.Detach {
 					return fmt.Errorf("--abort-on-container-exit and --detach are incompatible")
 				}
@@ -103,6 +107,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	flags.StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
+	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
@@ -284,10 +289,18 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		project.Services[0].DomainName = opts.DomainName
 	}
 	if opts.Build {
-		for _, service := range project.Services {
+		for i, service := range project.Services {
 			service.PullPolicy = types.PullPolicyBuild
+			project.Services[i] = service
 		}
 	}
+	if opts.noBuild {
+		for i, service := range project.Services {
+			service.Build = nil
+			project.Services[i] = service
+		}
+	}
+
 	if opts.EnvFile != "" {
 		var services types.Services
 		for _, s := range project.Services {
