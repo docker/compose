@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -130,20 +131,38 @@ type RemoveOptions struct {
 
 // RunOptions options to execute compose run
 type RunOptions struct {
-	Service    string
-	Command    []string
-	Detach     bool
-	AutoRemove bool
-	Writer     io.Writer
-	Reader     io.Reader
-
-	// used by exec
+	Name        string
+	Service     string
+	Command     []string
+	Entrypoint  []string
+	Detach      bool
+	AutoRemove  bool
+	Writer      io.Writer
+	Reader      io.Reader
 	Tty         bool
 	WorkingDir  string
 	User        string
 	Environment []string
+	Labels      types.Labels
 	Privileged  bool
-	Index       int
+	// used by exec
+	Index int
+}
+
+// EnvironmentMap return RunOptions.Environment as a MappingWithEquals
+func (opts *RunOptions) EnvironmentMap() types.MappingWithEquals {
+	environment := types.MappingWithEquals{}
+	for _, s := range opts.Environment {
+		parts := strings.SplitN(s, "=", 2)
+		key := parts[0]
+		switch {
+		case len(parts) == 1:
+			environment[key] = nil
+		default:
+			environment[key] = &parts[1]
+		}
+	}
+	return environment
 }
 
 // PsOptions group options of the Ps API

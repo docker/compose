@@ -30,37 +30,32 @@ import (
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
-	originalServices := project.Services
-	var requestedService types.ServiceConfig
-	for _, service := range originalServices {
-		if service.Name == opts.Service {
-			requestedService = service
-		}
+	service, err := project.GetService(opts.Service)
+	if err != nil {
+		return 0, err
 	}
 
-	project.Services = originalServices
-	if len(opts.Command) > 0 {
-		requestedService.Command = opts.Command
-	}
-	requestedService.Scale = 1
-	requestedService.Tty = true
-	requestedService.StdinOpen = true
+	applyRunOptions(&service, opts)
 
 	slug := moby.GenerateRandomID()
-	requestedService.ContainerName = fmt.Sprintf("%s_%s_run_%s", project.Name, requestedService.Name, moby.TruncateID(slug))
-	requestedService.Labels = requestedService.Labels.Add(slugLabel, slug)
-	requestedService.Labels = requestedService.Labels.Add(oneoffLabel, "True")
+	if service.ContainerName == "" {
+		service.ContainerName = fmt.Sprintf("%s_%s_run_%s", project.Name, service.Name, moby.TruncateID(slug))
+	}
+	service.Scale = 1
+	service.StdinOpen = true
+	service.Labels = service.Labels.Add(slugLabel, slug)
+	service.Labels = service.Labels.Add(oneoffLabel, "True")
 
-	if err := s.ensureImagesExists(ctx, project); err != nil { // all dependencies already checked, but might miss requestedService img
+	if err := s.ensureImagesExists(ctx, project); err != nil { // all dependencies already checked, but might miss service img
 		return 0, err
 	}
-	if err := s.waitDependencies(ctx, project, requestedService); err != nil {
+	if err := s.waitDependencies(ctx, project, service); err != nil {
 		return 0, err
 	}
-	if err := s.createContainer(ctx, project, requestedService, requestedService.ContainerName, 1, opts.AutoRemove); err != nil {
+	if err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove); err != nil {
 		return 0, err
 	}
-	containerID := requestedService.ContainerName
+	containerID := service.ContainerName
 
 	if opts.Detach {
 		err := s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
@@ -81,7 +76,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 	oneoffContainer := containers[0]
-	err = s.attachContainerStreams(ctx, oneoffContainer, true, opts.Reader, opts.Writer)
+	err = s.attachContainerStreams(ctx, oneoffContainer, service.Tty, opts.Reader, opts.Writer)
 	if err != nil {
 		return 0, err
 	}
@@ -99,4 +94,28 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
+}
+
+func applyRunOptions(service *types.ServiceConfig, opts compose.RunOptions) {
+	service.Tty = opts.Tty
+	service.ContainerName = opts.Name
+
+	if len(opts.Command) > 0 {
+		service.Command = opts.Command
+	}
+	if len(opts.User) > 0 {
+		service.User = opts.User
+	}
+	if len(opts.WorkingDir) > 0 {
+		service.WorkingDir = opts.WorkingDir
+	}
+	if len(opts.Entrypoint) > 0 {
+		service.Entrypoint = opts.Entrypoint
+	}
+	if len(opts.Environment) > 0 {
+		service.Environment.OverrideBy(opts.EnvironmentMap())
+	}
+	for k, v := range opts.Labels {
+		service.Labels.Add(k, v)
+	}
 }

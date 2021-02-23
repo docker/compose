@@ -18,9 +18,12 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -33,9 +36,15 @@ type runOptions struct {
 	*composeOptions
 	Service     string
 	Command     []string
-	Environment []string
+	environment []string
 	Detach      bool
 	Remove      bool
+	noTty       bool
+	user        string
+	workdir     string
+	entrypoint  string
+	labels      []string
+	name        string
 }
 
 func runCommand(p *projectOptions) *cobra.Command {
@@ -44,7 +53,7 @@ func runCommand(p *projectOptions) *cobra.Command {
 			projectOptions: p,
 		},
 	}
-	runCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
@@ -56,12 +65,19 @@ func runCommand(p *projectOptions) *cobra.Command {
 			return runRun(cmd.Context(), opts)
 		},
 	}
-	runCmd.Flags().BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
-	runCmd.Flags().StringArrayVarP(&opts.Environment, "env", "e", []string{}, "Set environment variables")
-	runCmd.Flags().BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
+	flags := cmd.Flags()
+	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
+	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
+	flags.StringArrayVarP(&opts.labels, "labels", "l", []string{}, "Add or override a label")
+	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-tty allocation. By default docker compose run allocates a TTY")
+	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
+	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
+	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
+	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
 
-	runCmd.Flags().SetInterspersed(false)
-	return runCmd
+	flags.SetInterspersed(false)
+	return cmd
 }
 
 func runRun(ctx context.Context, opts runOptions) error {
@@ -77,14 +93,39 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
+	var entrypoint []string
+	if opts.entrypoint != "" {
+		entrypoint, err = shellwords.Parse(opts.entrypoint)
+		if err != nil {
+			return err
+		}
+	}
+
+	labels := types.Labels{}
+	for _, s := range opts.labels {
+		parts := strings.SplitN(s, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("label must be set as KEY=VALUE")
+		}
+		labels[parts[0]] = parts[1]
+	}
+
 	// start container and attach to container streams
 	runOpts := compose.RunOptions{
-		Service:    opts.Service,
-		Command:    opts.Command,
-		Detach:     opts.Detach,
-		AutoRemove: opts.Remove,
-		Writer:     os.Stdout,
-		Reader:     os.Stdin,
+		Name:        opts.name,
+		Service:     opts.Service,
+		Command:     opts.Command,
+		Detach:      opts.Detach,
+		AutoRemove:  opts.Remove,
+		Writer:      os.Stdout,
+		Reader:      os.Stdin,
+		Tty:         !opts.noTty,
+		WorkingDir:  opts.workdir,
+		User:        opts.user,
+		Environment: opts.environment,
+		Entrypoint:  entrypoint,
+		Labels:      labels,
+		Index:       0,
 	}
 	exitCode, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
