@@ -258,6 +258,11 @@ func exit(ctx string, err error, ctype string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(errdefs.ExitCodeLoginRequired)
 	}
+
+	if compose.Warning != "" {
+		fmt.Fprintln(os.Stderr, compose.Warning)
+	}
+
 	if errors.Is(err, errdefs.ErrNotImplemented) {
 		name := metrics.GetCommand(os.Args[1:])
 		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
