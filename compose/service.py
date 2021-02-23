@@ -1873,6 +1873,8 @@ class _CLIBuilder:
         command_builder.add_arg("--tag", tag)
         command_builder.add_arg("--target", target)
         command_builder.add_arg("--iidfile", iidfile)
+        command_builder.add_arg("--platform", platform)
+        command_builder.add_arg("--isolation", isolation)
         args = command_builder.build([path])
 
         magic_word = "Successfully built "
