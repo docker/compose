@@ -34,18 +34,37 @@ import (
 
 func (s *composeService) Build(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
+	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
+			imagesToBuild = append(imagesToBuild, imageName)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 		}
 	}
 
-	return s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts)
+	if err == nil {
+		displayScanMessage(imagesToBuild)
+	}
+
+	return err
+}
+
+func displayScanMessage(builtImages []string) {
+	if len(builtImages) > 0 {
+		commands := []string{}
+		for _, image := range builtImages {
+			commands = append(commands, fmt.Sprintf("docker scan %s", image))
+		}
+		allCommands := strings.Join(commands, ", ")
+		fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
+	}
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
+	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
@@ -66,6 +85,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
+			imagesToBuild = append(imagesToBuild, imageName)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 			continue
 		}
@@ -84,7 +104,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	}
 
-	return s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts)
+	if err == nil {
+		displayScanMessage(imagesToBuild)
+	}
+	return err
 }
 
 func (s *composeService) localImagePresent(ctx context.Context, imageName string) (bool, error) {
@@ -126,14 +150,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	errW := w.Wait()
 	if err == nil {
 		err = errW
-	}
-	if err == nil {
-		commands := make([]string, 0, len(opts))
-		for image, _ := range opts {
-			commands = append(commands, fmt.Sprintf("docker scan %s", image))
-		}
-		allCommands := strings.Join(commands, ", ")
-		fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
 	}
 	return err
 }
