@@ -1,6 +1,43 @@
 Change log
 ==========
 
+1.28.3 (2021-02-17)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/53?closed=1)
+
+### Bugs
+
+- Fix SSH hostname parsing when it contains leading s/h, and remove the quiet option that was hiding the error (via docker-py bump to 4.4.2)
+
+- Fix key error for '--no-log-prefix' option
+
+- Fix incorrect CLI environment variable name for service profiles: `COMPOSE_PROFILES` instead of `COMPOSE_PROFILE`
+
+- Fix fish completion
+
+### Miscellaneous
+
+- Bump cryptography to 3.3.2
+
+- Remove log driver filter
+
+1.28.2 (2021-01-26)
+-------------------
+
+### Miscellaneous
+
+- CI setup update
+
+1.28.1 (2021-01-25)
+-------------------
+
+### Bugs
+
+- Revert to Python 3.7 bump for Linux static builds
+
+- Add bash completion for `docker-compose logs|up --no-log-prefix`
+
 1.28.0 (2021-01-20)
 -------------------
 

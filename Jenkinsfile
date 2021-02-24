@@ -23,7 +23,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('alpine')
@@ -31,7 +31,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('debian')
@@ -62,7 +62,7 @@ pipeline {
 
 def buildImage(baseImage) {
     def scmvar = checkout(scm)
-    def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+    def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
     image = docker.image(imageName)
 
     withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -89,7 +89,7 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
             node("ubuntu && amd64 && !zfs") {
                 def scmvar = checkout(scm)
-                def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+                def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
                 echo "Using local system's storage driver: ${storageDriver}"
                 withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -99,6 +99,8 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
                       --privileged \\
                       --volume="\$(pwd)/.git:/code/.git" \\
                       --volume="/var/run/docker.sock:/var/run/docker.sock" \\
+                      --volume="\${DOCKER_CONFIG}/config.json:/root/.docker/config.json" \\
+                      -e "DOCKER_TLS_CERTDIR=" \\
                       -e "TAG=${imageName}" \\
                       -e "STORAGE_DRIVER=${storageDriver}" \\
                       -e "DOCKER_VERSIONS=${dockerVersion}" \\

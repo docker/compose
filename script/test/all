@@ -38,16 +38,18 @@ for version in $DOCKER_VERSIONS; do
 
   trap "on_exit" EXIT
 
-  repo="dockerswarm/dind"
-
   docker run \
     -d \
     --name "$daemon_container" \
     --privileged \
     --volume="/var/lib/docker" \
-    "$repo:$version" \
+    -v $DOCKER_CONFIG/config.json:/root/.docker/config.json \
+    -e "DOCKER_TLS_CERTDIR=" \
+    "docker:$version-dind" \
     dockerd -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
     2>&1 | tail -n 10
+
+  docker exec "$daemon_container" sh -c "apk add --no-cache git"
 
   docker run \
     --rm \
