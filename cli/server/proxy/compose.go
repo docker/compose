@@ -77,7 +77,7 @@ func (p *proxy) Services(ctx context.Context, request *composev1.ComposeServices
 }
 
 func (p *proxy) Stacks(ctx context.Context, request *composev1.ComposeStacksRequest) (*composev1.ComposeStacksResponse, error) {
-	stacks, err := Client(ctx).ComposeService().List(ctx)
+	stacks, err := Client(ctx).ComposeService().List(ctx, compose.ListOptions{All: request.All})
 	if err != nil {
 		return nil, err
 	}

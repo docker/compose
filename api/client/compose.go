@@ -68,7 +68,7 @@ func (c *composeService) Ps(context.Context, string, compose.PsOptions) ([]compo
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (c *composeService) List(context.Context) ([]compose.Stack, error) {
+func (c *composeService) List(context.Context, compose.ListOptions) ([]compose.Stack, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 

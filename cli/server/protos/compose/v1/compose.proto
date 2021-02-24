@@ -48,6 +48,7 @@ message ComposeDownResponse {
 
 message ComposeStacksRequest {
   string projectName = 1;
+  bool all = 2;
 }
 
 message ComposeStacksResponse {

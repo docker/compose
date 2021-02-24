@@ -28,16 +28,18 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type lsOptions struct {
 	Format string
 	Quiet  bool
+	All    bool
 	Filter opts.FilterOpt
 }
 
-func listCommand() *cobra.Command {
+func listCommand(contextType string) *cobra.Command {
 	opts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls",
@@ -49,6 +51,9 @@ func listCommand() *cobra.Command {
 	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")
 	lsCmd.Flags().Var(&opts.Filter, "filter", "Filter output based on conditions provided.")
+	if contextType == store.DefaultContextType {
+		lsCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped Compose projects")
+	}
 
 	return lsCmd
 }
@@ -68,7 +73,7 @@ func runList(ctx context.Context, opts lsOptions) error {
 	if err != nil {
 		return err
 	}
-	stackList, err := c.ComposeService().List(ctx)
+	stackList, err := c.ComposeService().List(ctx, compose.ListOptions{All: opts.All})
 	if err != nil {
 		return err
 	}

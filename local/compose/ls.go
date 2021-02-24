@@ -27,9 +27,10 @@ import (
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) List(ctx context.Context) ([]compose.Stack, error) {
+func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
 	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(hasProjectLabelFilter()),
+		All:     opts.All,
 	})
 	if err != nil {
 		return nil, err

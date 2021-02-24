@@ -175,7 +175,7 @@ func (cs *aciComposeService) Ps(ctx context.Context, projectName string, options
 	return res, nil
 }
 
-func (cs *aciComposeService) List(ctx context.Context) ([]compose.Stack, error) {
+func (cs *aciComposeService) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
 	containerGroups, err := getACIContainerGroups(ctx, cs.ctx.SubscriptionID, cs.ctx.ResourceGroup)
 	if err != nil {
 		return nil, err
