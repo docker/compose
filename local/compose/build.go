@@ -127,6 +127,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	if err == nil {
 		err = errW
 	}
+	if err == nil {
+		commands := make([]string, 0, len(opts))
+		for image, _ := range opts {
+			commands = append(commands, fmt.Sprintf("docker scan %s", image))
+		}
+		allCommands := strings.Join(commands, ", ")
+		fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
+	}
 	return err
 }
 

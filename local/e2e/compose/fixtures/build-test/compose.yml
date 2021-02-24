@@ -6,4 +6,4 @@ services:
 
   nginx2:
     build: nginx-build
-    image: custom-nginx
+    image: gtardif/custom-nginx
