@@ -6,10 +6,4 @@ services:
 
   nginx2:
     build: nginx-build
-    image: gtardif/custom-nginx:1.0
-
-  mongo:
-    image: mongo
-
-  sentences:
-    image: gtardif/sentences-web
+    image: custom-nginx

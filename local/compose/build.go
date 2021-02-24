@@ -51,20 +51,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 	return err
 }
 
-func displayScanSuggestMsg(builtImages []string) {
-	if len(builtImages) > 0 {
-		if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
-			return
-		}
-		commands := []string{}
-		for _, image := range builtImages {
-			commands = append(commands, fmt.Sprintf("docker scan %s", image))
-		}
-		allCommands := strings.Join(commands, ", ")
-		fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
-	}
-}
-
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
