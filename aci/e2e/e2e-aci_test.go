@@ -486,7 +486,7 @@ func TestContainerRunAttached(t *testing.T) {
 				c.RunDockerCmd("rm", "-f", container)
 			}
 			c.RunDockerCmd("run",
-				"--name", container,
+				"--name", "fallback", // don't reuse the container name, this container is in a weird state and blocks everything
 				"--memory", "0.1G", "--cpus", "0.1",
 				"nginx")
 		} else {
