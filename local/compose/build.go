@@ -45,14 +45,17 @@ func (s *composeService) Build(ctx context.Context, project *types.Project) erro
 
 	err := s.build(ctx, project, opts)
 	if err == nil {
-		displayScanMessage(imagesToBuild)
+		displayScanSuggestMsg(imagesToBuild)
 	}
 
 	return err
 }
 
-func displayScanMessage(builtImages []string) {
+func displayScanSuggestMsg(builtImages []string) {
 	if len(builtImages) > 0 {
+		if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
+			return
+		}
 		commands := []string{}
 		for _, image := range builtImages {
 			commands = append(commands, fmt.Sprintf("docker scan %s", image))
@@ -106,7 +109,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	err := s.build(ctx, project, opts)
 	if err == nil {
-		displayScanMessage(imagesToBuild)
+		displayScanSuggestMsg(imagesToBuild)
 	}
 	return err
 }
