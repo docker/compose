@@ -119,7 +119,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 }
 
 // List executes the equivalent to a `docker stack ls`
-func (s *composeService) List(ctx context.Context) ([]compose.Stack, error) {
+func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
 	return s.sdk.ListReleases()
 }
 

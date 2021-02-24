@@ -48,7 +48,7 @@ type Service interface {
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
-	List(ctx context.Context) ([]Stack, error)
+	List(ctx context.Context, options ListOptions) ([]Stack, error)
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
@@ -163,6 +163,11 @@ func (opts *RunOptions) EnvironmentMap() types.MappingWithEquals {
 		}
 	}
 	return environment
+}
+
+// ListOptions group options of the ls API
+type ListOptions struct {
+	All bool
 }
 
 // PsOptions group options of the Ps API
