@@ -490,8 +490,6 @@ class Project:
                 log.info('%s uses an image, skipping' % service.name)
 
         if cli:
-            log.info("Building with native build. Learn about native build in Compose here: "
-                     "https://docs.docker.com/go/compose-native-build/")
             if parallel_build:
                 log.warning("Flag '--parallel' is ignored when building with "
                             "COMPOSE_DOCKER_CLI_BUILD=1")
@@ -650,10 +648,6 @@ class Project:
            attach_dependencies=False,
            override_options=None,
            ):
-
-        if cli:
-            log.info("Building with native build. Learn about native build in Compose here: "
-                     "https://docs.docker.com/go/compose-native-build/")
 
         self.initialize()
         if not ignore_orphans:
