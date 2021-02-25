@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	pluginmanager "github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
@@ -40,12 +39,7 @@ func displayScanSuggestMsg(ctx context.Context, builtImages []string) {
 	if !scanAvailable() || scanAlreadyInvoked(ctx) {
 		return
 	}
-	commands := []string{}
-	for _, image := range builtImages {
-		commands = append(commands, fmt.Sprintf("docker scan %s", image))
-	}
-	allCommands := strings.Join(commands, ", ")
-	fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
+	fmt.Println("Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them")
 }
 
 func scanAlreadyInvoked(ctx context.Context) bool {
