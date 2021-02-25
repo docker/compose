@@ -17,29 +17,60 @@
 package compose
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	pluginmanager "github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose-cli/api/config"
 )
 
-func displayScanSuggestMsg(builtImages []string) {
+func displayScanSuggestMsg(ctx context.Context, builtImages []string) {
 	if len(builtImages) <= 0 {
 		return
 	}
 	if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
 		return
 	}
-	if scanAvailable() {
-		commands := []string{}
-		for _, image := range builtImages {
-			commands = append(commands, fmt.Sprintf("docker scan %s", image))
-		}
-		allCommands := strings.Join(commands, ", ")
-		fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
+	if !scanAvailable() || scanAlreadyInvoked(ctx) {
+		return
 	}
+	commands := []string{}
+	for _, image := range builtImages {
+		commands = append(commands, fmt.Sprintf("docker scan %s", image))
+	}
+	allCommands := strings.Join(commands, ", ")
+	fmt.Printf("Try scanning the image you have just built to identify vulnerabilities with Docker’s new security tool: %s\n", allCommands)
+}
+
+func scanAlreadyInvoked(ctx context.Context) bool {
+	configDir := config.Dir(ctx)
+	filename := filepath.Join(configDir, "scan", "config.json")
+	f, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if f.IsDir() { // should never happen, do not bother user with suggestion if something goes wrong
+		return true
+	}
+	type scanOptin struct {
+		Optin bool `json:"optin"`
+	}
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return true
+	}
+	scanConfig := scanOptin{}
+	err = json.Unmarshal(data, &scanConfig)
+	if err != nil {
+		return true
+	}
+	return scanConfig.Optin
 }
 
 func scanAvailable() bool {
