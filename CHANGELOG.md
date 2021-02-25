@@ -1,6 +1,21 @@
 Change log
 ==========
 
+1.28.5 (2021-02-25)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/55?closed=1)
+
+### Bugs
+
+- Fix OpenSSL version mismatch error when shelling out to the ssh client (via bump to docker-py 4.4.4 which contains the fix)
+
+- Add missing build flags to the native builder: `platform`, `isolation` and `extra_hosts`
+
+- Remove info message on native build
+
+- Avoid fetching logs when service logging driver is set to 'none'
+
 1.28.4 (2021-02-18)
 -------------------
 
