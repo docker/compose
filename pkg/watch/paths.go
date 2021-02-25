@@ -10,17 +10,6 @@ import (
 	"github.com/tilt-dev/tilt/internal/ospath"
 )
 
-func greatestExistingAncestors(paths []string) ([]string, error) {
-	result := []string{}
-	for _, p := range paths {
-		newP, err := greatestExistingAncestor(p)
-		if err != nil {
-			return nil, fmt.Errorf("Finding ancestor of %s: %v", p, err)
-		}
-		result = append(result, newP)
-	}
-	return result, nil
-}
 func greatestExistingAncestor(path string) (string, error) {
 	if path == string(filepath.Separator) ||
 		path == fmt.Sprintf("%s%s", filepath.VolumeName(path), string(filepath.Separator)) {

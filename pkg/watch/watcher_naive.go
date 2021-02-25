@@ -303,3 +303,15 @@ func newWatcher(paths []string, ignore PathMatcher, l logger.Logger) (*naiveNoti
 }
 
 var _ Notify = &naiveNotify{}
+
+func greatestExistingAncestors(paths []string) ([]string, error) {
+	result := []string{}
+	for _, p := range paths {
+		newP, err := greatestExistingAncestor(p)
+		if err != nil {
+			return nil, fmt.Errorf("Finding ancestor of %s: %v", p, err)
+		}
+		result = append(result, newP)
+	}
+	return result, nil
+}
