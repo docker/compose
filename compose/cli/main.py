@@ -1482,7 +1482,7 @@ def log_printer_from_project(
         keep_prefix=True,
 ):
     return LogPrinter(
-        containers,
+        [c for c in containers if c.log_driver not in (None, 'none')],
         build_log_presenters(project.service_names, monochrome, keep_prefix),
         event_stream or project.events(),
         cascade_stop=cascade_stop,
