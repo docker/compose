@@ -32,7 +32,7 @@ type projectOptions struct {
 	ProjectName string
 	Profiles    []string
 	ConfigPaths []string
-	WorkingDir  string
+	ProjectDir  string
 	EnvFile     string
 }
 
@@ -41,8 +41,7 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	f.StringVar(&o.WorkingDir, "workdir", "", "Specify an alternate working directory")
-	// TODO make --project-directory an alias
+	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
 }
 
 func (o *projectOptions) toProjectName() (string, error) {
@@ -87,7 +86,7 @@ func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithEnvFile(o.EnvFile),
 		cli.WithDotEnv,
 		cli.WithOsEnv,
-		cli.WithWorkingDirectory(o.WorkingDir),
+		cli.WithWorkingDirectory(o.ProjectDir),
 		cli.WithName(o.ProjectName))
 }
 

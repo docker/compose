@@ -118,7 +118,7 @@ func TestLocalComposeUp(t *testing.T) {
 func TestComposePull(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	res := c.RunDockerOrExitError("compose", "--workdir", "fixtures/simple-composefile", "pull")
+	res := c.RunDockerOrExitError("compose", "--project-directory", "fixtures/simple-composefile", "pull")
 	output := res.Combined()
 
 	assert.Assert(t, strings.Contains(output, "simple Pulled"))

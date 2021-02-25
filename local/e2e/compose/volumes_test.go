@@ -37,7 +37,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
 		c.RunDockerOrExitError("volume", "rm", "myvolume")
-		c.RunDockerCmd("compose", "--workdir", "fixtures/volume-test", "--project-name", projectName, "up", "-d")
+		c.RunDockerCmd("compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("access bind mount data", func(t *testing.T) {
