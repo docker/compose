@@ -485,10 +485,14 @@ func TestContainerRunAttached(t *testing.T) {
 				time.Sleep(1 * time.Second)
 				c.RunDockerCmd("rm", "-f", container)
 			}
-			c.RunDockerCmd("run",
-				"--name", "fallback", // don't reuse the container name, this container is in a weird state and blocks everything
-				"--memory", "0.1G", "--cpus", "0.1",
-				"nginx")
+			go func() { // this specific call to run sometimes does not come back when in this weird state, but the container is actually running fine
+				c.RunDockerCmd("run",
+					"--name", container, // don't reuse the container name, this container is in a weird state and blocks everything
+					"--memory", "0.1G", "--cpus", "0.1",
+					"nginx")
+				fmt.Printf("	[%s] Finished docker run %s\n", t.Name(), container)
+			}()
+			waitForStatus(t, c, container, convert.StatusRunning)
 		} else {
 			res.Assert(t, icmd.Expected{Out: container})
 			waitForStatus(t, c, container, convert.StatusRunning)
