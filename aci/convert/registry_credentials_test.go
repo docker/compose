@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	cliconfigtypes "github.com/docker/cli/cli/config/types"
+	"github.com/docker/compose-cli/aci/login"
 	"github.com/stretchr/testify/mock"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
@@ -255,7 +256,7 @@ func (s *MockRegistryHelper) getAllRegistryCredentials() (map[string]cliconfigty
 	return args.Get(0).(map[string]cliconfigtypes.AuthConfig), args.Error(1)
 }
 
-func (s *MockRegistryHelper) autoLoginAcr(registry string) error {
-	args := s.Called(registry)
+func (s *MockRegistryHelper) autoLoginAcr(registry string, loginService login.AzureLoginService) error {
+	args := s.Called(registry, loginService)
 	return args.Error(0)
 }

@@ -39,17 +39,17 @@ var (
 )
 
 type apiHelper interface {
-	queryToken(data url.Values, tenantID string) (azureToken, error)
-	openAzureLoginPage(redirectURL string) error
+	queryToken(ce CloudEnvironment, data url.Values, tenantID string) (azureToken, error)
+	openAzureLoginPage(redirectURL string, ce CloudEnvironment) error
 	queryAPIWithHeader(ctx context.Context, authorizationURL string, authorizationHeader string) ([]byte, int, error)
-	getDeviceCodeFlowToken() (adal.Token, error)
+	getDeviceCodeFlowToken(ce CloudEnvironment) (adal.Token, error)
 }
 
 type azureAPIHelper struct{}
 
-func (helper azureAPIHelper) getDeviceCodeFlowToken() (adal.Token, error) {
+func (helper azureAPIHelper) getDeviceCodeFlowToken(ce CloudEnvironment) (adal.Token, error) {
 	deviceconfig := auth.NewDeviceFlowConfig(clientID, "common")
-	deviceconfig.Resource = azureManagementURL
+	deviceconfig.Resource = ce.ResourceManagerURL
 	spToken, err := deviceconfig.ServicePrincipalToken()
 	if err != nil {
 		return adal.Token{}, err
@@ -57,9 +57,9 @@ func (helper azureAPIHelper) getDeviceCodeFlowToken() (adal.Token, error) {
 	return spToken.Token(), err
 }
 
-func (helper azureAPIHelper) openAzureLoginPage(redirectURL string) error {
+func (helper azureAPIHelper) openAzureLoginPage(redirectURL string, ce CloudEnvironment) error {
 	state := randomString("", 10)
-	authURL := fmt.Sprintf(authorizeFormat, clientID, redirectURL, state, scopes)
+	authURL := fmt.Sprintf(ce.GetAuthorizeRequestFormat(), clientID, redirectURL, state, ce.GetTokenScope())
 	return openbrowser(authURL)
 }
 
@@ -81,8 +81,8 @@ func (helper azureAPIHelper) queryAPIWithHeader(ctx context.Context, authorizati
 	return bits, res.StatusCode, nil
 }
 
-func (helper azureAPIHelper) queryToken(data url.Values, tenantID string) (azureToken, error) {
-	res, err := http.Post(fmt.Sprintf(tokenEndpoint, tenantID), "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+func (helper azureAPIHelper) queryToken(ce CloudEnvironment, data url.Values, tenantID string) (azureToken, error) {
+	res, err := http.Post(fmt.Sprintf(ce.GetTokenRequestFormat(), tenantID), "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
 		return azureToken{}, err
 	}

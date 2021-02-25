@@ -25,7 +25,7 @@ import (
 )
 
 type aciCloudService struct {
-	loginService login.AzureLoginServiceAPI
+	loginService login.AzureLoginService
 }
 
 func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error {
@@ -33,10 +33,13 @@ func (cs *aciCloudService) Login(ctx context.Context, params interface{}) error 
 	if !ok {
 		return errors.New("could not read Azure LoginParams struct from generic parameter")
 	}
-	if opts.ClientID != "" {
-		return cs.loginService.LoginServicePrincipal(opts.ClientID, opts.ClientSecret, opts.TenantID)
+	if opts.CloudName == "" {
+		opts.CloudName = login.AzurePublicCloudName
 	}
-	return cs.loginService.Login(ctx, opts.TenantID)
+	if opts.ClientID != "" {
+		return cs.loginService.LoginServicePrincipal(opts.ClientID, opts.ClientSecret, opts.TenantID, opts.CloudName)
+	}
+	return cs.loginService.Login(ctx, opts.TenantID, opts.CloudName)
 }
 
 func (cs *aciCloudService) Logout(ctx context.Context) error {

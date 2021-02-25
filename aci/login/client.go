@@ -17,6 +17,8 @@
 package login
 
 import (
+	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
@@ -24,6 +26,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2019-12-01/containerinstance"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/errdefs"
@@ -32,8 +36,12 @@ import (
 
 // NewContainerGroupsClient get client toi manipulate containerGrouos
 func NewContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
-	containerGroupsClient := containerinstance.NewContainerGroupsClient(subscriptionID)
-	err := setupClient(&containerGroupsClient.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
+	if err != nil {
+		return containerinstance.ContainerGroupsClient{}, err
+	}
+	containerGroupsClient := containerinstance.NewContainerGroupsClientWithBaseURI(mgmtURL, subscriptionID)
+	setupClient(&containerGroupsClient.Client, authorizer)
 	if err != nil {
 		return containerinstance.ContainerGroupsClient{}, err
 	}
@@ -43,68 +51,100 @@ func NewContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 	return containerGroupsClient, nil
 }
 
-func setupClient(aciClient *autorest.Client) error {
+func setupClient(aciClient *autorest.Client, auth autorest.Authorizer) {
 	aciClient.UserAgent = internal.UserAgentName + "/" + internal.Version
-	auth, err := NewAuthorizerFromLogin()
-	if err != nil {
-		return err
-	}
 	aciClient.Authorizer = auth
-	return nil
 }
 
 // NewStorageAccountsClient get client to manipulate storage accounts
 func NewStorageAccountsClient(subscriptionID string) (storage.AccountsClient, error) {
-	containerGroupsClient := storage.NewAccountsClient(subscriptionID)
-	err := setupClient(&containerGroupsClient.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
 		return storage.AccountsClient{}, err
 	}
-	containerGroupsClient.PollingDelay = 5 * time.Second
-	containerGroupsClient.RetryAttempts = 30
-	containerGroupsClient.RetryDuration = 1 * time.Second
-	return containerGroupsClient, nil
+	storageAccuntsClient := storage.NewAccountsClientWithBaseURI(mgmtURL, subscriptionID)
+	setupClient(&storageAccuntsClient.Client, authorizer)
+	storageAccuntsClient.PollingDelay = 5 * time.Second
+	storageAccuntsClient.RetryAttempts = 30
+	storageAccuntsClient.RetryDuration = 1 * time.Second
+	return storageAccuntsClient, nil
 }
 
 // NewFileShareClient get client to manipulate file shares
 func NewFileShareClient(subscriptionID string) (storage.FileSharesClient, error) {
-	containerGroupsClient := storage.NewFileSharesClient(subscriptionID)
-	err := setupClient(&containerGroupsClient.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
 		return storage.FileSharesClient{}, err
 	}
-	containerGroupsClient.PollingDelay = 5 * time.Second
-	containerGroupsClient.RetryAttempts = 30
-	containerGroupsClient.RetryDuration = 1 * time.Second
-	return containerGroupsClient, nil
+	fileSharesClient := storage.NewFileSharesClientWithBaseURI(mgmtURL, subscriptionID)
+	setupClient(&fileSharesClient.Client, authorizer)
+	fileSharesClient.PollingDelay = 5 * time.Second
+	fileSharesClient.RetryAttempts = 30
+	fileSharesClient.RetryDuration = 1 * time.Second
+	return fileSharesClient, nil
 }
 
 // NewSubscriptionsClient get subscription client
 func NewSubscriptionsClient() (subscription.SubscriptionsClient, error) {
-	subc := subscription.NewSubscriptionsClient()
-	err := setupClient(&subc.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
 		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginRequired, err.Error())
 	}
+	subc := subscription.NewSubscriptionsClientWithBaseURI(mgmtURL)
+	setupClient(&subc.Client, authorizer)
 	return subc, nil
 }
 
 // NewGroupsClient get client to manipulate groups
 func NewGroupsClient(subscriptionID string) (resources.GroupsClient, error) {
-	groupsClient := resources.NewGroupsClient(subscriptionID)
-	err := setupClient(&groupsClient.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
 		return resources.GroupsClient{}, err
 	}
+	groupsClient := resources.NewGroupsClientWithBaseURI(mgmtURL, subscriptionID)
+	setupClient(&groupsClient.Client, authorizer)
 	return groupsClient, nil
 }
 
 // NewContainerClient get client to manipulate containers
 func NewContainerClient(subscriptionID string) (containerinstance.ContainersClient, error) {
-	containerClient := containerinstance.NewContainersClient(subscriptionID)
-	err := setupClient(&containerClient.Client)
+	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
 		return containerinstance.ContainersClient{}, err
 	}
+	containerClient := containerinstance.NewContainersClientWithBaseURI(mgmtURL, subscriptionID)
+	setupClient(&containerClient.Client, authorizer)
 	return containerClient, nil
+}
+
+func getClientSetupData() (autorest.Authorizer, string, error) {
+	return getClientSetupDataImpl(GetTokenStorePath())
+}
+
+func getClientSetupDataImpl(tokenStorePath string) (autorest.Authorizer, string, error) {
+	als, err := newAzureLoginServiceFromPath(tokenStorePath, azureAPIHelper{}, CloudEnvironments)
+	if err != nil {
+		return nil, "", err
+	}
+
+	oauthToken, _, err := als.GetValidToken()
+	if err != nil {
+		return nil, "", errors.Wrap(err, "not logged in to azure, you need to run \"docker login azure\" first")
+	}
+
+	ce, err := als.GetCloudEnvironment()
+	if err != nil {
+		return nil, "", err
+	}
+
+	token := adal.Token{
+		AccessToken:  oauthToken.AccessToken,
+		Type:         oauthToken.TokenType,
+		ExpiresIn:    json.Number(strconv.Itoa(int(time.Until(oauthToken.Expiry).Seconds()))),
+		ExpiresOn:    json.Number(strconv.Itoa(int(oauthToken.Expiry.Sub(date.UnixEpoch()).Seconds()))),
+		RefreshToken: "",
+		Resource:     "",
+	}
+
+	return autorest.NewBearerAuthorizer(&token), ce.ResourceManagerURL, nil
 }
