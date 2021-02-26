@@ -34,18 +34,26 @@ import (
 
 func (s *composeService) Build(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
+	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
+			imagesToBuild = append(imagesToBuild, imageName)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 		}
 	}
 
-	return s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts)
+	if err == nil {
+		displayScanSuggestMsg(ctx, imagesToBuild)
+	}
+
+	return err
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
 	opts := map[string]build.Options{}
+	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
@@ -66,6 +74,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
+			imagesToBuild = append(imagesToBuild, imageName)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 			continue
 		}
@@ -84,7 +93,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	}
 
-	return s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts)
+	if err == nil {
+		displayScanSuggestMsg(ctx, imagesToBuild)
+	}
+	return err
 }
 
 func (s *composeService) localImagePresent(ctx context.Context, imageName string) (bool, error) {
