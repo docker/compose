@@ -977,7 +977,10 @@ func getContainerName(stdout string) string {
 
 func waitForStatus(t *testing.T, c *E2eCLI, containerID string, statuses ...string) {
 	checkStopped := func(logt poll.LogT) poll.Result {
-		res := c.RunDockerCmd("inspect", containerID)
+		res := c.RunDockerOrExitError("inspect", containerID)
+		if res.Error != nil {
+			return poll.Continue("Error while inspecting container %s: %s", containerID, res.Combined())
+		}
 		containerInspect, err := parseContainerInspect(res.Stdout())
 		assert.NilError(t, err)
 		for _, status := range statuses {
