@@ -35,6 +35,33 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/bin/ v1.37.0
           make -f builder.Makefile lint
 
+  # only on main branch, costs too much for the gain on every PR
+  validate-cross-build:
+    name: Validate cros build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      GO111MODULE: "on"
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      # Ensure we don't discover cross platform build issues at release time.
+      # Time used to build linux here is gained back in the build for local E2E step
+      - name: Build packages
+        run: make -f builder.Makefile cross
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -63,11 +90,6 @@ jobs:
         with:
           path: ~/go/pkg/mod
           key: go-${{ hashFiles('**/go.sum') }}
-
-      # Ensure we don't discover cross platform build issues at release time.
-      # Time used to build linux here is gained back in the build for local E2E step
-      - name: Build packages
-        run: make -f builder.Makefile cross
 
       - name: Test
         env:
