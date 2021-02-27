@@ -26,12 +26,14 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
 	"github.com/docker/docker/errdefs"
 	bclient "github.com/moby/buildkit/client"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
@@ -41,7 +43,10 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions := s.toBuildOptions(service, project.WorkingDir, imageName)
+			buildOptions, err := s.toBuildOptions(service, project.WorkingDir, imageName)
+			if err != nil {
+				return err
+			}
 			buildOptions.Pull = options.Pull
 			buildOptions.BuildArgs = options.Args
 			opts[imageName] = buildOptions
@@ -75,7 +80,10 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				continue
 			}
 			imagesToBuild = append(imagesToBuild, imageName)
-			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
+			opts[imageName], err = s.toBuildOptions(service, project.WorkingDir, imageName)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 		if service.Image != "" {
@@ -148,7 +156,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	return err
 }
 
-func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string, imageTag string) build.Options {
+func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string, imageTag string) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
@@ -156,6 +164,15 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		service.Build.Dockerfile = "Dockerfile"
 	}
 	var buildArgs map[string]string
+
+	var plats []specs.Platform
+	if service.Platform != "" {
+		p, err := platforms.Parse(service.Platform)
+		if err != nil {
+			return build.Options{}, err
+		}
+		plats = append(plats, p)
+	}
 
 	return build.Options{
 		Inputs: build.Inputs{
@@ -166,7 +183,8 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		Tags:      tags,
 		Target:    service.Build.Target,
 		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
-	}
+		Platforms: plats,
+	}, nil
 }
 
 func flatten(in types.MappingWithEquals) map[string]string {
