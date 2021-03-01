@@ -36,7 +36,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
 
-		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "build")
+		res := c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "build")
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 		c.RunDockerCmd("image", "inspect", "build-test_nginx")
@@ -47,9 +47,9 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
 
-		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d")
+		res := c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "up", "-d")
 		t.Cleanup(func() {
-			c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "down")
+			c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "down")
 		})
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
@@ -62,13 +62,13 @@ func TestLocalComposeBuild(t *testing.T) {
 	})
 
 	t.Run("no rebuild when up again", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d")
+		res := c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "up", "-d")
 
 		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static /usr/share/nginx/html"), res.Stdout())
 	})
 
 	t.Run("cleanup build project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "down")
+		c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "down")
 		c.RunDockerCmd("rmi", "build-test_nginx")
 		c.RunDockerCmd("rmi", "custom-nginx")
 	})

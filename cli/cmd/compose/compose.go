@@ -17,8 +17,12 @@
 package compose
 
 import (
+	"fmt"
+
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/morikuni/aec"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -32,7 +36,8 @@ type projectOptions struct {
 	ProjectName string
 	Profiles    []string
 	ConfigPaths []string
-	WorkingDir  string
+	WorkDir     string
+	ProjectDir  string
 	EnvFile     string
 }
 
@@ -41,8 +46,9 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	f.StringVar(&o.WorkingDir, "workdir", "", "Specify an alternate working directory")
-	// TODO make --project-directory an alias
+	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
+	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the Compose file)")
+	_ = f.MarkHidden("workdir")
 }
 
 func (o *projectOptions) toProjectName() (string, error) {
@@ -87,7 +93,7 @@ func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 		cli.WithEnvFile(o.EnvFile),
 		cli.WithDotEnv,
 		cli.WithOsEnv,
-		cli.WithWorkingDirectory(o.WorkingDir),
+		cli.WithWorkingDirectory(o.ProjectDir),
 		cli.WithName(o.ProjectName))
 }
 
@@ -99,6 +105,13 @@ func Command(contextType string) *cobra.Command {
 		Use:              "compose",
 		TraverseChildren: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if opts.WorkDir != "" {
+				if opts.ProjectDir != "" {
+					return errors.New(aec.Apply(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead.`, aec.RedF))
+				}
+				opts.ProjectDir = opts.WorkDir
+				fmt.Println(aec.Apply(`option "--workdir" is DEPRECATED at root level! Please use "--project-directory" instead.`, aec.RedF))
+			}
 			if contextType == store.DefaultContextType || contextType == store.LocalContextType {
 				Warning = "The new 'docker compose' command is currently experimental. " +
 					"To provide feedback or request new features please open issues at https://github.com/docker/compose-cli"
