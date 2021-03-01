@@ -5,6 +5,7 @@ from .version import ComposeVersion
 DEFAULT_TIMEOUT = 10
 HTTP_TIMEOUT = 60
 IS_WINDOWS_PLATFORM = (sys.platform == "win32")
+IS_LINUX_PLATFORM = (sys.platform == "linux")
 LABEL_CONTAINER_NUMBER = 'com.docker.compose.container-number'
 LABEL_ONE_OFF = 'com.docker.compose.oneoff'
 LABEL_PROJECT = 'com.docker.compose.project'
