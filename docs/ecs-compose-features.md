@@ -104,8 +104,8 @@ by passing configuration attributes prefixed with `awslogs-`.
 ## Exposing ports
 
 When one or more services expose ports, a Load Balancer is created for the application.
-As all services are expose through the same Load Balancer, only one service can expose a given port number.
-The source and target ports defined in the Compose file MUST be the same, as service-to-service communication don't go trought the Load Balancer and could not
+As all services are exposed through the same Load Balancer, only one service can expose a given port number.
+The source and target ports defined in the Compose file MUST be the same, as service-to-service communication don't go through the Load Balancer and could not
 benefit from Listeners abstraction to assign a distinct published port.
 
 If services in the Compose file only expose ports 80 or 443, an Application Load Balancer is created, otherwise ECS integration will provision a Network Load Balancer.
