@@ -42,6 +42,10 @@ import (
 )
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
+	if len(opts.Services) == 0 {
+		opts.Services = project.ServiceNames()
+	}
+
 	err := s.ensureImagesExists(ctx, project)
 	if err != nil {
 		return err
@@ -97,7 +101,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	prepareNetworkMode(project)
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.ensureService(c, project, service, opts.Recreate, opts.Inherit)
+		if contains(opts.Services, service.Name) {
+			return s.ensureService(c, project, service, opts.Recreate, opts.Inherit)
+		}
+		return s.ensureService(c, project, service, opts.RecreateDependencies, opts.Inherit)
 	})
 }
 

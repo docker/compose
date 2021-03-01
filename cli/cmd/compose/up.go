@@ -56,7 +56,9 @@ type upOptions struct {
 	removeOrphans bool
 	forceRecreate bool
 	noRecreate    bool
+	recreateDeps  bool
 	noStart       bool
+	noDeps        bool
 	cascadeStop   bool
 	exitCodeFrom  string
 	scale         []string
@@ -64,7 +66,6 @@ type upOptions struct {
 	noPrefix      bool
 	timeChanged   bool
 	timeout       int
-	noDeps        bool
 	noInherit     bool
 }
 
@@ -73,6 +74,16 @@ func (o upOptions) recreateStrategy() string {
 		return compose.RecreateNever
 	}
 	if o.forceRecreate {
+		return compose.RecreateForce
+	}
+	return compose.RecreateDiverged
+}
+
+func (o upOptions) dependenciesRecreateStrategy() string {
+	if o.noRecreate {
+		return compose.RecreateNever
+	}
+	if o.recreateDeps {
 		return compose.RecreateForce
 	}
 	return compose.RecreateDiverged
@@ -103,6 +114,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 				if opts.forceRecreate && opts.noRecreate {
 					return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
 				}
+				if opts.recreateDeps && opts.noRecreate {
+					return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+				}
 				return runCreateStart(cmd.Context(), opts, args)
 			default:
 				return runUp(cmd.Context(), opts, args)
@@ -130,6 +144,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 		flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
 		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
+		flags.BoolVar(&opts.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 		flags.BoolVarP(&opts.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
 	}
 
@@ -192,9 +207,11 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
-			RemoveOrphans: opts.removeOrphans,
-			Recreate:      opts.recreateStrategy(),
-			Inherit:       !opts.noInherit,
+			Services:             services,
+			RemoveOrphans:        opts.removeOrphans,
+			Recreate:             opts.recreateStrategy(),
+			RecreateDependencies: opts.dependenciesRecreateStrategy(),
+			Inherit:              !opts.noInherit,
 		})
 		if err != nil {
 			return "", err
