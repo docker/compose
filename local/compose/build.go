@@ -69,11 +69,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			return err
 		}
 
-		if service.Image != "" {
-			if localImagePresent {
-				continue
-			}
-		}
 		if service.Build != nil {
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
@@ -81,6 +76,11 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 			imagesToBuild = append(imagesToBuild, imageName)
 			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
 			continue
+		}
+		if service.Image != "" {
+			if localImagePresent {
+				continue
+			}
 		}
 
 		// Buildx has no command to "just pull", see
