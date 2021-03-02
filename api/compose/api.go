@@ -67,10 +67,14 @@ type Service interface {
 
 // CreateOptions group options of the Create API
 type CreateOptions struct {
+	// Services defines the services user interacts with
+	Services []string
 	// Remove legacy containers for services that are not defined in the project
 	RemoveOrphans bool
 	// Recreate define the strategy to apply on existing containers
 	Recreate string
+	// RecreateDependencies define the strategy to apply on dependencies services
+	RecreateDependencies string
 	// Inherit reuse anonymous volumes from previous container
 	Inherit bool
 }
