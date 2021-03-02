@@ -19,12 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/cli/cmd"
-	"github.com/docker/compose-cli/cli/formatter"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,6 +31,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/cli/cmd"
+	"github.com/docker/compose-cli/cli/formatter"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project
@@ -68,24 +69,32 @@ type upOptions struct {
 	noInherit     bool
 }
 
-func (o upOptions) recreateStrategy() string {
-	if o.noRecreate {
+func (opts upOptions) recreateStrategy() string {
+	if opts.noRecreate {
 		return compose.RecreateNever
 	}
-	if o.forceRecreate {
+	if opts.forceRecreate {
 		return compose.RecreateForce
 	}
 	return compose.RecreateDiverged
 }
 
-func (o upOptions) dependenciesRecreateStrategy() string {
-	if o.noRecreate {
+func (opts upOptions) dependenciesRecreateStrategy() string {
+	if opts.noRecreate {
 		return compose.RecreateNever
 	}
-	if o.recreateDeps {
+	if opts.recreateDeps {
 		return compose.RecreateForce
 	}
 	return compose.RecreateDiverged
+}
+
+func (opts upOptions) GetTimeout() *time.Duration {
+	if opts.timeChanged {
+		t := time.Duration(opts.timeout) * time.Second
+		return &t
+	}
+	return nil
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
@@ -106,14 +115,6 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 		_, err := project.GetService(opts.exitCodeFrom)
 		if err != nil {
 			return err
-		}
-	}
-
-	if opts.timeChanged {
-		timeoutValue := types.Duration(time.Duration(opts.timeout) * time.Second)
-		for i, s := range project.Services {
-			s.StopGracePeriod = &timeoutValue
-			project.Services[i] = s
 		}
 	}
 
@@ -235,6 +236,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 			Recreate:             opts.recreateStrategy(),
 			RecreateDependencies: opts.dependenciesRecreateStrategy(),
 			Inherit:              !opts.noInherit,
+			Timeout:              opts.GetTimeout(),
 		})
 		if err != nil {
 			return "", err

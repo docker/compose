@@ -102,9 +102,9 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		if contains(opts.Services, service.Name) {
-			return s.ensureService(c, project, service, opts.Recreate, opts.Inherit)
+			return s.ensureService(c, project, service, opts.Recreate, opts.Inherit, opts.Timeout)
 		}
-		return s.ensureService(c, project, service, opts.RecreateDependencies, opts.Inherit)
+		return s.ensureService(c, project, service, opts.RecreateDependencies, opts.Inherit, opts.Timeout)
 	})
 }
 
