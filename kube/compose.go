@@ -124,7 +124,7 @@ func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]
 }
 
 // Build executes the equivalent to a `compose build`
-func (s *composeService) Build(ctx context.Context, project *types.Project) error {
+func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

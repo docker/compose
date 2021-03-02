@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"github.com/docker/compose-cli/api/compose"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ type buildOptions struct {
 	*projectOptions
 	composeOptions
 	quiet bool
+	pull  bool
 }
 
 func buildCommand(p *projectOptions) *cobra.Command {
@@ -51,6 +53,7 @@ func buildCommand(p *projectOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
+	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	return cmd
 }
 
@@ -66,7 +69,9 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Build(ctx, project)
+		return "", c.ComposeService().Build(ctx, project, compose.BuildOptions{
+			Pull: opts.pull,
+		})
 	})
 	return err
 }

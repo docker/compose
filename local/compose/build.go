@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"github.com/docker/compose-cli/api/compose"
 	"os"
 	"path"
 	"strings"
@@ -32,14 +33,16 @@ import (
 	bclient "github.com/moby/buildkit/client"
 )
 
-func (s *composeService) Build(ctx context.Context, project *types.Project) error {
+func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			opts[imageName] = s.toBuildOptions(service, project.WorkingDir, imageName)
+			buildOptions := s.toBuildOptions(service, project.WorkingDir, imageName)
+			buildOptions.Pull = options.Pull
+			opts[imageName] = buildOptions
 		}
 	}
 
