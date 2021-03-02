@@ -89,7 +89,9 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		message := fmt.Sprintf(format, v...)
 		w.Event(progress.NewEvent(eventName, progress.Done, message))
 	})
-
+	if err != nil {
+		return err
+	}
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
 	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{

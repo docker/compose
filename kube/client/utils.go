@@ -19,9 +19,11 @@
 package client
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -35,9 +37,37 @@ func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
 	}
 }
 
+func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, map[string]string, error) {
+	servicePods := map[string]string{}
+	stateReached := true
+	for _, pod := range pods {
+		service := pod.Labels[compose.ServiceTag]
+
+		if len(services) > 0 && !utils.StringContains(services, service) {
+			continue
+		}
+		servicePods[service] = pod.Status.Message
+
+		if status == compose.REMOVING {
+			continue
+		}
+		if pod.Status.Phase == corev1.PodFailed {
+			return false, servicePods, fmt.Errorf(pod.Status.Reason)
+		}
+		if status == compose.RUNNING && pod.Status.Phase != corev1.PodRunning {
+			stateReached = false
+		}
+	}
+	if status == compose.REMOVING && len(servicePods) > 0 {
+		stateReached = false
+	}
+	return stateReached, servicePods, nil
+}
+
+// LogFunc defines a custom logger function (progress writer events)
 type LogFunc func(pod string, stateReached bool, message string)
 
-// ServiceStatus hold status about a service
+// WaitForStatusOptions hold the state pods should reach
 type WaitForStatusOptions struct {
 	ProjectName string
 	Services    []string
