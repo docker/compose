@@ -69,6 +69,8 @@ type Service interface {
 type BuildOptions struct {
 	// Pull always attempt to pull a newer version of the image
 	Pull bool
+	// Progress set type of progress output ("auto", "plain", "tty")
+	Progress string
 }
 
 // CreateOptions group options of the Create API

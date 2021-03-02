@@ -19,10 +19,11 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/docker/compose-cli/api/compose"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
@@ -46,7 +47,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	err := s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts, options.Progress)
 	if err == nil {
 		displayScanSuggestMsg(ctx, imagesToBuild)
 	}
@@ -96,7 +97,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	}
 
-	err := s.build(ctx, project, opts)
+	err := s.build(ctx, project, opts, "auto")
 	if err == nil {
 		displayScanSuggestMsg(ctx, imagesToBuild)
 	}
@@ -114,7 +115,7 @@ func (s *composeService) localImagePresent(ctx context.Context, imageName string
 	return true, nil
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options) error {
+func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) error {
 	if len(opts) == 0 {
 		return nil
 	}
@@ -135,7 +136,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	// build and will lock
 	progressCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := progress.NewPrinter(progressCtx, os.Stdout, "auto")
+	w := progress.NewPrinter(progressCtx, os.Stdout, mode)
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
