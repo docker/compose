@@ -5,5 +5,5 @@ services:
       - 8070:80
 
   nginx2:
-    build: nginx-build
+    build: nginx-build2
     image: custom-nginx

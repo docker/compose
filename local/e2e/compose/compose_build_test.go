@@ -53,6 +53,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		})
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
 
 		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
@@ -64,7 +65,14 @@ func TestLocalComposeBuild(t *testing.T) {
 	t.Run("no rebuild when up again", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d")
 
-		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static /usr/share/nginx/html"), res.Stdout())
+		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
+	})
+
+	t.Run("rebuild when up --build", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "--workdir", "fixtures/build-test", "up", "-d", "--build")
+
+		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
 	})
 
 	t.Run("cleanup build project", func(t *testing.T) {
