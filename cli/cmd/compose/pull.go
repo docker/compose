@@ -64,7 +64,11 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 		if err != nil {
 			return err
 		}
-		project.DisabledServices = append(project.DisabledServices, project.Services...)
+		for _, s := range project.Services {
+			if !contains(services, s.Name) {
+				project.DisabledServices = append(project.DisabledServices, s)
+			}
+		}
 		project.Services = enabled
 	}
 

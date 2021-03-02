@@ -34,7 +34,8 @@ func TestApplyScaleOpt(t *testing.T) {
 			},
 		},
 	}
-	err := applyScaleOpt([]string{"foo=2"}, &p)
+	opt := upOptions{scale: []string{"foo=2"}}
+	err := opt.apply(&p, nil)
 	assert.NilError(t, err)
 	foo, err := p.GetService("foo")
 	assert.NilError(t, err)
