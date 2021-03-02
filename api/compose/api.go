@@ -28,7 +28,7 @@ import (
 // Service manages a compose project
 type Service interface {
 	// Build executes the equivalent to a `compose build`
-	Build(ctx context.Context, project *types.Project) error
+	Build(ctx context.Context, project *types.Project, options BuildOptions) error
 	// Push executes the equivalent ot a `compose push`
 	Push(ctx context.Context, project *types.Project) error
 	// Pull executes the equivalent of a `compose pull`
@@ -63,6 +63,14 @@ type Service interface {
 	Pause(ctx context.Context, project *types.Project) error
 	// UnPause executes the equivalent to a `compose unpause`
 	UnPause(ctx context.Context, project *types.Project) error
+}
+
+// BuildOptions group options of the Build API
+type BuildOptions struct {
+	// Pull always attempt to pull a newer version of the image
+	Pull bool
+	// Progress set type of progress output ("auto", "plain", "tty")
+	Progress string
 }
 
 // CreateOptions group options of the Create API

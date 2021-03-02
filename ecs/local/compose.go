@@ -32,8 +32,8 @@ import (
 	"github.com/docker/compose-cli/api/errdefs"
 )
 
-func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project) error {
-	return e.compose.Build(ctx, project)
+func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
+	return e.compose.Build(ctx, project, options)
 }
 
 func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project) error {

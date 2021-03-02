@@ -31,7 +31,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (b *ecsAPIService) Build(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

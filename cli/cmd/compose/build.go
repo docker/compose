@@ -23,13 +23,16 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
 type buildOptions struct {
 	*projectOptions
 	composeOptions
-	quiet bool
+	quiet    bool
+	pull     bool
+	progress string
 }
 
 func buildCommand(p *projectOptions) *cobra.Command {
@@ -51,6 +54,8 @@ func buildCommand(p *projectOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
+	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
+	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "tty")`)
 	return cmd
 }
 
@@ -66,7 +71,10 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Build(ctx, project)
+		return "", c.ComposeService().Build(ctx, project, compose.BuildOptions{
+			Pull:     opts.pull,
+			Progress: opts.progress,
+		})
 	})
 	return err
 }

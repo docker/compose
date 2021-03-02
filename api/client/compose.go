@@ -28,7 +28,7 @@ import (
 type composeService struct {
 }
 
-func (c *composeService) Build(ctx context.Context, project *types.Project) error {
+func (c *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
