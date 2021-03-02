@@ -71,6 +71,8 @@ type BuildOptions struct {
 	Pull bool
 	// Progress set type of progress output ("auto", "plain", "tty")
 	Progress string
+	// Args set build-time args
+	Args types.Mapping
 }
 
 // CreateOptions group options of the Create API

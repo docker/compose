@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -33,6 +34,7 @@ type buildOptions struct {
 	quiet    bool
 	pull     bool
 	progress string
+	args     []string
 }
 
 func buildCommand(p *projectOptions) *cobra.Command {
@@ -56,6 +58,7 @@ func buildCommand(p *projectOptions) *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "tty")`)
+	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	return cmd
 }
 
@@ -74,6 +77,7 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 		return "", c.ComposeService().Build(ctx, project, compose.BuildOptions{
 			Pull:     opts.pull,
 			Progress: opts.progress,
+			Args:     types.NewMapping(opts.args),
 		})
 	})
 	return err
