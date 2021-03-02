@@ -85,6 +85,8 @@ type CreateOptions struct {
 	RecreateDependencies string
 	// Inherit reuse anonymous volumes from previous container
 	Inherit bool
+	// Timeout set delay to wait for container to gracelfuly stop before sending SIGKILL
+	Timeout *time.Duration
 }
 
 // StartOptions group options of the Start API

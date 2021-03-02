@@ -93,7 +93,11 @@ func runRun(ctx context.Context, opts runOptions) error {
 		if err != nil {
 			return err
 		}
-		project.DisabledServices = append(project.DisabledServices, project.Services...)
+		for _, s := range project.Services {
+			if s.Name != opts.Service {
+				project.DisabledServices = append(project.DisabledServices, s)
+			}
+		}
 		project.Services = types.Services{enabled}
 	}
 

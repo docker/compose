@@ -42,7 +42,7 @@ const (
 		"Remove the custom name to scale the service.\n"
 )
 
-func (s *composeService) ensureScale(ctx context.Context, project *types.Project, service types.ServiceConfig) (*errgroup.Group, []moby.Container, error) {
+func (s *composeService) ensureScale(ctx context.Context, project *types.Project, service types.ServiceConfig, timeout *time.Duration) (*errgroup.Group, []moby.Container, error) {
 	cState, err := GetContextContainerState(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -73,7 +73,7 @@ func (s *composeService) ensureScale(ctx context.Context, project *types.Project
 		for i := scale; i < len(actual); i++ {
 			container := actual[i]
 			eg.Go(func() error {
-				err := s.apiClient.ContainerStop(ctx, container.ID, nil)
+				err := s.apiClient.ContainerStop(ctx, container.ID, timeout)
 				if err != nil {
 					return err
 				}
@@ -85,8 +85,8 @@ func (s *composeService) ensureScale(ctx context.Context, project *types.Project
 	return eg, actual, nil
 }
 
-func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool) error {
-	eg, actual, err := s.ensureScale(ctx, project, service)
+func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool, timeout *time.Duration) error {
+	eg, actual, err := s.ensureScale(ctx, project, service, timeout)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 		diverged := container.Labels[configHashLabel] != expected
 		if diverged || recreate == compose.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
-				return s.recreateContainer(ctx, project, service, container, inherit)
+				return s.recreateContainer(ctx, project, service, container, inherit, timeout)
 			})
 			continue
 		}
@@ -209,10 +209,10 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	return nil
 }
 
-func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container, inherit bool) error {
+func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container, inherit bool, timeout *time.Duration) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Recreate"))
-	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
+	err := s.apiClient.ContainerStop(ctx, container.ID, timeout)
 	if err != nil {
 		return err
 	}

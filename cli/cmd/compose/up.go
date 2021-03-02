@@ -27,17 +27,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/formatter"
-
-	"github.com/compose-spec/compose-go/types"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project
@@ -69,24 +69,72 @@ type upOptions struct {
 	noInherit     bool
 }
 
-func (o upOptions) recreateStrategy() string {
-	if o.noRecreate {
+func (opts upOptions) recreateStrategy() string {
+	if opts.noRecreate {
 		return compose.RecreateNever
 	}
-	if o.forceRecreate {
+	if opts.forceRecreate {
 		return compose.RecreateForce
 	}
 	return compose.RecreateDiverged
 }
 
-func (o upOptions) dependenciesRecreateStrategy() string {
-	if o.noRecreate {
+func (opts upOptions) dependenciesRecreateStrategy() string {
+	if opts.noRecreate {
 		return compose.RecreateNever
 	}
-	if o.recreateDeps {
+	if opts.recreateDeps {
 		return compose.RecreateForce
 	}
 	return compose.RecreateDiverged
+}
+
+func (opts upOptions) GetTimeout() *time.Duration {
+	if opts.timeChanged {
+		t := time.Duration(opts.timeout) * time.Second
+		return &t
+	}
+	return nil
+}
+
+func (opts upOptions) apply(project *types.Project, services []string) error {
+	if opts.noDeps {
+		enabled, err := project.GetServices(services...)
+		if err != nil {
+			return err
+		}
+		for _, s := range project.Services {
+			if !contains(services, s.Name) {
+				project.DisabledServices = append(project.DisabledServices, s)
+			}
+		}
+		project.Services = enabled
+	}
+
+	if opts.exitCodeFrom != "" {
+		_, err := project.GetService(opts.exitCodeFrom)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, scale := range opts.scale {
+		split := strings.Split(scale, "=")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
+		}
+		name := split[0]
+		replicas, err := strconv.Atoi(split[1])
+		if err != nil {
+			return err
+		}
+		err = setServiceScale(project, name, replicas)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func upCommand(p *projectOptions, contextType string) *cobra.Command {
@@ -157,7 +205,7 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 		return err
 	}
 
-	err = applyScaleOpt(opts.scale, project)
+	err = opts.apply(project, services)
 	if err != nil {
 		return err
 	}
@@ -176,33 +224,9 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
-	if opts.noDeps {
-		enabled, err := project.GetServices(services...)
-		if err != nil {
-			return err
-		}
-		project.DisabledServices = append(project.DisabledServices, project.Services...)
-		project.Services = enabled
-	}
-
-	err = applyScaleOpt(opts.scale, project)
+	err = opts.apply(project, services)
 	if err != nil {
 		return err
-	}
-
-	if opts.exitCodeFrom != "" {
-		_, err := project.GetService(opts.exitCodeFrom)
-		if err != nil {
-			return err
-		}
-	}
-
-	if opts.timeChanged {
-		timeoutValue := types.Duration(time.Duration(opts.timeout) * time.Second)
-		for i, s := range project.Services {
-			s.StopGracePeriod = &timeoutValue
-			project.Services[i] = s
-		}
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
@@ -212,6 +236,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 			Recreate:             opts.recreateStrategy(),
 			RecreateDependencies: opts.dependenciesRecreateStrategy(),
 			Inherit:              !opts.noInherit,
+			Timeout:              opts.GetTimeout(),
 		})
 		if err != nil {
 			return "", err
@@ -280,25 +305,6 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return cmd.ExitCodeError{ExitCode: exitCode}
 	}
 	return err
-}
-
-func applyScaleOpt(opts []string, project *types.Project) error {
-	for _, scale := range opts {
-		split := strings.Split(scale, "=")
-		if len(split) != 2 {
-			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
-		}
-		name := split[0]
-		replicas, err := strconv.Atoi(split[1])
-		if err != nil {
-			return err
-		}
-		err = setServiceScale(project, name, replicas)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func setServiceScale(project *types.Project, name string, replicas int) error {

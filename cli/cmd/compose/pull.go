@@ -28,7 +28,8 @@ import (
 type pullOptions struct {
 	*projectOptions
 	composeOptions
-	quiet bool
+	quiet       bool
+	includeDeps bool
 }
 
 func pullCommand(p *projectOptions) *cobra.Command {
@@ -43,6 +44,7 @@ func pullCommand(p *projectOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
+	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies")
 	return cmd
 }
 
@@ -55,6 +57,19 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
+	}
+
+	if !opts.includeDeps {
+		enabled, err := project.GetServices(services...)
+		if err != nil {
+			return err
+		}
+		for _, s := range project.Services {
+			if !contains(services, s.Name) {
+				project.DisabledServices = append(project.DisabledServices, s)
+			}
+		}
+		project.Services = enabled
 	}
 
 	if opts.quiet {
