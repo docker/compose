@@ -71,6 +71,8 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Recreate define the strategy to apply on existing containers
 	Recreate string
+	// Inherit reuse anonymous volumes from previous container
+	Inherit bool
 }
 
 // StartOptions group options of the Start API

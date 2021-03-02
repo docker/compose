@@ -65,6 +65,7 @@ type upOptions struct {
 	timeChanged   bool
 	timeout       int
 	noDeps        bool
+	noInherit     bool
 }
 
 func (o upOptions) recreateStrategy() string {
@@ -129,6 +130,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
 		flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
 		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
+		flags.BoolVarP(&opts.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
 	}
 
 	return upCmd
@@ -192,6 +194,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Recreate:      opts.recreateStrategy(),
+			Inherit:       !opts.noInherit,
 		})
 		if err != nil {
 			return "", err

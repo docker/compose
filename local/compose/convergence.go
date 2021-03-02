@@ -85,7 +85,7 @@ func (s *composeService) ensureScale(ctx context.Context, project *types.Project
 	return eg, actual, nil
 }
 
-func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string) error {
+func (s *composeService) ensureService(ctx context.Context, project *types.Project, service types.ServiceConfig, recreate string, inherit bool) error {
 	eg, actual, err := s.ensureScale(ctx, project, service)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 		diverged := container.Labels[configHashLabel] != expected
 		if diverged || recreate == compose.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
-				return s.recreateContainer(ctx, project, service, container)
+				return s.recreateContainer(ctx, project, service, container, inherit)
 			})
 			continue
 		}
@@ -209,7 +209,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	return nil
 }
 
-func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container) error {
+func (s *composeService) recreateContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, container moby.Container, inherit bool) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Recreate"))
 	err := s.apiClient.ContainerStop(ctx, container.ID, nil)
@@ -226,7 +226,12 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	err = s.createMobyContainer(ctx, project, service, name, number, &container, false)
+
+	var inherited *moby.Container
+	if inherit {
+		inherited = &container
+	}
+	err = s.createMobyContainer(ctx, project, service, name, number, inherited, false)
 	if err != nil {
 		return err
 	}
@@ -263,13 +268,13 @@ func (s *composeService) restartContainer(ctx context.Context, container moby.Co
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, container *moby.Container,
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, inherit *moby.Container,
 	autoRemove bool) error {
 	cState, err := GetContextContainerState(ctx)
 	if err != nil {
 		return err
 	}
-	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, container, autoRemove)
+	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove)
 	if err != nil {
 		return err
 	}
