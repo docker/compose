@@ -19,12 +19,12 @@ package local
 import (
 	"context"
 
-	"github.com/docker/docker/client"
-
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
+	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
@@ -42,7 +42,10 @@ func init() {
 }
 
 func service(ctx context.Context) (backend.Service, error) {
-	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	options := apicontext.CliOptions(ctx)
+	config := apicontext.Config(ctx)
+
+	apiClient, err := command.NewAPIClientFromFlags(&options, &config)
 	if err != nil {
 		return nil, err
 	}

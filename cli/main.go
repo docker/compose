@@ -47,6 +47,9 @@ import (
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 
+	cliconfig "github.com/docker/cli/cli/config"
+	cliflags "github.com/docker/cli/cli/flags"
+
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
 	_ "github.com/docker/compose-cli/ecs"
@@ -151,10 +154,7 @@ func main() {
 	})
 
 	flags := root.Flags()
-	flags.StringVarP(&opts.LogLevel, "log-level", "l", "info", "Set the logging level (\"debug\"|\"info\"|\"warn\"|\"error\"|\"fatal\")")
-	flags.BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
-	flags.StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
-	opts.AddContextFlags(flags)
+	opts.InstallFlags(flags)
 	opts.AddConfigFlags(flags)
 	flags.BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
@@ -184,8 +184,8 @@ func main() {
 	ctx, cancel := newSigContext()
 	defer cancel()
 
-	// --host and --version should immediately be forwarded to the original cli
-	if opts.Host != "" || opts.Version {
+	// --version should immediately be forwarded to the original cli
+	if opts.Version {
 		mobycli.Exec(root)
 	}
 
@@ -214,7 +214,29 @@ func main() {
 		volume.Command(ctype),
 	)
 
+	configFile, err := cliconfig.Load(opts.Config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to load docker config: %s\n", opts.Config)
+		os.Exit(1)
+	}
+	ctx = apicontext.WithConfig(ctx, *configFile)
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
+
+	cnxOptions := cliflags.CommonOptions{
+		Context:   opts.Context,
+		Debug:     opts.Debug,
+		Hosts:     opts.Hosts,
+		LogLevel:  opts.LogLevel,
+		TLS:       opts.TLS,
+		TLSVerify: opts.TLSVerify,
+	}
+	if len(opts.Hosts) == 0 {
+		cnxOptions.Context = currentContext
+	}
+	if opts.TLSVerify {
+		cnxOptions.TLSOptions = opts.TLSOptions
+	}
+	ctx = apicontext.WithCliOptions(ctx, cnxOptions)
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
