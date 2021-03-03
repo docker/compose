@@ -93,6 +93,8 @@ type CreateOptions struct {
 type StartOptions struct {
 	// Attach will attach to service containers and send container logs and events
 	Attach ContainerEventListener
+	// Services passed in the command line to be started
+	Services []string
 }
 
 // StopOptions group options of the Stop API

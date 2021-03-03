@@ -37,7 +37,7 @@ const (
 	oneOffOnly
 )
 
-func (s *composeService) getContainers(ctx context.Context, project *types.Project, oneOff oneOff) (Containers, error) {
+func (s *composeService) getContainers(ctx context.Context, project *types.Project, oneOff oneOff, selectedServices []string) (Containers, error) {
 	var containers Containers
 	f := filters.NewArgs(
 		projectFilter(project.Name),
@@ -56,7 +56,10 @@ func (s *composeService) getContainers(ctx context.Context, project *types.Proje
 	if err != nil {
 		return nil, err
 	}
-	containers = containers.filter(isService(project.ServiceNames()...))
+	if len(selectedServices) == 0 {
+		selectedServices = project.ServiceNames()
+	}
+	containers = containers.filter(isService(selectedServices...))
 	return containers, nil
 }
 

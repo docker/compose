@@ -51,22 +51,23 @@ type composeOptions struct {
 
 type upOptions struct {
 	*composeOptions
-	Detach        bool
-	Environment   []string
-	removeOrphans bool
-	forceRecreate bool
-	noRecreate    bool
-	recreateDeps  bool
-	noStart       bool
-	noDeps        bool
-	cascadeStop   bool
-	exitCodeFrom  string
-	scale         []string
-	noColor       bool
-	noPrefix      bool
-	timeChanged   bool
-	timeout       int
-	noInherit     bool
+	Detach             bool
+	Environment        []string
+	removeOrphans      bool
+	forceRecreate      bool
+	noRecreate         bool
+	recreateDeps       bool
+	noStart            bool
+	noDeps             bool
+	cascadeStop        bool
+	exitCodeFrom       string
+	scale              []string
+	noColor            bool
+	noPrefix           bool
+	timeChanged        bool
+	timeout            int
+	noInherit          bool
+	attachDependencies bool
 }
 
 func (opts upOptions) recreateStrategy() string {
@@ -156,8 +157,8 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 				if opts.Build && opts.noBuild {
 					return fmt.Errorf("--build and --no-build are incompatible")
 				}
-				if opts.cascadeStop && opts.Detach {
-					return fmt.Errorf("--abort-on-container-exit and --detach are incompatible")
+				if opts.Detach && (opts.attachDependencies || opts.cascadeStop) {
+					return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit or --attach-dependencies")
 				}
 				if opts.forceRecreate && opts.noRecreate {
 					return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
@@ -194,6 +195,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
 		flags.BoolVar(&opts.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 		flags.BoolVarP(&opts.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
+		flags.BoolVar(&opts.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	}
 
 	return upCmd
@@ -254,6 +256,10 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return nil
 	}
 
+	if opts.attachDependencies {
+		services = nil
+	}
+
 	if opts.Detach {
 		return nil
 	}
@@ -295,6 +301,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		Attach: func(event compose.ContainerEvent) {
 			queue <- event
 		},
+		Services: services,
 	})
 	if err != nil {
 		return err

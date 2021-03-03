@@ -31,8 +31,8 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.ContainerEventListener) (Containers, error) {
-	containers, err := s.getContainers(ctx, project, oneOffExclude)
+func (s *composeService) attach(ctx context.Context, project *types.Project, consumer compose.ContainerEventListener, selectedServices []string) (Containers, error) {
+	containers, err := s.getContainers(ctx, project, oneOffExclude, selectedServices)
 	if err != nil {
 		return nil, err
 	}

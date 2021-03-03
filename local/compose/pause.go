@@ -27,7 +27,7 @@ import (
 )
 
 func (s *composeService) Pause(ctx context.Context, project *types.Project) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude)
+	containers, err := s.getContainers(ctx, project, oneOffExclude, nil)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (s *composeService) Pause(ctx context.Context, project *types.Project) erro
 }
 
 func (s *composeService) UnPause(ctx context.Context, project *types.Project) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude)
+	containers, err := s.getContainers(ctx, project, oneOffExclude, nil)
 	if err != nil {
 		return err
 	}

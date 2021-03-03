@@ -29,7 +29,7 @@ import (
 )
 
 func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
-	containers, err := s.getContainers(ctx, project, oneOffInclude)
+	containers, err := s.getContainers(ctx, project, oneOffInclude, nil)
 	if err != nil {
 		return nil, err
 	}
