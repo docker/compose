@@ -81,7 +81,7 @@ func ContainerToComposeProject(r containers.ContainerConfig) (types.Project, err
 }
 
 func toComposeEnvs(opts []string) types.MappingWithEquals {
-	result := map[string]*string{}
+	result := types.MappingWithEquals{}
 	for _, env := range opts {
 		tokens := strings.SplitN(env, "=", 2)
 		if len(tokens) > 1 {

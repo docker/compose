@@ -43,6 +43,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 			imagesToBuild = append(imagesToBuild, imageName)
 			buildOptions := s.toBuildOptions(service, project.WorkingDir, imageName)
 			buildOptions.Pull = options.Pull
+			buildOptions.BuildArgs = options.Args
 			opts[imageName] = buildOptions
 		}
 	}

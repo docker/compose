@@ -14,4 +14,6 @@
 
 FROM nginx
 
+ARG FOO
+LABEL FOO=$FOO
 COPY static /usr/share/nginx/html
