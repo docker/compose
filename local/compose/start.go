@@ -29,7 +29,7 @@ import (
 func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	var containers Containers
 	if options.Attach != nil {
-		c, err := s.attach(ctx, project, options.Attach)
+		c, err := s.attach(ctx, project, options.Attach, options.Services)
 		if err != nil {
 			return err
 		}
