@@ -195,6 +195,10 @@ func main() {
 	ctx = config.WithDir(ctx, configDir)
 
 	currentContext := determineCurrentContext(opts.Context, configDir)
+	if len(opts.Hosts) > 0 {
+		opts.Context = ""
+		currentContext = "default"
+	}
 
 	s, err := store.New(configDir)
 	if err != nil {
@@ -213,8 +217,6 @@ func main() {
 		volume.Command(ctype),
 	)
 
-	ctx = apicontext.WithCurrentContext(ctx, currentContext)
-
 	cnxOptions := cliflags.CommonOptions{
 		Context:   opts.Context,
 		Debug:     opts.Debug,
@@ -223,13 +225,12 @@ func main() {
 		TLS:       opts.TLS,
 		TLSVerify: opts.TLSVerify,
 	}
-	if len(opts.Hosts) == 0 {
-		cnxOptions.Context = currentContext
-	}
+
 	if opts.TLSVerify {
 		cnxOptions.TLSOptions = opts.TLSOptions
 	}
 	ctx = apicontext.WithCliOptions(ctx, cnxOptions)
+	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
