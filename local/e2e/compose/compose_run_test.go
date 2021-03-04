@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -82,5 +83,21 @@ func TestLocalComposeRun(t *testing.T) {
 		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "down")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
+	})
+
+	t.Run("compose run --volumes", func(t *testing.T) {
+		wd, err := os.Getwd()
+		assert.NilError(t, err)
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "--volumes", wd+":/foo", "back", "/bin/sh", "-c", "ls /foo")
+		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
+
+		res = c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, strings.Contains(res.Stdout(), "run-test_back"), res.Stdout())
+	})
+
+	t.Run("compose run --publish", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "--rm", "--publish", "8080:80", "-d", "back", "/bin/sh", "-c", "sleep 10")
+		res := c.RunDockerCmd("ps")
+		assert.Assert(t, strings.Contains(res.Stdout(), "8080->80/tcp"), res.Stdout())
 	})
 }

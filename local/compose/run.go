@@ -62,7 +62,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	if err := s.waitDependencies(ctx, project, service); err != nil {
 		return 0, err
 	}
-	if err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove); err != nil {
+	if err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove, opts.UseNetworkAliases); err != nil {
 		return 0, err
 	}
 	containerID := service.ContainerName
