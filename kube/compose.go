@@ -89,9 +89,23 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		message := fmt.Sprintf(format, v...)
 		w.Event(progress.NewEvent(eventName, progress.Done, message))
 	})
-
+	if err != nil {
+		return err
+	}
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
-	return err
+
+	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
+		ProjectName: project.Name,
+		Services:    project.ServiceNames(),
+		Status:      compose.RUNNING,
+		Log: func(pod string, stateReached bool, message string) {
+			state := progress.Done
+			if !stateReached {
+				state = progress.Working
+			}
+			w.Event(progress.NewEvent(pod, state, message))
+		},
+	})
 }
 
 // Down executes the equivalent to a `compose down`
@@ -113,9 +127,35 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 		w.Event(progress.NewEvent(eventName, progress.Working, message))
 	}
 	err := s.sdk.Uninstall(projectName, logger)
-	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+	if err != nil {
+		return err
+	}
 
-	return err
+	events := []string{}
+	err = s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
+		ProjectName: projectName,
+		Services:    nil,
+		Status:      compose.REMOVING,
+		Timeout:     options.Timeout,
+		Log: func(pod string, stateReached bool, message string) {
+			state := progress.Done
+			if !stateReached {
+				state = progress.Working
+			}
+			w.Event(progress.NewEvent(pod, state, message))
+			if !utils.StringContains(events, pod) {
+				events = append(events, pod)
+			}
+		},
+	})
+	if err != nil {
+		return err
+	}
+	for _, e := range events {
+		w.Event(progress.NewEvent(e, progress.Done, ""))
+	}
+	w.Event(progress.NewEvent(eventName, progress.Done, ""))
+	return nil
 }
 
 // List executes the equivalent to a `docker stack ls`
@@ -175,8 +215,8 @@ func (s *composeService) Convert(ctx context.Context, project *types.Project, op
 	}
 
 	if options.Output != "" {
-		fullpath, err := helm.SaveChart(chart, options.Output)
-		return []byte(fullpath), err
+		_, err := helm.SaveChart(chart, options.Output)
+		return nil, err
 	}
 
 	buff := []byte{}

@@ -116,7 +116,7 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	}
 
 	var out io.Writer = os.Stdout
-	if opts.Output != "" {
+	if opts.Output != "" && len(json) > 0 {
 		file, err := os.Create(opts.Output)
 		if err != nil {
 			return err

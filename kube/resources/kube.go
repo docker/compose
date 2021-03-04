@@ -42,6 +42,17 @@ const (
 func MapToKubernetesObjects(project *types.Project) (map[string]runtime.Object, error) {
 	objects := map[string]runtime.Object{}
 
+	secrets, err := toSecretSpecs(project)
+	if err != nil {
+		return nil, err
+	}
+	if len(secrets) > 0 {
+		for _, secret := range secrets {
+			name := secret.Name[len(project.Name)+1:]
+			objects[fmt.Sprintf("%s-secret.yaml", name)] = &secret
+		}
+	}
+
 	for _, service := range project.Services {
 		svcObject := mapToService(project, service)
 		if svcObject != nil {

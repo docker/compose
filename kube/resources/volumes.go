@@ -84,17 +84,11 @@ func toVolumeSpecs(project *types.Project, s types.ServiceConfig) ([]volumeSpec,
 		})
 	}
 
-	for i, s := range s.Secrets {
-		name := fmt.Sprintf("secret-%d", i)
+	for _, s := range s.Secrets {
+		name := fmt.Sprintf("%s-%s", project.Name, s.Source)
+		target := path.Join("/run/secrets", or(s.Target, path.Join(s.Source, s.Source)))
 
-		target := path.Join("/run/secrets", or(s.Target, s.Source))
-		subPath := name
-		readOnly := true
-
-		specs = append(specs, volumeSpec{
-			source: secretVolume(s, project.Secrets[name], subPath),
-			mount:  volumeMount(name, target, readOnly, subPath),
-		})
+		specs = append(specs, secretMount(name, target))
 	}
 
 	for i, c := range s.Configs {
@@ -178,17 +172,28 @@ func defaultMode(mode *uint32) *int32 {
 	return defaultMode
 }
 
-func secretVolume(config types.ServiceSecretConfig, topLevelConfig types.SecretConfig, subPath string) *apiv1.VolumeSource {
-	return &apiv1.VolumeSource{
-		Secret: &apiv1.SecretVolumeSource{
-			SecretName: config.Source,
-			Items: []apiv1.KeyToPath{
-				{
-					Key:  toKey(topLevelConfig.File),
-					Path: subPath,
-					Mode: defaultMode(config.Mode),
+func secretMount(name, target string) volumeSpec {
+	readOnly := true
+
+	filename := filepath.Base(target)
+	dir := filepath.Dir(target)
+
+	return volumeSpec{
+		source: &apiv1.VolumeSource{
+			Secret: &apiv1.SecretVolumeSource{
+				SecretName: name,
+				Items: []apiv1.KeyToPath{
+					{
+						Key:  name,
+						Path: filename,
+					},
 				},
 			},
+		},
+		mount: apiv1.VolumeMount{
+			Name:      filename,
+			MountPath: dir,
+			ReadOnly:  readOnly,
 		},
 	}
 }

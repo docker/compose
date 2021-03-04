@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/utils"
@@ -83,16 +84,6 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 	return result, nil
 }
 
-func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
-	return compose.ContainerSummary{
-		ID:      pod.GetObjectMeta().GetName(),
-		Name:    pod.GetObjectMeta().GetName(),
-		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceTag],
-		State:   string(pod.Status.Phase),
-		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectTag],
-	}
-}
-
 // GetLogs retrieves pod logs
 func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
@@ -111,13 +102,62 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 
 		eg.Go(func() error {
 			r, err := request.Stream(ctx)
-			defer r.Close() // nolint errcheck
 			if err != nil {
 				return err
 			}
+
+			defer r.Close() // nolint errcheck
 			_, err = io.Copy(w, r)
 			return err
 		})
 	}
 	return eg.Wait()
+}
+
+// WaitForPodState blocks until pods reach desired state
+func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOptions) error {
+	var timeout time.Duration = time.Minute
+	if opts.Timeout != nil {
+		timeout = *opts.Timeout
+	}
+
+	errch := make(chan error, 1)
+	done := make(chan bool)
+	go func() {
+		for {
+			time.Sleep(500 * time.Millisecond)
+
+			pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, opts.ProjectName),
+			})
+			if err != nil {
+				errch <- err
+			}
+			stateReached, servicePods, err := checkPodsState(opts.Services, pods.Items, opts.Status)
+			if err != nil {
+				errch <- err
+			}
+			if opts.Log != nil {
+				for p, m := range servicePods {
+					opts.Log(p, stateReached, m)
+				}
+			}
+
+			if stateReached {
+				done <- true
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(timeout):
+		return fmt.Errorf("timeout: pods did not reach expected state")
+	case err := <-errch:
+		if err != nil {
+			return err
+		}
+	case <-done:
+		return nil
+	}
+	return nil
 }
