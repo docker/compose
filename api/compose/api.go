@@ -89,6 +89,8 @@ type CreateOptions struct {
 	Inherit bool
 	// Timeout set delay to wait for container to gracelfuly stop before sending SIGKILL
 	Timeout *time.Duration
+	// QuietPull makes the pulling process quiet
+	QuietPull bool
 }
 
 // StartOptions group options of the Start API
@@ -109,6 +111,8 @@ type StopOptions struct {
 type UpOptions struct {
 	// Detach will create services and return immediately
 	Detach bool
+	// QuietPull makes the pulling process quiet
+	QuietPull bool
 }
 
 // DownOptions group options of the Down API

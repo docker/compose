@@ -22,8 +22,8 @@ require (
 	github.com/containerd/containerd v1.4.3
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/distribution/distribution/v3 v3.0.0-20210209042832-22c074842eaa
-	github.com/docker/buildx v0.5.1
-	github.com/docker/cli v20.10.1+incompatible
+	github.com/docker/buildx v0.5.2-0.20210309210748-c9f02c32d495
+	github.com/docker/cli v20.10.3-0.20210127070556-d26bdfd4ea23+incompatible
 	github.com/docker/docker v20.10.1+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0

@@ -46,7 +46,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 		opts.Services = project.ServiceNames()
 	}
 
-	err := s.ensureImagesExists(ctx, project)
+	err := s.ensureImagesExists(ctx, project, opts.QuietPull)
 	if err != nil {
 		return err
 	}

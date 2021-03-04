@@ -56,7 +56,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	return err
 }
 
-func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project) error {
+func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
@@ -98,7 +98,12 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	}
 
-	err := s.build(ctx, project, opts, "auto")
+	mode := progress.PrinterModeAuto
+	if quietPull {
+		mode = progress.PrinterModeQuiet
+	}
+
+	err := s.build(ctx, project, opts, mode)
 	if err == nil {
 		displayScanSuggestMsg(ctx, imagesToBuild)
 	}
