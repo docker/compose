@@ -22,13 +22,17 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/cloud"
+
 	"github.com/docker/compose-cli/api/compose"
+	apiconfig "github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/containers"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	local_compose "github.com/docker/compose-cli/local/compose"
+
+	cliconfig "github.com/docker/cli/cli/config"
 )
 
 type local struct {
@@ -43,9 +47,12 @@ func init() {
 
 func service(ctx context.Context) (backend.Service, error) {
 	options := apicontext.CliOptions(ctx)
-	config := apicontext.Config(ctx)
-
-	apiClient, err := command.NewAPIClientFromFlags(&options, &config)
+	config := apiconfig.Dir(ctx)
+	configFile, err := cliconfig.Load(config)
+	if err != nil {
+		return nil, err
+	}
+	apiClient, err := command.NewAPIClientFromFlags(&options, configFile)
 	if err != nil {
 		return nil, err
 	}

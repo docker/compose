@@ -396,11 +396,11 @@ func TestLegacy(t *testing.T) {
 	})
 
 	t.Run("host flag", func(t *testing.T) {
-		stderr := "Cannot connect to the Docker daemon at tcp://localhost:123"
+		stderr := "nonexistent: Name or service not known"
 		if runtime.GOOS == "windows" {
-			stderr = "error during connect: Get http://localhost:123"
+			stderr = "error during connect: Get http://nonexitent:123"
 		}
-		res := c.RunDockerOrExitError("-H", "tcp://localhost:123", "version")
+		res := c.RunDockerOrExitError("-H", "tcp://nonexistent:123", "version")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      stderr,

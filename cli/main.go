@@ -47,7 +47,6 @@ import (
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 
-	cliconfig "github.com/docker/cli/cli/config"
 	cliflags "github.com/docker/cli/cli/flags"
 
 	// Backend registrations
@@ -214,12 +213,6 @@ func main() {
 		volume.Command(ctype),
 	)
 
-	configFile, err := cliconfig.Load(opts.Config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to load docker config: %s\n", opts.Config)
-		os.Exit(1)
-	}
-	ctx = apicontext.WithConfig(ctx, *configFile)
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 
 	cnxOptions := cliflags.CommonOptions{
