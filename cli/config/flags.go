@@ -17,9 +17,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/config"
@@ -43,4 +45,37 @@ func confDir() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, config.ConfigFileDir)
+}
+
+// GetCurrentContext get current context based on opts, env vars
+func GetCurrentContext(contextOpt string, configDir string, hosts []string) string {
+	// host and context flags cannot be both set at the same time -- the local backend enforces this when resolving hostname
+	// -H flag disables context --> set default as current
+	if len(hosts) > 0 {
+		return "default"
+	}
+	// DOCKER_HOST disables context --> set default as current
+	if _, present := os.LookupEnv("DOCKER_HOST"); present {
+		return "default"
+	}
+	res := contextOpt
+	if res == "" {
+		// check if DOCKER_CONTEXT env variable was set
+		if _, present := os.LookupEnv("DOCKER_CONTEXT"); present {
+			res = os.Getenv("DOCKER_CONTEXT")
+		}
+
+		if res == "" {
+			config, err := config.LoadFile(configDir)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
+				return "default"
+			}
+			res = config.CurrentContext
+		}
+	}
+	if res == "" {
+		res = "default"
+	}
+	return res
 }

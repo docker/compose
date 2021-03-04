@@ -57,6 +57,10 @@ protos:
 cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(BINARY_WITH_EXTENSION) ./cli
 
+.PHONY: compose-plugin
+compose-plugin:
+	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o ./bin/docker-compose .
+
 .PHONY: cross
 cross:
 	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli

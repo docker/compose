@@ -85,6 +85,13 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 		_ = os.RemoveAll(d)
 	})
 
+	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
+	composePlugin, _ := findExecutable("docker-compose", []string{"../../bin", "../../../bin"})
+	err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", "docker-compose"))
+	if err != nil {
+		panic(err)
+	}
+
 	return &E2eCLI{binDir, d, t}
 }
 
@@ -117,7 +124,7 @@ func SetupExistingCLI() (string, func(), error) {
 		return "", nil, err
 	}
 
-	bin, err := findExecutable([]string{"../../bin", "../../../bin"})
+	bin, err := findExecutable(DockerExecutableName, []string{"../../bin", "../../../bin"})
 	if err != nil {
 		return "", nil, err
 	}
@@ -133,9 +140,9 @@ func SetupExistingCLI() (string, func(), error) {
 	return d, cleanup, nil
 }
 
-func findExecutable(paths []string) (string, error) {
+func findExecutable(executableName string, paths []string) (string, error) {
 	for _, p := range paths {
-		bin, err := filepath.Abs(path.Join(p, DockerExecutableName))
+		bin, err := filepath.Abs(path.Join(p, executableName))
 		if err != nil {
 			return "", err
 		}

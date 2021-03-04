@@ -29,9 +29,6 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli/command"
-	cliconfig "github.com/docker/cli/cli/config"
-	cliflags "github.com/docker/cli/cli/flags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -48,6 +45,7 @@ import (
 	"github.com/docker/compose-cli/cli/cmd/logout"
 	"github.com/docker/compose-cli/cli/cmd/run"
 	"github.com/docker/compose-cli/cli/cmd/volume"
+	cliconfig "github.com/docker/compose-cli/cli/config"
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
@@ -62,7 +60,6 @@ import (
 
 var (
 	contextAgnosticCommands = map[string]struct{}{
-		"compose":          {},
 		"context":          {},
 		"login":            {},
 		"logout":           {},
@@ -198,7 +195,7 @@ func main() {
 	configDir := opts.Config
 	config.WithDir(configDir)
 
-	currentContext := determineCurrentContext(opts.Context, configDir, opts.Hosts)
+	currentContext := cliconfig.GetCurrentContext(opts.Context, configDir, opts.Hosts)
 	apicontext.WithCurrentContext(currentContext)
 
 	s, err := store.New(configDir)
@@ -234,27 +231,7 @@ func main() {
 func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backend.Service, error) {
 	switch ctype {
 	case store.DefaultContextType, store.LocalContextType:
-		configFile, err := cliconfig.Load(configDir)
-		if err != nil {
-			return nil, err
-		}
-		options := cliflags.CommonOptions{
-			Context:  opts.Context,
-			Debug:    opts.Debug,
-			Hosts:    opts.Hosts,
-			LogLevel: opts.LogLevel,
-		}
-
-		if opts.TLSVerify {
-			options.TLS = opts.TLS
-			options.TLSVerify = opts.TLSVerify
-			options.TLSOptions = opts.TLSOptions
-		}
-		apiClient, err := command.NewAPIClientFromFlags(&options, configFile)
-		if err != nil {
-			return nil, err
-		}
-		return local.NewService(apiClient), nil
+		return local.GetLocalBackend(configDir, opts)
 	}
 	service, err := backend.Get(ctype)
 	if errdefs.IsNotFoundError(err) {
@@ -311,6 +288,7 @@ func exit(ctx string, err error, ctype string) {
 	}
 
 	if compose.Warning != "" {
+		logrus.Warn(err)
 		fmt.Fprintln(os.Stderr, compose.Warning)
 	}
 
@@ -352,38 +330,6 @@ func newSigContext() (context.Context, func()) {
 		cancel()
 	}()
 	return ctx, cancel
-}
-
-func determineCurrentContext(flag string, configDir string, hosts []string) string {
-	// host and context flags cannot be both set at the same time -- the local backend enforces this when resolving hostname
-	// -H flag disables context --> set default as current
-	if len(hosts) > 0 {
-		return "default"
-	}
-	// DOCKER_HOST disables context --> set default as current
-	if _, present := os.LookupEnv("DOCKER_HOST"); present {
-		return "default"
-	}
-	res := flag
-	if res == "" {
-		// check if DOCKER_CONTEXT env variable was set
-		if _, present := os.LookupEnv("DOCKER_CONTEXT"); present {
-			res = os.Getenv("DOCKER_CONTEXT")
-		}
-
-		if res == "" {
-			config, err := config.LoadFile(configDir)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
-				return "default"
-			}
-			res = config.CurrentContext
-		}
-	}
-	if res == "" {
-		res = "default"
-	}
-	return res
 }
 
 func walk(c *cobra.Command, f func(*cobra.Command)) {

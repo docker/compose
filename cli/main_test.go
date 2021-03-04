@@ -17,52 +17,16 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/run"
 )
-
-var contextSetConfig = []byte(`{
-	"currentContext": "some-context"
-}`)
-
-func TestDetermineCurrentContext(t *testing.T) {
-	d, err := ioutil.TempDir("", "")
-	// nolint errcheck
-	defer os.RemoveAll(d)
-	assert.NilError(t, err)
-	err = ioutil.WriteFile(filepath.Join(d, config.ConfigFileName), contextSetConfig, 0644)
-	assert.NilError(t, err)
-
-	// If nothing set, fallback to default
-	c := determineCurrentContext("", "", []string{})
-	assert.Equal(t, c, "default")
-
-	// If context flag set, use that
-	c = determineCurrentContext("other-context", "", []string{})
-	assert.Equal(t, c, "other-context")
-
-	// If no context flag, use config
-	c = determineCurrentContext("", d, []string{})
-	assert.Equal(t, c, "some-context")
-
-	// Ensure context flag overrides config
-	c = determineCurrentContext("other-context", d, []string{})
-	assert.Equal(t, "other-context", c)
-
-	// Ensure host flag overrides context
-	c = determineCurrentContext("other-context", d, []string{"hostname"})
-	assert.Equal(t, "default", c)
-}
 
 func TestCheckOwnCommand(t *testing.T) {
 	assert.Assert(t, isContextAgnosticCommand(login.Command()))
