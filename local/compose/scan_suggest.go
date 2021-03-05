@@ -17,7 +17,6 @@
 package compose
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,25 +25,24 @@ import (
 
 	pluginmanager "github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose-cli/api/config"
+	cliConfig "github.com/docker/cli/cli/config"
 )
 
-func displayScanSuggestMsg(ctx context.Context, builtImages []string) {
+func displayScanSuggestMsg(builtImages []string) {
 	if len(builtImages) <= 0 {
 		return
 	}
 	if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
 		return
 	}
-	if !scanAvailable() || scanAlreadyInvoked(ctx) {
+	if !scanAvailable() || scanAlreadyInvoked() {
 		return
 	}
 	fmt.Println("Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them")
 }
 
-func scanAlreadyInvoked(ctx context.Context) bool {
-	configDir := config.Dir(ctx)
-	filename := filepath.Join(configDir, "scan", "config.json")
+func scanAlreadyInvoked() bool {
+	filename := filepath.Join(cliConfig.Dir(), "scan", "config.json")
 	f, err := os.Stat(filename)
 	if os.IsNotExist(err) {
 		return false

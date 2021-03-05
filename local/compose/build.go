@@ -50,7 +50,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 	err := s.build(ctx, project, opts, options.Progress)
 	if err == nil {
-		displayScanSuggestMsg(ctx, imagesToBuild)
+		displayScanSuggestMsg(imagesToBuild)
 	}
 
 	return err
@@ -100,7 +100,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	err := s.build(ctx, project, opts, "auto")
 	if err == nil {
-		displayScanSuggestMsg(ctx, imagesToBuild)
+		displayScanSuggestMsg(imagesToBuild)
 	}
 	return err
 }
