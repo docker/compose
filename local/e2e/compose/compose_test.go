@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -129,6 +130,15 @@ func TestLocalComposeUp(t *testing.T) {
 		res := c.RunDockerCmd("network", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
+}
+
+func TestComposeUsingCliPlugin(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"))
+	assert.NilError(t, err)
+	res := c.RunDockerOrExitError("compose", "ls")
+	res.Assert(t, icmd.Expected{Err: "'compose' is not a docker command", ExitCode: 1})
 }
 
 func TestComposePull(t *testing.T) {

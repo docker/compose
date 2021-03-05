@@ -86,8 +86,12 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 	})
 
 	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
-	composePlugin, _ := findExecutable("docker-compose", []string{"../../bin", "../../../bin"})
-	err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", "docker-compose"))
+	composePluginFile := "docker-compose"
+	if runtime.GOOS == "windows" {
+		composePluginFile += ".exe"
+	}
+	composePlugin, _ := findExecutable(composePluginFile, []string{"../../bin", "../../../bin"})
+	err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", composePluginFile))
 	if err != nil {
 		panic(err)
 	}
