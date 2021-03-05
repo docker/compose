@@ -30,7 +30,7 @@ type Service interface {
 	// Build executes the equivalent to a `compose build`
 	Build(ctx context.Context, project *types.Project, options BuildOptions) error
 	// Push executes the equivalent ot a `compose push`
-	Push(ctx context.Context, project *types.Project) error
+	Push(ctx context.Context, project *types.Project, options PushOptions) error
 	// Pull executes the equivalent of a `compose pull`
 	Pull(ctx context.Context, project *types.Project) error
 	// Create executes the equivalent to a `compose create`
@@ -131,6 +131,11 @@ type ConvertOptions struct {
 	Format string
 	// Output defines the path to save the application model
 	Output string
+}
+
+// PushOptions group options of the Push API
+type PushOptions struct {
+	IgnoreFailures bool
 }
 
 // KillOptions group options of the Kill API

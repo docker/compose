@@ -22,12 +22,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
 type pushOptions struct {
 	*projectOptions
 	composeOptions
+
+	Ignorefailures bool
 }
 
 func pushCommand(p *projectOptions) *cobra.Command {
@@ -41,6 +44,8 @@ func pushCommand(p *projectOptions) *cobra.Command {
 			return runPush(cmd.Context(), opts, args)
 		},
 	}
+	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
+
 	return pushCmd
 }
 
@@ -56,7 +61,9 @@ func runPush(ctx context.Context, opts pushOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Push(ctx, project)
+		return "", c.ComposeService().Push(ctx, project, compose.PushOptions{
+			IgnoreFailures: opts.Ignorefailures,
+		})
 	})
 	return err
 }

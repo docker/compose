@@ -33,11 +33,12 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func (s *composeService) Push(ctx context.Context, project *types.Project) error {
+func (s *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	configFile, err := cliconfig.Load(config.Dir(ctx))
 	if err != nil {
 		return err
@@ -64,13 +65,25 @@ func (s *composeService) Push(ctx context.Context, project *types.Project) error
 		}
 		service := service
 		eg.Go(func() error {
-			return s.pullServiceImage(ctx, service, info, configFile, w)
+			err := s.pushServiceImage(ctx, service, info, configFile, w)
+			if err != nil {
+				if !options.IgnoreFailures {
+					return err
+				}
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Pushing %s:", service.Name),
+					Text:       fmt.Sprintf("%v", err),
+					Status:     progress.Error,
+					StatusText: fmt.Sprintf("%s", err),
+				})
+			}
+			return nil
 		})
 	}
 	return eg.Wait()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
+func (s *composeService) pushServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return err
@@ -113,7 +126,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		if jm.Error != nil {
 			return errors.New(jm.Error.Message)
 		}
-		toPushProgressEvent("Pushing "+service.Name, jm, w)
+		toPushProgressEvent(service.Name, jm, w)
 	}
 	return nil
 }

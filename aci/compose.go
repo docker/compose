@@ -48,7 +48,7 @@ func (cs *aciComposeService) Build(ctx context.Context, project *types.Project, 
 	return errdefs.ErrNotImplemented
 }
 
-func (cs *aciComposeService) Push(ctx context.Context, project *types.Project) error {
+func (cs *aciComposeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

@@ -36,8 +36,8 @@ func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project, o
 	return e.compose.Build(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project) error {
-	return e.compose.Push(ctx, project)
+func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
+	return e.compose.Push(ctx, project, options)
 }
 
 func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) error {
