@@ -64,7 +64,7 @@ func (s *composeService) ensureScale(ctx context.Context, project *types.Project
 			number := next + i
 			name := getContainerName(project.Name, service, number)
 			eg.Go(func() error {
-				return s.createContainer(ctx, project, service, name, number, false)
+				return s.createContainer(ctx, project, service, name, number, false, true)
 			})
 		}
 	}
@@ -197,11 +197,11 @@ func getScale(config types.ServiceConfig) (int, error) {
 	return scale, err
 }
 
-func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool) error {
+func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, autoRemove bool, useNetworkAliases bool) error {
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
-	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove)
+	err := s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if inherit {
 		inherited = &container
 	}
-	err = s.createMobyContainer(ctx, project, service, name, number, inherited, false)
+	err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true)
 	if err != nil {
 		return err
 	}
@@ -268,8 +268,10 @@ func (s *composeService) restartContainer(ctx context.Context, container moby.Co
 	return nil
 }
 
-func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int, inherit *moby.Container,
-	autoRemove bool) error {
+func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig, name string, number int,
+	inherit *moby.Container,
+	autoRemove bool,
+	useNetworkAliases bool) error {
 	cState, err := GetContextContainerState(ctx)
 	if err != nil {
 		return err
@@ -287,9 +289,16 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		Labels: containerConfig.Labels,
 	}
 	cState.Add(createdContainer)
-	for netName := range service.Networks {
+	for netName, cfg := range service.Networks {
 		netwrk := project.Networks[netName]
-		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, service.Name, getContainerName(project.Name, service, number))
+		aliases := []string{getContainerName(project.Name, service, number)}
+		if useNetworkAliases {
+			aliases = append(aliases, service.Name)
+			if cfg != nil {
+				aliases = append(aliases, cfg.Aliases...)
+			}
+		}
+		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, aliases...)
 		if err != nil {
 			return err
 		}

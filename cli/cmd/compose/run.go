@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
@@ -34,18 +35,69 @@ import (
 
 type runOptions struct {
 	*composeOptions
-	Service     string
-	Command     []string
-	environment []string
-	Detach      bool
-	Remove      bool
-	noTty       bool
-	user        string
-	workdir     string
-	entrypoint  string
-	labels      []string
-	name        string
-	noDeps      bool
+	Service      string
+	Command      []string
+	environment  []string
+	Detach       bool
+	Remove       bool
+	noTty        bool
+	user         string
+	workdir      string
+	entrypoint   string
+	labels       []string
+	volumes      []string
+	publish      []string
+	useAliases   bool
+	servicePorts bool
+	name         string
+	noDeps       bool
+}
+
+func (opts runOptions) apply(project *types.Project) error {
+	target, err := project.GetService(opts.Service)
+	if err != nil {
+		return err
+	}
+	if !opts.servicePorts {
+		target.Ports = []types.ServicePortConfig{}
+	}
+	if len(opts.publish) > 0 {
+		target.Ports = []types.ServicePortConfig{}
+		for _, p := range opts.publish {
+			config, err := types.ParsePortConfig(p)
+			if err != nil {
+				return err
+			}
+			target.Ports = append(target.Ports, config...)
+		}
+	}
+	if len(opts.volumes) > 0 {
+		target.Volumes = []types.ServiceVolumeConfig{}
+		for _, v := range opts.volumes {
+			volume, err := loader.ParseVolume(v)
+			if err != nil {
+				return err
+			}
+			target.Volumes = append(target.Volumes, volume)
+		}
+	}
+
+	if opts.noDeps {
+		for _, s := range project.Services {
+			if s.Name != opts.Service {
+				project.DisabledServices = append(project.DisabledServices, s)
+			}
+		}
+		project.Services = types.Services{target}
+	}
+
+	for i, s := range project.Services {
+		if s.Name == opts.Service {
+			project.Services[i] = target
+			break
+		}
+	}
+	return nil
 }
 
 func runCommand(p *projectOptions) *cobra.Command {
@@ -63,6 +115,9 @@ func runCommand(p *projectOptions) *cobra.Command {
 				opts.Command = args[1:]
 			}
 			opts.Service = args[0]
+			if len(opts.publish) > 0 && opts.servicePorts {
+				return fmt.Errorf("--service-ports and --publish are incompatible")
+			}
 			return runRun(cmd.Context(), opts)
 		},
 	}
@@ -77,6 +132,10 @@ func runCommand(p *projectOptions) *cobra.Command {
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
 	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
 	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
+	flags.StringArrayVarP(&opts.volumes, "volumes", "v", []string{}, "Bind mount a volume.")
+	flags.StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
+	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
+	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 
 	flags.SetInterspersed(false)
 	return cmd
@@ -88,17 +147,9 @@ func runRun(ctx context.Context, opts runOptions) error {
 		return err
 	}
 
-	if opts.noDeps {
-		enabled, err := project.GetService(opts.Service)
-		if err != nil {
-			return err
-		}
-		for _, s := range project.Services {
-			if s.Name != opts.Service {
-				project.DisabledServices = append(project.DisabledServices, s)
-			}
-		}
-		project.Services = types.Services{enabled}
+	err = opts.apply(project)
+	if err != nil {
+		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
@@ -127,20 +178,21 @@ func runRun(ctx context.Context, opts runOptions) error {
 
 	// start container and attach to container streams
 	runOpts := compose.RunOptions{
-		Name:        opts.name,
-		Service:     opts.Service,
-		Command:     opts.Command,
-		Detach:      opts.Detach,
-		AutoRemove:  opts.Remove,
-		Writer:      os.Stdout,
-		Reader:      os.Stdin,
-		Tty:         !opts.noTty,
-		WorkingDir:  opts.workdir,
-		User:        opts.user,
-		Environment: opts.environment,
-		Entrypoint:  entrypoint,
-		Labels:      labels,
-		Index:       0,
+		Name:              opts.name,
+		Service:           opts.Service,
+		Command:           opts.Command,
+		Detach:            opts.Detach,
+		AutoRemove:        opts.Remove,
+		Writer:            os.Stdout,
+		Reader:            os.Stdin,
+		Tty:               !opts.noTty,
+		WorkingDir:        opts.workdir,
+		User:              opts.user,
+		Environment:       opts.environment,
+		Entrypoint:        entrypoint,
+		Labels:            labels,
+		UseNetworkAliases: opts.useAliases,
+		Index:             0,
 	}
 	exitCode, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {

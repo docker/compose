@@ -156,20 +156,21 @@ type RemoveOptions struct {
 
 // RunOptions options to execute compose run
 type RunOptions struct {
-	Name        string
-	Service     string
-	Command     []string
-	Entrypoint  []string
-	Detach      bool
-	AutoRemove  bool
-	Writer      io.Writer
-	Reader      io.Reader
-	Tty         bool
-	WorkingDir  string
-	User        string
-	Environment []string
-	Labels      types.Labels
-	Privileged  bool
+	Name              string
+	Service           string
+	Command           []string
+	Entrypoint        []string
+	Detach            bool
+	AutoRemove        bool
+	Writer            io.Writer
+	Reader            io.Reader
+	Tty               bool
+	WorkingDir        string
+	User              string
+	Environment       []string
+	Labels            types.Labels
+	Privileged        bool
+	UseNetworkAliases bool
 	// used by exec
 	Index int
 }
