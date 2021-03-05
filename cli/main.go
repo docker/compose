@@ -195,10 +195,6 @@ func main() {
 	ctx = config.WithDir(ctx, configDir)
 
 	currentContext := determineCurrentContext(opts.Context, configDir)
-	if len(opts.Hosts) > 0 {
-		opts.Context = ""
-		currentContext = "default"
-	}
 
 	s, err := store.New(configDir)
 	if err != nil {
@@ -216,20 +212,26 @@ func main() {
 		compose.Command(ctype),
 		volume.Command(ctype),
 	)
+	if ctype == store.LocalContextType {
+		if len(opts.Hosts) > 0 {
+			opts.Context = ""
+			currentContext = "default"
+		}
 
-	cnxOptions := cliflags.CommonOptions{
-		Context:   opts.Context,
-		Debug:     opts.Debug,
-		Hosts:     opts.Hosts,
-		LogLevel:  opts.LogLevel,
-		TLS:       opts.TLS,
-		TLSVerify: opts.TLSVerify,
-	}
+		cnxOptions := cliflags.CommonOptions{
+			Context:   opts.Context,
+			Debug:     opts.Debug,
+			Hosts:     opts.Hosts,
+			LogLevel:  opts.LogLevel,
+			TLS:       opts.TLS,
+			TLSVerify: opts.TLSVerify,
+		}
 
-	if opts.TLSVerify {
-		cnxOptions.TLSOptions = opts.TLSOptions
+		if opts.TLSVerify {
+			cnxOptions.TLSOptions = opts.TLSOptions
+		}
+		ctx = apicontext.WithCliOptions(ctx, cnxOptions)
 	}
-	ctx = apicontext.WithCliOptions(ctx, cnxOptions)
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 

@@ -21,13 +21,11 @@ import (
 
 	"golang.org/x/net/context"
 
-	configfile "github.com/docker/cli/cli/config/configfile"
 	cliflags "github.com/docker/cli/cli/flags"
 )
 
 type currentContextKey struct{}
 type cliOptionsKey struct{}
-type configKey struct{}
 
 // WithCurrentContext sets the name of the current docker context
 func WithCurrentContext(ctx gocontext.Context, contextName string) context.Context {
@@ -48,16 +46,5 @@ func WithCliOptions(ctx gocontext.Context, options cliflags.CommonOptions) conte
 // CliOptions returns the current context name
 func CliOptions(ctx context.Context) cliflags.CommonOptions {
 	cc, _ := ctx.Value(cliOptionsKey{}).(cliflags.CommonOptions)
-	return cc
-}
-
-// WithConfig sets docker config
-func WithConfig(ctx gocontext.Context, config configfile.ConfigFile) context.Context {
-	return context.WithValue(ctx, configKey{}, config)
-}
-
-// Config returns the docker config
-func Config(ctx context.Context) configfile.ConfigFile {
-	cc, _ := ctx.Value(cliOptionsKey{}).(configfile.ConfigFile)
 	return cc
 }

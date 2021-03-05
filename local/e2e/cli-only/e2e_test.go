@@ -396,15 +396,15 @@ func TestLegacy(t *testing.T) {
 	})
 
 	t.Run("host flag", func(t *testing.T) {
-		stderr := "nonexistent: Name or service not known"
+		stderr := "dial tcp: lookup nonexistent"
 		if runtime.GOOS == "windows" {
 			stderr = "error during connect: Get http://nonexitent:123"
 		}
 		res := c.RunDockerOrExitError("-H", "tcp://nonexistent:123", "version")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      stderr,
 		})
+		assert.Assert(t, strings.Contains(res.Stderr(), stderr), res.Stderr())
 	})
 
 	t.Run("existing contexts delegate", func(t *testing.T) {
