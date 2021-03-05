@@ -63,6 +63,8 @@ type Service interface {
 	Pause(ctx context.Context, project *types.Project) error
 	// UnPause executes the equivalent to a `compose unpause`
 	UnPause(ctx context.Context, project *types.Project) error
+	// Top executes the equivalent to a `compose top`
+	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 }
 
 // BuildOptions group options of the Build API
@@ -212,6 +214,14 @@ type ContainerSummary struct {
 	State      string
 	Health     string
 	Publishers []PortPublisher
+}
+
+// ContainerProcSummary holds container processes top data
+type ContainerProcSummary struct {
+	ID        string
+	Name      string
+	Processes [][]string
+	Titles    []string
 }
 
 // ServiceStatus hold status about a service

@@ -226,3 +226,6 @@ func (cs *aciComposeService) Remove(ctx context.Context, project *types.Project,
 func (cs *aciComposeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
 	return errdefs.ErrNotImplemented
 }
+func (cs *aciComposeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}

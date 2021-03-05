@@ -99,3 +99,7 @@ func (c *composeService) Pause(ctx context.Context, project *types.Project) erro
 func (c *composeService) UnPause(ctx context.Context, project *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (c *composeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}
