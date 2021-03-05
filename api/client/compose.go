@@ -32,7 +32,7 @@ func (c *composeService) Build(ctx context.Context, project *types.Project, opti
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Push(ctx context.Context, project *types.Project) error {
+func (c *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

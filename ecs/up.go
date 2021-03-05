@@ -35,7 +35,7 @@ func (b *ecsAPIService) Build(ctx context.Context, project *types.Project, optio
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Push(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

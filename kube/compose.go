@@ -169,7 +169,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 }
 
 // Push executes the equivalent ot a `compose push`
-func (s *composeService) Push(ctx context.Context, project *types.Project) error {
+func (s *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
