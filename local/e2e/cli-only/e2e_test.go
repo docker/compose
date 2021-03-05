@@ -398,7 +398,7 @@ func TestLegacy(t *testing.T) {
 	t.Run("host flag", func(t *testing.T) {
 		stderr := "dial tcp: lookup nonexistent"
 		if runtime.GOOS == "windows" {
-			stderr = "error during connect: Get http://nonexitent:123"
+			stderr = "dial tcp: lookup nonexistent: no such host"
 		}
 		res := c.RunDockerOrExitError("-H", "tcp://nonexistent:123", "version")
 		res.Assert(t, icmd.Expected{
