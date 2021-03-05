@@ -43,7 +43,7 @@ func WithCliOptions(ctx gocontext.Context, options cliflags.CommonOptions) conte
 	return context.WithValue(ctx, cliOptionsKey{}, options)
 }
 
-// CliOptions returns the current context name
+// CliOptions returns common cli options
 func CliOptions(ctx context.Context) cliflags.CommonOptions {
 	cc, _ := ctx.Value(cliOptionsKey{}).(cliflags.CommonOptions)
 	return cc
