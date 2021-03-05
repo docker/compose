@@ -212,7 +212,7 @@ func main() {
 		compose.Command(ctype),
 		volume.Command(ctype),
 	)
-	if ctype == store.LocalContextType {
+	if ctype == store.DefaultContextType || ctype == store.LocalContextType {
 		if len(opts.Hosts) > 0 {
 			opts.Context = ""
 			currentContext = "default"
