@@ -25,7 +25,6 @@ def find_version(*file_paths):
 
 
 install_requires = [
-    'cached-property >= 1.2.0, < 2',
     'docopt >= 0.6.1, < 1',
     'PyYAML >= 3.10, < 6',
     'requests >= 2.20.0, < 3',
@@ -50,6 +49,7 @@ if sys.version_info[:2] < (3, 4):
 
 extras_require = {
     ':python_version < "3.5"': ['backports.ssl_match_hostname >= 3.5, < 4'],
+    ':python_version < "3.8"': ['cached-property >= 1.2.0, < 2'],
     ':sys_platform == "win32"': ['colorama >= 0.4, < 1'],
     'socks': ['PySocks >= 1.5.6, != 1.5.7, < 2'],
     'tests': tests_require,
