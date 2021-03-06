@@ -106,7 +106,11 @@ if ! [ "$(command -v curl)" ]; then
 	exit 1
 fi
 
-DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64.tar.gz" | cut -d : -f 2,3)}
+if [ "$(uname -m)" = "aarch64" ]; then
+	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-arm64.tar.gz" | cut -d : -f 2,3)}
+else
+	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64.tar.gz" | cut -d : -f 2,3)}
+fi
 
 # Check if the Compose CLI is already installed
 if [ $(is_new_cli "docker") -eq 1 ]; then
