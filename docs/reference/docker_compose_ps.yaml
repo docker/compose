@@ -1,0 +1,52 @@
+command: docker compose ps
+short: List containers
+long: List containers
+usage: docker compose ps
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: all
+    shorthand: a
+    value_type: bool
+    default_value: "false"
+    description: |
+        Show all stopped containers (including those created by the run command)
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: format
+    value_type: string
+    default_value: pretty
+    description: 'Format the output. Values: [pretty | json].'
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet
+    shorthand: q
+    value_type: bool
+    default_value: "false"
+    description: Only display IDs
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: services
+    value_type: bool
+    default_value: "false"
+    description: Display services
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

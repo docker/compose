@@ -1,0 +1,22 @@
+command: docker compose push
+short: Push service images
+long: Push service images
+usage: docker compose push [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: ignore-push-failures
+    value_type: bool
+    default_value: "false"
+    description: Push what it can and ignores images with push failures
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

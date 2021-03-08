@@ -1,0 +1,51 @@
+command: docker compose create
+short: Creates containers for a service.
+long: Creates containers for a service.
+usage: docker compose create [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: build
+    value_type: bool
+    default_value: "false"
+    description: Build images before starting containers.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: force-recreate
+    value_type: bool
+    default_value: "false"
+    description: |
+        Recreate containers even if their configuration and image haven't changed.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-build
+    value_type: bool
+    default_value: "false"
+    description: Don't build an image, even if it's missing.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-recreate
+    value_type: bool
+    default_value: "false"
+    description: |
+        If containers already exist, don't recreate them. Incompatible with --force-recreate.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

@@ -1,0 +1,32 @@
+command: docker compose pull
+short: Pull service images
+long: Pull service images
+usage: docker compose pull [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: include-deps
+    value_type: bool
+    default_value: "false"
+    description: Also pull services declared as dependencies
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet
+    shorthand: q
+    value_type: bool
+    default_value: "false"
+    description: Pull without printing progress information
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

@@ -95,3 +95,7 @@ package: cross
 	cp $(BINARY)-windows-amd64.exe $(WORK_DIR)/docker.exe
 	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe
 	rm -r $(WORK_DIR)
+
+.PHONY: yamldocs
+yamldocs:
+	go run docs/yaml/main/generate.go

@@ -1,0 +1,50 @@
+command: docker compose build
+short: Build or rebuild services
+long: Build or rebuild services
+usage: docker compose build [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: build-arg
+    value_type: stringArray
+    default_value: '[]'
+    description: Set build-time variables for services.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: progress
+    value_type: string
+    default_value: auto
+    description: Set type of progress output ("auto", "plain", "tty")
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: pull
+    value_type: bool
+    default_value: "false"
+    description: Always attempt to pull a newer version of the image.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet
+    shorthand: q
+    value_type: bool
+    default_value: "false"
+    description: Don't print anything to STDOUT
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+
