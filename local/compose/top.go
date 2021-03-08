@@ -26,29 +26,20 @@ import (
 )
 
 func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+	var containers Containers
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ignore := func(string) bool {
-		return false
-	}
 	if len(services) > 0 {
-		ignore = func(s string) bool {
-			return !contains(services, s)
-		}
+		containers = containers.filter(isService(services...))
 	}
 	summary := make([]compose.ContainerProcSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, c := range containers {
 		container := c
-		service := c.Labels[serviceLabel]
-		if ignore(service) {
-			continue
-		}
 		i := i
 		eg.Go(func() error {
 			topContent, err := s.apiClient.ContainerTop(ctx, container.ID, []string{})
