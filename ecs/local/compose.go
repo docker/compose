@@ -195,7 +195,7 @@ func (e ecsLocalSimulation) UnPause(ctx context.Context, project *types.Project)
 func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
 	return e.compose.Top(ctx, projectName, services)
 }
-	
+
 func (e ecsLocalSimulation) Events(ctx context.Context, project string, options compose.EventsOptions) error {
 	return e.compose.Events(ctx, project, options)
 }

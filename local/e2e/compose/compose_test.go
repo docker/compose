@@ -132,3 +132,17 @@ func TestComposePull(t *testing.T) {
 	assert.Assert(t, strings.Contains(output, "simple Pulled"))
 	assert.Assert(t, strings.Contains(output, "another Pulled"))
 }
+
+func TestAttachRestart(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "fixtures/attach-restart", "up")
+	output := res.Stdout()
+
+	assert.Assert(t, strings.Contains(output, `another_1  | world
+attach-restart_another_1 exited with code 1
+another_1  | world
+attach-restart_another_1 exited with code 1
+another_1  | world
+attach-restart_another_1 exited with code 1`), res.Combined())
+}

@@ -53,8 +53,12 @@ func (s *composeService) Events(ctx context.Context, project string, options com
 				attributes[k] = v
 			}
 
+			timestamp := time.Unix(event.Time, 0)
+			if event.TimeNano != 0 {
+				timestamp = time.Unix(0, event.TimeNano)
+			}
 			err := options.Consumer(compose.Event{
-				Timestamp:  time.Unix(event.Time, event.TimeNano),
+				Timestamp:  timestamp,
 				Service:    service,
 				Container:  event.ID,
 				Status:     event.Status,

@@ -18,7 +18,10 @@ package formatter
 
 import (
 	"fmt"
+	"os"
 	"strconv"
+
+	"github.com/mattn/go-isatty"
 )
 
 var names = []string{
@@ -30,6 +33,36 @@ var names = []string{
 	"magenta",
 	"cyan",
 	"white",
+}
+
+const (
+	// Never use ANSI codes
+	Never = "never"
+
+	// Always use ANSI codes
+	Always = "always"
+
+	// Auto detect terminal is a tty and can use ANSI codes
+	Auto = "auto"
+)
+
+// SetANSIMode configure formatter for colored output on ANSI-compliant console
+func SetANSIMode(ansi string) {
+	if !useAnsi(ansi) {
+		nextColor = func() colorFunc {
+			return monochrome
+		}
+	}
+}
+
+func useAnsi(ansi string) bool {
+	switch ansi {
+	case Always:
+		return true
+	case Auto:
+		return isatty.IsTerminal(os.Stdout.Fd())
+	}
+	return false
 }
 
 // colorFunc use ANSI codes to render colored text on console
@@ -51,6 +84,12 @@ func makeColorFunc(code string) colorFunc {
 	return func(s string) string {
 		return ansiColor(code, s)
 	}
+}
+
+var nextColor func() colorFunc = rainbowColor
+
+func rainbowColor() colorFunc {
+	return <-loop
 }
 
 var loop = make(chan colorFunc)
