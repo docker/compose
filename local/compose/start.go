@@ -22,6 +22,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/compose-spec/compose-go/types"
+	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/sirupsen/logrus"
 )
@@ -50,20 +51,25 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	for _, c := range containers {
 		c := c
 		go func() {
-			statusC, errC := s.apiClient.ContainerWait(context.Background(), c.ID, container.WaitConditionNotRunning)
-			select {
-			case status := <-statusC:
-				options.Attach(compose.ContainerEvent{
-					Type:     compose.ContainerEventExit,
-					Source:   c.ID,
-					Name:     getCanonicalContainerName(c),
-					Service:  c.Labels[serviceLabel],
-					ExitCode: int(status.StatusCode),
-				})
-			case err := <-errC:
-				logrus.Warnf("Unexpected API error for %s : %s\n", getCanonicalContainerName(c), err.Error())
-			}
+			s.waitContainer(ctx, c, options.Attach)
 		}()
 	}
 	return nil
+}
+
+func (s *composeService) waitContainer(ctx context.Context, c moby.Container, listener compose.ContainerEventListener) {
+	statusC, errC := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNotRunning)
+	name := getCanonicalContainerName(c)
+	select {
+	case status := <-statusC:
+		listener(compose.ContainerEvent{
+			Type:     compose.ContainerEventExit,
+			Source:   c.ID,
+			Name:     name,
+			Service:  c.Labels[serviceLabel],
+			ExitCode: int(status.StatusCode),
+		})
+	case err := <-errC:
+		logrus.Warnf("Unexpected API error for %s : %s", name, err.Error())
+	}
 }

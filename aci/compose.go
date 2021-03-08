@@ -229,3 +229,7 @@ func (cs *aciComposeService) Exec(ctx context.Context, project *types.Project, o
 func (cs *aciComposeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
 	return nil, errdefs.ErrNotImplemented
 }
+
+func (cs *aciComposeService) Events(ctx context.Context, project string, options compose.EventsOptions) error {
+	return errdefs.ErrNotImplemented
+}

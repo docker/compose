@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/cli/formatter"
 )
 
 // Warning is a global warning to be displayed to user on command failure
@@ -100,11 +101,13 @@ func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 // Command returns the compose command with its child commands
 func Command(contextType string) *cobra.Command {
 	opts := projectOptions{}
+	var ansi string
 	command := &cobra.Command{
 		Short:            "Docker Compose",
 		Use:              "compose",
 		TraverseChildren: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			formatter.SetANSIMode(ansi)
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(aec.Apply(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead.`, aec.RedF))
@@ -136,6 +139,7 @@ func Command(contextType string) *cobra.Command {
 		pauseCommand(&opts),
 		unpauseCommand(&opts),
 		topCommand(&opts),
+		eventsCommand(&opts),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
@@ -148,5 +152,6 @@ func Command(contextType string) *cobra.Command {
 	}
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
+	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	return command
 }

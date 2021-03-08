@@ -272,6 +272,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
 		Binds:          binds,
@@ -281,6 +282,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		NetworkMode:    networkMode,
 		Init:           service.Init,
 		ReadonlyRootfs: service.ReadOnly,
+		RestartPolicy:  getRestartPolicy(service),
 		// ShmSize: , TODO
 		Sysctls:      service.Sysctls,
 		PortBindings: portBindings,
@@ -291,6 +293,33 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 
 	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
 	return &containerConfig, &hostConfig, networkConfig, nil
+}
+
+func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
+	var restart container.RestartPolicy
+	if service.Restart != "" {
+		split := strings.Split(service.Restart, ":")
+		var attempts int
+		if len(split) > 1 {
+			attempts, _ = strconv.Atoi(split[1])
+		}
+		restart = container.RestartPolicy{
+			Name:              split[0],
+			MaximumRetryCount: attempts,
+		}
+	}
+	if service.Deploy != nil && service.Deploy.RestartPolicy != nil {
+		policy := *service.Deploy.RestartPolicy
+		var attempts int
+		if policy.MaxAttempts != nil {
+			attempts = int(*policy.MaxAttempts)
+		}
+		restart = container.RestartPolicy{
+			Name:              policy.Condition,
+			MaximumRetryCount: attempts,
+		}
+	}
+	return restart
 }
 
 func getDeployResources(s types.ServiceConfig) container.Resources {

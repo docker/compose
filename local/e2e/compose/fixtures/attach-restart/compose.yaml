@@ -1,0 +1,11 @@
+services:
+  simple:
+    image: busybox:1.31.0-uclibc
+    command: sh -c "sleep 5"
+  another:
+    image: busybox:1.31.0-uclibc
+    command: sh -c "sleep 0.1 && echo world && /bin/false"
+    deploy:
+      restart_policy:
+        condition: "on-failure"
+        max_attempts: 2

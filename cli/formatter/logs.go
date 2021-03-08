@@ -45,7 +45,7 @@ func (l *logConsumer) Register(name string, id string) {
 func (l *logConsumer) register(name string, id string) *presenter {
 	cf := monochrome
 	if l.color {
-		cf = <-loop
+		cf = nextColor()
 	}
 	p := &presenter{
 		colors: cf,
