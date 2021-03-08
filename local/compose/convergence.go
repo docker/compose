@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/containerd/containerd/platforms"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -280,7 +282,15 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	if err != nil {
 		return err
 	}
-	created, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, nil, name)
+	var plat *specs.Platform
+	if service.Platform != "" {
+		p, err := platforms.Parse(service.Platform)
+		if err != nil {
+			return err
+		}
+		plat = &p
+	}
+	created, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
 	if err != nil {
 		return err
 	}

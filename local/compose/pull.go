@@ -96,6 +96,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project) error
 
 			stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
 				RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+				Platform:     service.Platform,
 			})
 			if err != nil {
 				w.Event(progress.Event{
