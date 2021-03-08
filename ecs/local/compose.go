@@ -191,3 +191,7 @@ func (e ecsLocalSimulation) Pause(ctx context.Context, project *types.Project) e
 func (e ecsLocalSimulation) UnPause(ctx context.Context, project *types.Project) error {
 	return e.compose.UnPause(ctx, project)
 }
+
+func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+	return e.compose.Top(ctx, projectName, services)
+}

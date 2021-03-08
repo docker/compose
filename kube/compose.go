@@ -254,3 +254,7 @@ func (s *composeService) Pause(ctx context.Context, project *types.Project) erro
 func (s *composeService) UnPause(ctx context.Context, project *types.Project) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}
