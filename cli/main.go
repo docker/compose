@@ -191,10 +191,11 @@ func main() {
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))
 	}
+
 	configDir := opts.Config
 	ctx = config.WithDir(ctx, configDir)
 
-	currentContext := determineCurrentContext(opts.Context, configDir)
+	currentContext := determineCurrentContext(opts.Context, configDir, opts.Hosts)
 
 	s, err := store.New(configDir)
 	if err != nil {
@@ -213,11 +214,6 @@ func main() {
 		volume.Command(ctype),
 	)
 	if ctype == store.DefaultContextType || ctype == store.LocalContextType {
-		if len(opts.Hosts) > 0 {
-			opts.Context = ""
-			currentContext = "default"
-		}
-
 		cnxOptions := cliflags.CommonOptions{
 			Context:   opts.Context,
 			Debug:     opts.Debug,
@@ -320,15 +316,31 @@ func newSigContext() (context.Context, func()) {
 	return ctx, cancel
 }
 
-func determineCurrentContext(flag string, configDir string) string {
+func determineCurrentContext(flag string, configDir string, hosts []string) string {
+	// host and context flags cannot be both set at the same time -- the local backend enforces this when resolving hostname
+	// -H flag disables context --> set default as current
+	if len(hosts) > 0 {
+		return "default"
+	}
+	// DOCKER_HOST disables context --> set default as current
+	if _, present := os.LookupEnv("DOCKER_HOST"); present {
+		return "default"
+	}
 	res := flag
 	if res == "" {
-		config, err := config.LoadFile(configDir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
-			return "default"
+		// check if DOCKER_CONTEXT env variable was set
+		if _, present := os.LookupEnv("DOCKER_CONTEXT"); present {
+			res = os.Getenv("DOCKER_CONTEXT")
 		}
-		res = config.CurrentContext
+
+		if res == "" {
+			config, err := config.LoadFile(configDir)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
+				return "default"
+			}
+			res = config.CurrentContext
+		}
 	}
 	if res == "" {
 		res = "default"
