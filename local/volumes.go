@@ -29,7 +29,7 @@ import (
 )
 
 type volumeService struct {
-	apiClient *client.Client
+	apiClient client.APIClient
 }
 
 func (vs *volumeService) List(ctx context.Context) ([]volumes.Volume, error) {

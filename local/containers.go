@@ -39,10 +39,11 @@ import (
 )
 
 type containerService struct {
-	apiClient *client.Client
+	apiClient client.APIClient
 }
 
 func (cs *containerService) Inspect(ctx context.Context, id string) (containers.Container, error) {
+
 	c, err := cs.apiClient.ContainerInspect(ctx, id)
 	if err != nil {
 		return containers.Container{}, err

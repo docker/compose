@@ -44,20 +44,24 @@ func TestDetermineCurrentContext(t *testing.T) {
 	assert.NilError(t, err)
 
 	// If nothing set, fallback to default
-	c := determineCurrentContext("", "")
+	c := determineCurrentContext("", "", []string{})
 	assert.Equal(t, c, "default")
 
 	// If context flag set, use that
-	c = determineCurrentContext("other-context", "")
+	c = determineCurrentContext("other-context", "", []string{})
 	assert.Equal(t, c, "other-context")
 
 	// If no context flag, use config
-	c = determineCurrentContext("", d)
+	c = determineCurrentContext("", d, []string{})
 	assert.Equal(t, c, "some-context")
 
 	// Ensure context flag overrides config
-	c = determineCurrentContext("other-context", d)
+	c = determineCurrentContext("other-context", d, []string{})
 	assert.Equal(t, "other-context", c)
+
+	// Ensure host flag overrides context
+	c = determineCurrentContext("other-context", d, []string{"hostname"})
+	assert.Equal(t, "default", c)
 }
 
 func TestCheckOwnCommand(t *testing.T) {

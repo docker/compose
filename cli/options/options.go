@@ -17,16 +17,14 @@
 package options
 
 import (
-	apicontext "github.com/docker/compose-cli/api/context"
 	cliconfig "github.com/docker/compose-cli/cli/config"
+
+	cliflags "github.com/docker/cli/cli/flags"
 )
 
 // GlobalOpts contains the global CLI options
 type GlobalOpts struct {
-	apicontext.ContextFlags
 	cliconfig.ConfigFlags
-	Debug    bool
-	LogLevel string
-	Version  bool
-	Host     string
+	cliflags.CommonOptions
+	Version bool
 }

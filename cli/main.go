@@ -47,6 +47,8 @@ import (
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
 
+	cliflags "github.com/docker/cli/cli/flags"
+
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
 	_ "github.com/docker/compose-cli/ecs"
@@ -151,10 +153,7 @@ func main() {
 	})
 
 	flags := root.Flags()
-	flags.StringVarP(&opts.LogLevel, "log-level", "l", "info", "Set the logging level (\"debug\"|\"info\"|\"warn\"|\"error\"|\"fatal\")")
-	flags.BoolVarP(&opts.Debug, "debug", "D", false, "Enable debug output in the logs")
-	flags.StringVarP(&opts.Host, "host", "H", "", "Daemon socket(s) to connect to")
-	opts.AddContextFlags(flags)
+	opts.InstallFlags(flags)
 	opts.AddConfigFlags(flags)
 	flags.BoolVarP(&opts.Version, "version", "v", false, "Print version information and quit")
 
@@ -184,18 +183,19 @@ func main() {
 	ctx, cancel := newSigContext()
 	defer cancel()
 
-	// --host and --version should immediately be forwarded to the original cli
-	if opts.Host != "" || opts.Version {
+	// --version should immediately be forwarded to the original cli
+	if opts.Version {
 		mobycli.Exec(root)
 	}
 
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))
 	}
+
 	configDir := opts.Config
 	ctx = config.WithDir(ctx, configDir)
 
-	currentContext := determineCurrentContext(opts.Context, configDir)
+	currentContext := determineCurrentContext(opts.Context, configDir, opts.Hosts)
 
 	s, err := store.New(configDir)
 	if err != nil {
@@ -213,7 +213,21 @@ func main() {
 		compose.Command(ctype),
 		volume.Command(ctype),
 	)
+	if ctype == store.DefaultContextType || ctype == store.LocalContextType {
+		cnxOptions := cliflags.CommonOptions{
+			Context:   opts.Context,
+			Debug:     opts.Debug,
+			Hosts:     opts.Hosts,
+			LogLevel:  opts.LogLevel,
+			TLS:       opts.TLS,
+			TLSVerify: opts.TLSVerify,
+		}
 
+		if opts.TLSVerify {
+			cnxOptions.TLSOptions = opts.TLSOptions
+		}
+		ctx = apicontext.WithCliOptions(ctx, cnxOptions)
+	}
 	ctx = apicontext.WithCurrentContext(ctx, currentContext)
 	ctx = store.WithContextStore(ctx, s)
 
@@ -302,15 +316,31 @@ func newSigContext() (context.Context, func()) {
 	return ctx, cancel
 }
 
-func determineCurrentContext(flag string, configDir string) string {
+func determineCurrentContext(flag string, configDir string, hosts []string) string {
+	// host and context flags cannot be both set at the same time -- the local backend enforces this when resolving hostname
+	// -H flag disables context --> set default as current
+	if len(hosts) > 0 {
+		return "default"
+	}
+	// DOCKER_HOST disables context --> set default as current
+	if _, present := os.LookupEnv("DOCKER_HOST"); present {
+		return "default"
+	}
 	res := flag
 	if res == "" {
-		config, err := config.LoadFile(configDir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
-			return "default"
+		// check if DOCKER_CONTEXT env variable was set
+		if _, present := os.LookupEnv("DOCKER_CONTEXT"); present {
+			res = os.Getenv("DOCKER_CONTEXT")
 		}
-		res = config.CurrentContext
+
+		if res == "" {
+			config, err := config.LoadFile(configDir)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, errors.Wrap(err, "WARNING"))
+				return "default"
+			}
+			res = config.CurrentContext
+		}
 	}
 	if res == "" {
 		res = "default"

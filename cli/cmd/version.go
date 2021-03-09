@@ -36,8 +36,12 @@ func VersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Show the Docker version information",
 		Args:  cobra.MaximumNArgs(0),
-		Run: func(cmd *cobra.Command, _ []string) {
-			runVersion(cmd)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			err := runVersion(cmd)
+			if err != nil {
+				return ExitCodeError{ExitCode: 1}
+			}
+			return nil
 		},
 	}
 	// define flags for backward compatibility with com.docker.cli
@@ -48,34 +52,38 @@ func VersionCommand() *cobra.Command {
 	return cmd
 }
 
-func runVersion(cmd *cobra.Command) {
+func runVersion(cmd *cobra.Command) error {
 	var versionString string
+	var err error
 	format := strings.ToLower(strings.ReplaceAll(cmd.Flag(formatOpt).Value.String(), " ", ""))
 	displayedVersion := strings.TrimPrefix(internal.Version, "v")
 	// Replace is preferred in this case to keep the order.
 	switch format {
 	case formatter.PRETTY, "":
-		versionString = strings.Replace(getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...),
+		versionString, err = getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...)
+		versionString = strings.Replace(versionString,
 			"\n Version:", "\n Cloud integration: "+displayedVersion+"\n Version:", 1)
 	case formatter.JSON, formatter.TemplateLegacyJSON: // Try to catch full JSON formats
-		versionString = strings.Replace(getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...),
+		versionString, err = getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...)
+		versionString = strings.Replace(versionString,
 			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
 	default:
-		versionString = getOutFromMoby(cmd)
+		versionString, err = getOutFromMoby(cmd)
 	}
 
 	fmt.Print(versionString)
+	return err
 }
 
-func getOutFromMoby(cmd *cobra.Command, args ...string) string {
-	versionResult, _ := mobycli.ExecSilent(cmd.Context(), args...)
+func getOutFromMoby(cmd *cobra.Command, args ...string) (string, error) {
+	versionResult, err := mobycli.ExecSilent(cmd.Context(), args...)
 	// we don't want to fail on error, there is an error if the engine is not available but it displays client version info
 	// Still, technically the [] byte versionResult could be nil, just let the original command display what it has to display
 	if versionResult == nil {
 		mobycli.Exec(cmd.Root())
-		return ""
+		return "", nil
 	}
-	return string(versionResult)
+	return string(versionResult), err
 }
 
 func fixedPrettyArgs(oArgs []string) []string {
