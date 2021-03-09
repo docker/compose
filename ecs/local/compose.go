@@ -57,6 +57,10 @@ func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, o
 	return e.compose.Start(ctx, project, options)
 }
 
+func (e ecsLocalSimulation) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+	return e.compose.Restart(ctx, project, options)
+}
+
 func (e ecsLocalSimulation) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	return e.compose.Stop(ctx, project, options)
 }

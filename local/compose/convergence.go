@@ -390,3 +390,26 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	}
 	return eg.Wait()
 }
+
+func (s *composeService) restartService(ctx context.Context, serviceName string, timeout *time.Duration) error {
+	containerState, err := GetContextContainerState(ctx)
+	if err != nil {
+		return err
+	}
+	containers := containerState.GetContainers().filter(isService(serviceName))
+	w := progress.ContextWriter(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, c := range containers {
+		container := c
+		eg.Go(func() error {
+			eventName := getContainerProgressName(container)
+			w.Event(progress.RestartingEvent(eventName))
+			err := s.apiClient.ContainerRestart(ctx, container.ID, timeout)
+			if err == nil {
+				w.Event(progress.StartedEvent(eventName))
+			}
+			return err
+		})
+	}
+	return eg.Wait()
+}

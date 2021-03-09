@@ -51,6 +51,10 @@ func (b *ecsAPIService) Start(ctx context.Context, project *types.Project, optio
 	return errdefs.ErrNotImplemented
 }
 
+func (b *ecsAPIService) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (b *ecsAPIService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	return errdefs.ErrNotImplemented
 }

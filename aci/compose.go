@@ -64,6 +64,10 @@ func (cs *aciComposeService) Start(ctx context.Context, project *types.Project, 
 	return errdefs.ErrNotImplemented
 }
 
+func (cs *aciComposeService) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *aciComposeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	return errdefs.ErrNotImplemented
 }
