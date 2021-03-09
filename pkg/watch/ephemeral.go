@@ -14,7 +14,7 @@ import (
 // there or aren't in the right places.
 //
 // https://app.clubhouse.io/windmill/story/691/filter-out-ephemeral-file-changes
-var ephemeralPathMatcher = initEphemeralPathMatcher()
+var EphemeralPathMatcher = initEphemeralPathMatcher()
 
 func initEphemeralPathMatcher() model.PathMatcher {
 	golandPatterns := []string{"**/*___jb_old___", "**/*___jb_tmp___", "**/.idea/**"}
