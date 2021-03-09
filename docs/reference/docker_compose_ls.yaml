@@ -1,0 +1,40 @@
+command: docker compose ls
+short: List running compose projects
+long: List running compose projects
+usage: docker compose ls
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: filter
+    value_type: filter
+    description: Filter output based on conditions provided.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: format
+    value_type: string
+    default_value: pretty
+    description: 'Format the output. Values: [pretty | json].'
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet
+    shorthand: q
+    value_type: bool
+    default_value: "false"
+    description: Only display IDs.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

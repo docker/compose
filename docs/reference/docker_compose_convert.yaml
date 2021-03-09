@@ -1,0 +1,42 @@
+command: docker compose convert
+aliases: config
+short: Converts the compose file to platform's canonical format
+long: Converts the compose file to platform's canonical format
+usage: docker compose convert SERVICES
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: format
+    value_type: string
+    default_value: yaml
+    description: 'Format the output. Values: [yaml | json]'
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet
+    shorthand: q
+    value_type: bool
+    default_value: "false"
+    description: Only validate the configuration, don't print anything.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: resolve-image-digests
+    value_type: bool
+    default_value: "false"
+    description: Pin image tags to digests.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

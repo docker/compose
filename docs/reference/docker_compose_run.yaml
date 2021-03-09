@@ -1,0 +1,147 @@
+command: docker compose run
+short: Run a one-off command on a service.
+long: Run a one-off command on a service.
+usage: docker compose run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l
+    KEY=VALUE...] SERVICE [COMMAND] [ARGS...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: detach
+    shorthand: d
+    value_type: bool
+    default_value: "false"
+    description: Run container in background and print container ID
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: entrypoint
+    value_type: string
+    description: Override the entrypoint of the image
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: env
+    shorthand: e
+    value_type: stringArray
+    default_value: '[]'
+    description: Set environment variables
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: labels
+    shorthand: l
+    value_type: stringArray
+    default_value: '[]'
+    description: Add or override a label
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: name
+    value_type: string
+    description: ' Assign a name to the container'
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-TTY
+    shorthand: T
+    value_type: bool
+    default_value: "false"
+    description: |
+        Disable pseudo-tty allocation. By default docker compose run allocates a TTY
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-deps
+    value_type: bool
+    default_value: "false"
+    description: Don't start linked services.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: publish
+    shorthand: p
+    value_type: stringArray
+    default_value: '[]'
+    description: Publish a container's port(s) to the host.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: rm
+    value_type: bool
+    default_value: "false"
+    description: Automatically remove the container when it exits
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: service-ports
+    value_type: bool
+    default_value: "false"
+    description: |
+        Run command with the service's ports enabled and mapped to the host.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: use-aliases
+    value_type: bool
+    default_value: "false"
+    description: |
+        Use the service's network useAliases in the network(s) the container connects to.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: user
+    shorthand: u
+    value_type: string
+    description: Run as specified username or uid
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: volumes
+    shorthand: v
+    value_type: stringArray
+    default_value: '[]'
+    description: Bind mount a volume.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: workdir
+    shorthand: w
+    value_type: string
+    description: Working directory inside the container
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

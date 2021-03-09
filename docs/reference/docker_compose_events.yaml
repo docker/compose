@@ -1,0 +1,22 @@
+command: docker compose events
+short: Receive real time events from containers.
+long: Receive real time events from containers.
+usage: docker compose events [options] [--] [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: json
+    value_type: bool
+    default_value: "false"
+    description: Output events as a stream of json objects
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

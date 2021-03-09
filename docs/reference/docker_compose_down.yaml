@@ -1,0 +1,53 @@
+command: docker compose down
+short: Stop and remove containers, networks
+long: Stop and remove containers, networks
+usage: docker compose down
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: remove-orphans
+    value_type: bool
+    default_value: "false"
+    description: |
+        Remove containers for services not defined in the Compose file.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: rmi
+    value_type: string
+    description: |
+        Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: timeout
+    shorthand: t
+    value_type: int
+    default_value: "10"
+    description: Specify a shutdown timeout in seconds
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: volumes
+    shorthand: v
+    value_type: bool
+    default_value: "false"
+    description: |4
+         Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

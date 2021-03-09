@@ -1,0 +1,23 @@
+command: docker compose stop
+short: Stop services
+long: Stop services
+usage: docker compose stop [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: timeout
+    shorthand: t
+    value_type: int
+    default_value: "10"
+    description: Specify a shutdown timeout in seconds
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

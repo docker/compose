@@ -1,0 +1,121 @@
+command: docker compose
+short: Docker Compose
+long: Docker Compose
+pname: docker
+plink: docker.yaml
+cname:
+  - docker compose build
+  - docker compose convert
+  - docker compose create
+  - docker compose down
+  - docker compose events
+  - docker compose exec
+  - docker compose kill
+  - docker compose logs
+  - docker compose ls
+  - docker compose pause
+  - docker compose ps
+  - docker compose pull
+  - docker compose push
+  - docker compose rm
+  - docker compose run
+  - docker compose start
+  - docker compose stop
+  - docker compose top
+  - docker compose unpause
+  - docker compose up
+clink:
+  - docker_compose_build.yaml
+  - docker_compose_convert.yaml
+  - docker_compose_create.yaml
+  - docker_compose_down.yaml
+  - docker_compose_events.yaml
+  - docker_compose_exec.yaml
+  - docker_compose_kill.yaml
+  - docker_compose_logs.yaml
+  - docker_compose_ls.yaml
+  - docker_compose_pause.yaml
+  - docker_compose_ps.yaml
+  - docker_compose_pull.yaml
+  - docker_compose_push.yaml
+  - docker_compose_rm.yaml
+  - docker_compose_run.yaml
+  - docker_compose_start.yaml
+  - docker_compose_stop.yaml
+  - docker_compose_top.yaml
+  - docker_compose_unpause.yaml
+  - docker_compose_up.yaml
+options:
+  - option: ansi
+    value_type: string
+    default_value: auto
+    description: |
+        Control when to print ANSI control characters ("never"|"always"|"auto")
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: env-file
+    value_type: string
+    description: Specify an alternate environment file.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: file
+    shorthand: f
+    value_type: stringArray
+    default_value: '[]'
+    description: Compose configuration files
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: profile
+    value_type: stringArray
+    default_value: '[]'
+    description: Specify a profile to enable
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: project-directory
+    value_type: string
+    description: |-
+        Specify an alternate working directory
+        (default: the path of the Compose file)
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: project-name
+    shorthand: p
+    value_type: string
+    description: Project name
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: workdir
+    value_type: string
+    description: |-
+        DEPRECATED! USE --project-directory INSTEAD.
+        Specify an alternate working directory
+        (default: the path of the Compose file)
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

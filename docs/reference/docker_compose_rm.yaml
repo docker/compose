@@ -1,0 +1,43 @@
+command: docker compose rm
+short: Removes stopped service containers
+long: Removes stopped service containers
+usage: docker compose rm [SERVICE...]
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: force
+    shorthand: f
+    value_type: bool
+    default_value: "false"
+    description: Don't ask to confirm removal
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: stop
+    shorthand: s
+    value_type: bool
+    default_value: "false"
+    description: Stop the containers, if required, before removing
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: volumes
+    shorthand: v
+    value_type: bool
+    default_value: "false"
+    description: Remove any anonymous volumes attached to containers
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+
