@@ -17,6 +17,7 @@
 package context
 
 import (
+	"github.com/docker/compose-cli/cli/mobycli"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,32 @@ func Command() *cobra.Command {
 		useCommand(),
 		inspectCommand(),
 		updateCommand(),
+		exportCommand(),
+		importCommand(),
 	)
 
+	return cmd
+}
+
+func exportCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "Export a context to a tar or kubeconfig file",
+		Run: func(cmd *cobra.Command, args []string) {
+			mobycli.Exec(cmd.Root())
+		},
+	}
+	cmd.Flags().Bool("kubeconfig", false, "Export as a kubeconfig file")
+	return cmd
+}
+
+func importCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import a context from a tar or zip file",
+		Run: func(cmd *cobra.Command, args []string) {
+			mobycli.Exec(cmd.Root())
+		},
+	}
 	return cmd
 }
