@@ -289,6 +289,12 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Resources:    resources,
 		VolumeDriver: service.VolumeDriver,
 		VolumesFrom:  service.VolumesFrom,
+		DNS:          service.DNS,
+		DNSSearch:    service.DNSSearch,
+		DNSOptions:   service.DNSOpts,
+		ExtraHosts:   service.ExtraHosts,
+		SecurityOpt:  service.SecurityOpt,
+		UsernsMode:   container.UsernsMode(service.UserNSMode),
 	}
 
 	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
