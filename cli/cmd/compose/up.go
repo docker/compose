@@ -68,6 +68,7 @@ type upOptions struct {
 	timeout            int
 	noInherit          bool
 	attachDependencies bool
+	quietPull          bool
 }
 
 func (opts upOptions) recreateStrategy() string {
@@ -196,6 +197,7 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 		flags.BoolVar(&opts.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
 		flags.BoolVarP(&opts.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
 		flags.BoolVar(&opts.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
+		flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	}
 
 	return upCmd
@@ -214,7 +216,8 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return "", c.ComposeService().Up(ctx, project, compose.UpOptions{
-			Detach: opts.Detach,
+			Detach:    opts.Detach,
+			QuietPull: opts.quietPull,
 		})
 	})
 	return err
@@ -239,6 +242,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 			RecreateDependencies: opts.dependenciesRecreateStrategy(),
 			Inherit:              !opts.noInherit,
 			Timeout:              opts.GetTimeout(),
+			QuietPull:            opts.quietPull,
 		})
 		if err != nil {
 			return "", err
