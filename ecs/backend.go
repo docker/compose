@@ -63,9 +63,9 @@ func init() {
 	backend.Register(backendType, backendType, service, getCloudService)
 }
 
-func service(ctx context.Context) (backend.Service, error) {
-	contextStore := store.ContextStore(ctx)
-	currentContext := apicontext.CurrentContext(ctx)
+func service() (backend.Service, error) {
+	contextStore := store.Instance()
+	currentContext := apicontext.Current()
 	var ecsContext store.EcsContext
 
 	if err := contextStore.GetEndpoint(currentContext, &ecsContext); err != nil {

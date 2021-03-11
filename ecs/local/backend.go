@@ -17,8 +17,6 @@
 package local
 
 import (
-	"context"
-
 	local_compose "github.com/docker/compose-cli/local/compose"
 
 	"github.com/docker/docker/client"
@@ -44,7 +42,7 @@ type ecsLocalSimulation struct {
 	compose compose.Service
 }
 
-func service(ctx context.Context) (backend.Service, error) {
+func service() (backend.Service, error) {
 	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err

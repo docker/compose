@@ -75,7 +75,7 @@ func execCommand(p *projectOptions) *cobra.Command {
 }
 
 func runExec(ctx context.Context, opts execOpts) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

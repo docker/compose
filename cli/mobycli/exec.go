@@ -39,9 +39,9 @@ const ComDockerCli = "com.docker.cli"
 
 // ExecIfDefaultCtxType delegates to com.docker.cli if on moby context
 func ExecIfDefaultCtxType(ctx context.Context, root *cobra.Command) {
-	currentContext := apicontext.CurrentContext(ctx)
+	currentContext := apicontext.Current()
 
-	s := store.ContextStore(ctx)
+	s := store.Instance()
 
 	currentCtx, err := s.Get(currentContext)
 	// Only run original docker command if the current context is not ours.

@@ -72,7 +72,7 @@ $ docker context update my-context --description "some description" --docker "ho
 }
 
 func runUpdate(cmd *cobra.Command, name string) error {
-	s := store.ContextStore(cmd.Context())
+	s := store.Instance()
 	dockerContext, err := s.Get(name)
 	if err == nil && dockerContext != nil {
 		if dockerContext.Type() != store.DefaultContextType {

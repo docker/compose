@@ -17,22 +17,15 @@
 package local
 
 import (
-	"context"
+	"github.com/docker/docker/client"
 
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose-cli/api/backend"
-	"github.com/docker/compose-cli/api/cloud"
-
 	"github.com/docker/compose-cli/api/compose"
-	apiconfig "github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/containers"
-	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	local_compose "github.com/docker/compose-cli/local/compose"
-
-	cliconfig "github.com/docker/cli/cli/config"
 )
 
 type local struct {
@@ -41,27 +34,13 @@ type local struct {
 	composeService   compose.Service
 }
 
-func init() {
-	backend.Register("local", "local", service, cloud.NotImplementedCloudService)
-}
-
-func service(ctx context.Context) (backend.Service, error) {
-	options := apicontext.CliOptions(ctx)
-	config := apiconfig.Dir(ctx)
-	configFile, err := cliconfig.Load(config)
-	if err != nil {
-		return nil, err
-	}
-	apiClient, err := command.NewAPIClientFromFlags(&options, configFile)
-	if err != nil {
-		return nil, err
-	}
-
+// NewService build a backend for "local" context, using Docker API client
+func NewService(apiClient client.APIClient) backend.Service {
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
 		composeService:   local_compose.NewComposeService(apiClient),
-	}, nil
+	}
 }
 
 func (s *local) ContainerService() containers.Service {

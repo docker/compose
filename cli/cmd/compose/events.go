@@ -51,7 +51,7 @@ func eventsCommand(p *projectOptions) *cobra.Command {
 }
 
 func runEvents(ctx context.Context, opts eventsOpts, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

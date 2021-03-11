@@ -109,7 +109,7 @@ func parseAccessKeysFile(file string, opts *ecs.ContextParams) error {
 }
 
 func runCreateLocalSimulation(ctx context.Context, contextName string, opts ecs.ContextParams) error {
-	if contextExists(ctx, contextName) {
+	if contextExists(contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 	cs, err := client.GetCloudService(ctx, store.EcsLocalSimulationContextType)
@@ -120,18 +120,18 @@ func runCreateLocalSimulation(ctx context.Context, contextName string, opts ecs.
 	if err != nil {
 		return err
 	}
-	return createDockerContext(ctx, contextName, store.EcsLocalSimulationContextType, description, data)
+	return createDockerContext(contextName, store.EcsLocalSimulationContextType, description, data)
 }
 
 func runCreateEcs(ctx context.Context, contextName string, opts ecs.ContextParams) error {
-	if contextExists(ctx, contextName) {
+	if contextExists(contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 	contextData, description, err := getEcsContextData(ctx, opts)
 	if err != nil {
 		return err
 	}
-	return createDockerContext(ctx, contextName, store.EcsContextType, description, contextData)
+	return createDockerContext(contextName, store.EcsContextType, description, contextData)
 
 }
 

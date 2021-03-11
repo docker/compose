@@ -104,7 +104,7 @@ func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, opt
 }
 
 func (b *ecsAPIService) resolveServiceImagesDigests(ctx context.Context, project *types.Project) error {
-	configFile, err := cliconfig.Load(config.Dir(ctx))
+	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
 		return err
 	}

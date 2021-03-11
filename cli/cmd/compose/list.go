@@ -69,7 +69,7 @@ func runList(ctx context.Context, opts lsOptions) error {
 		return err
 	}
 
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

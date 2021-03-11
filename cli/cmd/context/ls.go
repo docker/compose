@@ -73,9 +73,8 @@ func runList(cmd *cobra.Command, opts lsOpts) error {
 		return nil
 	}
 
-	ctx := cmd.Context()
-	currentContext := apicontext.CurrentContext(ctx)
-	s := store.ContextStore(ctx)
+	currentContext := apicontext.Current()
+	s := store.Instance()
 	contexts, err := s.List()
 	if err != nil {
 		return err

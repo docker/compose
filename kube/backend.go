@@ -19,8 +19,6 @@
 package kube
 
 import (
-	"context"
-
 	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/cloud"
 	"github.com/docker/compose-cli/api/compose"
@@ -41,8 +39,8 @@ func init() {
 	backend.Register(backendType, backendType, service, cloud.NotImplementedCloudService)
 }
 
-func service(ctx context.Context) (backend.Service, error) {
-	s, err := NewComposeService(ctx)
+func service() (backend.Service, error) {
+	s, err := NewComposeService()
 	if err != nil {
 		return nil, err
 	}

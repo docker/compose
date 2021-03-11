@@ -37,7 +37,7 @@ func (cp *contextsProxy) SetCurrent(ctx context.Context, request *contextsv1.Set
 }
 
 func (cp *contextsProxy) List(ctx context.Context, request *contextsv1.ListRequest) (*contextsv1.ListResponse, error) {
-	s := store.ContextStore(ctx)
+	s := store.Instance()
 	configFile, err := config.LoadFile(cp.configDir)
 	if err != nil {
 		return nil, err

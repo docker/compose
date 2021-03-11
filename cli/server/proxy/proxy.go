@@ -62,7 +62,7 @@ type proxy struct {
 
 // New creates a new proxy server
 func New(ctx context.Context) Proxy {
-	configDir := config.Dir(ctx)
+	configDir := config.Dir()
 	return &proxy{
 		configDir: configDir,
 		streams:   map[string]*streams.Stream{},

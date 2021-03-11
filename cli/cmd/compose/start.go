@@ -45,7 +45,7 @@ func startCommand(p *projectOptions) *cobra.Command {
 }
 
 func runStart(ctx context.Context, opts startOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,6 @@
 package aci
 
 import (
-	"context"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2019-12-01/containerinstance"
@@ -68,9 +67,9 @@ func init() {
 	backend.Register(backendType, backendType, service, getCloudService)
 }
 
-func service(ctx context.Context) (backend.Service, error) {
-	contextStore := store.ContextStore(ctx)
-	currentContext := apicontext.CurrentContext(ctx)
+func service() (backend.Service, error) {
+	contextStore := store.Instance()
+	currentContext := apicontext.Current()
 	var aciContext store.AciContext
 
 	if err := contextStore.GetEndpoint(currentContext, &aciContext); err != nil {

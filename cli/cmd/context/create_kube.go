@@ -19,8 +19,6 @@
 package context
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -45,7 +43,7 @@ func createKubeCommand() *cobra.Command {
 		Short: "Create context for a Kubernetes Cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateKube(cmd.Context(), args[0], opts)
+			return runCreateKube(args[0], opts)
 		},
 	}
 
@@ -56,8 +54,8 @@ func createKubeCommand() *cobra.Command {
 	return cmd
 }
 
-func runCreateKube(ctx context.Context, contextName string, opts kube.ContextParams) error {
-	if contextExists(ctx, contextName) {
+func runCreateKube(contextName string, opts kube.ContextParams) error {
+	if contextExists(contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
 	}
 
@@ -65,5 +63,5 @@ func runCreateKube(ctx context.Context, contextName string, opts kube.ContextPar
 	if err != nil {
 		return err
 	}
-	return createDockerContext(ctx, contextName, store.KubeContextType, description, contextData)
+	return createDockerContext(contextName, store.KubeContextType, description, contextData)
 }

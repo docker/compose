@@ -44,7 +44,7 @@ func pauseCommand(p *projectOptions) *cobra.Command {
 }
 
 func runPause(ctx context.Context, opts pauseOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func unpauseCommand(p *projectOptions) *cobra.Command {
 }
 
 func runUnPause(ctx context.Context, opts unpauseOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

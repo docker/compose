@@ -52,7 +52,7 @@ func stopCommand(p *projectOptions) *cobra.Command {
 }
 
 func runStop(ctx context.Context, opts stopOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

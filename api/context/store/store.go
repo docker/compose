@@ -17,7 +17,6 @@
 package store
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -67,17 +66,16 @@ const (
 	metaFile          = "meta.json"
 )
 
-type contextStoreKey struct{}
+var instance Store
 
 // WithContextStore adds the store to the context
-func WithContextStore(ctx context.Context, store Store) context.Context {
-	return context.WithValue(ctx, contextStoreKey{}, store)
+func WithContextStore(store Store) {
+	instance = store
 }
 
-// ContextStore returns the store from the context
-func ContextStore(ctx context.Context) Store {
-	s, _ := ctx.Value(contextStoreKey{}).(Store)
-	return s
+// Instance returns the store from the context
+func Instance() Store {
+	return instance
 }
 
 // Store is the context store
