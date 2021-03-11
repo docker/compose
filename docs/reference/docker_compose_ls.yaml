@@ -1,6 +1,6 @@
 command: docker compose ls
 short: List running compose projects
-long: List running compose projects
+long: List Compose projects running on platform.
 usage: docker compose ls
 pname: docker compose
 plink: docker_compose.yaml

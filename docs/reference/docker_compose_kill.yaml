@@ -1,6 +1,11 @@
 command: docker compose kill
 short: Force stop service containers.
-long: Force stop service containers.
+long: |-
+    Forces running containers to stop by sending a `SIGKILL` signal. Optionally the signal can be passed, for example:
+
+    ```
+    docker-compose kill -s SIGINT
+    ```
 usage: docker compose kill [options] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml

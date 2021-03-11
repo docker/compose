@@ -1,6 +1,19 @@
 command: docker compose up
 short: Create and start containers
-long: Create and start containers
+long: "Builds, (re)creates, starts, and attaches to containers for a service.\n\nUnless
+    they are already running, this command also starts any linked services.\n\nThe
+    `docker compose up` command aggregates the output of each container (liked `docker
+    compose logs --follow` does). \nWhen the command exits, all containers are stopped.
+    Running `docker compose up --detach` starts the containers in the \nbackground
+    and leaves them running.\n\nIf there are existing containers for a service, and
+    the service’s configuration or image was changed after the \ncontainer’s creation,
+    `docker compose up` picks up the changes by stopping and recreating the containers
+    \n(preserving mounted volumes). To prevent Compose from picking up changes, use
+    the `--no-recreate` flag.\n\nIf you want to force Compose to stop and recreate
+    all containers, use the `--force-recreate` flag.\n\nIf the process encounters
+    an error, the exit code for this command is `1`.\nIf the process is interrupted
+    using `SIGINT` (ctrl + C) or `SIGTERM`, the containers are stopped, and the exit
+    code is `0`."
 usage: docker compose up [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
@@ -132,6 +145,15 @@ options:
     value_type: bool
     default_value: "false"
     description: Don't start the services after creating them.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: quiet-pull
+    value_type: bool
+    default_value: "false"
+    description: Pull without printing progress information.
     deprecated: false
     experimental: false
     experimentalcli: false

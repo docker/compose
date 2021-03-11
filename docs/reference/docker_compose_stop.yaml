@@ -1,6 +1,7 @@
 command: docker compose stop
 short: Stop services
-long: Stop services
+long: Stops running containers without removing them. They can be started again with
+    `docker compose start`.
 usage: docker compose stop [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml

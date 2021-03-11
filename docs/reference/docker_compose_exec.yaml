@@ -1,6 +1,9 @@
 command: docker compose exec
 short: Execute a command in a running container.
-long: Execute a command in a running container.
+long: "This is the equivalent of `docker exec` targeting a Compose service. \n\nWith
+    this subcommand you can run arbitrary commands in your services. Commands are
+    by default allocating a TTY, so \nyou can use a command such as `docker compose
+    exec web sh` to get an interactive prompt."
 usage: docker compose exec [options] [-e KEY=VAL...] [--] SERVICE COMMAND [ARGS...]
 pname: docker compose
 plink: docker_compose.yaml

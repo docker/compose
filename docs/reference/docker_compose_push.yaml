@@ -1,6 +1,11 @@
 command: docker compose push
 short: Push service images
-long: Push service images
+long: "Pushes images for services to their respective registry/repository.\n\nThe
+    following assumptions are made:\n- You are pushing an image you have built locally\n-
+    You have access to the build key\n\nExamples\n\n```yaml\nservices:\n    service1:\n
+    \       build: .\n        image: localhost:5000/yourimage  ## goes to local registry\n
+    \   \n    service2:\n        build: .\n        image: your-dockerid/yourimage
+    \ ## goes to your repository on Docker Hub\n```"
 usage: docker compose push [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
