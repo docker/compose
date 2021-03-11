@@ -1855,7 +1855,7 @@ class _CLIBuilder:
         Returns:
             A generator for the build output.
         """
-        if dockerfile:
+        if dockerfile and os.path.isdir(path):
             dockerfile = os.path.join(path, dockerfile)
         iidfile = tempfile.mktemp()
 
