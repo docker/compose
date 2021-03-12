@@ -40,7 +40,7 @@ func unaryServerInterceptor(clictx context.Context) grpc.UnaryServerInterceptor 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		currentContext, err := getIncomingContext(ctx)
 		if err != nil {
-			currentContext, err = getConfigContext(clictx)
+			currentContext, err = getConfigContext()
 			if err != nil {
 				return nil, err
 			}
@@ -59,7 +59,7 @@ func streamServerInterceptor(clictx context.Context) grpc.StreamServerIntercepto
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		currentContext, err := getIncomingContext(ss.Context())
 		if err != nil {
-			currentContext, err = getConfigContext(clictx)
+			currentContext, err = getConfigContext()
 			if err != nil {
 				return err
 			}
@@ -77,8 +77,8 @@ func streamServerInterceptor(clictx context.Context) grpc.StreamServerIntercepto
 }
 
 // Returns the current context from the configuration file
-func getConfigContext(ctx context.Context) (string, error) {
-	configDir := config.Dir(ctx)
+func getConfigContext() (string, error) {
+	configDir := config.Dir()
 	configFile, err := config.LoadFile(configDir)
 	if err != nil {
 		return "", err
@@ -100,9 +100,9 @@ func getIncomingContext(ctx context.Context) (string, error) {
 // configureContext populates the request context with objects the client
 // needs: the context store and the api client
 func configureContext(ctx context.Context, currentContext string, method string) (context.Context, error) {
-	configDir := config.Dir(ctx)
+	configDir := config.Dir()
 
-	ctx = apicontext.WithCurrentContext(ctx, currentContext)
+	apicontext.WithCurrentContext(currentContext)
 
 	// The contexts service doesn't need the client
 	if !strings.Contains(method, "/com.docker.api.protos.context.v1.Contexts") {
@@ -118,7 +118,7 @@ func configureContext(ctx context.Context, currentContext string, method string)
 	if err != nil {
 		return nil, err
 	}
-	ctx = store.WithContextStore(ctx, s)
+	store.WithContextStore(s)
 
 	return ctx, nil
 }

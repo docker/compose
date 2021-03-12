@@ -69,7 +69,7 @@ func downCommand(p *projectOptions, contextType string) *cobra.Command {
 }
 
 func runDown(ctx context.Context, opts downOptions) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/docker/compose-cli/api/containers"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
@@ -32,31 +33,17 @@ import (
 
 // New returns a backend client associated with current context
 func New(ctx context.Context) (*Client, error) {
-	return newWithDefaultBackend(ctx, "")
-}
-
-// NewWithDefaultLocalBackend returns a backend client associated with current context or local backend if on default context type
-func NewWithDefaultLocalBackend(ctx context.Context) (*Client, error) {
-	return newWithDefaultBackend(ctx, store.LocalContextType)
-}
-
-func newWithDefaultBackend(ctx context.Context, defaultBackend string) (*Client, error) {
-	currentContext := apicontext.CurrentContext(ctx)
-	s := store.ContextStore(ctx)
+	currentContext := apicontext.Current()
+	s := store.Instance()
 
 	cc, err := s.Get(currentContext)
 	if err != nil {
 		return nil, err
 	}
 
-	backendName := cc.Type()
-	if backendName == store.DefaultContextType && defaultBackend != "" {
-		backendName = defaultBackend
-	}
-
-	service, err := backend.Get(ctx, backendName)
-	if err != nil {
-		return nil, err
+	service := backend.Current()
+	if service == nil {
+		return nil, errdefs.ErrNotFound
 	}
 
 	client := NewClient(cc.Type(), service)
@@ -73,7 +60,7 @@ func NewClient(backendType string, service backend.Service) Client {
 
 // GetCloudService returns a backend CloudService (typically login, create context)
 func GetCloudService(ctx context.Context, backendType string) (cloud.Service, error) {
-	return backend.GetCloudService(ctx, backendType)
+	return backend.GetCloudService(backendType)
 }
 
 // Client is a multi-backend client

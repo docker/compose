@@ -28,10 +28,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/cli/cli/command"
+	cliconfig "github.com/docker/cli/cli/config"
+	cliflags "github.com/docker/cli/cli/flags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/config"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
@@ -46,8 +50,7 @@ import (
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
-
-	cliflags "github.com/docker/cli/cli/flags"
+	"github.com/docker/compose-cli/local"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
@@ -191,16 +194,17 @@ func main() {
 	if opts.Config == "" {
 		fatal(errors.New("config path cannot be empty"))
 	}
-
 	configDir := opts.Config
-	ctx = config.WithDir(ctx, configDir)
+	config.WithDir(configDir)
 
 	currentContext := determineCurrentContext(opts.Context, configDir, opts.Hosts)
+	apicontext.WithCurrentContext(currentContext)
 
 	s, err := store.New(configDir)
 	if err != nil {
 		mobycli.Exec(root)
 	}
+	store.WithContextStore(s)
 
 	ctype := store.DefaultContextType
 	cc, _ := s.Get(currentContext)
@@ -208,33 +212,54 @@ func main() {
 		ctype = cc.Type()
 	}
 
+	service, err := getBackend(ctype, configDir, opts)
+	if err != nil {
+		fatal(err)
+	}
+	backend.WithBackend(service)
+
 	root.AddCommand(
 		run.Command(ctype),
 		compose.Command(ctype),
 		volume.Command(ctype),
 	)
-	if ctype == store.DefaultContextType || ctype == store.LocalContextType {
-		cnxOptions := cliflags.CommonOptions{
-			Context:   opts.Context,
-			Debug:     opts.Debug,
-			Hosts:     opts.Hosts,
-			LogLevel:  opts.LogLevel,
-			TLS:       opts.TLS,
-			TLSVerify: opts.TLSVerify,
-		}
-
-		if opts.TLSVerify {
-			cnxOptions.TLSOptions = opts.TLSOptions
-		}
-		ctx = apicontext.WithCliOptions(ctx, cnxOptions)
-	}
-	ctx = apicontext.WithCurrentContext(ctx, currentContext)
-	ctx = store.WithContextStore(ctx, s)
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)
 	}
 	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+}
+
+func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backend.Service, error) {
+	switch ctype {
+	case store.DefaultContextType, store.LocalContextType:
+		configFile, err := cliconfig.Load(configDir)
+		if err != nil {
+			return nil, err
+		}
+		options := cliflags.CommonOptions{
+			Context:  opts.Context,
+			Debug:    opts.Debug,
+			Hosts:    opts.Hosts,
+			LogLevel: opts.LogLevel,
+		}
+
+		if opts.TLSVerify {
+			options.TLS = opts.TLS
+			options.TLSVerify = opts.TLSVerify
+			options.TLSOptions = opts.TLSOptions
+		}
+		apiClient, err := command.NewAPIClientFromFlags(&options, configFile)
+		if err != nil {
+			return nil, err
+		}
+		return local.NewService(apiClient), nil
+	}
+	service, err := backend.Get(ctype)
+	if errdefs.IsNotFoundError(err) {
+		return service, nil
+	}
+	return service, err
 }
 
 func handleError(ctx context.Context, err error, ctype string, currentContext string, cc *store.DockerContext, root *cobra.Command) {

@@ -57,7 +57,7 @@ func createAciCommand() *cobra.Command {
 }
 
 func runCreateAci(ctx context.Context, contextName string, opts aci.ContextParams) error {
-	if contextExists(ctx, contextName) {
+	if contextExists(contextName) {
 		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %s", contextName)
 	}
 	contextData, description, err := getAciContextData(ctx, opts)
@@ -67,7 +67,7 @@ func runCreateAci(ctx context.Context, contextName string, opts aci.ContextParam
 		}
 		return err
 	}
-	return createDockerContext(ctx, contextName, store.AciContextType, description, contextData)
+	return createDockerContext(contextName, store.AciContextType, description, contextData)
 
 }
 

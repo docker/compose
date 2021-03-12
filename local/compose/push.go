@@ -39,7 +39,7 @@ import (
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
-	configFile, err := cliconfig.Load(config.Dir(ctx))
+	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
 		return err
 	}

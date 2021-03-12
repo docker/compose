@@ -17,7 +17,6 @@
 package context
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -32,20 +31,20 @@ func useCommand() *cobra.Command {
 		Short: "Set the default context",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUse(cmd.Context(), args[0])
+			return runUse(args[0])
 		},
 	}
 }
 
-func runUse(ctx context.Context, name string) error {
-	s := store.ContextStore(ctx)
+func runUse(name string) error {
+	s := store.Instance()
 	// Match behavior of existing CLI
 	if name != store.DefaultContextName {
 		if _, err := s.Get(name); err != nil {
 			return err
 		}
 	}
-	if err := config.WriteCurrentContext(config.Dir(ctx), name); err != nil {
+	if err := config.WriteCurrentContext(config.Dir(), name); err != nil {
 		return err
 	}
 	fmt.Println(name)

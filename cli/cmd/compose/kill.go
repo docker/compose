@@ -49,7 +49,7 @@ func killCommand(p *projectOptions) *cobra.Command {
 }
 
 func runKill(ctx context.Context, opts killOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

@@ -77,7 +77,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 
 func runConvert(ctx context.Context, opts convertOptions, services []string) error {
 	var json []byte
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	}
 
 	if opts.resolve {
-		configFile, err := cliconfig.Load(config.Dir(ctx))
+		configFile, err := cliconfig.Load(config.Dir())
 		if err != nil {
 			return err
 		}

@@ -41,7 +41,7 @@ func testContext(t *testing.T) context.Context {
 	})
 
 	ctx := context.Background()
-	ctx = config.WithDir(ctx, dir)
+	config.WithDir(dir)
 	err = ioutil.WriteFile(path.Join(dir, "config.json"), []byte(`{"currentContext": "default"}`), 0644)
 	assert.NilError(t, err)
 
@@ -100,7 +100,7 @@ func callStream(ctx context.Context, t *testing.T, interceptor grpc.StreamServer
 	}, &grpc.StreamServerInfo{
 		FullMethod: "/com.docker.api.protos.context.v1.Contexts/test",
 	}, func(srv interface{}, stream grpc.ServerStream) error {
-		currentContext = apicontext.CurrentContext(stream.Context())
+		currentContext = apicontext.Current()
 		return nil
 	})
 
@@ -114,7 +114,7 @@ func callUnary(ctx context.Context, t *testing.T, interceptor grpc.UnaryServerIn
 	resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{
 		FullMethod: "/com.docker.api.protos.context.v1.Contexts/test",
 	}, func(ctx context.Context, req interface{}) (interface{}, error) {
-		currentContext = apicontext.CurrentContext(ctx)
+		currentContext = apicontext.Current()
 		return nil, nil
 	})
 

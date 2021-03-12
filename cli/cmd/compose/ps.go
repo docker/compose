@@ -58,7 +58,7 @@ func psCommand(p *projectOptions) *cobra.Command {
 }
 
 func runPs(ctx context.Context, opts psOptions) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

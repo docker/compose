@@ -17,7 +17,6 @@
 package context
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -41,7 +40,7 @@ func removeCommand() *cobra.Command {
 		Aliases: []string{"remove"},
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRemove(cmd.Context(), args, opts.force)
+			return runRemove(args, opts.force)
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force removing current context")
@@ -49,15 +48,15 @@ func removeCommand() *cobra.Command {
 	return cmd
 }
 
-func runRemove(ctx context.Context, args []string, force bool) error {
-	currentContext := apicontext.CurrentContext(ctx)
-	s := store.ContextStore(ctx)
+func runRemove(args []string, force bool) error {
+	currentContext := apicontext.Current()
+	s := store.Instance()
 
 	var errs *multierror.Error
 	for _, contextName := range args {
 		if currentContext == contextName {
 			if force {
-				if err := runUse(ctx, "default"); err != nil {
+				if err := runUse("default"); err != nil {
 					errs = multierror.Append(errs, errors.New("cannot delete current context"))
 				} else {
 					errs = removeContext(s, contextName, errs)

@@ -17,7 +17,6 @@
 package context
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -103,15 +102,15 @@ func createLocalCommand() *cobra.Command {
 		Args:   cobra.ExactArgs(1),
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDockerContext(cmd.Context(), args[0], store.LocalContextType, opts.description, store.LocalContext{})
+			return createDockerContext(args[0], store.LocalContextType, opts.description, store.LocalContext{})
 		},
 	}
 	addDescriptionFlag(cmd, &opts.description)
 	return cmd
 }
 
-func createDockerContext(ctx context.Context, name string, contextType string, description string, data interface{}) error {
-	s := store.ContextStore(ctx)
+func createDockerContext(name string, contextType string, description string, data interface{}) error {
+	s := store.Instance()
 	result := s.Create(
 		name,
 		contextType,
@@ -122,8 +121,8 @@ func createDockerContext(ctx context.Context, name string, contextType string, d
 	return result
 }
 
-func contextExists(ctx context.Context, name string) bool {
-	s := store.ContextStore(ctx)
+func contextExists(name string) bool {
+	s := store.Instance()
 	return s.ContextExists(name)
 }
 

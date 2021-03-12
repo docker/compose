@@ -17,7 +17,6 @@
 package context
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -32,16 +31,16 @@ func showCommand() *cobra.Command {
 		Short: "Print the current context",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runShow(cmd.Context())
+			return runShow()
 		},
 	}
 }
 
-func runShow(ctx context.Context) error {
-	name := apicontext.CurrentContext(ctx)
+func runShow() error {
+	name := apicontext.Current()
 	// Match behavior of existing CLI
 	if name != store.DefaultContextName {
-		s := store.ContextStore(ctx)
+		s := store.Instance()
 		if _, err := s.Get(name); err != nil {
 			return err
 		}

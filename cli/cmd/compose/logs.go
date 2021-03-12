@@ -62,7 +62,7 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 }
 
 func runLogs(ctx context.Context, opts logsOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

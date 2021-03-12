@@ -49,7 +49,7 @@ func topCommand(p *projectOptions) *cobra.Command {
 }
 
 func runTop(ctx context.Context, opts topOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

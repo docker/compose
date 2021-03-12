@@ -61,7 +61,7 @@ Any data which is not in a volume will be lost.`,
 }
 
 func runRemove(ctx context.Context, opts removeOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

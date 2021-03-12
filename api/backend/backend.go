@@ -17,7 +17,6 @@
 package backend
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -38,7 +37,7 @@ var (
 	errTypeRegistered = errors.New("backend: already registered")
 )
 
-type initFunc func(context.Context) (Service, error)
+type initFunc func() (Service, error)
 type getCloudServiceFunc func() (cloud.Service, error)
 
 type registeredBackend struct {
@@ -51,6 +50,18 @@ type registeredBackend struct {
 var backends = struct {
 	r []*registeredBackend
 }{}
+
+var instance Service
+
+// Current return the active backend instance
+func Current() Service {
+	return instance
+}
+
+// WithBackend set the active backend instance
+func WithBackend(s Service) {
+	instance = s
+}
 
 // Service aggregates the service interfaces
 type Service interface {
@@ -85,10 +96,10 @@ func Register(name string, backendType string, init initFunc, getCoudService get
 
 // Get returns the backend registered for a particular type, it returns
 // an error if there is no registered backends for the given type.
-func Get(ctx context.Context, backendType string) (Service, error) {
+func Get(backendType string) (Service, error) {
 	for _, b := range backends.r {
 		if b.backendType == backendType {
-			return b.init(ctx)
+			return b.init()
 		}
 	}
 
@@ -97,7 +108,7 @@ func Get(ctx context.Context, backendType string) (Service, error) {
 
 // GetCloudService returns the backend registered for a particular type, it returns
 // an error if there is no registered backends for the given type.
-func GetCloudService(ctx context.Context, backendType string) (cloud.Service, error) {
+func GetCloudService(backendType string) (cloud.Service, error) {
 	for _, b := range backends.r {
 		if b.backendType == backendType {
 			return b.getCloudService()

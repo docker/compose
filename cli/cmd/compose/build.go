@@ -63,7 +63,7 @@ func buildCommand(p *projectOptions) *cobra.Command {
 }
 
 func runBuild(ctx context.Context, opts buildOptions, services []string) error {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return err
 	}

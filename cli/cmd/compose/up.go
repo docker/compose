@@ -338,7 +338,7 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 }
 
 func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
-	c, err := client.NewWithDefaultLocalBackend(ctx)
+	c, err := client.New(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

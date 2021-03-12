@@ -42,9 +42,9 @@ type composeService struct {
 }
 
 // NewComposeService create a kubernetes implementation of the compose.Service API
-func NewComposeService(ctx context.Context) (compose.Service, error) {
-	contextStore := store.ContextStore(ctx)
-	currentContext := apicontext.CurrentContext(ctx)
+func NewComposeService() (compose.Service, error) {
+	contextStore := store.Instance()
+	currentContext := apicontext.Current()
 	var kubeContext store.KubeContext
 
 	if err := contextStore.GetEndpoint(currentContext, &kubeContext); err != nil {
