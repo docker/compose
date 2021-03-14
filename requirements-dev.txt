@@ -8,3 +8,4 @@ pytest==6.0.1; python_version >= '3.5'
 pytest==4.6.5; python_version < '3.5'
 pytest-cov==2.10.1
 PyYAML==5.3.1
+toml==0.10.2
