@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -139,10 +140,9 @@ func TestAttachRestart(t *testing.T) {
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "fixtures/attach-restart", "up")
 	output := res.Stdout()
 
-	assert.Assert(t, strings.Contains(output, `another_1  | world
-attach-restart_another_1 exited with code 1
-another_1  | world
-attach-restart_another_1 exited with code 1
-another_1  | world
-attach-restart_another_1 exited with code 1`), res.Combined())
+	exitRegex := regexp.MustCompile("attach-restart_another_1 exited with code 1")
+	assert.Equal(t, len(exitRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
+
+	execRegex := regexp.MustCompile(`another_1  \| world`)
+	assert.Equal(t, len(execRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
 }
