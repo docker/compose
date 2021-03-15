@@ -1837,6 +1837,110 @@ web:
             'volumes': {'park_bom': None}
         }
 
+    def test_load_equivalent_yaml_and_toml(self):
+        tmpdir = tempfile.mkdtemp('yaml_toml')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        yaml_file = os.path.join(tmpdir, 'docker-compose.yml')
+        with codecs.open(str(yaml_file), 'w', encoding='utf-8') as f:
+            f.write('''
+                version: '3.3'
+                services:
+                    backend:
+                        build: backend
+                        secrets:
+                            - db-password
+                        depends_on:
+                            - db
+                        environment:
+                            DB_KEY: db-key-value
+                    db:
+                        image: database
+                        restart: always
+                        secrets:
+                            - db-password
+                        volumes:
+                            - db-data:/var/lib/database/data
+                        environment:
+                            - DB_NAME=example
+                            - DB_PASSWORD_FILE=/run/secrets/db-password
+                    proxy:
+                        build: proxy
+                        ports:
+                            - 80:80
+                        depends_on:
+                            - backend
+                        volumes:
+                            - type: tmpfs
+                              target: /opt
+                              tmpfs:
+                                size: 10000
+                volumes:
+                    db-data: {}
+                secrets:
+                    db-password:
+                        # Example comment -- should be ignored
+                        file: db/password.txt
+                    user:
+                        external: true
+            ''')
+        toml_file = os.path.join(tmpdir, 'docker-compose.toml')
+        with codecs.open(str(toml_file), 'w', encoding='utf-8') as f:
+            f.write('''
+                version = "3.3"
+
+                [services.backend]
+                build = "backend"
+                secrets = [ "db-password" ]
+                depends_on = [ "db" ]
+
+                [services.backend.environment]
+                DB_KEY = "db-key-value"
+
+                [services.db]
+                image = "database"
+                restart = "always"
+                secrets = [ "db-password" ]
+                volumes = [ "db-data:/var/lib/database/data" ]
+                environment = [
+                    "DB_NAME=example",
+                    "DB_PASSWORD_FILE=/run/secrets/db-password",
+                ]
+
+                [services.proxy]
+                build = "proxy"
+                ports = [ "80:80" ]
+                depends_on = [ "backend" ]
+
+                [[services.proxy.volumes]]
+                type = "tmpfs"
+                target = "/opt"
+                tmpfs = { size = 10_000 }
+
+                [volumes.db-data]
+
+                [secrets.db-password]
+                # Example comment -- should be ignored
+                file = "db/password.txt"
+
+                [secrets.user]
+                external = true
+            ''')
+        assert config.load_yaml(str(yaml_file)) == config.load_toml(str(toml_file))
+
+    def test_load_toml_with_toml_error(self):
+        tmpdir = tempfile.mkdtemp('invalid_toml_test')
+        self.addCleanup(shutil.rmtree, tmpdir)
+        invalid_toml_file = os.path.join(tmpdir, 'docker-compose.toml')
+        with open(invalid_toml_file, mode="w") as invalid_toml_file_fh:
+            invalid_toml_file_fh.write("""
+            [web."this is bogus"]
+            ok = what
+            """)
+        with pytest.raises(ConfigurationError) as exc:
+            config.load_toml(str(invalid_toml_file))
+
+        assert 'line 3 column 1 char 35' in exc.exconly()
+
     def test_validate_extra_hosts_invalid(self):
         with pytest.raises(ConfigurationError) as exc:
             config.load(build_config_details({
