@@ -189,7 +189,7 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		Target:    service.Build.Target,
 		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
 		Platforms: plats,
-		Labels:    service.Labels,
+		Labels:    service.Build.Labels,
 	}, nil
 }
 
