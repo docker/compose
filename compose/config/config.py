@@ -9,6 +9,7 @@ from itertools import chain
 from operator import attrgetter
 from operator import itemgetter
 
+import toml
 import yaml
 from cached_property import cached_property
 
@@ -28,6 +29,7 @@ from .errors import CircularReference
 from .errors import ComposeFileNotFound
 from .errors import ConfigurationError
 from .errors import DuplicateOverrideFileFound
+from .errors import InvalidComposeFileExtension
 from .errors import VERSION_EXPLANATION
 from .interpolation import interpolate_environment_variables
 from .sort_services import get_container_name_from_network_mode
@@ -146,12 +148,20 @@ DOCKER_VALID_URL_PREFIXES = (
     'git@',
 )
 
-SUPPORTED_FILENAMES = [
-    'docker-compose.yml',
-    'docker-compose.yaml',
-]
+YAML_EXTENSIONS = (
+    '.yml',
+    '.yaml',
+)
 
-DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml', 'docker-compose.override.yaml')
+TOML_EXTENSIONS = (
+    '.toml',
+)
+
+SUPPORTED_EXTENSIONS = YAML_EXTENSIONS + TOML_EXTENSIONS
+
+SUPPORTED_FILENAMES = tuple(['docker-compose' + ext for ext in SUPPORTED_EXTENSIONS])
+
+DEFAULT_OVERRIDE_FILENAMES = tuple(['docker-compose.override' + ext for ext in SUPPORTED_EXTENSIONS])
 
 
 log = logging.getLogger(__name__)
@@ -184,7 +194,12 @@ class ConfigFile(namedtuple('_ConfigFile', 'filename config')):
 
     @classmethod
     def from_filename(cls, filename):
-        return cls(filename, load_yaml(filename))
+        if filename.endswith(YAML_EXTENSIONS):
+            return cls(filename, load_yaml(filename))
+        elif filename.endswith(TOML_EXTENSIONS):
+            return cls(filename, load_toml(filename))
+        else:
+            raise InvalidComposeFileExtension(SUPPORTED_EXTENSIONS)
 
     @cached_property
     def config_version(self):
@@ -1476,5 +1491,13 @@ def load_yaml(filename, encoding=None, binary=True):
             # the YAML files. Im such cases, retry once with the "default"
             # UTF-8 encoding
             return load_yaml(filename, encoding='utf-8-sig', binary=False)
+        error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
+        raise ConfigurationError("{}: {}".format(error_name, e))
+
+
+def load_toml(filename):
+    try:
+        return toml.load(filename)
+    except (OSError, TypeError, toml.TomlDecodeError) as e:
         error_name = getattr(e, '__module__', '') + '.' + e.__class__.__name__
         raise ConfigurationError("{}: {}".format(error_name, e))

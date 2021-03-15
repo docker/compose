@@ -46,6 +46,14 @@ class ComposeFileNotFound(ConfigurationError):
         """ % ", ".join(supported_filenames))
 
 
+class InvalidComposeFileExtension(ConfigurationError):
+    def __init__(self, supported_extensions):
+        super().__init__(
+            "The configuration file provided uses an unsupported file extension.\n"
+            "Supported file extensions: {}".format(", ".join(supported_extensions))
+        )
+
+
 class DuplicateOverrideFileFound(ConfigurationError):
     def __init__(self, override_filenames):
         self.override_filenames = override_filenames
