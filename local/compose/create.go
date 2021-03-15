@@ -260,8 +260,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Env:             convert.ToMobyEnv(service.Environment),
 		Healthcheck:     convert.ToMobyHealthCheck(service.HealthCheck),
 		Volumes:         volumeMounts,
-
-		StopTimeout: convert.ToSeconds(service.StopGracePeriod),
+		StopTimeout:     convert.ToSeconds(service.StopGracePeriod),
 	}
 
 	portBindings := buildContainerPortBindingOptions(service)
@@ -295,6 +294,8 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		ExtraHosts:   service.ExtraHosts,
 		SecurityOpt:  service.SecurityOpt,
 		UsernsMode:   container.UsernsMode(service.UserNSMode),
+		Privileged:   service.Privileged,
+		Isolation:    container.Isolation(service.Isolation),
 	}
 
 	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
