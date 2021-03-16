@@ -149,9 +149,14 @@ DOCKER_VALID_URL_PREFIXES = (
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
     'docker-compose.yaml',
+    'compose.yml',
+    'compose.yaml',
 ]
 
-DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml', 'docker-compose.override.yaml')
+DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml',
+                              'docker-compose.override.yaml',
+                              'compose.override.yml',
+                              'compose.override.yaml')
 
 
 log = logging.getLogger(__name__)
