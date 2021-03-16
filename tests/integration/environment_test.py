@@ -1,9 +1,8 @@
 import tempfile
 
+import pytest
 from ddt import data
 from ddt import ddt
-
-import pytest
 
 from .. import mock
 from ..acceptance.cli_test import dispatch
