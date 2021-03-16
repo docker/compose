@@ -314,22 +314,21 @@ type Stack struct {
 
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
-	Log(name, service, container, message string)
-	Status(name, container, msg string)
-	Register(name string, source string)
+	Log(service, container, message string)
+	Status(container, msg string)
+	Register(container string)
 }
 
 // ContainerEventListener is a callback to process ContainerEvent from services
 type ContainerEventListener func(event ContainerEvent)
 
-// ContainerEvent notify an event has been collected on Source container implementing Service
+// ContainerEvent notify an event has been collected on source container implementing Service
 type ContainerEvent struct {
-	Type     int
-	Source   string
-	Service  string
-	Name     string
-	Line     string
-	ExitCode int
+	Type      int
+	Container string
+	Service   string
+	Line      string
+	ExitCode  int
 }
 
 const (

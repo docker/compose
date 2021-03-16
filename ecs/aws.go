@@ -63,7 +63,7 @@ type API interface {
 	InspectSecret(ctx context.Context, id string) (secrets.Secret, error)
 	ListSecrets(ctx context.Context) ([]secrets.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
-	GetLogs(ctx context.Context, name string, consumer func(name string, service string, container string, message string), follow bool) error
+	GetLogs(ctx context.Context, name string, consumer func(container string, service string, message string), follow bool) error
 	DescribeService(ctx context.Context, cluster string, arn string) (compose.ServiceStatus, error)
 	DescribeServiceTasks(ctx context.Context, cluster string, project string, service string) ([]compose.ContainerSummary, error)
 	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)

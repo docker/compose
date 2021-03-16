@@ -41,7 +41,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 	var names []string
 	for _, c := range containers {
-		names = append(names, getCanonicalContainerName(c))
+		names = append(names, getContainerNameWithoutProject(c))
 	}
 
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
@@ -95,7 +95,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := utils.GetWriter(getContainerNameWithoutProject(container), serviceName, container.ID, listener)
+	w := utils.GetWriter(getContainerNameWithoutProject(container), serviceName, listener)
 
 	service, err := project.GetService(serviceName)
 	if err != nil {
@@ -103,10 +103,9 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 	}
 
 	listener(compose.ContainerEvent{
-		Type:    compose.ContainerEventAttach,
-		Source:  container.ID,
-		Name:    getContainerNameWithoutProject(container),
-		Service: container.Labels[serviceLabel],
+		Type:      compose.ContainerEventAttach,
+		Container: getContainerNameWithoutProject(container),
+		Service:   container.Labels[serviceLabel],
 	})
 
 	return s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)

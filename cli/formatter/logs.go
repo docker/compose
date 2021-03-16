@@ -38,11 +38,11 @@ func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) c
 	}
 }
 
-func (l *logConsumer) Register(name string, id string) {
-	l.register(name, id)
+func (l *logConsumer) Register(name string) {
+	l.register(name)
 }
 
-func (l *logConsumer) register(name string, id string) *presenter {
+func (l *logConsumer) register(name string) *presenter {
 	cf := monochrome
 	if l.color {
 		cf = nextColor()
@@ -51,7 +51,7 @@ func (l *logConsumer) register(name string, id string) *presenter {
 		colors: cf,
 		name:   name,
 	}
-	l.presenters[id] = p
+	l.presenters[name] = p
 	if l.prefix {
 		l.computeWidth()
 		for _, p := range l.presenters {
@@ -62,25 +62,25 @@ func (l *logConsumer) register(name string, id string) *presenter {
 }
 
 // Log formats a log message as received from name/container
-func (l *logConsumer) Log(name, service, container, message string) {
+func (l *logConsumer) Log(container, service, message string) {
 	if l.ctx.Err() != nil {
 		return
 	}
 	p, ok := l.presenters[container]
 	if !ok { // should have been registered, but ¯\_(ツ)_/¯
-		p = l.register(name, container)
+		p = l.register(container)
 	}
 	for _, line := range strings.Split(message, "\n") {
 		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck
 	}
 }
 
-func (l *logConsumer) Status(name, id, msg string) {
-	p, ok := l.presenters[id]
+func (l *logConsumer) Status(container, msg string) {
+	p, ok := l.presenters[container]
 	if !ok {
-		p = l.register(name, id)
+		p = l.register(container)
 	}
-	s := p.colors(fmt.Sprintf("%s %s\n", name, msg))
+	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
 	l.writer.Write([]byte(s)) // nolint:errcheck
 }
 

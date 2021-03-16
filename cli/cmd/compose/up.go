@@ -399,11 +399,11 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 		case compose.UserCancel:
 			aborting = true
 		case compose.ContainerEventAttach:
-			consumer.Register(event.Name, event.Source)
+			consumer.Register(event.Container)
 			count++
 		case compose.ContainerEventExit:
 			if !aborting {
-				consumer.Status(event.Name, event.Source, fmt.Sprintf("exited with code %d", event.ExitCode))
+				consumer.Status(event.Container, fmt.Sprintf("exited with code %d", event.ExitCode))
 			}
 			if cascadeStop {
 				if !aborting {
@@ -426,7 +426,7 @@ func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string,
 			}
 		case compose.ContainerEventLog:
 			if !aborting {
-				consumer.Log(event.Name, event.Service, event.Source, event.Line)
+				consumer.Log(event.Container, event.Service, event.Line)
 			}
 		}
 	}

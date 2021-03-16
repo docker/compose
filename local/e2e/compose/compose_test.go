@@ -140,7 +140,7 @@ func TestAttachRestart(t *testing.T) {
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "fixtures/attach-restart", "up")
 	output := res.Stdout()
 
-	exitRegex := regexp.MustCompile("attach-restart_another_1 exited with code 1")
+	exitRegex := regexp.MustCompile("another_1 exited with code 1")
 	assert.Equal(t, len(exitRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
 
 	execRegex := regexp.MustCompile(`another_1  \| world`)

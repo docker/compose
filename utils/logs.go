@@ -43,29 +43,28 @@ type allowListLogConsumer struct {
 	delegate  compose.LogConsumer
 }
 
-func (a *allowListLogConsumer) Log(name, service, container, message string) {
+func (a *allowListLogConsumer) Log(container, service, message string) {
 	if a.allowList[service] {
-		a.delegate.Log(name, service, container, message)
+		a.delegate.Log(container, service, message)
 	}
 }
 
-func (a *allowListLogConsumer) Status(name, container, message string) {
-	if a.allowList[name] {
-		a.delegate.Status(name, container, message)
+func (a *allowListLogConsumer) Status(container, message string) {
+	if a.allowList[container] {
+		a.delegate.Status(container, message)
 	}
 }
 
-func (a *allowListLogConsumer) Register(name string, source string) {
+func (a *allowListLogConsumer) Register(name string) {
 	if a.allowList[name] {
-		a.delegate.Register(name, source)
+		a.delegate.Register(name)
 	}
 }
 
 // GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func GetWriter(name, service, container string, events compose.ContainerEventListener) io.Writer {
+func GetWriter(container, service string, events compose.ContainerEventListener) io.Writer {
 	return &splitBuffer{
 		buffer:    bytes.Buffer{},
-		name:      name,
 		service:   service,
 		container: container,
 		consumer:  events,
@@ -74,7 +73,6 @@ func GetWriter(name, service, container string, events compose.ContainerEventLis
 
 type splitBuffer struct {
 	buffer    bytes.Buffer
-	name      string
 	service   string
 	container string
 	consumer  compose.ContainerEventListener
@@ -94,11 +92,10 @@ func (s *splitBuffer) Write(b []byte) (int, error) {
 		}
 		line := s.buffer.Next(index + 1)
 		s.consumer(compose.ContainerEvent{
-			Type:    compose.ContainerEventLog,
-			Name:    s.name,
-			Service: s.service,
-			Source:  s.container,
-			Line:    string(line[:len(line)-1]),
+			Type:      compose.ContainerEventLog,
+			Service:   s.service,
+			Container: s.container,
+			Line:      string(line[:len(line)-1]),
 		})
 	}
 	return n, nil
