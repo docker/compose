@@ -26,7 +26,7 @@ import (
 
 func TestSplitWriter(t *testing.T) {
 	var lines []string
-	w := GetWriter("name", "service", "container", func(event compose.ContainerEvent) {
+	w := GetWriter("container", "service", func(event compose.ContainerEvent) {
 		lines = append(lines, event.Line)
 	})
 	w.Write([]byte("h"))        //nolint: errcheck

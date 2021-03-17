@@ -59,15 +59,14 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) waitContainer(ctx context.Context, c moby.Container, listener compose.ContainerEventListener) {
 	statusC, errC := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNotRunning)
-	name := getCanonicalContainerName(c)
+	name := getContainerNameWithoutProject(c)
 	select {
 	case status := <-statusC:
 		listener(compose.ContainerEvent{
-			Type:     compose.ContainerEventExit,
-			Source:   c.ID,
-			Name:     name,
-			Service:  c.Labels[serviceLabel],
-			ExitCode: int(status.StatusCode),
+			Type:      compose.ContainerEventExit,
+			Container: name,
+			Service:   c.Labels[serviceLabel],
+			ExitCode:  int(status.StatusCode),
 		})
 	case err := <-errC:
 		logrus.Warnf("Unexpected API error for %s : %s", name, err.Error())

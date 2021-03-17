@@ -805,7 +805,7 @@ func (s sdk) DeleteSecret(ctx context.Context, id string, recover bool) error {
 	return err
 }
 
-func (s sdk) GetLogs(ctx context.Context, name string, consumer func(name string, service string, container string, message string), follow bool) error {
+func (s sdk) GetLogs(ctx context.Context, name string, consumer func(container string, service string, message string), follow bool) error {
 	logGroup := fmt.Sprintf("/docker-compose/%s", name)
 	var startTime int64
 	for {
@@ -832,7 +832,7 @@ func (s sdk) GetLogs(ctx context.Context, name string, consumer func(name string
 
 				for _, event := range events.Events {
 					p := strings.Split(aws.StringValue(event.LogStreamName), "/")
-					consumer(p[1], p[1], p[2], aws.StringValue(event.Message))
+					consumer(p[1], p[2], aws.StringValue(event.Message))
 					startTime = *event.IngestionTime
 				}
 			}
