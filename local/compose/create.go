@@ -366,7 +366,9 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 	for _, port := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
 		bind := []nat.PortBinding{}
-		binding := nat.PortBinding{}
+		binding := nat.PortBinding{
+			HostIP: port.HostIP,
+		}
 		if port.Published > 0 {
 			binding.HostPort = fmt.Sprint(port.Published)
 		}
