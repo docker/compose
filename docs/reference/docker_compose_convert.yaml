@@ -1,7 +1,10 @@
 command: docker compose convert
 aliases: config
 short: Converts the compose file to platform's canonical format
-long: Converts the compose file to platform's canonical format
+long: "`docker compose convert` render the actual data model to be applied on target
+    platform. When used with Docker engine,\nit merges the Compose files set by `-f`
+    flags, resolves variables in Compose file, and expands short-notation into \nfully
+    defined Compose model."
 usage: docker compose convert SERVICES
 pname: docker compose
 plink: docker_compose.yaml

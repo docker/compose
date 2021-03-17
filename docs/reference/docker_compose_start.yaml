@@ -1,6 +1,6 @@
 command: docker compose start
 short: Start services
-long: Start services
+long: Starts existing containers for a service.
 usage: docker compose start [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml

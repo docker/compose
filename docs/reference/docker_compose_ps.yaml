@@ -1,6 +1,6 @@
 command: docker compose ps
 short: List containers
-long: List containers
+long: Lists containers for a Compose project.
 usage: docker compose ps
 pname: docker compose
 plink: docker_compose.yaml
