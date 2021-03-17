@@ -137,7 +137,7 @@ def get_filtered_args(args):
 
 
 def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1):
-    if log_msg:
+    if log_msg and command != 'exec':
         if not exit_code:
             log.info(log_msg)
         else:
