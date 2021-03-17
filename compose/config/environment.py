@@ -54,9 +54,10 @@ class Environment(dict):
             if base_dir is None:
                 return result
             if env_file:
-                env_file_path = os.path.join(base_dir, env_file)
-            else:
-                env_file_path = os.path.join(base_dir, '.env')
+                env_file_path = os.path.join(os.getcwd(), env_file)
+                return cls(env_vars_from_file(env_file_path))
+
+            env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
             except EnvFileNotFound:
