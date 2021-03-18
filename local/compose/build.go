@@ -50,6 +50,17 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 			buildOptions.Pull = options.Pull
 			buildOptions.BuildArgs = options.Args
 			opts[imageName] = buildOptions
+			buildOptions.CacheFrom, err = build.ParseCacheEntry(service.Build.CacheFrom)
+			if err != nil {
+				return err
+			}
+
+			for _, image := range service.Build.CacheFrom {
+				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
+					Type:  "registry",
+					Attrs: map[string]string{"ref": image},
+				})
+			}
 		}
 	}
 

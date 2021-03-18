@@ -33,6 +33,7 @@ import (
 	volume_api "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
+	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -272,6 +273,31 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
+	shmSize := int64(0)
+	if service.ShmSize != "" {
+		shmSize, err = strconv.ParseInt(service.ShmSize, 10, 64)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	tmpfs := map[string]string{}
+	for _, t := range service.Tmpfs {
+		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
+			tmpfs[arr[0]] = arr[1]
+		} else {
+			tmpfs[arr[0]] = ""
+		}
+	}
+
+	var logConfig container.LogConfig
+	if service.Logging != nil {
+		logConfig = container.LogConfig{
+			Type:   service.Logging.Driver,
+			Config: service.Logging.Options,
+		}
+	}
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
 		Binds:          binds,
@@ -282,20 +308,23 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Init:           service.Init,
 		ReadonlyRootfs: service.ReadOnly,
 		RestartPolicy:  getRestartPolicy(service),
-		// ShmSize: , TODO
-		Sysctls:      service.Sysctls,
-		PortBindings: portBindings,
-		Resources:    resources,
-		VolumeDriver: service.VolumeDriver,
-		VolumesFrom:  service.VolumesFrom,
-		DNS:          service.DNS,
-		DNSSearch:    service.DNSSearch,
-		DNSOptions:   service.DNSOpts,
-		ExtraHosts:   service.ExtraHosts,
-		SecurityOpt:  service.SecurityOpt,
-		UsernsMode:   container.UsernsMode(service.UserNSMode),
-		Privileged:   service.Privileged,
-		Isolation:    container.Isolation(service.Isolation),
+		ShmSize:        shmSize,
+		Sysctls:        service.Sysctls,
+		PortBindings:   portBindings,
+		Resources:      resources,
+		VolumeDriver:   service.VolumeDriver,
+		VolumesFrom:    service.VolumesFrom,
+		DNS:            service.DNS,
+		DNSSearch:      service.DNSSearch,
+		DNSOptions:     service.DNSOpts,
+		ExtraHosts:     service.ExtraHosts,
+		SecurityOpt:    service.SecurityOpt,
+		UsernsMode:     container.UsernsMode(service.UserNSMode),
+		Privileged:     service.Privileged,
+		PidMode:        container.PidMode(service.Pid),
+		Tmpfs:          tmpfs,
+		Isolation:      container.Isolation(service.Isolation),
+		LogConfig:      logConfig,
 	}
 
 	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
@@ -347,6 +376,37 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 			Count:        int(device.Count),
 			DeviceIDs:    device.IDs,
 			Driver:       device.Driver,
+		})
+	}
+
+	for _, device := range s.Devices {
+		// FIXME should use docker/cli parseDevice, unfortunately private
+		src := ""
+		dst := ""
+		permissions := "rwm"
+		arr := strings.Split(device, ":")
+		switch len(arr) {
+		case 3:
+			permissions = arr[2]
+			fallthrough
+		case 2:
+			dst = arr[1]
+			fallthrough
+		case 1:
+			src = arr[0]
+		}
+		resources.Devices = append(resources.Devices, container.DeviceMapping{
+			PathOnHost:        src,
+			PathInContainer:   dst,
+			CgroupPermissions: permissions,
+		})
+	}
+
+	for name, u := range s.Ulimits {
+		resources.Ulimits = append(resources.Ulimits, &units.Ulimit{
+			Name: name,
+			Hard: int64(u.Hard),
+			Soft: int64(u.Soft),
 		})
 	}
 	return resources
