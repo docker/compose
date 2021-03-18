@@ -1888,10 +1888,13 @@ class _CLIBuilder:
         appear = False
         with subprocess.Popen(args, stdout=subprocess.PIPE,
                               universal_newlines=True) as p:
+            # https://stackoverflow.com/questions/14693701/how-can-i-remove-the-ansi-escape-sequences-from-a-string-in-python
+            regex = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             while True:
                 line = p.stdout.readline()
                 if not line:
                     break
+                line = regex.sub('', line)
                 if line.startswith(magic_word):
                     appear = True
                 yield json.dumps({"stream": line})
