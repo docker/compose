@@ -137,7 +137,8 @@ func TestComposePull(t *testing.T) {
 func TestAttachRestart(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "fixtures/attach-restart", "up")
+	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
+	defer c.RunDockerCmd("compose", "-p", "attach-restart", "down")
 	output := res.Stdout()
 
 	exitRegex := regexp.MustCompile("another_1 exited with code 1")
