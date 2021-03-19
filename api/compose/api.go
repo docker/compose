@@ -70,6 +70,8 @@ type Service interface {
 	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, project string, options EventsOptions) error
+	// Port executes the equivalent to a `compose port`
+	Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
 }
 
 // BuildOptions group options of the Build API
@@ -205,6 +207,12 @@ type Event struct {
 	Container  string
 	Status     string
 	Attributes map[string]string
+}
+
+// PortOptions group options of the Port API
+type PortOptions struct {
+	Protocol string
+	Index    int
 }
 
 func (e Event) String() string {

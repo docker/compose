@@ -111,3 +111,7 @@ func (c *composeService) Top(ctx context.Context, projectName string, services [
 func (c *composeService) Events(ctx context.Context, project string, options compose.EventsOptions) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (c *composeService) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
+	return "", 0, errdefs.ErrNotImplemented
+}

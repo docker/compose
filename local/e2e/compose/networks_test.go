@@ -55,6 +55,11 @@ func TestNetworks(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: "microservices"})
 	})
 
+	t.Run("port", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "--project-name", projectName, "port", "words", "8080")
+		res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
