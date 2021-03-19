@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -113,7 +114,7 @@ func Command(contextType string) *cobra.Command {
 					return errors.New(aec.Apply(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead.`, aec.RedF))
 				}
 				opts.ProjectDir = opts.WorkDir
-				fmt.Println(aec.Apply(`option "--workdir" is DEPRECATED at root level! Please use "--project-directory" instead.`, aec.RedF))
+				fmt.Fprint(os.Stderr, aec.Apply(`option "--workdir" is DEPRECATED at root level! Please use "--project-directory" instead.\n`, aec.RedF))
 			}
 			if contextType == store.DefaultContextType || contextType == store.LocalContextType {
 				Warning = "The new 'docker compose' command is currently experimental. " +

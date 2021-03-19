@@ -18,7 +18,10 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"os"
 
+	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
@@ -29,6 +32,8 @@ type pullOptions struct {
 	*projectOptions
 	composeOptions
 	quiet       bool
+	parallel    bool
+	noParallel  bool
 	includeDeps bool
 }
 
@@ -40,11 +45,19 @@ func pullCommand(p *projectOptions) *cobra.Command {
 		Use:   "pull [SERVICE...]",
 		Short: "Pull service images",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.noParallel {
+				fmt.Fprint(os.Stderr, aec.Apply(`option "--no-parallel" is DEPRECATED and will be ignored.\n`, aec.RedF))
+			}
 			return runPull(cmd.Context(), opts, args)
 		},
 	}
-	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
+	flags := cmd.Flags()
+	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
 	cmd.Flags().BoolVar(&opts.includeDeps, "include-deps", false, "Also pull services declared as dependencies")
+	cmd.Flags().BoolVar(&opts.parallel, "parallel", true, "DEPRECATED pull multiple images in parallel.")
+	flags.MarkHidden("parallel") //nolint:errcheck
+	cmd.Flags().BoolVar(&opts.parallel, "no-parallel", true, "DEPRECATED disable parallel pulling.")
+	flags.MarkHidden("no-parallel") //nolint:errcheck
 	return cmd
 }
 
