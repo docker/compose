@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -106,7 +107,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 			return err
 		}
 		for _, s := range project.Services {
-			if !contains(services, s.Name) {
+			if !utils.StringContains(services, s.Name) {
 				project.DisabledServices = append(project.DisabledServices, s)
 			}
 		}

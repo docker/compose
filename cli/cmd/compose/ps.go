@@ -29,6 +29,7 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/utils"
 )
 
 type psOptions struct {
@@ -77,7 +78,7 @@ func runPs(ctx context.Context, opts psOptions) error {
 	if opts.Services {
 		services := []string{}
 		for _, s := range containers {
-			if !contains(services, s.Service) {
+			if !utils.StringContains(services, s.Service) {
 				services = append(services, s.Service)
 			}
 		}
@@ -114,13 +115,4 @@ func runPs(ctx context.Context, opts psOptions) error {
 			}
 		},
 		"NAME", "SERVICE", "STATUS", "PORTS")
-}
-
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
 }

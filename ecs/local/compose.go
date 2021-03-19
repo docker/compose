@@ -199,3 +199,7 @@ func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, service
 func (e ecsLocalSimulation) Events(ctx context.Context, project string, options compose.EventsOptions) error {
 	return e.compose.Events(ctx, project, options)
 }
+
+func (e ecsLocalSimulation) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
+	return "", 0, errdefs.ErrNotImplemented
+}

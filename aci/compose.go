@@ -233,3 +233,7 @@ func (cs *aciComposeService) Top(ctx context.Context, projectName string, servic
 func (cs *aciComposeService) Events(ctx context.Context, project string, options compose.EventsOptions) error {
 	return errdefs.ErrNotImplemented
 }
+
+func (cs *aciComposeService) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
+	return "", 0, errdefs.ErrNotImplemented
+}

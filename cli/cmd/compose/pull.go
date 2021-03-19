@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/utils"
 )
 
 type pullOptions struct {
@@ -65,7 +66,7 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 			return err
 		}
 		for _, s := range project.Services {
-			if !contains(services, s.Name) {
+			if !utils.StringContains(services, s.Name) {
 				project.DisabledServices = append(project.DisabledServices, s)
 			}
 		}
