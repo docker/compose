@@ -40,6 +40,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	convert "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/utils"
 )
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
@@ -102,7 +103,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	prepareNetworkMode(project)
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		if contains(opts.Services, service.Name) {
+		if utils.StringContains(opts.Services, service.Name) {
 			return s.ensureService(c, project, service, opts.Recreate, opts.Inherit, opts.Timeout)
 		}
 		return s.ensureService(c, project, service, opts.RecreateDependencies, opts.Inherit, opts.Timeout)
@@ -121,7 +122,7 @@ func prepareVolumes(p *types.Project) error {
 				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
 			}
 			for _, service := range p.Services {
-				if contains(dependServices, service.Name) {
+				if utils.StringContains(dependServices, service.Name) {
 					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 						Condition: types.ServiceConditionStarted,
 					}
@@ -196,7 +197,7 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig, number int, inherit *moby.Container,
 	autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	hash, err := jsonHash(service)
+	hash, err := utils.ServiceHash(service)
 	if err != nil {
 		return nil, nil, nil, err
 	}

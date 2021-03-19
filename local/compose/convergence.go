@@ -33,6 +33,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	status "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/utils"
 )
 
 const (
@@ -97,7 +98,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 		return nil
 	}
 
-	expected, err := jsonHash(service)
+	expected, err := utils.ServiceHash(service)
 	if err != nil {
 		return err
 	}
@@ -249,7 +250,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 // setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
 func setDependentLifecycle(project *types.Project, service string, strategy string) {
 	for i, s := range project.Services {
-		if contains(s.GetDependencies(), service) {
+		if utils.StringContains(s.GetDependencies(), service) {
 			if s.Extensions == nil {
 				s.Extensions = map[string]interface{}{}
 			}

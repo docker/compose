@@ -24,6 +24,8 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/utils"
 )
 
 // ServiceStatus indicates the status of a service
@@ -313,7 +315,7 @@ func (g *Graph) HasCycles() (bool, error) {
 		path := []string{
 			vertex.Key,
 		}
-		if !contains(discovered, vertex.Key) && !contains(finished, vertex.Key) {
+		if !utils.StringContains(discovered, vertex.Key) && !utils.StringContains(finished, vertex.Key) {
 			var err error
 			discovered, finished, err = g.visit(vertex.Key, path, discovered, finished)
 
@@ -331,11 +333,11 @@ func (g *Graph) visit(key string, path []string, discovered []string, finished [
 
 	for _, v := range g.Vertices[key].Children {
 		path := append(path, v.Key)
-		if contains(discovered, v.Key) {
+		if utils.StringContains(discovered, v.Key) {
 			return nil, nil, fmt.Errorf("cycle found: %s", strings.Join(path, " -> "))
 		}
 
-		if !contains(finished, v.Key) {
+		if !utils.StringContains(finished, v.Key) {
 			if _, _, err := g.visit(v.Key, path, discovered, finished); err != nil {
 				return nil, nil, err
 			}

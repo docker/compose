@@ -43,7 +43,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	}
 	if len(options.Services) > 0 {
 		ignore = func(s string) bool {
-			return !contains(options.Services, s)
+			return !utils.StringContains(options.Services, s)
 		}
 	}
 
