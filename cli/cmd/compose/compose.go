@@ -103,18 +103,26 @@ func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
 func Command(contextType string) *cobra.Command {
 	opts := projectOptions{}
 	var ansi string
+	var noAnsi bool
 	command := &cobra.Command{
 		Short:            "Docker Compose",
 		Use:              "compose",
 		TraverseChildren: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if noAnsi {
+				if ansi != "auto" {
+					return errors.New(aec.Apply(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi".`, aec.RedF))
+				}
+				ansi = "never"
+				fmt.Fprint(os.Stderr, aec.Apply("option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n", aec.RedF))
+			}
 			formatter.SetANSIMode(ansi)
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(aec.Apply(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead.`, aec.RedF))
 				}
 				opts.ProjectDir = opts.WorkDir
-				fmt.Fprint(os.Stderr, aec.Apply(`option "--workdir" is DEPRECATED at root level! Please use "--project-directory" instead.\n`, aec.RedF))
+				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
 			if contextType == store.DefaultContextType || contextType == store.LocalContextType {
 				Warning = "The new 'docker compose' command is currently experimental. " +
@@ -156,5 +164,7 @@ func Command(contextType string) *cobra.Command {
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
 	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	command.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
+	command.Flags().MarkHidden("no-ansi") //nolint:errcheck
 	return command
 }
