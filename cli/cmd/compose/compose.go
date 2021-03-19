@@ -111,7 +111,7 @@ func Command(contextType string) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if noAnsi {
 				if ansi != "auto" {
-					return errors.New(aec.Apply(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi".`, aec.RedF))
+					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
 				}
 				ansi = "never"
 				fmt.Fprint(os.Stderr, aec.Apply("option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n", aec.RedF))
@@ -119,7 +119,7 @@ func Command(contextType string) *cobra.Command {
 			formatter.SetANSIMode(ansi)
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
-					return errors.New(aec.Apply(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead.`, aec.RedF))
+					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
 				}
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
