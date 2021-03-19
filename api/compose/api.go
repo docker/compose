@@ -38,6 +38,8 @@ type Service interface {
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, project *types.Project, options StartOptions) error
+	// Restart restarts containers
+	Restart(ctx context.Context, project *types.Project, options RestartOptions) error
 	// Stop executes the equivalent to a `compose stop`
 	Stop(ctx context.Context, project *types.Project, options StopOptions) error
 	// Up executes the equivalent to a `compose up`
@@ -104,6 +106,12 @@ type StartOptions struct {
 	Attach ContainerEventListener
 	// Services passed in the command line to be started
 	Services []string
+}
+
+// RestartOptions group options of the Restart API
+type RestartOptions struct {
+	// Timeout override container restart timeout
+	Timeout *time.Duration
 }
 
 // StopOptions group options of the Stop API

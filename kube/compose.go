@@ -188,6 +188,11 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	return errdefs.ErrNotImplemented
 }
 
+// Restart executes the equivalent to a `compose restart`
+func (s *composeService) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 // Stop executes the equivalent to a `compose stop`
 func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	return errdefs.ErrNotImplemented

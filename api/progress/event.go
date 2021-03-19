@@ -68,6 +68,16 @@ func StartedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Started")
 }
 
+// RestartingEvent creates a new Restarting in progress Event
+func RestartingEvent(ID string) Event {
+	return NewEvent(ID, Working, "Restarting")
+}
+
+// RestartedEvent creates a new Restarted in progress Event
+func RestartedEvent(ID string) Event {
+	return NewEvent(ID, Done, "Restarted")
+}
+
 // RunningEvent creates a new Running in progress Event
 func RunningEvent(ID string) Event {
 	return NewEvent(ID, Done, "Running")

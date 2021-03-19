@@ -1,0 +1,4 @@
+services:
+  restart:
+    image: busybox
+    command: ash -c "if [[ -f /tmp/restart.lock ]] ; then sleep infinity; else touch /tmp/restart.lock; fi"

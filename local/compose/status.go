@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/pkg/errors"
 )
 
@@ -99,4 +100,18 @@ func GetContextContainerState(ctx context.Context) (ContainersState, error) {
 		return nil, errors.New("containers' containersState not available in context")
 	}
 	return cState, nil
+}
+
+func (s composeService) getUpdatedContainersStateContext(ctx context.Context, projectName string) (context.Context, error) {
+	observedState, err := s.apiClient.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(projectName),
+		),
+		All: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	containerState := NewContainersState(observedState)
+	return context.WithValue(ctx, ContainersKey{}, containerState), nil
 }
