@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -190,11 +191,22 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		plats = append(plats, p)
 	}
 
-	return build.Options{
-		Inputs: build.Inputs{
+	var input build.Inputs
+	_, err := url.ParseRequestURI(service.Build.Context)
+	if err == nil {
+		input = build.Inputs{
+			ContextPath:    service.Build.Context,
+			DockerfilePath: service.Build.Dockerfile,
+		}
+	} else {
+		input = build.Inputs{
 			ContextPath:    path.Join(contextPath, service.Build.Context),
 			DockerfilePath: path.Join(contextPath, service.Build.Context, service.Build.Dockerfile),
-		},
+		}
+	}
+
+	return build.Options{
+		Inputs:    input,
 		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
 		Tags:      tags,
 		Target:    service.Build.Target,
