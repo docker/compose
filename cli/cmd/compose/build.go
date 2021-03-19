@@ -59,6 +59,13 @@ func buildCommand(p *projectOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "tty")`)
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
+	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
+	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
+	cmd.Flags().Bool("compress", true, "Compress the build context using gzip. DEPRECATED")
+	cmd.Flags().MarkHidden("compress") //nolint:errcheck
+	cmd.Flags().Bool("force-rm", true, "Always remove intermediate containers. DEPRECATED")
+	cmd.Flags().MarkHidden("force-rm") //nolint:errcheck
+
 	return cmd
 }
 
