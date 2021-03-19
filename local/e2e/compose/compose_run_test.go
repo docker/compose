@@ -35,7 +35,6 @@ func TestLocalComposeRun(t *testing.T) {
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
-
 		res = c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "back", "echo", "Hello one more time")
 		lines = Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello one more time", res.Stdout())
@@ -96,8 +95,14 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "--rm", "--publish", "8080:80", "-d", "back", "/bin/sh", "-c", "sleep 10")
+		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "run", "--publish", "8080:80", "-d", "back", "/bin/sh", "-c", "sleep 1")
 		res := c.RunDockerCmd("ps")
 		assert.Assert(t, strings.Contains(res.Stdout(), "8080->80/tcp"), res.Stdout())
+	})
+
+	t.Run("down", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yml", "down")
+		res := c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
 }
