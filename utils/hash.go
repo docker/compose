@@ -14,27 +14,21 @@
    limitations under the License.
 */
 
-package compose
+package utils
 
 import (
 	"encoding/json"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/opencontainers/go-digest"
 )
 
-func jsonHash(o interface{}) (string, error) {
+// ServiceHash compute configuration has for a service
+// TODO move this to compose-go
+func ServiceHash(o types.ServiceConfig) (string, error) {
 	bytes, err := json.Marshal(o)
 	if err != nil {
 		return "", err
 	}
-	return digest.SHA256.FromBytes(bytes).String(), nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
+	return digest.SHA256.FromBytes(bytes).Encoded(), nil
 }

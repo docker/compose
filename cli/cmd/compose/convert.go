@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/distribution/distribution/v3/reference"
@@ -32,14 +33,18 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
+	"github.com/docker/compose-cli/utils"
 )
 
 type convertOptions struct {
 	*projectOptions
-	Format  string
-	Output  string
-	quiet   bool
-	resolve bool
+	Format   string
+	Output   string
+	quiet    bool
+	resolve  bool
+	services bool
+	volumes  bool
+	hash     string
 }
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
@@ -60,6 +65,16 @@ func convertCommand(p *projectOptions) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
+			if opts.services {
+				return runServices(opts)
+			}
+			if opts.volumes {
+				return runVolumes(opts)
+			}
+			if opts.hash != "" {
+				return runHash(opts)
+			}
+
 			return runConvert(cmd.Context(), opts, args)
 		},
 	}
@@ -67,6 +82,10 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 	flags.BoolVar(&opts.resolve, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
+
+	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
+	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
+	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 
 	// add flags for hidden backends
 	for _, f := range addFlagsFuncs {
@@ -125,4 +144,45 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 	}
 	_, err = fmt.Fprint(out, string(json))
 	return err
+}
+
+func runServices(opts convertOptions) error {
+	project, err := opts.toProject(nil)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		fmt.Println(s.Name)
+	}
+	return nil
+}
+
+func runVolumes(opts convertOptions) error {
+	project, err := opts.toProject(nil)
+	if err != nil {
+		return err
+	}
+	for _, v := range project.Volumes {
+		fmt.Println(v.Name)
+	}
+	return nil
+}
+
+func runHash(opts convertOptions) error {
+	var services []string
+	if opts.hash != "*" {
+		services = append(services, strings.Split(opts.hash, ",")...)
+	}
+	project, err := opts.toProject(services)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		hash, err := utils.ServiceHash(s)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s %s\n", s.Name, hash)
+	}
+	return nil
 }

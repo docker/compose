@@ -24,6 +24,8 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose-cli/utils"
 )
 
 // Containers is a set of moby Container
@@ -69,14 +71,14 @@ type containerPredicate func(c moby.Container) bool
 func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[serviceLabel]
-		return contains(services, service)
+		return utils.StringContains(services, service)
 	}
 }
 
 func isNotService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[serviceLabel]
-		return !contains(services, service)
+		return !utils.StringContains(services, service)
 	}
 }
 
