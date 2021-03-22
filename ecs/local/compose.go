@@ -40,8 +40,8 @@ func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project, op
 	return e.compose.Push(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project) error {
-	return e.compose.Pull(ctx, project)
+func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project, options compose.PullOptions) error {
+	return e.compose.Pull(ctx, project, options)
 }
 
 func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {

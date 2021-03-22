@@ -21,22 +21,25 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
+	"github.com/docker/buildx/driver"
 	cliconfig "github.com/docker/cli/cli/config"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func (s *composeService) Pull(ctx context.Context, project *types.Project) error {
+func (s *composeService) Pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
 	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
 		return err
@@ -64,73 +67,90 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project) error
 			continue
 		}
 		eg.Go(func() error {
-			w.Event(progress.Event{
-				ID:     service.Name,
-				Status: progress.Working,
-				Text:   "Pulling",
-			})
-			ref, err := reference.ParseNormalizedNamed(service.Image)
+			err := s.pullServiceImage(ctx, service, info, configFile, w)
 			if err != nil {
-				return err
-			}
-
-			repoInfo, err := registry.ParseRepositoryInfo(ref)
-			if err != nil {
-				return err
-			}
-
-			key := repoInfo.Index.Name
-			if repoInfo.Index.Official {
-				key = info.IndexServerAddress
-			}
-
-			authConfig, err := configFile.GetAuthConfig(key)
-			if err != nil {
-				return err
-			}
-
-			buf, err := json.Marshal(authConfig)
-			if err != nil {
-				return err
-			}
-
-			stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
-				RegistryAuth: base64.URLEncoding.EncodeToString(buf),
-				Platform:     service.Platform,
-			})
-			if err != nil {
-				w.Event(progress.Event{
-					ID:     service.Name,
-					Status: progress.Error,
-					Text:   "Error",
-				})
-				return err
-			}
-
-			dec := json.NewDecoder(stream)
-			for {
-				var jm jsonmessage.JSONMessage
-				if err := dec.Decode(&jm); err != nil {
-					if err == io.EOF {
-						break
-					}
+				if !opts.IgnoreFailures {
 					return err
 				}
-				if jm.Error != nil {
-					return errors.New(jm.Error.Message)
-				}
-				toPullProgressEvent(service.Name, jm, w)
+				// If IgnoreFailures we still want to show the error message
+				w.Event(progress.Event{
+					ID:         fmt.Sprintf("Pulling %s:", service.Name),
+					Text:       fmt.Sprintf("%v", err),
+					Status:     progress.Error,
+					StatusText: fmt.Sprintf("%s", err),
+				})
 			}
-			w.Event(progress.Event{
-				ID:     service.Name,
-				Status: progress.Done,
-				Text:   "Pulled",
-			})
 			return nil
 		})
 	}
 
 	return eg.Wait()
+}
+
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
+	w.Event(progress.Event{
+		ID:     service.Name,
+		Status: progress.Working,
+		Text:   "Pulling",
+	})
+	ref, err := reference.ParseNormalizedNamed(service.Image)
+	if err != nil {
+		return err
+	}
+
+	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return err
+	}
+
+	key := repoInfo.Index.Name
+	if repoInfo.Index.Official {
+		key = info.IndexServerAddress
+	}
+
+	authConfig, err := configFile.GetAuthConfig(key)
+	if err != nil {
+		return err
+	}
+
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return err
+	}
+
+	stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
+		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+		Platform:     service.Platform,
+	})
+	if err != nil {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Error,
+			Text:   "Error",
+		})
+		return err
+	}
+
+	dec := json.NewDecoder(stream)
+	for {
+		var jm jsonmessage.JSONMessage
+		if err := dec.Decode(&jm); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if jm.Error != nil {
+			return errors.New(jm.Error.Message)
+		}
+		toPullProgressEvent(service.Name, jm, w)
+	}
+	w.Event(progress.Event{
+		ID:     service.Name,
+		Status: progress.Done,
+		Text:   "Pulled",
+	})
+	return nil
 }
 
 func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {

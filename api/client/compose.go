@@ -36,7 +36,7 @@ func (c *composeService) Push(ctx context.Context, project *types.Project, optio
 	return errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Pull(ctx context.Context, project *types.Project) error {
+func (c *composeService) Pull(ctx context.Context, project *types.Project, options compose.PullOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

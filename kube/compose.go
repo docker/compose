@@ -174,7 +174,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 }
 
 // Pull executes the equivalent of a `compose pull`
-func (s *composeService) Pull(ctx context.Context, project *types.Project) error {
+func (s *composeService) Pull(ctx context.Context, project *types.Project, options compose.PullOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
