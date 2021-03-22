@@ -24,13 +24,25 @@ FROM centos:7 AS base-centos
 RUN curl https://get.docker.com | sh
 
 FROM base-${DISTRO} AS install
+
+RUN apt-get update && apt-get -y install sudo
+RUN adduser --disabled-password --gecos '' newuser
+RUN adduser newuser sudo
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER newuser
+WORKDIR /home/newuser
+
 COPY install_linux.sh /scripts/install_linux.sh
-RUN chmod +x /scripts/install_linux.sh
+RUN sudo chmod +x /scripts/install_linux.sh
 ARG DOWNLOAD_URL=
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
 
 FROM install AS upgrade
+
+USER newuser
+WORKDIR /home/newuser
+
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
 
