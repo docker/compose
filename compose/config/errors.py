@@ -39,8 +39,7 @@ class CircularReference(ConfigurationError):
 class ComposeFileNotFound(ConfigurationError):
     def __init__(self, supported_filenames):
         super().__init__("""
-        Can't find a suitable configuration file in this directory or any
-        parent. Are you in the right directory?
+        Can't find a suitable configuration file in the project directory or its parents.
 
         Supported filenames: %s
         """ % ", ".join(supported_filenames))
