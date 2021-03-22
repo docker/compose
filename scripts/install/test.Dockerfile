@@ -37,6 +37,7 @@ RUN sudo chmod +x /scripts/install_linux.sh
 ARG DOWNLOAD_URL=
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
+RUN sh -c "docker info || true" | grep "compose: Docker Compose (Docker Inc.,"
 
 FROM install AS upgrade
 
@@ -45,6 +46,7 @@ WORKDIR /home/newuser
 
 RUN DOWNLOAD_URL=${DOWNLOAD_URL} /scripts/install_linux.sh
 RUN docker version | grep Cloud
+RUN sh -c "docker info || true" | grep "compose: Docker Compose (Docker Inc.,"
 
 # To run this test locally, start an HTTP server that serves the dist/ folder
 # then run a docker build passing the DOWNLOAD_URL as a build arg:

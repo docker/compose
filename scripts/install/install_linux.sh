@@ -120,6 +120,7 @@ if [ $(is_new_cli "docker") -eq 1 ]; then
 		$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
 		$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
 		$sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
+		$sh_c "mkdir -p ~/.docker/cli-plugins && cp ${download_dir}/docker-compose ~/.docker/cli-plugins/docker-compose"
 		exit 0
 	fi
 	echo "You already have the Docker Compose CLI installed, in a different location."
@@ -185,6 +186,8 @@ $sudo_sh_c "ln -s ${existing_cli_path} ${link_path}"
 
 # Install downloaded CLI
 $sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
+# Install Compose CLI plugin
+$sh_c "mkdir -p ~/.docker/cli-plugins && cp ${download_dir}/docker-compose ~/.docker/cli-plugins/docker-compose"
 
 # Clear cache
 cleared_cache=1
