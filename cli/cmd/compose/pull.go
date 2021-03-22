@@ -47,7 +47,7 @@ func pullCommand(p *projectOptions) *cobra.Command {
 		Short: "Pull service images",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.noParallel {
-				fmt.Fprint(os.Stderr, aec.Apply(`option "--no-parallel" is DEPRECATED and will be ignored.\n`, aec.RedF))
+				fmt.Fprint(os.Stderr, aec.Apply("option '--no-parallel' is DEPRECATED and will be ignored.\n", aec.RedF))
 			}
 			return runPull(cmd.Context(), opts, args)
 		},
