@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/cnabio/cnab-to-oci/remotes"
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/distribution/distribution/v3/reference"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/opencontainers/go-digest"
@@ -38,13 +39,14 @@ import (
 
 type convertOptions struct {
 	*projectOptions
-	Format   string
-	Output   string
-	quiet    bool
-	resolve  bool
-	services bool
-	volumes  bool
-	hash     string
+	Format        string
+	Output        string
+	quiet         bool
+	resolve       bool
+	noInterpolate bool
+	services      bool
+	volumes       bool
+	hash          string
 }
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
@@ -82,6 +84,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
 	flags.BoolVar(&opts.resolve, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
+	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
@@ -101,7 +104,7 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 		return err
 	}
 
-	project, err := opts.toProject(services)
+	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate))
 	if err != nil {
 		return err
 	}

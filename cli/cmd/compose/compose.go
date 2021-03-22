@@ -65,8 +65,8 @@ func (o *projectOptions) toProjectName() (string, error) {
 	return project.Name, nil
 }
 
-func (o *projectOptions) toProject(services []string) (*types.Project, error) {
-	options, err := o.toProjectOptions()
+func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	options, err := o.toProjectOptions(po...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +90,14 @@ func (o *projectOptions) toProject(services []string) (*types.Project, error) {
 	return project, err
 }
 
-func (o *projectOptions) toProjectOptions() (*cli.ProjectOptions, error) {
+func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
-		cli.WithEnvFile(o.EnvFile),
-		cli.WithDotEnv,
-		cli.WithOsEnv,
-		cli.WithWorkingDirectory(o.ProjectDir),
-		cli.WithName(o.ProjectName))
+		append(po,
+			cli.WithEnvFile(o.EnvFile),
+			cli.WithDotEnv,
+			cli.WithOsEnv,
+			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithName(o.ProjectName))...)
 }
 
 // Command returns the compose command with its child commands
