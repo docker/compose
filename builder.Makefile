@@ -42,9 +42,9 @@ ifdef BUILD_TAGS
   LINT_TAGS=--build-tags $(BUILD_TAGS)
 endif
 
-TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ --transform s/docker-linux-amd64/docker/ --transform s/docker-darwin-amd64/docker/
+TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ --transform s/docker-linux-amd64/docker/ --transform s/docker-darwin-amd64/docker/ --transform s/docker-linux-arm64/docker/ --transform s/docker-darwin-arm64/docker/
 ifneq ($(findstring bsd,$(shell tar --version)),)
-  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ -s /docker-linux-amd64/docker/ -s /docker-darwin-amd64/docker/
+  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ -s /docker-linux-amd64/docker/ -s /docker-darwin-amd64/docker/ -s /docker-linux-arm64/docker/ -s /docker-darwin-arm64/docker/
 endif
 
 all: cli
