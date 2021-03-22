@@ -45,9 +45,22 @@ ifdef BUILD_TAGS
   LINT_TAGS=--build-tags $(BUILD_TAGS)
 endif
 
-TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ --transform s/docker-linux-amd64/docker/ --transform s/docker-darwin-amd64/docker/ --transform s/docker-linux-arm64/docker/ --transform s/docker-linux-armv6/docker/ --transform s/docker-linux-armv7/docker/ --transform s/docker-darwin-arm64/docker/
+TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ \
+				--transform s/docker-linux-amd64/docker/ --transform s/docker-linux-arm64/docker/ \
+				--transform s/docker-linux-armv6/docker/ --transform s/docker-linux-armv7/docker/ \
+				--transform s/docker-darwin-amd64/docker/ --transform s/docker-darwin-arm64/docker/ \
+				--transform s/docker-compose-linux-amd64/docker-compose/ --transform s/docker-compose-linux-arm64/docker-compose/ \
+				--transform s/docker-compose-linux-armv6/docker-compose/ --transform s/docker-compose-linux-armv7/docker-compose/ \
+				--transform s/docker-compose-darwin-amd64/docker-compose/ --transform s/docker-compose-darwin-arm64/docker-compose/
+
 ifneq ($(findstring bsd,$(shell tar --version)),)
-  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ -s /docker-linux-amd64/docker/ -s /docker-darwin-amd64/docker/ -s /docker-linux-arm64/docker/ -s /docker-linux-armv6/docker/ -s /docker-linux-armv7/docker/ -s /docker-darwin-arm64/docker/
+  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ \
+  				-s /docker-linux-amd64/docker/  -s /docker-linux-arm64/docker/ \
+  				-s /docker-linux-armv6/docker/  -s /docker-linux-armv7/docker/ \
+				-s /docker-darwin-amd64/docker/	 -s /docker-darwin-arm64/docker/ \
+  				-s /docker-compose-linux-amd64/docker-compose/  -s /docker-compose-linux-arm64/docker-compose/ \
+  				-s /docker-compose-linux-armv6/docker-compose/  -s /docker-compose-linux-armv7/docker-compose/ \
+				-s /docker-compose-darwin-amd64/docker-compose/	 -s /docker-compose-darwin-arm64/docker-compose/
 endif
 
 all: cli
@@ -62,10 +75,10 @@ cli: compose-plugin
 
 .PHONY: compose-plugin
 compose-plugin:
-	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY_WITH_EXTENSION) ./compose_plugin
+	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY_WITH_EXTENSION) .
 
 .PHONY: cross
-cross:
+cross: cross-compose-plugin
 	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
 	GOOS=linux   GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-arm64 ./cli
 	GOOS=linux   GOARM=6 GOARCH=arm $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-armv6 ./cli
@@ -73,6 +86,16 @@ cross:
 	GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-amd64 ./cli
 	GOOS=darwin  GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(BINARY)-darwin-arm64 ./cli
 	GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-windows-amd64.exe ./cli
+
+.PHONY: cross-compose-plugin
+cross-compose-plugin:
+	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-linux-amd64 .
+	GOOS=linux   GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-linux-arm64 .
+	GOOS=linux   GOARM=6 GOARCH=arm $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-linux-armv6 .
+	GOOS=linux   GOARM=7 GOARCH=arm $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-linux-armv7 .
+	GOOS=darwin  GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-darwin-amd64 .
+	GOOS=darwin  GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-darwin-arm64 .
+	GOOS=windows GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY)-windows-amd64.exe .
 
 .PHONY: test
 test:
@@ -97,14 +120,15 @@ check-go-mod:
 .PHONY: package
 package: cross
 	mkdir -p dist
-	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64
-	tar -czf dist/docker-linux-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-arm64
-	tar -czf dist/docker-linux-armv6.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv6
-	tar -czf dist/docker-linux-armv7.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv7
-	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64
-	tar -czf dist/docker-darwin-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-arm64
+	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64 $(COMPOSE_BINARY)-linux-amd64
+	tar -czf dist/docker-linux-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-arm64 $(COMPOSE_BINARY)-linux-arm64
+	tar -czf dist/docker-linux-armv6.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv6 $(COMPOSE_BINARY)-linux-armv6
+	tar -czf dist/docker-linux-armv7.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv7 $(COMPOSE_BINARY)-linux-armv7
+	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64 $(COMPOSE_BINARY)-darwin-amd64
+	tar -czf dist/docker-darwin-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-arm64 $(COMPOSE_BINARY)-darwin-arm64
 	cp $(BINARY)-windows-amd64.exe $(WORK_DIR)/docker.exe
-	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe
+	cp $(COMPOSE_BINARY)-windows-amd64.exe $(WORK_DIR)/docker-compose.exe
+	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe $(WORK_DIR)/docker-compose.exe
 	rm -r $(WORK_DIR)
 
 .PHONY: yamldocs

@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/cli/cli/config/configfile"
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/config/configfile"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/sanathkr/go-yaml"
