@@ -274,21 +274,26 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		queue: queue,
 	}
 
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	stopFunc := func() error {
 		ctx := context.Background()
 		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+			go func() {
+				<-signalChan
+				c.ComposeService().Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
+			}()
+
 			return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{})
 		})
 		return err
 	}
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signalChan
 		queue <- compose.ContainerEvent{
 			Type: compose.UserCancel,
 		}
-		fmt.Println("Gracefully stopping...")
+		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
 		stopFunc() // nolint:errcheck
 	}()
 

@@ -51,14 +51,14 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	for _, c := range containers {
 		c := c
 		go func() {
-			s.waitContainer(ctx, c, options.Attach)
+			s.waitContainer(c, options.Attach)
 		}()
 	}
 	return nil
 }
 
-func (s *composeService) waitContainer(ctx context.Context, c moby.Container, listener compose.ContainerEventListener) {
-	statusC, errC := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNotRunning)
+func (s *composeService) waitContainer(c moby.Container, listener compose.ContainerEventListener) {
+	statusC, errC := s.apiClient.ContainerWait(context.Background(), c.ID, container.WaitConditionNotRunning)
 	name := getContainerNameWithoutProject(c)
 	select {
 	case status := <-statusC:
