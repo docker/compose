@@ -83,7 +83,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 					s.attachContainer(ctx, container, listener, project) // nolint: errcheck
 					delete(crashed, event.Container)
 
-					s.waitContainer(ctx, container, listener)
+					s.waitContainer(container, listener)
 				}
 				return nil
 			},
