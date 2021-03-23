@@ -23,6 +23,7 @@ from ..config import resolve_build_args
 from ..config.environment import Environment
 from ..config.serialize import serialize_config
 from ..config.types import VolumeSpec
+from ..const import IS_LINUX_PLATFORM
 from ..const import IS_WINDOWS_PLATFORM
 from ..errors import StreamParseError
 from ..metrics.decorator import metrics
@@ -78,6 +79,8 @@ def main():  # noqa: C901
     try:
         command_func = dispatch()
         command_func()
+        if not IS_LINUX_PLATFORM and command == 'help':
+            print("\nDocker Compose is now in the Docker CLI, try `docker compose` help")
     except (KeyboardInterrupt, signals.ShutdownException):
         exit_with_metrics(command, "Aborting.", status=Status.FAILURE)
     except (UserError, NoSuchService, ConfigurationError,
@@ -98,6 +101,8 @@ def main():  # noqa: C901
                               e.service.name), status=Status.FAILURE)
     except NoSuchCommand as e:
         commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
+        if not IS_LINUX_PLATFORM:
+            commands += "\n\nDocker Compose is now in the Docker CLI, try `docker compose`"
         exit_with_metrics(e.command, "No such command: {}\n\n{}".format(e.command, commands))
     except (errors.ConnectionError, StreamParseError):
         exit_with_metrics(command, status=Status.FAILURE)
@@ -116,6 +121,10 @@ def main():  # noqa: C901
         code = 0
         if isinstance(e.code, int):
             code = e.code
+
+        if not IS_LINUX_PLATFORM and not command:
+            msg += "\n\nDocker Compose is now in the Docker CLI, try `docker compose`"
+
         exit_with_metrics(command, log_msg=msg, status=status,
                           exit_code=code)
 
@@ -128,7 +137,7 @@ def get_filtered_args(args):
 
 
 def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1):
-    if log_msg:
+    if log_msg and command != 'exec':
         if not exit_code:
             log.info(log_msg)
         else:
@@ -1122,6 +1131,9 @@ class TopLevelCommand:
         no_start = options.get('--no-start')
         attach_dependencies = options.get('--attach-dependencies')
         keep_prefix = not options.get('--no-log-prefix')
+
+        if not IS_LINUX_PLATFORM:
+            print('Docker Compose is now in the Docker CLI, try `docker compose up`\n')
 
         if detached and (cascade_stop or exit_value_from or attach_dependencies):
             raise UserError(

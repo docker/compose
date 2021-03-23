@@ -1855,7 +1855,7 @@ class _CLIBuilder:
         Returns:
             A generator for the build output.
         """
-        if dockerfile:
+        if dockerfile and os.path.isdir(path):
             dockerfile = os.path.join(path, dockerfile)
         iidfile = tempfile.mktemp()
 
@@ -1877,8 +1877,10 @@ class _CLIBuilder:
         command_builder.add_arg("--isolation", isolation)
 
         if extra_hosts:
-            for host, ip in extra_hosts.items():
-                command_builder.add_arg("--add-host", "{}:{}".format(host, ip))
+            if isinstance(extra_hosts, dict):
+                extra_hosts = ["{}:{}".format(host, ip) for host, ip in extra_hosts.items()]
+            for host in extra_hosts:
+                command_builder.add_arg("--add-host", "{}".format(host))
 
         args = command_builder.build([path])
 

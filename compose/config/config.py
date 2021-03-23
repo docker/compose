@@ -10,7 +10,11 @@ from operator import attrgetter
 from operator import itemgetter
 
 import yaml
-from cached_property import cached_property
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 from . import types
 from ..const import COMPOSE_SPEC as VERSION
@@ -149,9 +153,14 @@ DOCKER_VALID_URL_PREFIXES = (
 SUPPORTED_FILENAMES = [
     'docker-compose.yml',
     'docker-compose.yaml',
+    'compose.yml',
+    'compose.yaml',
 ]
 
-DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml', 'docker-compose.override.yaml')
+DEFAULT_OVERRIDE_FILENAMES = ('docker-compose.override.yml',
+                              'docker-compose.override.yaml',
+                              'compose.override.yml',
+                              'compose.override.yaml')
 
 
 log = logging.getLogger(__name__)
@@ -304,7 +313,16 @@ def find(base_dir, filenames, environment, override_dir=None):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
+        # search for compose files in the base dir and its parents
         filenames = get_default_config_files(base_dir)
+        if not filenames and not override_dir:
+            # none found in base_dir and no override_dir defined
+            raise ComposeFileNotFound(SUPPORTED_FILENAMES)
+        if not filenames:
+            # search for compose files in the project directory and its parents
+            filenames = get_default_config_files(override_dir)
+            if not filenames:
+                raise ComposeFileNotFound(SUPPORTED_FILENAMES)
 
     log.debug("Using configuration files: {}".format(",".join(filenames)))
     return ConfigDetails(
@@ -335,7 +353,7 @@ def get_default_config_files(base_dir):
     (candidates, path) = find_candidates_in_parent_dirs(SUPPORTED_FILENAMES, base_dir)
 
     if not candidates:
-        raise ComposeFileNotFound(SUPPORTED_FILENAMES)
+        return None
 
     winner = candidates[0]
 
@@ -556,8 +574,7 @@ def process_config_section(config_file, config, section, environment, interpolat
             config_file.version,
             config,
             section,
-            environment
-            )
+            environment)
     else:
         return config
 

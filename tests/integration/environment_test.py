@@ -1,5 +1,6 @@
 import tempfile
 
+import pytest
 from ddt import data
 from ddt import ddt
 
@@ -8,6 +9,7 @@ from ..acceptance.cli_test import dispatch
 from compose.cli.command import get_project
 from compose.cli.command import project_from_options
 from compose.config.environment import Environment
+from compose.config.errors import EnvFileNotFound
 from tests.integration.testcases import DockerClientTestCase
 
 
@@ -55,13 +57,36 @@ services:
 class EnvironmentOverrideFileTest(DockerClientTestCase):
     def test_env_file_override(self):
         base_dir = 'tests/fixtures/env-file-override'
+        # '--env-file' are relative to the current working dir
+        env = Environment.from_env_file(base_dir, base_dir+'/.env.override')
         dispatch(base_dir, ['--env-file', '.env.override', 'up'])
         project = get_project(project_dir=base_dir,
                               config_path=['docker-compose.yml'],
-                              environment=Environment.from_env_file(base_dir, '.env.override'),
+                              environment=env,
                               override_dir=base_dir)
         containers = project.containers(stopped=True)
         assert len(containers) == 1
         assert "WHEREAMI=override" in containers[0].get('Config.Env')
         assert "DEFAULT_CONF_LOADED=true" in containers[0].get('Config.Env')
         dispatch(base_dir, ['--env-file', '.env.override', 'down'], None)
+
+    def test_env_file_not_found_error(self):
+        base_dir = 'tests/fixtures/env-file-override'
+        with pytest.raises(EnvFileNotFound) as excinfo:
+            Environment.from_env_file(base_dir, '.env.override')
+
+        assert "Couldn't find env file" in excinfo.exconly()
+
+    def test_dot_env_file(self):
+        base_dir = 'tests/fixtures/env-file-override'
+        # '.env' is relative to the project_dir (base_dir)
+        env = Environment.from_env_file(base_dir, None)
+        dispatch(base_dir, ['up'])
+        project = get_project(project_dir=base_dir,
+                              config_path=['docker-compose.yml'],
+                              environment=env,
+                              override_dir=base_dir)
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        assert "WHEREAMI=default" in containers[0].get('Config.Env')
+        dispatch(base_dir, ['down'], None)
