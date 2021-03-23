@@ -313,9 +313,12 @@ def find(base_dir, filenames, environment, override_dir=None):
     if filenames:
         filenames = [os.path.join(base_dir, f) for f in filenames]
     else:
-        # search for compose files in the project directory or current working
-        # directory if no project-directory is set
-        filenames = get_default_config_files(override_dir or base_dir)
+        if override_dir:
+            # search for compose files in the project directory and its parents
+            filenames = get_default_config_files(override_dir)
+        if not filenames:
+            # fallback to base directory (current dir) and its parents
+            filenames = get_default_config_files(base_dir)
         if not filenames:
             raise ComposeFileNotFound(SUPPORTED_FILENAMES)
 

@@ -901,7 +901,6 @@ services:
         self.override_dir = os.path.abspath('tests/fixtures')
         result = self.dispatch([
             '--project-directory', self.override_dir,
-            '-f', 'docker-compose.yml',
             'build'])
 
         assert 'Successfully built' in result.stdout
