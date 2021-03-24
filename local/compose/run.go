@@ -86,10 +86,11 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 	oneoffContainer := containers[0]
-	err = s.attachContainerStreams(ctx, oneoffContainer.ID, service.Tty, opts.Reader, opts.Writer)
+	restore, err := s.attachContainerStreams(ctx, oneoffContainer.ID, service.Tty, opts.Reader, opts.Writer)
 	if err != nil {
 		return 0, err
 	}
+	defer restore()
 
 	err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
 	if err != nil {
