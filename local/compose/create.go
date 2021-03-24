@@ -100,7 +100,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 		}
 	}
 
-	prepareNetworkMode(project)
+	prepareServicesDependsOn(project)
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		if utils.StringContains(opts.Services, service.Name) {
@@ -142,18 +142,20 @@ func prepareNetworks(project *types.Project) {
 	}
 }
 
-func prepareNetworkMode(p *types.Project) {
+func prepareServicesDependsOn(p *types.Project) {
 outLoop:
 	for i := range p.Services {
-		dependency := getDependentServiceByNetwork(p.Services[i].NetworkMode)
-		if dependency == "" {
+		networkDependency := getDependentServiceFromMode(p.Services[i].NetworkMode)
+		ipcDependency := getDependentServiceFromMode(p.Services[i].Ipc)
+
+		if networkDependency == "" && ipcDependency == "" {
 			continue
 		}
 		if p.Services[i].DependsOn == nil {
 			p.Services[i].DependsOn = make(types.DependsOnConfig)
 		}
 		for _, service := range p.Services {
-			if service.Name == dependency {
+			if service.Name == networkDependency || service.Name == ipcDependency {
 				p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 					Condition: types.ServiceConditionStarted,
 				}
@@ -269,7 +271,14 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 
 	resources := getDeployResources(service)
 
-	networkMode, err := getNetworkMode(ctx, p, service)
+	networkMode, err := getMode(ctx, service.Name, service.NetworkMode)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if networkMode == "" {
+		networkMode = getDefaultNetworkMode(p, service)
+	}
+	ipcmode, err := getMode(ctx, service.Name, service.Ipc)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -305,8 +314,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
 		CapDrop:        strslice.StrSlice(service.CapDrop),
-		NetworkMode:    networkMode,
+		NetworkMode:    container.NetworkMode(networkMode),
 		Init:           service.Init,
+		IpcMode:        container.IpcMode(ipcmode),
 		ReadonlyRootfs: service.ReadOnly,
 		RestartPolicy:  getRestartPolicy(service),
 		ShmSize:        shmSize,
@@ -328,8 +338,19 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		LogConfig:      logConfig,
 	}
 
-	networkConfig := buildDefaultNetworkConfig(service, networkMode, getContainerName(p.Name, service, number))
+	networkConfig := buildDefaultNetworkConfig(service, container.NetworkMode(networkMode), getContainerName(p.Name, service, number))
 	return &containerConfig, &hostConfig, networkConfig, nil
+}
+
+func getDefaultNetworkMode(project *types.Project, service types.ServiceConfig) string {
+	mode := "none"
+	if len(project.Networks) > 0 {
+		for name := range getNetworksForService(service) {
+			mode = project.Networks[name].Name
+			break
+		}
+	}
+	return mode
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
@@ -470,12 +491,11 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 
 }
 
-func getDependentServiceByNetwork(networkMode string) string {
-	baseService := ""
-	if strings.HasPrefix(networkMode, types.NetworkModeServicePrefix) {
-		return networkMode[len(types.NetworkModeServicePrefix):]
+func getDependentServiceFromMode(mode string) string {
+	if strings.HasPrefix(mode, types.NetworkModeServicePrefix) {
+		return mode[len(types.NetworkModeServicePrefix):]
 	}
-	return baseService
+	return ""
 }
 
 func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Project, service types.ServiceConfig,
@@ -745,33 +765,22 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 	return aliases
 }
 
-func getNetworkMode(ctx context.Context, p *types.Project, service types.ServiceConfig) (container.NetworkMode, error) {
+func getMode(ctx context.Context, serviceName string, mode string) (string, error) {
 	cState, err := GetContextContainerState(ctx)
 	if err != nil {
-		return container.NetworkMode("none"), nil
+		return "", nil
 	}
 	observedState := cState.GetContainers()
-
-	mode := service.NetworkMode
-	if mode == "" {
-		if len(p.Networks) > 0 {
-			for name := range getNetworksForService(service) {
-				return container.NetworkMode(p.Networks[name].Name), nil
-			}
-		}
-		return container.NetworkMode("none"), nil
-	}
-	depServiceNetworkMode := getDependentServiceByNetwork(service.NetworkMode)
-	if depServiceNetworkMode != "" {
-		depServiceContainers := observedState.filter(isService(depServiceNetworkMode))
+	depService := getDependentServiceFromMode(mode)
+	if depService != "" {
+		depServiceContainers := observedState.filter(isService(depService))
 		if len(depServiceContainers) > 0 {
-			return container.NetworkMode(types.NetworkModeContainerPrefix + depServiceContainers[0].ID), nil
+			return types.NetworkModeContainerPrefix + depServiceContainers[0].ID, nil
 		}
-		return container.NetworkMode("none"),
-			fmt.Errorf(`no containers started for network_mode %q in service %q -> %v`,
-				mode, service.Name, observedState)
+		return "", fmt.Errorf(`no containers started for %q in service %q -> %v`,
+			mode, serviceName, observedState)
 	}
-	return container.NetworkMode(mode), nil
+	return mode, nil
 }
 
 func getNetworksForService(s types.ServiceConfig) map[string]*types.ServiceNetworkConfig {
