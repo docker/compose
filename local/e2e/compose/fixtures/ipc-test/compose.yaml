@@ -1,0 +1,13 @@
+services:
+  service:
+    image: busybox
+    command: top
+    ipc: "service:shareable"
+  container:
+    image: busybox
+    command: top
+    ipc: "container:ipc_mode_container"
+  shareable:
+    image: busybox
+    command: top
+    ipc: shareable
