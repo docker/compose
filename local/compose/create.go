@@ -47,7 +47,15 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 		opts.Services = project.ServiceNames()
 	}
 
-	err := s.ensureImagesExists(ctx, project, opts.QuietPull)
+	var observedState Containers
+	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return err
+	}
+	containerState := NewContainersState(observedState)
+	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
+
+	err = s.ensureImagesExists(ctx, project, observedState, opts.QuietPull)
 	if err != nil {
 		return err
 	}
@@ -66,14 +74,6 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	if err := s.ensureProjectVolumes(ctx, project); err != nil {
 		return err
 	}
-
-	var observedState Containers
-	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return err
-	}
-	containerState := NewContainersState(observedState)
-	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
 
 	allServices := project.AllServices()
 	allServiceNames := []string{}

@@ -29,7 +29,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
-	"github.com/docker/compose-cli/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -39,6 +38,7 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/utils"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project

@@ -66,7 +66,7 @@ func (s *containersState) Remove(id string) types.Container {
 	var c types.Container
 	var newObserved Containers
 	for _, o := range *s.observedContainers {
-		if o.ID != id {
+		if o.ID == id {
 			c = o
 			continue
 		}

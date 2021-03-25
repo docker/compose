@@ -125,7 +125,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 			w.Event(progress.CreatedEvent(name))
 		default:
 			eg.Go(func() error {
-				return s.restartContainer(ctx, container)
+				return s.startContainer(ctx, container)
 			})
 		}
 	}
@@ -269,7 +269,7 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 	}
 }
 
-func (s *composeService) restartContainer(ctx context.Context, container moby.Container) error {
+func (s *composeService) startContainer(ctx context.Context, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Restart"))
 	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
