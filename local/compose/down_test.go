@@ -36,8 +36,8 @@ func TestDown(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil).Times(2)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
+		[]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
 
 	api.EXPECT().ContainerStop(ctx, "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(ctx, "456", nil).Return(nil)
@@ -62,8 +62,8 @@ func TestDownRemoveOrphans(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil).Times(2)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
+		[]apitypes.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
 
 	api.EXPECT().ContainerStop(ctx, "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(ctx, "789", nil).Return(nil)

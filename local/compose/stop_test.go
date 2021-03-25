@@ -21,9 +21,10 @@ import (
 	"testing"
 	"time"
 
+	moby "github.com/docker/docker/api/types"
+
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/local/mocks"
-	moby "github.com/docker/docker/api/types"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/golang/mock/gomock"
@@ -37,7 +38,7 @@ func TestStopTimeout(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
 		[]moby.Container{
 			testContainer("service1", "123"),
 			testContainer("service1", "456"),

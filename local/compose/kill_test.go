@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -43,7 +44,7 @@ func TestKillAll(t *testing.T) {
 	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return(
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
 		[]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
@@ -62,7 +63,7 @@ func TestKillSignal(t *testing.T) {
 	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt(testProject)).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
 	err := tested.Kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
@@ -89,4 +90,11 @@ func anyCancellableContext() gomock.Matcher {
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	cancel()
 	return gomock.AssignableToTypeOf(ctxWithCancel)
+}
+
+func projectFilterListOpt() apitypes.ContainerListOptions {
+	return apitypes.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(testProject)),
+		All:     true,
+	}
 }

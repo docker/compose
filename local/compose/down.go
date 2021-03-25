@@ -38,22 +38,23 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
+	var containers Containers
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+		All:     true,
+	})
+	if err != nil {
+		return err
+	}
+
 	if options.Project == nil {
-		project, err := s.projectFromContainerLabels(ctx, projectName)
+		project, err := s.projectFromContainerLabels(containers, projectName)
 		if err != nil {
 			return err
 		}
 		options.Project = project
 	}
 
-	var containers Containers
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(options.Project.Name)),
-		All:     true,
-	})
-	if err != nil {
-		return err
-	}
 	if len(containers) > 0 {
 		resourceToRemove = true
 	}
@@ -176,18 +177,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-func projectFilterListOpt(projectName string) moby.ContainerListOptions {
-	return moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
-		All:     true,
-	}
-}
-
-func (s *composeService) projectFromContainerLabels(ctx context.Context, projectName string) (*types.Project, error) {
-	containers, err := s.apiClient.ContainerList(ctx, projectFilterListOpt(projectName))
-	if err != nil {
-		return nil, err
-	}
+func (s *composeService) projectFromContainerLabels(containers Containers, projectName string) (*types.Project, error) {
 	fakeProject := &types.Project{
 		Name: projectName,
 	}
