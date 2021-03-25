@@ -33,7 +33,7 @@ type Service interface {
 	// Push executes the equivalent ot a `compose push`
 	Push(ctx context.Context, project *types.Project, options PushOptions) error
 	// Pull executes the equivalent of a `compose pull`
-	Pull(ctx context.Context, project *types.Project) error
+	Pull(ctx context.Context, project *types.Project, opts PullOptions) error
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
@@ -154,6 +154,11 @@ type ConvertOptions struct {
 
 // PushOptions group options of the Push API
 type PushOptions struct {
+	IgnoreFailures bool
+}
+
+// PullOptions group options of the Push API
+type PullOptions struct {
 	IgnoreFailures bool
 }
 

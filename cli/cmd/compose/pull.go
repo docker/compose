@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils"
 )
@@ -32,10 +33,11 @@ import (
 type pullOptions struct {
 	*projectOptions
 	composeOptions
-	quiet       bool
-	parallel    bool
-	noParallel  bool
-	includeDeps bool
+	quiet              bool
+	parallel           bool
+	noParallel         bool
+	includeDeps        bool
+	ignorePullFailures bool
 }
 
 func pullCommand(p *projectOptions) *cobra.Command {
@@ -59,6 +61,7 @@ func pullCommand(p *projectOptions) *cobra.Command {
 	flags.MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().BoolVar(&opts.parallel, "no-parallel", true, "DEPRECATED disable parallel pulling.")
 	flags.MarkHidden("no-parallel") //nolint:errcheck
+	cmd.Flags().BoolVar(&opts.ignorePullFailures, "ignore-pull-failures", false, "Pull what it can and ignores images with pull failures")
 	return cmd
 }
 
@@ -86,12 +89,16 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 		project.Services = enabled
 	}
 
+	apiOpts := compose.PullOptions{
+		IgnoreFailures: opts.ignorePullFailures,
+	}
+
 	if opts.quiet {
-		return c.ComposeService().Pull(ctx, project)
+		return c.ComposeService().Pull(ctx, project, apiOpts)
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Pull(ctx, project)
+		return "", c.ComposeService().Pull(ctx, project, apiOpts)
 	})
 	return err
 }
