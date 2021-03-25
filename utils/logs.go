@@ -62,7 +62,7 @@ func (a *allowListLogConsumer) Register(name string) {
 }
 
 // GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func GetWriter(container, service string, events compose.ContainerEventListener) io.Writer {
+func GetWriter(container, service string, events compose.ContainerEventListener) io.WriteCloser {
 	return &splitBuffer{
 		buffer:    bytes.Buffer{},
 		service:   service,
@@ -99,4 +99,18 @@ func (s *splitBuffer) Write(b []byte) (int, error) {
 		})
 	}
 	return n, nil
+}
+
+func (s *splitBuffer) Close() error {
+	b := s.buffer.Bytes()
+	if len(b) == 0 {
+		return nil
+	}
+	s.consumer(compose.ContainerEvent{
+		Type:      compose.ContainerEventLog,
+		Service:   s.service,
+		Container: s.container,
+		Line:      string(b),
+	})
+	return nil
 }

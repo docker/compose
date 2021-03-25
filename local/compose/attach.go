@@ -27,6 +27,7 @@ import (
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
 )
@@ -108,26 +109,40 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 		Service:   container.Labels[serviceLabel],
 	})
 
-	return s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
+	_, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
+	return err
 }
 
-func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, r io.Reader, w io.Writer) error {
+func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, r io.ReadCloser, w io.Writer) (func(), error) {
+	var (
+		in      *streams.In
+		restore = func() { /* noop */ }
+	)
+	if r != nil {
+		in = streams.NewIn(r)
+		restore = in.RestoreTerminal
+	}
+
 	stdin, stdout, err := s.getContainerStreams(ctx, container)
 	if err != nil {
-		return err
+		return restore, err
 	}
 
 	go func() {
 		<-ctx.Done()
-		stdout.Close() //nolint:errcheck
-		if stdin != nil {
-			stdin.Close() //nolint:errcheck
+		if in != nil {
+			in.Close() //nolint:errcheck
 		}
+		stdout.Close() //nolint:errcheck
 	}()
 
-	if r != nil && stdin != nil {
+	if in != nil && stdin != nil {
+		err := in.SetRawTerminal()
+		if err != nil {
+			return restore, err
+		}
 		go func() {
-			io.Copy(stdin, r) //nolint:errcheck
+			io.Copy(stdin, in) //nolint:errcheck
 		}()
 	}
 
@@ -140,7 +155,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 			}
 		}()
 	}
-	return nil
+	return restore, nil
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {

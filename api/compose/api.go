@@ -186,8 +186,8 @@ type RunOptions struct {
 	Entrypoint        []string
 	Detach            bool
 	AutoRemove        bool
-	Writer            io.Writer
-	Reader            io.Reader
+	Writer            io.WriteCloser
+	Reader            io.ReadCloser
 	Tty               bool
 	WorkingDir        string
 	User              string
