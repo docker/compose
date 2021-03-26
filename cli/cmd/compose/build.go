@@ -35,6 +35,8 @@ type buildOptions struct {
 	pull     bool
 	progress string
 	args     []string
+	noCache  bool
+	memory   string
 }
 
 func buildCommand(p *projectOptions) *cobra.Command {
@@ -65,6 +67,11 @@ func buildCommand(p *projectOptions) *cobra.Command {
 	cmd.Flags().MarkHidden("compress") //nolint:errcheck
 	cmd.Flags().Bool("force-rm", true, "Always remove intermediate containers. DEPRECATED")
 	cmd.Flags().MarkHidden("force-rm") //nolint:errcheck
+	cmd.Flags().BoolVar(&opts.noCache, "no-cache", false, "Do not use cache when building the image")
+	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
+	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
+	cmd.Flags().StringVarP(&opts.memory, "memory", "m", "", "Set memory limit for the build container. DEPRECATED")
+	cmd.Flags().MarkHidden("memory") //nolint:errcheck
 
 	return cmd
 }
@@ -85,6 +92,7 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 			Pull:     opts.pull,
 			Progress: opts.progress,
 			Args:     types.NewMapping(opts.args),
+			NoCache:  opts.noCache,
 		})
 	})
 	return err
