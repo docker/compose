@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/cli/mobycli"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -60,7 +60,10 @@ func (s *composeService) windowsBuild(project *types.Project, options compose.Bu
 
 			args := cmd.getArguments()
 			// shell out to moby cli
-			err := moby.Exec(args)
+			childExit := make(chan bool)
+			err := mobycli.RunDocker(childExit, args...)
+			childExit <- true
+
 			if err != nil {
 				return err
 			}
