@@ -92,8 +92,7 @@
                 "target": {"type": "string"},
                 "shm_size": {"type": ["integer", "string"]},
                 "extra_hosts": {"$ref": "#/definitions/list_or_dict"},
-                "isolation": {"type": "string"},
-                "extra_cli_build_args": {"$ref": "list_of_strings"}
+                "isolation": {"type": "string"}
               },
               "additionalProperties": false,
               "patternProperties": {"^x-": {}}
