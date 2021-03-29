@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -67,7 +68,9 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 	err := s.build(ctx, project, opts, options.Progress)
 	if err == nil {
-		displayScanSuggestMsg(imagesToBuild)
+		if len(imagesToBuild) > 0 {
+			utils.DisplayScanSuggestMsg()
+		}
 	}
 
 	return err
@@ -125,7 +128,9 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 	err := s.build(ctx, project, opts, mode)
 	if err == nil {
-		displayScanSuggestMsg(imagesToBuild)
+		if len(imagesToBuild) > 0 {
+			utils.DisplayScanSuggestMsg()
+		}
 	}
 	return err
 }
