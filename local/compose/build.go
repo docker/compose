@@ -41,6 +41,18 @@ import (
 func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
+
+	// retrieve OS type
+	info, err := s.apiClient.Info(ctx)
+	if err != nil {
+		return err
+	}
+	if info.OSType == "windows" {
+		// no support yet for Windows container builds in Buildkit
+		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
+		return s.windowsBuild(project, options)
+	}
+
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
@@ -66,7 +78,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	err := s.build(ctx, project, opts, options.Progress)
+	err = s.build(ctx, project, opts, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 {
 			utils.DisplayScanSuggestMsg()
