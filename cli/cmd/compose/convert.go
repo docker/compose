@@ -46,6 +46,7 @@ type convertOptions struct {
 	noInterpolate bool
 	services      bool
 	volumes       bool
+	profiles      bool
 	hash          string
 }
 
@@ -76,6 +77,9 @@ func convertCommand(p *projectOptions) *cobra.Command {
 			if opts.hash != "" {
 				return runHash(opts)
 			}
+			if opts.profiles {
+				return runProfiles(opts)
+			}
 
 			return runConvert(cmd.Context(), opts, args)
 		},
@@ -88,6 +92,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
+	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 
 	// add flags for hidden backends
@@ -186,6 +191,23 @@ func runHash(opts convertOptions) error {
 			return err
 		}
 		fmt.Printf("%s %s\n", s.Name, hash)
+	}
+	return nil
+}
+
+func runProfiles(opts convertOptions) error {
+	profiles := map[string]struct{}{}
+	project, err := opts.toProject(nil)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		for _, p := range s.Profiles {
+			profiles[p] = struct{}{}
+		}
+	}
+	for _, p := range profiles {
+		fmt.Println(p)
 	}
 	return nil
 }
