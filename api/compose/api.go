@@ -82,6 +82,8 @@ type BuildOptions struct {
 	Progress string
 	// Args set build-time args
 	Args types.Mapping
+	// NoCache disables cache use
+	NoCache bool
 }
 
 // CreateOptions group options of the Create API

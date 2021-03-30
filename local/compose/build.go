@@ -63,6 +63,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 			}
 			buildOptions.Pull = options.Pull
 			buildOptions.BuildArgs = options.Args
+			buildOptions.NoCache = options.NoCache
 			opts[imageName] = buildOptions
 			buildOptions.CacheFrom, err = build.ParseCacheEntry(service.Build.CacheFrom)
 			if err != nil {
