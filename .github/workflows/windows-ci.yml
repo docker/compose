@@ -38,6 +38,9 @@ jobs:
       - name: Setup docker CLI
         run: |
           docker version
+          curl -L -o docker.exe https://github.com/StefanScherer/docker-cli-builder/releases/download/20.10.5/docker.exe
+          mv -Force ./docker.exe "C:\Program Files\Docker\"
+          docker version
 
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
