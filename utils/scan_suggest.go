@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package utils
 
 import (
 	"encoding/json"
@@ -28,16 +28,18 @@ import (
 	cliConfig "github.com/docker/cli/cli/config"
 )
 
-func displayScanSuggestMsg(builtImages []string) {
-	if len(builtImages) <= 0 {
-		return
-	}
+// DisplayScanSuggestMsg displlay a message suggesting users can scan new image
+func DisplayScanSuggestMsg() {
 	if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
 		return
 	}
-	if !scanAvailable() || scanAlreadyInvoked() {
+	if !scanAvailable() {
 		return
 	}
+	if scanAlreadyInvoked() {
+		return
+	}
+	fmt.Println()
 	fmt.Println("Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them")
 }
 

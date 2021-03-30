@@ -30,6 +30,7 @@ import (
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli/resolvepath"
+	"github.com/docker/compose-cli/utils"
 )
 
 var delegatedContextTypes = []string{store.DefaultContextType}
@@ -99,6 +100,10 @@ func Exec(root *cobra.Command) {
 		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	command := metrics.GetCommand(os.Args[1:])
+	if command == "build" {
+		utils.DisplayScanSuggestMsg()
 	}
 	metrics.Track(store.DefaultContextType, os.Args[1:], metrics.SuccessStatus)
 
