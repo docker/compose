@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/compose-spec/compose-go/types"
@@ -47,6 +48,9 @@ func buildCommand(p *projectOptions) *cobra.Command {
 		Use:   "build [SERVICE...]",
 		Short: "Build or rebuild services",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.memory != "" {
+				fmt.Println("WARNING --memory is ignored as not supported in buildkit.")
+			}
 			if opts.quiet {
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
@@ -70,7 +74,7 @@ func buildCommand(p *projectOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.noCache, "no-cache", false, "Do not use cache when building the image")
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
 	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
-	cmd.Flags().StringVarP(&opts.memory, "memory", "m", "", "Set memory limit for the build container. DEPRECATED")
+	cmd.Flags().StringVarP(&opts.memory, "memory", "m", "", "Set memory limit for the build container. Not supported on buildkit yet.")
 	cmd.Flags().MarkHidden("memory") //nolint:errcheck
 
 	return cmd
