@@ -45,8 +45,9 @@ func TestRestart(t *testing.T) {
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yml", "--project-name", projectName, "up", "-d")
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart_restart_1  Started"), res.Combined())
 
-		// Give the time for it to exit
-		time.Sleep(time.Second)
+		c.WaitForCmdResult(c.NewDockerCmd("compose", "--project-name", projectName, "ps", "-a", "--format", "json"),
+			StdoutContains(`"State":"exited"`),
+			10*time.Second, 1*time.Second)
 
 		res = c.RunDockerOrExitError("compose", "--project-name", projectName, "ps", "-a")
 		testify.Regexp(t, getServiceRegx("restart", "exited"), res.Stdout())
