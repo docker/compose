@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  frontend:
+    image: frontend
+    profiles: ["frontend", "gui"]
+  phpmyadmin:
+    image: phpmyadmin
+    depends_on:
+      - db
+    profiles:
+      - debug
+  backend:
+    image: backend
+  db:
+    image: mysql
