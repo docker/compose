@@ -42,17 +42,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 
-	// retrieve OS type
-	info, err := s.apiClient.Info(ctx)
-	if err != nil {
-		return err
-	}
-	if info.OSType == "windows" {
-		// no support yet for Windows container builds in Buildkit
-		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
-		return s.windowsBuild(project, options)
-	}
-
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
@@ -79,7 +68,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	err = s.build(ctx, project, opts, options.Progress)
+	err := s.build(ctx, project, opts, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 {
 			utils.DisplayScanSuggestMsg()
@@ -128,7 +117,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				DockerfilePath: "-",
 				InStream:       strings.NewReader("FROM " + service.Image),
 			},
-			Tags: []string{service.Image},
+			Tags: []string{service.Image}, // Used to retrieve image to pull in case of windows engine
 			Pull: true,
 		}
 
@@ -160,6 +149,16 @@ func (s *composeService) localImagePresent(ctx context.Context, imageName string
 }
 
 func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) error {
+	info, err := s.apiClient.Info(ctx)
+	if err != nil {
+		return err
+	}
+
+	if info.OSType == "windows" {
+		// no support yet for Windows container builds in Buildkit
+		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
+		return s.windowsBuild(opts, mode)
+	}
 	if len(opts) == 0 {
 		return nil
 	}
