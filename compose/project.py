@@ -13,6 +13,7 @@ from docker.utils import version_lt
 
 from . import parallel
 from .cli.errors import UserError
+from .cli.scan_suggest import display_scan_suggest_msg
 from .config import ConfigurationError
 from .config.config import V1
 from .config.sort_services import get_container_name_from_network_mode
@@ -518,6 +519,9 @@ class Project:
             for service in services:
                 build_service(service)
 
+        if services:
+            display_scan_suggest_msg()
+
     def create(
         self,
         service_names=None,
@@ -660,8 +664,15 @@ class Project:
             service_names,
             include_deps=start_deps)
 
+        must_build = False
         for svc in services:
+            if svc.must_build(do_build=do_build):
+                must_build = True
             svc.ensure_image_exists(do_build=do_build, silent=silent, cli=cli)
+
+        if must_build:
+            display_scan_suggest_msg()
+
         plans = self._get_convergence_plans(
             services,
             strategy,
