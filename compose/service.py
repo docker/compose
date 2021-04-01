@@ -366,6 +366,24 @@ class Service:
             "rebuild this image you must use `docker-compose build` or "
             "`docker-compose up --build`.".format(self.name))
 
+    def must_build(self, do_build=BuildAction.none):
+        if self.can_be_built() and do_build == BuildAction.force:
+            return True
+
+        try:
+            self.image()
+            return False
+        except NoSuchImageError:
+            pass
+
+        if not self.can_be_built():
+            return False
+
+        if do_build == BuildAction.skip:
+            return False
+
+        return True
+
     def get_image_registry_data(self):
         try:
             return self.client.inspect_distribution(self.image_name)
