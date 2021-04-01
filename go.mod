@@ -15,7 +15,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.15
 	github.com/aws/aws-sdk-go v1.35.33
 	github.com/awslabs/goformation/v4 v4.15.6
-	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
+	github.com/buger/goterm v1.0.0
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
 	github.com/compose-spec/compose-go v0.0.0-20210322090015-6166d06f9ce2
 	github.com/containerd/console v1.0.1
