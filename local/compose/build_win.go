@@ -18,58 +18,56 @@ package compose
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/buildx/build"
 	"github.com/docker/compose-cli/cli/mobycli"
-
-	"github.com/compose-spec/compose-go/types"
 )
 
-func (s *composeService) windowsBuild(project *types.Project, options compose.BuildOptions) error {
-	projectDir := project.WorkingDir
-	for _, service := range project.Services {
-		if service.Build != nil {
-			imageName := getImageName(service, project.Name)
-			dockerfile := service.Build.Dockerfile
-			if dockerfile != "" {
-				if stat, err := os.Stat(projectDir); err == nil && stat.IsDir() {
+func (s *composeService) windowsBuild(opts map[string]build.Options, mode string) error {
+	for serviceName, options := range opts {
+		imageName := serviceName
+		dockerfile := options.Inputs.DockerfilePath
 
-					dockerfile = filepath.Join(projectDir, dockerfile)
-				}
+		if options.Inputs.DockerfilePath == "-" { // image needs to be pulled
+			imageName := options.Tags[0]
+			err := shellOutMoby("pull", imageName)
+			if err != nil {
+				return err
 			}
-			// build args
+		} else {
 			cmd := &commandBuilder{
-				Path: filepath.Join(projectDir, service.Build.Context),
+				Path: options.Inputs.ContextPath,
 			}
-			cmd.addParams("--build-arg", options.Args)
+			cmd.addParams("--build-arg", options.BuildArgs)
 			cmd.addFlag("--pull", options.Pull)
-			cmd.addArg("--progress", options.Progress)
+			cmd.addArg("--progress", mode)
 
-			cmd.addList("--cache-from", service.Build.CacheFrom)
+			cacheFrom := []string{}
+			for _, cacheImage := range options.CacheFrom {
+				cacheFrom = append(cacheFrom, cacheImage.Attrs["ref"])
+			}
+			cmd.addList("--cache-from", cacheFrom)
 			cmd.addArg("--file", dockerfile)
-			cmd.addParams("--label", service.Build.Labels)
-			cmd.addArg("--network", service.Build.Network)
-			cmd.addArg("--target", service.Build.Target)
-			cmd.addArg("--platform", service.Platform)
-			cmd.addArg("--isolation", service.Build.Isolation)
-			cmd.addList("--add-host", service.Build.ExtraHosts)
-
+			cmd.addParams("--label", options.Labels)
+			cmd.addArg("--network", options.NetworkMode)
+			cmd.addArg("--target", options.Target)
+			cmd.addList("--add-host", options.ExtraHosts)
 			cmd.addArg("--tag", imageName)
 
-			args := cmd.getArguments()
-			// shell out to moby cli
-			childExit := make(chan bool)
-			err := mobycli.RunDocker(childExit, args...)
-			childExit <- true
-
+			err := shellOutMoby(cmd.getArguments()...)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func shellOutMoby(args ...string) error {
+	childExit := make(chan bool)
+	err := mobycli.RunDocker(childExit, args...)
+	childExit <- true
+	return err
 }
 
 type commandBuilder struct {
