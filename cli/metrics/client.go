@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -37,9 +38,16 @@ type Command struct {
 	Status  string `json:"status"`
 }
 
+// CLISource is sent for cli metrics
+var CLISource = "cli"
+
+func init() {
+	if v, ok := os.LookupEnv("DOCKER_METRICS_SOURCE"); ok {
+		CLISource = v
+	}
+}
+
 const (
-	// CLISource is sent for cli metrics
-	CLISource = "cli"
 	// APISource is sent for API metrics
 	APISource = "api"
 	// SuccessStatus is sent for API metrics
