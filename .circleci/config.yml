@@ -1,57 +1,14 @@
 version: 2.1
+orbs:
+  node: circleci/node@1.1
 jobs:
-  Hello-World:
-    docker:
-      - image: alpine:3.7
-    steps:
-      - run:
-          name: Hello World
-          command: |
-            echo 'Hello World!'
-            echo 'This is the delivery pipeline'
-  I-Have-Code:
-    docker:
-      - image: alpine:3.7
+  build:
+    executor:
+      name: node/default
+      tag: '10.4'
     steps:
       - checkout
-      - run:
-          name: Code Has Arrived
-          command: |
-            ls -al
-            echo '^^^That should look familiar^^^'
-  Run-With-Node:
-    docker:
-      - image: circleci/node:10-browsers
-    steps:
-      - run:
-          name: Running In A Container With Node
-          command: |
-            node -v
-  Now-Complete:
-    docker:
-      - image: alpine:3.7
-    steps:
-      - run:
-          name: Approval Complete
-          command: |
-            echo 'Do work once the approval has completed'
-
-workflows:
- version: 2
- Example_Workflow:
-   jobs:
-     - Hello-World
-     - I-Have-Code:
-         requires:
-           - Hello-World
-     - Run-With-Node:
-         requires:
-           - Hello-World
-     - Hold-For-Approval:
-         type: approval
-         requires:
-           - Run-With-Node
-           - I-Have-Code
-     - Now-Complete:
-         requires:
-           - Hold-For-Approval
+      - node/with-cache:
+          steps:
+            - run: npm install
+      - run: npm run test
