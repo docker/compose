@@ -19,6 +19,7 @@ package compose
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -82,6 +83,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 			return nil, err
 		}
 		o.Profiles = append(o.Profiles, s.GetProfiles()...)
+	}
+
+	if profiles, ok := options.Environment["COMPOSE_PROFILES"]; ok {
+		o.Profiles = append(o.Profiles, strings.Split(profiles, ",")...)
 	}
 
 	project.ApplyProfiles(o.Profiles)
