@@ -1,6 +1,29 @@
 Change log
 ==========
 
+1.29.0 (2021-04-06)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/56?closed=1)
+
+### Features
+
+- Add profile filter to `docker-compose config`
+
+- Add a `depends_on` condition to wait for successful service completion
+
+### Miscellaneous
+
+- Add image scan message on build
+
+- Update warning message for `--no-ansi` to mention `--ansi never` as alternative
+
+- Bump docker-py to 5.0.0
+
+- Bump PyYAML to 5.4.1
+
+- Bump python-dotenv to 0.17.0
+
 1.28.6 (2021-03-23)
 -------------------
 
