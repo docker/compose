@@ -1,0 +1,3 @@
+services:
+  simple:
+    image:  unknownimage

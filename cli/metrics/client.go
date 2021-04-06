@@ -47,17 +47,6 @@ func init() {
 	}
 }
 
-const (
-	// APISource is sent for API metrics
-	APISource = "api"
-	// SuccessStatus is sent for API metrics
-	SuccessStatus = "success"
-	// FailureStatus is sent for API metrics
-	FailureStatus = "failure"
-	// CanceledStatus is sent for API metrics
-	CanceledStatus = "canceled"
-)
-
 // Client sends metrics to Docker Desktopn
 type Client interface {
 	// Send sends the command to Docker Desktop. Note that the function doesn't

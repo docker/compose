@@ -1,0 +1,3 @@
+services:
+  simple:
+    build:  service1

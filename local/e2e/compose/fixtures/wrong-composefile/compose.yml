@@ -1,0 +1,4 @@
+services:
+  simple:
+    image:  nginx
+    wrongField: test
