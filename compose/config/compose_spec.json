@@ -188,7 +188,7 @@
                   "properties": {
                     "condition": {
                       "type": "string",
-                      "enum": ["service_started", "service_healthy"]
+                      "enum": ["service_started", "service_healthy", "service_completed_successfully"]
                     }
                   },
                   "required": ["condition"]

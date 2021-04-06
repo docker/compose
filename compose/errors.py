@@ -27,3 +27,8 @@ class NoHealthCheckConfigured(HealthCheckException):
                 service_name
             )
         )
+
+
+class CompletedUnsuccessfully(Exception):
+    def __init__(self, container_id, exit_code):
+        self.msg = 'Container "{}" exited with code {}.'.format(container_id, exit_code)

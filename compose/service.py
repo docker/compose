@@ -45,6 +45,7 @@ from .const import LABEL_VERSION
 from .const import NANOCPUS_SCALE
 from .const import WINDOWS_LONGPATH_PREFIX
 from .container import Container
+from .errors import CompletedUnsuccessfully
 from .errors import HealthCheckFailed
 from .errors import NoHealthCheckConfigured
 from .errors import OperationFailedError
@@ -112,6 +113,7 @@ HOST_CONFIG_KEYS = [
 
 CONDITION_STARTED = 'service_started'
 CONDITION_HEALTHY = 'service_healthy'
+CONDITION_COMPLETED_SUCCESSFULLY = 'service_completed_successfully'
 
 
 class BuildError(Exception):
@@ -771,6 +773,8 @@ class Service:
                 configs[svc] = lambda s: True
             elif config['condition'] == CONDITION_HEALTHY:
                 configs[svc] = lambda s: s.is_healthy()
+            elif config['condition'] == CONDITION_COMPLETED_SUCCESSFULLY:
+                configs[svc] = lambda s: s.is_completed_successfully()
             else:
                 # The config schema already prevents this, but it might be
                 # bypassed if Compose is called programmatically.
@@ -1320,6 +1324,21 @@ class Service:
                 result = False
             elif status == 'unhealthy':
                 raise HealthCheckFailed(ctnr.short_id)
+        return result
+
+    def is_completed_successfully(self):
+        """ Check that all containers for this service has completed successfully
+            Returns false if at least one container does not exited and
+            raises CompletedUnsuccessfully exception if at least one container
+            exited with non-zero exit code.
+        """
+        result = True
+        for ctnr in self.containers(stopped=True):
+            ctnr.inspect()
+            if ctnr.get('State.Status') != 'exited':
+                result = False
+            elif ctnr.exit_code != 0:
+                raise CompletedUnsuccessfully(ctnr.short_id, ctnr.exit_code)
         return result
 
     def _parse_proxy_config(self):
