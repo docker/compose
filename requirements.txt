@@ -14,7 +14,7 @@ jsonschema==3.2.0
 paramiko==2.7.1
 PySocks==1.7.1
 python-dotenv==0.17.0
-pywin32==227; sys_platform == 'win32'
+pywin32==300; sys_platform == 'win32'
 PyYAML==5.4.1
 requests==2.24.0
 texttable==1.6.2
