@@ -66,11 +66,16 @@ func Exec(root *cobra.Command) {
 	err := RunDocker(childExit, os.Args[1:]...)
 	childExit <- true
 	if err != nil {
-		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
-
 		if exiterr, ok := err.(*exec.ExitError); ok {
+			exitCode := exiterr.ExitCode()
+			if exitCode == 130 {
+				metrics.Track(store.DefaultContextType, os.Args[1:], metrics.CanceledStatus)
+			} else {
+				metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
+			}
 			os.Exit(exiterr.ExitCode())
 		}
+		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
