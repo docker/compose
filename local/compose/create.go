@@ -618,9 +618,9 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 	for _, config := range s.Configs {
 		target := config.Target
 		if config.Target == "" {
-			target = filepath.Join(configsBaseDir, config.Source)
-		} else if !filepath.IsAbs(config.Target) {
-			target = filepath.Join(configsBaseDir, config.Target)
+			target = configsBaseDir + config.Source
+		} else if !isUnixAbs(config.Target) {
+			target = configsBaseDir + config.Target
 		}
 
 		definedConfig := p.Configs[config.Source]
@@ -649,13 +649,13 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 
-	secretsDir := "/run/secrets"
+	secretsDir := "/run/secrets/"
 	for _, secret := range s.Secrets {
 		target := secret.Target
 		if secret.Target == "" {
-			target = filepath.Join(secretsDir, secret.Source)
-		} else if !filepath.IsAbs(secret.Target) {
-			target = filepath.Join(secretsDir, secret.Target)
+			target = secretsDir + secret.Source
+		} else if !isUnixAbs(secret.Target) {
+			target = secretsDir + secret.Target
 		}
 
 		definedSecret := p.Secrets[secret.Source]
@@ -681,6 +681,10 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
+func isUnixAbs(path string) bool {
+	return strings.HasPrefix(path, "/")
+}
+
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
 	if volume.Type == types.VolumeTypeBind && !filepath.IsAbs(source) {
@@ -699,7 +703,6 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 				source = pVolume.Name
 			}
 		}
-
 	}
 
 	return mount.Mount{
