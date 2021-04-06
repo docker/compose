@@ -171,7 +171,8 @@ def dispatch():
     if options.get("--no-ansi"):
         if options.get("--ansi"):
             raise UserError("--no-ansi and --ansi cannot be combined.")
-        log.warning('--no-ansi option is deprecated and will be removed in future versions.')
+        log.warning('--no-ansi option is deprecated and will be removed in future versions. '
+                    'Use `--ansi never` instead.')
         ansi_mode = AnsiMode.NEVER
 
     setup_console_handler(console_handler,
