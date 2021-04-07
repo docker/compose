@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/pkg/errors"
 )
 
@@ -103,12 +102,7 @@ func GetContextContainerState(ctx context.Context) (ContainersState, error) {
 }
 
 func (s composeService) getUpdatedContainersStateContext(ctx context.Context, projectName string) (context.Context, error) {
-	observedState, err := s.apiClient.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-		),
-		All: true,
-	})
+	observedState, err := s.getContainers(ctx, projectName, oneOffInclude, true)
 	if err != nil {
 		return nil, err
 	}

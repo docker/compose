@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
@@ -39,10 +38,10 @@ const (
 	oneOffOnly
 )
 
-func (s *composeService) getContainers(ctx context.Context, project *types.Project, oneOff oneOff, selectedServices []string) (Containers, error) {
+func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, stopped bool, selectedServices ...string) (Containers, error) {
 	var containers Containers
 	f := filters.NewArgs(
-		projectFilter(project.Name),
+		projectFilter(project),
 	)
 	switch oneOff {
 	case oneOffOnly:
@@ -53,15 +52,14 @@ func (s *composeService) getContainers(ctx context.Context, project *types.Proje
 	}
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: f,
-		All:     true,
+		All:     stopped,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(selectedServices) == 0 {
-		selectedServices = project.ServiceNames()
+	if len(selectedServices) > 0 {
+		containers = containers.filter(isService(selectedServices...))
 	}
-	containers = containers.filter(isService(selectedServices...))
 	return containers, nil
 }
 

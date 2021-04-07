@@ -63,9 +63,9 @@ type Service interface {
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project *types.Project, opts RunOptions) error
 	// Pause executes the equivalent to a `compose pause`
-	Pause(ctx context.Context, project *types.Project) error
+	Pause(ctx context.Context, project string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`
-	UnPause(ctx context.Context, project *types.Project) error
+	UnPause(ctx context.Context, project string, options PauseOptions) error
 	// Top executes the equivalent to a `compose top`
 	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	// Events executes the equivalent to a `compose events`
@@ -301,6 +301,12 @@ type LogOptions struct {
 	Tail       string
 	Follow     bool
 	Timestamps bool
+}
+
+// PauseOptions group options of the Pause API
+type PauseOptions struct {
+	// Services passed in the command line to be started
+	Services []string
 }
 
 const (

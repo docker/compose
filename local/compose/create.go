@@ -26,7 +26,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -69,10 +68,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	}
 
 	var observedState Containers
-	observedState, err = s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(project.Name)),
-		All:     true,
-	})
+	observedState, err = s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return err
 	}

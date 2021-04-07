@@ -24,28 +24,12 @@ import (
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
-	list, err := s.apiClient.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-			oneOffFilter(false),
-		),
-		All: true,
-	})
-
-	ignore := func(string) bool {
-		return false
-	}
-	if len(options.Services) > 0 {
-		ignore = func(s string) bool {
-			return !utils.StringContains(options.Services, s)
-		}
-	}
+	list, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 
 	if err != nil {
 		return err
@@ -54,9 +38,6 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	for _, c := range list {
 		c := c
 		service := c.Labels[serviceLabel]
-		if ignore(service) {
-			continue
-		}
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return err

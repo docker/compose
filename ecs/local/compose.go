@@ -188,12 +188,12 @@ func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, op
 	return errdefs.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Pause(ctx context.Context, project *types.Project) error {
-	return e.compose.Pause(ctx, project)
+func (e ecsLocalSimulation) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
+	return e.compose.Pause(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) UnPause(ctx context.Context, project *types.Project) error {
-	return e.compose.UnPause(ctx, project)
+func (e ecsLocalSimulation) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
+	return e.compose.UnPause(ctx, project, options)
 }
 
 func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {

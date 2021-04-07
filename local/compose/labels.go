@@ -18,8 +18,6 @@ package compose
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 
@@ -45,10 +43,6 @@ const (
 
 func projectFilter(projectName string) filters.KeyValuePair {
 	return filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, projectName))
-}
-
-func oneOffFilter(oneOff bool) filters.KeyValuePair {
-	return filters.Arg("label", fmt.Sprintf("%s=%s", oneoffLabel, strings.Title(strconv.FormatBool(oneOff))))
 }
 
 func serviceFilter(serviceName string) filters.KeyValuePair {
