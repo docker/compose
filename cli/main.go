@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
 	cliconfig "github.com/docker/cli/cli/config"
 	cliflags "github.com/docker/cli/cli/flags"
@@ -286,9 +287,9 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 }
 
 func exit(ctx string, err error, ctype string) {
-	if exit, ok := err.(cmd.ExitCodeError); ok {
+	if exit, ok := err.(cli.StatusError); ok {
 		metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
-		os.Exit(exit.ExitCode)
+		os.Exit(exit.StatusCode)
 	}
 
 	metrics.Track(ctype, os.Args[1:], metrics.FailureStatus)
