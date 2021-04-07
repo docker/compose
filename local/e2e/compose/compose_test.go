@@ -147,3 +147,13 @@ func TestAttachRestart(t *testing.T) {
 	execRegex := regexp.MustCompile(`another_1  \| world`)
 	assert.Equal(t, len(execRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
 }
+
+func TestInitContainer(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
+	defer c.RunDockerCmd("compose", "-p", "init-container", "down")
+	output := res.Stdout()
+
+	assert.Assert(t, strings.Contains(output, "foo_1  | hello\nbar_1  | world"), res.Combined())
+}
