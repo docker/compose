@@ -207,3 +207,7 @@ func (e ecsLocalSimulation) Events(ctx context.Context, project string, options 
 func (e ecsLocalSimulation) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
 	return "", 0, errdefs.ErrNotImplemented
 }
+
+func (e ecsLocalSimulation) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}

@@ -241,3 +241,7 @@ func (cs *aciComposeService) Events(ctx context.Context, project string, options
 func (cs *aciComposeService) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
 	return "", 0, errdefs.ErrNotImplemented
 }
+
+func (cs *aciComposeService) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}

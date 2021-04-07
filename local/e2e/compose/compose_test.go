@@ -109,6 +109,13 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      db                  running             5432/tcp`})
 	})
 
+	t.Run("images", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "-p", projectName, "images")
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      gtardif/sentences-db    latest`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_web_1     gtardif/sentences-web   latest`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_words_1   gtardif/sentences-api   latest`})
+	})
+
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
