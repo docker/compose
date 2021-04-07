@@ -89,7 +89,7 @@ setup(
     install_requires=install_requires,
     extras_require=extras_require,
     tests_require=tests_require,
-    python_requires='>=3.4',
+    python_requires='>=3.6',
     entry_points={
         'console_scripts': ['docker-compose=compose.cli.main:main'],
     },
@@ -99,7 +99,6 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
