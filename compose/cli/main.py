@@ -82,7 +82,7 @@ def main():  # noqa: C901
         if not IS_LINUX_PLATFORM and command == 'help':
             print("\nDocker Compose is now in the Docker CLI, try `docker compose` help")
     except (KeyboardInterrupt, signals.ShutdownException):
-        exit_with_metrics(command, "Aborting.", status=Status.FAILURE)
+        exit_with_metrics(command, "Aborting.", status=Status.CANCELED)
     except (UserError, NoSuchService, ConfigurationError,
             ProjectError, OperationFailedError) as e:
         exit_with_metrics(command, e.msg, status=Status.FAILURE)
@@ -103,7 +103,8 @@ def main():  # noqa: C901
         commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
         if not IS_LINUX_PLATFORM:
             commands += "\n\nDocker Compose is now in the Docker CLI, try `docker compose`"
-        exit_with_metrics(e.command, "No such command: {}\n\n{}".format(e.command, commands))
+        exit_with_metrics("", log_msg="No such command: {}\n\n{}".format(
+            e.command, commands), status=Status.FAILURE)
     except (errors.ConnectionError, StreamParseError):
         exit_with_metrics(command, status=Status.FAILURE)
     except SystemExit as e:
