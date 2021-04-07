@@ -1,0 +1,11 @@
+services:
+  foo:
+    image: alpine
+    command: "echo hello"
+
+  bar:
+    image: alpine
+    command: "echo world"
+    depends_on:
+      foo:
+        condition: "service_completed_successfully"

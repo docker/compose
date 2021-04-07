@@ -25,6 +25,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -162,6 +163,14 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 					}
 				}
 			})
+		case "service_completed_successfully":
+			exit, err := s.waitCompleted(ctx, project, dep)
+			if err != nil {
+				return err
+			}
+			if exit != 0 {
+				return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, exit)
+			}
 		}
 	}
 	return eg.Wait()
@@ -330,8 +339,8 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", projectLabel, project.Name)),
-			filters.Arg("label", fmt.Sprintf("%s=%s", serviceLabel, service)),
+			projectFilter(project.Name),
+			serviceFilter(service),
 		),
 	})
 	if err != nil {
@@ -354,6 +363,28 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		}
 	}
 	return true, nil
+}
+
+func (s *composeService) waitCompleted(ctx context.Context, project *types.Project, dep string) (int64, error) {
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+			serviceFilter(dep),
+		),
+	})
+	if err != nil {
+		return 0, err
+	}
+	for _, c := range containers {
+		wait, errors := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNextExit)
+		select {
+		case w := <-wait:
+			return w.StatusCode, nil
+		case err := <-errors:
+			return 0, err
+		}
+	}
+	return 0, nil
 }
 
 func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
