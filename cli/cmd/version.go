@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/docker/cli/cli"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/mobycli"
 	"github.com/docker/compose-cli/internal"
@@ -39,7 +40,7 @@ func VersionCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			err := runVersion(cmd)
 			if err != nil {
-				return ExitCodeError{ExitCode: 1}
+				return cli.StatusError{StatusCode: 1, Status: err.Error()}
 			}
 			return nil
 		},

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli"
 	"github.com/docker/compose-cli/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,7 +38,6 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/cli/cmd"
 	"github.com/docker/compose-cli/cli/formatter"
 )
 
@@ -323,7 +323,11 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 
 	err = eg.Wait()
 	if exitCode != 0 {
-		return cmd.ExitCodeError{ExitCode: exitCode}
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
 }

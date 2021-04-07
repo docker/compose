@@ -27,10 +27,10 @@ import (
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/cli/cli"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/cli/cmd"
 )
 
 type runOptions struct {
@@ -196,7 +196,11 @@ func runRun(ctx context.Context, opts runOptions) error {
 	}
 	exitCode, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
-		return cmd.ExitCodeError{ExitCode: exitCode}
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
 	}
 	return err
 }
