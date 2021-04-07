@@ -32,13 +32,14 @@ import (
 )
 
 type ttyWriter struct {
-	out      io.Writer
-	events   map[string]Event
-	eventIDs []string
-	repeated bool
-	numLines int
-	done     chan bool
-	mtx      *sync.RWMutex
+	out        io.Writer
+	events     map[string]Event
+	eventIDs   []string
+	repeated   bool
+	numLines   int
+	done       chan bool
+	mtx        *sync.RWMutex
+	tailEvents []string
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
@@ -48,9 +49,11 @@ func (w *ttyWriter) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			w.print()
+			w.printTailEvents()
 			return ctx.Err()
 		case <-w.done:
 			w.print()
+			w.printTailEvents()
 			return nil
 		case <-ticker.C:
 			w.print()
@@ -88,6 +91,20 @@ func (w *ttyWriter) Event(e Event) {
 			e.stop()
 		}
 		w.events[e.ID] = e
+	}
+}
+
+func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+	w.tailEvents = append(w.tailEvents, fmt.Sprintf(msg, args...))
+}
+
+func (w *ttyWriter) printTailEvents() {
+	w.mtx.Lock()
+	defer w.mtx.Unlock()
+	for _, msg := range w.tailEvents {
+		fmt.Fprintln(w.out, msg)
 	}
 }
 

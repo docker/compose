@@ -70,12 +70,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 				if !options.IgnoreFailures {
 					return err
 				}
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Pushing %s:", service.Name),
-					Text:       fmt.Sprintf("%v", err),
-					Status:     progress.Error,
-					StatusText: fmt.Sprintf("%s", err),
-				})
+				w.TailMsgf("Pushing %s: %s", service.Name, err.Error())
 			}
 			return nil
 		})

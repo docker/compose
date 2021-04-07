@@ -30,5 +30,8 @@ func (p *noopWriter) Start(ctx context.Context) error {
 func (p *noopWriter) Event(e Event) {
 }
 
+func (p *noopWriter) TailMsgf(_ string, _ ...interface{}) {
+}
+
 func (p *noopWriter) Stop() {
 }

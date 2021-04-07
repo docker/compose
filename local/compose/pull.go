@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -72,13 +71,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 				if !opts.IgnoreFailures {
 					return err
 				}
-				// If IgnoreFailures we still want to show the error message
-				w.Event(progress.Event{
-					ID:         fmt.Sprintf("Pulling %s:", service.Name),
-					Text:       fmt.Sprintf("%v", err),
-					Status:     progress.Error,
-					StatusText: fmt.Sprintf("%s", err),
-				})
+				w.TailMsgf("Pulling %s: %s", service.Name, err.Error())
 			}
 			return nil
 		})

@@ -31,6 +31,7 @@ type Writer interface {
 	Start(context.Context) error
 	Stop()
 	Event(Event)
+	TailMsgf(string, ...interface{})
 }
 
 type writerKey struct{}
