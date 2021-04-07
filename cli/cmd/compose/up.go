@@ -235,6 +235,10 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	}
 
+	if len(project.Services) == 0 {
+		return fmt.Errorf("no service selected")
+	}
+
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
 			Services:             services,
@@ -302,7 +306,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	var exitCode int
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		code, err := printer.run(ctx, opts.cascadeStop, opts.exitCodeFrom, consumer, stopFunc)
+		code, err := printer.run(opts.cascadeStop, opts.exitCodeFrom, consumer, stopFunc)
 		exitCode = code
 		return err
 	})
@@ -396,7 +400,7 @@ type printer struct {
 	queue chan compose.ContainerEvent
 }
 
-func (p printer) run(ctx context.Context, cascadeStop bool, exitCodeFrom string, consumer compose.LogConsumer, stopFn func() error) (int, error) { //nolint:unparam
+func (p printer) run(cascadeStop bool, exitCodeFrom string, consumer compose.LogConsumer, stopFn func() error) (int, error) {
 	var aborting bool
 	var count int
 	for {
