@@ -115,3 +115,7 @@ func (c *composeService) Events(ctx context.Context, project string, options com
 func (c *composeService) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
 	return "", 0, errdefs.ErrNotImplemented
 }
+
+func (c *composeService) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
+	return nil, errdefs.ErrNotImplemented
+}

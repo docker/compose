@@ -72,6 +72,8 @@ type Service interface {
 	Events(ctx context.Context, project string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
 	Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
+	// Images executes the equivalent of a `compose images`
+	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 }
 
 // BuildOptions group options of the Build API
@@ -162,6 +164,11 @@ type PushOptions struct {
 // PullOptions group options of the Push API
 type PullOptions struct {
 	IgnoreFailures bool
+}
+
+// ImagesOptions group options of the Images API
+type ImagesOptions struct {
+	Services []string
 }
 
 // KillOptions group options of the Kill API
@@ -283,6 +290,15 @@ type ContainerProcSummary struct {
 	Name      string
 	Processes [][]string
 	Titles    []string
+}
+
+// ImageSummary holds container image description
+type ImageSummary struct {
+	ID            string
+	ContainerName string
+	Repository    string
+	Tag           string
+	Size          int64
 }
 
 // ServiceStatus hold status about a service
