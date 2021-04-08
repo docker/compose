@@ -20,16 +20,12 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
 	var containers Containers
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
-	})
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false)
 	if err != nil {
 		return nil, err
 	}

@@ -59,11 +59,11 @@ func (b *ecsAPIService) Stop(ctx context.Context, project *types.Project, option
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Pause(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (b *ecsAPIService) UnPause(ctx context.Context, project *types.Project) error {
+func (b *ecsAPIService) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

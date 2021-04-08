@@ -23,22 +23,15 @@ import (
 	"github.com/docker/compose-cli/api/progress"
 
 	"github.com/compose-spec/compose-go/types"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 )
 
 func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 	var containers Containers
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(project.Name)),
-		All:     true,
-	})
+	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, project.ServiceNames()...)
 	if err != nil {
 		return err
 	}
-
-	containers = containers.filter(isService(project.ServiceNames()...))
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		return s.stopContainers(ctx, w, containers.filter(isService(service.Name)), options.Timeout)

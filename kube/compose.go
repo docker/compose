@@ -252,11 +252,11 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 	return errdefs.ErrNotImplemented
 }
 
-func (s *composeService) Pause(ctx context.Context, project *types.Project) error {
+func (s *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
 	return errdefs.ErrNotImplemented
 }
 
-func (s *composeService) UnPause(ctx context.Context, project *types.Project) error {
+func (s *composeService) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
 	return errdefs.ErrNotImplemented
 }
 

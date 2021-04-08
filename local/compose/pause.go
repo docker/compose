@@ -19,15 +19,15 @@ package compose
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
-func (s *composeService) Pause(ctx context.Context, project *types.Project) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, nil)
+func (s *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
+	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err
 	}
@@ -48,8 +48,8 @@ func (s *composeService) Pause(ctx context.Context, project *types.Project) erro
 	return eg.Wait()
 }
 
-func (s *composeService) UnPause(ctx context.Context, project *types.Project) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, nil)
+func (s *composeService) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
+	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err
 	}

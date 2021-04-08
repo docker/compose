@@ -21,7 +21,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -32,10 +31,7 @@ func (s *composeService) Kill(ctx context.Context, project *types.Project, optio
 	w := progress.ContextWriter(ctx)
 
 	var containers Containers
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(project.Name)),
-		All:     true,
-	})
+	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return err
 	}

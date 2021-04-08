@@ -39,10 +39,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	resourceToRemove := false
 
 	var containers Containers
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(projectName)),
-		All:     true,
-	})
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true)
 	if err != nil {
 		return err
 	}

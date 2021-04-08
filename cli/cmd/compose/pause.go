@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
 
@@ -49,13 +50,15 @@ func runPause(ctx context.Context, opts pauseOptions, services []string) error {
 		return err
 	}
 
-	project, err := opts.toProject(services)
+	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Pause(ctx, project)
+		return "", c.ComposeService().Pause(ctx, project, compose.PauseOptions{
+			Services: services,
+		})
 	})
 	return err
 }
@@ -84,13 +87,15 @@ func runUnPause(ctx context.Context, opts unpauseOptions, services []string) err
 		return err
 	}
 
-	project, err := opts.toProject(services)
+	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().UnPause(ctx, project)
+		return "", c.ComposeService().UnPause(ctx, project, compose.PauseOptions{
+			Services: services,
+		})
 	})
 	return err
 }
