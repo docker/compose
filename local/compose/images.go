@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -58,6 +59,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	}
 
 	images := map[string]moby.ImageInspect{}
+	l := sync.Mutex{}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, img := range imageIDs {
 		img := img
@@ -66,7 +68,9 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 			if err != nil {
 				return err
 			}
+			l.Lock()
 			images[img] = inspect
+			l.Unlock()
 			return nil
 		})
 	}
