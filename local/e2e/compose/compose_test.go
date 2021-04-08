@@ -69,9 +69,9 @@ func TestLocalComposeUp(t *testing.T) {
 	t.Run("top", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-p", projectName, "top")
 		output := res.Stdout()
-		assert.Assert(t, strings.Contains(output, `UID    PID     PPID    C    STIME   TTY   TIME       CMD`))
-		assert.Assert(t, strings.Contains(output, `java -Xmx8m -Xms8m -jar /app/words.jar`))
-		assert.Assert(t, strings.Contains(output, `/dispatcher`))
+		assert.Assert(t, strings.Contains(output, `UID    PID     PPID    C    STIME   TTY   TIME       CMD`), output)
+		assert.Assert(t, strings.Contains(output, `java -Xmx8m -Xms8m -jar /app/words.jar`), output)
+		assert.Assert(t, strings.Contains(output, `/dispatcher`), output)
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {

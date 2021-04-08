@@ -33,6 +33,7 @@ import (
 )
 
 func TestDisplayScanMessageAfterBuild(t *testing.T) {
+
 	c := NewParallelE2eCLI(t, binDir)
 	setupScanPlugin(t, c)
 
@@ -40,7 +41,7 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	res.Assert(t, icmd.Expected{Out: "scan: Docker Scan"})
 
 	t.Run("display when docker build", func(t *testing.T) {
-		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/build-test/nginx-build")
+		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/simple-build-test/nginx-build")
 		res.Assert(t, icmd.Expected{Out: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
@@ -52,21 +53,21 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	})
 
 	t.Run("display on compose build", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/build-test/compose.yml", "build")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "build")
 		res.Assert(t, icmd.Expected{Out: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
-	_ = c.RunDockerOrExitError("rmi", "build-test_nginx")
+	_ = c.RunDockerOrExitError("rmi", "scan-msg-test_nginx")
 
 	t.Run("display on compose up if image is built", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/build-test/compose.yml", "up", "-d")
-		defer c.RunDockerCmd("compose", "-f", "./fixtures/build-test/compose.yml", "down")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "up", "-d")
+		defer c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down")
 		res.Assert(t, icmd.Expected{Out: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
 	t.Run("do not display on compose up if no image built", func(t *testing.T) { // re-run the same Compose aproject
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/build-test/compose.yml", "up", "-d")
-		defer c.RunDockerCmd("compose", "-f", "./fixtures/build-test/compose.yml", "down")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "up", "-d")
+		defer c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})
 
@@ -76,7 +77,7 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 		err := ioutil.WriteFile(scanConfigFile, []byte(`{"optin":true}`), 0644)
 		assert.NilError(t, err)
 
-		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/build-test/nginx-build")
+		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/simple-build-test/nginx-build")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})
 }
