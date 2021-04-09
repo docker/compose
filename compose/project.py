@@ -519,7 +519,7 @@ class Project:
             for service in services:
                 build_service(service)
 
-        if services:
+        if services and not silent:
             display_scan_suggest_msg()
 
     def create(
