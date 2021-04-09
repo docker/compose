@@ -93,6 +93,16 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options 
 	if err != nil {
 		return err
 	}
+
+	var previousEvents []string
+	if update {
+		var err error
+		previousEvents, err = b.previousStackEvents(ctx, project.Name)
+		if err != nil {
+			return err
+		}
+	}
+
 	operation := stackCreate
 	if update {
 		operation = stackUpdate
@@ -121,6 +131,6 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options 
 		b.Down(ctx, project.Name, compose.DownOptions{}) // nolint:errcheck
 	}()
 
-	err = b.WaitStackCompletion(ctx, project.Name, operation)
+	err = b.WaitStackCompletion(ctx, project.Name, operation, previousEvents...)
 	return err
 }
