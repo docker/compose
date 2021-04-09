@@ -24,7 +24,10 @@ import (
 	"path"
 	"strings"
 
+	moby "github.com/docker/docker/api/types"
+
 	"github.com/docker/compose-cli/api/compose"
+	composeprogress "github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
@@ -68,7 +71,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	err := s.build(ctx, project, opts, options.Progress)
+	err := s.build(ctx, project, opts, Containers{}, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 {
 			utils.DisplayScanSuggestMsg()
@@ -78,7 +81,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	return err
 }
 
-func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, quietPull bool) error {
+func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, observedState Containers, quietPull bool) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
@@ -128,7 +131,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		mode = progress.PrinterModeQuiet
 	}
 
-	err := s.build(ctx, project, opts, mode)
+	err := s.build(ctx, project, opts, observedState, mode)
 	if err == nil {
 		if len(imagesToBuild) > 0 {
 			utils.DisplayScanSuggestMsg()
@@ -148,7 +151,7 @@ func (s *composeService) localImagePresent(ctx context.Context, imageName string
 	return true, nil
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) error {
+func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, observedState Containers, mode string) error {
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
 		return err
@@ -187,6 +190,19 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	if err == nil {
 		err = errW
 	}
+
+	cw := composeprogress.ContextWriter(ctx)
+	for _, c := range observedState {
+		for imageName := range opts {
+			if c.Image == imageName {
+				err = s.removeContainers(ctx, cw, []moby.Container{c}, nil)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return err
 }
 

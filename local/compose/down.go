@@ -43,6 +43,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 	if err != nil {
 		return err
 	}
+	ctx = context.WithValue(ctx, ContainersKey{}, NewContainersState(containers))
 
 	if options.Project == nil {
 		project, err := s.projectFromContainerLabels(containers, projectName)
@@ -167,6 +168,11 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
 			}
+			contextContainerState, err := GetContextContainerState(ctx)
+			if err != nil {
+				return err
+			}
+			contextContainerState.Remove(toDelete.ID)
 			w.Event(progress.RemovedEvent(eventName))
 			return nil
 		})
