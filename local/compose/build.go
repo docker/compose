@@ -30,12 +30,14 @@ import (
 	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
+	cliconfig "github.com/docker/cli/cli/config"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/errdefs"
 	bclient "github.com/moby/buildkit/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/config"
 	composeprogress "github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/utils"
@@ -167,7 +169,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 		return nil
 	}
 	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, nil, nil, nil, "", nil, nil, project.WorkingDir)
+
+	configFile, err := cliconfig.Load(config.Dir())
+	if err != nil {
+		return err
+	}
+
+	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, configFile, nil, nil, "", nil, nil, project.WorkingDir)
 	if err != nil {
 		return err
 	}
