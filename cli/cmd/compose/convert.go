@@ -78,7 +78,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 				return runHash(opts)
 			}
 			if opts.profiles {
-				return runProfiles(opts)
+				return runProfiles(opts, args)
 			}
 
 			return runConvert(cmd.Context(), opts, args)
@@ -195,19 +195,19 @@ func runHash(opts convertOptions) error {
 	return nil
 }
 
-func runProfiles(opts convertOptions) error {
-	profiles := map[string]struct{}{}
-	project, err := opts.toProject(nil)
+func runProfiles(opts convertOptions, services []string) error {
+	profiles := map[string]interface{}{}
+	_, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
-	for _, s := range project.Services {
-		for _, p := range s.Profiles {
-			profiles[p] = struct{}{}
+	if opts.projectOptions != nil {
+		for _, p := range opts.projectOptions.Profiles {
+			profiles[p] = nil
 		}
-	}
-	for _, p := range profiles {
-		fmt.Println(p)
+		for p := range profiles {
+			fmt.Println(p)
+		}
 	}
 	return nil
 }
