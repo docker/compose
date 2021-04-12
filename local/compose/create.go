@@ -25,6 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
@@ -377,24 +378,32 @@ func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 }
 
 func getDeployResources(s types.ServiceConfig) container.Resources {
-	resources := container.Resources{}
-	if s.Deploy == nil {
-		return resources
+	var swappiness *int64
+	if s.MemSwappiness != 0 {
+		val := int64(s.MemSwappiness)
+		swappiness = &val
+	}
+	resources := container.Resources{
+		CgroupParent:       s.CgroupParent,
+		Memory:             int64(s.MemLimit),
+		MemorySwap:         int64(s.MemSwapLimit),
+		MemorySwappiness:   swappiness,
+		MemoryReservation:  int64(s.MemReservation),
+		CPUCount:           s.CPUCount,
+		CPUPeriod:          s.CPUPeriod,
+		CPUQuota:           s.CPUQuota,
+		CPURealtimePeriod:  s.CPURTPeriod,
+		CPURealtimeRuntime: s.CPURTRuntime,
+		CPUShares:          s.CPUShares,
+		CPUPercent:         int64(s.CPUS * 100),
+		CpusetCpus:         s.CPUSet,
 	}
 
-	reservations := s.Deploy.Resources.Reservations
+	setBlkio(s.BlkioConfig, &resources)
 
-	if reservations == nil || len(reservations.Devices) == 0 {
-		return resources
-	}
-
-	for _, device := range reservations.Devices {
-		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
-			Capabilities: [][]string{device.Capabilities},
-			Count:        int(device.Count),
-			DeviceIDs:    device.IDs,
-			Driver:       device.Driver,
-		})
+	if s.Deploy != nil {
+		setLimits(s.Deploy.Resources.Limits, &resources)
+		setReservations(s.Deploy.Resources.Reservations, &resources)
 	}
 
 	for _, device := range s.Devices {
@@ -428,6 +437,70 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		})
 	}
 	return resources
+}
+
+func setReservations(reservations *types.Resource, resources *container.Resources) {
+	if reservations == nil {
+		return
+	}
+	for _, device := range reservations.Devices {
+		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
+			Capabilities: [][]string{device.Capabilities},
+			Count:        int(device.Count),
+			DeviceIDs:    device.IDs,
+			Driver:       device.Driver,
+		})
+	}
+}
+
+func setLimits(limits *types.Resource, resources *container.Resources) {
+	if limits == nil {
+		return
+	}
+	if limits.MemoryBytes != 0 {
+		resources.Memory = int64(limits.MemoryBytes)
+	}
+	if limits.NanoCPUs != "" {
+		i, _ := strconv.ParseInt(limits.NanoCPUs, 10, 64)
+		resources.NanoCPUs = i
+	}
+}
+
+func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
+	if blkio == nil {
+		return
+	}
+	resources.BlkioWeight = blkio.Weight
+	for _, b := range blkio.WeightDevice {
+		resources.BlkioWeightDevice = append(resources.BlkioWeightDevice, &blkiodev.WeightDevice{
+			Path:   b.Path,
+			Weight: b.Weight,
+		})
+	}
+	for _, b := range blkio.DeviceReadBps {
+		resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, &blkiodev.ThrottleDevice{
+			Path: b.Path,
+			Rate: b.Rate,
+		})
+	}
+	for _, b := range blkio.DeviceReadIOps {
+		resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, &blkiodev.ThrottleDevice{
+			Path: b.Path,
+			Rate: b.Rate,
+		})
+	}
+	for _, b := range blkio.DeviceWriteBps {
+		resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, &blkiodev.ThrottleDevice{
+			Path: b.Path,
+			Rate: b.Rate,
+		})
+	}
+	for _, b := range blkio.DeviceWriteIOps {
+		resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, &blkiodev.ThrottleDevice{
+			Path: b.Path,
+			Rate: b.Rate,
+		})
+	}
 }
 
 func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
