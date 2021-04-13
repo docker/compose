@@ -774,16 +774,48 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
+	bind, vol, tmpfs := buildMountOptions(volume)
+
 	return mount.Mount{
 		Type:          mount.Type(volume.Type),
 		Source:        source,
 		Target:        volume.Target,
 		ReadOnly:      volume.ReadOnly,
 		Consistency:   mount.Consistency(volume.Consistency),
-		BindOptions:   buildBindOption(volume.Bind),
-		VolumeOptions: buildVolumeOptions(volume.Volume),
-		TmpfsOptions:  buildTmpfsOptions(volume.Tmpfs),
+		BindOptions:   bind,
+		VolumeOptions: vol,
+		TmpfsOptions:  tmpfs,
 	}, nil
+}
+
+func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+	switch volume.Type {
+	case "bind":
+		if volume.Volume != nil {
+			logrus.Warnf("mount of type `bind` should not define `volume` option")
+		}
+		if volume.Tmpfs != nil {
+			logrus.Warnf("mount of type `tmpfs` should not define `tmpfs` option")
+		}
+		return buildBindOption(volume.Bind), nil, nil
+	case "volume":
+		if volume.Bind != nil {
+			logrus.Warnf("mount of type `volume` should not define `bind` option")
+		}
+		if volume.Tmpfs != nil {
+			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
+		}
+		return nil, buildVolumeOptions(volume.Volume), nil
+	case "tmpfs":
+		if volume.Bind != nil {
+			logrus.Warnf("mount of type `tmpfs` should not define `bind` option")
+		}
+		if volume.Tmpfs != nil {
+			logrus.Warnf("mount of type `tmpfs` should not define `volumeZ` option")
+		}
+		return nil, nil, buildTmpfsOptions(volume.Tmpfs)
+	}
+	return nil, nil, nil
 }
 
 func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
