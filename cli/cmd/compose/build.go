@@ -97,6 +97,7 @@ func runBuild(ctx context.Context, opts buildOptions, services []string) error {
 			Progress: opts.progress,
 			Args:     types.NewMapping(opts.args),
 			NoCache:  opts.noCache,
+			Quiet:    opts.quiet,
 		})
 	})
 	return err

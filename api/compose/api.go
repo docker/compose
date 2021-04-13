@@ -86,6 +86,8 @@ type BuildOptions struct {
 	Args types.Mapping
 	// NoCache disables cache use
 	NoCache bool
+	// Quiet make the build process not output to the console
+	Quiet bool
 }
 
 // CreateOptions group options of the Create API
