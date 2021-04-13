@@ -75,7 +75,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 	err := s.build(ctx, project, opts, Containers{}, options.Progress)
 	if err == nil {
-		if len(imagesToBuild) > 0 {
+		if len(imagesToBuild) > 0 && !options.Quiet {
 			utils.DisplayScanSuggestMsg()
 		}
 	}

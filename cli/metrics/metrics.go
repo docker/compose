@@ -57,6 +57,17 @@ func isCommandFlag(word string) bool {
 	return utils.StringContains(commandFlags, word)
 }
 
+// HasQuietFlag returns true if one of the arguments is `--quiet` or `-q`
+func HasQuietFlag(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "--quiet", "-q":
+			return true
+		}
+	}
+	return false
+}
+
 // GetCommand get the invoked command
 func GetCommand(args []string) string {
 	result := ""

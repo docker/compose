@@ -22,6 +22,36 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestHasQuietFlag(t *testing.T) {
+	cases := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{
+			name:     "long flag",
+			args:     []string{"build", "-t", "tag", "--quiet", "."},
+			expected: true,
+		},
+		{
+			name:     "short flag",
+			args:     []string{"build", "-t", "tag", "-q", "."},
+			expected: true,
+		},
+		{
+			name:     "no flag",
+			args:     []string{"build", "-t", "tag", "."},
+			expected: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := HasQuietFlag(c.args)
+			assert.Equal(t, c.expected, result)
+		})
+	}
+}
+
 func TestGetCommand(t *testing.T) {
 	testCases := []struct {
 		name     string

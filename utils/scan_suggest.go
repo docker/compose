@@ -39,8 +39,7 @@ func DisplayScanSuggestMsg() {
 	if scanAlreadyInvoked() {
 		return
 	}
-	fmt.Println()
-	fmt.Println("Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them")
+	fmt.Fprintf(os.Stderr, "\nUse 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them\n")
 }
 
 func scanAlreadyInvoked() bool {

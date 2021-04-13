@@ -80,7 +80,7 @@ func Exec(root *cobra.Command) {
 		os.Exit(1)
 	}
 	command := metrics.GetCommand(os.Args[1:])
-	if command == "build" {
+	if command == "build" && !metrics.HasQuietFlag(os.Args[1:]) {
 		utils.DisplayScanSuggestMsg()
 	}
 	metrics.Track(store.DefaultContextType, os.Args[1:], metrics.SuccessStatus)
