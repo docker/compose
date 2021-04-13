@@ -397,8 +397,7 @@ func TestLegacy(t *testing.T) {
 	t.Run("host flag", func(t *testing.T) {
 		res := c.RunDockerOrExitError("-H", "tcp://nonexistent:123", "version")
 		assert.Assert(t, res.ExitCode == 1)
-		assert.Assert(t, strings.Contains(res.Stdout(), "dial tcp: lookup nonexistent"), res.Stdout())
-
+		assert.Assert(t, strings.Contains(res.Stderr(), "dial tcp: lookup nonexistent"), res.Stderr())
 	})
 
 	t.Run("remote engine context", func(t *testing.T) {
@@ -407,7 +406,7 @@ func TestLegacy(t *testing.T) {
 
 		res := c.RunDockerOrExitError("version")
 		assert.Assert(t, res.ExitCode == 1)
-		assert.Assert(t, strings.Contains(res.Stdout(), "dial tcp: lookup nonexistent"), res.Stdout())
+		assert.Assert(t, strings.Contains(res.Stderr(), "dial tcp: lookup nonexistent"), res.Stderr())
 	})
 
 	t.Run("existing contexts delegate", func(t *testing.T) {

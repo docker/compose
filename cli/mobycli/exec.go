@@ -136,5 +136,6 @@ func ExecSilent(ctx context.Context, args ...string) ([]byte, error) {
 		args = os.Args[1:]
 	}
 	cmd := exec.CommandContext(ctx, ComDockerCli, args...)
-	return cmd.CombinedOutput()
+	cmd.Stderr = os.Stderr
+	return cmd.Output()
 }
