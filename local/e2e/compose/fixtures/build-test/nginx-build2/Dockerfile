@@ -12,6 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM nginx:alpine
+FROM nginx
 
 COPY static2 /usr/share/nginx/html

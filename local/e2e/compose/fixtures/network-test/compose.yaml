@@ -1,6 +1,6 @@
 services:
   mydb:
-    image: mariadb
+    image: mysql
     network_mode: "service:db"
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes

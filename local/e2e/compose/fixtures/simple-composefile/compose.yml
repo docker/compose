@@ -1,7 +1,7 @@
 services:
   simple:
-    image: alpine
+    image: busybox:1.27.2
     command: top
   another:
-    image: alpine
+    image: busybox:1.31.0-uclibc
     command: top

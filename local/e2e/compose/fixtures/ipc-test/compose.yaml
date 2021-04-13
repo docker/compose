@@ -1,13 +1,13 @@
 services:
   service:
-    image: alpine
+    image: busybox
     command: top
     ipc: "service:shareable"
   container:
-    image: alpine
+    image: busybox
     command: top
     ipc: "container:ipc_mode_container"
   shareable:
-    image: alpine
+    image: busybox
     command: top
     ipc: shareable
