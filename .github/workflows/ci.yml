@@ -32,12 +32,12 @@ jobs:
         env:
           BUILD_TAGS: kube,e2e
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/bin/ v1.37.0
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/bin/ v1.39.0
           make -f builder.Makefile lint
 
   # only on main branch, costs too much for the gain on every PR
   validate-cross-build:
-    name: Validate cros build
+    name: Validate cross build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     env:
