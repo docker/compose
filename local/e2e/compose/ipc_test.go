@@ -32,7 +32,7 @@ func TestIPC(t *testing.T) {
 	const projectName = "ipc_e2e"
 	var cid string
 	t.Run("create ipc mode container", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "--rm", "--ipc=shareable", "--name", "ipc_mode_container", "busybox", "top")
+		res := c.RunDockerCmd("run", "-d", "--rm", "--ipc=shareable", "--name", "ipc_mode_container", "alpine", "top")
 		cid = strings.Trim(res.Stdout(), "\n")
 	})
 

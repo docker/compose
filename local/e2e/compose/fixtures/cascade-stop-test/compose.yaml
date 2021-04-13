@@ -1,7 +1,7 @@
 services:
   should_fail:
-    image: busybox:1.27.2
+    image: alpine
     command: ls /does_not_exist
   sleep: # will be killed
-    image: busybox:1.27.2
+    image: alpine
     command: ping localhost
