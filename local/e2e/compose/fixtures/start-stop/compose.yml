@@ -1,5 +1,5 @@
 services:
   simple:
-    image:  nginx:alpine
+    image:  nginx
   another:
-    image:  nginx:alpine
+    image:  nginx

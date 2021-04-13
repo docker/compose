@@ -8,13 +8,13 @@ services:
     networks:
       - backnet
   db:
-    image: nginx:alpine
+    image: nginx
     networks:
       - backnet
     volumes:
       - data:/test
   front:
-    image: nginx:alpine
+    image: nginx
     networks:
       - frontnet
 networks:
