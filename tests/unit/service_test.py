@@ -330,7 +330,7 @@ class ServiceTest(unittest.TestCase):
         assert service.options['environment'] == environment
 
         assert opts['labels'][LABEL_CONFIG_HASH] == \
-            '689149e6041a85f6fb4945a2146a497ed43c8a5cbd8991753d875b165f1b4de4'
+            '6da0f3ec0d5adf901de304bdc7e0ee44ec5dd7adb08aebc20fe0dd791d4ee5a8'
         assert opts['environment'] == ['also=real']
 
     def test_get_container_create_options_sets_affinity_with_binds(self):
@@ -700,6 +700,7 @@ class ServiceTest(unittest.TestCase):
         config_dict = service.config_dict()
         expected = {
             'image_id': 'abcd',
+            'ipc_mode': None,
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
@@ -723,6 +724,7 @@ class ServiceTest(unittest.TestCase):
         config_dict = service.config_dict()
         expected = {
             'image_id': 'abcd',
+            'ipc_mode': None,
             'options': {'image': 'example.com/foo'},
             'links': [],
             'networks': {},

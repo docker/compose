@@ -713,6 +713,7 @@ class Service:
             'image_id': image_id(),
             'links': self.get_link_names(),
             'net': self.network_mode.id,
+            'ipc_mode': self.ipc_mode.mode,
             'networks': self.networks,
             'secrets': self.secrets,
             'volumes_from': [
