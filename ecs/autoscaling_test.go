@@ -34,10 +34,10 @@ services:
         max: 10
 `, useDefaultVPC)
 	target := template.Resources["FooScalableTarget"].(*autoscaling.ScalableTarget)
-	assert.Check(t, target != nil)
+	assert.Check(t, target != nil)            //nolint:staticcheck
 	assert.Check(t, target.MaxCapacity == 10) //nolint:staticcheck
 
 	policy := template.Resources["FooScalingPolicy"].(*autoscaling.ScalingPolicy)
-	assert.Check(t, policy != nil)
+	assert.Check(t, policy != nil)                                                              //nolint:staticcheck
 	assert.Check(t, policy.TargetTrackingScalingPolicyConfiguration.TargetValue == float64(75)) //nolint:staticcheck
 }

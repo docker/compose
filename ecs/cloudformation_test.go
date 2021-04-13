@@ -366,7 +366,7 @@ networks:
 	assert.Check(t, template.Resources["DefaultNetwork"] == nil)
 	assert.Check(t, template.Resources["DefaultNetworkIngress"] == nil)
 	s := template.Resources["TestService"].(*ecs.Service)
-	assert.Check(t, s != nil)
+	assert.Check(t, s != nil)                                                                    //nolint:staticcheck
 	assert.Check(t, s.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups[0] == "sg-123abc") //nolint:staticcheck
 }
 
@@ -383,11 +383,11 @@ volumes:
 		m.ResolveFileSystem(gomock.Any(), "fs-123abc").Return(existingAWSResource{id: "fs-123abc"}, nil)
 	})
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
+	assert.Check(t, s != nil)                    //nolint:staticcheck
 	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
 
 	s = template.Resources["DbdataNFSMountTargetOnSubnet2"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
+	assert.Check(t, s != nil)                    //nolint:staticcheck
 	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
 }
 
@@ -412,7 +412,7 @@ volumes:
 	})
 	n := volumeResourceName("db-data")
 	f := template.Resources[n].(*efs.FileSystem)
-	assert.Check(t, f != nil)
+	assert.Check(t, f != nil)                                               //nolint:staticcheck
 	assert.Equal(t, f.BackupPolicy.Status, "ENABLED")                       //nolint:staticcheck
 	assert.Equal(t, f.LifecyclePolicies[0].TransitionToIA, "AFTER_30_DAYS") //nolint:staticcheck
 	assert.Equal(t, f.PerformanceMode, "maxIO")                             //nolint:staticcheck
@@ -420,7 +420,7 @@ volumes:
 	assert.Equal(t, f.ProvisionedThroughputInMibps, float64(1024))          //nolint:staticcheck
 
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
+	assert.Check(t, s != nil)                              //nolint:staticcheck
 	assert.Equal(t, s.FileSystemId, cloudformation.Ref(n)) //nolint:staticcheck
 }
 
@@ -438,7 +438,7 @@ volumes:
 		m.ListFileSystems(gomock.Any(), gomock.Any()).Return(nil, nil)
 	})
 	a := template.Resources["DbdataAccessPoint"].(*efs.AccessPoint)
-	assert.Check(t, a != nil)
+	assert.Check(t, a != nil)                //nolint:staticcheck
 	assert.Equal(t, a.PosixUser.Uid, "1002") //nolint:staticcheck
 	assert.Equal(t, a.PosixUser.Gid, "1002") //nolint:staticcheck
 }
@@ -461,7 +461,7 @@ volumes:
 		}, nil)
 	})
 	s := template.Resources["DbdataNFSMountTargetOnSubnet1"].(*efs.MountTarget)
-	assert.Check(t, s != nil)
+	assert.Check(t, s != nil)                    //nolint:staticcheck
 	assert.Equal(t, s.FileSystemId, "fs-123abc") //nolint:staticcheck
 }
 
