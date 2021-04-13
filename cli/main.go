@@ -70,7 +70,7 @@ var (
 		"version":          {},
 		"backend-metadata": {},
 	}
-	unknownCommandRegexp = regexp.MustCompile(`unknown command "([^"]*)"`)
+	unknownCommandRegexp = regexp.MustCompile(`unknown docker command: "([^"]*)"`)
 )
 
 func init() {
@@ -122,7 +122,7 @@ func main() {
 			if len(args) == 0 {
 				return cmd.Help()
 			}
-			return fmt.Errorf("unknown command %q", args[0])
+			return fmt.Errorf("unknown docker command: %q", args[0])
 		},
 	}
 
@@ -292,7 +292,18 @@ func exit(ctx string, err error, ctype string) {
 		os.Exit(exit.StatusCode)
 	}
 
-	metrics.Track(ctype, os.Args[1:], metrics.FailureStatus)
+	var composeErr metrics.ComposeError
+	metricsStatus := metrics.FailureStatus
+	exitCode := 1
+	if errors.As(err, &composeErr) {
+		metricsStatus = composeErr.GetMetricsFailureCategory().MetricsStatus
+		exitCode = composeErr.GetMetricsFailureCategory().ExitCode
+	}
+	if strings.HasPrefix(err.Error(), "unknown shorthand flag:") || strings.HasPrefix(err.Error(), "unknown flag:") || strings.HasPrefix(err.Error(), "unknown docker command:") {
+		metricsStatus = metrics.CommandSyntaxFailure.MetricsStatus
+		exitCode = metrics.CommandSyntaxFailure.ExitCode
+	}
+	metrics.Track(ctype, os.Args[1:], metricsStatus)
 
 	if errors.Is(err, errdefs.ErrLoginRequired) {
 		fmt.Fprintln(os.Stderr, err)
@@ -310,7 +321,8 @@ func exit(ctx string, err error, ctype string) {
 		os.Exit(1)
 	}
 
-	fatal(err)
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(exitCode)
 }
 
 func fatal(err error) {

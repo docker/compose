@@ -182,7 +182,7 @@ func TestContextMetrics(t *testing.T) {
 		assert.DeepEqual(t, []string{
 			`{"command":"ps","context":"moby","source":"cli","status":"success"}`,
 			`{"command":"version","context":"moby","source":"cli","status":"success"}`,
-			`{"command":"version","context":"moby","source":"cli","status":"failure"}`,
+			`{"command":"version","context":"moby","source":"cli","status":"failure-cmd-syntax"}`,
 		}, usage)
 	})
 
@@ -224,7 +224,6 @@ func TestContextDuplicateACI(t *testing.T) {
 }
 
 func TestContextRemove(t *testing.T) {
-
 	t.Run("remove current", func(t *testing.T) {
 		c := NewParallelE2eCLI(t, binDir)
 

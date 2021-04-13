@@ -30,6 +30,7 @@ import (
 
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/cli/metrics"
 )
 
 // Warning is a global warning to be displayed to user on command failure
@@ -74,7 +75,7 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
-		return nil, err
+		return nil, metrics.WrapComposeError(err)
 	}
 
 	s, err := project.GetServices(services...)
@@ -112,6 +113,14 @@ func Command(contextType string) *cobra.Command {
 		Short:            "Docker Compose",
 		Use:              "compose",
 		TraverseChildren: true,
+		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			_ = cmd.Help()
+			return fmt.Errorf("unknown docker command: %q", "compose "+args[0])
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if noAnsi {
 				if ansi != "auto" {

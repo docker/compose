@@ -24,21 +24,21 @@ import (
 	"path"
 	"strings"
 
-	moby "github.com/docker/docker/api/types"
-
-	"github.com/docker/compose-cli/api/compose"
-	composeprogress "github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/utils"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/progress"
+	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/errdefs"
 	bclient "github.com/moby/buildkit/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/docker/compose-cli/api/compose"
+	composeprogress "github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/cli/metrics"
+	"github.com/docker/compose-cli/utils"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
@@ -160,7 +160,8 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	if info.OSType == "windows" {
 		// no support yet for Windows container builds in Buildkit
 		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
-		return s.windowsBuild(opts, mode)
+		err := s.windowsBuild(opts, mode)
+		return metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
 	}
 	if len(opts) == 0 {
 		return nil
@@ -189,6 +190,9 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	errW := w.Wait()
 	if err == nil {
 		err = errW
+	}
+	if err != nil {
+		return metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
 	}
 
 	cw := composeprogress.ContextWriter(ctx)

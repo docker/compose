@@ -36,6 +36,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/cli/metrics"
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
@@ -121,7 +122,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: progress.Error,
 			Text:   "Error",
 		})
-		return err
+		return metrics.WrapCategorisedComposeError(err, metrics.PullFailure)
 	}
 
 	dec := json.NewDecoder(stream)
@@ -131,10 +132,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			if err == io.EOF {
 				break
 			}
-			return err
+			return metrics.WrapCategorisedComposeError(err, metrics.PullFailure)
 		}
 		if jm.Error != nil {
-			return errors.New(jm.Error.Message)
+			return metrics.WrapCategorisedComposeError(errors.New(jm.Error.Message), metrics.PullFailure)
 		}
 		toPullProgressEvent(service.Name, jm, w)
 	}
