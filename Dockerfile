@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:experimental
+# syntax=docker/dockerfile:1.2
 
 
 #   Copyright 2020 Docker Compose CLI authors
@@ -16,13 +16,12 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.16-alpine
-ARG GOLANGCI_LINT_VERSION=v1.37.0-alpine
+ARG GOLANGCI_LINT_VERSION=v1.39.0-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
-ENV GO111MODULE=on
-RUN apk add --no-cache \
+RUN apk add --no-cache -vv \
     git \
     docker \
     make \
