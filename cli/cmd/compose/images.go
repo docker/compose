@@ -99,8 +99,15 @@ func runImages(ctx context.Context, opts imageOptions, services []string) error 
 			for _, img := range images {
 				id := stringid.TruncateID(img.ID)
 				size := units.HumanSizeWithPrecision(float64(img.Size), 3)
-
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", img.ContainerName, img.Repository, img.Tag, id, size)
+				repo := img.Repository
+				if repo == "" {
+					repo = "<none>"
+				}
+				tag := img.Tag
+				if tag == "" {
+					tag = "<none>"
+				}
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", img.ContainerName, repo, tag, id, size)
 			}
 		},
 		"Container", "Repository", "Tag", "Image Id", "Size")

@@ -57,25 +57,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 			imageIDs = append(imageIDs, c.ImageID)
 		}
 	}
-
-	images := map[string]moby.ImageInspect{}
-	l := sync.Mutex{}
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, img := range imageIDs {
-		img := img
-		eg.Go(func() error {
-			inspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, img)
-			if err != nil {
-				return err
-			}
-			l.Lock()
-			images[img] = inspect
-			l.Unlock()
-			return nil
-		})
-	}
-	err = eg.Wait()
-
+	images, err := s.getImages(ctx, imageIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -85,24 +67,44 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 		if !ok {
 			return nil, fmt.Errorf("failed to retrieve image for container %s", getCanonicalContainerName(container))
 		}
-		if len(img.RepoTags) == 0 {
-			return nil, fmt.Errorf("no image tag found for %s", img.ID)
-		}
-		tag := ""
-		repository := ""
-		repotag := strings.Split(img.RepoTags[0], ":")
-		repository = repotag[0]
-		if len(repotag) > 1 {
-			tag = repotag[1]
-		}
 
-		summary[i] = compose.ImageSummary{
-			ID:            img.ID,
-			ContainerName: getCanonicalContainerName(container),
-			Repository:    repository,
-			Tag:           tag,
-			Size:          img.Size,
-		}
+		summary[i] = img
+		summary[i].ContainerName = getCanonicalContainerName(container)
 	}
 	return summary, nil
+}
+
+func (s *composeService) getImages(ctx context.Context, images []string) (map[string]compose.ImageSummary, error) {
+	summary := map[string]compose.ImageSummary{}
+	l := sync.Mutex{}
+	eg, ctx := errgroup.WithContext(ctx)
+	for _, img := range images {
+		img := img
+		eg.Go(func() error {
+			inspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, img)
+			if err != nil {
+				return err
+			}
+			tag := ""
+			repository := ""
+			if len(inspect.RepoTags) > 0 {
+
+				repotag := strings.Split(inspect.RepoTags[0], ":")
+				repository = repotag[0]
+				if len(repotag) > 1 {
+					tag = repotag[1]
+				}
+			}
+			l.Lock()
+			summary[img] = compose.ImageSummary{
+				ID:         inspect.ID,
+				Repository: repository,
+				Tag:        tag,
+				Size:       inspect.Size,
+			}
+			l.Unlock()
+			return nil
+		})
+	}
+	return summary, eg.Wait()
 }

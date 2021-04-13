@@ -134,12 +134,39 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 
 	err := s.build(ctx, project, opts, observedState, mode)
-	if err == nil {
-		if len(imagesToBuild) > 0 {
-			utils.DisplayScanSuggestMsg()
+	if err != nil {
+		return err
+	}
+	if len(imagesToBuild) > 0 {
+		utils.DisplayScanSuggestMsg()
+	}
+
+	return s.updateServiceImages(ctx, project)
+}
+
+func (s *composeService) updateServiceImages(ctx context.Context, project *types.Project) error {
+	imageNames := []string{}
+	for _, s := range project.Services {
+		imgName := s.Image
+		if imgName == "" {
+			imgName = getImageName(s, project.Name)
+		}
+		if !utils.StringContains(imageNames, imgName) {
+			imageNames = append(imageNames, imgName)
 		}
 	}
-	return err
+	images, err := s.getImages(ctx, imageNames)
+	if err != nil {
+		return err
+	}
+	for i, s := range project.Services {
+		img, ok := images[getImageName(s, project.Name)]
+		if !ok {
+			return fmt.Errorf("failed to retrieve image for service %s", s.Name)
+		}
+		project.Services[i].Image = img.ID
+	}
+	return nil
 }
 
 func (s *composeService) localImagePresent(ctx context.Context, imageName string) (bool, error) {
