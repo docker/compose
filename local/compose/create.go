@@ -949,7 +949,7 @@ func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string
 
 	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
 		w.Event(progress.ErrorEvent(eventName))
-		return errors.Wrapf(err, fmt.Sprintf("failed to create network %s", networkID))
+		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", networkID))
 	}
 
 	w.Event(progress.RemovedEvent(eventName))
