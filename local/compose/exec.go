@@ -83,7 +83,7 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 	defer resp.Close()
 
 	if opts.Tty {
-		err := s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
+		s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
 		if err != nil {
 			return err
 		}
