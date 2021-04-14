@@ -337,16 +337,14 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 }
 
 func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(service),
-		),
-	})
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, service)
 	if err != nil {
 		return false, err
 	}
 
+	if len(containers) == 0 {
+		return false, nil
+	}
 	for _, c := range containers {
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
@@ -355,10 +353,7 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		if container.State == nil || container.State.Health == nil {
 			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
 		}
-		switch container.State.Health.Status {
-		case "starting":
-			return false, nil
-		case "unhealthy":
+		if container.State.Health.Status != moby.Healthy {
 			return false, nil
 		}
 	}

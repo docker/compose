@@ -43,6 +43,9 @@ func (s *composeService) getContainers(ctx context.Context, project string, oneO
 	f := filters.NewArgs(
 		projectFilter(project),
 	)
+	if len(selectedServices) == 1 {
+		f.Add("label", fmt.Sprintf("%s=%s", serviceLabel, selectedServices[0]))
+	}
 	switch oneOff {
 	case oneOffOnly:
 		f.Add("label", fmt.Sprintf("%s=%s", oneoffLabel, "True"))
@@ -57,7 +60,7 @@ func (s *composeService) getContainers(ctx context.Context, project string, oneO
 	if err != nil {
 		return nil, err
 	}
-	if len(selectedServices) > 0 {
+	if len(selectedServices) > 1 {
 		containers = containers.filter(isService(selectedServices...))
 	}
 	return containers, nil

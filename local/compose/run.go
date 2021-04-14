@@ -89,6 +89,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 	defer restore()
 
+	statusC, errC := s.apiClient.ContainerWait(context.Background(), oneoffContainer.ID, container.WaitConditionNextExit)
+
 	err = s.apiClient.ContainerStart(ctx, containerID, apitypes.ContainerStartOptions{})
 	if err != nil {
 		return 0, err
@@ -99,7 +101,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	statusC, errC := s.apiClient.ContainerWait(context.Background(), oneoffContainer.ID, container.WaitConditionNotRunning)
 	select {
 	case status := <-statusC:
 		return int(status.StatusCode), nil
