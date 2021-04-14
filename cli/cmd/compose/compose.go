@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/metrics"
@@ -105,7 +106,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 }
 
 // Command returns the compose command with its child commands
-func Command(contextType string) *cobra.Command {
+func Command(contextType string, backend compose.Service) *cobra.Command {
 	opts := projectOptions{}
 	var ansi string
 	var noAnsi bool
@@ -146,34 +147,34 @@ func Command(contextType string) *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(&opts, contextType),
-		downCommand(&opts, contextType),
-		startCommand(&opts),
-		restartCommand(&opts),
-		stopCommand(&opts),
-		psCommand(&opts),
-		listCommand(contextType),
-		logsCommand(&opts, contextType),
-		convertCommand(&opts),
-		killCommand(&opts),
-		runCommand(&opts),
-		removeCommand(&opts),
-		execCommand(&opts),
-		pauseCommand(&opts),
-		unpauseCommand(&opts),
-		topCommand(&opts),
-		eventsCommand(&opts),
-		portCommand(&opts),
-		imagesCommand(&opts),
+		upCommand(&opts, contextType, backend),
+		downCommand(&opts, contextType, backend),
+		startCommand(&opts, backend),
+		restartCommand(&opts, backend),
+		stopCommand(&opts, backend),
+		psCommand(&opts, backend),
+		listCommand(contextType, backend),
+		logsCommand(&opts, contextType, backend),
+		convertCommand(&opts, backend),
+		killCommand(&opts, backend),
+		runCommand(&opts, backend),
+		removeCommand(&opts, backend),
+		execCommand(&opts, backend),
+		pauseCommand(&opts, backend),
+		unpauseCommand(&opts, backend),
+		topCommand(&opts, backend),
+		eventsCommand(&opts, backend),
+		portCommand(&opts, backend),
+		imagesCommand(&opts, backend),
 		versionCommand(),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
 		command.AddCommand(
-			buildCommand(&opts),
-			pushCommand(&opts),
-			pullCommand(&opts),
-			createCommand(&opts),
+			buildCommand(&opts, backend),
+			pushCommand(&opts, backend),
+			pullCommand(&opts, backend),
+			createCommand(&opts, backend),
 		)
 	}
 	command.Flags().SetInterspersed(false)

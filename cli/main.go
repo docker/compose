@@ -221,7 +221,7 @@ func main() {
 
 	root.AddCommand(
 		run.Command(ctype),
-		compose.Command(ctype),
+		compose.Command(ctype, service.ComposeService()),
 		volume.Command(ctype),
 	)
 

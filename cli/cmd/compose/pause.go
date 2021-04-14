@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -30,7 +29,7 @@ type pauseOptions struct {
 	*projectOptions
 }
 
-func pauseCommand(p *projectOptions) *cobra.Command {
+func pauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := pauseOptions{
 		projectOptions: p,
 	}
@@ -38,25 +37,20 @@ func pauseCommand(p *projectOptions) *cobra.Command {
 		Use:   "pause [SERVICE...]",
 		Short: "pause services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPause(cmd.Context(), opts, args)
+			return runPause(cmd.Context(), backend, opts, args)
 		},
 	}
 	return cmd
 }
 
-func runPause(ctx context.Context, opts pauseOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runPause(ctx context.Context, backend compose.Service, opts pauseOptions, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Pause(ctx, project, compose.PauseOptions{
+		return "", backend.Pause(ctx, project, compose.PauseOptions{
 			Services: services,
 		})
 	})
@@ -67,7 +61,7 @@ type unpauseOptions struct {
 	*projectOptions
 }
 
-func unpauseCommand(p *projectOptions) *cobra.Command {
+func unpauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := unpauseOptions{
 		projectOptions: p,
 	}
@@ -75,25 +69,20 @@ func unpauseCommand(p *projectOptions) *cobra.Command {
 		Use:   "unpause [SERVICE...]",
 		Short: "unpause services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUnPause(cmd.Context(), opts, args)
+			return runUnPause(cmd.Context(), backend, opts, args)
 		},
 	}
 	return cmd
 }
 
-func runUnPause(ctx context.Context, opts unpauseOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runUnPause(ctx context.Context, backend compose.Service, opts unpauseOptions, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().UnPause(ctx, project, compose.PauseOptions{
+		return "", backend.UnPause(ctx, project, compose.PauseOptions{
 			Services: services,
 		})
 	})

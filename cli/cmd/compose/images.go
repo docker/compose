@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/utils"
@@ -40,7 +39,7 @@ type imageOptions struct {
 	Quiet bool
 }
 
-func imagesCommand(p *projectOptions) *cobra.Command {
+func imagesCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := imageOptions{
 		projectOptions: p,
 	}
@@ -48,25 +47,20 @@ func imagesCommand(p *projectOptions) *cobra.Command {
 		Use:   "images [SERVICE...]",
 		Short: "List images used by the created containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runImages(cmd.Context(), opts, args)
+			return runImages(cmd.Context(), backend, opts, args)
 		},
 	}
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd
 }
 
-func runImages(ctx context.Context, opts imageOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runImages(ctx context.Context, backend compose.Service, opts imageOptions, services []string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	images, err := c.ComposeService().Images(ctx, projectName, compose.ImagesOptions{
+	images, err := backend.Images(ctx, projectName, compose.ImagesOptions{
 		Services: services,
 	})
 	if err != nil {

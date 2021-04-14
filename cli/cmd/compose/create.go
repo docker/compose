@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/docker/compose-cli/api/compose"
 )
 
 type createOptions struct {
@@ -28,7 +30,7 @@ type createOptions struct {
 	noRecreate    bool
 }
 
-func createCommand(p *projectOptions) *cobra.Command {
+func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := createOptions{
 		composeOptions: &composeOptions{},
 	}
@@ -42,7 +44,7 @@ func createCommand(p *projectOptions) *cobra.Command {
 			if opts.forceRecreate && opts.noRecreate {
 				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
 			}
-			return runCreateStart(cmd.Context(), upOptions{
+			return runCreateStart(cmd.Context(), backend, upOptions{
 				composeOptions: &composeOptions{
 					projectOptions: p,
 					Build:          opts.Build,

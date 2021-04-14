@@ -31,7 +31,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/utils"
@@ -52,7 +51,7 @@ type convertOptions struct {
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
 
-func convertCommand(p *projectOptions) *cobra.Command {
+func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := convertOptions{
 		projectOptions: p,
 	}
@@ -81,7 +80,7 @@ func convertCommand(p *projectOptions) *cobra.Command {
 				return runProfiles(opts, args)
 			}
 
-			return runConvert(cmd.Context(), opts, args)
+			return runConvert(cmd.Context(), backend, opts, args)
 		},
 	}
 	flags := cmd.Flags()
@@ -102,13 +101,8 @@ func convertCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runConvert(ctx context.Context, opts convertOptions, services []string) error {
+func runConvert(ctx context.Context, backend compose.Service, opts convertOptions, services []string) error {
 	var json []byte
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
 	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate))
 	if err != nil {
 		return err
@@ -130,7 +124,7 @@ func runConvert(ctx context.Context, opts convertOptions, services []string) err
 		}
 	}
 
-	json, err = c.ComposeService().Convert(ctx, project, compose.ConvertOptions{
+	json, err = backend.Convert(ctx, project, compose.ConvertOptions{
 		Format: opts.Format,
 		Output: opts.Output,
 	})

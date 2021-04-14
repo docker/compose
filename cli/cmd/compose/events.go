@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 
 	"github.com/spf13/cobra"
@@ -32,7 +31,7 @@ type eventsOpts struct {
 	json bool
 }
 
-func eventsCommand(p *projectOptions) *cobra.Command {
+func eventsCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -42,7 +41,7 @@ func eventsCommand(p *projectOptions) *cobra.Command {
 		Use:   "events [options] [--] [SERVICE...]",
 		Short: "Receive real time events from containers.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEvents(cmd.Context(), opts, args)
+			return runEvents(cmd.Context(), backend, opts, args)
 		},
 	}
 
@@ -50,18 +49,13 @@ func eventsCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runEvents(ctx context.Context, opts eventsOpts, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runEvents(ctx context.Context, backend compose.Service, opts eventsOpts, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	return c.ComposeService().Events(ctx, project, compose.EventsOptions{
+	return backend.Events(ctx, project, compose.EventsOptions{
 		Services: services,
 		Consumer: func(event compose.Event) error {
 			if opts.json {

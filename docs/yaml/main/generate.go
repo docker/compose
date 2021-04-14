@@ -35,7 +35,7 @@ const descriptionSourcePath = "docs/reference/"
 
 func generateCliYaml(opts *options) error {
 	cmd := &cobra.Command{Use: "docker"}
-	cmd.AddCommand(compose.Command("local"))
+	cmd.AddCommand(compose.Command("local", nil))
 	disableFlagsInUseLine(cmd)
 	source := filepath.Join(opts.source, descriptionSourcePath)
 	if err := loadLongDescription(cmd, source); err != nil {

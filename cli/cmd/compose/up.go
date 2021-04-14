@@ -33,7 +33,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
@@ -140,7 +139,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *projectOptions, contextType string) *cobra.Command {
+func upCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
 	opts := upOptions{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -168,9 +167,9 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 				if opts.recreateDeps && opts.noRecreate {
 					return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
 				}
-				return runCreateStart(cmd.Context(), opts, args)
+				return runCreateStart(cmd.Context(), backend, opts, args)
 			default:
-				return runUp(cmd.Context(), opts, args)
+				return runUp(cmd.Context(), backend, opts, args)
 			}
 		},
 	}
@@ -204,8 +203,8 @@ func upCommand(p *projectOptions, contextType string) *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, opts upOptions, services []string) error {
-	c, project, err := setup(ctx, *opts.composeOptions, services)
+func runUp(ctx context.Context, backend compose.Service, opts upOptions, services []string) error {
+	project, err := setup(*opts.composeOptions, services)
 	if err != nil {
 		return err
 	}
@@ -216,7 +215,7 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Up(ctx, project, compose.UpOptions{
+		return "", backend.Up(ctx, project, compose.UpOptions{
 			Detach:    opts.Detach,
 			QuietPull: opts.quietPull,
 		})
@@ -224,8 +223,8 @@ func runUp(ctx context.Context, opts upOptions, services []string) error {
 	return err
 }
 
-func runCreateStart(ctx context.Context, opts upOptions, services []string) error {
-	c, project, err := setup(ctx, *opts.composeOptions, services)
+func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions, services []string) error {
+	project, err := setup(*opts.composeOptions, services)
 	if err != nil {
 		return err
 	}
@@ -240,7 +239,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		err := c.ComposeService().Create(ctx, project, compose.CreateOptions{
+		err := backend.Create(ctx, project, compose.CreateOptions{
 			Services:             services,
 			RemoveOrphans:        opts.removeOrphans,
 			Recreate:             opts.recreateStrategy(),
@@ -253,7 +252,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 			return "", err
 		}
 		if opts.Detach {
-			err = c.ComposeService().Start(ctx, project, compose.StartOptions{})
+			err = backend.Start(ctx, project, compose.StartOptions{})
 		}
 		return "", err
 	})
@@ -285,10 +284,10 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
 			go func() {
 				<-signalChan
-				c.ComposeService().Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
+				backend.Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
 			}()
 
-			return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{})
+			return "", backend.Stop(ctx, project, compose.StopOptions{})
 		})
 		return err
 	}
@@ -311,7 +310,7 @@ func runCreateStart(ctx context.Context, opts upOptions, services []string) erro
 		return err
 	})
 
-	err = c.ComposeService().Start(ctx, project, compose.StartOptions{
+	err = backend.Start(ctx, project, compose.StartOptions{
 		Attach: func(event compose.ContainerEvent) {
 			queue <- event
 		},
@@ -351,15 +350,10 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 	return fmt.Errorf("unknown service %q", name)
 }
 
-func setup(ctx context.Context, opts composeOptions, services []string) (*client.Client, *types.Project, error) {
-	c, err := client.New(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func setup(opts composeOptions, services []string) (*types.Project, error) {
 	project, err := opts.toProject(services)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if opts.DomainName != "" {
@@ -397,7 +391,7 @@ func setup(ctx context.Context, opts composeOptions, services []string) (*client
 		project.Services = services
 	}
 
-	return c, project, nil
+	return project, nil
 }
 
 type printer struct {

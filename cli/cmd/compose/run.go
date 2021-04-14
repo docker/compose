@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/cli/cli"
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -100,7 +99,7 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *projectOptions) *cobra.Command {
+func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := runOptions{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -118,7 +117,7 @@ func runCommand(p *projectOptions) *cobra.Command {
 			if len(opts.publish) > 0 && opts.servicePorts {
 				return fmt.Errorf("--service-ports and --publish are incompatible")
 			}
-			return runRun(cmd.Context(), opts)
+			return runRun(cmd.Context(), backend, opts)
 		},
 	}
 	flags := cmd.Flags()
@@ -141,8 +140,8 @@ func runCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runRun(ctx context.Context, opts runOptions) error {
-	c, project, err := setup(ctx, *opts.composeOptions, []string{opts.Service})
+func runRun(ctx context.Context, backend compose.Service, opts runOptions) error {
+	project, err := setup(*opts.composeOptions, []string{opts.Service})
 	if err != nil {
 		return err
 	}
@@ -153,7 +152,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", startDependencies(ctx, c, *project, opts.Service)
+		return "", startDependencies(ctx, backend, *project, opts.Service)
 	})
 	if err != nil {
 		return err
@@ -194,7 +193,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 		UseNetworkAliases: opts.useAliases,
 		Index:             0,
 	}
-	exitCode, err := c.ComposeService().RunOneOffContainer(ctx, project, runOpts)
+	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
 		errMsg := ""
 		if err != nil {
@@ -205,7 +204,7 @@ func runRun(ctx context.Context, opts runOptions) error {
 	return err
 }
 
-func startDependencies(ctx context.Context, c *client.Client, project types.Project, requestedServiceName string) error {
+func startDependencies(ctx context.Context, backend compose.Service, project types.Project, requestedServiceName string) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -218,10 +217,10 @@ func startDependencies(ctx context.Context, c *client.Client, project types.Proj
 
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
-	if err := c.ComposeService().Create(ctx, &project, compose.CreateOptions{}); err != nil {
+	if err := backend.Create(ctx, &project, compose.CreateOptions{}); err != nil {
 		return err
 	}
-	if err := c.ComposeService().Start(ctx, &project, compose.StartOptions{}); err != nil {
+	if err := backend.Start(ctx, &project, compose.StartOptions{}); err != nil {
 		return err
 	}
 	return nil

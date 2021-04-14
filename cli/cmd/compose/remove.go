@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils/prompt"
@@ -36,7 +35,7 @@ type removeOptions struct {
 	volumes bool
 }
 
-func removeCommand(p *projectOptions) *cobra.Command {
+func removeCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := removeOptions{
 		projectOptions: p,
 	}
@@ -50,7 +49,7 @@ can override this with -v. To list all volumes, use "docker volume ls".
 
 Any data which is not in a volume will be lost.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRemove(cmd.Context(), opts, args)
+			return runRemove(cmd.Context(), backend, opts, args)
 		},
 	}
 	f := cmd.Flags()
@@ -60,12 +59,7 @@ Any data which is not in a volume will be lost.`,
 	return cmd
 }
 
-func runRemove(ctx context.Context, opts removeOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runRemove(ctx context.Context, backend compose.Service, opts removeOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -73,7 +67,7 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 
 	if opts.stop {
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			err := c.ComposeService().Stop(ctx, project, compose.StopOptions{
+			err := backend.Stop(ctx, project, compose.StopOptions{
 				Services: services,
 			})
 			return "", err
@@ -83,8 +77,8 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 		}
 	}
 
-	reosurces, err := c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
-		DryRun:   true,
+	reosurces, err := backend.Remove(ctx, project, compose.RemoveOptions{
+		DryRun: true,
 		Services: services,
 	})
 	if err != nil {
@@ -109,7 +103,7 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		_, err = c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
+		_, err = backend.Remove(ctx, project, compose.RemoveOptions{
 			Volumes: opts.volumes,
 			Force:   opts.force,
 		})

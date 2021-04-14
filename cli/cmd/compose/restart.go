@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -32,7 +31,7 @@ type restartOptions struct {
 	timeout int
 }
 
-func restartCommand(p *projectOptions) *cobra.Command {
+func restartCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := restartOptions{
 		projectOptions: p,
 	}
@@ -40,7 +39,7 @@ func restartCommand(p *projectOptions) *cobra.Command {
 		Use:   "restart",
 		Short: "Restart containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRestart(cmd.Context(), opts, args)
+			return runRestart(cmd.Context(), backend, opts, args)
 		},
 	}
 	flags := restartCmd.Flags()
@@ -49,12 +48,7 @@ func restartCommand(p *projectOptions) *cobra.Command {
 	return restartCmd
 }
 
-func runRestart(ctx context.Context, opts restartOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runRestart(ctx context.Context, backend compose.Service, opts restartOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -62,7 +56,7 @@ func runRestart(ctx context.Context, opts restartOptions, services []string) err
 
 	timeout := time.Duration(opts.timeout) * time.Second
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Restart(ctx, project, compose.RestartOptions{
+		return "", backend.Restart(ctx, project, compose.RestartOptions{
 			Timeout: &timeout,
 		})
 	})

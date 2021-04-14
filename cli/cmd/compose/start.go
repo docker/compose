@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 
@@ -30,7 +29,7 @@ type startOptions struct {
 	*projectOptions
 }
 
-func startCommand(p *projectOptions) *cobra.Command {
+func startCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := startOptions{
 		projectOptions: p,
 	}
@@ -38,25 +37,20 @@ func startCommand(p *projectOptions) *cobra.Command {
 		Use:   "start [SERVICE...]",
 		Short: "Start services",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runStart(cmd.Context(), opts, args)
+			return runStart(cmd.Context(), backend, opts, args)
 		},
 	}
 	return startCmd
 }
 
-func runStart(ctx context.Context, opts startOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runStart(ctx context.Context, backend compose.Service, opts startOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Start(ctx, project, compose.StartOptions{})
+		return "", backend.Start(ctx, project, compose.StartOptions{})
 	})
 	return err
 }

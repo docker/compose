@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 )
 
@@ -30,7 +29,7 @@ type killOptions struct {
 	Signal string
 }
 
-func killCommand(p *projectOptions) *cobra.Command {
+func killCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := killOptions{
 		projectOptions: p,
 	}
@@ -38,7 +37,7 @@ func killCommand(p *projectOptions) *cobra.Command {
 		Use:   "kill [options] [SERVICE...]",
 		Short: "Force stop service containers.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runKill(cmd.Context(), opts, args)
+			return runKill(cmd.Context(), backend, opts, args)
 		},
 	}
 
@@ -48,16 +47,12 @@ func killCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runKill(ctx context.Context, opts killOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
+func runKill(ctx context.Context, backend compose.Service, opts killOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
-	return c.ComposeService().Kill(ctx, project, compose.KillOptions{
+	return backend.Kill(ctx, project, compose.KillOptions{
 		Signal: opts.Signal,
 	})
 }

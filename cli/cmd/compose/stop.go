@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -33,7 +32,7 @@ type stopOptions struct {
 	timeout     int
 }
 
-func stopCommand(p *projectOptions) *cobra.Command {
+func stopCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := stopOptions{
 		projectOptions: p,
 	}
@@ -42,7 +41,7 @@ func stopCommand(p *projectOptions) *cobra.Command {
 		Short: "Stop services",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
-			return runStop(cmd.Context(), opts, args)
+			return runStop(cmd.Context(), backend, opts, args)
 		},
 	}
 	flags := cmd.Flags()
@@ -51,12 +50,7 @@ func stopCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runStop(ctx context.Context, opts stopOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runStop(ctx context.Context, backend compose.Service, opts stopOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -68,8 +62,8 @@ func runStop(ctx context.Context, opts stopOptions, services []string) error {
 		timeout = &timeoutValue
 	}
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{
-			Timeout:  timeout,
+		return "", backend.Stop(ctx, project, compose.StopOptions{
+			Timeout: timeout,
 			Services: services,
 		})
 	})

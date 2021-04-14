@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/utils"
@@ -40,7 +39,7 @@ type psOptions struct {
 	Services bool
 }
 
-func psCommand(p *projectOptions) *cobra.Command {
+func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := psOptions{
 		projectOptions: p,
 	}
@@ -48,7 +47,7 @@ func psCommand(p *projectOptions) *cobra.Command {
 		Use:   "ps",
 		Short: "List containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPs(cmd.Context(), opts)
+			return runPs(cmd.Context(), backend, opts)
 		},
 	}
 	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
@@ -58,17 +57,12 @@ func psCommand(p *projectOptions) *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, opts psOptions) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runPs(ctx context.Context, backend compose.Service, opts psOptions) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	containers, err := c.ComposeService().Ps(ctx, projectName, compose.PsOptions{
+	containers, err := backend.Ps(ctx, projectName, compose.PsOptions{
 		All: opts.All,
 	})
 	if err != nil {
