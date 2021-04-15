@@ -850,6 +850,9 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 }
 
 func buildDefaultNetworkConfig(s types.ServiceConfig, networkMode container.NetworkMode, containerName string) *network.NetworkingConfig {
+	if len(s.Networks) == 0 {
+		return nil
+	}
 	config := map[string]*network.EndpointSettings{}
 	net := string(networkMode)
 	config[net] = &network.EndpointSettings{
