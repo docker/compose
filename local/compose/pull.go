@@ -27,23 +27,17 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/buildx/driver"
-	cliconfig "github.com/docker/cli/cli/config"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/metrics"
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
-	configFile, err := cliconfig.Load(config.Dir())
-	if err != nil {
-		return err
-	}
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
 		return err
@@ -67,7 +61,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, info, configFile, w)
+			err := s.pullServiceImage(ctx, service, info, s.configFile, w)
 			if err != nil {
 				if !opts.IgnoreFailures {
 					return err

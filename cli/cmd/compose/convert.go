@@ -32,7 +32,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -109,10 +108,7 @@ func runConvert(ctx context.Context, backend compose.Service, opts convertOption
 	}
 
 	if opts.resolve {
-		configFile, err := cliconfig.Load(config.Dir())
-		if err != nil {
-			return err
-		}
+		configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
 
 		resolver := remotes.CreateResolver(configFile)
 		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {

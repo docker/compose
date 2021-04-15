@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/cli/cli/config/configfile"
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -32,14 +33,16 @@ import (
 )
 
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(apiClient client.APIClient) compose.Service {
+func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) compose.Service {
 	return &composeService{
-		apiClient: apiClient,
+		apiClient:  apiClient,
+		configFile: configFile,
 	}
 }
 
 type composeService struct {
-	apiClient client.APIClient
+	apiClient  client.APIClient
+	configFile *configfile.ConfigFile
 }
 
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {

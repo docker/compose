@@ -17,6 +17,9 @@
 package local
 
 import (
+	"os"
+
+	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/backend"
@@ -36,10 +39,11 @@ type local struct {
 
 // NewService build a backend for "local" context, using Docker API client
 func NewService(apiClient client.APIClient) backend.Service {
+	file := cliconfig.LoadDefaultConfigFile(os.Stderr)
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
-		composeService:   local_compose.NewComposeService(apiClient),
+		composeService:   local_compose.NewComposeService(apiClient, file),
 	}
 }
 
