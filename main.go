@@ -19,14 +19,16 @@ package main
 import (
 	"strings"
 
-	"github.com/spf13/cobra"
-
+	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
+	"github.com/spf13/cobra"
+
 	api "github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/cmd/compose"
+	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/internal"
 	impl "github.com/docker/compose-cli/local/compose"
 )
@@ -36,7 +38,7 @@ func main() {
 		lazyInit := api.ServiceDelegator{
 			Delegate: api.NoImpl{},
 		}
-		cmd := compose.Command(store.DefaultContextType, &lazyInit)
+		cmd := compose.RootCommand(store.DefaultContextType, &lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
@@ -48,6 +50,12 @@ func main() {
 			}
 			return nil
 		}
+		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+			return dockercli.StatusError{
+				StatusCode: metrics.CommandSyntaxFailure.ExitCode,
+				Status:     err.Error(),
+			}
+		})
 		return cmd
 	},
 		manager.Metadata{

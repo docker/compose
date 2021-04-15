@@ -46,9 +46,9 @@ func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	psCmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPs(cmd.Context(), backend, opts)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runPs(ctx, backend, opts)
+		}),
 	}
 	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	psCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")

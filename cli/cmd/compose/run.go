@@ -109,7 +109,7 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if len(args) > 1 {
 				opts.Command = args[1:]
 			}
@@ -117,8 +117,8 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 			if len(opts.publish) > 0 && opts.servicePorts {
 				return fmt.Errorf("--service-ports and --publish are incompatible")
 			}
-			return runRun(cmd.Context(), backend, opts)
-		},
+			return runRun(ctx, backend, opts)
+		}),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")

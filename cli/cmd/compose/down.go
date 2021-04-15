@@ -45,15 +45,17 @@ func downCommand(p *projectOptions, contextType string, backend compose.Service)
 	downCmd := &cobra.Command{
 		Use:   "down",
 		Short: "Stop and remove containers, networks",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
+		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
 				}
 			}
-			return runDown(cmd.Context(), backend, opts)
-		},
+			return runDown(ctx, backend, opts)
+		}),
 	}
 	flags := downCmd.Flags()
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")

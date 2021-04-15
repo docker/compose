@@ -39,9 +39,9 @@ func pushCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	pushCmd := &cobra.Command{
 		Use:   "push [SERVICE...]",
 		Short: "Push service images",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPush(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runPush(ctx, backend, opts, args)
+		}),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
 

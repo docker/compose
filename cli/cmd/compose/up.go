@@ -148,8 +148,10 @@ func upCommand(p *projectOptions, contextType string, backend compose.Service) *
 	upCmd := &cobra.Command{
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
+		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 				if opts.exitCodeFrom != "" {
@@ -167,11 +169,11 @@ func upCommand(p *projectOptions, contextType string, backend compose.Service) *
 				if opts.recreateDeps && opts.noRecreate {
 					return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
 				}
-				return runCreateStart(cmd.Context(), backend, opts, args)
+				return runCreateStart(ctx, backend, opts, args)
 			default:
-				return runUp(cmd.Context(), backend, opts, args)
+				return runUp(ctx, backend, opts, args)
 			}
-		},
+		}),
 	}
 	flags := upCmd.Flags()
 	flags.StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")

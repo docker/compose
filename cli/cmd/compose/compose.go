@@ -17,12 +17,14 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	dockercli "github.com/docker/cli/cli"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -33,6 +35,24 @@ import (
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/metrics"
 )
+
+//Command defines a compose CLI command as a func with args
+type Command func(context.Context, []string) error
+
+//Adapt a Command func to cobra library
+func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		err := fn(cmd.Context(), args)
+		var composeErr metrics.ComposeError
+		if errors.As(err, &composeErr) {
+			err = dockercli.StatusError{
+				StatusCode: composeErr.GetMetricsFailureCategory().ExitCode,
+				Status:     err.Error(),
+			}
+		}
+		return err
+	}
+}
 
 // Warning is a global warning to be displayed to user on command failure
 var Warning string
@@ -105,8 +125,8 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithName(o.ProjectName))...)
 }
 
-// Command returns the compose command with its child commands
-func Command(contextType string, backend compose.Service) *cobra.Command {
+// RootCommand returns the compose command with its child commands
+func RootCommand(contextType string, backend compose.Service) *cobra.Command {
 	opts := projectOptions{}
 	var ansi string
 	var noAnsi bool
@@ -120,7 +140,10 @@ func Command(contextType string, backend compose.Service) *cobra.Command {
 				return cmd.Help()
 			}
 			_ = cmd.Help()
-			return fmt.Errorf("unknown docker command: %q", "compose "+args[0])
+			return dockercli.StatusError{
+				StatusCode: metrics.CommandSyntaxFailure.ExitCode,
+				Status:     fmt.Sprintf("unknown docker command: %q", "compose "+args[0]),
+			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			parent := cmd.Root()

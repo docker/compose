@@ -58,7 +58,7 @@ func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Aliases: []string{"config"},
 		Use:     "convert SERVICES",
 		Short:   "Converts the compose file to platform's canonical format",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
@@ -79,8 +79,8 @@ func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 				return runProfiles(opts, args)
 			}
 
-			return runConvert(cmd.Context(), backend, opts, args)
-		},
+			return runConvert(ctx, backend, opts, args)
+		}),
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")

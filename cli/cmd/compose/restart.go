@@ -38,9 +38,9 @@ func restartCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	restartCmd := &cobra.Command{
 		Use:   "restart",
 		Short: "Restart containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRestart(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runRestart(ctx, backend, opts, args)
+		}),
 	}
 	flags := restartCmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")

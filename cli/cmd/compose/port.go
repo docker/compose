@@ -40,13 +40,13 @@ func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Use:   "port [options] [--] SERVICE PRIVATE_PORT",
 		Short: "Print the public port for a port binding.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			port, err := strconv.Atoi(args[1])
 			if err != nil {
 				return err
 			}
-			return runPort(cmd.Context(), backend, opts, args[0], port)
-		},
+			return runPort(ctx, backend, opts, args[0], port)
+		}),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
 	cmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if service has multiple replicas")

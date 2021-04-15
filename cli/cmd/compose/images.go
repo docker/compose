@@ -46,9 +46,9 @@ func imagesCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	imgCmd := &cobra.Command{
 		Use:   "images [SERVICE...]",
 		Short: "List images used by the created containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runImages(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runImages(ctx, backend, opts, args)
+		}),
 	}
 	imgCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	return imgCmd

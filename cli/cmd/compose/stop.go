@@ -39,10 +39,12 @@ func stopCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop [SERVICE...]",
 		Short: "Stop services",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
-			return runStop(cmd.Context(), backend, opts, args)
 		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runStop(ctx, backend, opts, args)
+		}),
 	}
 	flags := cmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")

@@ -43,9 +43,9 @@ func listCommand(contextType string, backend compose.Service) *cobra.Command {
 	lsCmd := &cobra.Command{
 		Use:   "ls",
 		Short: "List running compose projects",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runList(cmd.Context(), backend, opts)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runList(ctx, backend, opts)
+		}),
 	}
 	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")

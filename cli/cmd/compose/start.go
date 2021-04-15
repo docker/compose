@@ -36,9 +36,9 @@ func startCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	startCmd := &cobra.Command{
 		Use:   "start [SERVICE...]",
 		Short: "Start services",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runStart(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runStart(ctx, backend, opts, args)
+		}),
 	}
 	return startCmd
 }

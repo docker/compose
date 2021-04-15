@@ -41,9 +41,9 @@ func topCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	topCmd := &cobra.Command{
 		Use:   "top",
 		Short: "Display the running processes",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTop(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runTop(ctx, backend, opts, args)
+		}),
 	}
 	return topCmd
 }

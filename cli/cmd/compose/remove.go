@@ -48,9 +48,9 @@ By default, anonymous volumes attached to containers will not be removed. You
 can override this with -v. To list all volumes, use "docker volume ls".
 
 Any data which is not in a volume will be lost.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRemove(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runRemove(ctx, backend, opts, args)
+		}),
 	}
 	f := cmd.Flags()
 	f.BoolVarP(&opts.force, "force", "f", false, "Don't ask to confirm removal")

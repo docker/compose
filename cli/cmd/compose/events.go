@@ -40,9 +40,9 @@ func eventsCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "events [options] [--] [SERVICE...]",
 		Short: "Receive real time events from containers.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEvents(cmd.Context(), backend, opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runEvents(ctx, backend, opts, args)
+		}),
 	}
 
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Output events as a stream of json objects")
