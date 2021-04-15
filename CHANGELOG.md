@@ -1,6 +1,21 @@
 Change log
 ==========
 
+1.29.1 (2021-04-13)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/58?closed=1)
+
+### Bugs
+
+- Fix for invalid handler warning on Windows builds
+
+- Fix config hash to trigger container recreation on IPC mode updates
+
+- Fix conversion map for `placement.max_replicas_per_node`
+
+- Remove extra scan suggestion on build
+
 1.29.0 (2021-04-06)
 -------------------
 
