@@ -68,12 +68,8 @@ func Exec(root *cobra.Command) {
 	if err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			exitCode := exiterr.ExitCode()
-			if exitCode == 130 {
-				metrics.Track(store.DefaultContextType, os.Args[1:], metrics.CanceledStatus)
-			} else {
-				metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
-			}
-			os.Exit(exiterr.ExitCode())
+			metrics.Track(store.DefaultContextType, os.Args[1:], metrics.ByExitCode(exitCode).MetricsStatus)
+			os.Exit(exitCode)
 		}
 		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
 		fmt.Fprintln(os.Stderr, err)

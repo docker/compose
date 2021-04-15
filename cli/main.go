@@ -294,7 +294,7 @@ func exit(ctx string, err error, ctype string) {
 
 	if errors.Is(err, errdefs.ErrNotImplemented) {
 		name := metrics.GetCommand(os.Args[1:])
-		fmt.Fprintf(os.Stderr, "RootCommand %q not available in current context (%s)\n", name, ctx)
+		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
 
 		os.Exit(1)
 	}
@@ -314,7 +314,7 @@ func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string
 		dockerCommand := string(submatch[1])
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
-			fmt.Fprintf(os.Stderr, "RootCommand %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
+			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
 			metrics.Track(contextType, os.Args[1:], metrics.FailureStatus)
 			os.Exit(1)
 		}

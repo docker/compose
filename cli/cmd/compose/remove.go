@@ -78,7 +78,7 @@ func runRemove(ctx context.Context, backend compose.Service, opts removeOptions,
 	}
 
 	reosurces, err := backend.Remove(ctx, project, compose.RemoveOptions{
-		DryRun: true,
+		DryRun:   true,
 		Services: services,
 	})
 	if err != nil {
