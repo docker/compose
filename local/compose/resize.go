@@ -28,13 +28,13 @@ import (
 	"github.com/docker/docker/pkg/signal"
 )
 
-func (s *composeService) monitorTTySize(ctx context.Context, container string, resize func(context.Context, string, moby.ResizeOptions) error) error {
+func (s *composeService) monitorTTySize(ctx context.Context, container string, resize func(context.Context, string, moby.ResizeOptions) error) {
 	err := resize(ctx, container, moby.ResizeOptions{ // nolint:errcheck
 		Height: uint(goterm.Height()),
 		Width:  uint(goterm.Width()),
 	})
 	if err != nil {
-		return err
+		return
 	}
 
 	sigchan := make(chan os.Signal, 1)
@@ -71,5 +71,4 @@ func (s *composeService) monitorTTySize(ctx context.Context, container string, r
 			}
 		}
 	}()
-	return nil
 }
