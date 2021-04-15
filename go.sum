@@ -308,8 +308,8 @@ github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGX
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20210412113016-e35895260882 h1:vLKOiHY9QPS1eiBvGfsEI7wR23B1bGNvwOF5aVl25Fs=
-github.com/compose-spec/compose-go v0.0.0-20210412113016-e35895260882/go.mod h1:6eIT9U2OgdHmkRD6szmqatCrWWEEUSwl/j2iJYH4jLo=
+github.com/compose-spec/compose-go v0.0.0-20210421142148-66b18e67d2c0 h1:aoUSQGFmWi8dn1OfT4H5Mx48u5wHt+n07nLFw5j1JXs=
+github.com/compose-spec/compose-go v0.0.0-20210421142148-66b18e67d2c0/go.mod h1:6eIT9U2OgdHmkRD6szmqatCrWWEEUSwl/j2iJYH4jLo=
 github.com/containerd/cgroups v0.0.0-20190919134610-bf292b21730f/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59/go.mod h1:pA0z1pT8KYB3TCXK/ocprsh7MAkoW8bZVzPdih9snmM=
 github.com/containerd/cgroups v0.0.0-20200710171044-318312a37340 h1:9atoWyI9RtXFwf7UDbme/6M8Ud0rFrx+Q3ZWgSnsxtw=

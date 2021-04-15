@@ -25,10 +25,10 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -147,13 +147,13 @@ func getContainerProgressName(container moby.Container) string {
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for dep, config := range service.DependsOn {
-		switch config.Condition {
-		case "service_healthy":
-			eg.Go(func() error {
-				ticker := time.NewTicker(500 * time.Millisecond)
-				defer ticker.Stop()
-				for {
-					<-ticker.C
+		eg.Go(func() error {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				<-ticker.C
+				switch config.Condition {
+				case types.ServiceConditionHealthy:
 					healthy, err := s.isServiceHealthy(ctx, project, dep)
 					if err != nil {
 						return err
@@ -161,17 +161,26 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 					if healthy {
 						return nil
 					}
+				case types.ServiceConditionCompletedSuccessfully:
+					exited, code, err := s.isServiceCompleted(ctx, project, dep)
+					if err != nil {
+						return err
+					}
+					if exited {
+						if code != 0 {
+							return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, code)
+						}
+						return nil
+					}
+				case types.ServiceConditionStarted:
+					// already managed by InDependencyOrder
+					return nil
+				default:
+					logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
+					return nil
 				}
-			})
-		case "service_completed_successfully":
-			exit, err := s.waitCompleted(ctx, project, dep)
-			if err != nil {
-				return err
 			}
-			if exit != 0 {
-				return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, exit)
-			}
-		}
+		})
 	}
 	return eg.Wait()
 }
@@ -360,26 +369,21 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 	return true, nil
 }
 
-func (s *composeService) waitCompleted(ctx context.Context, project *types.Project, dep string) (int64, error) {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(dep),
-		),
-	})
+func (s *composeService) isServiceCompleted(ctx context.Context, project *types.Project, dep string) (bool, int, error) {
+	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, dep)
 	if err != nil {
-		return 0, err
+		return false, 0, err
 	}
 	for _, c := range containers {
-		wait, errors := s.apiClient.ContainerWait(ctx, c.ID, container.WaitConditionNextExit)
-		select {
-		case w := <-wait:
-			return w.StatusCode, nil
-		case err := <-errors:
-			return 0, err
+		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return false, 0, err
+		}
+		if container.State != nil && container.State.Status == "exited" {
+			return true, container.State.ExitCode, nil
 		}
 	}
-	return 0, nil
+	return false, 0, nil
 }
 
 func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
