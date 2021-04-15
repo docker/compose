@@ -43,13 +43,17 @@ for version in $DOCKER_VERSIONS; do
     --name "$daemon_container" \
     --privileged \
     --volume="/var/lib/docker" \
-    -v $DOCKER_CONFIG/config.json:/root/.docker/config.json \
     -e "DOCKER_TLS_CERTDIR=" \
     "docker:$version-dind" \
     dockerd -H tcp://0.0.0.0:2375 $DOCKER_DAEMON_ARGS \
     2>&1 | tail -n 10
 
   docker exec "$daemon_container" sh -c "apk add --no-cache git"
+
+  # copy docker config from host for authentication with Docker Hub
+  docker exec "$daemon_container" sh -c "mkdir /root/.docker"
+  docker cp /root/.docker/config.json $daemon_container:/root/.docker/config.json
+  docker exec "$daemon_container" sh -c "chmod 644 /root/.docker/config.json"
 
   docker run \
     --rm \
