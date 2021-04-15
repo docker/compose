@@ -51,6 +51,7 @@ for version in $DOCKER_VERSIONS; do
   docker exec "$daemon_container" sh -c "apk add --no-cache git"
 
   # copy docker config from host for authentication with Docker Hub
+  docker exec "$daemon_container" sh -c "mkdir /root/.docker"
   docker cp /root/.docker/config.json $daemon_container:/root/.docker/config.json
   docker exec "$daemon_container" sh -c "chmod 644 /root/.docker/config.json"
 
