@@ -170,8 +170,8 @@ func runVolumes(opts convertOptions) error {
 	if err != nil {
 		return err
 	}
-	for _, v := range project.Volumes {
-		fmt.Println(v.Name)
+	for n := range project.Volumes {
+		fmt.Println(n)
 	}
 	return nil
 }
