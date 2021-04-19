@@ -32,7 +32,6 @@ import (
 	"github.com/docker/buildx/util/progress"
 	cliconfig "github.com/docker/cli/cli/config"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/errdefs"
 	bclient "github.com/moby/buildkit/client"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -73,7 +72,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	err := s.build(ctx, project, opts, Containers{}, options.Progress)
+	_, err := s.build(ctx, project, opts, Containers{}, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 && !options.Quiet {
 			utils.DisplayScanSuggestMsg()
@@ -84,28 +83,60 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, observedState Containers, quietPull bool) error {
+	images, err := s.getImageDigests(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	mode := progress.PrinterModeAuto
+	if quietPull {
+		mode = progress.PrinterModeQuiet
+	}
+	opts, imagesToBuild, err := s.getBuildOptions(project, images)
+	if err != nil {
+		return err
+	}
+	builtImages, err := s.build(ctx, project, opts, observedState, mode)
+	if err != nil {
+		return err
+	}
+
+	if len(imagesToBuild) > 0 {
+		utils.DisplayScanSuggestMsg()
+	}
+	for name, digest := range builtImages {
+		images[name] = digest
+	}
+	// set digest as service.Image
+	for i, service := range project.Services {
+		digest, ok := images[getImageName(service, project.Name)]
+		if ok {
+			project.Services[i].Image = digest
+		}
+	}
+	return nil
+}
+
+func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, []string, error) {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
-			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+			return nil, nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
-
 		imageName := getImageName(service, project.Name)
-		localImagePresent, err := s.localImagePresent(ctx, imageName)
-		if err != nil {
-			return err
-		}
+		_, localImagePresent := images[imageName]
 
 		if service.Build != nil {
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
 			imagesToBuild = append(imagesToBuild, imageName)
-			opts[imageName], err = s.toBuildOptions(service, project.WorkingDir, imageName)
+			opt, err := s.toBuildOptions(service, project.WorkingDir, imageName)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
+			opts[imageName] = opt
 			continue
 		}
 		if service.Image != "" {
@@ -113,7 +144,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				continue
 			}
 		}
-
 		// Buildx has no command to "just pull", see
 		// so we bake a temporary dockerfile that will just pull and export pulled image
 		opts[service.Name] = build.Options{
@@ -127,84 +157,54 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		}
 
 	}
+	return opts, imagesToBuild, nil
 
-	mode := progress.PrinterModeAuto
-	if quietPull {
-		mode = progress.PrinterModeQuiet
-	}
-
-	err := s.build(ctx, project, opts, observedState, mode)
-	if err != nil {
-		return err
-	}
-	if len(imagesToBuild) > 0 {
-		utils.DisplayScanSuggestMsg()
-	}
-
-	return s.updateServiceImages(ctx, project)
 }
 
-func (s *composeService) updateServiceImages(ctx context.Context, project *types.Project) error {
+func (s *composeService) getImageDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
 	imageNames := []string{}
 	for _, s := range project.Services {
-		imgName := s.Image
-		if imgName == "" {
-			imgName = getImageName(s, project.Name)
-		}
+		imgName := getImageName(s, project.Name)
 		if !utils.StringContains(imageNames, imgName) {
 			imageNames = append(imageNames, imgName)
 		}
 	}
-	images, err := s.getImages(ctx, imageNames)
+	imgs, err := s.getImages(ctx, imageNames)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for i, s := range project.Services {
-		img, ok := images[getImageName(s, project.Name)]
-		if !ok {
-			return fmt.Errorf("failed to retrieve image for service %s", s.Name)
-		}
-		project.Services[i].Image = img.ID
+	images := map[string]string{}
+	for name, info := range imgs {
+		images[name] = info.ID
 	}
-	return nil
+	return images, nil
 }
 
-func (s *composeService) localImagePresent(ctx context.Context, imageName string) (bool, error) {
-	_, _, err := s.apiClient.ImageInspectWithRaw(ctx, imageName)
-	if err != nil {
-		if errdefs.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
-func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, observedState Containers, mode string) error {
+func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, observedState Containers, mode string) (map[string]string, error) {
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if info.OSType == "windows" {
 		// no support yet for Windows container builds in Buildkit
 		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
 		err := s.windowsBuild(opts, mode)
-		return metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
+		return nil, metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
 	}
 	if len(opts) == 0 {
-		return nil
+		return nil, nil
 	}
 	const drivername = "default"
 
 	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, configFile, nil, nil, "", nil, nil, project.WorkingDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	driverInfo := []build.DriverInfo{
 		{
@@ -221,13 +221,13 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	w := progress.NewPrinter(progressCtx, os.Stdout, mode)
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	_, err = build.Build(ctx, driverInfo, opts, nil, nil, w)
+	response, err := build.Build(ctx, driverInfo, opts, nil, nil, w)
 	errW := w.Wait()
 	if err == nil {
 		err = errW
 	}
 	if err != nil {
-		return metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
+		return nil, metrics.WrapCategorisedComposeError(err, metrics.BuildFailure)
 	}
 
 	cw := composeprogress.ContextWriter(ctx)
@@ -236,13 +236,25 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 			if c.Image == imageName {
 				err = s.removeContainers(ctx, cw, []moby.Container{c}, nil)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	return err
+	imagesBuilt := map[string]string{}
+	for name, img := range response {
+		if img == nil || len(img.ExporterResponse) == 0 {
+			continue
+		}
+		digest, ok := img.ExporterResponse["containerimage.digest"]
+		if !ok {
+			continue
+		}
+		imagesBuilt[name] = digest
+	}
+
+	return imagesBuilt, err
 }
 
 func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string, imageTag string) (build.Options, error) {

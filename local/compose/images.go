@@ -24,6 +24,7 @@ import (
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -83,6 +84,9 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 		eg.Go(func() error {
 			inspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, img)
 			if err != nil {
+				if errdefs.IsNotFound(err) {
+					return nil
+				}
 				return err
 			}
 			tag := ""
