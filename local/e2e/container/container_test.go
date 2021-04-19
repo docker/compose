@@ -53,7 +53,7 @@ func TestLocalBackendRun(t *testing.T) {
 
 	t.Run("run", func(t *testing.T) {
 		t.Parallel()
-		res := c.RunDockerCmd("run", "-d", "nginx")
+		res := c.RunDockerCmd("run", "-d", "nginx:alpine")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrExitError("rm", "-f", containerName)
@@ -64,7 +64,7 @@ func TestLocalBackendRun(t *testing.T) {
 
 	t.Run("run rm", func(t *testing.T) {
 		t.Parallel()
-		res := c.RunDockerCmd("run", "--rm", "-d", "nginx")
+		res := c.RunDockerCmd("run", "--rm", "-d", "nginx:alpine")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrExitError("rm", "-f", containerName)
@@ -81,7 +81,7 @@ func TestLocalBackendRun(t *testing.T) {
 	})
 
 	t.Run("run with ports", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "-p", "85:80", "nginx")
+		res := c.RunDockerCmd("run", "-d", "-p", "85:80", "nginx:alpine")
 		containerName := strings.TrimSpace(res.Combined())
 		t.Cleanup(func() {
 			_ = c.RunDockerOrExitError("rm", "-f", containerName)
@@ -101,7 +101,7 @@ func TestLocalBackendRun(t *testing.T) {
 			fields := strings.Fields(line)
 			if fields[0] == nginxID {
 				nginxFound = true
-				assert.Equal(t, fields[1], "nginx", res.Combined())
+				assert.Equal(t, fields[1], "nginx:alpine", res.Combined())
 				assert.Equal(t, fields[2], "/docker-entrypoint.sh", res.Combined())
 				assert.Equal(t, fields[len(fields)-1], "0.0.0.0:85->80/tcp", res.Combined())
 			}
@@ -109,7 +109,7 @@ func TestLocalBackendRun(t *testing.T) {
 		assert.Assert(t, nginxFound, res.Stdout())
 
 		res = c.RunDockerCmd("ps", "--format", "json")
-		res.Assert(t, icmd.Expected{Out: `"Image":"nginx","Status":"Up Less than a second","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Ports":["0.0.0.0:85->80/tcp"`})
+		res.Assert(t, icmd.Expected{Out: `"Image":"nginx:alpine","Status":"Up Less than a second","Command":"/docker-entrypoint.sh nginx -g 'daemon off;'","Ports":["0.0.0.0:85->80/tcp"`})
 
 		res = c.RunDockerCmd("ps", "--quiet")
 		res.Assert(t, icmd.Expected{Out: nginxID + "\n"})

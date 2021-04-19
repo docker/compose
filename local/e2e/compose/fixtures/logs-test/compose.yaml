@@ -1,7 +1,7 @@
 services:
   ping:
-    image: busybox:1.27.2
+    image: alpine
     command: ping localhost -c 1
   hello:
-    image: busybox:1.31.0-uclibc
+    image: alpine
     command: echo hello
