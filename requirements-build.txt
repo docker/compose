@@ -1,1 +1,1 @@
-pyinstaller==4.1
+pyinstaller==4.3
