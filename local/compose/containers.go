@@ -83,6 +83,11 @@ func isNotService(services ...string) containerPredicate {
 	}
 }
 
+func isNotOneOff(c moby.Container) bool {
+	v, ok := c.Labels[oneoffLabel]
+	return !ok || v == "False"
+}
+
 // filter return Containers with elements to match predicate
 func (containers Containers) filter(predicate containerPredicate) Containers {
 	var filtered Containers

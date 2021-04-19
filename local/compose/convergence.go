@@ -52,7 +52,7 @@ func (s *composeService) ensureScale(ctx context.Context, project *types.Project
 		return nil, nil, err
 	}
 	observedState := cState.GetContainers()
-	actual := observedState.filter(isService(service.Name))
+	actual := observedState.filter(isService(service.Name)).filter(isNotOneOff)
 	scale, err := getScale(service)
 	if err != nil {
 		return nil, nil, err
