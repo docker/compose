@@ -930,7 +930,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 				}
 				createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
 			}
-			networkEventName := fmt.Sprintf("Network %q", n.Name)
+			networkEventName := fmt.Sprintf("Network %s", n.Name)
 			w := progress.ContextWriter(ctx)
 			w.Event(progress.CreatingEvent(networkEventName))
 			if _, err := s.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
@@ -947,7 +947,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 
 func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string, networkName string) error {
 	w := progress.ContextWriter(ctx)
-	eventName := fmt.Sprintf("Network %q", networkName)
+	eventName := fmt.Sprintf("Network %s", networkName)
 	w.Event(progress.RemovingEvent(eventName))
 
 	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
