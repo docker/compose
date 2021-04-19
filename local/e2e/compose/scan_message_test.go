@@ -42,23 +42,23 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 
 	t.Run("display when docker build", func(t *testing.T) {
 		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/simple-build-test/nginx-build")
-		defer c.RunDockerCmd("rmi", "-f", "test-image-scan-msg")
+		defer c.RunDockerOrExitError("rmi", "-f", "test-image-scan-msg")
 		res.Assert(t, icmd.Expected{Err: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
 	t.Run("do not display with docker build and quiet flag", func(t *testing.T) {
 		res := c.RunDockerCmd("build", "-t", "test-image-scan-msg-quiet", "--quiet", "./fixtures/simple-build-test/nginx-build")
-		defer c.RunDockerCmd("rmi", "-f", "test-image-scan-msg-quiet")
+		defer c.RunDockerOrExitError("rmi", "-f", "test-image-scan-msg-quiet")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"))
 
 		res = c.RunDockerCmd("build", "-t", "test-image-scan-msg-q", "-q", "./fixtures/simple-build-test/nginx-build")
-		defer c.RunDockerCmd("rmi", "-f", "test-image-scan-msg-q")
+		defer c.RunDockerOrExitError("rmi", "-f", "test-image-scan-msg-q")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"))
 	})
 
 	t.Run("do not display if envvar DOCKER_SCAN_SUGGEST=false", func(t *testing.T) {
 		cmd := c.NewDockerCmd("build", "-t", "test-image-scan-msg", "./fixtures/build-test/nginx-build")
-		defer c.RunDockerCmd("rmi", "-f", "test-image-scan-msg")
+		defer c.RunDockerOrExitError("rmi", "-f", "test-image-scan-msg")
 		cmd.Env = append(cmd.Env, "DOCKER_SCAN_SUGGEST=false")
 		res := icmd.StartCmd(cmd)
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
@@ -66,7 +66,7 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 
 	t.Run("display on compose build", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test-compose-build", "build")
-		defer c.RunDockerCmd("rmi", "-f", "scan-msg-test-compose-build_nginx")
+		defer c.RunDockerOrExitError("rmi", "-f", "scan-msg-test-compose-build_nginx")
 		res.Assert(t, icmd.Expected{Err: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
@@ -77,7 +77,7 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), "No such image"))
 
 		res = c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test-q", "build", "-q")
-		defer c.RunDockerCmd("rmi", "-f", "scan-msg-test-q_nginx")
+		defer c.RunDockerOrExitError("rmi", "-f", "scan-msg-test-q_nginx")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})
 
@@ -85,13 +85,13 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 
 	t.Run("display on compose up if image is built", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "up", "-d")
-		defer c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down")
+		defer c.RunDockerOrExitError("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down")
 		res.Assert(t, icmd.Expected{Err: "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"})
 	})
 
 	t.Run("do not display on compose up if no image built", func(t *testing.T) { // re-run the same Compose aproject
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "up", "-d")
-		defer c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down", "--rmi", "all")
+		defer c.RunDockerOrExitError("compose", "-f", "./fixtures/simple-build-test/compose.yml", "-p", "scan-msg-test", "down", "--rmi", "all")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})
 

@@ -145,7 +145,7 @@ func TestAttachRestart(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
-	defer c.RunDockerCmd("compose", "-p", "attach-restart", "down")
+	defer c.RunDockerOrExitError("compose", "-p", "attach-restart", "down")
 	output := res.Stdout()
 
 	exitRegex := regexp.MustCompile("another_1 exited with code 1")
@@ -159,7 +159,7 @@ func TestInitContainer(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
-	defer c.RunDockerCmd("compose", "-p", "init-container", "down")
+	defer c.RunDockerOrExitError("compose", "-p", "init-container", "down")
 	output := res.Stdout()
 
 	assert.Assert(t, strings.Contains(output, "foo_1  | hello\nbar_1  | world"), res.Combined())
