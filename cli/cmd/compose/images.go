@@ -32,7 +32,7 @@ import (
 	"github.com/docker/compose-cli/utils"
 	"github.com/docker/docker/pkg/stringid"
 
-	units "github.com/docker/go-units"
+	"github.com/docker/go-units"
 )
 
 type imageOptions struct {

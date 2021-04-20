@@ -126,6 +126,8 @@ type RestartOptions struct {
 type StopOptions struct {
 	// Timeout override container stop timeout
 	Timeout *time.Duration
+	// Services passed in the command line to be stopped
+	Services []string
 }
 
 // UpOptions group options of the Up API
@@ -187,6 +189,8 @@ type RemoveOptions struct {
 	Volumes bool
 	// Force don't ask to confirm removal
 	Force bool
+	// Services passed in the command line to be removed
+	Services []string
 }
 
 // RunOptions group options of the Run API
