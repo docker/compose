@@ -73,7 +73,9 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 
 	if opts.stop {
 		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			err := c.ComposeService().Stop(ctx, project, compose.StopOptions{})
+			err := c.ComposeService().Stop(ctx, project, compose.StopOptions{
+				Services: services,
+			})
 			return "", err
 		})
 		if err != nil {
@@ -82,7 +84,8 @@ func runRemove(ctx context.Context, opts removeOptions, services []string) error
 	}
 
 	reosurces, err := c.ComposeService().Remove(ctx, project, compose.RemoveOptions{
-		DryRun: true,
+		DryRun:   true,
+		Services: services,
 	})
 	if err != nil {
 		return err

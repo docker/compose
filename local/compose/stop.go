@@ -27,8 +27,13 @@ import (
 
 func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	w := progress.ContextWriter(ctx)
+
+	services := options.Services
+	if len(services) == 0 {
+		services = project.ServiceNames()
+	}
 	var containers Containers
-	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, project.ServiceNames()...)
+	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
 	if err != nil {
 		return err
 	}

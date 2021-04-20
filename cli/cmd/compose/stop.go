@@ -69,7 +69,8 @@ func runStop(ctx context.Context, opts stopOptions, services []string) error {
 	}
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
 		return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{
-			Timeout: timeout,
+			Timeout:  timeout,
+			Services: services,
 		})
 	})
 	return err
