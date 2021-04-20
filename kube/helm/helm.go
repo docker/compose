@@ -84,6 +84,19 @@ func (hc *Actions) InstallChart(name string, chart *chart.Chart, logger func(for
 	return err
 }
 
+// UpdateChart upgrades chart
+func (hc *Actions) UpdateChart(name string, chart *chart.Chart, logger func(format string, v ...interface{})) error {
+	err := hc.initialize(logger)
+	if err != nil {
+		return err
+	}
+
+	actUpgrade := action.NewUpgrade(hc.Config)
+	actUpgrade.Namespace = hc.Namespace
+	_, err = actUpgrade.Run(name, chart, map[string]interface{}{})
+	return err
+}
+
 // Uninstall uninstall chart
 func (hc *Actions) Uninstall(name string, logger func(format string, v ...interface{})) error {
 	err := hc.initialize(logger)
