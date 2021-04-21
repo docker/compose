@@ -141,6 +141,22 @@ func TestComposePull(t *testing.T) {
 	assert.Assert(t, strings.Contains(output, "another Pulled"))
 }
 
+func TestDownComposefileInParentFolder(t *testing.T) {
+
+	c := NewParallelE2eCLI(t, binDir)
+
+	tmpFolder, err := os.MkdirTemp("fixtures/simple-composefile", "test-tmp")
+	projectName := strings.TrimPrefix(tmpFolder, "fixtures/simple-composefile/")
+	defer os.Remove(tmpFolder) //nolint: errcheck
+	assert.NilError(t, err)
+
+	res := c.RunDockerCmd("compose", "--project-directory", tmpFolder, "up", "-d")
+	res.Assert(t, icmd.Expected{Err: "Started", ExitCode: 0})
+
+	res = c.RunDockerCmd("compose", "-p", projectName, "down")
+	res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
+}
+
 func TestAttachRestart(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
