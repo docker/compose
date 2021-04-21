@@ -26,6 +26,9 @@ import (
 // ServiceHash compute configuration has for a service
 // TODO move this to compose-go
 func ServiceHash(o types.ServiceConfig) (string, error) {
+	// remove the Build config when generating the service hash
+	o.Build = nil
+	o.PullPolicy = ""
 	bytes, err := json.Marshal(o)
 	if err != nil {
 		return "", err
