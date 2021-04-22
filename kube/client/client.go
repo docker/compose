@@ -22,6 +22,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -31,12 +33,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 )
 
 // KubeClient API to access kube objects
 type KubeClient struct {
 	client    *kubernetes.Clientset
 	namespace string
+	config    *rest.Config
 }
 
 // NewKubeClient new kubernetes client
@@ -59,6 +65,7 @@ func NewKubeClient(config genericclioptions.RESTClientGetter) (*KubeClient, erro
 	return &KubeClient{
 		client:    clientset,
 		namespace: namespace,
+		config:    restConfig,
 	}, nil
 }
 
@@ -160,4 +167,38 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOpti
 		return nil
 	}
 	return nil
+}
+
+func (kc KubeClient) MapPorts(ctx context.Context, opts PortMappingOptions) error {
+
+	stopChannel := make(chan struct{}, 1)
+	readyChannel := make(chan struct{})
+
+	eg, ctx := errgroup.WithContext(ctx)
+	for serviceName, servicePorts := range opts.Services {
+		serviceName = serviceName
+		servicePorts = servicePorts
+		eg.Go(func() error {
+
+			req := kc.client.RESTClient().Post().Resource("services").Namespace(kc.namespace).Name(serviceName).SubResource("portforward")
+			transport, upgrader, err := spdy.RoundTripperFor(kc.config)
+			if err != nil {
+				return err
+			}
+
+			ports := []string{}
+			for _, p := range servicePorts {
+				ports = append(ports, fmt.Sprintf("%d:%d", p.PublishedPort, p.TargetPort))
+			}
+			//println(req.URL().String())
+			//os.Exit(0)
+			dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+			fw, err := portforward.New(dialer, ports, stopChannel, readyChannel, os.Stdout, os.Stderr)
+			if err != nil {
+				return err
+			}
+			return fw.ForwardPorts()
+		})
+	}
+	return eg.Wait()
 }

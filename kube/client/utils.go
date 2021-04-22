@@ -98,3 +98,10 @@ type WaitForStatusOptions struct {
 	Timeout     *time.Duration
 	Log         LogFunc
 }
+
+type Ports []compose.PortPublisher
+
+type PortMappingOptions struct {
+	ProjectName string
+	Services    map[string]Ports
+}
