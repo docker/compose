@@ -252,6 +252,18 @@ func (c *E2eCLI) WaitForCmdResult(command icmd.Cmd, predicate func(*icmd.Result)
 	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
 }
 
+// WaitForCondition wait for predicate to execute to true
+func (c *E2eCLI) WaitForCondition(predicate func() (bool, string), timeout time.Duration, delay time.Duration) {
+	checkStopped := func(logt poll.LogT) poll.Result {
+		pass, description := predicate()
+		if !pass {
+			return poll.Continue("Condition not met: %q", description)
+		}
+		return poll.Success()
+	}
+	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
+}
+
 // PathEnvVar returns path (os sensitive) for running test
 func (c *E2eCLI) PathEnvVar() string {
 	path := c.BinDir + ":" + os.Getenv("PATH")

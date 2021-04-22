@@ -20,7 +20,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
@@ -32,6 +34,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/metrics"
 )
@@ -42,8 +45,26 @@ type Command func(context.Context, []string) error
 //Adapt a Command func to cobra library
 func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		err := fn(cmd.Context(), args)
+		ctx := cmd.Context()
+		contextString := fmt.Sprintf("%s", ctx)
+		if !strings.HasSuffix(contextString, ".WithCancel") { // need to handle cancel
+			cancellableCtx, cancel := context.WithCancel(cmd.Context())
+			ctx = cancellableCtx
+			s := make(chan os.Signal, 1)
+			signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+			go func() {
+				<-s
+				cancel()
+			}()
+		}
+		err := fn(ctx, args)
 		var composeErr metrics.ComposeError
+		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+			err = dockercli.StatusError{
+				StatusCode: 130,
+				Status:     metrics.CanceledStatus,
+			}
+		}
 		if errors.As(err, &composeErr) {
 			err = dockercli.StatusError{
 				StatusCode: composeErr.GetMetricsFailureCategory().ExitCode,
