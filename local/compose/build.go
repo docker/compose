@@ -19,9 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
@@ -50,7 +48,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(service, project.WorkingDir, imageName)
+			buildOptions, err := s.toBuildOptions(service, imageName)
 			if err != nil {
 				return err
 			}
@@ -132,7 +130,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 				continue
 			}
 			imagesToBuild = append(imagesToBuild, imageName)
-			opt, err := s.toBuildOptions(service, project.WorkingDir, imageName)
+			opt, err := s.toBuildOptions(service, imageName)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -257,13 +255,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	return imagesBuilt, err
 }
 
-func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath string, imageTag string) (build.Options, error) {
+func (s *composeService) toBuildOptions(service types.ServiceConfig, imageTag string) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
-	if service.Build.Dockerfile == "" {
-		service.Build.Dockerfile = "Dockerfile"
-	}
 	var buildArgs map[string]string
 
 	var plats []specs.Platform
@@ -275,22 +270,11 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, contextPath
 		plats = append(plats, p)
 	}
 
-	var input build.Inputs
-	_, err := url.ParseRequestURI(service.Build.Context)
-	if err == nil {
-		input = build.Inputs{
+	return build.Options{
+		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
 			DockerfilePath: service.Build.Dockerfile,
-		}
-	} else {
-		input = build.Inputs{
-			ContextPath:    path.Join(contextPath, service.Build.Context),
-			DockerfilePath: path.Join(contextPath, service.Build.Context, service.Build.Dockerfile),
-		}
-	}
-
-	return build.Options{
-		Inputs:    input,
+		},
 		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
 		Tags:      tags,
 		Target:    service.Build.Target,
