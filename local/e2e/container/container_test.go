@@ -103,7 +103,7 @@ func TestLocalBackendRun(t *testing.T) {
 				nginxFound = true
 				assert.Equal(t, fields[1], "nginx:alpine", res.Combined())
 				assert.Equal(t, fields[2], "/docker-entrypoint.sh", res.Combined())
-				assert.Equal(t, fields[len(fields)-1], "0.0.0.0:85->80/tcp", res.Combined())
+				assert.Assert(t, strings.Contains(fields[len(fields)-1], ":85->80/tcp"), res.Combined())
 			}
 		}
 		assert.Assert(t, nginxFound, res.Stdout())
