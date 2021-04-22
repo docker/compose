@@ -141,6 +141,17 @@ func TestComposeUsingCliPlugin(t *testing.T) {
 	res.Assert(t, icmd.Expected{Err: "'compose' is not a docker command", ExitCode: 1})
 }
 
+func TestComposeCliPluginWithoutCloudIntegration(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	err := os.Remove(filepath.Join(binDir, "docker"))
+	assert.NilError(t, err)
+	err = os.Rename(filepath.Join(binDir, "com.docker.cli"), filepath.Join(binDir, "docker"))
+	assert.NilError(t, err)
+	res := c.RunDockerOrExitError("compose", "ls")
+	res.Assert(t, icmd.Expected{Out: "NAME                STATUS", ExitCode: 0})
+}
+
 func TestComposePull(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
