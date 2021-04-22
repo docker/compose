@@ -280,14 +280,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
-	shmSize := int64(0)
-	if service.ShmSize != "" {
-		shmSize, err = strconv.ParseInt(service.ShmSize, 10, 64)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-
 	tmpfs := map[string]string{}
 	for _, t := range service.Tmpfs {
 		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
@@ -316,7 +308,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		IpcMode:        container.IpcMode(ipcmode),
 		ReadonlyRootfs: service.ReadOnly,
 		RestartPolicy:  getRestartPolicy(service),
-		ShmSize:        shmSize,
+		ShmSize:        int64(service.ShmSize),
 		Sysctls:        service.Sysctls,
 		PortBindings:   portBindings,
 		Resources:      resources,

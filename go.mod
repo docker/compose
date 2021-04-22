@@ -17,7 +17,7 @@ require (
 	github.com/awslabs/goformation/v4 v4.15.6
 	github.com/buger/goterm v1.0.0
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
-	github.com/compose-spec/compose-go v0.0.0-20210421142148-66b18e67d2c0
+	github.com/compose-spec/compose-go v0.0.0-20210422124345-d4bf0e1bfea5
 	github.com/containerd/console v1.0.1
 	github.com/containerd/containerd v1.4.3
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
