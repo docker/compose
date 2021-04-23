@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -76,13 +77,12 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
-		wd, _ := os.Getwd()
 		res := c.RunDockerCmd("inspect", projectName+"_web_1")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"com.docker.compose.project.config_files": "%s/fixtures/sentences/compose.yaml"`, wd)})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -166,10 +166,10 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 
 	c := NewParallelE2eCLI(t, binDir)
 
-	tmpFolder, err := os.MkdirTemp("fixtures/simple-composefile", "test-tmp")
-	projectName := strings.TrimPrefix(tmpFolder, "fixtures/simple-composefile/")
-	defer os.Remove(tmpFolder) //nolint: errcheck
+	tmpFolder, err := ioutil.TempDir("fixtures/simple-composefile", "test-tmp")
 	assert.NilError(t, err)
+	defer os.Remove(tmpFolder) //nolint: errcheck
+	projectName := filepath.Base(tmpFolder)
 
 	res := c.RunDockerCmd("compose", "--project-directory", tmpFolder, "up", "-d")
 	res.Assert(t, icmd.Expected{Err: "Started", ExitCode: 0})

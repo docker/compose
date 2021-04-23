@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -53,7 +54,11 @@ func TestComposeMetrics(t *testing.T) {
 		s.ResetUsage()
 
 		res := c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/does-not-exist/compose.yml", "build")
-		res.Assert(t, icmd.Expected{ExitCode: 14, Err: "compose/fixtures/does-not-exist/compose.yml: no such file or directory"})
+		expectedErr := "compose/fixtures/does-not-exist/compose.yml: no such file or directory"
+		if runtime.GOOS == "windows" {
+			expectedErr = "does-not-exist\\compose.yml: The system cannot find the path specified"
+		}
+		res.Assert(t, icmd.Expected{ExitCode: 14, Err: expectedErr})
 		res = c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/wrong-composefile/compose.yml", "up", "-d")
 		res.Assert(t, icmd.Expected{ExitCode: 15, Err: "services.simple Additional property wrongField is not allowed"})
 		res = c.RunDockerOrExitError("compose", "up")
