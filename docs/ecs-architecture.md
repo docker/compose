@@ -59,7 +59,7 @@ This diagram shows compose model and on same line AWS components that get create
       +------------+                        +---------------+
 ```
 
-Each compose application service is mapped to an ECS `Service`. A `TaksDefinition` is created according to compose definition.
+Each compose application service is mapped to an ECS `Service`. A `TaskDefinition` is created according to compose definition.
 Actual mapping is constrained by both Cloud platform and Fargate limitations. Such a `TaskDefinition` is set with a single container,
 according to the compose model which doesn't offer a syntax to support sidecar containers.
 
