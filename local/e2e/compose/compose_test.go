@@ -18,10 +18,12 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -76,13 +78,12 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
-		wd, _ := os.Getwd()
 		res := c.RunDockerCmd("inspect", projectName+"_web_1")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.config-hash":`})
-		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"com.docker.compose.project.config_files": "%s/fixtures/sentences/compose.yaml"`, wd)})
+		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.config_files":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project.working_dir":`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
@@ -132,21 +133,31 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 }
 
+func binExt() string {
+	binaryExt := ""
+	if runtime.GOOS == "windows" {
+		binaryExt = ".exe"
+	}
+	return binaryExt
+}
 func TestComposeUsingCliPlugin(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"))
+	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"+binExt()))
 	assert.NilError(t, err)
 	res := c.RunDockerOrExitError("compose", "ls")
 	res.Assert(t, icmd.Expected{Err: "'compose' is not a docker command", ExitCode: 1})
 }
 
 func TestComposeCliPluginWithoutCloudIntegration(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-
-	err := os.Remove(filepath.Join(binDir, "docker"))
+	newBinFolder, cleanup, err := SetupExistingCLI() // do not share bin folder with other tests
 	assert.NilError(t, err)
-	err = os.Rename(filepath.Join(binDir, "com.docker.cli"), filepath.Join(binDir, "docker"))
+	defer cleanup()
+	c := NewParallelE2eCLI(t, newBinFolder)
+
+	err = os.Remove(filepath.Join(newBinFolder, "docker"+binExt()))
+	assert.NilError(t, err)
+	err = os.Rename(filepath.Join(newBinFolder, "com.docker.cli"+binExt()), filepath.Join(newBinFolder, "docker"+binExt()))
 	assert.NilError(t, err)
 	res := c.RunDockerOrExitError("compose", "ls")
 	res.Assert(t, icmd.Expected{Out: "NAME                STATUS", ExitCode: 0})
@@ -166,10 +177,10 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 
 	c := NewParallelE2eCLI(t, binDir)
 
-	tmpFolder, err := os.MkdirTemp("fixtures/simple-composefile", "test-tmp")
-	projectName := strings.TrimPrefix(tmpFolder, "fixtures/simple-composefile/")
-	defer os.Remove(tmpFolder) //nolint: errcheck
+	tmpFolder, err := ioutil.TempDir("fixtures/simple-composefile", "test-tmp")
 	assert.NilError(t, err)
+	defer os.Remove(tmpFolder) //nolint: errcheck
+	projectName := filepath.Base(tmpFolder)
 
 	res := c.RunDockerCmd("compose", "--project-directory", tmpFolder, "up", "-d")
 	res.Assert(t, icmd.Expected{Err: "Started", ExitCode: 0})
