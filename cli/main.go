@@ -218,9 +218,13 @@ func main() {
 
 	root.AddCommand(
 		run.Command(ctype),
-		compose.RootCommand(ctype, service.ComposeService()),
 		volume.Command(ctype),
 	)
+
+	if ctype != store.DefaultContextType {
+		// On default context, "compose" is implemented by CLI Plugin
+		root.AddCommand(compose.RootCommand(ctype, service.ComposeService()))
+	}
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)
