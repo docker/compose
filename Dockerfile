@@ -73,7 +73,7 @@ RUN --mount=target=. \
     GOARCH=${TARGETARCH} \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
-    make BINARY=/out/docker -f builder.Makefile cli
+    make BINARY=/out/docker COMPOSE_BINARY=/out/docker-compose -f builder.Makefile cli
 
 FROM base AS make-cross
 ARG BUILD_TAGS
@@ -83,7 +83,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
-    make BINARY=/out/docker  -f builder.Makefile cross
+    make BINARY=/out/docker COMPOSE_BINARY=/out/docker-compose -f builder.Makefile cross
 
 FROM scratch AS protos
 COPY --from=make-protos /compose-cli/cli/server/protos .

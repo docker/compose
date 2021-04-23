@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
@@ -38,16 +37,16 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *projectOptions, contextType string) *cobra.Command {
+func logsCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
 	opts := logsOptions{
 		projectOptions: p,
 	}
 	logsCmd := &cobra.Command{
 		Use:   "logs [service...]",
 		Short: "View output from containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runLogs(cmd.Context(), opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runLogs(ctx, backend, opts, args)
+		}),
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
@@ -61,18 +60,13 @@ func logsCommand(p *projectOptions, contextType string) *cobra.Command {
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, opts logsOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runLogs(ctx context.Context, backend compose.Service, opts logsOptions, services []string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
-	return c.ComposeService().Logs(ctx, projectName, consumer, compose.LogOptions{
+	return backend.Logs(ctx, projectName, consumer, compose.LogOptions{
 		Services:   services,
 		Follow:     opts.follow,
 		Tail:       opts.tail,

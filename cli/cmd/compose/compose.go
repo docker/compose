@@ -17,21 +17,63 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	dockercli "github.com/docker/cli/cli"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/metrics"
 )
+
+//Command defines a compose CLI command as a func with args
+type Command func(context.Context, []string) error
+
+//Adapt a Command func to cobra library
+func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		contextString := fmt.Sprintf("%s", ctx)
+		if !strings.HasSuffix(contextString, ".WithCancel") { // need to handle cancel
+			cancellableCtx, cancel := context.WithCancel(cmd.Context())
+			ctx = cancellableCtx
+			s := make(chan os.Signal, 1)
+			signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
+			go func() {
+				<-s
+				cancel()
+			}()
+		}
+		err := fn(ctx, args)
+		var composeErr metrics.ComposeError
+		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+			err = dockercli.StatusError{
+				StatusCode: 130,
+				Status:     metrics.CanceledStatus,
+			}
+		}
+		if errors.As(err, &composeErr) {
+			err = dockercli.StatusError{
+				StatusCode: composeErr.GetMetricsFailureCategory().ExitCode,
+				Status:     err.Error(),
+			}
+		}
+		return err
+	}
+}
 
 // Warning is a global warning to be displayed to user on command failure
 var Warning string
@@ -104,8 +146,8 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithName(o.ProjectName))...)
 }
 
-// Command returns the compose command with its child commands
-func Command(contextType string) *cobra.Command {
+// RootCommand returns the compose command with its child commands
+func RootCommand(contextType string, backend compose.Service) *cobra.Command {
 	opts := projectOptions{}
 	var ansi string
 	var noAnsi bool
@@ -119,9 +161,20 @@ func Command(contextType string) *cobra.Command {
 				return cmd.Help()
 			}
 			_ = cmd.Help()
-			return fmt.Errorf("unknown docker command: %q", "compose "+args[0])
+			return dockercli.StatusError{
+				StatusCode: metrics.CommandSyntaxFailure.ExitCode,
+				Status:     fmt.Sprintf("unknown docker command: %q", "compose "+args[0]),
+			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			parent := cmd.Root()
+			parentPrerun := parent.PersistentPreRunE
+			if parentPrerun != nil {
+				err := parentPrerun(cmd, args)
+				if err != nil {
+					return err
+				}
+			}
 			if noAnsi {
 				if ansi != "auto" {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
@@ -146,34 +199,34 @@ func Command(contextType string) *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(&opts, contextType),
-		downCommand(&opts, contextType),
-		startCommand(&opts),
-		restartCommand(&opts),
-		stopCommand(&opts),
-		psCommand(&opts),
-		listCommand(contextType),
-		logsCommand(&opts, contextType),
-		convertCommand(&opts),
-		killCommand(&opts),
-		runCommand(&opts),
-		removeCommand(&opts),
-		execCommand(&opts),
-		pauseCommand(&opts),
-		unpauseCommand(&opts),
-		topCommand(&opts),
-		eventsCommand(&opts),
-		portCommand(&opts),
-		imagesCommand(&opts),
+		upCommand(&opts, contextType, backend),
+		downCommand(&opts, contextType, backend),
+		startCommand(&opts, backend),
+		restartCommand(&opts, backend),
+		stopCommand(&opts, backend),
+		psCommand(&opts, backend),
+		listCommand(contextType, backend),
+		logsCommand(&opts, contextType, backend),
+		convertCommand(&opts, backend),
+		killCommand(&opts, backend),
+		runCommand(&opts, backend),
+		removeCommand(&opts, backend),
+		execCommand(&opts, backend),
+		pauseCommand(&opts, backend),
+		unpauseCommand(&opts, backend),
+		topCommand(&opts, backend),
+		eventsCommand(&opts, backend),
+		portCommand(&opts, backend),
+		imagesCommand(&opts, backend),
 		versionCommand(),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
 		command.AddCommand(
-			buildCommand(&opts),
-			pushCommand(&opts),
-			pullCommand(&opts),
-			createCommand(&opts),
+			buildCommand(&opts, backend),
+			pushCommand(&opts, backend),
+			pullCommand(&opts, backend),
+			createCommand(&opts, backend),
 		)
 	}
 	command.Flags().SetInterspersed(false)

@@ -55,3 +55,26 @@ var (
 	// PullFailure failure while pulling image
 	PullFailure = FailureCategory{MetricsStatus: PullFailureStatus, ExitCode: 18}
 )
+
+//ByExitCode retrieve FailureCategory based on command exit code
+func ByExitCode(exitCode int) FailureCategory {
+	switch exitCode {
+	case 0:
+		return FailureCategory{MetricsStatus: SuccessStatus, ExitCode: 0}
+	case 14:
+		return FileNotFoundFailure
+	case 15:
+		return ComposeParseFailure
+	case 16:
+		return CommandSyntaxFailure
+	case 17:
+		return BuildFailure
+	case 18:
+		return PullFailure
+	case 130:
+		return FailureCategory{MetricsStatus: CanceledStatus, ExitCode: exitCode}
+	default:
+		return FailureCategory{MetricsStatus: FailureStatus, ExitCode: exitCode}
+	}
+
+}

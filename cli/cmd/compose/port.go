@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 )
 
@@ -33,7 +32,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *projectOptions) *cobra.Command {
+func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := portOptions{
 		projectOptions: p,
 	}
@@ -41,30 +40,25 @@ func portCommand(p *projectOptions) *cobra.Command {
 		Use:   "port [options] [--] SERVICE PRIVATE_PORT",
 		Short: "Print the public port for a port binding.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			port, err := strconv.Atoi(args[1])
 			if err != nil {
 				return err
 			}
-			return runPort(cmd.Context(), opts, args[0], port)
-		},
+			return runPort(ctx, backend, opts, args[0], port)
+		}),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
 	cmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if service has multiple replicas")
 	return cmd
 }
 
-func runPort(ctx context.Context, opts portOptions, service string, port int) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runPort(ctx context.Context, backend compose.Service, opts portOptions, service string, port int) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	ip, port, err := c.ComposeService().Port(ctx, projectName, service, port, compose.PortOptions{
+	ip, port, err := backend.Port(ctx, projectName, service, port, compose.PortOptions{
 		Protocol: opts.protocol,
 		Index:    opts.index,
 	})

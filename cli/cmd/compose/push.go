@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -33,35 +32,30 @@ type pushOptions struct {
 	Ignorefailures bool
 }
 
-func pushCommand(p *projectOptions) *cobra.Command {
+func pushCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := pushOptions{
 		projectOptions: p,
 	}
 	pushCmd := &cobra.Command{
 		Use:   "push [SERVICE...]",
 		Short: "Push service images",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runPush(cmd.Context(), opts, args)
-		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runPush(ctx, backend, opts, args)
+		}),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
 
 	return pushCmd
 }
 
-func runPush(ctx context.Context, opts pushOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runPush(ctx context.Context, backend compose.Service, opts pushOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Push(ctx, project, compose.PushOptions{
+		return "", backend.Push(ctx, project, compose.PushOptions{
 			IgnoreFailures: opts.Ignorefailures,
 		})
 	})

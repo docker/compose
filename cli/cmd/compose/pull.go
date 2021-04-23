@@ -24,7 +24,6 @@ import (
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils"
@@ -40,19 +39,19 @@ type pullOptions struct {
 	ignorePullFailures bool
 }
 
-func pullCommand(p *projectOptions) *cobra.Command {
+func pullCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := pullOptions{
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "pull [SERVICE...]",
 		Short: "Pull service images",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.noParallel {
 				fmt.Fprint(os.Stderr, aec.Apply("option '--no-parallel' is DEPRECATED and will be ignored.\n", aec.RedF))
 			}
-			return runPull(cmd.Context(), opts, args)
-		},
+			return runPull(ctx, backend, opts, args)
+		}),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Pull without printing progress information")
@@ -65,12 +64,7 @@ func pullCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runPull(ctx context.Context, opts pullOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runPull(ctx context.Context, backend compose.Service, opts pullOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -94,11 +88,11 @@ func runPull(ctx context.Context, opts pullOptions, services []string) error {
 	}
 
 	if opts.quiet {
-		return c.ComposeService().Pull(ctx, project, apiOpts)
+		return backend.Pull(ctx, project, apiOpts)
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Pull(ctx, project, apiOpts)
+		return "", backend.Pull(ctx, project, apiOpts)
 	})
 	return err
 }

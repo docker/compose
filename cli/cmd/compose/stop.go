@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -33,17 +32,19 @@ type stopOptions struct {
 	timeout     int
 }
 
-func stopCommand(p *projectOptions) *cobra.Command {
+func stopCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := stopOptions{
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "stop [SERVICE...]",
 		Short: "Stop services",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
-			return runStop(cmd.Context(), opts, args)
 		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runStop(ctx, backend, opts, args)
+		}),
 	}
 	flags := cmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
@@ -51,12 +52,7 @@ func stopCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runStop(ctx context.Context, opts stopOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runStop(ctx context.Context, backend compose.Service, opts stopOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -68,7 +64,7 @@ func runStop(ctx context.Context, opts stopOptions, services []string) error {
 		timeout = &timeoutValue
 	}
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Stop(ctx, project, compose.StopOptions{
+		return "", backend.Stop(ctx, project, compose.StopOptions{
 			Timeout:  timeout,
 			Services: services,
 		})

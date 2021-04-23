@@ -24,7 +24,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 )
@@ -40,14 +39,14 @@ type buildOptions struct {
 	memory   string
 }
 
-func buildCommand(p *projectOptions) *cobra.Command {
+func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := buildOptions{
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
 		Use:   "build [SERVICE...]",
 		Short: "Build or rebuild services",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.memory != "" {
 				fmt.Println("WARNING --memory is ignored as not supported in buildkit.")
 			}
@@ -58,8 +57,8 @@ func buildCommand(p *projectOptions) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
-			return runBuild(cmd.Context(), opts, args)
-		},
+			return runBuild(ctx, backend, opts, args)
+		}),
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
@@ -80,19 +79,14 @@ func buildCommand(p *projectOptions) *cobra.Command {
 	return cmd
 }
 
-func runBuild(ctx context.Context, opts buildOptions, services []string) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runBuild(ctx context.Context, backend compose.Service, opts buildOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
 	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", c.ComposeService().Build(ctx, project, compose.BuildOptions{
+		return "", backend.Build(ctx, project, compose.BuildOptions{
 			Pull:     opts.pull,
 			Progress: opts.progress,
 			Args:     types.NewMapping(opts.args),

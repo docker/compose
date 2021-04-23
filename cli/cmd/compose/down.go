@@ -24,7 +24,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/progress"
@@ -39,22 +38,24 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *projectOptions, contextType string) *cobra.Command {
+func downCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
 	opts := downOptions{
 		projectOptions: p,
 	}
 	downCmd := &cobra.Command{
 		Use:   "down",
 		Short: "Stop and remove containers, networks",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
+		},
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
 				}
 			}
-			return runDown(cmd.Context(), opts)
-		},
+			return runDown(ctx, backend, opts)
+		}),
 	}
 	flags := downCmd.Flags()
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
@@ -68,13 +69,8 @@ func downCommand(p *projectOptions, contextType string) *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, opts downOptions) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+func runDown(ctx context.Context, backend compose.Service, opts downOptions) error {
+	_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
 		name := opts.ProjectName
 		var project *types.Project
 		if opts.ProjectName == "" {
@@ -91,7 +87,7 @@ func runDown(ctx context.Context, opts downOptions) error {
 			timeoutValue := time.Duration(opts.timeout) * time.Second
 			timeout = &timeoutValue
 		}
-		return name, c.ComposeService().Down(ctx, name, compose.DownOptions{
+		return name, backend.Down(ctx, name, compose.DownOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Project:       project,
 			Timeout:       timeout,

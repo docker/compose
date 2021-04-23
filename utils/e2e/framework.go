@@ -85,6 +85,17 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 		_ = os.RemoveAll(d)
 	})
 
+	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
+	composePluginFile := "docker-compose"
+	if runtime.GOOS == "windows" {
+		composePluginFile += ".exe"
+	}
+	composePlugin, _ := findExecutable(composePluginFile, []string{"../../bin", "../../../bin"})
+	err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", composePluginFile))
+	if err != nil {
+		panic(err)
+	}
+
 	return &E2eCLI{binDir, d, t}
 }
 
@@ -117,7 +128,7 @@ func SetupExistingCLI() (string, func(), error) {
 		return "", nil, err
 	}
 
-	bin, err := findExecutable([]string{"../../bin", "../../../bin"})
+	bin, err := findExecutable(DockerExecutableName, []string{"../../bin", "../../../bin"})
 	if err != nil {
 		return "", nil, err
 	}
@@ -133,9 +144,9 @@ func SetupExistingCLI() (string, func(), error) {
 	return d, cleanup, nil
 }
 
-func findExecutable(paths []string) (string, error) {
+func findExecutable(executableName string, paths []string) (string, error) {
 	for _, p := range paths {
-		bin, err := filepath.Abs(path.Join(p, DockerExecutableName))
+		bin, err := filepath.Abs(path.Join(p, executableName))
 		if err != nil {
 			return "", err
 		}
@@ -235,6 +246,18 @@ func (c *E2eCLI) WaitForCmdResult(command icmd.Cmd, predicate func(*icmd.Result)
 		res = icmd.RunCmd(command)
 		if !predicate(res) {
 			return poll.Continue("Cmd output did not match requirement: %q", res.Combined())
+		}
+		return poll.Success()
+	}
+	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
+}
+
+// WaitForCondition wait for predicate to execute to true
+func (c *E2eCLI) WaitForCondition(predicate func() (bool, string), timeout time.Duration, delay time.Duration) {
+	checkStopped := func(logt poll.LogT) poll.Result {
+		pass, description := predicate()
+		if !pass {
+			return poll.Continue("Condition not met: %q", description)
 		}
 		return poll.Success()
 	}

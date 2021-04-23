@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/console"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/compose"
 )
 
@@ -43,7 +42,7 @@ type execOpts struct {
 	privileged bool
 }
 
-func execCommand(p *projectOptions) *cobra.Command {
+func execCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -53,13 +52,13 @@ func execCommand(p *projectOptions) *cobra.Command {
 		Use:   "exec [options] [-e KEY=VAL...] [--] SERVICE COMMAND [ARGS...]",
 		Short: "Execute a command in a running container.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if len(args) > 1 {
 				opts.command = args[1:]
 			}
 			opts.service = args[0]
-			return runExec(cmd.Context(), opts)
-		},
+			return runExec(ctx, backend, opts)
+		}),
 	}
 
 	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background.")
@@ -74,12 +73,7 @@ func execCommand(p *projectOptions) *cobra.Command {
 	return runCmd
 }
 
-func runExec(ctx context.Context, opts execOpts) error {
-	c, err := client.New(ctx)
-	if err != nil {
-		return err
-	}
-
+func runExec(ctx context.Context, backend compose.Service, opts execOpts) error {
 	project, err := opts.toProject(nil)
 	if err != nil {
 		return err
@@ -114,5 +108,5 @@ func runExec(ctx context.Context, opts execOpts) error {
 		execOpts.Writer = con
 		execOpts.Reader = con
 	}
-	return c.ComposeService().Exec(ctx, project, execOpts)
+	return backend.Exec(ctx, project, execOpts)
 }
