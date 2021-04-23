@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -132,21 +133,31 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 }
 
+func binExt() string {
+	binaryExt := ""
+	if runtime.GOOS == "windows" {
+		binaryExt = ".exe"
+	}
+	return binaryExt
+}
 func TestComposeUsingCliPlugin(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"))
+	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"+binExt()))
 	assert.NilError(t, err)
 	res := c.RunDockerOrExitError("compose", "ls")
 	res.Assert(t, icmd.Expected{Err: "'compose' is not a docker command", ExitCode: 1})
 }
 
 func TestComposeCliPluginWithoutCloudIntegration(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-
-	err := os.Remove(filepath.Join(binDir, "docker"))
+	newBinFolder, cleanup, err := SetupExistingCLI() // do not share bin folder with other tests
 	assert.NilError(t, err)
-	err = os.Rename(filepath.Join(binDir, "com.docker.cli"), filepath.Join(binDir, "docker"))
+	defer cleanup()
+	c := NewParallelE2eCLI(t, newBinFolder)
+
+	err = os.Remove(filepath.Join(newBinFolder, "docker"+binExt()))
+	assert.NilError(t, err)
+	err = os.Rename(filepath.Join(newBinFolder, "com.docker.cli"+binExt()), filepath.Join(newBinFolder, "docker"+binExt()))
 	assert.NilError(t, err)
 	res := c.RunDockerOrExitError("compose", "ls")
 	res.Assert(t, icmd.Expected{Out: "NAME                STATUS", ExitCode: 0})
