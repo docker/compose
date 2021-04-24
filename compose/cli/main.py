@@ -82,7 +82,7 @@ def main():  # noqa: C901
         if not IS_LINUX_PLATFORM and command == 'help':
             print("\nDocker Compose is now in the Docker CLI, try `docker compose` help")
     except (KeyboardInterrupt, signals.ShutdownException):
-        exit_with_metrics(command, "Aborting.", status=Status.FAILURE)
+        exit_with_metrics(command, "Aborting.", status=Status.CANCELED)
     except (UserError, NoSuchService, ConfigurationError,
             ProjectError, OperationFailedError) as e:
         exit_with_metrics(command, e.msg, status=Status.FAILURE)
@@ -103,7 +103,8 @@ def main():  # noqa: C901
         commands = "\n".join(parse_doc_section("commands:", getdoc(e.supercommand)))
         if not IS_LINUX_PLATFORM:
             commands += "\n\nDocker Compose is now in the Docker CLI, try `docker compose`"
-        exit_with_metrics(e.command, "No such command: {}\n\n{}".format(e.command, commands))
+        exit_with_metrics("", log_msg="No such command: {}\n\n{}".format(
+            e.command, commands), status=Status.FAILURE)
     except (errors.ConnectionError, StreamParseError):
         exit_with_metrics(command, status=Status.FAILURE)
     except SystemExit as e:
@@ -137,7 +138,7 @@ def get_filtered_args(args):
 
 
 def exit_with_metrics(command, log_msg=None, status=Status.SUCCESS, exit_code=1):
-    if log_msg:
+    if log_msg and command != 'exec':
         if not exit_code:
             log.info(log_msg)
         else:
@@ -171,7 +172,8 @@ def dispatch():
     if options.get("--no-ansi"):
         if options.get("--ansi"):
             raise UserError("--no-ansi and --ansi cannot be combined.")
-        log.warning('--no-ansi option is deprecated and will be removed in future versions.')
+        log.warning('--no-ansi option is deprecated and will be removed in future versions. '
+                    'Use `--ansi never` instead.')
         ansi_mode = AnsiMode.NEVER
 
     setup_console_handler(console_handler,
@@ -390,6 +392,7 @@ class TopLevelCommand:
             --no-interpolate         Don't interpolate environment variables.
             -q, --quiet              Only validate the configuration, don't print
                                      anything.
+            --profiles               Print the profile names, one per line.
             --services               Print the service names, one per line.
             --volumes                Print the volume names, one per line.
             --hash="*"               Print the service config hash, one per line.
@@ -407,6 +410,15 @@ class TopLevelCommand:
                 image_digests = image_digests_for_project(self.project)
 
         if options['--quiet']:
+            return
+
+        if options['--profiles']:
+            profiles = set()
+            for service in compose_config.services:
+                if 'profiles' in service:
+                    for profile in service['profiles']:
+                        profiles.add(profile)
+            print('\n'.join(sorted(profiles)))
             return
 
         if options['--services']:

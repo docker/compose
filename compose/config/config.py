@@ -11,7 +11,11 @@ from operator import itemgetter
 
 import toml
 import yaml
-from cached_property import cached_property
+
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
 
 from . import types
 from ..const import COMPOSE_SPEC as VERSION

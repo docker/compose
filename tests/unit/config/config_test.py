@@ -2501,7 +2501,8 @@ web:
             'image': 'busybox',
             'depends_on': {
                 'app1': {'condition': 'service_started'},
-                'app2': {'condition': 'service_healthy'}
+                'app2': {'condition': 'service_healthy'},
+                'app3': {'condition': 'service_completed_successfully'}
             }
         }
         override = {}
@@ -2513,11 +2514,12 @@ web:
             'image': 'busybox',
             'depends_on': {
                 'app1': {'condition': 'service_started'},
-                'app2': {'condition': 'service_healthy'}
+                'app2': {'condition': 'service_healthy'},
+                'app3': {'condition': 'service_completed_successfully'}
             }
         }
         override = {
-            'depends_on': ['app3']
+            'depends_on': ['app4']
         }
 
         actual = config.merge_service_dicts(base, override, VERSION)
@@ -2526,7 +2528,8 @@ web:
             'depends_on': {
                 'app1': {'condition': 'service_started'},
                 'app2': {'condition': 'service_healthy'},
-                'app3': {'condition': 'service_started'}
+                'app3': {'condition': 'service_completed_successfully'},
+                'app4': {'condition': 'service_started'},
             }
         }
 

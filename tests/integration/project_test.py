@@ -25,6 +25,7 @@ from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.errors import CompletedUnsuccessfully
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
@@ -1898,6 +1899,106 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
+
+    def test_project_up_completed_successfully_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'true'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+
+        assert 'svc1' in svc2.get_dependency_names()
+        assert svc2.containers()[0].is_running
+        assert len(svc1.containers()) == 0
+        assert svc1.is_completed_successfully()
+
+    def test_project_up_completed_unsuccessfully_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'false'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        assert 'svc1' in svc2.get_dependency_names()
+        assert len(svc2.containers()) == 0
+        with pytest.raises(CompletedUnsuccessfully):
+            svc1.is_completed_successfully()
+
+    def test_project_up_completed_differently_dependencies(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'true'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'false'
+                },
+                'svc3': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                        'svc2': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        svc3 = project.get_service('svc3')
+        assert ['svc1', 'svc2'] == svc3.get_dependency_names()
+        assert svc1.is_completed_successfully()
+        assert len(svc3.containers()) == 0
+        with pytest.raises(CompletedUnsuccessfully):
+            svc2.is_completed_successfully()
 
     def test_project_up_seccomp_profile(self):
         seccomp_data = {

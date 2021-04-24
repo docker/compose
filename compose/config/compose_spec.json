@@ -188,7 +188,7 @@
                   "properties": {
                     "condition": {
                       "type": "string",
-                      "enum": ["service_started", "service_healthy"]
+                      "enum": ["service_started", "service_healthy", "service_completed_successfully"]
                     }
                   },
                   "required": ["condition"]
@@ -335,7 +335,6 @@
         "read_only": {"type": "boolean"},
         "restart": {"type": "string"},
         "runtime": {
-          "deprecated": true,
           "type": "string"
         },
         "scale": {
@@ -367,6 +366,7 @@
         "stdin_open": {"type": "boolean"},
         "stop_grace_period": {"type": "string", "format": "duration"},
         "stop_signal": {"type": "string"},
+        "storage_opt": {"type": "object"},
         "tmpfs": {"$ref": "#/definitions/string_or_list"},
         "tty": {"type": "boolean"},
         "ulimits": {

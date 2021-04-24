@@ -1,6 +1,63 @@
 Change log
 ==========
 
+1.29.1 (2021-04-13)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/58?closed=1)
+
+### Bugs
+
+- Fix for invalid handler warning on Windows builds
+
+- Fix config hash to trigger container recreation on IPC mode updates
+
+- Fix conversion map for `placement.max_replicas_per_node`
+
+- Remove extra scan suggestion on build
+
+1.29.0 (2021-04-06)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/56?closed=1)
+
+### Features
+
+- Add profile filter to `docker-compose config`
+
+- Add a `depends_on` condition to wait for successful service completion
+
+### Miscellaneous
+
+- Add image scan message on build
+
+- Update warning message for `--no-ansi` to mention `--ansi never` as alternative
+
+- Bump docker-py to 5.0.0
+
+- Bump PyYAML to 5.4.1
+
+- Bump python-dotenv to 0.17.0
+
+1.28.6 (2021-03-23)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/57?closed=1)
+
+### Bugs
+
+- Make `--env-file` relative to the current working directory and error out for invalid paths. Environment file paths set with `--env-file` are relative to the current working directory while the default `.env` file is located in the project directory which by default is the base directory of the Compose file.
+
+- Fix missing service property `storage_opt` by updating the compose schema
+
+- Fix build `extra_hosts` list format
+
+- Remove extra error message on `exec`
+
+### Miscellaneous
+
+- Add `compose.yml` and `compose.yaml` to default filename list
+
 1.28.5 (2021-02-25)
 -------------------
 

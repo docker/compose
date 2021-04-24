@@ -36,7 +36,7 @@ class MetricsCommand(requests.Session):
                  context_type=None, status=Status.SUCCESS,
                  source=MetricsSource.CLI, uri=None):
         super().__init__()
-        self.command = "compose " + command if command else "compose --help"
+        self.command = ("compose " + command).strip() if command else "compose --help"
         self.context = context_type or ContextAPI.get_current_context().context_type or 'moby'
         self.source = source
         self.status = status.value
