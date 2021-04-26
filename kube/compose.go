@@ -122,15 +122,12 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			w.Event(progress.NewEvent(pod, state, message))
 		},
 	})
-	//return err
-
 	if err != nil {
 		return err
 	}
 
 	// check if there is a port mapping
 	services := map[string]client.Ports{}
-
 	for _, s := range project.Services {
 		if len(s.Ports) > 0 {
 			services[s.Name] = client.Ports{}
@@ -144,7 +141,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		}
 	}
 	if len(services) > 0 {
-		return s.client.MapPorts(ctx, client.PortMappingOptions{
+		return s.client.MapPortsToLocalhost(ctx, client.PortMappingOptions{
 			ProjectName: project.Name,
 			Services:    services,
 		})

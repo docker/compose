@@ -246,8 +246,8 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOpti
 	return nil
 }
 
-func (kc KubeClient) MapPorts(ctx context.Context, opts PortMappingOptions) error {
-
+//MapPortsToLocalhost runs a port-forwarder daemon process
+func (kc KubeClient) MapPortsToLocalhost(ctx context.Context, opts PortMappingOptions) error {
 	stopChannel := make(chan struct{}, 1)
 	readyChannel := make(chan struct{})
 
@@ -260,19 +260,20 @@ func (kc KubeClient) MapPorts(ctx context.Context, opts PortMappingOptions) erro
 			return err
 		}
 		eg.Go(func() error {
-
-			req := kc.client.RESTClient().Post().Resource("pods").Namespace(kc.namespace).Name(pod.Name).SubResource("portforward") //fmt.Sprintf("service/%s", serviceName)).SubResource("portforward")
-			transport, upgrader, err := spdy.RoundTripperFor(kc.config)
-			if err != nil {
-				return err
-			}
-
 			ports := []string{}
 			for _, p := range servicePorts {
 				ports = append(ports, fmt.Sprintf("%d:%d", p.PublishedPort, p.TargetPort))
 			}
-			//println(req.URL().String())
-			//os.Exit(0)
+
+			req := kc.client.CoreV1().RESTClient().Post().
+				Resource("pods").
+				Name(pod.Name).
+				Namespace(kc.namespace).
+				SubResource("portforward")
+			transport, upgrader, err := spdy.RoundTripperFor(kc.config)
+			if err != nil {
+				return err
+			}
 			dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 			fw, err := portforward.New(dialer, ports, stopChannel, readyChannel, os.Stdout, os.Stderr)
 			if err != nil {
