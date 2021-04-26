@@ -1,7 +1,7 @@
 services:
   simple:
     image: alpine
-    command: sh -c "sleep 5"
+    command: sh -c "sleep infinity"
   another:
     image: alpine
     command: sh -c "sleep 0.1 && echo world && /bin/false"
