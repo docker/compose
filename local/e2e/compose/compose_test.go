@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -192,15 +191,16 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 func TestAttachRestart(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
-	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
+	cmd := c.NewDockerCmd("compose", "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
+	res := icmd.StartCmd(cmd)
 	defer c.RunDockerOrExitError("compose", "-p", "attach-restart", "down")
-	output := res.Stdout()
 
-	exitRegex := regexp.MustCompile("another_1 exited with code 1")
-	assert.Equal(t, len(exitRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
+	c.WaitForCondition(func() (bool, string) {
+		debug := res.Combined()
+		return strings.Count(res.Stdout(), "another_1 exited with code 1") == 3, fmt.Sprintf("'another_1 exited with code 1' not found 3 times in : \n%s\n", debug)
+	}, 2*time.Minute, 2*time.Second)
 
-	execRegex := regexp.MustCompile(`another_1  \| world`)
-	assert.Equal(t, len(execRegex.FindAllStringIndex(output, -1)), 3, res.Combined())
+	assert.Equal(t, strings.Count(res.Stdout(), "another_1  | world"), 3, res.Combined())
 }
 
 func TestInitContainer(t *testing.T) {
