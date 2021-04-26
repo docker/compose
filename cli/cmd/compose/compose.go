@@ -112,7 +112,7 @@ func (o *projectOptions) toProjectName() (string, error) {
 func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
-		return nil, err
+		return nil, metrics.WrapComposeError(err)
 	}
 
 	project, err := cli.ProjectFromOptions(options)
@@ -143,6 +143,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithDotEnv,
 			cli.WithOsEnv,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
 }
 
