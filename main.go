@@ -61,6 +61,6 @@ func main() {
 		manager.Metadata{
 			SchemaVersion: "0.1.0",
 			Vendor:        "Docker Inc.",
-			Version:       strings.TrimPrefix(internal.Version, "v"),
+			Version:       strings.TrimPrefix(internal.ComposePluginVersion, "v"),
 		})
 }
