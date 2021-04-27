@@ -110,7 +110,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
-	err = s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
+	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
 		ProjectName: project.Name,
 		Services:    project.ServiceNames(),
 		Status:      compose.RUNNING,
@@ -122,32 +122,6 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			w.Event(progress.NewEvent(pod, state, message))
 		},
 	})
-	if err != nil {
-		return err
-	}
-
-	// check if there is a port mapping
-	services := map[string]client.Ports{}
-	for _, s := range project.Services {
-		if len(s.Ports) > 0 {
-			services[s.Name] = client.Ports{}
-			for _, p := range s.Ports {
-				services[s.Name] = append(services[s.Name], compose.PortPublisher{
-					TargetPort:    int(p.Target),
-					PublishedPort: int(p.Published),
-					Protocol:      p.Protocol,
-				})
-			}
-		}
-	}
-	if len(services) > 0 {
-		return s.client.MapPortsToLocalhost(ctx, client.PortMappingOptions{
-			ProjectName: project.Name,
-			Services:    services,
-		})
-	}
-	return nil
-
 }
 
 // Down executes the equivalent to a `compose down`

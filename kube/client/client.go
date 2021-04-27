@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -73,7 +74,7 @@ func NewKubeClient(config genericclioptions.RESTClientGetter) (*KubeClient, erro
 	}, nil
 }
 
-// GetContainers get containers for a given compose project
+// GetPod retrieves a service pod
 func (kc KubeClient) GetPod(ctx context.Context, projectName, serviceName string) (*corev1.Pod, error) {
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectTag, projectName),
@@ -160,9 +161,39 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 	if err != nil {
 		return nil, err
 	}
+	services := map[string][]compose.PortPublisher{}
 	result := []compose.ContainerSummary{}
 	for _, pod := range pods.Items {
-		result = append(result, podToContainerSummary(pod))
+		summary := podToContainerSummary(pod)
+		serviceName := pod.GetObjectMeta().GetLabels()[compose.ServiceTag]
+		ports, ok := services[serviceName]
+		if !ok {
+			s, err := kc.client.CoreV1().Services(kc.namespace).Get(ctx, serviceName, metav1.GetOptions{})
+			if err != nil {
+				if !strings.Contains(err.Error(), "not found") {
+					return nil, err
+				}
+				result = append(result, summary)
+				continue
+			}
+			ports = []compose.PortPublisher{}
+			if s != nil {
+				if s.Spec.Type == corev1.ServiceTypeLoadBalancer {
+					if len(s.Status.LoadBalancer.Ingress) > 0 {
+						port := compose.PortPublisher{URL: s.Status.LoadBalancer.Ingress[0].IP}
+						if len(s.Spec.Ports) > 0 {
+							port.URL = fmt.Sprintf("%s:%d", port.URL, s.Spec.Ports[0].Port)
+							port.TargetPort = s.Spec.Ports[0].TargetPort.IntValue()
+							port.Protocol = string(s.Spec.Ports[0].Protocol)
+						}
+						ports = append(ports, port)
+					}
+				}
+			}
+			services[serviceName] = ports
+		}
+		summary.Publishers = ports
+		result = append(result, summary)
 	}
 
 	return result, nil
@@ -253,8 +284,8 @@ func (kc KubeClient) MapPortsToLocalhost(ctx context.Context, opts PortMappingOp
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for serviceName, servicePorts := range opts.Services {
-		serviceName = serviceName
-		servicePorts = servicePorts
+		serviceName := serviceName
+		servicePorts := servicePorts
 		pod, err := kc.GetPod(ctx, opts.ProjectName, serviceName)
 		if err != nil {
 			return err

@@ -99,8 +99,10 @@ type WaitForStatusOptions struct {
 	Log         LogFunc
 }
 
+// Ports holds published ports data
 type Ports []compose.PortPublisher
 
+// PortMappingOptions holds the port mapping for project services
 type PortMappingOptions struct {
 	ProjectName string
 	Services    map[string]Ports
