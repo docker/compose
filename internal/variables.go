@@ -26,4 +26,6 @@ const (
 var (
 	// Version is the version of the CLI injected in compilation time
 	Version = "dev"
+	// ComposePluginVersion is the version of the compose cli plugin, injected in compilation time
+	ComposePluginVersion = "dev"
 )
