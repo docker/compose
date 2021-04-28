@@ -574,22 +574,25 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 		return nil, nil, nil, err
 	}
 
-	// filter binds and volumes mount targets
 	volumeMounts := map[string]struct{}{}
 	binds := []string{}
+MOUNTS:
 	for _, m := range mountOptions {
-
-		if m.Type == mount.TypeVolume {
-			volumeMounts[m.Target] = struct{}{}
-			if m.Source != "" {
-				binds = append(binds, fmt.Sprintf("%s:%s:rw", m.Source, m.Target))
+		volumeMounts[m.Target] = struct{}{}
+		// `Bind` API is used when host path need to be created if missing, `Mount` is preferred otherwise
+		if m.Type == mount.TypeBind {
+			for _, v := range service.Volumes {
+				if v.Target == m.Target && v.Bind != nil && v.Bind.CreateHostPath {
+					mode := "rw"
+					if m.ReadOnly {
+						mode = "ro"
+					}
+					binds = append(binds, fmt.Sprintf("%s:%s:%s", m.Source, m.Target, mode))
+					continue MOUNTS
+				}
 			}
 		}
-	}
-	for _, m := range mountOptions {
-		if m.Type == mount.TypeBind || m.Type == mount.TypeTmpfs {
-			mounts = append(mounts, m)
-		}
+		mounts = append(mounts, m)
 	}
 	return volumeMounts, binds, mounts, nil
 }
@@ -623,7 +626,6 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 				return nil, err
 			}
 			mounts[k] = m
-
 		}
 	}
 
@@ -758,7 +760,6 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}
 	if volume.Type == types.VolumeTypeVolume {
 		if volume.Source != "" {
-
 			pVolume, ok := project.Volumes[volume.Source]
 			if ok {
 				source = pVolume.Name
