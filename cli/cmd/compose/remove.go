@@ -56,6 +56,9 @@ Any data which is not in a volume will be lost.`,
 	f.BoolVarP(&opts.force, "force", "f", false, "Don't ask to confirm removal")
 	f.BoolVarP(&opts.stop, "stop", "s", false, "Stop the containers, if required, before removing")
 	f.BoolVarP(&opts.volumes, "volumes", "v", false, "Remove any anonymous volumes attached to containers")
+	f.BoolP("all", "a", false, "Deprecated - no effect")
+	f.MarkHidden("all") //nolint:errcheck
+
 	return cmd
 }
 
