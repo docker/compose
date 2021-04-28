@@ -61,7 +61,7 @@ type Service interface {
 	// Remove executes the equivalent to a `compose rm`
 	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
 	// Exec executes a command in a running service container
-	Exec(ctx context.Context, project *types.Project, opts RunOptions) error
+	Exec(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Pause executes the equivalent to a `compose pause`
 	Pause(ctx context.Context, project string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`

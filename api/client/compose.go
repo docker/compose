@@ -92,8 +92,8 @@ func (c *composeService) Remove(ctx context.Context, project *types.Project, opt
 	return nil, errdefs.ErrNotImplemented
 }
 
-func (c *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (c *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }
 
 func (c *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
