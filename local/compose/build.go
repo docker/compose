@@ -42,6 +42,14 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 
+	args := map[string]string{}
+	for k, v := range options.Args.Resolve(func(s string) (string, bool) {
+		s, ok := project.Environment[s]
+		return s, ok
+	}).RemoveEmpty() {
+		args[k] = *v
+	}
+
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
@@ -51,7 +59,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 				return err
 			}
 			buildOptions.Pull = options.Pull
-			buildOptions.BuildArgs = options.Args
+			buildOptions.BuildArgs = args
 			buildOptions.NoCache = options.NoCache
 			opts[imageName] = buildOptions
 			buildOptions.CacheFrom, err = build.ParseCacheEntry(service.Build.CacheFrom)

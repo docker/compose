@@ -54,6 +54,20 @@ func TestLocalComposeBuild(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
 	})
 
+	t.Run("build with build-arg set by env", func(t *testing.T) {
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("rmi", "build-test_nginx")
+		c.RunDockerOrExitError("rmi", "custom-nginx")
+
+		icmd.RunCmd(c.NewDockerCmd("compose", "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO"),
+			func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "FOO=BAR")
+			})
+
+		res := c.RunDockerCmd("image", "inspect", "build-test_nginx")
+		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
+	})
+
 	t.Run("build as part of up", func(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")

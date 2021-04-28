@@ -89,7 +89,7 @@ func runBuild(ctx context.Context, backend compose.Service, opts buildOptions, s
 		return "", backend.Build(ctx, project, compose.BuildOptions{
 			Pull:     opts.pull,
 			Progress: opts.progress,
-			Args:     types.NewMapping(opts.args),
+			Args:     types.NewMappingWithEquals(opts.args),
 			NoCache:  opts.noCache,
 			Quiet:    opts.quiet,
 		})
