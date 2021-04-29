@@ -98,6 +98,20 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 		}
 	}
 
+	if options.Volumes {
+		networks, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+		if err != nil {
+			return err
+		}
+		for _, vol := range networks.Volumes {
+			id := vol.Name
+			eg.Go(func() error {
+				resourceToRemove = true
+				return s.removeVolume(ctx, id, w)
+			})
+		}
+	}
+
 	if !resourceToRemove {
 		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
 	}
@@ -129,6 +143,21 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 	}
 	if errdefs.IsNotFound(err) {
 		w.Event(progress.NewEvent(id, progress.Done, "Warning: No resource found to remove"))
+		return nil
+	}
+	return err
+}
+
+func (s *composeService) removeVolume(ctx context.Context, id string, w progress.Writer) error {
+	resource := fmt.Sprintf("Volume %s", id)
+	w.Event(progress.NewEvent(resource, progress.Working, "Removing"))
+	err := s.apiClient.VolumeRemove(ctx, id, true)
+	if err == nil {
+		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
+		return nil
+	}
+	if errdefs.IsNotFound(err) {
+		w.Event(progress.NewEvent(resource, progress.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err

@@ -72,7 +72,9 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "--project-name", projectName, "down")
-		c.RunDockerCmd("volume", "rm", projectName+"_staticVol")
+		c.RunDockerCmd("compose", "--project-name", projectName, "down", "--volumes")
+		res := c.RunDockerCmd("volume", "ls")
+		assert.Assert(t, !strings.Contains(res.Stdout(), projectName+"_staticVol"))
+		assert.Assert(t, !strings.Contains(res.Stdout(), "myvolume"))
 	})
 }
