@@ -83,7 +83,7 @@ type BuildOptions struct {
 	// Progress set type of progress output ("auto", "plain", "tty")
 	Progress string
 	// Args set build-time args
-	Args types.Mapping
+	Args types.MappingWithEquals
 	// NoCache disables cache use
 	NoCache bool
 	// Quiet make the build process not output to the console
