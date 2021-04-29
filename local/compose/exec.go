@@ -28,10 +28,10 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 )
 
-func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
+func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
 	service, err := project.GetService(opts.Service)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
@@ -42,10 +42,10 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 		),
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if len(containers) < 1 {
-		return fmt.Errorf("container %s not running", getContainerName(project.Name, service, opts.Index))
+		return 0, fmt.Errorf("container %s not running", getContainerName(project.Name, service, opts.Index))
 	}
 	container := containers[0]
 
@@ -63,11 +63,11 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 		AttachStderr: true,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if opts.Detach {
-		return s.apiClient.ContainerExecStart(ctx, exec.ID, apitypes.ExecStartCheck{
+		return 0, s.apiClient.ContainerExecStart(ctx, exec.ID, apitypes.ExecStartCheck{
 			Detach: true,
 			Tty:    opts.Tty,
 		})
@@ -78,19 +78,19 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 		Tty:    opts.Tty,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Close()
 
 	if opts.Tty {
 		s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
-	readChannel := make(chan error, 10)
-	writeChannel := make(chan error, 10)
+	readChannel := make(chan error)
+	writeChannel := make(chan error)
 
 	go func() {
 		_, err := io.Copy(opts.Writer, resp.Reader)
@@ -102,12 +102,23 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 		writeChannel <- err
 	}()
 
-	for {
-		select {
-		case err := <-readChannel:
-			return err
-		case err := <-writeChannel:
-			return err
-		}
+	select {
+	case err = <-readChannel:
+		break
+	case err = <-writeChannel:
+		break
 	}
+
+	if err != nil {
+		return 0, err
+	}
+	return s.getExecExitStatus(ctx, exec.ID)
+}
+
+func (s *composeService) getExecExitStatus(ctx context.Context, execID string) (int, error) {
+	resp, err := s.apiClient.ContainerExecInspect(ctx, execID)
+	if err != nil {
+		return 0, err
+	}
+	return resp.ExitCode, nil
 }

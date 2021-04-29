@@ -108,8 +108,8 @@ func (s NoImpl) Remove(ctx context.Context, project *types.Project, options Remo
 }
 
 //Exec implements Service interface
-func (s NoImpl) Exec(ctx context.Context, project *types.Project, options RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (s NoImpl) Exec(ctx context.Context, project *types.Project, opts RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }
 
 //Pause implements Service interface

@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/containerd/console"
+	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -108,5 +109,13 @@ func runExec(ctx context.Context, backend compose.Service, opts execOpts) error 
 		execOpts.Writer = con
 		execOpts.Reader = con
 	}
-	return backend.Exec(ctx, project, execOpts)
+	exitCode, err := backend.Exec(ctx, project, execOpts)
+	if exitCode != 0 {
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
+	}
+	return err
 }

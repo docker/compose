@@ -248,8 +248,8 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 }
 
 // Exec executes a command in a running service container
-func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) error {
-	return errdefs.ErrNotImplemented
+func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+	return 0, errdefs.ErrNotImplemented
 }
 
 func (s *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {

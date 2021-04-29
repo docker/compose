@@ -108,7 +108,7 @@ func (s *ServiceDelegator) Remove(ctx context.Context, project *types.Project, o
 }
 
 //Exec implements Service interface
-func (s *ServiceDelegator) Exec(ctx context.Context, project *types.Project, options RunOptions) error {
+func (s *ServiceDelegator) Exec(ctx context.Context, project *types.Project, options RunOptions) (int, error) {
 	return s.Delegate.Exec(ctx, project, options)
 }
 
