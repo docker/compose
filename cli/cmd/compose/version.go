@@ -61,5 +61,5 @@ func runVersion(opts versionOptions) {
 		fmt.Printf(`{"version":"%s"}\n`, displayedVersion)
 		return
 	}
-	fmt.Printf(`Docker Compose version %s`, displayedVersion)
+	fmt.Printf("Docker Compose version %s\n", displayedVersion)
 }
