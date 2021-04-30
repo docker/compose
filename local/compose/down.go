@@ -33,6 +33,8 @@ import (
 	"github.com/docker/compose-cli/api/progress"
 )
 
+type downOp func() error
+
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
@@ -73,49 +75,74 @@ func (s *composeService) Down(ctx context.Context, projectName string, options c
 		}
 	}
 
-	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
+	ops, err := s.ensureNetwoksDown(ctx, projectName)
 	if err != nil {
 		return err
 	}
 
-	eg, _ := errgroup.WithContext(ctx)
-	for _, n := range networks {
-		resourceToRemove = true
-		networkID := n.ID
-		networkName := n.Name
-		eg.Go(func() error {
-			return s.ensureNetworkDown(ctx, networkID, networkName)
-		})
-	}
-
 	if options.Images != "" {
-		for image := range s.getServiceImages(options, projectName) {
-			image := image
-			eg.Go(func() error {
-				resourceToRemove = true
-				return s.removeImage(ctx, image, w)
-			})
-		}
+		ops = append(ops, s.ensureImagesDown(ctx, projectName, options, w)...)
 	}
 
 	if options.Volumes {
-		networks, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+		rm, err := s.ensureVolumesDown(ctx, projectName, w)
 		if err != nil {
 			return err
 		}
-		for _, vol := range networks.Volumes {
-			id := vol.Name
-			eg.Go(func() error {
-				resourceToRemove = true
-				return s.removeVolume(ctx, id, w)
-			})
-		}
+		ops = append(ops, rm...)
 	}
 
-	if !resourceToRemove {
+	if !resourceToRemove && len(ops) == 0 {
 		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
 	}
+
+	eg, _ := errgroup.WithContext(ctx)
+	for _, op := range ops {
+		eg.Go(op)
+	}
 	return eg.Wait()
+}
+
+func (s *composeService) ensureVolumesDown(ctx context.Context, projectName string, w progress.Writer) ([]downOp, error) {
+	var ops []downOp
+	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	if err != nil {
+		return ops, err
+	}
+	for _, vol := range volumes.Volumes {
+		id := vol.Name
+		ops = append(ops, func() error {
+			return s.removeVolume(ctx, id, w)
+		})
+	}
+	return ops, nil
+}
+
+func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options compose.DownOptions, w progress.Writer) []downOp {
+	var ops []downOp
+	for image := range s.getServiceImages(options, projectName) {
+		image := image
+		ops = append(ops, func() error {
+			return s.removeImage(ctx, image, w)
+		})
+	}
+	return ops
+}
+
+func (s *composeService) ensureNetwoksDown(ctx context.Context, projectName string) ([]downOp, error) {
+	var ops []downOp
+	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
+	if err != nil {
+		return ops, err
+	}
+	for _, n := range networks {
+		networkID := n.ID
+		networkName := n.Name
+		ops = append(ops, func() error {
+			return s.removeNetwork(ctx, networkID, networkName)
+		})
+	}
+	return ops, nil
 }
 
 func (s *composeService) getServiceImages(options compose.DownOptions, projectName string) map[string]struct{} {
