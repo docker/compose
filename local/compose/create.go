@@ -938,7 +938,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	return nil
 }
 
-func (s *composeService) ensureNetworkDown(ctx context.Context, networkID string, networkName string) error {
+func (s *composeService) removeNetwork(ctx context.Context, networkID string, networkName string) error {
 	w := progress.ContextWriter(ctx)
 	eventName := fmt.Sprintf("Network %s", networkName)
 	w.Event(progress.RemovingEvent(eventName))
