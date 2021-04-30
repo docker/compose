@@ -144,15 +144,16 @@ outLoop:
 	for i := range p.Services {
 		networkDependency := getDependentServiceFromMode(p.Services[i].NetworkMode)
 		ipcDependency := getDependentServiceFromMode(p.Services[i].Ipc)
+		pidDependency := getDependentServiceFromMode(p.Services[i].Pid)
 
-		if networkDependency == "" && ipcDependency == "" {
+		if networkDependency == "" && ipcDependency == "" && pidDependency == "" {
 			continue
 		}
 		if p.Services[i].DependsOn == nil {
 			p.Services[i].DependsOn = make(types.DependsOnConfig)
 		}
 		for _, service := range p.Services {
-			if service.Name == networkDependency || service.Name == ipcDependency {
+			if service.Name == networkDependency || service.Name == ipcDependency || service.Name == pidDependency {
 				p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 					Condition: types.ServiceConditionStarted,
 				}
