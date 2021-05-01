@@ -519,7 +519,7 @@ def load_services(config_details, config_file, interpolate=True):
         resolver = ServiceExtendsResolver(
             service_config, config_file, environment=config_details.environment
         )
-        service_dict = process_service(resolver.run())
+        service_dict = process_service(resolver.run(), interpolate)
 
         service_config = service_config._replace(config=service_dict)
         validate_service(service_config, service_names, config_file)
@@ -623,7 +623,7 @@ def process_config_file(config_file, environment, service_name=None, interpolate
         processed_config = services
 
     config_file = config_file._replace(config=processed_config)
-    validate_against_config_schema(config_file, config_file.version)
+    validate_against_config_schema(config_file, config_file.version, interpolate)
 
     if service_name and service_name not in services:
         raise ConfigurationError(
@@ -802,7 +802,7 @@ def validate_service(service_config, service_names, config_file):
             .format(name=service_name))
 
 
-def process_service(service_config):
+def process_service(service_config, interpolate=True):
     working_dir = service_config.working_dir
     service_dict = dict(service_config.config)
 
@@ -830,9 +830,9 @@ def process_service(service_config):
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
-    service_dict = process_security_opt(process_blkio_config(process_ports(
-        process_healthcheck(service_dict)
-    )))
+    service_dict = process_security_opt(process_blkio_config(
+        process_ports(process_healthcheck(service_dict), interpolate)
+    ))
 
     return service_dict
 
@@ -848,7 +848,7 @@ def process_build_section(service_dict, working_dir):
             service_dict['build']['labels'] = parse_labels(service_dict['build']['labels'])
 
 
-def process_ports(service_dict):
+def process_ports(service_dict, interpolate=True):
     if 'ports' not in service_dict:
         return service_dict
 
@@ -857,7 +857,10 @@ def process_ports(service_dict):
         if isinstance(port_definition, ServicePort):
             ports.append(port_definition)
         else:
-            ports.extend(ServicePort.parse(port_definition))
+            if interpolate:
+                ports.extend(ServicePort.parse(port_definition))
+            else:
+                ports.extend(ServicePort.parse(port_definition, interpolate))
     service_dict['ports'] = ports
     return service_dict
 

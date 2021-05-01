@@ -7,11 +7,10 @@ import os
 import re
 from collections import namedtuple
 
-from docker.utils.ports import build_port_bindings
-
 from ..const import COMPOSEFILE_V1 as V1
 from ..utils import unquote_path
 from .errors import ConfigurationError
+from .port_validation import build_port_bindings
 from compose.const import IS_WINDOWS_PLATFORM
 from compose.utils import splitdrive
 
@@ -352,9 +351,9 @@ class ServiceConfig(ServiceConfigBase):
 
 
 class ServicePort(namedtuple('_ServicePort', 'target published protocol mode external_ip')):
-    def __new__(cls, target, published, *args, **kwargs):
+    def __new__(cls, target, published, interpolate=True, *args, **kwargs):
         try:
-            if target:
+            if target and interpolate:
                 target = int(target)
         except ValueError:
             raise ConfigurationError('Invalid target port: {}'.format(target))
@@ -362,9 +361,9 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         if published:
             if isinstance(published, str) and '-' in published:  # "x-y:z" format
                 a, b = published.split('-', 1)
-                if not a.isdigit() or not b.isdigit():
+                if interpolate and (not a.isdigit() or not b.isdigit()):
                     raise ConfigurationError('Invalid published port: {}'.format(published))
-            else:
+            elif interpolate:
                 try:
                     published = int(published)
                 except ValueError:
@@ -375,7 +374,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         )
 
     @classmethod
-    def parse(cls, spec):
+    def parse(cls, spec, interpolate=True):
         if isinstance(spec, cls):
             # When extending a service with ports, the port definitions have already been parsed
             return [spec]
@@ -383,7 +382,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         if not isinstance(spec, dict):
             result = []
             try:
-                for k, v in build_port_bindings([spec]).items():
+                for k, v in build_port_bindings([spec], interpolate).items():
                     if '/' in k:
                         target, proto = k.split('/', 1)
                     else:
@@ -391,15 +390,15 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
                     for pub in v:
                         if pub is None:
                             result.append(
-                                cls(target, None, proto, None, None)
+                                cls(target, None, interpolate, proto, None, None)
                             )
                         elif isinstance(pub, tuple):
                             result.append(
-                                cls(target, pub[1], proto, None, pub[0])
+                                cls(target, pub[1], interpolate, proto, None, pub[0])
                             )
                         else:
                             result.append(
-                                cls(target, pub, proto, None, None)
+                                cls(target, pub, interpolate, proto, None, None)
                             )
             except ValueError as e:
                 raise ConfigurationError(str(e))
@@ -409,6 +408,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         return [cls(
             spec.get('target'),
             spec.get('published'),
+            interpolate,
             spec.get('protocol'),
             spec.get('mode'),
             None

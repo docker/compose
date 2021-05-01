@@ -2389,7 +2389,7 @@ web:
         assert actual == {
             'image': BUSYBOX_IMAGE_WITH_TAG,
             'command': 'top',
-            'ports': [types.ServicePort('1245', '1245', 'udp', None, None)]
+            'ports': [types.ServicePort('1245', '1245', True, 'udp', None, None)]
         }
 
     def test_merge_depends_on_no_override(self):
@@ -4975,7 +4975,7 @@ class ExtendsTest(unittest.TestCase):
 
         assert len(services) == 2
         for svc in services:
-            assert svc['ports'] == [types.ServicePort('80', None, None, None, None)]
+            assert svc['ports'] == [types.ServicePort('80', None, True, None, None, None)]
 
     def test_extends_with_security_opt(self):
         tmpdir = tempfile.mkdtemp('test_extends_with_ports')
@@ -5381,7 +5381,7 @@ class SerializeTest(unittest.TestCase):
     def test_serialize_ports(self):
         config_dict = config.Config(config_version=VERSION, version=VERSION, services=[
             {
-                'ports': [types.ServicePort('80', '8080', None, None, None)],
+                'ports': [types.ServicePort('80', '8080', True, None, None, None)],
                 'image': 'alpine',
                 'name': 'web'
             }
@@ -5393,7 +5393,7 @@ class SerializeTest(unittest.TestCase):
     def test_serialize_ports_v1(self):
         config_dict = config.Config(config_version=V1, version=V1, services=[
             {
-                'ports': [types.ServicePort('80', '8080', None, None, None)],
+                'ports': [types.ServicePort('80', '8080', True, None, None, None)],
                 'image': 'alpine',
                 'name': 'web'
             }
@@ -5405,7 +5405,7 @@ class SerializeTest(unittest.TestCase):
     def test_serialize_ports_with_ext_ip(self):
         config_dict = config.Config(config_version=VERSION, version=VERSION, services=[
             {
-                'ports': [types.ServicePort('80', '8080', None, None, '127.0.0.1')],
+                'ports': [types.ServicePort('80', '8080', True, None, None, '127.0.0.1')],
                 'image': 'alpine',
                 'name': 'web'
             }
@@ -5510,6 +5510,101 @@ class SerializeTest(unittest.TestCase):
         assert serialized_service['environment']['DOO'] == 'NO $${ENV} VAR'
         assert serialized_service['command'] == 'echo $FOO'
         assert serialized_service['entrypoint'][0] == '$SHELL'
+
+    def test_var_in_service_ports_dont_interpolate(self):
+        cfg = {
+            'version': '3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'ports': [
+                        '$PORT:6666'
+                    ],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=False)
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+
+        assert serialized_service['ports'][0] == {'published': '$PORT', 'target': '6666'}
+
+    def test_scoped_var_in_service_ports_dont_interpolate(self):
+        cfg = {
+            'version': '3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'ports': [
+                        '${PORT}:6666'
+                    ],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=False)
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+
+        assert serialized_service['ports'][0] == {'published': '${PORT}', 'target': '6666'}
+
+    def test_var_with_default_value_in_service_ports(self):
+        cfg = {
+            'version': '3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'ports': [
+                        '${EMPTY:-1111}:6666'
+                    ],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=True)
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+
+        assert serialized_service['ports'][0] == {'published': 1111, 'target': 6666}
+
+    def test_var_with_default_value_in_service_ports_dont_interpolate(self):
+        cfg = {
+            'version': '3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'ports': [
+                        '${PORT:-1111}:6666'
+                    ],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=False)
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
+        serialized_service = serialized_config['services']['web']
+
+        assert serialized_service['ports'][0] == {'published': '${PORT:-1111}', 'target': '6666'}
+
+    def test_combined_vars_in_service_ports_dont_interpolate(self):
+        cfg = {
+            'version': '3',
+            'services': {
+                'web': {
+                    'image': 'busybox',
+                    'ports': [
+                        '222.34.6.5:2559-2560:${PORT:-5555}/tcp',
+                        '$IP_ADDR:1111-1113:6666-6668/tcp'
+                    ],
+                }
+            }
+        }
+        config_dict = config.load(build_config_details(cfg, working_dir='.'), interpolate=False)
+        serialized_config = yaml.safe_load(serialize_config(config_dict, escape_dollar=False))
+        serialized_ports = serialized_config['services']['web']['ports']
+        assert serialized_ports == [
+            '222.34.6.5:2559-2560:${PORT:-5555}/tcp',
+            '$IP_ADDR:1111:6666/tcp',
+            '$IP_ADDR:1112:6667/tcp',
+            '$IP_ADDR:1113:6668/tcp',
+        ]
 
     def test_serialize_unicode_values(self):
         cfg = {

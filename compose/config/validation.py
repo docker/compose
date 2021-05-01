@@ -95,6 +95,22 @@ def format_subnet_ip_address(instance):
     return True
 
 
+@FormatChecker.cls_checks(format="ports_no_interpolation", raises=ValidationError)
+def format_ports_no_interpolation(instance):
+    # TODO: validate env variable or port
+    return True
+
+
+@FormatChecker.cls_checks(format="expose_no_interpolation", raises=ValidationError)
+def format_expose_no_interpolation(instance):
+    return True
+
+
+@FormatChecker.cls_checks("subnet_ip_address_no_interpolation", raises=ValidationError)
+def format_subnet_ip_address_no_interpolation(instance):
+    return True
+
+
 def match_named_volumes(service_dict, project_volumes):
     service_volumes = service_dict.get('volumes', [])
     for volume_spec in service_volumes:
@@ -462,11 +478,16 @@ def keys_to_str(config_file):
     return d
 
 
-def validate_against_config_schema(config_file, version):
+def validate_against_config_schema(config_file, version, interpolate=True):
     schema = load_jsonschema(version)
     config = keys_to_str(config_file.config)
 
-    format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
+    if interpolate:
+        format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
+    else:
+        format_checker = FormatChecker(["ports_no_interpolation", "expose_no_interpolation",
+                                        "subnet_ip_address_no_interpolation"])
+
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),
