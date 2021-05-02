@@ -75,6 +75,10 @@ func (b *ecsAPIService) Port(ctx context.Context, project string, service string
 	return "", 0, errdefs.ErrNotImplemented
 }
 
+func (b *ecsAPIService) Copy(ctx context.Context, project *types.Project, options compose.CopyOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("deploying on AWS with region=%q", b.Region)
 	err := b.aws.CheckRequirements(ctx, b.Region)

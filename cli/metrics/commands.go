@@ -63,6 +63,7 @@ var commands = []string{
 	"deploy",
 	"list",
 	"ls",
+	"cp",
 	"merge",
 	"pull",
 	"push",

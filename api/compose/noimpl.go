@@ -112,6 +112,11 @@ func (s NoImpl) Exec(ctx context.Context, project *types.Project, opts RunOption
 	return 0, errdefs.ErrNotImplemented
 }
 
+//Copy implements Service interface
+func (s NoImpl) Copy(ctx context.Context, project *types.Project, opts CopyOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 //Pause implements Service interface
 func (s NoImpl) Pause(ctx context.Context, project string, options PauseOptions) error {
 	return errdefs.ErrNotImplemented

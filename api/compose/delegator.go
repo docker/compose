@@ -112,6 +112,11 @@ func (s *ServiceDelegator) Exec(ctx context.Context, project *types.Project, opt
 	return s.Delegate.Exec(ctx, project, options)
 }
 
+//Copy implements Service interface
+func (s *ServiceDelegator) Copy(ctx context.Context, project *types.Project, options CopyOptions) error {
+	return s.Delegate.Copy(ctx, project, options)
+}
+
 //Pause implements Service interface
 func (s *ServiceDelegator) Pause(ctx context.Context, project string, options PauseOptions) error {
 	return s.Delegate.Pause(ctx, project, options)

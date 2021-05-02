@@ -188,6 +188,10 @@ func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, op
 	return 0, errdefs.ErrNotImplemented
 }
 
+func (e ecsLocalSimulation) Copy(ctx context.Context, project *types.Project, opts compose.CopyOptions) error {
+	return e.compose.Copy(ctx, project, opts)
+}
+
 func (e ecsLocalSimulation) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
 	return e.compose.Pause(ctx, project, options)
 }

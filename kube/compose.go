@@ -198,6 +198,11 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project, optio
 	return errdefs.ErrNotImplemented
 }
 
+// Copy copies a file/folder between a service container and the local filesystem
+func (s *composeService) Copy(ctx context.Context, project *types.Project, options compose.CopyOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 // Logs executes the equivalent to a `compose logs`
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
 	if len(options.Services) > 0 {

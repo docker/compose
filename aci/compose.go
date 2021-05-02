@@ -80,6 +80,10 @@ func (cs *aciComposeService) UnPause(ctx context.Context, project string, option
 	return errdefs.ErrNotImplemented
 }
 
+func (cs *aciComposeService) Copy(ctx context.Context, project *types.Project, options compose.CopyOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 
