@@ -1217,10 +1217,10 @@ class ServicePortsTest(unittest.TestCase):
         ports = [
             '3000',
             '0.0.0.0:4025-4030:23000-23005',
-            ServicePort(6000, None, None, None, None),
-            ServicePort(8080, 8080, None, None, None),
-            ServicePort('20000', '20000', 'udp', 'ingress', None),
-            ServicePort(30000, '30000', 'tcp', None, '127.0.0.1'),
+            ServicePort(6000, None, True, None, None, None),
+            ServicePort(8080, 8080, True, None, None, None),
+            ServicePort('20000', '20000', True, 'udp', 'ingress', None),
+            ServicePort(30000, '30000', True, 'tcp', None, '127.0.0.1'),
         ]
         formatted = formatted_ports(ports)
         assert ports[0] in formatted
