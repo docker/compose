@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose-cli/api/compose"
@@ -51,19 +53,25 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 	if srcService != "" {
 		direction |= fromService
 		serviceName = srcService
+
+		// copying from multiple containers of a services doesn't make sense.
+		if opts.All {
+			return errors.New("cannot use the --all flag when copying from a service")
+		}
 	}
 	if destService != "" {
 		direction |= toService
 		serviceName = destService
 	}
 
-	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(serviceName),
-			filters.Arg("label", fmt.Sprintf("%s=%d", containerNumberLabel, opts.Index)),
-		),
-	})
+	f := filters.NewArgs(
+		projectFilter(project.Name),
+		serviceFilter(serviceName),
+	)
+	if !opts.All {
+		f.Add("label", fmt.Sprintf("%s=%d", containerNumberLabel, opts.Index))
+	}
+	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{Filters: f})
 	if err != nil {
 		return err
 	}
@@ -72,17 +80,25 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 		return fmt.Errorf("service %s not running", serviceName)
 	}
 
-	containerID := containers[0].ID
-	switch direction {
-	case fromService:
-		return s.copyFromContainer(ctx, containerID, srcPath, dstPath, opts)
-	case toService:
-		return s.copyToContainer(ctx, containerID, srcPath, dstPath, opts)
-	case acrossServices:
-		return errors.New("copying between services is not supported")
-	default:
-		return errors.New("unknown copy direction")
+	g := errgroup.Group{}
+	for i := range containers {
+		containerID := containers[i].ID
+
+		g.Go(func() error {
+			switch direction {
+			case fromService:
+				return s.copyFromContainer(ctx, containerID, srcPath, dstPath, opts)
+			case toService:
+				return s.copyToContainer(ctx, containerID, srcPath, dstPath, opts)
+			case acrossServices:
+				return errors.New("copying between services is not supported")
+			default:
+				return errors.New("unknown copy direction")
+			}
+		})
 	}
+
+	return g.Wait()
 }
 
 func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts compose.CopyOptions) error {

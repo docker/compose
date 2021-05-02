@@ -32,6 +32,7 @@ type copyOptions struct {
 	source      string
 	destination string
 	index       int
+	all         bool
 	followLink  bool
 	copyUIDGID  bool
 }
@@ -60,7 +61,8 @@ func copyCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	}
 
 	flags := copyCmd.Flags()
-	flags.IntVar(&opts.index, "index", 1, "index of the container if there are multiple instances of a service [default: 1].")
+	flags.IntVar(&opts.index, "index", 1, "Index of the container if there are multiple instances of a service [default: 1].")
+	flags.BoolVar(&opts.all, "all", false, "Copy to all the containers of the service.")
 	flags.BoolVarP(&opts.followLink, "follow-link", "L", false, "Always follow symbol link in SRC_PATH")
 	flags.BoolVarP(&opts.copyUIDGID, "archive", "a", false, "Archive mode (copy all uid/gid information)")
 
@@ -76,6 +78,7 @@ func runCopy(ctx context.Context, backend compose.Service, opts copyOptions) err
 	return backend.Copy(ctx, projects, compose.CopyOptions{
 		Source:      opts.source,
 		Destination: opts.destination,
+		All:         opts.all,
 		Index:       opts.index,
 		FollowLink:  opts.followLink,
 		CopyUIDGID:  opts.copyUIDGID,

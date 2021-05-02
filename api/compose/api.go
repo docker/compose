@@ -277,6 +277,7 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
+	All         bool
 	Index       int
 	FollowLink  bool
 	CopyUIDGID  bool
