@@ -70,3 +70,22 @@ func TestNetworks(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), "microservices"), res.Combined())
 	})
 }
+
+func TestNetworkAliasses(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	const projectName = "network_alias_e2e"
+
+	t.Run("up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up", "-d")
+	})
+
+	t.Run("curl", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://alias-of-container2/")
+		assert.Assert(t, !strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
+	})
+
+	t.Run("down", func(t *testing.T) {
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+	})
+}

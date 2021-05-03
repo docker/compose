@@ -276,6 +276,22 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	if networkMode == "" {
 		networkMode = getDefaultNetworkMode(p, service)
 	}
+
+	var networkConfig *network.NetworkingConfig
+	// TODO use network with highest priority, attribute is missing from compose-go
+	for _, id := range service.NetworksByPriority() {
+		net := p.Networks[id]
+		config := service.Networks[id]
+		networkConfig = &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				net.Name: {
+					Aliases: getAliases(service, config),
+				},
+			},
+		}
+		break
+	}
+
 	ipcmode, err := getMode(ctx, service.Name, service.Ipc)
 	if err != nil {
 		return nil, nil, nil, err
@@ -328,7 +344,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		LogConfig:      logConfig,
 	}
 
-	networkConfig := buildDefaultNetworkConfig(service, container.NetworkMode(networkMode), getContainerName(p.Name, service, number))
 	return &containerConfig, &hostConfig, networkConfig, nil
 }
 
@@ -840,21 +855,6 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	return &mount.TmpfsOptions{
 		SizeBytes: tmpfs.Size,
 		// Mode:      , // FIXME missing from model ?
-	}
-}
-
-func buildDefaultNetworkConfig(s types.ServiceConfig, networkMode container.NetworkMode, containerName string) *network.NetworkingConfig {
-	if len(s.Networks) == 0 {
-		return nil
-	}
-	config := map[string]*network.EndpointSettings{}
-	net := string(networkMode)
-	config[net] = &network.EndpointSettings{
-		Aliases: append(getAliases(s, s.Networks[net]), containerName),
-	}
-
-	return &network.NetworkingConfig{
-		EndpointsConfig: config,
 	}
 }
 
