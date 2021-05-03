@@ -47,7 +47,7 @@ func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Use:   "ps",
 		Short: "List containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runPs(ctx, backend, opts)
+			return runPs(ctx, backend, args, opts)
 		}),
 	}
 	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
@@ -57,13 +57,14 @@ func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, backend compose.Service, opts psOptions) error {
+func runPs(ctx context.Context, backend compose.Service, services []string, opts psOptions) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 	containers, err := backend.Ps(ctx, projectName, compose.PsOptions{
-		All: opts.All,
+		All:      opts.All,
+		Services: services,
 	})
 	if err != nil {
 		return err
