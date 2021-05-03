@@ -318,8 +318,9 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		Labels: containerConfig.Labels,
 	}
 	cState.Add(createdContainer)
-	for netName, cfg := range service.Networks {
+	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]
+		cfg := service.Networks[netName]
 		aliases := []string{getContainerName(project.Name, service, number)}
 		if useNetworkAliases {
 			aliases = append(aliases, service.Name)

@@ -1,0 +1,15 @@
+services:
+
+  container1:
+    image: nginx
+
+  container2:
+    image: nginx
+    networks:
+      foo:
+        aliases:
+          - alias-of-container2
+
+networks:
+  foo:
+    name: bar
