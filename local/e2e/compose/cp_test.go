@@ -35,9 +35,9 @@ func TestCopy(t *testing.T) {
 	t.Cleanup(func() {
 		c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/docker-compose.yml", "--project-name", projectName, "down")
 
-		os.Remove("./fixtures/cp-test/from-default.txt")
-		os.Remove("./fixtures/cp-test/from-indexed.txt")
-		os.RemoveAll("./fixtures/cp-test/cp-folder2")
+		os.Remove("./fixtures/cp-test/from-default.txt") //nolint:errcheck
+		os.Remove("./fixtures/cp-test/from-indexed.txt") //nolint:errcheck
+		os.RemoveAll("./fixtures/cp-test/cp-folder2")    //nolint:errcheck
 	})
 
 	t.Run("start service", func(t *testing.T) {
