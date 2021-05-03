@@ -89,6 +89,7 @@ func RunDocker(childExit chan bool, args ...string) error {
 	execBinary, err := resolvepath.LookPath(ComDockerCli)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "Current PATH : "+os.Getenv("PATH"))
 		os.Exit(1)
 	}
 	cmd := exec.Command(execBinary, args...)
