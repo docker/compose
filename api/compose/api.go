@@ -268,7 +268,8 @@ type ListOptions struct {
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
-	All bool
+	All      bool
+	Services []string
 }
 
 // PortPublisher hold status about published port
