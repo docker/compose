@@ -328,7 +328,8 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 				aliases = append(aliases, cfg.Aliases...)
 			}
 		}
-		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, aliases...)
+
+		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, cfg, aliases...)
 		if err != nil {
 			return err
 		}
@@ -336,9 +337,19 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	return nil
 }
 
-func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, aliases ...string) error {
+func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, cfg *types.ServiceNetworkConfig, aliases ...string) error {
+	var (
+		ipv4ddress  string
+		ipv6Address string
+	)
+	if cfg != nil {
+		ipv4ddress = cfg.Ipv4Address
+		ipv6Address = cfg.Ipv6Address
+	}
 	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
-		Aliases: aliases,
+		Aliases:           aliases,
+		IPAddress:         ipv4ddress,
+		GlobalIPv6Address: ipv6Address,
 	})
 	if err != nil {
 		return err
