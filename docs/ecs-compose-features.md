@@ -176,6 +176,6 @@ services:
         deploy:
           resources:
             limits:
-              cpu: 0.5
+              cpu: '0.5'
               memory: 2Gb
 ```

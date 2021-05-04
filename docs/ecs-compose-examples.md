@@ -92,7 +92,8 @@ services:
   foo:
     image: nginx
     deploy:
-      x-aws-autoscaling: 75
+      x-aws-autoscaling: 
+        cpu: 75
 ```
 
 
