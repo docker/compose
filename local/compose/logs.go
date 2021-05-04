@@ -51,11 +51,11 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 				Tail:       options.Tail,
 				Timestamps: options.Timestamps,
 			})
-			defer r.Close() // nolint errcheck
-
 			if err != nil {
 				return err
 			}
+			defer r.Close() // nolint errcheck
+
 			name := getContainerNameWithoutProject(c)
 			w := utils.GetWriter(name, service, func(event compose.ContainerEvent) {
 				consumer.Log(name, service, event.Line)
