@@ -17,7 +17,10 @@
 package e2e
 
 import (
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -104,5 +107,43 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerCmd("compose", "--project-directory", "fixtures/build-test", "down")
 		c.RunDockerCmd("rmi", "build-test_nginx")
 		c.RunDockerCmd("rmi", "custom-nginx")
+	})
+}
+
+func TestLocalComposeBuildStaticDockerfilePath(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("build ddev-style compose files", func(t *testing.T) {
+		dir, err := ioutil.TempDir("", "ddev")
+		assert.NilError(t, err)
+		defer os.RemoveAll(dir) //nolint:errcheck
+
+		assert.NilError(t, ioutil.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(`services:
+  service1:
+    build:
+      context: `+dir+`/service1
+      dockerfile: Dockerfile
+  service2:
+    build:
+      context: `+dir+`/service2
+      dockerfile: `+dir+`/service2/Dockerfile
+  `), 0644))
+
+		assert.NilError(t, os.Mkdir(filepath.Join(dir, "service1"), 0700))
+		assert.NilError(t, ioutil.WriteFile(filepath.Join(dir, "service1", "Dockerfile"), []byte(`FROM alpine
+		RUN echo "hello"
+		`), 0644))
+
+		assert.NilError(t, os.Mkdir(filepath.Join(dir, "service2"), 0700))
+		assert.NilError(t, ioutil.WriteFile(filepath.Join(dir, "service2", "Dockerfile"), []byte(`FROM alpine
+		RUN echo "world"
+		`), 0644))
+
+		res := c.RunDockerCmd("compose", "-f", filepath.Join(dir, "docker-compose.yml"), "build")
+
+		res.Assert(t, icmd.Expected{Out: `RUN echo "hello"`})
+		res.Assert(t, icmd.Expected{Out: `RUN echo "world"`})
+
+		c.RunDockerCmd("compose", "-f", filepath.Join(dir, "docker-compose.yml"), "down", "--rmi", "all")
 	})
 }
