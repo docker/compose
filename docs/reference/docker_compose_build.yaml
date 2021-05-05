@@ -14,6 +14,62 @@ options:
     experimentalcli: false
     kubernetes: false
     swarm: false
+  - option: compress
+    value_type: bool
+    default_value: "true"
+    description: Compress the build context using gzip. DEPRECATED
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: force-rm
+    value_type: bool
+    default_value: "true"
+    description: Always remove intermediate containers. DEPRECATED
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: memory
+    shorthand: m
+    value_type: string
+    description: |
+        Set memory limit for the build container. Not supported on buildkit yet.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-cache
+    value_type: bool
+    default_value: "false"
+    description: Do not use cache when building the image
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-rm
+    value_type: bool
+    default_value: "false"
+    description: |
+        Do not remove intermediate containers after a successful build. DEPRECATED
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: parallel
+    value_type: bool
+    default_value: "true"
+    description: Build images in parallel. DEPRECATED
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
   - option: progress
     value_type: string
     default_value: auto

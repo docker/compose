@@ -6,10 +6,37 @@ usage: docker compose pull [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+  - option: ignore-pull-failures
+    value_type: bool
+    default_value: "false"
+    description: Pull what it can and ignores images with pull failures
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
   - option: include-deps
     value_type: bool
     default_value: "false"
     description: Also pull services declared as dependencies
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-parallel
+    value_type: bool
+    default_value: "true"
+    description: DEPRECATED disable parallel pulling.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: parallel
+    value_type: bool
+    default_value: "true"
+    description: DEPRECATED pull multiple images in parallel.
     deprecated: false
     experimental: false
     experimentalcli: false
