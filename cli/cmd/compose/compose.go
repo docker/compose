@@ -120,11 +120,13 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, metrics.WrapComposeError(err)
 	}
 
-	s, err := project.GetServices(services...)
-	if err != nil {
-		return nil, err
+	if len(services) > 0 {
+		s, err := project.GetServices(services...)
+		if err != nil {
+			return nil, err
+		}
+		o.Profiles = append(o.Profiles, s.GetProfiles()...)
 	}
-	o.Profiles = append(o.Profiles, s.GetProfiles()...)
 
 	if profiles, ok := options.Environment["COMPOSE_PROFILES"]; ok {
 		o.Profiles = append(o.Profiles, strings.Split(profiles, ",")...)
