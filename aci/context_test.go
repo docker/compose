@@ -107,6 +107,28 @@ func TestCreateNewResourceGroup(t *testing.T) {
 	assert.DeepEqual(t, data, aciContext("1234", "newResourceGroup", "eastus"))
 }
 
+func TestCreateNewResourceGroupWithSpecificLocation(t *testing.T) {
+	ctx := context.TODO()
+	opts := options("1234", "")
+	opts.Location = "eastus2"
+	m := testContextMocks()
+	m.resourceGroupHelper.On("GetSubscriptionIDs", ctx).Return([]subscription.Model{subModel("1234", "Subscription1")}, nil)
+	m.resourceGroupHelper.On("GetGroup", ctx, "1234", "myResourceGroup").Return(group("myResourceGroup", "eastus"), nil)
+
+	selectOptions := []string{"create a new resource group", "group1 (eastus)", "group2 (westeurope)"}
+	m.userPrompt.On("Select", "Select a resource group", selectOptions).Return(0, nil)
+	m.resourceGroupHelper.On("CreateOrUpdate", ctx, "1234", mock.AnythingOfType("string"), mock.AnythingOfType("resources.Group")).Return(group("newResourceGroup", "eastus"), nil)
+	m.resourceGroupHelper.On("ListGroups", ctx, "1234").Return([]resources.Group{
+		group("group1", "eastus"),
+		group("group2", "westeurope"),
+	}, nil)
+
+	data, description, err := m.contextCreateHelper.createContextData(ctx, opts)
+	assert.NilError(t, err)
+	assert.Equal(t, description, "newResourceGroup@eastus2")
+	assert.DeepEqual(t, data, aciContext("1234", "newResourceGroup", "eastus2"))
+}
+
 func TestSelectExistingResourceGroup(t *testing.T) {
 	ctx := context.TODO()
 	opts := options("1234", "")
@@ -194,7 +216,6 @@ func options(subscriptionID string, resourceGroupName string) ContextParams {
 	return ContextParams{
 		SubscriptionID: subscriptionID,
 		ResourceGroup:  resourceGroupName,
-		Location:       "eastus",
 	}
 }
 

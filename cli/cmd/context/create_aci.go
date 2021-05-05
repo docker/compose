@@ -49,8 +49,8 @@ func createAciCommand() *cobra.Command {
 	}
 
 	addDescriptionFlag(cmd, &opts.Description)
-	cmd.Flags().StringVar(&opts.Location, "location", "eastus", "Location")
-	cmd.Flags().StringVar(&opts.SubscriptionID, "subscription-id", "", "Location")
+	cmd.Flags().StringVar(&opts.Location, "location", "", "Location")
+	cmd.Flags().StringVar(&opts.SubscriptionID, "subscription-id", "", "Subscription id")
 	cmd.Flags().StringVar(&opts.ResourceGroup, "resource-group", "", "Resource group")
 
 	return cmd
