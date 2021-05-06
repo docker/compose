@@ -27,9 +27,12 @@ import (
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
+	"github.com/docker/buildx/util/buildflags"
 	"github.com/docker/buildx/util/progress"
 	moby "github.com/docker/docker/api/types"
 	bclient "github.com/moby/buildkit/client"
+	"github.com/moby/buildkit/session"
+	"github.com/moby/buildkit/session/auth/authprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose-cli/api/compose"
@@ -62,7 +65,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 			buildOptions.BuildArgs = args
 			buildOptions.NoCache = options.NoCache
 			opts[imageName] = buildOptions
-			buildOptions.CacheFrom, err = build.ParseCacheEntry(service.Build.CacheFrom)
+			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
 			if err != nil {
 				return err
 			}
@@ -122,6 +125,9 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 }
 
 func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, []string, error) {
+	session := []session.Attachable{
+		authprovider.NewDockerAuthProvider(os.Stderr),
+	}
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
@@ -156,8 +162,9 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 				DockerfilePath: "-",
 				InStream:       strings.NewReader("FROM " + service.Image),
 			},
-			Tags: []string{service.Image}, // Used to retrieve image to pull in case of windows engine
-			Pull: true,
+			Tags:    []string{service.Image}, // Used to retrieve image to pull in case of windows engine
+			Pull:    true,
+			Session: session,
 		}
 
 	}
