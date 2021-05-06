@@ -33,12 +33,17 @@ long: "You can use compose subcommand, `docker compose [-f <arg>...] [options] [
     pull db\n```\n\n### Use `-p` to specify a project name\n\nEach configuration has
     a project name. If you supply a `-p` flag, you can specify a project name. If
     you don’t \nspecify the flag, Compose uses the current directory name. \nProject
-    name can also be set by `COMPOSE_PROJECT_NAME` environment variable.\n\n### Use
-    profiles to enable optional services\n\nUse `--profile` to specify one or more
-    active profiles\nCalling `docker compose --profile frontend up` will start the
-    services with the profile `frontend` and services \nwithout any specified profiles.
-    \nYou can also enable multiple profiles, e.g. with `docker compose --profile frontend
-    --profile debug up` the profiles `frontend` and `debug` will be enabled.\n\nProfiles
+    name can also be set by `COMPOSE_PROJECT_NAME` environment variable.\n\nMost compose
+    subcommand can be ran without a compose file, just passing \nproject name to retrieve
+    the relevant resources.\n\n```\n$ docker compose -p my_project ps -a\nNAME                 SERVICE
+    \   STATUS     PORTS\nmy_project_demo_1    demo       running             \n\n$
+    docker compose -p my_project logs\ndemo_1  | PING localhost (127.0.0.1): 56 data
+    bytes\ndemo_1  | 64 bytes from 127.0.0.1: seq=0 ttl=64 time=0.095 ms\n```\n\n###
+    Use profiles to enable optional services\n\nUse `--profile` to specify one or
+    more active profiles\nCalling `docker compose --profile frontend up` will start
+    the services with the profile `frontend` and services \nwithout any specified
+    profiles. \nYou can also enable multiple profiles, e.g. with `docker compose --profile
+    frontend --profile debug up` the profiles `frontend` and `debug` will be enabled.\n\nProfiles
     can also be set by `COMPOSE_PROFILES` environment variable.\n\n### Set up environment
     variables\n\nYou can set environment variables for various docker-compose options,
     including the `-f`, `-p` and `--profiles` flags.\n\nSetting the `COMPOSE_FILE`
@@ -46,6 +51,7 @@ long: "You can use compose subcommand, `docker compose [-f <arg>...] [options] [
     environment variable does the same for to the `-p` flag,\nand so does `COMPOSE_PROFILES`
     environment variable for to the `--profiles` flag.\n\nIf flags are explicitly
     set on command line, associated environment variable is ignored"
+usage: docker compose
 pname: docker
 plink: docker.yaml
 cname:
@@ -55,10 +61,12 @@ cname:
   - docker compose down
   - docker compose events
   - docker compose exec
+  - docker compose images
   - docker compose kill
   - docker compose logs
   - docker compose ls
   - docker compose pause
+  - docker compose port
   - docker compose ps
   - docker compose pull
   - docker compose push
@@ -77,10 +85,12 @@ clink:
   - docker_compose_down.yaml
   - docker_compose_events.yaml
   - docker_compose_exec.yaml
+  - docker_compose_images.yaml
   - docker_compose_kill.yaml
   - docker_compose_logs.yaml
   - docker_compose_ls.yaml
   - docker_compose_pause.yaml
+  - docker_compose_port.yaml
   - docker_compose_ps.yaml
   - docker_compose_pull.yaml
   - docker_compose_push.yaml
@@ -116,6 +126,15 @@ options:
     value_type: stringArray
     default_value: '[]'
     description: Compose configuration files
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-ansi
+    value_type: bool
+    default_value: "false"
+    description: Do not print ANSI control characters (DEPRECATED)
     deprecated: false
     experimental: false
     experimentalcli: false

@@ -4,7 +4,8 @@ short: Converts the compose file to platform's canonical format
 long: "`docker compose convert` render the actual data model to be applied on target
     platform. When used with Docker engine,\nit merges the Compose files set by `-f`
     flags, resolves variables in Compose file, and expands short-notation into \nfully
-    defined Compose model."
+    defined Compose model. \n\nTo allow smooth migration from docker-compose, this
+    subcommand declares alias `docker compose config`"
 usage: docker compose convert SERVICES
 pname: docker compose
 plink: docker_compose.yaml
@@ -13,6 +14,32 @@ options:
     value_type: string
     default_value: yaml
     description: 'Format the output. Values: [yaml | json]'
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: hash
+    value_type: string
+    description: Print the service config hash, one per line.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: no-interpolate
+    value_type: bool
+    default_value: "false"
+    description: Don't interpolate environment variables.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: profiles
+    value_type: bool
+    default_value: "false"
+    description: Print the profile names, one per line.
     deprecated: false
     experimental: false
     experimentalcli: false
@@ -32,6 +59,24 @@ options:
     value_type: bool
     default_value: "false"
     description: Pin image tags to digests.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: services
+    value_type: bool
+    default_value: "false"
+    description: Print the service names, one per line.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: volumes
+    value_type: bool
+    default_value: "false"
+    description: Print the volume names, one per line.
     deprecated: false
     experimental: false
     experimentalcli: false
