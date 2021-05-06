@@ -37,7 +37,9 @@ func TestPs(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	listOpts := apitypes.ContainerListOptions{Filters: filters.NewArgs(projectFilter(testProject)), All: false}
+	args := filters.NewArgs(projectFilter(testProject))
+	args.Add("label", "com.docker.compose.oneoff=False")
+	listOpts := apitypes.ContainerListOptions{Filters: args, All: true}
 	c1, inspect1 := containerDetails("service1", "123", "Running", "healthy")
 	c2, inspect2 := containerDetails("service1", "456", "Running", "")
 	c2.Ports = []apitypes.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}

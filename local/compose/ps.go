@@ -26,7 +26,11 @@ import (
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, options.All, options.Services...)
+	oneOff := oneOffExclude
+	if options.All {
+		oneOff = oneOffInclude
+	}
+	containers, err := s.getContainers(ctx, projectName, oneOff, true, options.Services...)
 	if err != nil {
 		return nil, err
 	}
