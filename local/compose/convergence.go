@@ -147,6 +147,7 @@ func getContainerProgressName(container moby.Container) string {
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for dep, config := range service.DependsOn {
+		dep, config := dep, config
 		eg.Go(func() error {
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()
