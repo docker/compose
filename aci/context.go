@@ -99,7 +99,10 @@ func (helper contextCreateACIHelper) createContextData(ctx context.Context, opts
 		}
 	}
 
-	location := *group.Location
+	location := opts.Location
+	if opts.Location == "" {
+		location = *group.Location
+	}
 
 	description := fmt.Sprintf("%s@%s", *group.Name, location)
 	if opts.Description != "" {
