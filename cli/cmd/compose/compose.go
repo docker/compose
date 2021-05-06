@@ -230,6 +230,7 @@ func RootCommand(contextType string, backend compose.Service) *cobra.Command {
 			pushCommand(&opts, backend),
 			pullCommand(&opts, backend),
 			createCommand(&opts, backend),
+			copyCommand(&opts, backend),
 		)
 	}
 	command.Flags().SetInterspersed(false)

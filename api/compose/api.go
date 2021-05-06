@@ -62,6 +62,8 @@ type Service interface {
 	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
+	// Copy copies a file/folder between a service container and the local filesystem
+	Copy(ctx context.Context, project *types.Project, opts CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
 	Pause(ctx context.Context, project string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`
@@ -270,6 +272,16 @@ type ListOptions struct {
 type PsOptions struct {
 	All      bool
 	Services []string
+}
+
+// CopyOptions group options of the cp API
+type CopyOptions struct {
+	Source      string
+	Destination string
+	All         bool
+	Index       int
+	FollowLink  bool
+	CopyUIDGID  bool
 }
 
 // PortPublisher hold status about published port
