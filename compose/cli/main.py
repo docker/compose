@@ -1144,9 +1144,6 @@ class TopLevelCommand:
         attach_dependencies = options.get('--attach-dependencies')
         keep_prefix = not options.get('--no-log-prefix')
 
-        if not IS_LINUX_PLATFORM:
-            print('Docker Compose is now in the Docker CLI, try `docker compose up`\n')
-
         if detached and (cascade_stop or exit_value_from or attach_dependencies):
             raise UserError(
                 "-d cannot be combined with --abort-on-container-exit or --attach-dependencies.")
