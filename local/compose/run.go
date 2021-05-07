@@ -42,7 +42,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	applyRunOptions(&service, opts)
+	applyRunOptions(project, &service, opts)
 
 	slug := moby.GenerateRandomID()
 	if service.ContainerName == "" {
@@ -107,7 +107,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 }
 
-func applyRunOptions(service *types.ServiceConfig, opts compose.RunOptions) {
+func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts compose.RunOptions) {
 	service.Tty = opts.Tty
 	service.ContainerName = opts.Name
 
@@ -124,7 +124,12 @@ func applyRunOptions(service *types.ServiceConfig, opts compose.RunOptions) {
 		service.Entrypoint = opts.Entrypoint
 	}
 	if len(opts.Environment) > 0 {
-		service.Environment.OverrideBy(opts.EnvironmentMap())
+		env := types.NewMappingWithEquals(opts.Environment)
+		projectEnv := env.Resolve(func(s string) (string, bool) {
+			v, ok := project.Environment[s]
+			return v, ok
+		}).RemoveEmpty()
+		service.Environment.OverrideBy(projectEnv)
 	}
 	for k, v := range opts.Labels {
 		service.Labels.Add(k, v)

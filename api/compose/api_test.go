@@ -19,6 +19,7 @@ package compose
 import (
 	"testing"
 
+	"github.com/compose-spec/compose-go/types"
 	"gotest.tools/v3/assert"
 )
 
@@ -30,7 +31,7 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 			"QIX",
 		},
 	}
-	env := opts.EnvironmentMap()
+	env := types.NewMappingWithEquals(opts.Environment)
 	assert.Equal(t, *env["FOO"], "BAR")
 	assert.Equal(t, *env["ZOT"], "")
 	assert.Check(t, env["QIX"] == nil)

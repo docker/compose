@@ -247,22 +247,6 @@ func (e Event) String() string {
 
 }
 
-// EnvironmentMap return RunOptions.Environment as a MappingWithEquals
-func (opts *RunOptions) EnvironmentMap() types.MappingWithEquals {
-	environment := types.MappingWithEquals{}
-	for _, s := range opts.Environment {
-		parts := strings.SplitN(s, "=", 2)
-		key := parts[0]
-		switch {
-		case len(parts) == 1:
-			environment[key] = nil
-		default:
-			environment[key] = &parts[1]
-		}
-	}
-	return environment
-}
-
 // ListOptions group options of the ls API
 type ListOptions struct {
 	All bool
