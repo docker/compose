@@ -1,6 +1,17 @@
 Change log
 ==========
 
+1.29.2 (2021-05-10)
+-------------------
+
+[List of PRs / issues for this release](https://github.com/docker/compose/milestone/59?closed=1)
+
+### Miscellaneous
+
+- Remove advertisement for `docker compose` in the `up` command to avoid annoyance
+
+- Bump `py` to `1.10.0` in `requirements-indirect.txt`
+
 1.29.1 (2021-04-13)
 -------------------
 
