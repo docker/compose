@@ -1955,12 +1955,10 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ProjectError):
             project.up()
 
-        containers = project.containers()
-        assert len(containers) == 0
-
         svc1 = project.get_service('svc1')
         svc2 = project.get_service('svc2')
         assert 'svc1' in svc2.get_dependency_names()
+        assert len(svc2.containers()) == 0
         with pytest.raises(CompletedUnsuccessfully):
             svc1.is_completed_successfully()
 
@@ -1993,14 +1991,12 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ProjectError):
             project.up()
 
-        containers = project.containers()
-        assert len(containers) == 0
-
         svc1 = project.get_service('svc1')
         svc2 = project.get_service('svc2')
         svc3 = project.get_service('svc3')
         assert ['svc1', 'svc2'] == svc3.get_dependency_names()
         assert svc1.is_completed_successfully()
+        assert len(svc3.containers()) == 0
         with pytest.raises(CompletedUnsuccessfully):
             svc2.is_completed_successfully()
 
