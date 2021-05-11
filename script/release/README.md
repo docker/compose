@@ -20,4 +20,3 @@ This should trigger a new CI build on the new tag. When the CI finishes with the
 4. In case of a GA version, please update `docker-compose`s release notes and version on [github documentation repository](https://github.com/docker/docker.github.io):
   - [Release Notes](https://github.com/docker/docker.github.io/blob/master/compose/release-notes.md)
   - [Config version](https://github.com/docker/docker.github.io/blob/master/_config.yml)
-  - [Config authoring version](https://github.com/docker/docker.github.io/blob/master/_config_authoring.yml)
