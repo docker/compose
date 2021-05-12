@@ -36,7 +36,15 @@ SILENT_COMMANDS = {
 def project_from_options(project_dir, options, additional_options=None):
     additional_options = additional_options or {}
     override_dir = get_project_dir(options)
+
+    config_details = config.find(project_dir, get_config_path_from_options(options, {}), {}, override_dir)
+
     environment_file = options.get('--env-file')
+    if environment_file is None:
+        for config_file in config_details.config_files:
+            if config_file.config['x-envfile'] is not None:
+                environment_file = config_file.config['x-envfile']
+
     environment = Environment.from_env_file(override_dir or project_dir, environment_file)
     environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
     set_parallel_limit(environment)
