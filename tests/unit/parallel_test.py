@@ -1,12 +1,9 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import unittest
 from threading import Lock
 
-import six
 from docker.errors import APIError
 
+from compose.cli.colors import AnsiMode
 from compose.parallel import GlobalLimit
 from compose.parallel import parallel_execute
 from compose.parallel import parallel_execute_iter
@@ -39,7 +36,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=[1, 2, 3, 4, 5],
             func=lambda x: x * 2,
-            get_name=six.text_type,
+            get_name=str,
             msg="Doubling",
         )
 
@@ -61,7 +58,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=list(range(tasks)),
             func=f,
-            get_name=six.text_type,
+            get_name=str,
             msg="Testing",
             limit=limit,
         )
@@ -85,7 +82,7 @@ class ParallelTest(unittest.TestCase):
         results, errors = parallel_execute(
             objects=list(range(tasks)),
             func=f,
-            get_name=six.text_type,
+            get_name=str,
             msg="Testing",
         )
 
@@ -147,7 +144,7 @@ def test_parallel_execute_alignment(capsys):
     results, errors = parallel_execute(
         objects=["short", "a very long name"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Aligning",
     )
 
@@ -160,11 +157,11 @@ def test_parallel_execute_alignment(capsys):
 
 def test_parallel_execute_ansi(capsys):
     ParallelStreamWriter.instance = None
-    ParallelStreamWriter.set_noansi(value=False)
+    ParallelStreamWriter.set_default_ansi_mode(AnsiMode.ALWAYS)
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Control characters",
     )
 
@@ -176,11 +173,11 @@ def test_parallel_execute_ansi(capsys):
 
 def test_parallel_execute_noansi(capsys):
     ParallelStreamWriter.instance = None
-    ParallelStreamWriter.set_noansi()
+    ParallelStreamWriter.set_default_ansi_mode(AnsiMode.NEVER)
     results, errors = parallel_execute(
         objects=["something", "something more"],
         func=lambda x: x,
-        get_name=six.text_type,
+        get_name=str,
         msg="Control characters",
     )
 

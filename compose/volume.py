@@ -1,8 +1,6 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import re
+from itertools import chain
 
 from docker.errors import NotFound
 from docker.utils import version_lt
@@ -18,7 +16,7 @@ from .const import LABEL_VOLUME
 log = logging.getLogger(__name__)
 
 
-class Volume(object):
+class Volume:
     def __init__(self, client, project, name, driver=None, driver_opts=None,
                  external=False, labels=None, custom_name=False):
         self.client = client
@@ -60,13 +58,13 @@ class Volume(object):
     def full_name(self):
         if self.custom_name:
             return self.name
-        return '{0}_{1}'.format(self.project.lstrip('-_'), self.name)
+        return '{}_{}'.format(self.project.lstrip('-_'), self.name)
 
     @property
     def legacy_full_name(self):
         if self.custom_name:
             return self.name
-        return '{0}_{1}'.format(
+        return '{}_{}'.format(
             re.sub(r'[_-]', '', self.project), self.name
         )
 
@@ -99,7 +97,7 @@ class Volume(object):
             self.legacy = False
 
 
-class ProjectVolumes(object):
+class ProjectVolumes:
 
     def __init__(self, volumes):
         self.volumes = volumes
@@ -135,7 +133,7 @@ class ProjectVolumes(object):
                 volume_exists = volume.exists()
                 if volume.external:
                     log.debug(
-                        'Volume {0} declared as external. No new '
+                        'Volume {} declared as external. No new '
                         'volume will be created.'.format(volume.name)
                     )
                     if not volume_exists:
@@ -151,7 +149,7 @@ class ProjectVolumes(object):
 
                 if not volume_exists:
                     log.info(
-                        'Creating volume "{0}" with {1} driver'.format(
+                        'Creating volume "{}" with {} driver'.format(
                             volume.full_name, volume.driver or 'default'
                         )
                     )
@@ -160,7 +158,7 @@ class ProjectVolumes(object):
                     check_remote_volume_config(volume.inspect(legacy=volume.legacy), volume)
         except NotFound:
             raise ConfigurationError(
-                'Volume %s specifies nonexistent driver %s' % (volume.name, volume.driver)
+                'Volume {} specifies nonexistent driver {}'.format(volume.name, volume.driver)
             )
 
     def namespace_spec(self, volume_spec):
@@ -177,7 +175,7 @@ class ProjectVolumes(object):
 
 class VolumeConfigChangedError(ConfigurationError):
     def __init__(self, local, property_name, local_value, remote_value):
-        super(VolumeConfigChangedError, self).__init__(
+        super().__init__(
             'Configuration for volume {vol_name} specifies {property_name} '
             '{local_value}, but a volume with the same name uses a different '
             '{property_name} ({remote_value}). If you wish to use the new '
@@ -195,7 +193,7 @@ def check_remote_volume_config(remote, local):
         raise VolumeConfigChangedError(local, 'driver', local.driver, remote.get('Driver'))
     local_opts = local.driver_opts or {}
     remote_opts = remote.get('Options') or {}
-    for k in set.union(set(remote_opts.keys()), set(local_opts.keys())):
+    for k in set(chain(remote_opts, local_opts)):
         if k.startswith('com.docker.'):  # These options are set internally
             continue
         if remote_opts.get(k) != local_opts.get(k):
@@ -205,7 +203,7 @@ def check_remote_volume_config(remote, local):
 
     local_labels = local.labels or {}
     remote_labels = remote.get('Labels') or {}
-    for k in set.union(set(remote_labels.keys()), set(local_labels.keys())):
+    for k in set(chain(remote_labels, local_labels)):
         if k.startswith('com.docker.'):  # We are only interested in user-specified labels
             continue
         if remote_labels.get(k) != local_labels.get(k):

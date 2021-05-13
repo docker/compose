@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import docker
 import pytest
 from docker.constants import DEFAULT_DOCKER_API_VERSION
@@ -66,9 +63,9 @@ class ServiceTest(unittest.TestCase):
         assert [c.id for c in service.containers()] == list(range(3))
 
         expected_labels = [
-            '{0}=myproject'.format(LABEL_PROJECT),
-            '{0}=db'.format(LABEL_SERVICE),
-            '{0}=False'.format(LABEL_ONE_OFF),
+            '{}=myproject'.format(LABEL_PROJECT),
+            '{}=db'.format(LABEL_SERVICE),
+            '{}=False'.format(LABEL_ONE_OFF),
         ]
 
         self.mock_client.containers.assert_called_once_with(
@@ -333,7 +330,7 @@ class ServiceTest(unittest.TestCase):
         assert service.options['environment'] == environment
 
         assert opts['labels'][LABEL_CONFIG_HASH] == \
-            '689149e6041a85f6fb4945a2146a497ed43c8a5cbd8991753d875b165f1b4de4'
+            '6da0f3ec0d5adf901de304bdc7e0ee44ec5dd7adb08aebc20fe0dd791d4ee5a8'
         assert opts['environment'] == ['also=real']
 
     def test_get_container_create_options_sets_affinity_with_binds(self):
@@ -580,6 +577,24 @@ class ServiceTest(unittest.TestCase):
         assert self.mock_client.build.call_count == 1
         self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
+    def test_ensure_image_exists_not_always_pull(self):
+        service = Service('foo', client=self.mock_client, image='someimage:sometag')
+
+        self.mock_client.inspect_image.side_effect = [NoSuchImageError, {'Id': 'abc123'}]
+        service.ensure_image_exists()
+        service.ensure_image_exists()
+
+        assert self.mock_client.pull.call_count == 1
+
+    def test_ensure_image_exists_always_pull(self):
+        service = Service('foo', client=self.mock_client, image='someimage:sometag')
+
+        self.mock_client.inspect_image.side_effect = [NoSuchImageError, {'Id': 'abc123'}]
+        service.ensure_image_exists()
+        service.ensure_image_exists(always_pull=True)
+
+        assert self.mock_client.pull.call_count == 2
+
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
             b'{"stream": "Successfully built 12345"}',
@@ -703,6 +718,7 @@ class ServiceTest(unittest.TestCase):
         config_dict = service.config_dict()
         expected = {
             'image_id': 'abcd',
+            'ipc_mode': None,
             'options': {'image': 'example.com/foo'},
             'links': [('one', 'one')],
             'net': 'other',
@@ -726,6 +742,7 @@ class ServiceTest(unittest.TestCase):
         config_dict = service.config_dict()
         expected = {
             'image_id': 'abcd',
+            'ipc_mode': None,
             'options': {'image': 'example.com/foo'},
             'links': [],
             'networks': {},

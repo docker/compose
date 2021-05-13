@@ -21,10 +21,6 @@ For example, if the list of versions is:
 `default` would return `1.7.1` and
 `recent -n 3` would return `1.8.0-rc2 1.7.1 1.6.2`
 """
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import argparse
 import itertools
 import operator

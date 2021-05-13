@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import pytest
 
 from compose.config.errors import DependencyError
@@ -8,7 +5,7 @@ from compose.config.sort_services import sort_service_dicts
 from compose.config.types import VolumeFromSpec
 
 
-class TestSortService(object):
+class TestSortService:
     def test_sort_service_dicts_1(self):
         services = [
             {

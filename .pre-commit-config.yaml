@@ -17,9 +17,12 @@
   sha: v1.3.4
   hooks:
     - id: reorder-python-imports
-      language_version: 'python2.7'
+      language_version: 'python3.7'
       args:
-        - --add-import
-        - from __future__ import absolute_import
-        - --add-import
-        - from __future__ import unicode_literals
+         - --py3-plus
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v2.1.0
+    hooks:
+    -   id: pyupgrade
+        args:
+          - --py3-plus

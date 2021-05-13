@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from compose.config.errors import DependencyError
 
 
@@ -24,7 +21,7 @@ def get_source_name_from_network_mode(network_mode, source_type):
 
 
 def get_service_names(links):
-    return [link.split(':')[0] for link in links]
+    return [link.split(':', 1)[0] for link in links]
 
 
 def get_service_names_from_volumes_from(volumes_from):
@@ -39,6 +36,7 @@ def get_service_dependents(service_dict, services):
             name in get_service_names_from_volumes_from(service.get('volumes_from', [])) or
             name == get_service_name_from_network_mode(service.get('network_mode')) or
             name == get_service_name_from_network_mode(service.get('pid')) or
+            name == get_service_name_from_network_mode(service.get('ipc')) or
             name in service.get('depends_on', []))
     ]
 

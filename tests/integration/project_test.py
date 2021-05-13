@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import copy
 import json
 import os
@@ -24,14 +21,11 @@ from compose.config import ConfigurationError
 from compose.config import types
 from compose.config.types import VolumeFromSpec
 from compose.config.types import VolumeSpec
-from compose.const import COMPOSEFILE_V2_0 as V2_0
-from compose.const import COMPOSEFILE_V2_1 as V2_1
-from compose.const import COMPOSEFILE_V2_2 as V2_2
-from compose.const import COMPOSEFILE_V2_3 as V2_3
-from compose.const import COMPOSEFILE_V3_1 as V3_1
+from compose.const import COMPOSE_SPEC as VERSION
 from compose.const import LABEL_PROJECT
 from compose.const import LABEL_SERVICE
 from compose.container import Container
+from compose.errors import CompletedUnsuccessfully
 from compose.errors import HealthCheckFailed
 from compose.errors import NoHealthCheckConfigured
 from compose.project import Project
@@ -40,16 +34,12 @@ from compose.service import ConvergenceStrategy
 from tests.integration.testcases import if_runtime_available
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
-from tests.integration.testcases import v2_1_only
-from tests.integration.testcases import v2_2_only
-from tests.integration.testcases import v2_3_only
-from tests.integration.testcases import v2_only
-from tests.integration.testcases import v3_only
 
 
 def build_config(**kwargs):
     return config.Config(
-        version=kwargs.get('version'),
+        config_version=kwargs.get('version', VERSION),
+        version=kwargs.get('version', VERSION),
         services=kwargs.get('services'),
         volumes=kwargs.get('volumes'),
         networks=kwargs.get('networks'),
@@ -109,7 +99,6 @@ class ProjectTest(DockerClientTestCase):
 
     def test_parallel_pull_with_no_image(self):
         config_data = build_config(
-            version=V2_3,
             services=[{
                 'name': 'web',
                 'build': {'context': '.'},
@@ -165,14 +154,12 @@ class ProjectTest(DockerClientTestCase):
         db = project.get_service('db')
         assert db._get_volumes_from() == [data_container.id + ':rw']
 
-    @v2_only()
     @no_cluster('container networks not supported in Swarm')
     def test_network_mode_from_service(self):
         project = Project.from_config(
             name='composetest',
             client=self.client,
             config_data=load_config({
-                'version': str(V2_0),
                 'services': {
                     'net': {
                         'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -193,14 +180,12 @@ class ProjectTest(DockerClientTestCase):
         net = project.get_service('net')
         assert web.network_mode.mode == 'container:' + net.containers()[0].id
 
-    @v2_only()
     @no_cluster('container networks not supported in Swarm')
     def test_network_mode_from_container(self):
         def get_project():
             return Project.from_config(
                 name='composetest',
                 config_data=load_config({
-                    'version': str(V2_0),
                     'services': {
                         'web': {
                             'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -306,19 +291,19 @@ class ProjectTest(DockerClientTestCase):
         db_container = db.create_container()
 
         project.start(service_names=['web'])
-        assert set(c.name for c in project.containers() if c.is_running) == {
+        assert {c.name for c in project.containers() if c.is_running} == {
             web_container_1.name, web_container_2.name}
 
         project.start()
-        assert set(c.name for c in project.containers() if c.is_running) == {
+        assert {c.name for c in project.containers() if c.is_running} == {
             web_container_1.name, web_container_2.name, db_container.name}
 
         project.pause(service_names=['web'])
-        assert set([c.name for c in project.containers() if c.is_paused]) == {
+        assert {c.name for c in project.containers() if c.is_paused} == {
             web_container_1.name, web_container_2.name}
 
         project.pause()
-        assert set([c.name for c in project.containers() if c.is_paused]) == {
+        assert {c.name for c in project.containers() if c.is_paused} == {
             web_container_1.name, web_container_2.name, db_container.name}
 
         project.unpause(service_names=['db'])
@@ -328,7 +313,7 @@ class ProjectTest(DockerClientTestCase):
         assert len([c.name for c in project.containers() if c.is_paused]) == 0
 
         project.stop(service_names=['web'], timeout=1)
-        assert set(c.name for c in project.containers() if c.is_running) == {db_container.name}
+        assert {c.name for c in project.containers() if c.is_running} == {db_container.name}
 
         project.kill(service_names=['db'])
         assert len([c for c in project.containers() if c.is_running]) == 0
@@ -451,7 +436,6 @@ class ProjectTest(DockerClientTestCase):
         assert db_container.id != old_db_id
         assert db_container.get('Volumes./etc') == db_volume_path
 
-    @v2_3_only()
     def test_recreate_preserves_mounts(self):
         web = self.create_service('web')
         db = self.create_service('db', volumes=[types.MountSpec(type='volume', target='/etc')])
@@ -659,10 +643,8 @@ class ProjectTest(DockerClientTestCase):
         service = project.get_service('web')
         assert len(service.containers()) == 1
 
-    @v2_only()
     def test_project_up_networks(self):
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -704,10 +686,8 @@ class ProjectTest(DockerClientTestCase):
         foo_data = self.client.inspect_network('composetest_foo')
         assert foo_data['Driver'] == 'bridge'
 
-    @v2_only()
     def test_up_with_ipam_config(self):
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -764,10 +744,8 @@ class ProjectTest(DockerClientTestCase):
             }],
         }
 
-    @v2_only()
     def test_up_with_ipam_options(self):
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -799,10 +777,8 @@ class ProjectTest(DockerClientTestCase):
             "com.docker.compose.network.test": "9-29-045"
         }
 
-    @v2_1_only()
     def test_up_with_network_static_addresses(self):
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -848,13 +824,11 @@ class ProjectTest(DockerClientTestCase):
         assert ipam_config.get('IPv4Address') == '172.16.100.100'
         assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
-    @v2_3_only()
     def test_up_with_network_priorities(self):
         mac_address = '74:6f:75:68:6f:75'
 
         def get_config_data(p1, p2, p3):
             return build_config(
-                version=V2_3,
                 services=[{
                     'name': 'web',
                     'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -913,11 +887,9 @@ class ProjectTest(DockerClientTestCase):
         net_config = service_container.inspect()['NetworkSettings']['Networks']['composetest_n3']
         assert net_config['MacAddress'] == mac_address
 
-    @v2_1_only()
     def test_up_with_enable_ipv6(self):
         self.require_api_version('1.23')
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -957,10 +929,8 @@ class ProjectTest(DockerClientTestCase):
                        get('IPAMConfig', {}))
         assert ipam_config.get('IPv6Address') == 'fe80::1001:102'
 
-    @v2_only()
     def test_up_with_network_static_addresses_missing_subnet(self):
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -993,10 +963,8 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ProjectError):
             project.up()
 
-    @v2_1_only()
     def test_up_with_network_link_local_ips(self):
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1028,10 +996,8 @@ class ProjectTest(DockerClientTestCase):
         assert 'LinkLocalIPs' in ipam_config
         assert ipam_config['LinkLocalIPs'] == ['169.254.8.8']
 
-    @v2_1_only()
     def test_up_with_custom_name_resources(self):
         config_data = build_config(
-            version=V2_2,
             services=[{
                 'name': 'web',
                 'volumes': [VolumeSpec.parse('foo:/container-path')],
@@ -1065,11 +1031,9 @@ class ProjectTest(DockerClientTestCase):
         assert network['Labels']['com.docker.compose.test_value'] == 'sharpdressedman'
         assert volume['Labels']['com.docker.compose.test_value'] == 'thefuror'
 
-    @v2_1_only()
     def test_up_with_isolation(self):
         self.require_api_version('1.24')
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1085,11 +1049,9 @@ class ProjectTest(DockerClientTestCase):
         service_container = project.get_service('web').containers(stopped=True)[0]
         assert service_container.inspect()['HostConfig']['Isolation'] == 'default'
 
-    @v2_1_only()
     def test_up_with_invalid_isolation(self):
         self.require_api_version('1.24')
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1104,12 +1066,10 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ProjectError):
             project.up()
 
-    @v2_3_only()
     @if_runtime_available('runc')
     def test_up_with_runtime(self):
         self.require_api_version('1.30')
         config_data = build_config(
-            version=V2_3,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1125,11 +1085,9 @@ class ProjectTest(DockerClientTestCase):
         service_container = project.get_service('web').containers(stopped=True)[0]
         assert service_container.inspect()['HostConfig']['Runtime'] == 'runc'
 
-    @v2_3_only()
     def test_up_with_invalid_runtime(self):
         self.require_api_version('1.30')
         config_data = build_config(
-            version=V2_3,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1144,12 +1102,10 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(ProjectError):
             project.up()
 
-    @v2_3_only()
     @if_runtime_available('nvidia')
     def test_up_with_nvidia_runtime(self):
         self.require_api_version('1.30')
         config_data = build_config(
-            version=V2_3,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1165,11 +1121,9 @@ class ProjectTest(DockerClientTestCase):
         service_container = project.get_service('web').containers(stopped=True)[0]
         assert service_container.inspect()['HostConfig']['Runtime'] == 'nvidia'
 
-    @v2_only()
     def test_project_up_with_network_internal(self):
         self.require_api_version('1.23')
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1191,14 +1145,12 @@ class ProjectTest(DockerClientTestCase):
 
         assert network['Internal'] is True
 
-    @v2_1_only()
     def test_project_up_with_network_label(self):
         self.require_api_version('1.23')
 
         network_name = 'network_with_label'
 
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1226,12 +1178,10 @@ class ProjectTest(DockerClientTestCase):
         assert 'label_key' in networks[0]['Labels']
         assert networks[0]['Labels']['label_key'] == 'label_val'
 
-    @v2_only()
     def test_project_up_volumes(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1251,14 +1201,12 @@ class ProjectTest(DockerClientTestCase):
         assert volume_data['Name'].split('/')[-1] == full_vol_name
         assert volume_data['Driver'] == 'local'
 
-    @v2_1_only()
     def test_project_up_with_volume_labels(self):
         self.require_api_version('1.23')
 
         volume_name = 'volume_with_label'
 
         config_data = build_config(
-            version=V2_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1286,19 +1234,17 @@ class ProjectTest(DockerClientTestCase):
             if v['Name'].split('/')[-1].startswith('composetest_')
         ]
 
-        assert set([v['Name'].split('/')[-1] for v in volumes]) == set(
-            ['composetest_{}'.format(volume_name)]
-        )
+        assert {v['Name'].split('/')[-1] for v in volumes} == {
+            'composetest_{}'.format(volume_name)
+        }
 
         assert 'label_key' in volumes[0]['Labels']
         assert volumes[0]['Labels']['label_key'] == 'label_val'
 
-    @v2_only()
     def test_project_up_logging_with_multiple_files(self):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': str(V2_0),
                 'services': {
                     'simple': {'image': BUSYBOX_IMAGE_WITH_TAG, 'command': 'top'},
                     'another': {
@@ -1317,7 +1263,6 @@ class ProjectTest(DockerClientTestCase):
         override_file = config.ConfigFile(
             'override.yml',
             {
-                'version': str(V2_0),
                 'services': {
                     'another': {
                         'logging': {
@@ -1345,12 +1290,10 @@ class ProjectTest(DockerClientTestCase):
         assert log_config
         assert log_config.get('Type') == 'none'
 
-    @v2_only()
     def test_project_up_port_mappings_with_multiple_files(self):
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1363,7 +1306,6 @@ class ProjectTest(DockerClientTestCase):
         override_file = config.ConfigFile(
             'override.yml',
             {
-                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'ports': ['1234:1234']
@@ -1381,10 +1323,8 @@ class ProjectTest(DockerClientTestCase):
         containers = project.containers()
         assert len(containers) == 1
 
-    @v2_2_only()
     def test_project_up_config_scale(self):
         config_data = build_config(
-            version=V2_2,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1409,12 +1349,40 @@ class ProjectTest(DockerClientTestCase):
         project.up()
         assert len(project.containers()) == 3
 
-    @v2_only()
-    def test_initialize_volumes(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+    def test_project_up_scale_with_stopped_containers(self):
         config_data = build_config(
-            version=V2_0,
+            services=[{
+                'name': 'web',
+                'image': BUSYBOX_IMAGE_WITH_TAG,
+                'command': 'top',
+                'scale': 2
+            }]
+        )
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+
+        project.up()
+        containers = project.containers()
+        assert len(containers) == 2
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 2})
+        containers = project.containers()
+        assert len(containers) == 2
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 3})
+        assert len(project.containers()) == 3
+
+        self.client.stop(containers[0].id)
+        project.up(scale_override={'web': 1})
+        assert len(project.containers()) == 1
+
+    def test_initialize_volumes(self):
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
+        config_data = build_config(
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1433,12 +1401,10 @@ class ProjectTest(DockerClientTestCase):
         assert volume_data['Name'].split('/')[-1] == full_vol_name
         assert volume_data['Driver'] == 'local'
 
-    @v2_only()
     def test_project_up_implicit_volume_driver(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1457,12 +1423,10 @@ class ProjectTest(DockerClientTestCase):
         assert volume_data['Name'].split('/')[-1] == full_vol_name
         assert volume_data['Driver'] == 'local'
 
-    @v3_only()
     def test_project_up_with_secrets(self):
         node = create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
 
         config_data = build_config(
-            version=V3_1,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1494,12 +1458,10 @@ class ProjectTest(DockerClientTestCase):
         output = container.logs()
         assert output == b"This is the secret\n"
 
-    @v3_only()
     def test_project_up_with_added_secrets(self):
         node = create_host_file(self.client, os.path.abspath('tests/fixtures/secrets/default'))
 
         config_input1 = {
-            'version': V3_1,
             'services': [
                 {
                     'name': 'web',
@@ -1548,12 +1510,11 @@ class ProjectTest(DockerClientTestCase):
         output = container.logs()
         assert output == b"This is the secret\n"
 
-    @v2_only()
     def test_initialize_volumes_invalid_volume_driver(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
+        vol_name = '{:x}'.format(random.getrandbits(32))
 
         config_data = build_config(
-            version=V2_0,
+            version=VERSION,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1569,14 +1530,12 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(APIError if is_cluster(self.client) else config.ConfigurationError):
             project.volumes.initialize()
 
-    @v2_only()
     @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_initialize_volumes_updated_driver(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
 
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1604,21 +1563,19 @@ class ProjectTest(DockerClientTestCase):
         )
         with pytest.raises(config.ConfigurationError) as e:
             project.volumes.initialize()
-        assert 'Configuration for volume {0} specifies driver smb'.format(
+        assert 'Configuration for volume {} specifies driver smb'.format(
             vol_name
         ) in str(e.value)
 
-    @v2_only()
     @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_initialize_volumes_updated_driver_opts(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
         tmpdir = tempfile.mkdtemp(prefix='compose_test_')
         self.addCleanup(shutil.rmtree, tmpdir)
         driver_opts = {'o': 'bind', 'device': tmpdir, 'type': 'none'}
 
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1650,17 +1607,15 @@ class ProjectTest(DockerClientTestCase):
         )
         with pytest.raises(config.ConfigurationError) as e:
             project.volumes.initialize()
-        assert 'Configuration for volume {0} specifies "device" driver_opt {1}'.format(
+        assert 'Configuration for volume {} specifies "device" driver_opt {}'.format(
             vol_name, driver_opts['device']
         ) in str(e.value)
 
-    @v2_only()
     def test_initialize_volumes_updated_blank_driver(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
 
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1691,15 +1646,13 @@ class ProjectTest(DockerClientTestCase):
         assert volume_data['Name'].split('/')[-1] == full_vol_name
         assert volume_data['Driver'] == 'local'
 
-    @v2_only()
     @no_cluster('inspect volume by name defect on Swarm Classic')
     def test_initialize_volumes_external_volumes(self):
         # Use composetest_ prefix so it gets garbage-collected in tearDown()
-        vol_name = 'composetest_{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = 'composetest_{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
         self.client.create_volume(vol_name)
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1718,12 +1671,10 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(NotFound):
             self.client.inspect_volume(full_vol_name)
 
-    @v2_only()
     def test_initialize_volumes_inexistent_external_volume(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
+        vol_name = '{:x}'.format(random.getrandbits(32))
 
         config_data = build_config(
-            version=V2_0,
             services=[{
                 'name': 'web',
                 'image': BUSYBOX_IMAGE_WITH_TAG,
@@ -1739,24 +1690,22 @@ class ProjectTest(DockerClientTestCase):
         )
         with pytest.raises(config.ConfigurationError) as e:
             project.volumes.initialize()
-        assert 'Volume {0} declared as external'.format(
+        assert 'Volume {} declared as external'.format(
             vol_name
         ) in str(e.value)
 
-    @v2_only()
     def test_project_up_named_volumes_in_binds(self):
-        vol_name = '{0:x}'.format(random.getrandbits(32))
-        full_vol_name = 'composetest_{0}'.format(vol_name)
+        vol_name = '{:x}'.format(random.getrandbits(32))
+        full_vol_name = 'composetest_{}'.format(vol_name)
 
         base_file = config.ConfigFile(
             'base.yml',
             {
-                'version': str(V2_0),
                 'services': {
                     'simple': {
                         'image': BUSYBOX_IMAGE_WITH_TAG,
                         'command': 'top',
-                        'volumes': ['{0}:/data'.format(vol_name)]
+                        'volumes': ['{}:/data'.format(vol_name)]
                     },
                 },
                 'volumes': {
@@ -1842,7 +1791,6 @@ class ProjectTest(DockerClientTestCase):
 
         mock_log.warning.assert_not_called()
 
-    @v2_1_only()
     def test_project_up_healthy_dependency(self):
         config_dict = {
             'version': '2.1',
@@ -1879,7 +1827,6 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         assert svc1.is_healthy()
 
-    @v2_1_only()
     def test_project_up_unhealthy_dependency(self):
         config_dict = {
             'version': '2.1',
@@ -1918,7 +1865,6 @@ class ProjectTest(DockerClientTestCase):
         with pytest.raises(HealthCheckFailed):
             svc1.is_healthy()
 
-    @v2_1_only()
     def test_project_up_no_healthcheck_dependency(self):
         config_dict = {
             'version': '2.1',
@@ -1953,6 +1899,106 @@ class ProjectTest(DockerClientTestCase):
         assert 'svc1' in svc2.get_dependency_names()
         with pytest.raises(NoHealthCheckConfigured):
             svc1.is_healthy()
+
+    def test_project_up_completed_successfully_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'true'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+
+        assert 'svc1' in svc2.get_dependency_names()
+        assert svc2.containers()[0].is_running
+        assert len(svc1.containers()) == 0
+        assert svc1.is_completed_successfully()
+
+    def test_project_up_completed_unsuccessfully_dependency(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'false'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        assert 'svc1' in svc2.get_dependency_names()
+        assert len(svc2.containers()) == 0
+        with pytest.raises(CompletedUnsuccessfully):
+            svc1.is_completed_successfully()
+
+    def test_project_up_completed_differently_dependencies(self):
+        config_dict = {
+            'version': '2.1',
+            'services': {
+                'svc1': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'true'
+                },
+                'svc2': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'false'
+                },
+                'svc3': {
+                    'image': BUSYBOX_IMAGE_WITH_TAG,
+                    'command': 'top',
+                    'depends_on': {
+                        'svc1': {'condition': 'service_completed_successfully'},
+                        'svc2': {'condition': 'service_completed_successfully'},
+                    }
+                }
+            }
+        }
+        config_data = load_config(config_dict)
+        project = Project.from_config(
+            name='composetest', config_data=config_data, client=self.client
+        )
+        with pytest.raises(ProjectError):
+            project.up()
+
+        svc1 = project.get_service('svc1')
+        svc2 = project.get_service('svc2')
+        svc3 = project.get_service('svc3')
+        assert ['svc1', 'svc2'] == svc3.get_dependency_names()
+        assert svc1.is_completed_successfully()
+        assert len(svc3.containers()) == 0
+        with pytest.raises(CompletedUnsuccessfully):
+            svc2.is_completed_successfully()
 
     def test_project_up_seccomp_profile(self):
         seccomp_data = {

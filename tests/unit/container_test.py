@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import docker
 
 from .. import mock
@@ -223,34 +220,6 @@ class ContainerTest(unittest.TestCase):
     def test_short_id(self):
         container = Container(None, self.container_dict, has_been_inspected=True)
         assert container.short_id == self.container_id[:12]
-
-    def test_has_api_logs(self):
-        container_dict = {
-            'HostConfig': {
-                'LogConfig': {
-                    'Type': 'json-file'
-                }
-            }
-        }
-
-        container = Container(None, container_dict, has_been_inspected=True)
-        assert container.has_api_logs is True
-
-        container_dict['HostConfig']['LogConfig']['Type'] = 'none'
-        container = Container(None, container_dict, has_been_inspected=True)
-        assert container.has_api_logs is False
-
-        container_dict['HostConfig']['LogConfig']['Type'] = 'syslog'
-        container = Container(None, container_dict, has_been_inspected=True)
-        assert container.has_api_logs is False
-
-        container_dict['HostConfig']['LogConfig']['Type'] = 'journald'
-        container = Container(None, container_dict, has_been_inspected=True)
-        assert container.has_api_logs is True
-
-        container_dict['HostConfig']['LogConfig']['Type'] = 'foobar'
-        container = Container(None, container_dict, has_been_inspected=True)
-        assert container.has_api_logs is False
 
 
 class GetContainerNameTestCase(unittest.TestCase):

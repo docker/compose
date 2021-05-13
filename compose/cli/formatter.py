@@ -1,18 +1,9 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
-import shutil
+from shutil import get_terminal_size
 
-import six
 import texttable
 
 from compose.cli import colors
-
-if hasattr(shutil, "get_terminal_size"):
-    from shutil import get_terminal_size
-else:
-    from backports.shutil_get_terminal_size import get_terminal_size
 
 
 def get_tty_width():
@@ -49,15 +40,15 @@ class ConsoleWarningFormatter(logging.Formatter):
 
     def get_level_message(self, record):
         separator = ': '
-        if record.levelno == logging.WARNING:
-            return colors.yellow(record.levelname) + separator
-        if record.levelno == logging.ERROR:
+        if record.levelno >= logging.ERROR:
             return colors.red(record.levelname) + separator
+        if record.levelno >= logging.WARNING:
+            return colors.yellow(record.levelname) + separator
 
         return ''
 
     def format(self, record):
-        if isinstance(record.msg, six.binary_type):
+        if isinstance(record.msg, bytes):
             record.msg = record.msg.decode('utf-8')
-        message = super(ConsoleWarningFormatter, self).format(record)
-        return '{0}{1}'.format(self.get_level_message(record), message)
+        message = super().format(record)
+        return '{}{}'.format(self.get_level_message(record), message)

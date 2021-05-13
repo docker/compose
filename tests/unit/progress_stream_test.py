@@ -1,14 +1,8 @@
-# ~*~ encoding: utf-8 ~*~
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import io
 import os
 import random
 import shutil
 import tempfile
-
-from six import StringIO
+from io import StringIO
 
 from compose import progress_stream
 from tests import unittest
@@ -79,7 +73,7 @@ class ProgressStreamTestCase(unittest.TestCase):
 
         def mktempfile(encoding):
             fname = os.path.join(tmpdir, hex(random.getrandbits(128))[2:-1])
-            return io.open(fname, mode='w+', encoding=encoding)
+            return open(fname, mode='w+', encoding=encoding)
 
         text = '就吃饭'
         with mktempfile(encoding='utf-8') as tf:

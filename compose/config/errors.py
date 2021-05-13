@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-
 VERSION_EXPLANATION = (
     'You might be seeing this error because you\'re using the wrong Compose file version. '
     'Either specify a supported version (e.g "2.2" or "3.3") and place '
@@ -42,7 +38,7 @@ class CircularReference(ConfigurationError):
 
 class ComposeFileNotFound(ConfigurationError):
     def __init__(self, supported_filenames):
-        super(ComposeFileNotFound, self).__init__("""
+        super().__init__("""
         Can't find a suitable configuration file in this directory or any
         parent. Are you in the right directory?
 
@@ -53,7 +49,7 @@ class ComposeFileNotFound(ConfigurationError):
 class DuplicateOverrideFileFound(ConfigurationError):
     def __init__(self, override_filenames):
         self.override_filenames = override_filenames
-        super(DuplicateOverrideFileFound, self).__init__(
+        super().__init__(
             "Multiple override files found: {}. You may only use a single "
             "override file.".format(", ".join(override_filenames))
         )

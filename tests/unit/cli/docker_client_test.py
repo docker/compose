@@ -1,12 +1,10 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import platform
 import ssl
 
 import docker
 import pytest
+from docker.constants import DEFAULT_DOCKER_API_VERSION
 
 import compose
 from compose.cli import errors
@@ -26,18 +24,18 @@ class DockerClientTestCase(unittest.TestCase):
                 del os.environ['HOME']
             except KeyError:
                 pass
-            docker_client(os.environ)
+            docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
 
     @mock.patch.dict(os.environ)
     def test_docker_client_with_custom_timeout(self):
         os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
-        client = docker_client(os.environ)
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
         assert client.timeout == 123
 
     @mock.patch.dict(os.environ)
     def test_custom_timeout_error(self):
         os.environ['COMPOSE_HTTP_TIMEOUT'] = '123'
-        client = docker_client(os.environ)
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
 
         with mock.patch('compose.cli.errors.log') as fake_log:
             with pytest.raises(errors.ConnectionError):
@@ -57,8 +55,8 @@ class DockerClientTestCase(unittest.TestCase):
         assert '123' in fake_log.error.call_args[0][0]
 
     def test_user_agent(self):
-        client = docker_client(os.environ)
-        expected = "docker-compose/{0} docker-py/{1} {2}/{3}".format(
+        client = docker_client(os.environ, version=DEFAULT_DOCKER_API_VERSION)
+        expected = "docker-compose/{} docker-py/{} {}/{}".format(
             compose.__version__,
             docker.__version__,
             platform.system(),
@@ -154,9 +152,9 @@ class TLSConfigTestCase(unittest.TestCase):
 
     def test_tls_client_and_ca_quoted_paths(self):
         options = {
-            '--tlscacert': '"{0}"'.format(self.ca_cert),
-            '--tlscert': '"{0}"'.format(self.client_cert),
-            '--tlskey': '"{0}"'.format(self.key),
+            '--tlscacert': '"{}"'.format(self.ca_cert),
+            '--tlscert': '"{}"'.format(self.client_cert),
+            '--tlskey': '"{}"'.format(self.key),
             '--tlsverify': True
         }
         result = tls_config_from_options(options)
@@ -188,9 +186,9 @@ class TLSConfigTestCase(unittest.TestCase):
             'DOCKER_TLS_VERIFY': 'false'
         })
         options = {
-            '--tlscacert': '"{0}"'.format(self.ca_cert),
-            '--tlscert': '"{0}"'.format(self.client_cert),
-            '--tlskey': '"{0}"'.format(self.key),
+            '--tlscacert': '"{}"'.format(self.ca_cert),
+            '--tlscert': '"{}"'.format(self.client_cert),
+            '--tlskey': '"{}"'.format(self.key),
             '--tlsverify': True
         }
 
@@ -233,7 +231,7 @@ class TLSConfigTestCase(unittest.TestCase):
         assert result.cert == (self.client_cert, self.key)
 
 
-class TestGetTlsVersion(object):
+class TestGetTlsVersion:
     def test_get_tls_version_default(self):
         environment = {}
         assert get_tls_version(environment) is None

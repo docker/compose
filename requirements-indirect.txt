@@ -1,0 +1,28 @@
+altgraph==0.17
+appdirs==1.4.4
+attrs==20.3.0
+bcrypt==3.2.0
+cffi==1.14.4
+cryptography==3.3.2
+distlib==0.3.1
+entrypoints==0.3
+filelock==3.0.12
+gitdb2==4.0.2
+mccabe==0.6.1
+more-itertools==8.6.0; python_version >= '3.5'
+more-itertools==5.0.0; python_version < '3.5'
+packaging==20.9
+pluggy==0.13.1
+py==1.10.0
+pycodestyle==2.6.0
+pycparser==2.20
+pyflakes==2.2.0
+PyNaCl==1.4.0
+pyparsing==2.4.7
+pyrsistent==0.16.0
+smmap==3.0.4
+smmap2==3.0.1
+toml==0.10.1
+tox==3.21.2
+virtualenv==20.4.0
+wcwidth==0.2.5

@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import unittest
 
 from compose.cli.utils import human_readable_file_size

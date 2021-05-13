@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import contextlib
 import os
 
@@ -52,7 +49,7 @@ def create_custom_host_file(client, filename, content):
 
 
 def create_host_file(client, filename):
-    with open(filename, 'r') as fh:
+    with open(filename) as fh:
         content = fh.read()
 
     return create_custom_host_file(client, filename, content)

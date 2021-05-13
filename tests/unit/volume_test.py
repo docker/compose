@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import docker
 import pytest
 
@@ -13,7 +10,7 @@ def mock_client():
     return mock.create_autospec(docker.APIClient)
 
 
-class TestVolume(object):
+class TestVolume:
 
     def test_remove_local_volume(self, mock_client):
         vol = volume.Volume(mock_client, 'foo', 'project')

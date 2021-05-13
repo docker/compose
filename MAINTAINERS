@@ -11,6 +11,7 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
+			"aiordache",
 			"ndeloof",
 			"rumpl",
 			"ulyssessouza",
@@ -29,7 +30,7 @@
 			# in 2015 with solid bugfixes and improved error handling
 			# among them
 			"mnowster",
-			# Daniel Nephin is one of the longest-running maitainers on
+			# Daniel Nephin is one of the longest-running maintainers on
 			# the Compose project, and has contributed several major features
 			# including muti-file support, variable interpolation, secrets
 			# emulation and many more
@@ -52,6 +53,11 @@
 	Name = "Aanand Prasad"
 	Email = "aanand.prasad@gmail.com"
 	GitHub = "aanand"
+
+	[people.aiordache]
+	Name = "Anca Iordache"
+	Email = "anca.iordache@docker.com"
+	GitHub = "aiordache"
 
 	[people.bfirsh]
 	Name = "Ben Firshman"

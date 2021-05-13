@@ -1,16 +1,12 @@
 """
 Types for objects parsed from the configuration.
 """
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import json
 import ntpath
 import os
 import re
 from collections import namedtuple
 
-import six
 from docker.utils.ports import build_port_bindings
 
 from ..const import COMPOSEFILE_V1 as V1
@@ -104,7 +100,7 @@ def serialize_restart_spec(restart_spec):
         return ''
     parts = [restart_spec['Name']]
     if restart_spec['MaximumRetryCount']:
-        parts.append(six.text_type(restart_spec['MaximumRetryCount']))
+        parts.append(str(restart_spec['MaximumRetryCount']))
     return ':'.join(parts)
 
 
@@ -150,7 +146,7 @@ def normpath(path, win_host=False):
     return path
 
 
-class MountSpec(object):
+class MountSpec:
     options_map = {
         'volume': {
             'nocopy': 'no_copy'
@@ -326,7 +322,7 @@ class ServiceLink(namedtuple('_ServiceLink', 'target alias')):
 class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid mode name')):
     @classmethod
     def parse(cls, spec):
-        if isinstance(spec, six.string_types):
+        if isinstance(spec, str):
             return cls(spec, None, None, None, None, None)
         return cls(
             spec.get('source'),
@@ -342,9 +338,9 @@ class ServiceConfigBase(namedtuple('_ServiceConfigBase', 'source target uid gid 
         return self.source
 
     def repr(self):
-        return dict(
-            [(k, v) for k, v in zip(self._fields, self) if v is not None]
-        )
+        return {
+            k: v for k, v in zip(self._fields, self) if v is not None
+        }
 
 
 class ServiceSecret(ServiceConfigBase):
@@ -364,12 +360,9 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
             raise ConfigurationError('Invalid target port: {}'.format(target))
 
         if published:
-            if isinstance(published, six.string_types) and '-' in published:  # "x-y:z" format
+            if isinstance(published, str) and '-' in published:  # "x-y:z" format
                 a, b = published.split('-', 1)
-                try:
-                    int(a)
-                    int(b)
-                except ValueError:
+                if not a.isdigit() or not b.isdigit():
                     raise ConfigurationError('Invalid published port: {}'.format(published))
             else:
                 try:
@@ -377,7 +370,7 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
                 except ValueError:
                     raise ConfigurationError('Invalid published port: {}'.format(published))
 
-        return super(ServicePort, cls).__new__(
+        return super().__new__(
             cls, target, published, *args, **kwargs
         )
 
@@ -426,9 +419,9 @@ class ServicePort(namedtuple('_ServicePort', 'target published protocol mode ext
         return (self.target, self.published, self.external_ip, self.protocol)
 
     def repr(self):
-        return dict(
-            [(k, v) for k, v in zip(self._fields, self) if v is not None]
-        )
+        return {
+            k: v for k, v in zip(self._fields, self) if v is not None
+        }
 
     def legacy_repr(self):
         return normalize_port_dict(self.repr())
@@ -477,7 +470,7 @@ def normalize_port_dict(port):
 class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
     @classmethod
     def parse(cls, value):
-        if not isinstance(value, six.string_types):
+        if not isinstance(value, str):
             return value
         # based on https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697
         con = value.split('=', 2)
@@ -488,9 +481,9 @@ class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
 
         if con[0] == 'seccomp' and con[1] != 'unconfined':
             try:
-                with open(unquote_path(con[1]), 'r') as f:
+                with open(unquote_path(con[1])) as f:
                     seccomp_data = json.load(f)
-            except (IOError, ValueError) as e:
+            except (OSError, ValueError) as e:
                 raise ConfigurationError('Error reading seccomp profile: {}'.format(e))
             return cls(
                 'seccomp={}'.format(json.dumps(seccomp_data)), con[1]

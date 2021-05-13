@@ -1,12 +1,8 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import os
 import re
 
 import dotenv
-import six
 
 from ..const import IS_WINDOWS_PLATFORM
 from .errors import ConfigurationError
@@ -16,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 def split_env(env):
-    if isinstance(env, six.binary_type):
+    if isinstance(env, bytes):
         env = env.decode('utf-8', 'replace')
     key = value = None
     if '=' in env:
@@ -30,7 +26,7 @@ def split_env(env):
     return key, value
 
 
-def env_vars_from_file(filename):
+def env_vars_from_file(filename, interpolate=True):
     """
     Read in a line delimited file of environment variables.
     """
@@ -39,12 +35,15 @@ def env_vars_from_file(filename):
     elif not os.path.isfile(filename):
         raise EnvFileNotFound("{} is not a file.".format(filename))
 
-    return dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig')
+    env = dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig', interpolate=interpolate)
+    for k, v in env.items():
+        env[k] = v if interpolate else v.replace('$', '$$')
+    return env
 
 
 class Environment(dict):
     def __init__(self, *args, **kwargs):
-        super(Environment, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.missing_keys = []
         self.silent = False
 
@@ -55,9 +54,10 @@ class Environment(dict):
             if base_dir is None:
                 return result
             if env_file:
-                env_file_path = os.path.join(base_dir, env_file)
-            else:
-                env_file_path = os.path.join(base_dir, '.env')
+                env_file_path = os.path.join(os.getcwd(), env_file)
+                return cls(env_vars_from_file(env_file_path))
+
+            env_file_path = os.path.join(base_dir, '.env')
             try:
                 return cls(env_vars_from_file(env_file_path))
             except EnvFileNotFound:
@@ -82,11 +82,11 @@ class Environment(dict):
 
     def __getitem__(self, key):
         try:
-            return super(Environment, self).__getitem__(key)
+            return super().__getitem__(key)
         except KeyError:
             if IS_WINDOWS_PLATFORM:
                 try:
-                    return super(Environment, self).__getitem__(key.upper())
+                    return super().__getitem__(key.upper())
                 except KeyError:
                     pass
             if not self.silent and key not in self.missing_keys:
@@ -99,28 +99,28 @@ class Environment(dict):
             return ""
 
     def __contains__(self, key):
-        result = super(Environment, self).__contains__(key)
+        result = super().__contains__(key)
         if IS_WINDOWS_PLATFORM:
             return (
-                result or super(Environment, self).__contains__(key.upper())
+                result or super().__contains__(key.upper())
             )
         return result
 
     def get(self, key, *args, **kwargs):
         if IS_WINDOWS_PLATFORM:
-            return super(Environment, self).get(
+            return super().get(
                 key,
-                super(Environment, self).get(key.upper(), *args, **kwargs)
+                super().get(key.upper(), *args, **kwargs)
             )
-        return super(Environment, self).get(key, *args, **kwargs)
+        return super().get(key, *args, **kwargs)
 
-    def get_boolean(self, key):
+    def get_boolean(self, key, default=False):
         # Convert a value to a boolean using "common sense" rules.
         # Unset, empty, "0" and "false" (i-case) yield False.
         # All other values yield True.
         value = self.get(key)
         if not value:
-            return False
+            return default
         if value.lower() in ['0', 'false']:
             return False
         return True

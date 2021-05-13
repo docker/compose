@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import re
 
@@ -9,7 +6,7 @@ from const import REPO_ROOT
 
 def update_init_py_version(version):
     path = os.path.join(REPO_ROOT, 'compose', '__init__.py')
-    with open(path, 'r') as f:
+    with open(path) as f:
         contents = f.read()
     contents = re.sub(r"__version__ = '[0-9a-z.-]+'", "__version__ = '{}'".format(version), contents)
     with open(path, 'w') as f:
@@ -18,7 +15,7 @@ def update_init_py_version(version):
 
 def update_run_sh_version(version):
     path = os.path.join(REPO_ROOT, 'script', 'run', 'run.sh')
-    with open(path, 'r') as f:
+    with open(path) as f:
         contents = f.read()
     contents = re.sub(r'VERSION="[0-9a-z.-]+"', 'VERSION="{}"'.format(version), contents)
     with open(path, 'w') as f:

@@ -1,14 +1,9 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import codecs
 import hashlib
 import json.decoder
 import logging
 import ntpath
 import random
 
-import six
 from docker.errors import DockerException
 from docker.utils import parse_bytes as sdk_parse_bytes
 
@@ -21,12 +16,6 @@ json_decoder = json.JSONDecoder()
 log = logging.getLogger(__name__)
 
 
-def get_output_stream(stream):
-    if six.PY3:
-        return stream
-    return codecs.getwriter('utf-8')(stream)
-
-
 def stream_as_text(stream):
     """Given a stream of bytes or text, if any of the items in the stream
     are bytes convert them to text.
@@ -35,13 +24,13 @@ def stream_as_text(stream):
     of byte streams.
     """
     for data in stream:
-        if not isinstance(data, six.text_type):
+        if not isinstance(data, str):
             data = data.decode('utf-8', 'replace')
         yield data
 
 
-def line_splitter(buffer, separator=u'\n'):
-    index = buffer.find(six.text_type(separator))
+def line_splitter(buffer, separator='\n'):
+    index = buffer.find(str(separator))
     if index == -1:
         return None
     return buffer[:index + 1], buffer[index + 1:]
@@ -56,7 +45,7 @@ def split_buffer(stream, splitter=None, decoder=lambda a: a):
     of the input.
     """
     splitter = splitter or line_splitter
-    buffered = six.text_type('')
+    buffered = ''
 
     for data in stream_as_text(stream):
         buffered += data
@@ -127,7 +116,7 @@ def parse_nanoseconds_int(value):
 
 
 def build_string_dict(source_dict):
-    return dict((k, str(v if v is not None else '')) for k, v in source_dict.items())
+    return {k: str(v if v is not None else '') for k, v in source_dict.items()}
 
 
 def splitdrive(path):
@@ -185,3 +174,18 @@ def truncate_string(s, max_chars=35):
     if len(s) > max_chars:
         return s[:max_chars - 2] + '...'
     return s
+
+
+def filter_attached_for_up(items, service_names, attach_dependencies=False,
+                           item_to_service_name=lambda x: x):
+    """This function contains the logic of choosing which services to
+    attach when doing docker-compose up. It may be used both with containers
+    and services, and any other entities that map to service names -
+    this mapping is provided by item_to_service_name."""
+    if attach_dependencies or not service_names:
+        return items
+
+    return [
+        item
+        for item in items if item_to_service_name(item) in service_names
+    ]

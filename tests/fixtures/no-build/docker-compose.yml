@@ -1,0 +1,8 @@
+version: "3"
+services:
+    my-alpine:
+        image: alpine:3.12
+        container_name: alpine
+        entrypoint: 'echo It works!'
+        build:
+          context: /this/path/doesnt/exist # and we don't really care. We just want to run containers already pulled.
