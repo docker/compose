@@ -343,7 +343,7 @@ class Service:
             raise OperationFailedError("Cannot create container for service %s: %s" %
                                        (self.name, binarystr_to_unicode(ex.explanation)))
 
-    def ensure_image_exists(self, do_build=BuildAction.none, silent=False, cli=False):
+    def ensure_image_exists(self, do_build=BuildAction.none, always_pull=False, silent=False, cli=False):
         if self.can_be_built() and do_build == BuildAction.force:
             self.build(cli=cli)
             return
@@ -354,7 +354,7 @@ class Service:
         except NoSuchImageError:
             pass
 
-        if not self.can_be_built():
+        if not self.can_be_built() or always_pull:
             self.pull(silent=silent)
             return
 

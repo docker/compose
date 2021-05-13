@@ -577,6 +577,24 @@ class ServiceTest(unittest.TestCase):
         assert self.mock_client.build.call_count == 1
         self.mock_client.build.call_args[1]['tag'] == 'default_foo'
 
+    def test_ensure_image_exists_not_always_pull(self):
+        service = Service('foo', client=self.mock_client, image='someimage:sometag')
+
+        self.mock_client.inspect_image.side_effect = [NoSuchImageError, {'Id': 'abc123'}]
+        service.ensure_image_exists()
+        service.ensure_image_exists()
+
+        assert self.mock_client.pull.call_count == 1
+
+    def test_ensure_image_exists_always_pull(self):
+        service = Service('foo', client=self.mock_client, image='someimage:sometag')
+
+        self.mock_client.inspect_image.side_effect = [NoSuchImageError, {'Id': 'abc123'}]
+        service.ensure_image_exists()
+        service.ensure_image_exists(always_pull=True)
+
+        assert self.mock_client.pull.call_count == 2
+
     def test_build_does_not_pull(self):
         self.mock_client.build.return_value = [
             b'{"stream": "Successfully built 12345"}',
