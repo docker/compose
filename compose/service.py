@@ -348,13 +348,17 @@ class Service:
             self.build(cli=cli)
             return
 
+        if not self.can_be_built() and always_pull:
+            self.pull(silent=silent)
+            return
+
         try:
             self.image()
             return
         except NoSuchImageError:
             pass
 
-        if not self.can_be_built() or always_pull:
+        if not self.can_be_built():
             self.pull(silent=silent)
             return
 
