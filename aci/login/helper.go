@@ -122,7 +122,7 @@ func isWsl() bool {
 		return false
 	}
 
-	return strings.Contains(string(b), "microsoft")
+	return strings.Contains(strings.ToLower(string(b)), "microsoft")
 }
 
 func randomString(prefix string, length int) string {
