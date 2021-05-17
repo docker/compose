@@ -254,7 +254,9 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 			return "", err
 		}
 		if opts.Detach {
-			err = backend.Start(ctx, project, compose.StartOptions{})
+			err = backend.Start(ctx, project, compose.StartOptions{
+				Services: services,
+			})
 		}
 		return "", err
 	})

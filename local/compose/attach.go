@@ -33,6 +33,10 @@ import (
 )
 
 func (s *composeService) attach(ctx context.Context, project *types.Project, listener compose.ContainerEventListener, selectedServices []string) (Containers, error) {
+	if len(selectedServices) == 0 {
+		selectedServices = project.ServiceNames()
+	}
+
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, selectedServices...)
 	if err != nil {
 		return nil, err
