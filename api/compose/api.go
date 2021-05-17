@@ -284,6 +284,7 @@ type ContainerSummary struct {
 	Service    string
 	State      string
 	Health     string
+	ExitCode   int
 	Publishers []PortPublisher
 }
 
