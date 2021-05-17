@@ -45,24 +45,21 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 
-	args := map[string]string{}
-	for k, v := range options.Args.Resolve(func(s string) (string, bool) {
+	args := flatten(options.Args.Resolve(func(s string) (string, bool) {
 		s, ok := project.Environment[s]
 		return s, ok
-	}).RemoveEmpty() {
-		args[k] = *v
-	}
+	}))
 
 	for _, service := range project.Services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(service, imageName)
+			buildOptions, err := s.toBuildOptions(project, service, imageName)
 			if err != nil {
 				return err
 			}
 			buildOptions.Pull = options.Pull
-			buildOptions.BuildArgs = args
+			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
 			buildOptions.NoCache = options.NoCache
 			opts[imageName] = buildOptions
 			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
@@ -142,7 +139,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 				continue
 			}
 			imagesToBuild = append(imagesToBuild, imageName)
-			opt, err := s.toBuildOptions(service, imageName)
+			opt, err := s.toBuildOptions(project, service, imageName)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -263,11 +260,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opts
 	return imagesBuilt, err
 }
 
-func (s *composeService) toBuildOptions(service types.ServiceConfig, imageTag string) (build.Options, error) {
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
-	var buildArgs map[string]string
+	buildArgs := flatten(service.Build.Args.Resolve(func(s string) (string, bool) {
+		s, ok := project.Environment[s]
+		return s, ok
+	}))
 
 	var plats []specs.Platform
 	if service.Platform != "" {
@@ -283,7 +283,7 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, imageTag st
 			ContextPath:    service.Build.Context,
 			DockerfilePath: service.Build.Dockerfile,
 		},
-		BuildArgs: flatten(mergeArgs(service.Build.Args, buildArgs)),
+		BuildArgs: buildArgs,
 		Tags:      tags,
 		Target:    service.Build.Target,
 		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
@@ -292,11 +292,11 @@ func (s *composeService) toBuildOptions(service types.ServiceConfig, imageTag st
 	}, nil
 }
 
-func flatten(in types.MappingWithEquals) map[string]string {
+func flatten(in types.MappingWithEquals) types.Mapping {
 	if len(in) == 0 {
 		return nil
 	}
-	out := make(map[string]string)
+	out := types.Mapping{}
 	for k, v := range in {
 		if v == nil {
 			continue
@@ -306,15 +306,12 @@ func flatten(in types.MappingWithEquals) map[string]string {
 	return out
 }
 
-func mergeArgs(src types.MappingWithEquals, values map[string]string) types.MappingWithEquals {
-	for key := range src {
-		if val, ok := values[key]; ok {
-			if val == "" {
-				src[key] = nil
-			} else {
-				src[key] = &val
-			}
+func mergeArgs(m ...types.Mapping) types.Mapping {
+	merged := types.Mapping{}
+	for _, mapping := range m {
+		for key, val := range mapping {
+			merged[key] = val
 		}
 	}
-	return src
+	return merged
 }
