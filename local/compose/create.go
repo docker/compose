@@ -604,7 +604,7 @@ MOUNTS:
 	for _, m := range mountOptions {
 		volumeMounts[m.Target] = struct{}{}
 		// `Bind` API is used when host path need to be created if missing, `Mount` is preferred otherwise
-		if m.Type == mount.TypeBind {
+		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
 			for _, v := range service.Volumes {
 				if v.Target == m.Target && v.Bind != nil && v.Bind.CreateHostPath {
 					mode := "rw"
