@@ -19,10 +19,10 @@ package compose
 import (
 	"context"
 	"fmt"
-
-	"golang.org/x/sync/errgroup"
+	"sort"
 
 	"github.com/docker/compose-cli/api/compose"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
@@ -42,6 +42,9 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 		i := i
 		eg.Go(func() error {
 			var publishers []compose.PortPublisher
+			sort.Slice(container.Ports, func(i, j int) bool {
+				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
+			})
 			for _, p := range container.Ports {
 				var url string
 				if p.PublicPort != 0 {
@@ -60,9 +63,19 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 				return err
 			}
 
-			var health string
-			if inspect.State != nil && inspect.State.Health != nil {
-				health = inspect.State.Health.Status
+			var (
+				health   string
+				exitCode int
+			)
+			if inspect.State != nil {
+				switch inspect.State.Status {
+				case "running":
+					if inspect.State.Health != nil {
+						health = inspect.State.Health.Status
+					}
+				case "exited", "dead":
+					exitCode = inspect.State.ExitCode
+				}
 			}
 
 			summary[i] = compose.ContainerSummary{
@@ -72,6 +85,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 				Service:    container.Labels[serviceLabel],
 				State:      container.State,
 				Health:     health,
+				ExitCode:   exitCode,
 				Publishers: publishers,
 			}
 			return nil

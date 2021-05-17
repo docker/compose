@@ -103,8 +103,10 @@ func runPs(ctx context.Context, backend compose.Service, services []string, opts
 					}
 				}
 				status := container.State
-				if container.Health != "" {
+				if status == "running" && container.Health != "" {
 					status = fmt.Sprintf("%s (%s)", container.State, container.Health)
+				} else if status == "exited" || status == "dead" {
+					status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", container.Name, container.Service, status, strings.Join(ports, ", "))
 			}

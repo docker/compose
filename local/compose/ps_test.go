@@ -40,10 +40,10 @@ func TestPs(t *testing.T) {
 	args := filters.NewArgs(projectFilter(testProject))
 	args.Add("label", "com.docker.compose.oneoff=False")
 	listOpts := apitypes.ContainerListOptions{Filters: args, All: true}
-	c1, inspect1 := containerDetails("service1", "123", "Running", "healthy")
-	c2, inspect2 := containerDetails("service1", "456", "Running", "")
+	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)
+	c2, inspect2 := containerDetails("service1", "456", "running", "", 0)
 	c2.Ports = []apitypes.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
-	c3, inspect3 := containerDetails("service2", "789", "Running", "")
+	c3, inspect3 := containerDetails("service2", "789", "exited", "", 130)
 	api.EXPECT().ContainerList(ctx, listOpts).Return([]apitypes.Container{c1, c2, c3}, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
@@ -52,45 +52,21 @@ func TestPs(t *testing.T) {
 	containers, err := tested.Ps(ctx, testProject, compose.PsOptions{})
 
 	expected := []compose.ContainerSummary{
-		{ID: "123", Name: "123", Project: testProject, Service: "service1", State: "Running", Health: "healthy", Publishers: nil},
-		{ID: "456", Name: "456", Project: testProject, Service: "service1", State: "Running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost:80", TargetPort: 90, PublishedPort: 80}}},
-		{ID: "789", Name: "789", Project: testProject, Service: "service2", State: "Running", Health: "", Publishers: nil},
+		{ID: "123", Name: "123", Project: testProject, Service: "service1", State: "running", Health: "healthy", Publishers: nil},
+		{ID: "456", Name: "456", Project: testProject, Service: "service1", State: "running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost:80", TargetPort: 90, PublishedPort: 80}}},
+		{ID: "789", Name: "789", Project: testProject, Service: "service2", State: "exited", Health: "", ExitCode: 130, Publishers: nil},
 	}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, containers, expected)
 }
 
-func TestPsAll(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
-
-	ctx := context.Background()
-	listOpts := apitypes.ContainerListOptions{Filters: filters.NewArgs(projectFilter(testProject)), All: true}
-	c1, inspect1 := containerDetails("service1", "123", "Running", "healthy")
-	c2, inspect2 := containerDetails("service1", "456", "Stopped", "")
-	api.EXPECT().ContainerList(ctx, listOpts).Return([]apitypes.Container{c1, c2}, nil)
-	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
-	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
-
-	containers, err := tested.Ps(ctx, testProject, compose.PsOptions{All: true})
-
-	expected := []compose.ContainerSummary{
-		{ID: "123", Name: "123", Project: testProject, Service: "service1", State: "Running", Health: "healthy", Publishers: nil},
-		{ID: "456", Name: "456", Project: testProject, Service: "service1", State: "Stopped", Health: "", Publishers: nil},
-	}
-	assert.NilError(t, err)
-	assert.DeepEqual(t, containers, expected)
-}
-
-func containerDetails(service string, id string, status string, health string) (apitypes.Container, apitypes.ContainerJSON) {
+func containerDetails(service string, id string, status string, health string, exitCode int) (apitypes.Container, apitypes.ContainerJSON) {
 	container := apitypes.Container{
 		ID:     id,
 		Names:  []string{"/" + id},
 		Labels: containerLabels(service),
 		State:  status,
 	}
-	inspect := apitypes.ContainerJSON{ContainerJSONBase: &apitypes.ContainerJSONBase{State: &apitypes.ContainerState{Status: status, Health: &apitypes.Health{Status: health}}}}
+	inspect := apitypes.ContainerJSON{ContainerJSONBase: &apitypes.ContainerJSONBase{State: &apitypes.ContainerState{Status: status, Health: &apitypes.Health{Status: health}, ExitCode: exitCode}}}
 	return container, inspect
 }
