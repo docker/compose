@@ -58,7 +58,7 @@ func convertPortsToAci(service serviceConfigAciHelper) ([]containerinstance.Cont
 			Protocol: groupProtocol,
 		})
 	}
-	var dnsLabelName *string = nil
+	var dnsLabelName *string
 	if service.DomainName != "" {
 		dnsLabelName = &service.DomainName
 	}

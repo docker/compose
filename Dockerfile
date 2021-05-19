@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.16-alpine
-ARG GOLANGCI_LINT_VERSION=v1.39.0-alpine
+ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base

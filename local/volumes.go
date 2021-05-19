@@ -63,10 +63,7 @@ func (vs *volumeService) Create(ctx context.Context, name string, options interf
 }
 
 func (vs *volumeService) Delete(ctx context.Context, volumeID string, options interface{}) error {
-	if err := vs.apiClient.VolumeRemove(ctx, volumeID, false); err != nil {
-		return err
-	}
-	return nil
+	return vs.apiClient.VolumeRemove(ctx, volumeID, false)
 }
 
 func (vs *volumeService) Inspect(ctx context.Context, volumeID string) (volumes.Volume, error) {

@@ -42,7 +42,7 @@ func main() {
 	}
 }
 
-var healthy bool = true
+var healthy = true
 
 func fail(w http.ResponseWriter, req *http.Request) {
 	healthy = false

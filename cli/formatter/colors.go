@@ -86,7 +86,7 @@ func makeColorFunc(code string) colorFunc {
 	}
 }
 
-var nextColor func() colorFunc = rainbowColor
+var nextColor = rainbowColor
 
 func rainbowColor() colorFunc {
 	return <-loop

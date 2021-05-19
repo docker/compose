@@ -459,7 +459,7 @@ func TestNonstandardCloudEnvironment(t *testing.T) {
 		},
 		"resourceManager": "https://management.docker.com/"
 	}]`)
-	var metadataReqCount int32 = 0
+	var metadataReqCount int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write(dockerCloudMetadata)
 		assert.NilError(t, err)

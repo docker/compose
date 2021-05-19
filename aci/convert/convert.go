@@ -347,7 +347,7 @@ func ContainerGroupToContainer(containerID string, cg containerinstance.Containe
 	status := GetStatus(cc, cg)
 	platform := string(cg.OsType)
 
-	var envVars map[string]string = nil
+	var envVars map[string]string
 	if cc.EnvironmentVariables != nil && len(*cc.EnvironmentVariables) != 0 {
 		envVars = map[string]string{}
 		for _, envVar := range *cc.EnvironmentVariables {
