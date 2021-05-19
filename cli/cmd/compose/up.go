@@ -45,8 +45,6 @@ type composeOptions struct {
 	*projectOptions
 	Build   bool
 	noBuild bool
-	// ACI only
-	DomainName string
 }
 
 type upOptions struct {
@@ -186,8 +184,6 @@ func upCommand(p *projectOptions, contextType string, backend compose.Service) *
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 
 	switch contextType {
-	case store.AciContextType:
-		flags.StringVar(&opts.DomainName, "domainname", "", "Container NIS domain name")
 	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
 		flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
@@ -360,10 +356,6 @@ func setup(opts composeOptions, services []string) (*types.Project, error) {
 		return nil, err
 	}
 
-	if opts.DomainName != "" {
-		// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
-		project.Services[0].DomainName = opts.DomainName
-	}
 	if opts.Build {
 		for i, service := range project.Services {
 			service.PullPolicy = types.PullPolicyBuild
