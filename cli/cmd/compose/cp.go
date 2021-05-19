@@ -46,14 +46,16 @@ func copyCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	docker compose cp [OPTIONS] SRC_PATH|- SERVICE:DEST_PATH`,
 		Short: "Copy files/folders between a service container and the local filesystem",
 		Args:  cli.ExactArgs(2),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if args[0] == "" {
 				return errors.New("source can not be empty")
 			}
 			if args[1] == "" {
 				return errors.New("destination can not be empty")
 			}
-
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			opts.source = args[0]
 			opts.destination = args[1]
 			return runCopy(ctx, backend, opts)

@@ -46,10 +46,13 @@ func pullCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull [SERVICE...]",
 		Short: "Pull service images",
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.noParallel {
 				fmt.Fprint(os.Stderr, aec.Apply("option '--no-parallel' is DEPRECATED and will be ignored.\n", aec.RedF))
 			}
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPull(ctx, backend, opts, args)
 		}),
 	}

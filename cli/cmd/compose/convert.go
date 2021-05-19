@@ -58,7 +58,7 @@ func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Aliases: []string{"config"},
 		Use:     "convert SERVICES",
 		Short:   "Converts the compose file to platform's canonical format",
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
@@ -66,6 +66,9 @@ func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.services {
 				return runServices(opts)
 			}

@@ -48,12 +48,15 @@ func downCommand(p *projectOptions, contextType string, backend compose.Service)
 		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 		},
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
 				}
 			}
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runDown(ctx, backend, opts)
 		}),
 	}

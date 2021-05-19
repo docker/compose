@@ -28,6 +28,7 @@ import (
 
 type portOptions struct {
 	*projectOptions
+	port     int
 	protocol string
 	index    int
 }
@@ -40,12 +41,16 @@ func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Use:   "port [options] [--] SERVICE PRIVATE_PORT",
 		Short: "Print the public port for a port binding.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			port, err := strconv.Atoi(args[1])
 			if err != nil {
 				return err
 			}
-			return runPort(ctx, backend, opts, args[0], port)
+			opts.port = port
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runPort(ctx, backend, opts, args[0])
 		}),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
@@ -53,12 +58,12 @@ func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runPort(ctx context.Context, backend compose.Service, opts portOptions, service string, port int) error {
+func runPort(ctx context.Context, backend compose.Service, opts portOptions, service string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	ip, port, err := backend.Port(ctx, projectName, service, port, compose.PortOptions{
+	ip, port, err := backend.Port(ctx, projectName, service, opts.port, compose.PortOptions{
 		Protocol: opts.protocol,
 		Index:    opts.index,
 	})
