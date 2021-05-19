@@ -29,6 +29,7 @@ RUN apk add --no-cache -vv \
     protobuf-dev
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     go mod download
 
 FROM base AS make-protos
@@ -58,6 +59,7 @@ RUN go get github.com/docker/import-restrictions
 FROM import-restrictions-base AS import-restrictions
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile import-restrictions
 
 FROM base AS make-cli
@@ -113,6 +115,7 @@ RUN --mount=target=. \
 FROM base AS make-go-mod-tidy
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     go mod tidy
 
 FROM scratch AS go-mod-tidy
