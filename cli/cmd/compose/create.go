@@ -38,13 +38,16 @@ func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [SERVICE...]",
 		Short: "Creates containers for a service.",
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.Build && opts.noBuild {
 				return fmt.Errorf("--build and --no-build are incompatible")
 			}
 			if opts.forceRecreate && opts.noRecreate {
 				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
 			}
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runCreateStart(ctx, backend, upOptions{
 				composeOptions: &composeOptions{
 					projectOptions: p,

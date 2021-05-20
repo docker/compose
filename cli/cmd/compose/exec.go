@@ -53,11 +53,12 @@ func execCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 		Use:   "exec [options] [-e KEY=VAL...] [--] SERVICE COMMAND [ARGS...]",
 		Short: "Execute a command in a running container.",
 		Args:  cobra.MinimumNArgs(2),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
-			if len(args) > 1 {
-				opts.command = args[1:]
-			}
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			opts.service = args[0]
+			opts.command = args[1:]
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runExec(ctx, backend, opts)
 		}),
 	}

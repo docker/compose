@@ -46,7 +46,7 @@ func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build [SERVICE...]",
 		Short: "Build or rebuild services",
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.memory != "" {
 				fmt.Println("WARNING --memory is ignored as not supported in buildkit.")
 			}
@@ -57,6 +57,9 @@ func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
+			return nil
+		}),
+		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runBuild(ctx, backend, opts, args)
 		}),
 	}

@@ -149,24 +149,27 @@ func upCommand(p *projectOptions, contextType string, backend compose.Service) *
 		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
 		},
+		PreRunE: Adapt(func(ctx context.Context, args []string) error {
+			if opts.exitCodeFrom != "" {
+				opts.cascadeStop = true
+			}
+			if opts.Build && opts.noBuild {
+				return fmt.Errorf("--build and --no-build are incompatible")
+			}
+			if opts.Detach && (opts.attachDependencies || opts.cascadeStop) {
+				return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit or --attach-dependencies")
+			}
+			if opts.forceRecreate && opts.noRecreate {
+				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+			}
+			if opts.recreateDeps && opts.noRecreate {
+				return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+			}
+			return nil
+		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			switch contextType {
 			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
-				if opts.exitCodeFrom != "" {
-					opts.cascadeStop = true
-				}
-				if opts.Build && opts.noBuild {
-					return fmt.Errorf("--build and --no-build are incompatible")
-				}
-				if opts.Detach && (opts.attachDependencies || opts.cascadeStop) {
-					return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit or --attach-dependencies")
-				}
-				if opts.forceRecreate && opts.noRecreate {
-					return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
-				}
-				if opts.recreateDeps && opts.noRecreate {
-					return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
-				}
 				return runCreateStart(ctx, backend, opts, args)
 			default:
 				return runUp(ctx, backend, opts, args)
