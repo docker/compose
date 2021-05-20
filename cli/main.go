@@ -28,12 +28,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/backend"
+	api "github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
@@ -223,13 +225,36 @@ func main() {
 
 	if ctype != store.DefaultContextType {
 		// On default context, "compose" is implemented by CLI Plugin
-		root.AddCommand(compose.RootCommand(ctype, service.ComposeService()))
+		proxy := api.NewServiceProxy().WithService(service.ComposeService())
+		command := compose.RootCommand(ctype, proxy)
+
+		if ctype == store.AciContextType {
+			customizeCliForACI(command, proxy)
+		}
+
+		root.AddCommand(command)
 	}
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)
 	}
 	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+}
+
+func customizeCliForACI(command *cobra.Command, proxy *api.ServiceProxy) {
+	var domainName string
+	for _, c := range command.Commands() {
+		if c.Name() == "up" {
+			c.Flags().StringVar(&domainName, "domainname", "", "Container NIS domain name")
+			proxy.WithInterceptor(func(ctx context.Context, project *types.Project) {
+				if domainName != "" {
+					// arbitrarily set the domain name on the first service ; ACI backend will expose the entire project
+					project.Services[0].DomainName = domainName
+				}
+
+			})
+		}
+	}
 }
 
 func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backend.Service, error) {

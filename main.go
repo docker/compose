@@ -35,16 +35,14 @@ import (
 
 func main() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
-		lazyInit := api.ServiceDelegator{
-			Delegate: api.NoImpl{},
-		}
-		cmd := compose.RootCommand(store.DefaultContextType, &lazyInit)
+		lazyInit := api.NewServiceProxy()
+		cmd := compose.RootCommand(store.DefaultContextType, lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			lazyInit.Delegate = impl.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile())
+			lazyInit.WithService(impl.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}
