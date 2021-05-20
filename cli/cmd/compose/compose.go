@@ -145,6 +145,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithDotEnv,
 			cli.WithOsEnv,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
 }
