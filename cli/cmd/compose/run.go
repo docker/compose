@@ -220,8 +220,5 @@ func startDependencies(ctx context.Context, backend compose.Service, project typ
 	if err := backend.Create(ctx, &project, compose.CreateOptions{}); err != nil {
 		return err
 	}
-	if err := backend.Start(ctx, &project, compose.StartOptions{}); err != nil {
-		return err
-	}
-	return nil
+	return backend.Start(ctx, &project, compose.StartOptions{})
 }

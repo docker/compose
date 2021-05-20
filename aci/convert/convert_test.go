@@ -570,7 +570,7 @@ func TestConvertContainerGroupStatus(t *testing.T) {
 }
 
 func container(status *string) containerinstance.Container {
-	var state *containerinstance.ContainerState = nil
+	var state *containerinstance.ContainerState
 	if status != nil {
 		state = &containerinstance.ContainerState{
 			State: status,
@@ -586,7 +586,7 @@ func container(status *string) containerinstance.Container {
 }
 
 func group(status *string) containerinstance.ContainerGroup {
-	var view *containerinstance.ContainerGroupPropertiesInstanceView = nil
+	var view *containerinstance.ContainerGroupPropertiesInstanceView
 	if status != nil {
 		view = &containerinstance.ContainerGroupPropertiesInstanceView{
 			State: status,

@@ -385,7 +385,7 @@ func TestContainerRunAttached(t *testing.T) {
 
 	// Used in subtests
 	var (
-		container         string = "test-container"
+		container         = "test-container"
 		endpoint          string
 		followLogsProcess *icmd.Result
 	)

@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.16-alpine
-ARG GOLANGCI_LINT_VERSION=v1.39.0-alpine
+ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
@@ -29,6 +29,7 @@ RUN apk add --no-cache -vv \
     protobuf-dev
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     go mod download
 
 FROM base AS make-protos
@@ -58,6 +59,7 @@ RUN go get github.com/docker/import-restrictions
 FROM import-restrictions-base AS import-restrictions
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     make -f builder.Makefile import-restrictions
 
 FROM base AS make-cli
@@ -113,6 +115,7 @@ RUN --mount=target=. \
 FROM base AS make-go-mod-tidy
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
     go mod tidy
 
 FROM scratch AS go-mod-tidy

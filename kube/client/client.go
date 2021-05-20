@@ -116,7 +116,7 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 
 // WaitForPodState blocks until pods reach desired state
 func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOptions) error {
-	var timeout time.Duration = time.Minute
+	var timeout = time.Minute
 	if opts.Timeout != nil {
 		timeout = *opts.Timeout
 	}

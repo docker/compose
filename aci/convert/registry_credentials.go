@@ -70,7 +70,7 @@ func getRegistryCredentials(project compose.Project, helper registryHelper) ([]c
 		return nil, err
 	}
 
-	var cloudEnvironment *login.CloudEnvironment = nil
+	var cloudEnvironment *login.CloudEnvironment
 	if ce, err := loginService.GetCloudEnvironment(); err != nil {
 		cloudEnvironment = &ce
 	}
