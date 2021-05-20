@@ -49,9 +49,18 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 	}
 	container := containers[0]
 
+	var env []string
+	projectEnv := types.NewMappingWithEquals(opts.Environment).Resolve(func(s string) (string, bool) {
+		v, ok := project.Environment[s]
+		return v, ok
+	})
+	for k, v := range service.Environment.OverrideBy(projectEnv) {
+		env = append(env, fmt.Sprintf("%s=%s", k, *v))
+	}
+
 	exec, err := s.apiClient.ContainerExecCreate(ctx, container.ID, apitypes.ExecConfig{
 		Cmd:        opts.Command,
-		Env:        opts.Environment,
+		Env:        env,
 		User:       opts.User,
 		Privileged: opts.Privileged,
 		Tty:        opts.Tty,
