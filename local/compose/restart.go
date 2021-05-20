@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -29,8 +30,16 @@ func (s *composeService) Restart(ctx context.Context, project *types.Project, op
 	if err != nil {
 		return err
 	}
+
+	if len(options.Services) == 0 {
+		options.Services = project.ServiceNames()
+	}
+
 	err = InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.restartService(ctx, service.Name, options.Timeout)
+		if utils.StringContains(options.Services, service.Name) {
+			return s.restartService(ctx, service.Name, options.Timeout)
+		}
+		return nil
 	})
 	if err != nil {
 		return err
