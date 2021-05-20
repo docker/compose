@@ -122,6 +122,8 @@ type StartOptions struct {
 type RestartOptions struct {
 	// Timeout override container restart timeout
 	Timeout *time.Duration
+	// Services passed in the command line to be restarted
+	Services []string
 }
 
 // StopOptions group options of the Stop API

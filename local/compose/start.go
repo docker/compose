@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -28,6 +29,10 @@ import (
 )
 
 func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+	if len(options.Services) == 0 {
+		options.Services = project.ServiceNames()
+	}
+
 	var containers Containers
 	if options.Attach != nil {
 		c, err := s.attach(ctx, project, options.Attach, options.Services)
@@ -38,7 +43,10 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	}
 
 	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		return s.startService(ctx, project, service)
+		if utils.StringContains(options.Services, service.Name) {
+			return s.startService(ctx, project, service)
+		}
+		return nil
 	})
 	if err != nil {
 		return err
