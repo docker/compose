@@ -632,7 +632,7 @@ func (f *notifyFixture) rebuildWatcher() {
 	}
 
 	// create a new watcher
-	notify, err := NewWatcher(f.paths, f.ignore, logger.NewLogger(logger.DebugLvl, f.out))
+	notify, err := NewWatcher(f.paths, f.ignore, logger.NewTestLogger(f.out))
 	if err != nil {
 		f.T().Fatal(err)
 	}
