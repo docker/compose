@@ -774,7 +774,9 @@ func isUnixAbs(path string) bool {
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
 	source := volume.Source
-	if volume.Type == types.VolumeTypeBind && !filepath.IsAbs(source) {
+	// on windows, filepath.IsAbs(source) is false for unix style abs path like /var/run/docker.sock.
+	// do not replace these with  filepath.Abs(source) that will include a default drive.
+	if volume.Type == types.VolumeTypeBind && !filepath.IsAbs(source) && !strings.HasPrefix(source, "/") {
 		// volume source has already been prefixed with workdir if required, by compose-go project loader
 		var err error
 		source, err = filepath.Abs(source)
