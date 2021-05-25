@@ -29,7 +29,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
@@ -275,13 +274,12 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 		return nil
 	}
 
-	queue := make(chan compose.ContainerEvent)
-	printer := printer{
-		queue: queue,
-	}
+	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
+	printer := compose.NewLogPrinter(consumer)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
 	stopFunc := func() error {
 		ctx := context.Background()
 		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
@@ -296,27 +294,21 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 	}
 	go func() {
 		<-signalChan
-		queue <- compose.ContainerEvent{
-			Type: compose.UserCancel,
-		}
+		printer.Cancel()
 		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
 		stopFunc() // nolint:errcheck
 	}()
 
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
-
 	var exitCode int
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		code, err := printer.run(opts.cascadeStop, opts.exitCodeFrom, consumer, stopFunc)
+		code, err := printer.Run(opts.cascadeStop, opts.exitCodeFrom, stopFunc)
 		exitCode = code
 		return err
 	})
 
 	err = backend.Start(ctx, project, compose.StartOptions{
-		Attach: func(event compose.ContainerEvent) {
-			queue <- event
-		},
+		Attach:   printer.HandleEvent,
 		Services: services,
 	})
 	if err != nil {
@@ -341,11 +333,7 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 			if err != nil {
 				return err
 			}
-			if service.Deploy == nil {
-				service.Deploy = &types.DeployConfig{}
-			}
-			count := uint64(replicas)
-			service.Deploy.Replicas = &count
+			service.Scale = replicas
 			project.Services[i] = service
 			return nil
 		}
@@ -391,50 +379,4 @@ func setup(opts composeOptions, services []string) (*types.Project, error) {
 	}
 
 	return project, nil
-}
-
-type printer struct {
-	queue chan compose.ContainerEvent
-}
-
-func (p printer) run(cascadeStop bool, exitCodeFrom string, consumer compose.LogConsumer, stopFn func() error) (int, error) {
-	var aborting bool
-	var count int
-	for {
-		event := <-p.queue
-		switch event.Type {
-		case compose.UserCancel:
-			aborting = true
-		case compose.ContainerEventAttach:
-			consumer.Register(event.Container)
-			count++
-		case compose.ContainerEventExit:
-			if !aborting {
-				consumer.Status(event.Container, fmt.Sprintf("exited with code %d", event.ExitCode))
-			}
-			if cascadeStop {
-				if !aborting {
-					aborting = true
-					fmt.Println("Aborting on container exit...")
-					err := stopFn()
-					if err != nil {
-						return 0, err
-					}
-				}
-				if exitCodeFrom == "" || exitCodeFrom == event.Service {
-					logrus.Error(event.ExitCode)
-					return event.ExitCode, nil
-				}
-			}
-			count--
-			if count == 0 {
-				// Last container terminated, done
-				return 0, nil
-			}
-		case compose.ContainerEventLog:
-			if !aborting {
-				consumer.Log(event.Container, event.Service, event.Line)
-			}
-		}
-	}
 }

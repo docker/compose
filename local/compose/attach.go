@@ -33,10 +33,6 @@ import (
 )
 
 func (s *composeService) attach(ctx context.Context, project *types.Project, listener compose.ContainerEventListener, selectedServices []string) (Containers, error) {
-	if len(selectedServices) == 0 {
-		selectedServices = project.ServiceNames()
-	}
-
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, selectedServices...)
 	if err != nil {
 		return nil, err
@@ -57,44 +53,6 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 			return nil, err
 		}
 	}
-
-	// Watch events to capture container restart and re-attach
-	go func() {
-		crashed := map[string]struct{}{}
-		s.Events(ctx, project.Name, compose.EventsOptions{ // nolint: errcheck
-			Services: selectedServices,
-			Consumer: func(event compose.Event) error {
-				if event.Status == "die" {
-					crashed[event.Container] = struct{}{}
-					return nil
-				}
-				if _, ok := crashed[event.Container]; ok {
-					inspect, err := s.apiClient.ContainerInspect(ctx, event.Container)
-					if err != nil {
-						return err
-					}
-
-					container := moby.Container{
-						ID:    event.Container,
-						Names: []string{inspect.Name},
-						State: convert.ContainerRunning,
-						Labels: map[string]string{
-							projectLabel: project.Name,
-							serviceLabel: event.Service,
-						},
-					}
-
-					// Just ignore errors when reattaching to already crashed containers
-					s.attachContainer(ctx, container, listener, project) // nolint: errcheck
-					delete(crashed, event.Container)
-
-					s.waitContainer(container, listener)
-				}
-				return nil
-			},
-		})
-	}()
-
 	return containers, err
 }
 

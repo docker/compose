@@ -191,18 +191,22 @@ func (s *composeService) removeVolume(ctx context.Context, id string, w progress
 }
 
 func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {
+	eg, ctx := errgroup.WithContext(ctx)
 	for _, container := range containers {
-		toStop := container
-		eventName := getContainerProgressName(toStop)
-		w.Event(progress.StoppingEvent(eventName))
-		err := s.apiClient.ContainerStop(ctx, toStop.ID, timeout)
-		if err != nil {
-			w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
-			return err
-		}
-		w.Event(progress.StoppedEvent(eventName))
+		container := container
+		eg.Go(func() error {
+			eventName := getContainerProgressName(container)
+			w.Event(progress.StoppingEvent(eventName))
+			err := s.apiClient.ContainerStop(ctx, container.ID, timeout)
+			if err != nil {
+				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
+				return err
+			}
+			w.Event(progress.StoppedEvent(eventName))
+			return nil
+		})
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {

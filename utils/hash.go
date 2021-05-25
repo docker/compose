@@ -29,6 +29,7 @@ func ServiceHash(o types.ServiceConfig) (string, error) {
 	// remove the Build config when generating the service hash
 	o.Build = nil
 	o.PullPolicy = ""
+	o.Scale = 1
 	bytes, err := json.Marshal(o)
 	if err != nil {
 		return "", err
