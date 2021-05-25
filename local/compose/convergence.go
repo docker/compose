@@ -105,6 +105,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 	}
 
 	for _, container := range actual {
+		container := container
 		name := getContainerProgressName(container)
 
 		diverged := container.Labels[configHashLabel] != expected
