@@ -62,19 +62,22 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 	containers := map[string]struct{}{}
 	for {
 		event := <-p.queue
+		container := event.Container
 		switch event.Type {
 		case UserCancel:
 			aborting = true
 		case ContainerEventAttach:
-			if _, ok := containers[event.Container]; ok {
+			if _, ok := containers[container]; ok {
 				continue
 			}
-			containers[event.Container] = struct{}{}
-			p.consumer.Register(event.Container)
+			containers[container] = struct{}{}
+			p.consumer.Register(container)
 		case ContainerEventExit:
-			delete(containers, event.Container)
+			if !event.Restarting {
+				delete(containers, container)
+			}
 			if !aborting {
-				p.consumer.Status(event.Container, fmt.Sprintf("exited with code %d", event.ExitCode))
+				p.consumer.Status(container, fmt.Sprintf("exited with code %d", event.ExitCode))
 			}
 			if cascadeStop {
 				if !aborting {
@@ -99,7 +102,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 			}
 		case ContainerEventLog:
 			if !aborting {
-				p.consumer.Log(event.Container, event.Service, event.Line)
+				p.consumer.Log(container, event.Service, event.Line)
 			}
 		}
 	}
