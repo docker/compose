@@ -17,8 +17,10 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
+	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
 	. "github.com/docker/compose-cli/utils/e2e"
@@ -39,5 +41,19 @@ func TestLocalComposeExec(t *testing.T) {
 	t.Run("exec false", func(t *testing.T) {
 		res := c.RunDockerOrExitError("exec", "compose-e2e-exec_simple_1", "/bin/false")
 		res.Assert(t, icmd.Expected{ExitCode: 1})
+	})
+
+	t.Run("exec with env set", func(t *testing.T) {
+		res := icmd.RunCmd(c.NewDockerCmd("exec", "-e", "FOO", "compose-e2e-exec_simple_1", "/usr/bin/env"),
+			func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "FOO=BAR")
+			})
+		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
+	})
+
+	t.Run("exec without env set", func(t *testing.T) {
+		res := c.RunDockerOrExitError("exec", "-e", "FOO", "compose-e2e-exec_simple_1", "/usr/bin/env")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="))
 	})
 }
