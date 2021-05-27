@@ -31,7 +31,7 @@ else
 	TEST_FLAGS=-run $(E2E_TEST)
 endif
 
-all: cli
+all: cli compose-plugin
 
 protos: ## Generate go code from .proto files
 	@docker build . --target protos \
@@ -39,6 +39,13 @@ protos: ## Generate go code from .proto files
 
 cli: ## Compile the cli
 	@docker build . --target cli \
+	--platform local \
+	--build-arg BUILD_TAGS=e2e,kube \
+	--build-arg GIT_TAG=$(GIT_TAG) \
+	--output ./bin
+
+compose-plugin: ## Compile the compose cli-plugin
+	@docker build . --target compose-plugin \
 	--platform local \
 	--build-arg BUILD_TAGS=e2e,kube \
 	--build-arg GIT_TAG=$(GIT_TAG) \

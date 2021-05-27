@@ -107,9 +107,9 @@ if ! [ "$(command -v curl)" ]; then
 fi
 
 if [ "$(uname -m)" = "aarch64" ]; then
-	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-arm64.tar.gz" | cut -d : -f 2,3)}
+	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-arm64" | cut -d : -f 2,3)}
 else
-	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64.tar.gz" | cut -d : -f 2,3)}
+	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64" | cut -d : -f 2,3)}
 fi
 
 # Check if the Compose CLI is already installed
@@ -117,10 +117,8 @@ if [ $(is_new_cli "docker") -eq 1 ]; then
 	if [ $(is_new_cli "/usr/local/bin/docker") -eq 1 ]; then
 		echo "You already have the Docker Compose CLI installed, overriding with latest version"
 		download_dir=$($sh_c 'mktemp -d')
-		$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
-		$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
+		$sh_c "${download_cmd} ${download_dir}/docker ${DOWNLOAD_URL}"
 		$sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
-		$sh_c "mkdir -p ~/.docker/cli-plugins && cp ${download_dir}/docker-compose ~/.docker/cli-plugins/docker-compose"
 		exit 0
 	fi
 	echo "You already have the Docker Compose CLI installed, in a different location."
@@ -175,8 +173,7 @@ echo "Downloading CLI..."
 
 # Download CLI to temporary directory
 download_dir=$($sh_c 'mktemp -d')
-$sh_c "${download_cmd} ${download_dir}/docker-compose-cli.tar.gz ${DOWNLOAD_URL}"
-$sh_c "tar xzf ${download_dir}/docker-compose-cli.tar.gz -C ${download_dir} --strip-components 1"
+$sh_c "${download_cmd} ${download_dir}/docker ${DOWNLOAD_URL}"
 
 echo "Downloaded CLI!"
 echo "Installing CLI..."
@@ -186,8 +183,6 @@ $sudo_sh_c "ln -s ${existing_cli_path} ${link_path}"
 
 # Install downloaded CLI
 $sudo_sh_c "install -m 775 ${download_dir}/docker /usr/local/bin/docker"
-# Install Compose CLI plugin
-$sh_c "mkdir -p ~/.docker/cli-plugins && cp ${download_dir}/docker-compose ~/.docker/cli-plugins/docker-compose"
 
 # Clear cache
 cleared_cache=1

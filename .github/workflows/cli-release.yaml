@@ -3,7 +3,7 @@ name: Releaser
 on:
   push:
     tags:
-      - "v*"
+      - "v1*"
 jobs:
   upload-release:
     runs-on: ubuntu-latest
@@ -30,10 +30,10 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build
-        run: make -f builder.Makefile package
+        run: make -f builder.Makefile cross
 
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/*"
+          artifacts: "bin/*"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}

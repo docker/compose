@@ -60,7 +60,7 @@ jobs:
       # Ensure we don't discover cross platform build issues at release time.
       # Time used to build linux here is gained back in the build for local E2E step
       - name: Build packages
-        run: make -f builder.Makefile cross
+        run: make -f builder.Makefile cross cross-compose-plugin
 
   build:
     name: Build
@@ -99,7 +99,7 @@ jobs:
       - name: Build for local E2E
         env:
           BUILD_TAGS: e2e
-        run: make -f builder.Makefile cli
+        run: make -f builder.Makefile cli compose-plugin
 
       - name: E2E Test
         run: make e2e-local

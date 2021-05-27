@@ -52,7 +52,7 @@ func versionCommand() *cobra.Command {
 }
 
 func runVersion(opts versionOptions) {
-	displayedVersion := strings.TrimPrefix(internal.ComposePluginVersion, "v")
+	displayedVersion := strings.TrimPrefix(internal.Version, "v")
 	if opts.short {
 		fmt.Println(displayedVersion)
 		return
