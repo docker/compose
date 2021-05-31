@@ -259,8 +259,8 @@ class ProjectTest(unittest.TestCase):
                 mock.Mock(id=container_id, spec=Container)
                 for container_id in container_ids]
             assert (
-                    project.get_service('test')._get_volumes_from() ==
-                    [container_ids[0] + ':rw']
+                project.get_service('test')._get_volumes_from() ==
+                [container_ids[0] + ':rw']
             )
 
     def test_events_legacy(self):
