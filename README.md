@@ -25,6 +25,9 @@ This `docker compose` local command :
 
 **Note: Compose v2 is released under the 2.x tag, until "Compose v2" gets a new home**
 
+Compose v2 can be installed manually as a CLI plugin, by downloading latest v2.x release from https://github.com/docker/compose-cli/releases for your architecture and move into `~/.docker/cli-plugins/docker-compose`
+```
+
 ## Getting started
 
 To get started with Compose CLI, all you need is:
