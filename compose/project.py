@@ -1153,7 +1153,9 @@ class NoSuchService(Exception):
         if isinstance(name, bytes):
             name = name.decode('utf-8')
         self.name = name
-        self.msg = "No such service: %s" % self.name
+        self.msg = "No such service: %s. Make sure you refer to an existing service." \
+                   " If you instead need to access a container by its name or id, please use the " \
+                   "\"docker\" command." % self.name
 
     def __str__(self):
         return self.msg
