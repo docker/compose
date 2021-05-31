@@ -10,8 +10,10 @@ This Compose CLI tool makes it easy to run Docker containers and Docker Compose 
 or Microsoft Azure Container Instances
 ([ACI](https://azure.microsoft.com/services/container-instances))
 using the Docker commands you already know.
+  
+**Note: Compose CLI is released under the 1.x tag, until "Compose v2" gets a new home**
 
-## Local Docker Compose
+## Compose v2 (a.k.a "Local Docker Compose")
 
 The `docker compose` local command is meant to be the next major version for docker-compose, and it supports the same commands and flags, in order to be used as a drop-in replacement.
 [Here](https://github.com/docker/compose-cli/issues/1283) is a checklist of docker-compose commands and flags that are implemented in `docker compose`.
@@ -20,6 +22,8 @@ This `docker compose` local command :
 * has a better integration with the rest of the docker ecosystem (being written in go, it's easier to share functionality with the Docker CLI and other Docker libraries)
 * is quicker and uses more parallelism to run multiple tasks in parallel. It also uses buildkit by default
 * includes additional commands, like `docker compose ls` to list current compose projects
+
+**Note: Compose v2 is released under the 2.x tag, until "Compose v2" gets a new home**
 
 ## Getting started
 

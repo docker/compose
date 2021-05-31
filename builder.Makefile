@@ -28,7 +28,7 @@ STATIC_FLAGS=CGO_ENABLED=0
 
 GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
 
-LDFLAGS="-s -w -X $(PKG_NAME)/internal.Version=${GIT_TAG} -X $(PKG_NAME)/internal.ComposePluginVersion=2.0.0-beta.2"
+LDFLAGS="-s -w -X $(PKG_NAME)/internal.Version=${GIT_TAG}"
 GO_BUILD=$(STATIC_FLAGS) go build -trimpath -ldflags=$(LDFLAGS)
 
 BINARY?=bin/docker
@@ -45,32 +45,12 @@ ifdef BUILD_TAGS
   LINT_TAGS=--build-tags $(BUILD_TAGS)
 endif
 
-TAR_TRANSFORM:=--transform s/packaging/docker/ --transform s/bin/docker/ \
-				--transform s/docker-linux-amd64/docker/ --transform s/docker-linux-arm64/docker/ \
-				--transform s/docker-linux-armv6/docker/ --transform s/docker-linux-armv7/docker/ \
-				--transform s/docker-darwin-amd64/docker/ --transform s/docker-darwin-arm64/docker/ \
-				--transform s/docker-compose-linux-amd64/docker-compose/ --transform s/docker-compose-linux-arm64/docker-compose/ \
-				--transform s/docker-compose-linux-armv6/docker-compose/ --transform s/docker-compose-linux-armv7/docker-compose/ \
-				--transform s/docker-compose-darwin-amd64/docker-compose/ --transform s/docker-compose-darwin-arm64/docker-compose/
-
-ifneq ($(findstring bsd,$(shell tar --version)),)
-  TAR_TRANSFORM=-s /packaging/docker/ -s /bin/docker/ \
-  				-s /docker-linux-amd64/docker/  -s /docker-linux-arm64/docker/ \
-  				-s /docker-linux-armv6/docker/  -s /docker-linux-armv7/docker/ \
-				-s /docker-darwin-amd64/docker/	 -s /docker-darwin-arm64/docker/ \
-  				-s /docker-compose-linux-amd64/docker-compose/  -s /docker-compose-linux-arm64/docker-compose/ \
-  				-s /docker-compose-linux-armv6/docker-compose/  -s /docker-compose-linux-armv7/docker-compose/ \
-				-s /docker-compose-darwin-amd64/docker-compose/	 -s /docker-compose-darwin-arm64/docker-compose/
-endif
-
-all: cli
-
 .PHONY: protos
 protos:
 	protoc -I. --go_out=plugins=grpc,paths=source_relative:. ${PROTOS}
 
 .PHONY: cli
-cli: compose-plugin
+cli:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(BINARY_WITH_EXTENSION) ./cli
 
 .PHONY: compose-plugin
@@ -78,7 +58,7 @@ compose-plugin:
 	GOOS=${GOOS} GOARCH=${GOARCH} $(GO_BUILD) $(TAGS) -o $(COMPOSE_BINARY_WITH_EXTENSION) .
 
 .PHONY: cross
-cross: cross-compose-plugin
+cross:
 	GOOS=linux   GOARCH=amd64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-amd64 ./cli
 	GOOS=linux   GOARCH=arm64 $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-arm64 ./cli
 	GOOS=linux   GOARM=6 GOARCH=arm $(GO_BUILD) $(TAGS) -o $(BINARY)-linux-armv6 ./cli
@@ -116,20 +96,6 @@ check-license-headers:
 .PHONY: check-go-mod
 check-go-mod:
 	./scripts/validate/check-go-mod
-
-.PHONY: package
-package: cross
-	mkdir -p dist
-	tar -czf dist/docker-linux-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-amd64 $(COMPOSE_BINARY)-linux-amd64
-	tar -czf dist/docker-linux-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-arm64 $(COMPOSE_BINARY)-linux-arm64
-	tar -czf dist/docker-linux-armv6.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv6 $(COMPOSE_BINARY)-linux-armv6
-	tar -czf dist/docker-linux-armv7.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-linux-armv7 $(COMPOSE_BINARY)-linux-armv7
-	tar -czf dist/docker-darwin-amd64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-amd64 $(COMPOSE_BINARY)-darwin-amd64
-	tar -czf dist/docker-darwin-arm64.tar.gz $(TAR_TRANSFORM) packaging/LICENSE $(BINARY)-darwin-arm64 $(COMPOSE_BINARY)-darwin-arm64
-	cp $(BINARY)-windows-amd64.exe $(WORK_DIR)/docker.exe
-	cp $(COMPOSE_BINARY)-windows-amd64.exe $(WORK_DIR)/docker-compose.exe
-	rm -f dist/docker-windows-amd64.zip && zip dist/docker-windows-amd64.zip -j packaging/LICENSE $(WORK_DIR)/docker.exe $(WORK_DIR)/docker-compose.exe
-	rm -r $(WORK_DIR)
 
 .PHONY: yamldocs
 yamldocs:
