@@ -259,8 +259,8 @@ class ProjectTest(unittest.TestCase):
                 mock.Mock(id=container_id, spec=Container)
                 for container_id in container_ids]
             assert (
-                project.get_service('test')._get_volumes_from() ==
-                [container_ids[0] + ':rw']
+                    project.get_service('test')._get_volumes_from() ==
+                    [container_ids[0] + ':rw']
             )
 
     def test_events_legacy(self):
@@ -739,8 +739,14 @@ class ProjectTest(unittest.TestCase):
             assert fake_log.warn.call_count == 0
 
     def test_no_such_service_unicode(self):
-        assert NoSuchService('十六夜　咲夜'.encode()).msg == 'No such service: 十六夜　咲夜'
-        assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜'
+        assert NoSuchService('十六夜　咲夜'.encode()).msg == 'No such service: 十六夜　咲夜. Make sure you refer' \
+                                                       ' to an existing service. If you instead need to ' \
+                                                       'access a container by its name or id, please use' \
+                                                       'the \"docker\" command.'  # noqa: E501
+        assert NoSuchService('十六夜　咲夜').msg == 'No such service: 十六夜　咲夜. Make sure you refer' \
+                                              ' to an existing service. If you instead need to ' \
+                                              'access a container by its name or id, please use' \
+                                              'the \"docker\" command.'  # noqa: E501
 
     def test_project_platform_value(self):
         service_config = {
