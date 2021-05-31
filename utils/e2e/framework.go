@@ -17,7 +17,6 @@
 package e2e
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -31,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -90,10 +90,15 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 	if runtime.GOOS == "windows" {
 		composePluginFile += ".exe"
 	}
-	composePlugin, _ := findExecutable(composePluginFile, []string{"../../bin", "../../../bin"})
-	err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", composePluginFile))
-	if err != nil {
-		panic(err)
+	composePlugin, err := findExecutable(composePluginFile, []string{"../../bin", "../../../bin"})
+	if os.IsNotExist(err) {
+		fmt.Println("WARNING: docker-compose cli-plugin not found")
+	}
+	if err == nil {
+		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", composePluginFile))
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return &E2eCLI{binDir, d, t}
@@ -158,7 +163,7 @@ func findExecutable(executableName string, paths []string) (string, error) {
 		return bin, nil
 	}
 
-	return "", errors.New("executable not found")
+	return "", errors.Wrap(os.ErrNotExist, "executable not found")
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
