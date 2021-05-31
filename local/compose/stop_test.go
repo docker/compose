@@ -38,7 +38,7 @@ func TestStopTimeout(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{
 			testContainer("service1", "123"),
 			testContainer("service1", "456"),
@@ -46,9 +46,9 @@ func TestStopTimeout(t *testing.T) {
 		}, nil)
 
 	timeout := time.Duration(2) * time.Second
-	api.EXPECT().ContainerStop(ctx, "123", &timeout).Return(nil)
-	api.EXPECT().ContainerStop(ctx, "456", &timeout).Return(nil)
-	api.EXPECT().ContainerStop(ctx, "789", &timeout).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "123", &timeout).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "456", &timeout).Return(nil)
+	api.EXPECT().ContainerStop(gomock.Any(), "789", &timeout).Return(nil)
 
 	err := tested.Stop(ctx, &types.Project{
 		Name: testProject,

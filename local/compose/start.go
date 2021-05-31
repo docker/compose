@@ -24,22 +24,26 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+	listener := options.Attach
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
 
-	var containers Containers
-	if options.Attach != nil {
-		c, err := s.attach(ctx, project, options.Attach, options.Services)
+	eg, ctx := errgroup.WithContext(ctx)
+	if listener != nil {
+		attached, err := s.attach(ctx, project, listener, options.Services)
 		if err != nil {
 			return err
 		}
-		containers = c
+
+		eg.Go(func() error {
+			return s.watchContainers(project, options.Services, listener, attached)
+		})
 	}
 
 	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
@@ -51,32 +55,79 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	if err != nil {
 		return err
 	}
-
-	if options.Attach == nil {
-		return nil
-	}
-
-	for _, c := range containers {
-		c := c
-		go func() {
-			s.waitContainer(c, options.Attach)
-		}()
-	}
-	return nil
+	return eg.Wait()
 }
 
-func (s *composeService) waitContainer(c moby.Container, listener compose.ContainerEventListener) {
-	statusC, errC := s.apiClient.ContainerWait(context.Background(), c.ID, container.WaitConditionNotRunning)
-	name := getContainerNameWithoutProject(c)
-	select {
-	case status := <-statusC:
-		listener(compose.ContainerEvent{
-			Type:      compose.ContainerEventExit,
-			Container: name,
-			Service:   c.Labels[serviceLabel],
-			ExitCode:  int(status.StatusCode),
-		})
-	case err := <-errC:
-		logrus.Warnf("Unexpected API error for %s : %s", name, err.Error())
+// watchContainers uses engine events to capture container start/die and notify ContainerEventListener
+func (s *composeService) watchContainers(project *types.Project, services []string, listener compose.ContainerEventListener, containers Containers) error {
+	watched := map[string]int{}
+	for _, c := range containers {
+		watched[c.ID] = 0
 	}
+
+	ctx, stop := context.WithCancel(context.Background())
+	err := s.Events(ctx, project.Name, compose.EventsOptions{
+		Services: services,
+		Consumer: func(event compose.Event) error {
+			inspected, err := s.apiClient.ContainerInspect(ctx, event.Container)
+			if err != nil {
+				return err
+			}
+			container := moby.Container{
+				ID:     inspected.ID,
+				Names:  []string{inspected.Name},
+				Labels: inspected.Config.Labels,
+			}
+			name := getContainerNameWithoutProject(container)
+
+			if event.Status == "die" {
+				restarted := watched[container.ID]
+				watched[container.ID] = restarted + 1
+				// Container terminated.
+				willRestart := inspected.HostConfig.RestartPolicy.MaximumRetryCount > restarted
+
+				listener(compose.ContainerEvent{
+					Type:       compose.ContainerEventExit,
+					Container:  name,
+					Service:    container.Labels[serviceLabel],
+					ExitCode:   inspected.State.ExitCode,
+					Restarting: willRestart,
+				})
+
+				if !willRestart {
+					// we're done with this one
+					delete(watched, container.ID)
+				}
+
+				if len(watched) == 0 {
+					// all project containers stopped, we're done
+					stop()
+				}
+				return nil
+			}
+
+			if event.Status == "start" {
+				count, ok := watched[container.ID]
+				mustAttach := ok && count > 0 // Container restarted, need to re-attach
+				if !ok {
+					// A new container has just been added to service by scale
+					watched[container.ID] = 0
+					mustAttach = true
+				}
+				if mustAttach {
+					// Container restarted, need to re-attach
+					err := s.attachContainer(ctx, container, listener, project)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+			return nil
+		},
+	})
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return nil
+	}
+	return err
 }

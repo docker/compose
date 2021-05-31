@@ -379,7 +379,9 @@ type ContainerEvent struct {
 	Container string
 	Service   string
 	Line      string
-	ExitCode  int
+	// ContainerEventExit only
+	ExitCode   int
+	Restarting bool
 }
 
 const (

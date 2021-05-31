@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 
@@ -197,10 +198,10 @@ func TestAttachRestart(t *testing.T) {
 
 	c.WaitForCondition(func() (bool, string) {
 		debug := res.Combined()
-		return strings.Count(res.Stdout(), "another_1 exited with code 1") == 3, fmt.Sprintf("'another_1 exited with code 1' not found 3 times in : \n%s\n", debug)
+		return strings.Count(res.Stdout(), "failing_1 exited with code 1") == 3, fmt.Sprintf("'failing_1 exited with code 1' not found 3 times in : \n%s\n", debug)
 	}, 2*time.Minute, 2*time.Second)
 
-	assert.Equal(t, strings.Count(res.Stdout(), "another_1  | world"), 3, res.Combined())
+	assert.Equal(t, strings.Count(res.Stdout(), "failing_1  | world"), 3, res.Combined())
 }
 
 func TestInitContainer(t *testing.T) {
@@ -208,7 +209,5 @@ func TestInitContainer(t *testing.T) {
 
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
 	defer c.RunDockerOrExitError("compose", "-p", "init-container", "down")
-	output := res.Stdout()
-
-	assert.Assert(t, strings.Contains(output, "foo_1  | hello\nbar_1  | world"), res.Combined())
+	testify.Regexp(t, "foo_1  | hello(?m:.*)bar_1  | world", res.Stdout())
 }
