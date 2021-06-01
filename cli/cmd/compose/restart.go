@@ -55,11 +55,10 @@ func runRestart(ctx context.Context, backend compose.Service, opts restartOption
 	}
 
 	timeout := time.Duration(opts.timeout) * time.Second
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Restart(ctx, project, compose.RestartOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Restart(ctx, project, compose.RestartOptions{
 			Timeout:  &timeout,
 			Services: services,
 		})
 	})
-	return err
 }

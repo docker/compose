@@ -73,13 +73,13 @@ func downCommand(p *projectOptions, contextType string, backend compose.Service)
 }
 
 func runDown(ctx context.Context, backend compose.Service, opts downOptions) error {
-	_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+	return progress.Run(ctx, func(ctx context.Context) error {
 		name := opts.ProjectName
 		var project *types.Project
 		if opts.ProjectName == "" {
 			p, err := opts.toProject(nil)
 			if err != nil {
-				return "", err
+				return err
 			}
 			project = p
 			name = p.Name
@@ -90,7 +90,7 @@ func runDown(ctx context.Context, backend compose.Service, opts downOptions) err
 			timeoutValue := time.Duration(opts.timeout) * time.Second
 			timeout = &timeoutValue
 		}
-		return name, backend.Down(ctx, name, compose.DownOptions{
+		return backend.Down(ctx, name, compose.DownOptions{
 			RemoveOrphans: opts.removeOrphans,
 			Project:       project,
 			Timeout:       timeout,
@@ -98,5 +98,4 @@ func runDown(ctx context.Context, backend compose.Service, opts downOptions) err
 			Volumes:       opts.volumes,
 		})
 	})
-	return err
 }

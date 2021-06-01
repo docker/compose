@@ -74,7 +74,7 @@ func createVolume(ctype string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			result, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+			result, err := progress.RunWithStatus(ctx, func(ctx context.Context) (string, error) {
 				volume, err := c.VolumeService().Create(ctx, args[0], opts)
 				if err != nil {
 					return "", err

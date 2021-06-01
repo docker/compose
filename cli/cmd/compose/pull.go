@@ -94,8 +94,7 @@ func runPull(ctx context.Context, backend compose.Service, opts pullOptions, ser
 		return backend.Pull(ctx, project, apiOpts)
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Pull(ctx, project, apiOpts)
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Pull(ctx, project, apiOpts)
 	})
-	return err
 }

@@ -49,8 +49,7 @@ func runStart(ctx context.Context, backend compose.Service, opts startOptions, s
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Start(ctx, project, compose.StartOptions{})
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Start(ctx, project, compose.StartOptions{})
 	})
-	return err
 }

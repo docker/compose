@@ -54,10 +54,9 @@ func runPush(ctx context.Context, backend compose.Service, opts pushOptions, ser
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Push(ctx, project, compose.PushOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Push(ctx, project, compose.PushOptions{
 			IgnoreFailures: opts.Ignorefailures,
 		})
 	})
-	return err
 }

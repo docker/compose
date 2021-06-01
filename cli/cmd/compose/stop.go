@@ -63,11 +63,10 @@ func runStop(ctx context.Context, backend compose.Service, opts stopOptions, ser
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Stop(ctx, project, compose.StopOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Stop(ctx, project, compose.StopOptions{
 			Timeout:  timeout,
 			Services: services,
 		})
 	})
-	return err
 }
