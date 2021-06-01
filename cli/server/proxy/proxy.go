@@ -22,7 +22,6 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/config"
-	composev1 "github.com/docker/compose-cli/cli/server/protos/compose/v1"
 	containersv1 "github.com/docker/compose-cli/cli/server/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/cli/server/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
@@ -46,7 +45,6 @@ func Client(ctx context.Context) *client.Client {
 // Proxy implements the gRPC server and forwards the actions
 // to the right backend
 type Proxy interface {
-	composev1.ComposeServer
 	containersv1.ContainersServer
 	streamsv1.StreamingServer
 	volumesv1.VolumesServer

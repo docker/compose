@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/cli/server"
-	composev1 "github.com/docker/compose-cli/cli/server/protos/compose/v1"
 	containersv1 "github.com/docker/compose-cli/cli/server/protos/containers/v1"
 	contextsv1 "github.com/docker/compose-cli/cli/server/protos/contexts/v1"
 	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
@@ -65,7 +64,6 @@ func runServe(ctx context.Context, opts serveOpts) error {
 
 	p := proxy.New(ctx)
 
-	composev1.RegisterComposeServer(s, p)
 	containersv1.RegisterContainersServer(s, p)
 	contextsv1.RegisterContextsServer(s, p.ContextsProxy())
 	streamsv1.RegisterStreamingServer(s, p)
