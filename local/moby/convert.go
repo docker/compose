@@ -132,8 +132,12 @@ func ToMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig
 	if check.Retries != nil {
 		retries = int(*check.Retries)
 	}
+	test := check.Test
+	if check.Disable {
+		test = []string{"NONE"}
+	}
 	return &container.HealthConfig{
-		Test:        check.Test,
+		Test:        test,
 		Interval:    interval,
 		Timeout:     timeout,
 		StartPeriod: period,
