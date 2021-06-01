@@ -215,13 +215,13 @@ func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
 
 // RunDockerOrExitError runs a docker command and returns a result
 func (c *E2eCLI) RunDockerOrExitError(args ...string) *icmd.Result {
-	fmt.Printf("	[%s] docker %s\n", c.test.Name(), strings.Join(args, " "))
+	fmt.Printf("\t[%s] docker %s\n", c.test.Name(), strings.Join(args, " "))
 	return icmd.RunCmd(c.NewDockerCmd(args...))
 }
 
 // RunCmd runs a command, expects no error and returns a result
 func (c *E2eCLI) RunCmd(args ...string) *icmd.Result {
-	fmt.Printf("	[%s] %s\n", c.test.Name(), strings.Join(args, " "))
+	fmt.Printf("\t[%s] %s\n", c.test.Name(), strings.Join(args, " "))
 	assert.Assert(c.test, len(args) >= 1, "require at least one command in parameters")
 	res := icmd.RunCmd(c.NewCmd(args[0], args[1:]...))
 	res.Assert(c.test, icmd.Success)
@@ -247,7 +247,7 @@ func (c *E2eCLI) WaitForCmdResult(command icmd.Cmd, predicate func(*icmd.Result)
 	assert.Assert(c.test, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
 	var res *icmd.Result
 	checkStopped := func(logt poll.LogT) poll.Result {
-		fmt.Printf("	[%s] %s\n", c.test.Name(), strings.Join(command.Command, " "))
+		fmt.Printf("\t[%s] %s\n", c.test.Name(), strings.Join(command.Command, " "))
 		res = icmd.RunCmd(command)
 		if !predicate(res) {
 			return poll.Continue("Cmd output did not match requirement: %q", res.Combined())
@@ -302,7 +302,7 @@ func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDe
 	client := &http.Client{
 		Timeout: retryDelay,
 	}
-	fmt.Printf("	[%s] GET %s\n", t.Name(), endpoint)
+	fmt.Printf("\t[%s] GET %s\n", t.Name(), endpoint)
 	checkUp := func(t poll.LogT) poll.Result {
 		r, err = client.Get(endpoint)
 		if err != nil {
