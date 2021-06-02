@@ -61,7 +61,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, info, s.configFile, w)
+			err := s.pullServiceImage(ctx, service, info, s.configFile, w, false)
 			if err != nil {
 				if !opts.IgnoreFailures {
 					return err
@@ -75,7 +75,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 	return eg.Wait()
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) error {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
@@ -131,7 +131,9 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		if jm.Error != nil {
 			return metrics.WrapCategorisedComposeError(errors.New(jm.Error.Message), metrics.PullFailure)
 		}
-		toPullProgressEvent(service.Name, jm, w)
+		if !quietPull {
+			toPullProgressEvent(service.Name, jm, w)
+		}
 	}
 	w.Event(progress.Event{
 		ID:     service.Name,
@@ -139,6 +141,47 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Text:   "Pulled",
 	})
 	return nil
+}
+
+func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
+	info, err := s.apiClient.Info(ctx)
+	if err != nil {
+		return err
+	}
+
+	if info.IndexServerAddress == "" {
+		info.IndexServerAddress = registry.IndexServer
+	}
+
+	return progress.Run(ctx, func(ctx context.Context) error {
+		w := progress.ContextWriter(ctx)
+		eg, ctx := errgroup.WithContext(ctx)
+		for _, service := range project.Services {
+			if service.Image == "" {
+				continue
+			}
+			switch service.PullPolicy {
+			case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+				if _, ok := images[service.Image]; ok {
+					continue
+				}
+			case types.PullPolicyNever, types.PullPolicyBuild:
+				continue
+			case types.PullPolicyAlways:
+				// force pull
+			}
+			service := service
+			eg.Go(func() error {
+				err := s.pullServiceImage(ctx, service, info, s.configFile, w, quietPull)
+				if err != nil && service.Build != nil {
+					// image can be built, so we can ignore pull failure
+					return nil
+				}
+				return err
+			})
+		}
+		return eg.Wait()
+	})
 }
 
 func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {
