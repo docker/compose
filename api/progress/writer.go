@@ -50,11 +50,20 @@ func ContextWriter(ctx context.Context) Writer {
 	return s
 }
 
-type progressFunc func(context.Context) (string, error)
+type progressFunc func(context.Context) error
 
-// Run will run a writer and the progress function
-// in parallel
-func Run(ctx context.Context, pf progressFunc) (string, error) {
+type progressFuncWithStatus func(context.Context) (string, error)
+
+// Run will run a writer and the progress function in parallel
+func Run(ctx context.Context, pf progressFunc) error {
+	_, err := RunWithStatus(ctx, func(ctx context.Context) (string, error) {
+		return "", pf(ctx)
+	})
+	return err
+}
+
+// RunWithStatus will run a writer and the progress function in parallel and return a status
+func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, error) {
 	eg, _ := errgroup.WithContext(ctx)
 	w, err := NewWriter(os.Stderr)
 	var result string

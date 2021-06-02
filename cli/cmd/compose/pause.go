@@ -49,8 +49,8 @@ func runPause(ctx context.Context, backend compose.Service, opts pauseOptions, s
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Pause(ctx, project, compose.PauseOptions{
+	err = progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Pause(ctx, project, compose.PauseOptions{
 			Services: services,
 		})
 	})
@@ -81,10 +81,9 @@ func runUnPause(ctx context.Context, backend compose.Service, opts unpauseOption
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.UnPause(ctx, project, compose.PauseOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.UnPause(ctx, project, compose.PauseOptions{
 			Services: services,
 		})
 	})
-	return err
 }

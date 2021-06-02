@@ -214,13 +214,12 @@ func runUp(ctx context.Context, backend compose.Service, opts upOptions, service
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Up(ctx, project, compose.UpOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Up(ctx, project, compose.UpOptions{
 			Detach:    opts.Detach,
 			QuietPull: opts.quietPull,
 		})
 	})
-	return err
 }
 
 func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions, services []string) error {
@@ -238,7 +237,7 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 		return fmt.Errorf("no service selected")
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
+	err = progress.Run(ctx, func(ctx context.Context) error {
 		err := backend.Create(ctx, project, compose.CreateOptions{
 			Services:             services,
 			RemoveOrphans:        opts.removeOrphans,
@@ -249,14 +248,14 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 			QuietPull:            opts.quietPull,
 		})
 		if err != nil {
-			return "", err
+			return err
 		}
 		if opts.Detach {
 			err = backend.Start(ctx, project, compose.StartOptions{
 				Services: services,
 			})
 		}
-		return "", err
+		return err
 	})
 	if err != nil {
 		return err
@@ -282,15 +281,14 @@ func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions
 
 	stopFunc := func() error {
 		ctx := context.Background()
-		_, err := progress.Run(ctx, func(ctx context.Context) (string, error) {
+		return progress.Run(ctx, func(ctx context.Context) error {
 			go func() {
 				<-signalChan
 				backend.Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
 			}()
 
-			return "", backend.Stop(ctx, project, compose.StopOptions{})
+			return backend.Stop(ctx, project, compose.StopOptions{})
 		})
-		return err
 	}
 	go func() {
 		<-signalChan

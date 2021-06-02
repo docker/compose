@@ -88,8 +88,8 @@ func runBuild(ctx context.Context, backend compose.Service, opts buildOptions, s
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", backend.Build(ctx, project, compose.BuildOptions{
+	err = progress.Run(ctx, func(ctx context.Context) error {
+		return backend.Build(ctx, project, compose.BuildOptions{
 			Pull:     opts.pull,
 			Progress: opts.progress,
 			Args:     types.NewMappingWithEquals(opts.args),

@@ -154,8 +154,8 @@ func runRun(ctx context.Context, backend compose.Service, opts runOptions) error
 		return err
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		return "", startDependencies(ctx, backend, *project, opts.Service)
+	err = progress.Run(ctx, func(ctx context.Context) error {
+		return startDependencies(ctx, backend, *project, opts.Service)
 	})
 	if err != nil {
 		return err

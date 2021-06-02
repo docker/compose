@@ -69,18 +69,17 @@ func runRemove(ctx context.Context, backend compose.Service, opts removeOptions,
 	}
 
 	if opts.stop {
-		_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-			err := backend.Stop(ctx, project, compose.StopOptions{
+		err = progress.Run(ctx, func(ctx context.Context) error {
+			return backend.Stop(ctx, project, compose.StopOptions{
 				Services: services,
 			})
-			return "", err
 		})
 		if err != nil {
 			return err
 		}
 	}
 
-	reosurces, err := backend.Remove(ctx, project, compose.RemoveOptions{
+	resources, err := backend.Remove(ctx, project, compose.RemoveOptions{
 		DryRun:   true,
 		Services: services,
 	})
@@ -88,11 +87,11 @@ func runRemove(ctx context.Context, backend compose.Service, opts removeOptions,
 		return err
 	}
 
-	if len(reosurces) == 0 {
+	if len(resources) == 0 {
 		fmt.Println("No stopped containers")
 		return nil
 	}
-	msg := fmt.Sprintf("Going to remove %s", strings.Join(reosurces, ", "))
+	msg := fmt.Sprintf("Going to remove %s", strings.Join(resources, ", "))
 	if opts.force {
 		fmt.Println(msg)
 	} else {
@@ -105,12 +104,11 @@ func runRemove(ctx context.Context, backend compose.Service, opts removeOptions,
 		}
 	}
 
-	_, err = progress.Run(ctx, func(ctx context.Context) (string, error) {
-		_, err = backend.Remove(ctx, project, compose.RemoveOptions{
+	return progress.Run(ctx, func(ctx context.Context) error {
+		_, err := backend.Remove(ctx, project, compose.RemoveOptions{
 			Volumes: opts.volumes,
 			Force:   opts.force,
 		})
-		return "", err
+		return err
 	})
-	return err
 }
