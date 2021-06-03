@@ -20,12 +20,19 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
 )
 
 func (s *composeService) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.restart(ctx, project, options)
+	})
+}
+
+func (s *composeService) restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
 	ctx, err := s.getUpdatedContainersStateContext(ctx, project.Name)
 	if err != nil {
 		return err

@@ -18,17 +18,20 @@ package compose
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	status "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/utils/prompt"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) ([]string, error) {
+func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
 	services := options.Services
 	if len(services) == 0 {
 		services = project.ServiceNames()
@@ -36,7 +39,7 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 
 	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	stoppedContainers := containers.filter(func(c moby.Container) bool {
@@ -48,18 +51,36 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 		names = append(names, getCanonicalContainerName(c))
 	})
 
-	if options.DryRun {
-		return names, nil
+	if len(names) == 0 {
+		fmt.Println("No stopped containers")
+		return nil
 	}
+	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
+	if options.Force {
+		fmt.Println(msg)
+	} else {
+		confirm, err := prompt.User{}.Confirm(msg, false)
+		if err != nil {
+			return err
+		}
+		if !confirm {
+			return nil
+		}
+	}
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.remove(ctx, stoppedContainers, options)
+	})
+}
 
+func (s *composeService) remove(ctx context.Context, containers Containers, options compose.RemoveOptions) error {
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range stoppedContainers {
+	for _, c := range containers {
 		c := c
 		eg.Go(func() error {
 			eventName := getContainerProgressName(c)
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{
+			err := s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})
@@ -69,5 +90,5 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 			return err
 		})
 	}
-	return nil, eg.Wait()
+	return eg.Wait()
 }

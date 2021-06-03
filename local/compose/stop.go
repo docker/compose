@@ -26,6 +26,12 @@ import (
 )
 
 func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.stop(ctx, project, options)
+	})
+}
+
+func (s *composeService) stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	services := options.Services

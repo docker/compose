@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type restartOptions struct {
@@ -55,10 +54,8 @@ func runRestart(ctx context.Context, backend compose.Service, opts restartOption
 	}
 
 	timeout := time.Duration(opts.timeout) * time.Second
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Restart(ctx, project, compose.RestartOptions{
-			Timeout:  &timeout,
-			Services: services,
-		})
+	return backend.Restart(ctx, project, compose.RestartOptions{
+		Timeout:  &timeout,
+		Services: services,
 	})
 }

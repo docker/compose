@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
@@ -29,6 +30,12 @@ import (
 )
 
 func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.start(ctx, project, options)
+	})
+}
+
+func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	listener := options.Attach
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()

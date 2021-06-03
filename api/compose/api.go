@@ -59,7 +59,7 @@ type Service interface {
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
-	Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
+	Remove(ctx context.Context, project *types.Project, options RemoveOptions) error
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Copy copies a file/folder between a service container and the local filesystem
@@ -169,8 +169,9 @@ type PushOptions struct {
 	IgnoreFailures bool
 }
 
-// PullOptions group options of the Push API
+// PullOptions group options of the Pull API
 type PullOptions struct {
+	Quiet          bool
 	IgnoreFailures bool
 }
 

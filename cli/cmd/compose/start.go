@@ -20,8 +20,6 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
-
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +47,5 @@ func runStart(ctx context.Context, backend compose.Service, opts startOptions, s
 		return err
 	}
 
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Start(ctx, project, compose.StartOptions{})
-	})
+	return backend.Start(ctx, project, compose.StartOptions{})
 }

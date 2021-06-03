@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type pauseOptions struct {
@@ -49,12 +48,9 @@ func runPause(ctx context.Context, backend compose.Service, opts pauseOptions, s
 		return err
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Pause(ctx, project, compose.PauseOptions{
-			Services: services,
-		})
+	return backend.Pause(ctx, project, compose.PauseOptions{
+		Services: services,
 	})
-	return err
 }
 
 type unpauseOptions struct {
@@ -81,9 +77,7 @@ func runUnPause(ctx context.Context, backend compose.Service, opts unpauseOption
 		return err
 	}
 
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.UnPause(ctx, project, compose.PauseOptions{
-			Services: services,
-		})
+	return backend.UnPause(ctx, project, compose.PauseOptions{
+		Services: services,
 	})
 }

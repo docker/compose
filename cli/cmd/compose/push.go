@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type pushOptions struct {
@@ -54,9 +53,7 @@ func runPush(ctx context.Context, backend compose.Service, opts pushOptions, ser
 		return err
 	}
 
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Push(ctx, project, compose.PushOptions{
-			IgnoreFailures: opts.Ignorefailures,
-		})
+	return backend.Push(ctx, project, compose.PushOptions{
+		IgnoreFailures: opts.Ignorefailures,
 	})
 }

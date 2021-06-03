@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type buildOptions struct {
@@ -88,14 +87,11 @@ func runBuild(ctx context.Context, backend compose.Service, opts buildOptions, s
 		return err
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Build(ctx, project, compose.BuildOptions{
-			Pull:     opts.pull,
-			Progress: opts.progress,
-			Args:     types.NewMappingWithEquals(opts.args),
-			NoCache:  opts.noCache,
-			Quiet:    opts.quiet,
-		})
+	return backend.Build(ctx, project, compose.BuildOptions{
+		Pull:     opts.pull,
+		Progress: opts.progress,
+		Args:     types.NewMappingWithEquals(opts.args),
+		NoCache:  opts.noCache,
+		Quiet:    opts.quiet,
 	})
-	return err
 }
