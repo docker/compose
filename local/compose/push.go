@@ -39,6 +39,12 @@ import (
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.push(ctx, project, options)
+	})
+}
+
+func (s *composeService) push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
 	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
 		return err

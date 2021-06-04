@@ -41,7 +41,7 @@ type ServiceProxy struct {
 	ConvertFn            func(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	KillFn               func(ctx context.Context, project *types.Project, options KillOptions) error
 	RunOneOffContainerFn func(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
-	RemoveFn             func(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error)
+	RemoveFn             func(ctx context.Context, project *types.Project, options RemoveOptions) error
 	ExecFn               func(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	CopyFn               func(ctx context.Context, project *types.Project, opts CopyOptions) error
 	PauseFn              func(ctx context.Context, project string, options PauseOptions) error
@@ -252,9 +252,9 @@ func (s *ServiceProxy) RunOneOffContainer(ctx context.Context, project *types.Pr
 }
 
 //Remove implements Service interface
-func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, options RemoveOptions) ([]string, error) {
+func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, options RemoveOptions) error {
 	if s.RemoveFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return errdefs.ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)

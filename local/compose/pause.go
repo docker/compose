@@ -27,6 +27,12 @@ import (
 )
 
 func (s *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.pause(ctx, project, options)
+	})
+}
+
+func (s *composeService) pause(ctx context.Context, project string, options compose.PauseOptions) error {
 	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err
@@ -49,6 +55,12 @@ func (s *composeService) Pause(ctx context.Context, project string, options comp
 }
 
 func (s *composeService) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.unPause(ctx, project, options)
+	})
+}
+
+func (s *composeService) unPause(ctx context.Context, project string, options compose.PauseOptions) error {
 	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err

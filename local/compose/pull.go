@@ -38,6 +38,15 @@ import (
 )
 
 func (s *composeService) Pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
+	if opts.Quiet {
+		return s.pull(ctx, project, opts)
+	}
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.pull(ctx, project, opts)
+	})
+}
+
+func (s *composeService) pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
 		return err

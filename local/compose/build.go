@@ -42,6 +42,12 @@ import (
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
+	return composeprogress.Run(ctx, func(ctx context.Context) error {
+		return s.build(ctx, project, options)
+	})
+}
+
+func (s *composeService) build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 
@@ -76,7 +82,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	_, err := s.build(ctx, project, opts, Containers{}, options.Progress)
+	_, err := s.doBuild(ctx, project, opts, Containers{}, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 && !options.Quiet {
 			utils.DisplayScanSuggestMsg()
@@ -100,7 +106,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	if err != nil {
 		return err
 	}
-	builtImages, err := s.build(ctx, project, opts, observedState, mode)
+	builtImages, err := s.doBuild(ctx, project, opts, observedState, mode)
 	if err != nil {
 		return err
 	}
@@ -188,7 +194,7 @@ func (s *composeService) getImageDigests(ctx context.Context, project *types.Pro
 	return images, nil
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, opts map[string]build.Options, observedState Containers, mode string) (map[string]string, error) {
+func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, observedState Containers, mode string) (map[string]string, error) {
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
 		return nil, err

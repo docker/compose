@@ -87,6 +87,20 @@ type projectOptions struct {
 	EnvFile     string
 }
 
+// ProjectFunc does stuff within a types.Project
+type ProjectFunc func(ctx context.Context, project *types.Project) error
+
+// WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
+func (o *projectOptions) WithServices(services []string, fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
+	return Adapt(func(ctx context.Context, strings []string) error {
+		project, err := o.toProject(services)
+		if err != nil {
+			return err
+		}
+		return fn(ctx, project)
+	})
+}
+
 func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")

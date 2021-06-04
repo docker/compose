@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type stopOptions struct {
@@ -63,10 +62,8 @@ func runStop(ctx context.Context, backend compose.Service, opts stopOptions, ser
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Stop(ctx, project, compose.StopOptions{
-			Timeout:  timeout,
-			Services: services,
-		})
+	return backend.Stop(ctx, project, compose.StopOptions{
+		Timeout:  timeout,
+		Services: services,
 	})
 }
