@@ -65,14 +65,14 @@ func TestComposeMetrics(t *testing.T) {
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown flag: --file"})
 		res = c.RunDockerOrExitError("compose", "donw", "--file", "../compose/fixtures/wrong-composefile/compose.yml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: `unknown docker command: "compose donw"`})
-		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/unknown-image.yml", "pull")
-		res.Assert(t, icmd.Expected{ExitCode: 18, Err: `pull access denied for unknownimage, repository does not exist or may require 'docker login'`})
 		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/build-error.yml", "build")
 		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `line 17: unknown instruction: WRONG`})
 		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/build-error.yml", "up")
 		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `line 17: unknown instruction: WRONG`})
+		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/unknown-image.yml", "pull")
+		res.Assert(t, icmd.Expected{ExitCode: 18, Err: `pull access denied for unknownimage, repository does not exist or may require 'docker login'`})
 		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/unknown-image.yml", "up")
-		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `pull access denied, repository does not exist or may require authorization`})
+		res.Assert(t, icmd.Expected{ExitCode: 18, Err: `pull access denied for unknownimage, repository does not exist or may require 'docker login'`})
 
 		usage := s.GetUsage()
 		assert.DeepEqual(t, []string{
@@ -82,10 +82,10 @@ func TestComposeMetrics(t *testing.T) {
 			`{"command":"compose up","context":"moby","source":"cli","status":"failure-cmd-syntax"}`,
 			`{"command":"compose up","context":"moby","source":"cli","status":"failure-cmd-syntax"}`,
 			`{"command":"compose","context":"moby","source":"cli","status":"failure-cmd-syntax"}`,
-			`{"command":"compose pull","context":"moby","source":"cli","status":"failure-pull"}`,
 			`{"command":"compose build","context":"moby","source":"cli","status":"failure-build"}`,
 			`{"command":"compose up","context":"moby","source":"cli","status":"failure-build"}`,
-			`{"command":"compose up","context":"moby","source":"cli","status":"failure-build"}`,
+			`{"command":"compose pull","context":"moby","source":"cli","status":"failure-pull"}`,
+			`{"command":"compose up","context":"moby","source":"cli","status":"failure-pull"}`,
 		}, usage)
 	})
 }

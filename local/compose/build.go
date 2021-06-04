@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -93,7 +92,18 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, observedState Containers, quietPull bool) error {
-	images, err := s.getImageDigests(ctx, project)
+	for _, service := range project.Services {
+		if service.Image == "" && service.Build == nil {
+			return fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+		}
+	}
+
+	images, err := s.getLocalImagesDigests(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	err = s.pullRequiredImages(ctx, project, images, quietPull)
 	if err != nil {
 		return err
 	}
@@ -128,9 +138,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 }
 
 func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, []string, error) {
-	session := []session.Attachable{
-		authprovider.NewDockerAuthProvider(os.Stderr),
-	}
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 	for _, service := range project.Services {
@@ -152,30 +159,12 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			opts[imageName] = opt
 			continue
 		}
-		if service.Image != "" {
-			if localImagePresent {
-				continue
-			}
-		}
-		// Buildx has no command to "just pull", see
-		// so we bake a temporary dockerfile that will just pull and export pulled image
-		opts[service.Name] = build.Options{
-			Inputs: build.Inputs{
-				ContextPath:    ".",
-				DockerfilePath: "-",
-				InStream:       strings.NewReader("FROM " + service.Image),
-			},
-			Tags:    []string{service.Image}, // Used to retrieve image to pull in case of windows engine
-			Pull:    true,
-			Session: session,
-		}
-
 	}
 	return opts, imagesToBuild, nil
 
 }
 
-func (s *composeService) getImageDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
+func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
 	imageNames := []string{}
 	for _, s := range project.Services {
 		imgName := getImageName(s, project.Name)
@@ -295,6 +284,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Exports:   []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
 		Platforms: plats,
 		Labels:    service.Build.Labels,
+		Session: []session.Attachable{
+			authprovider.NewDockerAuthProvider(os.Stderr),
+		},
 	}, nil
 }
 
