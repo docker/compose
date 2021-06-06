@@ -323,7 +323,7 @@ class TopLevelCommand:
 
     @property
     def project_dir(self):
-        return get_project_dir(self.toplevel_options)
+        return get_project_dir(self.toplevel_options, '.')
 
     @property
     def toplevel_environment(self):

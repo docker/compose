@@ -90,3 +90,17 @@ class EnvironmentOverrideFileTest(DockerClientTestCase):
         assert len(containers) == 1
         assert "WHEREAMI=default" in containers[0].get('Config.Env')
         dispatch(base_dir, ['down'], None)
+
+    def test_dot_env_file_in_subdir(self):
+        base_dir = 'tests/fixtures/env-file-override'
+        sub_dir = base_dir + '/subdir'
+        env = Environment.from_env_file(base_dir, None)
+        dispatch(sub_dir, ['up'])
+        project = get_project(project_dir=base_dir,
+                              config_path=['docker-compose.yml'],
+                              environment=env,
+                              override_dir=base_dir)
+        containers = project.containers(stopped=True)
+        assert len(containers) == 1
+        assert "WHEREAMI=default" in containers[0].get('Config.Env')
+        dispatch(base_dir, ['down'], None)
