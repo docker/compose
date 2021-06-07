@@ -162,23 +162,31 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		info.IndexServerAddress = registry.IndexServer
 	}
 
+	var needPull []types.ServiceConfig
+	for _, service := range project.Services {
+		if service.Image == "" {
+			continue
+		}
+		switch service.PullPolicy {
+		case "", types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+			if _, ok := images[service.Image]; ok {
+				continue
+			}
+		case types.PullPolicyNever, types.PullPolicyBuild:
+			continue
+		case types.PullPolicyAlways:
+			// force pull
+		}
+		needPull = append(needPull, service)
+	}
+	if len(needPull) == 0 {
+		return nil
+	}
+
 	return progress.Run(ctx, func(ctx context.Context) error {
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, service := range project.Services {
-			if service.Image == "" {
-				continue
-			}
-			switch service.PullPolicy {
-			case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
-				if _, ok := images[service.Image]; ok {
-					continue
-				}
-			case types.PullPolicyNever, types.PullPolicyBuild:
-				continue
-			case types.PullPolicyAlways:
-				// force pull
-			}
+		for _, service := range needPull {
 			service := service
 			eg.Go(func() error {
 				err := s.pullServiceImage(ctx, service, info, s.configFile, w, quietPull)
