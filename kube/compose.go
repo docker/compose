@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/compose"
 	apicontext "github.com/docker/compose-cli/api/context"
@@ -110,8 +111,19 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 
 // Down executes the equivalent to a `compose down`
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
-	w := progress.ContextWriter(ctx)
+	if options.Volumes {
+		return errors.Wrap(errdefs.ErrNotImplemented, "--volumes option is not supported on Kubernetes")
+	}
+	if options.Images != "" {
+		return errors.Wrap(errdefs.ErrNotImplemented, "--rmi option is not supported on Kubernetes")
+	}
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.down(ctx, projectName, options)
+	})
+}
 
+func (s *composeService) down(ctx context.Context, projectName string, options compose.DownOptions) error {
+	w := progress.ContextWriter(ctx)
 	eventName := fmt.Sprintf("Remove %s", projectName)
 	w.Event(progress.CreatingEvent(eventName))
 

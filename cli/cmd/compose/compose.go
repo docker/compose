@@ -218,7 +218,7 @@ func RootCommand(contextType string, backend compose.Service) *cobra.Command {
 
 	command.AddCommand(
 		upCommand(&opts, contextType, backend),
-		downCommand(&opts, contextType, backend),
+		downCommand(&opts, backend),
 		startCommand(&opts, backend),
 		restartCommand(&opts, backend),
 		stopCommand(&opts, backend),

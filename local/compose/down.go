@@ -36,6 +36,12 @@ import (
 type downOp func() error
 
 func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.down(ctx, projectName, options)
+	})
+}
+
+func (s *composeService) down(ctx context.Context, projectName string, options compose.DownOptions) error {
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
