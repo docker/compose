@@ -19,7 +19,7 @@ require (
 	github.com/awslabs/goformation/v4 v4.15.6
 	github.com/buger/goterm v1.0.0
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
-	github.com/compose-spec/compose-go v0.0.0-20210525111037-1dc9cd17f504
+	github.com/compose-spec/compose-go v0.0.0-20210607122939-5d8ae5f41be5
 	github.com/containerd/console v1.0.2
 	github.com/containerd/containerd v1.5.0
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
@@ -45,7 +45,7 @@ require (
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.12
-	github.com/mattn/go-shellwords v1.0.11
+	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.8.2-0.20210401015549-df49b648c8bf
 	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
 	github.com/morikuni/aec v1.0.0
