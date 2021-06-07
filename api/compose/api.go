@@ -112,10 +112,14 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
-	// Attach will attach to service containers and send container logs and events
-	Attach ContainerEventListener
-	// Services passed in the command line to be started
-	Services []string
+	// Attach to container and forward logs if not nil
+	Attach LogConsumer
+	// AttachTo set the services to attach to
+	AttachTo []string
+	// CascadeStop stops the application when a container stops
+	CascadeStop bool
+	// ExitCodeFrom return exit code from specified service
+	ExitCodeFrom string
 }
 
 // RestartOptions group options of the Restart API
@@ -136,10 +140,8 @@ type StopOptions struct {
 
 // UpOptions group options of the Up API
 type UpOptions struct {
-	// Detach will create services and return immediately
-	Detach bool
-	// QuietPull makes the pulling process quiet
-	QuietPull bool
+	Create CreateOptions
+	Start  StartOptions
 }
 
 // DownOptions group options of the Down API

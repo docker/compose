@@ -19,22 +19,29 @@ package compose
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
 )
 
 type createOptions struct {
-	*composeOptions
+	Build         bool
+	noBuild       bool
+	removeOrphans bool
 	forceRecreate bool
 	noRecreate    bool
+	recreateDeps  bool
+	noInherit     bool
+	timeChanged   bool
+	timeout       int
+	quietPull     bool
 }
 
 func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
-	opts := createOptions{
-		composeOptions: &composeOptions{},
-	}
+	opts := createOptions{}
 	cmd := &cobra.Command{
 		Use:   "create [SERVICE...]",
 		Short: "Creates containers for a service.",
@@ -47,17 +54,15 @@ func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 			}
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runCreateStart(ctx, backend, upOptions{
-				composeOptions: &composeOptions{
-					projectOptions: p,
-					Build:          opts.Build,
-					noBuild:        opts.noBuild,
-				},
-				noStart:       true,
-				forceRecreate: opts.forceRecreate,
-				noRecreate:    opts.noRecreate,
-			}, args)
+		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
+			return backend.Create(ctx, project, compose.CreateOptions{
+				RemoveOrphans:        opts.removeOrphans,
+				Recreate:             opts.recreateStrategy(),
+				RecreateDependencies: opts.dependenciesRecreateStrategy(),
+				Inherit:              !opts.noInherit,
+				Timeout:              opts.GetTimeout(),
+				QuietPull:            false,
+			})
 		}),
 	}
 	flags := cmd.Flags()
@@ -66,4 +71,47 @@ func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	return cmd
+}
+
+func (opts createOptions) recreateStrategy() string {
+	if opts.noRecreate {
+		return compose.RecreateNever
+	}
+	if opts.forceRecreate {
+		return compose.RecreateForce
+	}
+	return compose.RecreateDiverged
+}
+
+func (opts createOptions) dependenciesRecreateStrategy() string {
+	if opts.noRecreate {
+		return compose.RecreateNever
+	}
+	if opts.recreateDeps {
+		return compose.RecreateForce
+	}
+	return compose.RecreateDiverged
+}
+
+func (opts createOptions) GetTimeout() *time.Duration {
+	if opts.timeChanged {
+		t := time.Duration(opts.timeout) * time.Second
+		return &t
+	}
+	return nil
+}
+
+func (opts createOptions) Apply(project *types.Project) {
+	if opts.Build {
+		for i, service := range project.Services {
+			service.PullPolicy = types.PullPolicyBuild
+			project.Services[i] = service
+		}
+	}
+	if opts.noBuild {
+		for i, service := range project.Services {
+			service.Build = nil
+			project.Services[i] = service
+		}
+	}
 }

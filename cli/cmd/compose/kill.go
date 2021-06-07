@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"os"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
@@ -31,7 +30,7 @@ func killCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kill [options] [SERVICE...]",
 		Short: "Force stop service containers.",
-		RunE: p.WithServices(os.Args, func(ctx context.Context, project *types.Project) error {
+		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
 			return backend.Kill(ctx, project, opts)
 		}),
 	}

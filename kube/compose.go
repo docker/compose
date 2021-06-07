@@ -72,6 +72,12 @@ func NewComposeService() (compose.Service, error) {
 
 // Up executes the equivalent to a `compose up`
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.up(ctx, project)
+	})
+}
+
+func (s *composeService) up(ctx context.Context, project *types.Project) error {
 	w := progress.ContextWriter(ctx)
 
 	eventName := "Convert to Helm charts"

@@ -50,7 +50,7 @@ func TestKillAll(t *testing.T) {
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
 
-	err := tested.Kill(ctx, &project, compose.KillOptions{})
+	err := tested.kill(ctx, &project, compose.KillOptions{})
 	assert.NilError(t, err)
 }
 
@@ -66,7 +66,7 @@ func TestKillSignal(t *testing.T) {
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
-	err := tested.Kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
+	err := tested.kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
 	assert.NilError(t, err)
 }
 

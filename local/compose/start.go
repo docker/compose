@@ -19,45 +19,40 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/progress"
-	"github.com/docker/compose-cli/utils"
-
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, project, options)
+		return s.start(ctx, project, options, nil)
 	})
 }
 
-func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
-	listener := options.Attach
-	if len(options.Services) == 0 {
-		options.Services = project.ServiceNames()
+func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions, listener func(event compose.ContainerEvent)) error {
+	if len(options.AttachTo) == 0 {
+		options.AttachTo = project.ServiceNames()
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	if listener != nil {
-		attached, err := s.attach(ctx, project, listener, options.Services)
+		attached, err := s.attach(ctx, project, listener, options.AttachTo)
 		if err != nil {
 			return err
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(project, options.Services, listener, attached)
+			return s.watchContainers(project, options.AttachTo, listener, attached)
 		})
 	}
 
 	err := InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		if utils.StringContains(options.Services, service.Name) {
-			return s.startService(ctx, project, service)
-		}
-		return nil
+		return s.startService(ctx, project, service)
 	})
 	if err != nil {
 		return err

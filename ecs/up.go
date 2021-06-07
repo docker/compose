@@ -23,12 +23,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/errdefs"
-
-	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/api/progress"
 )
 
 func (b *ecsAPIService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
@@ -80,6 +80,12 @@ func (b *ecsAPIService) Copy(ctx context.Context, project *types.Project, option
 }
 
 func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return b.up(ctx, project, options)
+	})
+}
+
+func (b *ecsAPIService) up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	logrus.Debugf("deploying on AWS with region=%q", b.Region)
 	err := b.aws.CheckRequirements(ctx, b.Region)
 	if err != nil {
@@ -124,7 +130,7 @@ func (b *ecsAPIService) Up(ctx context.Context, project *types.Project, options 
 			return err
 		}
 	}
-	if options.Detach {
+	if options.Start.Attach == nil {
 		return nil
 	}
 	signalChan := make(chan os.Signal, 1)

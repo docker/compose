@@ -87,6 +87,12 @@ func (cs *aciComposeService) Copy(ctx context.Context, project *types.Project, o
 }
 
 func (cs *aciComposeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return cs.up(ctx, project)
+	})
+}
+
+func (cs *aciComposeService) up(ctx context.Context, project *types.Project) error {
 	logrus.Debugf("Up on project with name %q", project.Name)
 
 	if err := autocreateFileshares(ctx, project); err != nil {
