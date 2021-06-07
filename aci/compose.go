@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose-cli/aci/convert"
@@ -29,6 +30,7 @@ import (
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/utils/formatter"
 )
 
@@ -123,21 +125,29 @@ func (cs aciComposeService) warnKeepVolumeOnDown(ctx context.Context, projectNam
 }
 
 func (cs *aciComposeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
-	logrus.Debugf("Down on projectName with name %q", projectName)
+	if options.Volumes {
+		return errors.Wrap(errdefs.ErrNotImplemented, "--volumes option is not supported on ACI")
+	}
+	if options.Images != "" {
+		return errors.Wrap(errdefs.ErrNotImplemented, "--rmi option is not supported on ACI")
+	}
+	return progress.Run(ctx, func(ctx context.Context) error {
+		logrus.Debugf("Down on project with name %q", projectName)
 
-	if err := cs.warnKeepVolumeOnDown(ctx, projectName); err != nil {
+		if err := cs.warnKeepVolumeOnDown(ctx, projectName); err != nil {
+			return err
+		}
+
+		cg, err := deleteACIContainerGroup(ctx, cs.ctx, projectName)
+		if err != nil {
+			return err
+		}
+		if cg.IsHTTPStatus(http.StatusNoContent) {
+			return errdefs.ErrNotFound
+		}
+
 		return err
-	}
-
-	cg, err := deleteACIContainerGroup(ctx, cs.ctx, projectName)
-	if err != nil {
-		return err
-	}
-	if cg.IsHTTPStatus(http.StatusNoContent) {
-		return errdefs.ErrNotFound
-	}
-
-	return err
+	})
 }
 
 func (cs *aciComposeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {

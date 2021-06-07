@@ -25,8 +25,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 )
 
 type downOptions struct {
@@ -38,7 +36,7 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
+func downCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	opts := downOptions{
 		projectOptions: p,
 	}
@@ -63,39 +61,33 @@ func downCommand(p *projectOptions, contextType string, backend compose.Service)
 	flags := downCmd.Flags()
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
-
-	switch contextType {
-	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
-		flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
-		flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
-	}
+	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
+	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
 	return downCmd
 }
 
 func runDown(ctx context.Context, backend compose.Service, opts downOptions) error {
-	return progress.Run(ctx, func(ctx context.Context) error {
-		name := opts.ProjectName
-		var project *types.Project
-		if opts.ProjectName == "" {
-			p, err := opts.toProject(nil)
-			if err != nil {
-				return err
-			}
-			project = p
-			name = p.Name
+	name := opts.ProjectName
+	var project *types.Project
+	if opts.ProjectName == "" {
+		p, err := opts.toProject(nil)
+		if err != nil {
+			return err
 		}
+		project = p
+		name = p.Name
+	}
 
-		var timeout *time.Duration
-		if opts.timeChanged {
-			timeoutValue := time.Duration(opts.timeout) * time.Second
-			timeout = &timeoutValue
-		}
-		return backend.Down(ctx, name, compose.DownOptions{
-			RemoveOrphans: opts.removeOrphans,
-			Project:       project,
-			Timeout:       timeout,
-			Images:        opts.images,
-			Volumes:       opts.volumes,
-		})
+	var timeout *time.Duration
+	if opts.timeChanged {
+		timeoutValue := time.Duration(opts.timeout) * time.Second
+		timeout = &timeoutValue
+	}
+	return backend.Down(ctx, name, compose.DownOptions{
+		RemoveOrphans: opts.removeOrphans,
+		Project:       project,
+		Timeout:       timeout,
+		Images:        opts.images,
+		Volumes:       opts.volumes,
 	})
 }
