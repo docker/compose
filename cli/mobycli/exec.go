@@ -106,8 +106,13 @@ func RunDocker(childExit chan bool, args ...string) error {
 				if cmd.Process == nil {
 					continue // can happen if receiving signal before the process is actually started
 				}
-				// nolint errcheck
-				cmd.Process.Signal(sig)
+				// In go1.14+, the go runtime issues SIGURG as an interrupt to
+				// support preemptable system calls on Linux. Since we can't
+				// forward that along we'll check that here.
+				if isRuntimeSig(sig) {
+					continue
+				}
+				_ = cmd.Process.Signal(sig)
 			case <-childExit:
 				return
 			}
