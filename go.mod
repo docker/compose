@@ -24,8 +24,8 @@ require (
 	github.com/containerd/containerd v1.5.0
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
 	github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc
-	github.com/docker/cli v20.10.6+incompatible
-	github.com/docker/docker v20.10.5+incompatible
+	github.com/docker/cli v20.10.7+incompatible
+	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/fatih/color v1.9.0 // indirect
