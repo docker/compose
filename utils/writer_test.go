@@ -20,14 +20,12 @@ import (
 	"testing"
 
 	"gotest.tools/v3/assert"
-
-	"github.com/docker/compose-cli/api/compose"
 )
 
 func TestSplitWriter(t *testing.T) {
 	var lines []string
-	w := GetWriter("container", "service", func(event compose.ContainerEvent) {
-		lines = append(lines, event.Line)
+	w := GetWriter(func(line string) {
+		lines = append(lines, line)
 	})
 	w.Write([]byte("h"))        //nolint: errcheck
 	w.Write([]byte("e"))        //nolint: errcheck
