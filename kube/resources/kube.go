@@ -94,8 +94,8 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 		}
 		ports = append(ports,
 			core.ServicePort{
-				Name:       fmt.Sprintf("%d-%s", p.Target, strings.ToLower(p.Protocol)),
-				Port:       int32(p.Target),
+				Name:       fmt.Sprintf("%d-%s", p.Published, strings.ToLower(p.Protocol)),
+				Port:       int32(p.Published),
 				TargetPort: intstr.FromInt(int(p.Target)),
 				Protocol:   toProtocol(p.Protocol),
 			})

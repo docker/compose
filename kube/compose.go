@@ -74,7 +74,7 @@ func NewComposeService() (compose.Service, error) {
 func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
 	w := progress.ContextWriter(ctx)
 
-	eventName := "Convert to Helm charts"
+	eventName := "Convert Compose file to Helm charts"
 	w.Event(progress.CreatingEvent(eventName))
 
 	chart, err := helm.GetChartInMemory(project)
@@ -83,16 +83,31 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	}
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
-	eventName = "Install Helm charts"
-	w.Event(progress.CreatingEvent(eventName))
+	stack, err := s.sdk.Get(project.Name)
+	if err != nil || stack == nil {
+		// install stack
+		eventName = "Install Compose stack"
+		w.Event(progress.CreatingEvent(eventName))
 
-	err = s.sdk.InstallChart(project.Name, chart, func(format string, v ...interface{}) {
-		message := fmt.Sprintf(format, v...)
-		w.Event(progress.NewEvent(eventName, progress.Done, message))
-	})
+		err = s.sdk.InstallChart(project.Name, chart, func(format string, v ...interface{}) {
+			message := fmt.Sprintf(format, v...)
+			w.Event(progress.NewEvent(eventName, progress.Done, message))
+		})
+
+	} else {
+		//update stack
+		eventName = "Updating Compose stack"
+		w.Event(progress.CreatingEvent(eventName))
+
+		err = s.sdk.UpdateChart(project.Name, chart, func(format string, v ...interface{}) {
+			message := fmt.Sprintf(format, v...)
+			w.Event(progress.NewEvent(eventName, progress.Done, message))
+		})
+	}
 	if err != nil {
 		return err
 	}
+
 	w.Event(progress.NewEvent(eventName, progress.Done, ""))
 
 	return s.client.WaitForPodState(ctx, client.WaitForStatusOptions{
@@ -266,7 +281,7 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 
 // Exec executes a command in a running service container
 func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
-	return 0, errdefs.ErrNotImplemented
+	return 0, s.client.Exec(ctx, project.Name, opts)
 }
 
 func (s *composeService) Pause(ctx context.Context, project string, options compose.PauseOptions) error {

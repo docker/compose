@@ -28,11 +28,27 @@ import (
 )
 
 func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
+	state := compose.RUNNING
+
+	if pod.DeletionTimestamp != nil {
+		state = compose.REMOVING
+	} else {
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.State.Waiting != nil || container.State.Terminated != nil {
+				state = compose.UPDATING
+				break
+			}
+		}
+		if state == compose.RUNNING && pod.Status.Phase != corev1.PodRunning {
+			state = string(pod.Status.Phase)
+		}
+	}
+
 	return compose.ContainerSummary{
 		ID:      pod.GetObjectMeta().GetName(),
 		Name:    pod.GetObjectMeta().GetName(),
 		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceTag],
-		State:   string(pod.Status.Phase),
+		State:   state,
 		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectTag],
 	}
 }
@@ -46,6 +62,13 @@ func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, 
 		if len(services) > 0 && !utils.StringContains(services, service) {
 			continue
 		}
+		containersRunning := true
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.State.Running == nil {
+				containersRunning = false
+				break
+			}
+		}
 		servicePods[service] = pod.Status.Message
 
 		if status == compose.REMOVING {
@@ -54,7 +77,7 @@ func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, 
 		if pod.Status.Phase == corev1.PodFailed {
 			return false, servicePods, fmt.Errorf(pod.Status.Reason)
 		}
-		if status == compose.RUNNING && pod.Status.Phase != corev1.PodRunning {
+		if status == compose.RUNNING && (pod.Status.Phase != corev1.PodRunning || !containersRunning) {
 			stateReached = false
 		}
 	}
@@ -74,4 +97,13 @@ type WaitForStatusOptions struct {
 	Status      string
 	Timeout     *time.Duration
 	Log         LogFunc
+}
+
+// Ports holds published ports data
+type Ports []compose.PortPublisher
+
+// PortMappingOptions holds the port mapping for project services
+type PortMappingOptions struct {
+	ProjectName string
+	Services    map[string]Ports
 }
