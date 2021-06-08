@@ -128,7 +128,7 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "labels", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-tty allocation. By default docker compose run allocates a TTY")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")

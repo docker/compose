@@ -1,6 +1,9 @@
 command: docker compose ps
 short: List containers
-long: Lists containers for a Compose project.
+long: "Lists containers for a Compose project, with current status and exposed ports.\n\n```\n$
+    docker compose ps\nNAME                SERVICE             STATUS              PORTS\nexample_foo_1
+    \      foo                 running (healthy)   0.0.0.0:8000->80/tcp\nexample_bar_1
+    \      bar                 exited (1)          \n```"
 usage: docker compose ps
 pname: docker compose
 plink: docker_compose.yaml

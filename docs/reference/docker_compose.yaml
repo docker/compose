@@ -57,6 +57,7 @@ plink: docker.yaml
 cname:
   - docker compose build
   - docker compose convert
+  - docker compose cp
   - docker compose create
   - docker compose down
   - docker compose events
@@ -81,6 +82,7 @@ cname:
 clink:
   - docker_compose_build.yaml
   - docker_compose_convert.yaml
+  - docker_compose_cp.yaml
   - docker_compose_create.yaml
   - docker_compose_down.yaml
   - docker_compose_events.yaml
