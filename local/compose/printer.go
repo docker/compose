@@ -19,19 +19,21 @@ package compose
 import (
 	"fmt"
 
+	"github.com/docker/compose-cli/api/compose"
+
 	"github.com/sirupsen/logrus"
 )
 
-// LogPrinter watch application containers an collect their logs
-type LogPrinter interface {
-	HandleEvent(event ContainerEvent)
+// logPrinter watch application containers an collect their logs
+type logPrinter interface {
+	HandleEvent(event compose.ContainerEvent)
 	Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
 	Cancel()
 }
 
-// NewLogPrinter builds a LogPrinter passing containers logs to LogConsumer
-func NewLogPrinter(consumer LogConsumer) LogPrinter {
-	queue := make(chan ContainerEvent)
+// newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
+func newLogPrinter(consumer compose.LogConsumer) logPrinter {
+	queue := make(chan compose.ContainerEvent)
 	printer := printer{
 		consumer: consumer,
 		queue:    queue,
@@ -40,17 +42,17 @@ func NewLogPrinter(consumer LogConsumer) LogPrinter {
 }
 
 func (p *printer) Cancel() {
-	p.queue <- ContainerEvent{
-		Type: UserCancel,
+	p.queue <- compose.ContainerEvent{
+		Type: compose.UserCancel,
 	}
 }
 
 type printer struct {
-	queue    chan ContainerEvent
-	consumer LogConsumer
+	queue    chan compose.ContainerEvent
+	consumer compose.LogConsumer
 }
 
-func (p *printer) HandleEvent(event ContainerEvent) {
+func (p *printer) HandleEvent(event compose.ContainerEvent) {
 	p.queue <- event
 }
 
@@ -64,15 +66,15 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 		event := <-p.queue
 		container := event.Container
 		switch event.Type {
-		case UserCancel:
+		case compose.UserCancel:
 			aborting = true
-		case ContainerEventAttach:
+		case compose.ContainerEventAttach:
 			if _, ok := containers[container]; ok {
 				continue
 			}
 			containers[container] = struct{}{}
 			p.consumer.Register(container)
-		case ContainerEventExit:
+		case compose.ContainerEventExit:
 			if !event.Restarting {
 				delete(containers, container)
 			}
@@ -100,7 +102,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				// Last container terminated, done
 				return exitCode, nil
 			}
-		case ContainerEventLog:
+		case compose.ContainerEventLog:
 			if !aborting {
 				p.consumer.Log(container, event.Service, event.Line)
 			}
