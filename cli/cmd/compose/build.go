@@ -64,7 +64,7 @@ func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
-	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "tty")`)
+	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "noTty")`)
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck

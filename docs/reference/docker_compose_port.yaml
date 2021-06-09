@@ -1,6 +1,6 @@
 command: docker compose port
 short: Print the public port for a port binding.
-long: Print the public port for a port binding.
+long: Prints the public port for a port binding.
 usage: docker compose port [options] [--] SERVICE PRIVATE_PORT
 pname: docker compose
 plink: docker_compose.yaml

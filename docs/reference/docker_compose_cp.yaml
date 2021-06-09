@@ -1,0 +1,54 @@
+command: docker compose cp
+short: Copy files/folders between a service container and the local filesystem
+long: Copy files/folders between a service container and the local filesystem
+usage: |-
+    docker compose cp [OPTIONS] SERVICE:SRC_PATH DEST_PATH|-
+    	docker compose cp [OPTIONS] SRC_PATH|- SERVICE:DEST_PATH
+pname: docker compose
+plink: docker_compose.yaml
+options:
+  - option: all
+    value_type: bool
+    default_value: "false"
+    description: Copy to all the containers of the service.
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: archive
+    shorthand: a
+    value_type: bool
+    default_value: "false"
+    description: Archive mode (copy all uid/gid information)
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: follow-link
+    shorthand: L
+    value_type: bool
+    default_value: "false"
+    description: Always follow symbol link in SRC_PATH
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+  - option: index
+    value_type: int
+    default_value: "1"
+    description: |
+        Index of the container if there are multiple instances of a service [default: 1].
+    deprecated: false
+    experimental: false
+    experimentalcli: false
+    kubernetes: false
+    swarm: false
+deprecated: false
+experimental: false
+experimentalcli: false
+kubernetes: false
+swarm: false
+

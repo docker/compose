@@ -36,7 +36,7 @@ type execOpts struct {
 	environment []string
 	workingDir  string
 
-	tty        bool
+	noTty      bool
 	user       string
 	detach     bool
 	index      int
@@ -68,7 +68,7 @@ func execCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	runCmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if there are multiple instances of a service [default: 1].")
 	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process.")
 	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user.")
-	runCmd.Flags().BoolVarP(&opts.tty, "", "T", false, "Disable pseudo-tty allocation. By default `docker compose exec` allocates a TTY.")
+	runCmd.Flags().BoolVarP(&opts.noTty, "", "T", false, "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
 
 	runCmd.Flags().SetInterspersed(false)
@@ -85,7 +85,7 @@ func runExec(ctx context.Context, backend compose.Service, opts execOpts) error 
 		Service:     opts.service,
 		Command:     opts.command,
 		Environment: opts.environment,
-		Tty:         !opts.tty,
+		Tty:         !opts.noTty,
 		User:        opts.user,
 		Privileged:  opts.privileged,
 		Index:       opts.index,

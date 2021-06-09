@@ -1,6 +1,31 @@
 command: docker compose run
 short: Run a one-off command on a service.
-long: Run a one-off command on a service.
+long: "Runs a one-time command against a service. \n\nthe following command starts
+    the `web` service and runs `bash` as its command.\n`docker compose run web bash`\n\nCommands
+    you use with run start in new containers with configuration defined by that of
+    the service,\nincluding volumes, links, and other details. However, there are
+    two important differences:\n\nFirst, the command passed by `run` overrides the
+    command defined in the service configuration. For example, if the \n`web` service
+    configuration is started with `bash`, then `docker compose run web python app.py`
+    overrides it with \n`python app.py`.\n\nThe second difference is that the `docker
+    compose run` command does not create any of the ports specified in the \nservice
+    configuration. This prevents port collisions with already-open ports. If you do
+    want the service’s ports \nto be created and mapped to the host, specify the `--service-ports`\n\n```\ndocker
+    compose run --service-ports web python manage.py shell\n```\n\nAlternatively,
+    manual port mapping can be specified with the `--publish` or `-p` options, just
+    as when using docker run:\n\n```\ndocker compose run --publish 8080:80 -p 2022:22
+    -p 127.0.0.1:2021:21 web python manage.py shell\n```\n\n\nIf you start a service
+    configured with links, the run command first checks to see if the linked service
+    is running \nand starts the service if it is stopped. Once all the linked services
+    are running, the run executes the command you \npassed it. For example, you could
+    run:\n\n```\ndocker compose run db psql -h db -U docker\n```\n\nThis opens an
+    interactive PostgreSQL shell for the linked `db` container.\n\nIf you do not want
+    the run command to start linked containers, use the `--no-deps` flag:\n\n```\ndocker
+    compose run --no-deps web python manage.py shell\n```\n\nIf you want to remove
+    the container after running while overriding the container’s restart policy, use
+    the `--rm` flag:\n\n```\ndocker compose run --rm web python manage.py db upgrade\n```\n\nThis
+    runs a database upgrade script, and removes the container when finished running,
+    even if a restart policy is \nspecified in the service configuration."
 usage: docker compose run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l
     KEY=VALUE...] SERVICE [COMMAND] [ARGS...]
 pname: docker compose
@@ -57,7 +82,7 @@ options:
     value_type: bool
     default_value: "false"
     description: |
-        Disable pseudo-tty allocation. By default docker compose run allocates a TTY
+        Disable pseudo-noTty allocation. By default docker compose run allocates a TTY
     deprecated: false
     experimental: false
     experimentalcli: false
