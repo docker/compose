@@ -32,6 +32,9 @@ jobs:
       - name: Build
         run: make -f builder.Makefile cross
 
+      - name: License
+        run: cp packaging/* bin/
+
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "bin/*"
