@@ -34,7 +34,7 @@ func (s *composeService) Start(ctx context.Context, project *types.Project, opti
 	})
 }
 
-func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions, listener func(event compose.ContainerEvent)) error {
+func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions, listener compose.ContainerEventListener) error {
 	if len(options.AttachTo) == 0 {
 		options.AttachTo = project.ServiceNames()
 	}
@@ -47,7 +47,9 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(project, options.AttachTo, listener, attached)
+			return s.watchContainers(project, options.AttachTo, listener, attached, func(container moby.Container) error {
+				return s.attachContainer(ctx, container, listener, project)
+			})
 		})
 	}
 
@@ -60,8 +62,10 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 	return eg.Wait()
 }
 
+type containerWatchFn func(container moby.Container) error
+
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
-func (s *composeService) watchContainers(project *types.Project, services []string, listener compose.ContainerEventListener, containers Containers) error {
+func (s *composeService) watchContainers(project *types.Project, services []string, listener compose.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
 	watched := map[string]int{}
 	for _, c := range containers {
 		watched[c.ID] = 0
@@ -118,7 +122,7 @@ func (s *composeService) watchContainers(project *types.Project, services []stri
 				}
 				if mustAttach {
 					// Container restarted, need to re-attach
-					err := s.attachContainer(ctx, container, listener, project)
+					err := onStart(container)
 					if err != nil {
 						return err
 					}

@@ -47,7 +47,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 
-	printer := compose.NewLogPrinter(options.Start.Attach)
+	printer := newLogPrinter(options.Start.Attach)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
