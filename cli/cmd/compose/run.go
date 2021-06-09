@@ -120,7 +120,11 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runRun(ctx, backend, opts)
+			project, err := p.toProject([]string{opts.Service})
+			if err != nil {
+				return err
+			}
+			return runRun(ctx, backend, project, opts)
 		}),
 	}
 	flags := cmd.Flags()
@@ -143,13 +147,8 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runRun(ctx context.Context, backend compose.Service, opts runOptions) error {
-	project, err := setup(*opts.composeOptions, []string{opts.Service})
-	if err != nil {
-		return err
-	}
-
-	err = opts.apply(project)
+func runRun(ctx context.Context, backend compose.Service, project *types.Project, opts runOptions) error {
+	err := opts.apply(project)
 	if err != nil {
 		return err
 	}

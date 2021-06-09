@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -43,10 +42,6 @@ func NewComposeService(apiClient client.APIClient, configFile *configfile.Config
 type composeService struct {
 	apiClient  client.APIClient
 	configFile *configfile.ConfigFile
-}
-
-func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
-	return errdefs.ErrNotImplemented
 }
 
 func getCanonicalContainerName(c moby.Container) string {

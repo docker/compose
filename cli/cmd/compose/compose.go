@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -90,14 +91,43 @@ type projectOptions struct {
 // ProjectFunc does stuff within a types.Project
 type ProjectFunc func(ctx context.Context, project *types.Project) error
 
+// ProjectServicesFunc does stuff within a types.Project and a selection of services
+type ProjectServicesFunc func(ctx context.Context, project *types.Project, services []string) error
+
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
-func (o *projectOptions) WithServices(services []string, fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
-	return Adapt(func(ctx context.Context, strings []string) error {
-		project, err := o.toProject(services)
+func (o *projectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
+	return o.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
+		return fn(ctx, project)
+	})
+}
+
+// WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
+func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
+	return Adapt(func(ctx context.Context, args []string) error {
+		project, err := o.toProject(args)
 		if err != nil {
 			return err
 		}
-		return fn(ctx, project)
+
+		if o.EnvFile != "" {
+			var services types.Services
+			for _, s := range project.Services {
+				ef := o.EnvFile
+				if ef != "" {
+					if !filepath.IsAbs(ef) {
+						ef = filepath.Join(project.WorkingDir, o.EnvFile)
+					}
+					if s.Labels == nil {
+						s.Labels = make(map[string]string)
+					}
+					s.Labels[compose.EnvironmentFileLabel] = ef
+					services = append(services, s)
+				}
+			}
+			project.Services = services
+		}
+
+		return fn(ctx, project, args)
 	})
 }
 
@@ -217,7 +247,7 @@ func RootCommand(contextType string, backend compose.Service) *cobra.Command {
 	}
 
 	command.AddCommand(
-		upCommand(&opts, contextType, backend),
+		upCommand(&opts, backend),
 		downCommand(&opts, backend),
 		startCommand(&opts, backend),
 		restartCommand(&opts, backend),

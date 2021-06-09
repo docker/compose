@@ -20,40 +20,25 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/cli/cli"
-	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/utils"
+	"github.com/spf13/cobra"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project
 type composeOptions struct {
 	*projectOptions
-	Build   bool
-	noBuild bool
 }
 
 type upOptions struct {
 	*composeOptions
 	Detach             bool
 	Environment        []string
-	removeOrphans      bool
-	forceRecreate      bool
-	noRecreate         bool
-	recreateDeps       bool
 	noStart            bool
 	noDeps             bool
 	cascadeStop        bool
@@ -61,39 +46,7 @@ type upOptions struct {
 	scale              []string
 	noColor            bool
 	noPrefix           bool
-	timeChanged        bool
-	timeout            int
-	noInherit          bool
 	attachDependencies bool
-	quietPull          bool
-}
-
-func (opts upOptions) recreateStrategy() string {
-	if opts.noRecreate {
-		return compose.RecreateNever
-	}
-	if opts.forceRecreate {
-		return compose.RecreateForce
-	}
-	return compose.RecreateDiverged
-}
-
-func (opts upOptions) dependenciesRecreateStrategy() string {
-	if opts.noRecreate {
-		return compose.RecreateNever
-	}
-	if opts.recreateDeps {
-		return compose.RecreateForce
-	}
-	return compose.RecreateDiverged
-}
-
-func (opts upOptions) GetTimeout() *time.Duration {
-	if opts.timeChanged {
-		t := time.Duration(opts.timeout) * time.Second
-		return &t
-	}
-	return nil
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
@@ -136,192 +89,105 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
-	opts := upOptions{
-		composeOptions: &composeOptions{
-			projectOptions: p,
-		},
-	}
+func upCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+	up := upOptions{}
+	create := createOptions{}
 	upCmd := &cobra.Command{
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
 		PreRun: func(cmd *cobra.Command, args []string) {
-			opts.timeChanged = cmd.Flags().Changed("timeout")
+			create.timeChanged = cmd.Flags().Changed("timeout")
 		},
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
-			if opts.exitCodeFrom != "" {
-				opts.cascadeStop = true
+			if up.exitCodeFrom != "" {
+				up.cascadeStop = true
 			}
-			if opts.Build && opts.noBuild {
+			if create.Build && create.noBuild {
 				return fmt.Errorf("--build and --no-build are incompatible")
 			}
-			if opts.Detach && (opts.attachDependencies || opts.cascadeStop) {
+			if up.Detach && (up.attachDependencies || up.cascadeStop) {
 				return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit or --attach-dependencies")
 			}
-			if opts.forceRecreate && opts.noRecreate {
+			if create.forceRecreate && create.noRecreate {
 				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
 			}
-			if opts.recreateDeps && opts.noRecreate {
+			if create.recreateDeps && create.noRecreate {
 				return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
 			}
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
-			switch contextType {
-			case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
-				return runCreateStart(ctx, backend, opts, args)
-			default:
-				return runUp(ctx, backend, opts, args)
-			}
+		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
+			return runUp(ctx, backend, create, up, project, services)
 		}),
 	}
 	flags := upCmd.Flags()
-	flags.StringArrayVarP(&opts.Environment, "environment", "e", []string{}, "Environment variables")
-	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
-	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
-	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
-	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
-	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
-	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
-	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
-
-	switch contextType {
-	case store.LocalContextType, store.DefaultContextType, store.EcsLocalSimulationContextType:
-		flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
-		flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
-		flags.BoolVar(&opts.noStart, "no-start", false, "Don't start the services after creating them.")
-		flags.BoolVar(&opts.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
-		flags.StringVar(&opts.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
-		flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
-		flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
-		flags.BoolVar(&opts.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
-		flags.BoolVarP(&opts.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
-		flags.BoolVar(&opts.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
-		flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
-	}
+	flags.StringArrayVarP(&up.Environment, "environment", "e", []string{}, "Environment variables")
+	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
+	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
+	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
+	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
+	flags.StringArrayVar(&up.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
+	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
+	flags.BoolVar(&up.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
+	flags.BoolVar(&create.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
+	flags.BoolVar(&create.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
+	flags.BoolVar(&up.noStart, "no-start", false, "Don't start the services after creating them.")
+	flags.BoolVar(&up.cascadeStop, "abort-on-container-exit", false, "Stops all containers if any container was stopped. Incompatible with -d")
+	flags.StringVar(&up.exitCodeFrom, "exit-code-from", "", "Return the exit code of the selected service container. Implies --abort-on-container-exit")
+	flags.IntVarP(&create.timeout, "timeout", "t", 10, "Use this timeout in seconds for container shutdown when attached or when containers are already running.")
+	flags.BoolVar(&up.noDeps, "no-deps", false, "Don't start linked services.")
+	flags.BoolVar(&create.recreateDeps, "always-recreate-deps", false, "Recreate dependent containers. Incompatible with --no-recreate.")
+	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
+	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
+	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 
 	return upCmd
 }
 
-func runUp(ctx context.Context, backend compose.Service, opts upOptions, services []string) error {
-	project, err := setup(*opts.composeOptions, services)
-	if err != nil {
-		return err
-	}
-
-	err = opts.apply(project, services)
-	if err != nil {
-		return err
-	}
-
-	return progress.Run(ctx, func(ctx context.Context) error {
-		return backend.Up(ctx, project, compose.UpOptions{
-			Detach:    opts.Detach,
-			QuietPull: opts.quietPull,
-		})
-	})
-}
-
-func runCreateStart(ctx context.Context, backend compose.Service, opts upOptions, services []string) error {
-	project, err := setup(*opts.composeOptions, services)
-	if err != nil {
-		return err
-	}
-
-	err = opts.apply(project, services)
-	if err != nil {
-		return err
-	}
-
+func runUp(ctx context.Context, backend compose.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
 
-	err = progress.Run(ctx, func(ctx context.Context) error {
-		err := backend.Create(ctx, project, compose.CreateOptions{
-			Services:             services,
-			RemoveOrphans:        opts.removeOrphans,
-			Recreate:             opts.recreateStrategy(),
-			RecreateDependencies: opts.dependenciesRecreateStrategy(),
-			Inherit:              !opts.noInherit,
-			Timeout:              opts.GetTimeout(),
-			QuietPull:            opts.quietPull,
-		})
-		if err != nil {
-			return err
-		}
-		if opts.Detach {
-			err = backend.Start(ctx, project, compose.StartOptions{
-				Services: services,
-			})
-		}
-		return err
-	})
+	createOptions.Apply(project)
+
+	err := upOptions.apply(project, services)
 	if err != nil {
 		return err
 	}
 
-	if opts.noStart {
-		return nil
+	var consumer compose.LogConsumer
+	if !upOptions.Detach {
+		consumer = formatter.NewLogConsumer(ctx, os.Stdout, !upOptions.noColor, !upOptions.noPrefix)
 	}
 
-	if opts.attachDependencies {
-		services = nil
+	attachTo := services
+	if upOptions.attachDependencies {
+		attachTo = project.ServiceNames()
 	}
 
-	if opts.Detach {
-		return nil
+	create := compose.CreateOptions{
+		RemoveOrphans:        createOptions.removeOrphans,
+		Recreate:             createOptions.recreateStrategy(),
+		RecreateDependencies: createOptions.dependenciesRecreateStrategy(),
+		Inherit:              !createOptions.noInherit,
+		Timeout:              createOptions.GetTimeout(),
+		QuietPull:            createOptions.quietPull,
 	}
 
-	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
-	printer := compose.NewLogPrinter(consumer)
-
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	stopFunc := func() error {
-		ctx := context.Background()
-		return progress.Run(ctx, func(ctx context.Context) error {
-			go func() {
-				<-signalChan
-				backend.Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
-			}()
-
-			return backend.Stop(ctx, project, compose.StopOptions{})
-		})
+	if upOptions.noStart {
+		return backend.Create(ctx, project, create)
 	}
-	go func() {
-		<-signalChan
-		printer.Cancel()
-		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
-		stopFunc() // nolint:errcheck
-	}()
 
-	var exitCode int
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		code, err := printer.Run(opts.cascadeStop, opts.exitCodeFrom, stopFunc)
-		exitCode = code
-		return err
+	return backend.Up(ctx, project, compose.UpOptions{
+		Create: create,
+		Start: compose.StartOptions{
+			Attach:       consumer,
+			AttachTo:     attachTo,
+			ExitCodeFrom: upOptions.exitCodeFrom,
+			CascadeStop:  upOptions.cascadeStop,
+		},
 	})
-
-	err = backend.Start(ctx, project, compose.StartOptions{
-		Attach:   printer.HandleEvent,
-		Services: services,
-	})
-	if err != nil {
-		return err
-	}
-
-	err = eg.Wait()
-	if exitCode != 0 {
-		errMsg := ""
-		if err != nil {
-			errMsg = err.Error()
-		}
-		return cli.StatusError{StatusCode: exitCode, Status: errMsg}
-	}
-	return err
 }
 
 func setServiceScale(project *types.Project, name string, replicas int) error {
@@ -337,44 +203,4 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 		}
 	}
 	return fmt.Errorf("unknown service %q", name)
-}
-
-func setup(opts composeOptions, services []string) (*types.Project, error) {
-	project, err := opts.toProject(services)
-	if err != nil {
-		return nil, err
-	}
-
-	if opts.Build {
-		for i, service := range project.Services {
-			service.PullPolicy = types.PullPolicyBuild
-			project.Services[i] = service
-		}
-	}
-	if opts.noBuild {
-		for i, service := range project.Services {
-			service.Build = nil
-			project.Services[i] = service
-		}
-	}
-
-	if opts.EnvFile != "" {
-		var services types.Services
-		for _, s := range project.Services {
-			ef := opts.EnvFile
-			if ef != "" {
-				if !filepath.IsAbs(ef) {
-					ef = filepath.Join(project.WorkingDir, opts.EnvFile)
-				}
-				if s.Labels == nil {
-					s.Labels = make(map[string]string)
-				}
-				s.Labels[compose.EnvironmentFileLabel] = ef
-				services = append(services, s)
-			}
-		}
-		project.Services = services
-	}
-
-	return project, nil
 }

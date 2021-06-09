@@ -43,9 +43,15 @@ import (
 	"github.com/docker/compose-cli/utils"
 )
 
-func (s *composeService) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
-	if len(opts.Services) == 0 {
-		opts.Services = project.ServiceNames()
+func (s *composeService) Create(ctx context.Context, project *types.Project, options compose.CreateOptions) error {
+	return progress.Run(ctx, func(ctx context.Context) error {
+		return s.create(ctx, project, options)
+	})
+}
+
+func (s *composeService) create(ctx context.Context, project *types.Project, options compose.CreateOptions) error {
+	if len(options.Services) == 0 {
+		options.Services = project.ServiceNames()
 	}
 
 	var observedState Containers
@@ -56,7 +62,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	containerState := NewContainersState(observedState)
 	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
 
-	err = s.ensureImagesExists(ctx, project, observedState, opts.QuietPull)
+	err = s.ensureImagesExists(ctx, project, observedState, options.QuietPull)
 	if err != nil {
 		return err
 	}
@@ -83,7 +89,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	}
 	orphans := observedState.filter(isNotService(allServiceNames...))
 	if len(orphans) > 0 {
-		if opts.RemoveOrphans {
+		if options.RemoveOrphans {
 			w := progress.ContextWriter(ctx)
 			err := s.removeContainers(ctx, w, orphans, nil)
 			if err != nil {
@@ -100,10 +106,10 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 	prepareServicesDependsOn(project)
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		if utils.StringContains(opts.Services, service.Name) {
-			return s.ensureService(c, project, service, opts.Recreate, opts.Inherit, opts.Timeout)
+		if utils.StringContains(options.Services, service.Name) {
+			return s.ensureService(c, project, service, options.Recreate, options.Inherit, options.Timeout)
 		}
-		return s.ensureService(c, project, service, opts.RecreateDependencies, opts.Inherit, opts.Timeout)
+		return s.ensureService(c, project, service, options.RecreateDependencies, options.Inherit, options.Timeout)
 	})
 }
 
