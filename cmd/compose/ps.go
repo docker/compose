@@ -76,6 +76,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, backend, args, opts)
 		}),
+		ValidArgsFunction: psCompletion(p),
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
@@ -183,4 +184,14 @@ func filterByStatus(containers []api.ContainerSummary, status string) []api.Cont
 		}
 	}
 	return filtered
+}
+
+func psCompletion(p *projectOptions) ValidArgsFn {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		project, err := p.toProject(nil)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return project.ServiceNames(), cobra.ShellCompDirectiveNoFileComp
+	}
 }

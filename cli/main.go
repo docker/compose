@@ -68,6 +68,9 @@ var (
 		"serve":            {},
 		"version":          {},
 		"backend-metadata": {},
+		// Special hidden commands used by cobra for completion
+		"__complete":       {},
+		"__completeNoDesc": {},
 	}
 	unknownCommandRegexp = regexp.MustCompile(`unknown docker command: "([^"]*)"`)
 )
@@ -167,7 +170,7 @@ func main() {
 	})
 
 	// populate the opts with the global flags
-	flags.Parse(os.Args[1:]) //nolint: errcheck
+	flags.Parse(os.Args[1:]) // nolint: errcheck
 
 	level, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
@@ -223,17 +226,15 @@ func main() {
 		volume.Command(ctype),
 	)
 
-	if ctype != store.DefaultContextType {
-		// On default context, "compose" is implemented by CLI Plugin
-		proxy := api.NewServiceProxy().WithService(service.ComposeService())
-		command := compose2.RootCommand(ctype, proxy)
+	// On default context, "compose" is implemented by CLI Plugin
+	proxy := api.NewServiceProxy().WithService(service.ComposeService())
+	command := compose2.RootCommand(ctype, proxy)
 
-		if ctype == store.AciContextType {
-			customizeCliForACI(command, proxy)
-		}
-
-		root.AddCommand(command)
+	if ctype == store.AciContextType {
+		customizeCliForACI(command, proxy)
 	}
+
+	root.AddCommand(command)
 
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)

@@ -44,6 +44,9 @@ import (
 // Command defines a compose CLI command as a func with args
 type Command func(context.Context, []string) error
 
+// ValidArgsFn defines a completion func to be returned to fetch completion options
+type ValidArgsFn func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
+
 // Adapt a Command func to cobra library
 func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
