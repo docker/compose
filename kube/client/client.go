@@ -211,8 +211,8 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 	for _, pod := range pods.Items {
 		request := kc.client.CoreV1().Pods(kc.namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow})
 		service := pod.Labels[compose.ServiceTag]
-		w := utils.GetWriter(pod.Name, service, func(event compose.ContainerEvent) {
-			consumer.Log(event.Container, event.Service, event.Line)
+		w := utils.GetWriter(func(line string) {
+			consumer.Log(pod.Name, service, line)
 		})
 
 		eg.Go(func() error {

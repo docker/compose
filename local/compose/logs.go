@@ -57,8 +57,8 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			defer r.Close() // nolint errcheck
 
 			name := getContainerNameWithoutProject(c)
-			w := utils.GetWriter(name, service, func(event compose.ContainerEvent) {
-				consumer.Log(name, service, event.Line)
+			w := utils.GetWriter(func(line string) {
+				consumer.Log(name, service, line)
 			})
 			if container.Config.Tty {
 				_, err = io.Copy(w, r)

@@ -17,9 +17,6 @@
 package utils
 
 import (
-	"bytes"
-	"io"
-
 	"github.com/docker/compose-cli/api/compose"
 )
 
@@ -59,58 +56,4 @@ func (a *allowListLogConsumer) Register(name string) {
 	if a.allowList[name] {
 		a.delegate.Register(name)
 	}
-}
-
-// GetWriter creates a io.Writer that will actually split by line and format by LogConsumer
-func GetWriter(container, service string, events compose.ContainerEventListener) io.WriteCloser {
-	return &splitBuffer{
-		buffer:    bytes.Buffer{},
-		service:   service,
-		container: container,
-		consumer:  events,
-	}
-}
-
-type splitBuffer struct {
-	buffer    bytes.Buffer
-	service   string
-	container string
-	consumer  compose.ContainerEventListener
-}
-
-// Write implements io.Writer. joins all input, splits on the separator and yields each chunk
-func (s *splitBuffer) Write(b []byte) (int, error) {
-	n, err := s.buffer.Write(b)
-	if err != nil {
-		return n, err
-	}
-	for {
-		b = s.buffer.Bytes()
-		index := bytes.Index(b, []byte{'\n'})
-		if index < 0 {
-			break
-		}
-		line := s.buffer.Next(index + 1)
-		s.consumer(compose.ContainerEvent{
-			Type:      compose.ContainerEventLog,
-			Service:   s.service,
-			Container: s.container,
-			Line:      string(line[:len(line)-1]),
-		})
-	}
-	return n, nil
-}
-
-func (s *splitBuffer) Close() error {
-	b := s.buffer.Bytes()
-	if len(b) == 0 {
-		return nil
-	}
-	s.consumer(compose.ContainerEvent{
-		Type:      compose.ContainerEventLog,
-		Service:   s.service,
-		Container: s.container,
-		Line:      string(b),
-	})
-	return nil
 }

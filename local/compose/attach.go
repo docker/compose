@@ -58,8 +58,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener compose.ContainerEventListener, project *types.Project) error {
 	serviceName := container.Labels[serviceLabel]
-	w := utils.GetWriter(getContainerNameWithoutProject(container), serviceName, listener)
-
+	containerName := getContainerNameWithoutProject(container)
 	service, err := project.GetService(serviceName)
 	if err != nil {
 		return err
@@ -67,10 +66,18 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 
 	listener(compose.ContainerEvent{
 		Type:      compose.ContainerEventAttach,
-		Container: getContainerNameWithoutProject(container),
-		Service:   container.Labels[serviceLabel],
+		Container: containerName,
+		Service:   serviceName,
 	})
 
+	w := utils.GetWriter(func(line string) {
+		listener(compose.ContainerEvent{
+			Type:      compose.ContainerEventLog,
+			Container: containerName,
+			Service:   serviceName,
+			Line:      line,
+		})
+	})
 	_, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
 	return err
 }
