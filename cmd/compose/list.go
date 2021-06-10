@@ -46,6 +46,7 @@ func listCommand(contextType string, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runList(ctx, backend, opts)
 		}),
+		ValidArgsFunction: noCompletion(),
 	}
 	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")

@@ -33,6 +33,7 @@ func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
 			return backend.Kill(ctx, project, opts)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 
 	flags := cmd.Flags()

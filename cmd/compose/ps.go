@@ -67,8 +67,8 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := psOptions{
 		projectOptions: p,
 	}
-	cmd := &cobra.Command{
-		Use:   "ps [options] [SERVICE...]",
+	psCmd := &cobra.Command{
+		Use:   "ps [SERVICE...]",
 		Short: "List containers",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return opts.parseFilter()
@@ -76,9 +76,9 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, backend, args, opts)
 		}),
-		ValidArgsFunction: psCompletion(p),
+		ValidArgsFunction: serviceCompletion(p),
 	}
-	flags := cmd.Flags()
+	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property")
 	flags.StringVar(&opts.Status, "status", "", "Filter services by status")
@@ -86,7 +86,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
 	flags.Lookup("filter").Hidden = true
-	return cmd
+	return psCmd
 }
 
 func runPs(ctx context.Context, backend api.Service, services []string, opts psOptions) error {
@@ -186,7 +186,7 @@ func filterByStatus(containers []api.ContainerSummary, status string) []api.Cont
 	return filtered
 }
 
-func psCompletion(p *projectOptions) ValidArgsFn {
+func psCompletion(p *projectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		project, err := p.toProject(nil)
 		if err != nil {

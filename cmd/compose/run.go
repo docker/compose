@@ -126,6 +126,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			}
 			return runRun(ctx, backend, project, opts)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")

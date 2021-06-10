@@ -43,6 +43,7 @@ func eventsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runEvents(ctx, backend, opts, args)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 
 	cmd.Flags().BoolVar(&opts.json, "json", false, "Output events as a stream of json objects")

@@ -82,5 +82,25 @@ PowerShell:
 			}
 			return err
 		},
+		Hidden: true,
+	}
+}
+
+// validArgsFn defines a completion func to be returned to fetch completion options
+type validArgsFn func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
+
+func noCompletion() validArgsFn {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func serviceCompletion(p *projectOptions) validArgsFn {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		project, err := p.toProject(nil)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return project.ServiceNames(), cobra.ShellCompDirectiveNoFileComp
 	}
 }
