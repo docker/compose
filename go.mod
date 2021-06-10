@@ -47,7 +47,7 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.8.2-0.20210401015549-df49b648c8bf
-	github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf
+	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
