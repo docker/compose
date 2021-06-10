@@ -104,6 +104,9 @@ func (opts createOptions) GetTimeout() *time.Duration {
 func (opts createOptions) Apply(project *types.Project) {
 	if opts.Build {
 		for i, service := range project.Services {
+			if service.Build == nil {
+				continue
+			}
 			service.PullPolicy = types.PullPolicyBuild
 			project.Services[i] = service
 		}
