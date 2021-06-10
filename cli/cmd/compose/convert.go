@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/cnabio/cnab-to-oci/remotes"
@@ -189,18 +190,23 @@ func runHash(opts convertOptions) error {
 }
 
 func runProfiles(opts convertOptions, services []string) error {
-	profiles := map[string]interface{}{}
-	_, err := opts.toProject(services)
+	set := map[string]struct{}{}
+	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
-	if opts.projectOptions != nil {
-		for _, p := range opts.projectOptions.Profiles {
-			profiles[p] = nil
+	for _, s := range project.AllServices() {
+		for _, p := range s.Profiles {
+			set[p] = struct{}{}
 		}
-		for p := range profiles {
-			fmt.Println(p)
-		}
+	}
+	profiles := make([]string, 0, len(set))
+	for p := range set {
+		profiles = append(profiles, p)
+	}
+	sort.Strings(profiles)
+	for _, p := range profiles {
+		fmt.Println(p)
 	}
 	return nil
 }
