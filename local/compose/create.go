@@ -284,7 +284,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	}
 
 	var networkConfig *network.NetworkingConfig
-	// TODO use network with highest priority, attribute is missing from compose-go
 	for _, id := range service.NetworksByPriority() {
 		net := p.Networks[id]
 		config := service.Networks[id]

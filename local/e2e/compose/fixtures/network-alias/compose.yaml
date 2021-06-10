@@ -6,10 +6,6 @@ services:
   container2:
     image: nginx
     networks:
-      foo:
+      default:
         aliases:
           - alias-of-container2
-
-networks:
-  foo:
-    name: bar
