@@ -453,8 +453,8 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		}
 		resources.Ulimits = append(resources.Ulimits, &units.Ulimit{
 			Name: name,
-			Hard: int64(soft),
-			Soft: int64(hard),
+			Hard: int64(hard),
+			Soft: int64(soft),
 		})
 	}
 	return resources
