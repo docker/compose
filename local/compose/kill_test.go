@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/docker/docker/api/types/filters"
@@ -83,7 +84,9 @@ func testContainer(service string, id string) apitypes.Container {
 }
 
 func containerLabels(service string) map[string]string {
-	return map[string]string{serviceLabel: service, configFilesLabel: "docker-compose.yml", workingDirLabel: "testdata", projectLabel: testProject}
+	workingdir, _ := filepath.Abs("testdata")
+	composefile := filepath.Join(workingdir, "docker-compose.yml")
+	return map[string]string{serviceLabel: service, configFilesLabel: composefile, workingDirLabel: workingdir, projectLabel: testProject}
 }
 
 func anyCancellableContext() gomock.Matcher {
