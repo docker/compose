@@ -24,6 +24,7 @@ import (
 
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/mattn/go-isatty"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 
@@ -132,7 +133,7 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "labels", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", notAtTTY(), "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
@@ -145,6 +146,10 @@ func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 
 	flags.SetInterspersed(false)
 	return cmd
+}
+
+func notAtTTY() bool {
+	return !isatty.IsTerminal(os.Stdout.Fd())
 }
 
 func runRun(ctx context.Context, backend compose.Service, project *types.Project, opts runOptions) error {
