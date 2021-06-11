@@ -26,7 +26,7 @@ import (
 func projectTags(project *types.Project) []tags.Tag {
 	return []tags.Tag{
 		{
-			Key:   compose.ProjectTag,
+			Key:   compose.ProjectLabel,
 			Value: project.Name,
 		},
 	}
@@ -35,11 +35,11 @@ func projectTags(project *types.Project) []tags.Tag {
 func serviceTags(project *types.Project, service types.ServiceConfig) []tags.Tag {
 	return []tags.Tag{
 		{
-			Key:   compose.ProjectTag,
+			Key:   compose.ProjectLabel,
 			Value: project.Name,
 		},
 		{
-			Key:   compose.ServiceTag,
+			Key:   compose.ServiceLabel,
 			Value: service.Name,
 		},
 	}
@@ -48,11 +48,11 @@ func serviceTags(project *types.Project, service types.ServiceConfig) []tags.Tag
 func networkTags(project *types.Project, net types.NetworkConfig) []tags.Tag {
 	return []tags.Tag{
 		{
-			Key:   compose.ProjectTag,
+			Key:   compose.ProjectLabel,
 			Value: project.Name,
 		},
 		{
-			Key:   compose.NetworkTag,
+			Key:   compose.NetworkLabel,
 			Value: net.Name,
 		},
 	}

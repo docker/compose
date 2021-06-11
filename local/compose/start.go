@@ -95,7 +95,7 @@ func (s *composeService) watchContainers(project *types.Project, services []stri
 				listener(compose.ContainerEvent{
 					Type:       compose.ContainerEventExit,
 					Container:  name,
-					Service:    container.Labels[serviceLabel],
+					Service:    container.Labels[compose.ServiceLabel],
 					ExitCode:   inspected.State.ExitCode,
 					Restarting: willRestart,
 				})

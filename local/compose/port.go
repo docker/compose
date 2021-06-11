@@ -31,7 +31,7 @@ func (s *composeService) Port(ctx context.Context, project string, service strin
 		Filters: filters.NewArgs(
 			projectFilter(project),
 			serviceFilter(service),
-			filters.Arg("label", fmt.Sprintf("%s=%d", containerNumberLabel, options.Index)),
+			containerNumberFilter(options.Index),
 		),
 	})
 	if err != nil {

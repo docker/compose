@@ -341,7 +341,7 @@ func (s sdk) CreateStack(ctx context.Context, name string, region string, templa
 			},
 			Tags: []*cloudformation.Tag{
 				{
-					Key:   aws.String(compose.ProjectTag),
+					Key:   aws.String(compose.ProjectLabel),
 					Value: aws.String(name),
 				},
 			},
@@ -455,7 +455,7 @@ func (s sdk) ListStacks(ctx context.Context) ([]compose.Stack, error) {
 		}
 		for _, stack := range response.Stacks {
 			for _, t := range stack.Tags {
-				if *t.Key == compose.ProjectTag {
+				if *t.Key == compose.ProjectLabel {
 					status := compose.RUNNING
 					switch aws.StringValue(stack.StackStatus) {
 					case "CREATE_IN_PROGRESS":
@@ -860,12 +860,12 @@ func (s sdk) DescribeService(ctx context.Context, cluster string, arn string) (c
 	service := services.Services[0]
 	var name string
 	for _, t := range service.Tags {
-		if *t.Key == compose.ServiceTag {
+		if *t.Key == compose.ServiceLabel {
 			name = aws.StringValue(t.Value)
 		}
 	}
 	if name == "" {
-		return compose.ServiceStatus{}, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceTag)
+		return compose.ServiceStatus{}, fmt.Errorf("service %s doesn't have a %s tag", *service.ServiceArn, compose.ServiceLabel)
 	}
 	targetGroupArns := []string{}
 	for _, lb := range service.LoadBalancers {
@@ -919,9 +919,9 @@ func (s sdk) DescribeServiceTasks(ctx context.Context, cluster string, project s
 			var service string
 			for _, tag := range t.Tags {
 				switch aws.StringValue(tag.Key) {
-				case compose.ProjectTag:
+				case compose.ProjectLabel:
 					project = aws.StringValue(tag.Value)
-				case compose.ServiceTag:
+				case compose.ServiceLabel:
 					service = aws.StringValue(tag.Value)
 				}
 			}

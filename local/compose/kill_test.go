@@ -86,7 +86,11 @@ func testContainer(service string, id string) apitypes.Container {
 func containerLabels(service string) map[string]string {
 	workingdir, _ := filepath.Abs("testdata")
 	composefile := filepath.Join(workingdir, "docker-compose.yml")
-	return map[string]string{serviceLabel: service, configFilesLabel: composefile, workingDirLabel: workingdir, projectLabel: testProject}
+	return map[string]string{
+		compose.ServiceLabel:     service,
+		compose.ConfigFilesLabel: composefile,
+		compose.WorkingDirLabel:  workingdir,
+		compose.ProjectLabel:     testProject}
 }
 
 func anyCancellableContext() gomock.Matcher {

@@ -289,8 +289,8 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 
 		logrus.Debugf("searching for existing filesystem as volume %q", name)
 		tags := map[string]string{
-			compose.ProjectTag: project.Name,
-			compose.VolumeTag:  name,
+			compose.ProjectLabel: project.Name,
+			compose.VolumeLabel:  name,
 		}
 		previous, err := b.aws.ListFileSystems(ctx, tags)
 		if err != nil {
@@ -397,11 +397,11 @@ func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, t
 			FileSystemPolicy: nil,
 			FileSystemTags: []efs.FileSystem_ElasticFileSystemTag{
 				{
-					Key:   compose.ProjectTag,
+					Key:   compose.ProjectLabel,
 					Value: project.Name,
 				},
 				{
-					Key:   compose.VolumeTag,
+					Key:   compose.VolumeLabel,
 					Value: name,
 				},
 				{

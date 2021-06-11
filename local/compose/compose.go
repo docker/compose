@@ -56,8 +56,8 @@ func getCanonicalContainerName(c moby.Container) string {
 
 func getContainerNameWithoutProject(c moby.Container) string {
 	name := getCanonicalContainerName(c)
-	project := c.Labels[projectLabel]
-	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[serviceLabel])
+	project := c.Labels[compose.ProjectLabel]
+	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[compose.ServiceLabel])
 	if strings.HasPrefix(name, prefix) {
 		return name[len(project)+1:]
 	}

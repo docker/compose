@@ -57,7 +57,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 }
 
 func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener compose.ContainerEventListener, project *types.Project) error {
-	serviceName := container.Labels[serviceLabel]
+	serviceName := container.Labels[compose.ServiceLabel]
 	containerName := getContainerNameWithoutProject(container)
 	service, err := project.GetService(serviceName)
 	if err != nil {

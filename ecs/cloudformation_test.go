@@ -406,8 +406,8 @@ volumes:
         provisioned_throughput: 1024
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.ListFileSystems(gomock.Any(), map[string]string{
-			compose.ProjectTag: t.Name(),
-			compose.VolumeTag:  "db-data",
+			compose.ProjectLabel: t.Name(),
+			compose.VolumeLabel:  "db-data",
 		}).Return(nil, nil)
 	})
 	n := volumeResourceName("db-data")
@@ -452,8 +452,8 @@ volumes:
   db-data: {}
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.ListFileSystems(gomock.Any(), map[string]string{
-			compose.ProjectTag: t.Name(),
-			compose.VolumeTag:  "db-data",
+			compose.ProjectLabel: t.Name(),
+			compose.VolumeLabel:  "db-data",
 		}).Return([]awsResource{
 			existingAWSResource{
 				id: "fs-123abc",
@@ -521,7 +521,7 @@ services:
 		for i := 0; i < tags.Len(); i++ {
 			k := tags.Index(i).FieldByName("Key").String()
 			v := tags.Index(i).FieldByName("Value").String()
-			if k == compose.ProjectTag {
+			if k == compose.ProjectLabel {
 				assert.Equal(t, v, t.Name())
 			}
 		}

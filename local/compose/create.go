@@ -39,6 +39,7 @@ import (
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/internal"
 	convert "github.com/docker/compose-cli/local/moby"
 	"github.com/docker/compose-cli/utils"
 )
@@ -138,9 +139,9 @@ func prepareVolumes(p *types.Project) error {
 
 func prepareNetworks(project *types.Project) {
 	for k, network := range project.Networks {
-		network.Labels = network.Labels.Add(networkLabel, k)
-		network.Labels = network.Labels.Add(projectLabel, project.Name)
-		network.Labels = network.Labels.Add(versionLabel, ComposeVersion)
+		network.Labels = network.Labels.Add(compose.NetworkLabel, k)
+		network.Labels = network.Labels.Add(compose.ProjectLabel, project.Name)
+		network.Labels = network.Labels.Add(compose.VersionLabel, internal.Version)
 		project.Networks[k] = network
 	}
 }
@@ -181,9 +182,9 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 
 func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
 	for k, volume := range project.Volumes {
-		volume.Labels = volume.Labels.Add(volumeLabel, k)
-		volume.Labels = volume.Labels.Add(projectLabel, project.Name)
-		volume.Labels = volume.Labels.Add(versionLabel, ComposeVersion)
+		volume.Labels = volume.Labels.Add(compose.VolumeLabel, k)
+		volume.Labels = volume.Labels.Add(compose.ProjectLabel, project.Name)
+		volume.Labels = volume.Labels.Add(compose.VersionLabel, internal.Version)
 		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
@@ -213,16 +214,16 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		labels[k] = v
 	}
 
-	labels[projectLabel] = p.Name
-	labels[serviceLabel] = service.Name
-	labels[versionLabel] = ComposeVersion
-	if _, ok := service.Labels[oneoffLabel]; !ok {
-		labels[oneoffLabel] = "False"
+	labels[compose.ProjectLabel] = p.Name
+	labels[compose.ServiceLabel] = service.Name
+	labels[compose.VersionLabel] = internal.Version
+	if _, ok := service.Labels[compose.OneoffLabel]; !ok {
+		labels[compose.OneoffLabel] = "False"
 	}
-	labels[configHashLabel] = hash
-	labels[workingDirLabel] = p.WorkingDir
-	labels[configFilesLabel] = strings.Join(p.ComposeFiles, ",")
-	labels[containerNumberLabel] = strconv.Itoa(number)
+	labels[compose.ConfigHashLabel] = hash
+	labels[compose.WorkingDirLabel] = p.WorkingDir
+	labels[compose.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
+	labels[compose.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var (
 		runCmd     strslice.StrSlice

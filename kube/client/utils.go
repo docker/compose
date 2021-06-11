@@ -47,9 +47,9 @@ func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
 	return compose.ContainerSummary{
 		ID:      pod.GetObjectMeta().GetName(),
 		Name:    pod.GetObjectMeta().GetName(),
-		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceTag],
+		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceLabel],
 		State:   state,
-		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectTag],
+		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectLabel],
 	}
 }
 
@@ -57,7 +57,7 @@ func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, 
 	servicePods := map[string]string{}
 	stateReached := true
 	for _, pod := range pods {
-		service := pod.Labels[compose.ServiceTag]
+		service := pod.Labels[compose.ServiceLabel]
 
 		if len(services) > 0 && !utils.StringContains(services, service) {
 			continue
