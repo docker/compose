@@ -42,7 +42,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if len(options.Services) > 0 {
 		// filter service containers
 		for _, c := range allContainers {
-			if utils.StringContains(options.Services, c.Labels[compose.ServiceTag]) {
+			if utils.StringContains(options.Services, c.Labels[compose.ServiceLabel]) {
 				containers = append(containers, c)
 
 			}

@@ -40,7 +40,7 @@ func (s *composeService) Events(ctx context.Context, project string, options com
 				continue
 			}
 
-			service := event.Actor.Attributes[serviceLabel]
+			service := event.Actor.Attributes[compose.ServiceLabel]
 			if len(options.Services) > 0 && !utils.StringContains(options.Services, service) {
 				continue
 			}

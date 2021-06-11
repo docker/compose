@@ -34,8 +34,8 @@ func TestPodToContainerSummary(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "c1-123",
 			Labels: map[string]string{
-				compose.ProjectTag: "myproject",
-				compose.ServiceTag: "service1",
+				compose.ProjectLabel: "myproject",
+				compose.ServiceLabel: "service1",
 			},
 		},
 		Status: v1.PodStatus{

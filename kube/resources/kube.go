@@ -151,8 +151,8 @@ func mapToDeployment(project *types.Project, service types.ServiceConfig) (*apps
 
 func selectorLabels(projectName string, serviceName string) map[string]string {
 	return map[string]string{
-		compose.ProjectTag: projectName,
-		compose.ServiceTag: serviceName,
+		compose.ProjectLabel: projectName,
+		compose.ServiceLabel: serviceName,
 	}
 }
 

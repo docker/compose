@@ -108,7 +108,7 @@ func (s *composeService) ensureService(ctx context.Context, project *types.Proje
 		container := container
 		name := getContainerProgressName(container)
 
-		diverged := container.Labels[configHashLabel] != expected
+		diverged := container.Labels[compose.ConfigHashLabel] != expected
 		if diverged || recreate == compose.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
 			eg.Go(func() error {
 				return s.recreateContainer(ctx, project, service, container, inherit, timeout)
@@ -190,7 +190,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 func nextContainerNumber(containers []moby.Container) (int, error) {
 	max := 0
 	for _, c := range containers {
-		n, err := strconv.Atoi(c.Labels[containerNumberLabel])
+		n, err := strconv.Atoi(c.Labels[compose.ContainerNumberLabel])
 		if err != nil {
 			return 0, err
 		}
@@ -245,7 +245,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return err
 	}
-	number, err := strconv.Atoi(container.Labels[containerNumberLabel])
+	number, err := strconv.Atoi(container.Labels[compose.ContainerNumberLabel])
 	if err != nil {
 		return err
 	}

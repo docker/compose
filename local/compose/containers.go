@@ -18,12 +18,12 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
+	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -40,21 +40,19 @@ const (
 
 func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, stopped bool, selectedServices ...string) (Containers, error) {
 	var containers Containers
-	f := filters.NewArgs(
-		projectFilter(project),
-	)
+	f := []filters.KeyValuePair{projectFilter(project)}
 	if len(selectedServices) == 1 {
-		f.Add("label", fmt.Sprintf("%s=%s", serviceLabel, selectedServices[0]))
+		f = append(f, serviceFilter(selectedServices[0]))
 	}
 	switch oneOff {
 	case oneOffOnly:
-		f.Add("label", fmt.Sprintf("%s=%s", oneoffLabel, "True"))
+		f = append(f, oneOffFilter(true))
 	case oneOffExclude:
-		f.Add("label", fmt.Sprintf("%s=%s", oneoffLabel, "False"))
+		f = append(f, oneOffFilter(false))
 	case oneOffInclude:
 	}
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: f,
+		Filters: filters.NewArgs(f...),
 		All:     stopped,
 	})
 	if err != nil {
@@ -71,20 +69,20 @@ type containerPredicate func(c moby.Container) bool
 
 func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
-		service := c.Labels[serviceLabel]
+		service := c.Labels[compose.ServiceLabel]
 		return utils.StringContains(services, service)
 	}
 }
 
 func isNotService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
-		service := c.Labels[serviceLabel]
+		service := c.Labels[compose.ServiceLabel]
 		return !utils.StringContains(services, service)
 	}
 }
 
 func isNotOneOff(c moby.Container) bool {
-	v, ok := c.Labels[oneoffLabel]
+	v, ok := c.Labels[compose.OneoffLabel]
 	return !ok || v == "False"
 }
 

@@ -81,8 +81,8 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 			summary[i] = compose.ContainerSummary{
 				ID:         container.ID,
 				Name:       getCanonicalContainerName(container),
-				Project:    container.Labels[projectLabel],
-				Service:    container.Labels[serviceLabel],
+				Project:    container.Labels[compose.ProjectLabel],
+				Service:    container.Labels[compose.ServiceLabel],
 				State:      container.State,
 				Health:     health,
 				ExitCode:   exitCode,

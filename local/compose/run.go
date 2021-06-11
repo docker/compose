@@ -50,8 +50,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 	service.Scale = 1
 	service.StdinOpen = true
-	service.Labels = service.Labels.Add(slugLabel, slug)
-	service.Labels = service.Labels.Add(oneoffLabel, "True")
+	service.Labels = service.Labels.Add(compose.SlugLabel, slug)
+	service.Labels = service.Labels.Add(compose.OneoffLabel, "True")
 
 	if err := s.ensureImagesExists(ctx, project, observedState, false); err != nil { // all dependencies already checked, but might miss service img
 		return 0, err
@@ -74,10 +74,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 
 	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{
-		Filters: filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", slugLabel, slug)),
-		),
-		All: true,
+		Filters: filters.NewArgs(slugFilter(slug)),
+		All:     true,
 	})
 	if err != nil {
 		return 0, err

@@ -30,17 +30,17 @@ func TestContainersToStacks(t *testing.T) {
 		{
 			ID:     "service1",
 			State:  "running",
-			Labels: map[string]string{projectLabel: "project1"},
+			Labels: map[string]string{compose.ProjectLabel: "project1"},
 		},
 		{
 			ID:     "service2",
 			State:  "running",
-			Labels: map[string]string{projectLabel: "project1"},
+			Labels: map[string]string{compose.ProjectLabel: "project1"},
 		},
 		{
 			ID:     "service3",
 			State:  "running",
-			Labels: map[string]string{projectLabel: "project2"},
+			Labels: map[string]string{compose.ProjectLabel: "project2"},
 		},
 	}
 	stacks, err := containersToStacks(containers)

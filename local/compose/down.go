@@ -259,7 +259,7 @@ func (s *composeService) projectFromContainerLabels(containers Containers, proje
 	if options.ConfigPaths[0] == "-" {
 		for _, container := range containers {
 			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
-				Name: container.Labels[serviceLabel],
+				Name: container.Labels[compose.ServiceLabel],
 			})
 		}
 		return fakeProject, nil
@@ -273,8 +273,8 @@ func (s *composeService) projectFromContainerLabels(containers Containers, proje
 }
 
 func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error) {
-	return cli.NewProjectOptions(strings.Split(c.Labels[configFilesLabel], ","),
+	return cli.NewProjectOptions(strings.Split(c.Labels[compose.ConfigFilesLabel], ","),
 		cli.WithOsEnv,
-		cli.WithWorkingDirectory(c.Labels[workingDirLabel]),
-		cli.WithName(c.Labels[projectLabel]))
+		cli.WithWorkingDirectory(c.Labels[compose.WorkingDirLabel]),
+		cli.WithName(c.Labels[compose.ProjectLabel]))
 }

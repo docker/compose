@@ -127,7 +127,7 @@ func (s *composeService) getExecTarget(ctx context.Context, project *types.Proje
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
 			serviceFilter(service.Name),
-			filters.Arg("label", fmt.Sprintf("%s=%d", containerNumberLabel, opts.Index)),
+			containerNumberFilter(opts.Index),
 		),
 	})
 	if err != nil {

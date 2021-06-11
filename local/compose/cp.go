@@ -69,7 +69,7 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 		serviceFilter(serviceName),
 	)
 	if !opts.All {
-		f.Add("label", fmt.Sprintf("%s=%d", containerNumberLabel, opts.Index))
+		f.Add("label", fmt.Sprintf("%s=%d", compose.ContainerNumberLabel, opts.Index))
 	}
 	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{Filters: f})
 	if err != nil {

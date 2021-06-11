@@ -63,11 +63,11 @@ func (b *ecsAPIService) createAccessPoints(project *types.Project, r awsResource
 		ap := efs.AccessPoint{
 			AccessPointTags: []efs.AccessPoint_AccessPointTag{
 				{
-					Key:   compose.ProjectTag,
+					Key:   compose.ProjectLabel,
 					Value: project.Name,
 				},
 				{
-					Key:   compose.VolumeTag,
+					Key:   compose.VolumeLabel,
 					Value: name,
 				},
 				{

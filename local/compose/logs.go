@@ -37,7 +37,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		c := c
-		service := c.Labels[serviceLabel]
+		service := c.Labels[compose.ServiceLabel]
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return err

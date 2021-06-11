@@ -40,7 +40,7 @@ func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]
 }
 
 func containersToStacks(containers []moby.Container) ([]compose.Stack, error) {
-	containersByLabel, keys, err := groupContainerByLabel(containers, projectLabel)
+	containersByLabel, keys, err := groupContainerByLabel(containers, compose.ProjectLabel)
 	if err != nil {
 		return nil, err
 	}
