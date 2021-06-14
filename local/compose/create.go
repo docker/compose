@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -630,6 +631,7 @@ MOUNTS:
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
 	var mounts = map[string]mount.Mount{}
 	if inherit != nil {
+
 		for _, m := range inherit.Mounts {
 			if m.Type == "tmpfs" {
 				continue
@@ -638,24 +640,20 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 			if m.Type == "volume" {
 				src = m.Name
 			}
-			mounts[m.Destination] = mount.Mount{
-				Type:     m.Type,
-				Source:   src,
-				Target:   m.Destination,
-				ReadOnly: !m.RW,
+			m.Destination = path.Clean(m.Destination)
+
+			if img.Config != nil {
+				if _, ok := img.Config.Volumes[m.Destination]; ok {
+					// inherit previous container's anonymous volume
+					mounts[m.Destination] = mount.Mount{
+						Type:     m.Type,
+						Source:   src,
+						Target:   m.Destination,
+						ReadOnly: !m.RW,
+					}
+				}
 			}
-		}
-	}
-	if img.ContainerConfig != nil {
-		for k := range img.ContainerConfig.Volumes {
-			m, err := buildMount(p, types.ServiceVolumeConfig{
-				Type:   types.VolumeTypeVolume,
-				Target: k,
-			})
-			if err != nil {
-				return nil, err
-			}
-			mounts[k] = m
+
 		}
 	}
 
@@ -800,6 +798,8 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}
 
 	bind, vol, tmpfs := buildMountOptions(volume)
+
+	volume.Target = path.Clean(volume.Target)
 
 	return mount.Mount{
 		Type:          mount.Type(volume.Type),
