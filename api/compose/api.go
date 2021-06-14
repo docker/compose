@@ -324,6 +324,7 @@ type ServiceStatus struct {
 type LogOptions struct {
 	Services   []string
 	Tail       string
+	Since      string
 	Follow     bool
 	Timestamps bool
 }
