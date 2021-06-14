@@ -90,7 +90,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 		[]apitypes.Container{testContainer("service1", "123")}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", apitypes.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), apitypes.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return(nil, nil)
 
