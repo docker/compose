@@ -23,7 +23,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -69,20 +69,20 @@ type containerPredicate func(c moby.Container) bool
 
 func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
-		service := c.Labels[compose.ServiceLabel]
+		service := c.Labels[api.ServiceLabel]
 		return utils.StringContains(services, service)
 	}
 }
 
 func isNotService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
-		service := c.Labels[compose.ServiceLabel]
+		service := c.Labels[api.ServiceLabel]
 		return !utils.StringContains(services, service)
 	}
 }
 
 func isNotOneOff(c moby.Container) bool {
-	v, ok := c.Labels[compose.OneoffLabel]
+	v, ok := c.Labels[api.OneoffLabel]
 	return !ok || v == "False"
 }
 

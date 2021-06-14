@@ -33,18 +33,18 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (s *composeService) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
+func (s *composeService) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
 	})
 }
 
-func (s *composeService) push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
+func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	configFile, err := cliconfig.Load(config.Dir())
 	if err != nil {
 		return err

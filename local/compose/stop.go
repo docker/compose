@@ -19,19 +19,19 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 )
 
-func (s *composeService) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
+func (s *composeService) Stop(ctx context.Context, project *types.Project, options api.StopOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.stop(ctx, project, options)
 	})
 }
 
-func (s *composeService) stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
+func (s *composeService) stop(ctx context.Context, project *types.Project, options api.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	services := options.Services

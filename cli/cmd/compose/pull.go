@@ -24,7 +24,7 @@ import (
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -38,7 +38,7 @@ type pullOptions struct {
 	ignorePullFailures bool
 }
 
-func pullCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func pullCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := pullOptions{
 		projectOptions: p,
 	}
@@ -66,7 +66,7 @@ func pullCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runPull(ctx context.Context, backend compose.Service, opts pullOptions, services []string) error {
+func runPull(ctx context.Context, backend api.Service, opts pullOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func runPull(ctx context.Context, backend compose.Service, opts pullOptions, ser
 		project.Services = enabled
 	}
 
-	return backend.Pull(ctx, project, compose.PullOptions{
+	return backend.Pull(ctx, project, api.PullOptions{
 		Quiet:          opts.quiet,
 		IgnoreFailures: opts.ignorePullFailures,
 	})

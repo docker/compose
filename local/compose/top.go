@@ -19,11 +19,11 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
 	var containers Containers
 	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 	if len(services) > 0 {
 		containers = containers.filter(isService(services...))
 	}
-	summary := make([]compose.ContainerProcSummary, len(containers))
+	summary := make([]api.ContainerProcSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, c := range containers {
 		container := c
@@ -42,7 +42,7 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 			if err != nil {
 				return err
 			}
-			summary[i] = compose.ContainerProcSummary{
+			summary[i] = api.ContainerProcSummary{
 				ID:        container.ID,
 				Name:      getCanonicalContainerName(container),
 				Processes: topContent.Processes,

@@ -23,10 +23,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/config"
-	"github.com/docker/compose-cli/api/errdefs"
-
 	ecsapi "github.com/aws/aws-sdk-go/service/ecs"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	cloudmapapi "github.com/aws/aws-sdk-go/service/servicediscovery"
@@ -42,16 +38,18 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	cliconfig "github.com/docker/cli/cli/config"
+	"github.com/docker/compose-cli/api/config"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/opencontainers/go-digest"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 )
 
-func (b *ecsAPIService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
-	return errdefs.ErrNotImplemented
+func (b *ecsAPIService) Kill(ctx context.Context, project *types.Project, options api.KillOptions) error {
+	return api.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+func (b *ecsAPIService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
 	err := b.resolveServiceImagesDigests(ctx, project)
 	if err != nil {
 		return nil, err

@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type createOptions struct {
@@ -40,7 +40,7 @@ type createOptions struct {
 	quietPull     bool
 }
 
-func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := createOptions{}
 	cmd := &cobra.Command{
 		Use:   "create [SERVICE...]",
@@ -55,7 +55,7 @@ func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
-			return backend.Create(ctx, project, compose.CreateOptions{
+			return backend.Create(ctx, project, api.CreateOptions{
 				RemoveOrphans:        opts.removeOrphans,
 				Recreate:             opts.recreateStrategy(),
 				RecreateDependencies: opts.dependenciesRecreateStrategy(),
@@ -75,22 +75,22 @@ func createCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 
 func (opts createOptions) recreateStrategy() string {
 	if opts.noRecreate {
-		return compose.RecreateNever
+		return api.RecreateNever
 	}
 	if opts.forceRecreate {
-		return compose.RecreateForce
+		return api.RecreateForce
 	}
-	return compose.RecreateDiverged
+	return api.RecreateDiverged
 }
 
 func (opts createOptions) dependenciesRecreateStrategy() string {
 	if opts.noRecreate {
-		return compose.RecreateNever
+		return api.RecreateNever
 	}
 	if opts.recreateDeps {
-		return compose.RecreateForce
+		return api.RecreateForce
 	}
-	return compose.RecreateDiverged
+	return api.RecreateDiverged
 }
 
 func (opts createOptions) GetTimeout() *time.Duration {

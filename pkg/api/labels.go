@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package api
 
 const (
 	// ProjectLabel allow to track resource related to a compose project

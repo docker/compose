@@ -34,19 +34,19 @@ import (
 	"github.com/moby/buildkit/session/auth/authprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/docker/compose-cli/api/compose"
 	composeprogress "github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/metrics"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
-func (s *composeService) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
+func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	return composeprogress.Run(ctx, func(ctx context.Context) error {
 		return s.build(ctx, project, options)
 	})
 }
 
-func (s *composeService) build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
+func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 

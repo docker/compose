@@ -21,14 +21,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type pauseOptions struct {
 	*projectOptions
 }
 
-func pauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func pauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := pauseOptions{
 		projectOptions: p,
 	}
@@ -42,13 +42,13 @@ func pauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runPause(ctx context.Context, backend compose.Service, opts pauseOptions, services []string) error {
+func runPause(ctx context.Context, backend api.Service, opts pauseOptions, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	return backend.Pause(ctx, project, compose.PauseOptions{
+	return backend.Pause(ctx, project, api.PauseOptions{
 		Services: services,
 	})
 }
@@ -57,7 +57,7 @@ type unpauseOptions struct {
 	*projectOptions
 }
 
-func unpauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func unpauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := unpauseOptions{
 		projectOptions: p,
 	}
@@ -71,13 +71,13 @@ func unpauseCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runUnPause(ctx context.Context, backend compose.Service, opts unpauseOptions, services []string) error {
+func runUnPause(ctx context.Context, backend api.Service, opts unpauseOptions, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	return backend.UnPause(ctx, project, compose.PauseOptions{
+	return backend.UnPause(ctx, project, api.PauseOptions{
 		Services: services,
 	})
 }

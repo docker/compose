@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
+func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	oneOff := oneOffExclude
 	if options.All {
 		oneOff = oneOffInclude
@@ -35,13 +35,13 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 		return nil, err
 	}
 
-	summary := make([]compose.ContainerSummary, len(containers))
+	summary := make([]api.ContainerSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
 	for i, c := range containers {
 		container := c
 		i := i
 		eg.Go(func() error {
-			var publishers []compose.PortPublisher
+			var publishers []api.PortPublisher
 			sort.Slice(container.Ports, func(i, j int) bool {
 				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
 			})
@@ -50,7 +50,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 				if p.PublicPort != 0 {
 					url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
 				}
-				publishers = append(publishers, compose.PortPublisher{
+				publishers = append(publishers, api.PortPublisher{
 					URL:           url,
 					TargetPort:    int(p.PrivatePort),
 					PublishedPort: int(p.PublicPort),
@@ -78,11 +78,11 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options com
 				}
 			}
 
-			summary[i] = compose.ContainerSummary{
+			summary[i] = api.ContainerSummary{
 				ID:         container.ID,
 				Name:       getCanonicalContainerName(container),
-				Project:    container.Labels[compose.ProjectLabel],
-				Service:    container.Labels[compose.ServiceLabel],
+				Project:    container.Labels[api.ProjectLabel],
+				Service:    container.Labels[api.ServiceLabel],
 				State:      container.State,
 				Health:     health,
 				ExitCode:   exitCode,

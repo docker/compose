@@ -25,12 +25,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/compose-cli/pkg/api"
+
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
-
-	"github.com/docker/compose-cli/api/errdefs"
 )
 
 //go login process, derived from code sample provided by MS at https://github.com/devigned/go-az-cli-stuff
@@ -98,20 +98,20 @@ func (login *azureLoginService) LoginServicePrincipal(clientID string, clientSec
 
 	spToken, err := creds.ServicePrincipalToken()
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not login with service principal: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "could not login with service principal: %s", err)
 	}
 	err = spToken.Refresh()
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not login with service principal: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "could not login with service principal: %s", err)
 	}
 	token, err := spToOAuthToken(spToken.Token())
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not read service principal token expiry: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "could not read service principal token expiry: %s", err)
 	}
 	loginInfo := TokenInfo{TenantID: tenantID, Token: token, CloudEnvironment: cloudEnvironment}
 
 	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "could not store login info: %s", err)
 	}
 	return nil
 }
@@ -134,28 +134,28 @@ func (login *azureLoginService) getTenantAndValidateLogin(
 ) error {
 	bits, statusCode, err := login.apiHelper.queryAPIWithHeader(ctx, ce.GetTenantQueryURL(), fmt.Sprintf("Bearer %s", accessToken))
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "check auth failed: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "check auth failed: %s", err)
 	}
 
 	if statusCode != http.StatusOK {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
+		return errors.Wrapf(api.ErrLoginFailed, "unable to login status code %d: %s", statusCode, bits)
 	}
 	var t tenantResult
 	if err := json.Unmarshal(bits, &t); err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "unable to unmarshal tenant: %s", err)
 	}
 	tenantID, err := getTenantID(t.Value, requestedTenantID)
 	if err != nil {
-		return errors.Wrap(errdefs.ErrLoginFailed, err.Error())
+		return errors.Wrap(api.ErrLoginFailed, err.Error())
 	}
 	tToken, err := login.refreshToken(refreshToken, tenantID, ce)
 	if err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "unable to refresh token: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "unable to refresh token: %s", err)
 	}
 	loginInfo := TokenInfo{TenantID: tenantID, Token: tToken, CloudEnvironment: ce.Name}
 
 	if err := login.tokenStore.writeLoginInfo(loginInfo); err != nil {
-		return errors.Wrapf(errdefs.ErrLoginFailed, "could not store login info: %s", err)
+		return errors.Wrapf(api.ErrLoginFailed, "could not store login info: %s", err)
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ func (login *azureLoginService) Login(ctx context.Context, requestedTenantID str
 
 	redirectURL := s.Addr()
 	if redirectURL == "" {
-		return errors.Wrap(errdefs.ErrLoginFailed, "empty redirect URL")
+		return errors.Wrap(api.ErrLoginFailed, "empty redirect URL")
 	}
 
 	deviceCodeFlowCh := make(chan deviceCodeFlowResponse, 1)
@@ -190,17 +190,17 @@ func (login *azureLoginService) Login(ctx context.Context, requestedTenantID str
 		return ctx.Err()
 	case dcft := <-deviceCodeFlowCh:
 		if dcft.err != nil {
-			return errors.Wrapf(errdefs.ErrLoginFailed, "could not get token using device code flow: %s", err)
+			return errors.Wrapf(api.ErrLoginFailed, "could not get token using device code flow: %s", err)
 		}
 		token := dcft.token
 		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID, ce)
 	case q := <-queryCh:
 		if q.err != nil {
-			return errors.Wrapf(errdefs.ErrLoginFailed, "unhandled local login server error: %s", err)
+			return errors.Wrapf(api.ErrLoginFailed, "unhandled local login server error: %s", err)
 		}
 		code, hasCode := q.values["code"]
 		if !hasCode {
-			return errors.Wrap(errdefs.ErrLoginFailed, "no login code")
+			return errors.Wrap(api.ErrLoginFailed, "no login code")
 		}
 		data := url.Values{
 			"grant_type":   []string{"authorization_code"},
@@ -211,7 +211,7 @@ func (login *azureLoginService) Login(ctx context.Context, requestedTenantID str
 		}
 		token, err := login.apiHelper.queryToken(ce, data, "organizations")
 		if err != nil {
-			return errors.Wrapf(errdefs.ErrLoginFailed, "access token request failed: %s", err)
+			return errors.Wrapf(api.ErrLoginFailed, "access token request failed: %s", err)
 		}
 		return login.getTenantAndValidateLogin(ctx, token.AccessToken, token.RefreshToken, requestedTenantID, ce)
 	}

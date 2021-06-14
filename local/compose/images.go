@@ -27,11 +27,11 @@ import (
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
-func (s *composeService) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
+func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	allContainers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
@@ -42,7 +42,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if len(options.Services) > 0 {
 		// filter service containers
 		for _, c := range allContainers {
-			if utils.StringContains(options.Services, c.Labels[compose.ServiceLabel]) {
+			if utils.StringContains(options.Services, c.Labels[api.ServiceLabel]) {
 				containers = append(containers, c)
 
 			}
@@ -62,7 +62,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if err != nil {
 		return nil, err
 	}
-	summary := make([]compose.ImageSummary, len(containers))
+	summary := make([]api.ImageSummary, len(containers))
 	for i, container := range containers {
 		img, ok := images[container.ImageID]
 		if !ok {
@@ -75,8 +75,8 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	return summary, nil
 }
 
-func (s *composeService) getImages(ctx context.Context, images []string) (map[string]compose.ImageSummary, error) {
-	summary := map[string]compose.ImageSummary{}
+func (s *composeService) getImages(ctx context.Context, images []string) (map[string]api.ImageSummary, error) {
+	summary := map[string]api.ImageSummary{}
 	l := sync.Mutex{}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, img := range images {
@@ -100,7 +100,7 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 				}
 			}
 			l.Lock()
-			summary[img] = compose.ImageSummary{
+			summary[img] = api.ImageSummary{
 				ID:         inspect.ID,
 				Repository: repository,
 				Tag:        tag,

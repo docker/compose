@@ -14,12 +14,10 @@
    limitations under the License.
 */
 
-package compose
+package api
 
 import (
 	"context"
-
-	"github.com/docker/compose-cli/api/errdefs"
 
 	"github.com/compose-spec/compose-go/types"
 )
@@ -101,7 +99,7 @@ func (s *ServiceProxy) WithInterceptor(interceptors ...Interceptor) *ServiceProx
 //Build implements Service interface
 func (s *ServiceProxy) Build(ctx context.Context, project *types.Project, options BuildOptions) error {
 	if s.BuildFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -112,7 +110,7 @@ func (s *ServiceProxy) Build(ctx context.Context, project *types.Project, option
 //Push implements Service interface
 func (s *ServiceProxy) Push(ctx context.Context, project *types.Project, options PushOptions) error {
 	if s.PushFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -123,7 +121,7 @@ func (s *ServiceProxy) Push(ctx context.Context, project *types.Project, options
 //Pull implements Service interface
 func (s *ServiceProxy) Pull(ctx context.Context, project *types.Project, options PullOptions) error {
 	if s.PullFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -134,7 +132,7 @@ func (s *ServiceProxy) Pull(ctx context.Context, project *types.Project, options
 //Create implements Service interface
 func (s *ServiceProxy) Create(ctx context.Context, project *types.Project, options CreateOptions) error {
 	if s.CreateFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -145,7 +143,7 @@ func (s *ServiceProxy) Create(ctx context.Context, project *types.Project, optio
 //Start implements Service interface
 func (s *ServiceProxy) Start(ctx context.Context, project *types.Project, options StartOptions) error {
 	if s.StartFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -156,7 +154,7 @@ func (s *ServiceProxy) Start(ctx context.Context, project *types.Project, option
 //Restart implements Service interface
 func (s *ServiceProxy) Restart(ctx context.Context, project *types.Project, options RestartOptions) error {
 	if s.RestartFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -167,7 +165,7 @@ func (s *ServiceProxy) Restart(ctx context.Context, project *types.Project, opti
 //Stop implements Service interface
 func (s *ServiceProxy) Stop(ctx context.Context, project *types.Project, options StopOptions) error {
 	if s.StopFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -178,7 +176,7 @@ func (s *ServiceProxy) Stop(ctx context.Context, project *types.Project, options
 //Up implements Service interface
 func (s *ServiceProxy) Up(ctx context.Context, project *types.Project, options UpOptions) error {
 	if s.UpFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -189,7 +187,7 @@ func (s *ServiceProxy) Up(ctx context.Context, project *types.Project, options U
 //Down implements Service interface
 func (s *ServiceProxy) Down(ctx context.Context, project string, options DownOptions) error {
 	if s.DownFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	return s.DownFn(ctx, project, options)
 }
@@ -197,7 +195,7 @@ func (s *ServiceProxy) Down(ctx context.Context, project string, options DownOpt
 //Logs implements Service interface
 func (s *ServiceProxy) Logs(ctx context.Context, project string, consumer LogConsumer, options LogOptions) error {
 	if s.LogsFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	return s.LogsFn(ctx, project, consumer, options)
 }
@@ -205,7 +203,7 @@ func (s *ServiceProxy) Logs(ctx context.Context, project string, consumer LogCon
 //Ps implements Service interface
 func (s *ServiceProxy) Ps(ctx context.Context, project string, options PsOptions) ([]ContainerSummary, error) {
 	if s.PsFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	return s.PsFn(ctx, project, options)
 }
@@ -213,7 +211,7 @@ func (s *ServiceProxy) Ps(ctx context.Context, project string, options PsOptions
 //List implements Service interface
 func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, error) {
 	if s.ListFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	return s.ListFn(ctx, options)
 }
@@ -221,7 +219,7 @@ func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, 
 //Convert implements Service interface
 func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error) {
 	if s.ConvertFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -232,7 +230,7 @@ func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, opti
 //Kill implements Service interface
 func (s *ServiceProxy) Kill(ctx context.Context, project *types.Project, options KillOptions) error {
 	if s.KillFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -243,7 +241,7 @@ func (s *ServiceProxy) Kill(ctx context.Context, project *types.Project, options
 //RunOneOffContainer implements Service interface
 func (s *ServiceProxy) RunOneOffContainer(ctx context.Context, project *types.Project, options RunOptions) (int, error) {
 	if s.RunOneOffContainerFn == nil {
-		return 0, errdefs.ErrNotImplemented
+		return 0, ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -254,7 +252,7 @@ func (s *ServiceProxy) RunOneOffContainer(ctx context.Context, project *types.Pr
 //Remove implements Service interface
 func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, options RemoveOptions) error {
 	if s.RemoveFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -265,7 +263,7 @@ func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, optio
 //Exec implements Service interface
 func (s *ServiceProxy) Exec(ctx context.Context, project *types.Project, options RunOptions) (int, error) {
 	if s.ExecFn == nil {
-		return 0, errdefs.ErrNotImplemented
+		return 0, ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -276,7 +274,7 @@ func (s *ServiceProxy) Exec(ctx context.Context, project *types.Project, options
 //Copy implements Service interface
 func (s *ServiceProxy) Copy(ctx context.Context, project *types.Project, options CopyOptions) error {
 	if s.CopyFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	for _, i := range s.interceptors {
 		i(ctx, project)
@@ -287,7 +285,7 @@ func (s *ServiceProxy) Copy(ctx context.Context, project *types.Project, options
 //Pause implements Service interface
 func (s *ServiceProxy) Pause(ctx context.Context, project string, options PauseOptions) error {
 	if s.PauseFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	return s.PauseFn(ctx, project, options)
 }
@@ -295,7 +293,7 @@ func (s *ServiceProxy) Pause(ctx context.Context, project string, options PauseO
 //UnPause implements Service interface
 func (s *ServiceProxy) UnPause(ctx context.Context, project string, options PauseOptions) error {
 	if s.UnPauseFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	return s.UnPauseFn(ctx, project, options)
 }
@@ -303,7 +301,7 @@ func (s *ServiceProxy) UnPause(ctx context.Context, project string, options Paus
 //Top implements Service interface
 func (s *ServiceProxy) Top(ctx context.Context, project string, services []string) ([]ContainerProcSummary, error) {
 	if s.TopFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	return s.TopFn(ctx, project, services)
 }
@@ -311,7 +309,7 @@ func (s *ServiceProxy) Top(ctx context.Context, project string, services []strin
 //Events implements Service interface
 func (s *ServiceProxy) Events(ctx context.Context, project string, options EventsOptions) error {
 	if s.EventsFn == nil {
-		return errdefs.ErrNotImplemented
+		return ErrNotImplemented
 	}
 	return s.EventsFn(ctx, project, options)
 }
@@ -319,7 +317,7 @@ func (s *ServiceProxy) Events(ctx context.Context, project string, options Event
 //Port implements Service interface
 func (s *ServiceProxy) Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error) {
 	if s.PortFn == nil {
-		return "", 0, errdefs.ErrNotImplemented
+		return "", 0, ErrNotImplemented
 	}
 	return s.PortFn(ctx, project, service, port, options)
 }
@@ -327,7 +325,7 @@ func (s *ServiceProxy) Port(ctx context.Context, project string, service string,
 //Images implements Service interface
 func (s *ServiceProxy) Images(ctx context.Context, project string, options ImagesOptions) ([]ImageSummary, error) {
 	if s.ImagesFn == nil {
-		return nil, errdefs.ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	return s.ImagesFn(ctx, project, options)
 }

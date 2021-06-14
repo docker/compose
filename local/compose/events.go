@@ -21,14 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Events(ctx context.Context, project string, options compose.EventsOptions) error {
+func (s *composeService) Events(ctx context.Context, project string, options api.EventsOptions) error {
 	events, errors := s.apiClient.Events(ctx, moby.EventsOptions{
 		Filters: filters.NewArgs(projectFilter(project)),
 	})
@@ -40,7 +40,7 @@ func (s *composeService) Events(ctx context.Context, project string, options com
 				continue
 			}
 
-			service := event.Actor.Attributes[compose.ServiceLabel]
+			service := event.Actor.Attributes[api.ServiceLabel]
 			if len(options.Services) > 0 && !utils.StringContains(options.Services, service) {
 				continue
 			}
@@ -57,7 +57,7 @@ func (s *composeService) Events(ctx context.Context, project string, options com
 			if event.TimeNano != 0 {
 				timestamp = time.Unix(0, event.TimeNano)
 			}
-			err := options.Consumer(compose.Event{
+			err := options.Consumer(api.Event{
 				Timestamp:  timestamp,
 				Service:    service,
 				Container:  event.ID,

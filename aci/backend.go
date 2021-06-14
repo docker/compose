@@ -26,11 +26,11 @@ import (
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/backend"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/docker/compose-cli/api/cloud"
 	apicontext "github.com/docker/compose-cli/api/context"
@@ -115,7 +115,7 @@ func (a *aciAPIService) ContainerService() containers.Service {
 	return a.aciContainerService
 }
 
-func (a *aciAPIService) ComposeService() compose.Service {
+func (a *aciAPIService) ComposeService() api.Service {
 	return a.aciComposeService
 }
 

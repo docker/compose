@@ -22,11 +22,11 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func killCommand(p *projectOptions, backend compose.Service) *cobra.Command {
-	var opts compose.KillOptions
+func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
+	var opts api.KillOptions
 	cmd := &cobra.Command{
 		Use:   "kill [options] [SERVICE...]",
 		Short: "Force stop service containers.",

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	status "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils/prompt"
 
 	"github.com/compose-spec/compose-go/types"
@@ -31,7 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
+func (s *composeService) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {
 	services := options.Services
 	if len(services) == 0 {
 		services = project.ServiceNames()
@@ -72,7 +72,7 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 	})
 }
 
-func (s *composeService) remove(ctx context.Context, containers Containers, options compose.RemoveOptions) error {
+func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {

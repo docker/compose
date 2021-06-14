@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // AzureLogoutCommand returns the azure logout command
@@ -44,7 +44,7 @@ func cloudLogout(cmd *cobra.Command, backendType string) error {
 	ctx := cmd.Context()
 	cs, err := client.GetCloudService(ctx, backendType)
 	if err != nil {
-		return errors.Wrap(errdefs.ErrLoginFailed, "cannot connect to backend")
+		return errors.Wrap(api.ErrLoginFailed, "cannot connect to backend")
 	}
 	err = cs.Logout(ctx)
 	if errors.Is(err, context.Canceled) {

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
@@ -151,8 +151,8 @@ func mapToDeployment(project *types.Project, service types.ServiceConfig) (*apps
 
 func selectorLabels(projectName string, serviceName string) map[string]string {
 	return map[string]string{
-		compose.ProjectLabel: projectName,
-		compose.ServiceLabel: serviceName,
+		api.ProjectLabel: projectName,
+		api.ServiceLabel: serviceName,
 	}
 }
 

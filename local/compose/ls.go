@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
+func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
 	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(hasProjectLabelFilter()),
 		All:     opts.All,
@@ -39,14 +39,14 @@ func (s *composeService) List(ctx context.Context, opts compose.ListOptions) ([]
 	return containersToStacks(list)
 }
 
-func containersToStacks(containers []moby.Container) ([]compose.Stack, error) {
-	containersByLabel, keys, err := groupContainerByLabel(containers, compose.ProjectLabel)
+func containersToStacks(containers []moby.Container) ([]api.Stack, error) {
+	containersByLabel, keys, err := groupContainerByLabel(containers, api.ProjectLabel)
 	if err != nil {
 		return nil, err
 	}
-	var projects []compose.Stack
+	var projects []api.Stack
 	for _, project := range keys {
-		projects = append(projects, compose.Stack{
+		projects = append(projects, api.Stack{
 			ID:     project,
 			Name:   project,
 			Status: combinedStatus(containerToState(containersByLabel[project])),

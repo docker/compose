@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type restartOptions struct {
@@ -30,7 +30,7 @@ type restartOptions struct {
 	timeout int
 }
 
-func restartCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := restartOptions{
 		projectOptions: p,
 	}
@@ -47,14 +47,14 @@ func restartCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return restartCmd
 }
 
-func runRestart(ctx context.Context, backend compose.Service, opts restartOptions, services []string) error {
+func runRestart(ctx context.Context, backend api.Service, opts restartOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
 	timeout := time.Duration(opts.timeout) * time.Second
-	return backend.Restart(ctx, project, compose.RestartOptions{
+	return backend.Restart(ctx, project, api.RestartOptions{
 		Timeout:  &timeout,
 		Services: services,
 	})

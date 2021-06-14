@@ -31,9 +31,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/aci/login"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils/formatter"
 )
 
@@ -314,12 +314,12 @@ func gbToBytes(memInBytes float64) uint64 {
 }
 
 // ContainerGroupToServiceStatus convert from an ACI container definition to service status
-func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container, region string) compose.ServiceStatus {
+func ContainerGroupToServiceStatus(containerID string, group containerinstance.ContainerGroup, container containerinstance.Container, region string) api.ServiceStatus {
 	var replicas = 1
 	if GetStatus(container, group) != StatusRunning {
 		replicas = 0
 	}
-	return compose.ServiceStatus{
+	return api.ServiceStatus{
 		ID:       containerID,
 		Name:     *container.Name,
 		Ports:    formatter.PortsToStrings(ToPorts(group.IPAddress, *container.Ports), FQDN(group, region)),
@@ -452,5 +452,5 @@ func GetGroupStatus(group containerinstance.ContainerGroup) string {
 	if group.InstanceView != nil && group.InstanceView.State != nil {
 		return "Node " + *group.InstanceView.State
 	}
-	return compose.UNKNOWN
+	return api.UNKNOWN
 }

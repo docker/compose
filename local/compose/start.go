@@ -24,17 +24,17 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (s *composeService) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+func (s *composeService) Start(ctx context.Context, project *types.Project, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.start(ctx, project, options, nil)
 	})
 }
 
-func (s *composeService) start(ctx context.Context, project *types.Project, options compose.StartOptions, listener compose.ContainerEventListener) error {
+func (s *composeService) start(ctx context.Context, project *types.Project, options api.StartOptions, listener api.ContainerEventListener) error {
 	if len(options.AttachTo) == 0 {
 		options.AttachTo = project.ServiceNames()
 	}
@@ -65,16 +65,16 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 type containerWatchFn func(container moby.Container) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
-func (s *composeService) watchContainers(project *types.Project, services []string, listener compose.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
+func (s *composeService) watchContainers(project *types.Project, services []string, listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
 	watched := map[string]int{}
 	for _, c := range containers {
 		watched[c.ID] = 0
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
-	err := s.Events(ctx, project.Name, compose.EventsOptions{
+	err := s.Events(ctx, project.Name, api.EventsOptions{
 		Services: services,
-		Consumer: func(event compose.Event) error {
+		Consumer: func(event api.Event) error {
 			inspected, err := s.apiClient.ContainerInspect(ctx, event.Container)
 			if err != nil {
 				return err
@@ -92,10 +92,10 @@ func (s *composeService) watchContainers(project *types.Project, services []stri
 				// Container terminated.
 				willRestart := inspected.HostConfig.RestartPolicy.MaximumRetryCount > restarted
 
-				listener(compose.ContainerEvent{
-					Type:       compose.ContainerEventExit,
+				listener(api.ContainerEvent{
+					Type:       api.ContainerEventExit,
 					Container:  name,
-					Service:    container.Labels[compose.ServiceLabel],
+					Service:    container.Labels[api.ServiceLabel],
 					ExitCode:   inspected.State.ExitCode,
 					Restarting: willRestart,
 				})

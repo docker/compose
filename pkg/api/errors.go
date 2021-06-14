@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package errdefs
+package api
 
 import (
 	"github.com/pkg/errors"

@@ -22,8 +22,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
 	convert "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/compose-spec/compose-go/types"
@@ -32,7 +32,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, listener compose.ContainerEventListener, selectedServices []string) (Containers, error) {
+func (s *composeService) attach(ctx context.Context, project *types.Project, listener api.ContainerEventListener, selectedServices []string) (Containers, error) {
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, selectedServices...)
 	if err != nil {
 		return nil, err
@@ -56,23 +56,23 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	return containers, err
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener compose.ContainerEventListener, project *types.Project) error {
-	serviceName := container.Labels[compose.ServiceLabel]
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener api.ContainerEventListener, project *types.Project) error {
+	serviceName := container.Labels[api.ServiceLabel]
 	containerName := getContainerNameWithoutProject(container)
 	service, err := project.GetService(serviceName)
 	if err != nil {
 		return err
 	}
 
-	listener(compose.ContainerEvent{
-		Type:      compose.ContainerEventAttach,
+	listener(api.ContainerEvent{
+		Type:      api.ContainerEventAttach,
 		Container: containerName,
 		Service:   serviceName,
 	})
 
 	w := utils.GetWriter(func(line string) {
-		listener(compose.ContainerEvent{
-			Type:      compose.ContainerEventLog,
+		listener(api.ContainerEvent{
+			Type:      api.ContainerEventLog,
 			Container: containerName,
 			Service:   serviceName,
 			Line:      line,

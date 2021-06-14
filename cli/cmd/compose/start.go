@@ -19,7 +19,7 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ type startOptions struct {
 	*projectOptions
 }
 
-func startCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func startCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := startOptions{
 		projectOptions: p,
 	}
@@ -41,11 +41,11 @@ func startCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return startCmd
 }
 
-func runStart(ctx context.Context, backend compose.Service, opts startOptions, services []string) error {
+func runStart(ctx context.Context, backend api.Service, opts startOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
-	return backend.Start(ctx, project, compose.StartOptions{})
+	return backend.Start(ctx, project, api.StartOptions{})
 }

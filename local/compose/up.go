@@ -23,15 +23,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
+func (s *composeService) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
 	err := progress.Run(ctx, func(ctx context.Context) error {
 		err := s.create(ctx, project, options.Create)
 		if err != nil {
@@ -57,10 +57,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return progress.Run(ctx, func(ctx context.Context) error {
 			go func() {
 				<-signalChan
-				s.Kill(ctx, project, compose.KillOptions{}) // nolint:errcheck
+				s.Kill(ctx, project, api.KillOptions{}) // nolint:errcheck
 			}()
 
-			return s.Stop(ctx, project, compose.StopOptions{})
+			return s.Stop(ctx, project, api.StopOptions{})
 		})
 	}
 	go func() {

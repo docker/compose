@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type pushOptions struct {
@@ -31,7 +31,7 @@ type pushOptions struct {
 	Ignorefailures bool
 }
 
-func pushCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := pushOptions{
 		projectOptions: p,
 	}
@@ -47,13 +47,13 @@ func pushCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return pushCmd
 }
 
-func runPush(ctx context.Context, backend compose.Service, opts pushOptions, services []string) error {
+func runPush(ctx context.Context, backend api.Service, opts pushOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
-	return backend.Push(ctx, project, compose.PushOptions{
+	return backend.Push(ctx, project, api.PushOptions{
 		IgnoreFailures: opts.Ignorefailures,
 	})
 }

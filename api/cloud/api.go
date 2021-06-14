@@ -19,7 +19,7 @@ package cloud
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // Service cloud specific services
@@ -42,13 +42,13 @@ type notImplementedCloudService struct {
 
 // Logout login to cloud provider
 func (cs notImplementedCloudService) Logout(ctx context.Context) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (cs notImplementedCloudService) Login(ctx context.Context, params interface{}) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (cs notImplementedCloudService) CreateContextData(ctx context.Context, params interface{}) (interface{}, string, error) {
-	return nil, "", errdefs.ErrNotImplemented
+	return nil, "", api.ErrNotImplemented
 }

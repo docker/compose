@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 
 	"github.com/docker/docker/api/types"
@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (s *composeService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
+func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
 	list, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 
 	if err != nil {
@@ -37,7 +37,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range list {
 		c := c
-		service := c.Labels[compose.ServiceLabel]
+		service := c.Labels[api.ServiceLabel]
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return err

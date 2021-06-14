@@ -19,21 +19,21 @@ package compose
 import (
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/sirupsen/logrus"
 )
 
 // logPrinter watch application containers an collect their logs
 type logPrinter interface {
-	HandleEvent(event compose.ContainerEvent)
+	HandleEvent(event api.ContainerEvent)
 	Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
 	Cancel()
 }
 
 // newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
-func newLogPrinter(consumer compose.LogConsumer) logPrinter {
-	queue := make(chan compose.ContainerEvent)
+func newLogPrinter(consumer api.LogConsumer) logPrinter {
+	queue := make(chan api.ContainerEvent)
 	printer := printer{
 		consumer: consumer,
 		queue:    queue,
@@ -42,17 +42,17 @@ func newLogPrinter(consumer compose.LogConsumer) logPrinter {
 }
 
 func (p *printer) Cancel() {
-	p.queue <- compose.ContainerEvent{
-		Type: compose.UserCancel,
+	p.queue <- api.ContainerEvent{
+		Type: api.UserCancel,
 	}
 }
 
 type printer struct {
-	queue    chan compose.ContainerEvent
-	consumer compose.LogConsumer
+	queue    chan api.ContainerEvent
+	consumer api.LogConsumer
 }
 
-func (p *printer) HandleEvent(event compose.ContainerEvent) {
+func (p *printer) HandleEvent(event api.ContainerEvent) {
 	p.queue <- event
 }
 
@@ -66,15 +66,15 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 		event := <-p.queue
 		container := event.Container
 		switch event.Type {
-		case compose.UserCancel:
+		case api.UserCancel:
 			aborting = true
-		case compose.ContainerEventAttach:
+		case api.ContainerEventAttach:
 			if _, ok := containers[container]; ok {
 				continue
 			}
 			containers[container] = struct{}{}
 			p.consumer.Register(container)
-		case compose.ContainerEventExit:
+		case api.ContainerEventExit:
 			if !event.Restarting {
 				delete(containers, container)
 			}
@@ -102,7 +102,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				// Last container terminated, done
 				return exitCode, nil
 			}
-		case compose.ContainerEventLog:
+		case api.ContainerEventLog:
 			if !aborting {
 				p.consumer.Log(container, event.Service, event.Line)
 			}

@@ -32,7 +32,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -51,7 +51,7 @@ type convertOptions struct {
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
 
-func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := convertOptions{
 		projectOptions: p,
 	}
@@ -104,7 +104,7 @@ func convertCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runConvert(ctx context.Context, backend compose.Service, opts convertOptions, services []string) error {
+func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var json []byte
 	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate))
 	if err != nil {
@@ -124,7 +124,7 @@ func runConvert(ctx context.Context, backend compose.Service, opts convertOption
 		}
 	}
 
-	json, err = backend.Convert(ctx, project, compose.ConvertOptions{
+	json, err = backend.Convert(ctx, project, api.ConvertOptions{
 		Format: opts.Format,
 		Output: opts.Output,
 	})

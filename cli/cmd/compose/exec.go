@@ -25,7 +25,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type execOpts struct {
@@ -43,7 +43,7 @@ type execOpts struct {
 	privileged bool
 }
 
-func execCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -75,13 +75,13 @@ func execCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return runCmd
 }
 
-func runExec(ctx context.Context, backend compose.Service, opts execOpts) error {
+func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 	project, err := opts.toProject(nil)
 	if err != nil {
 		return err
 	}
 
-	execOpts := compose.RunOptions{
+	execOpts := api.RunOptions{
 		Service:     opts.service,
 		Command:     opts.command,
 		Environment: opts.environment,

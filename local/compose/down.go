@@ -29,19 +29,19 @@ import (
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type downOp func() error
 
-func (s *composeService) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+func (s *composeService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.down(ctx, projectName, options)
 	})
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options compose.DownOptions) error {
+func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -124,7 +124,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, projectName stri
 	return ops, nil
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options compose.DownOptions, w progress.Writer) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options api.DownOptions, w progress.Writer) []downOp {
 	var ops []downOp
 	for image := range s.getServiceImages(options, projectName) {
 		image := image
@@ -151,7 +151,7 @@ func (s *composeService) ensureNetwoksDown(ctx context.Context, projectName stri
 	return ops, nil
 }
 
-func (s *composeService) getServiceImages(options compose.DownOptions, projectName string) map[string]struct{} {
+func (s *composeService) getServiceImages(options api.DownOptions, projectName string) map[string]struct{} {
 	images := map[string]struct{}{}
 	for _, service := range options.Project.Services {
 		image := service.Image
@@ -262,7 +262,7 @@ func (s *composeService) projectFromContainerLabels(containers Containers, proje
 	if options.ConfigPaths[0] == "-" {
 		for _, container := range containers {
 			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
-				Name: container.Labels[compose.ServiceLabel],
+				Name: container.Labels[api.ServiceLabel],
 			})
 		}
 		return fakeProject, nil
@@ -276,8 +276,8 @@ func (s *composeService) projectFromContainerLabels(containers Containers, proje
 }
 
 func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error) {
-	return cli.NewProjectOptions(strings.Split(c.Labels[compose.ConfigFilesLabel], ","),
+	return cli.NewProjectOptions(strings.Split(c.Labels[api.ConfigFilesLabel], ","),
 		cli.WithOsEnv,
-		cli.WithWorkingDirectory(c.Labels[compose.WorkingDirLabel]),
-		cli.WithName(c.Labels[compose.ProjectLabel]))
+		cli.WithWorkingDirectory(c.Labels[api.WorkingDirLabel]),
+		cli.WithName(c.Labels[api.ProjectLabel]))
 }

@@ -20,18 +20,18 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/cloud"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/ecs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 var _ cloud.Service = ecsLocalSimulation{}
 
 func (e ecsLocalSimulation) Login(ctx context.Context, params interface{}) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (e ecsLocalSimulation) Logout(ctx context.Context) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (e ecsLocalSimulation) CreateContextData(ctx context.Context, params interface{}) (contextData interface{}, description string, err error) {

@@ -27,14 +27,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type topOptions struct {
 	*projectOptions
 }
 
-func topCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func topCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := topOptions{
 		projectOptions: p,
 	}
@@ -48,7 +48,7 @@ func topCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return topCmd
 }
 
-func runTop(ctx context.Context, backend compose.Service, opts topOptions, services []string) error {
+func runTop(ctx context.Context, backend api.Service, opts topOptions, services []string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err

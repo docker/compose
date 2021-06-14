@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type portOptions struct {
@@ -33,7 +33,7 @@ type portOptions struct {
 	index    int
 }
 
-func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func portCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := portOptions{
 		projectOptions: p,
 	}
@@ -58,12 +58,12 @@ func portCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runPort(ctx context.Context, backend compose.Service, opts portOptions, service string) error {
+func runPort(ctx context.Context, backend api.Service, opts portOptions, service string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	ip, port, err := backend.Port(ctx, projectName, service, opts.port, compose.PortOptions{
+	ip, port, err := backend.Port(ctx, projectName, service, opts.port, api.PortOptions{
 		Protocol: opts.protocol,
 		Index:    opts.index,
 	})

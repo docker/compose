@@ -33,7 +33,7 @@ import (
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type aciContainerService struct {
@@ -107,7 +107,7 @@ func (cs *aciContainerService) Start(ctx context.Context, containerID string) er
 		var aerr autorest.DetailedError
 		if ok := errors.As(err, &aerr); ok {
 			if aerr.StatusCode == http.StatusNotFound {
-				return errdefs.ErrNotFound
+				return api.ErrNotFound
 			}
 		}
 		return err
@@ -207,7 +207,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 		cg, err := containerGroupsClient.Get(ctx, cs.ctx.ResourceGroup, groupName)
 		if err != nil {
 			if cg.StatusCode == http.StatusNotFound {
-				return errdefs.ErrNotFound
+				return api.ErrNotFound
 			}
 			return err
 		}
@@ -216,7 +216,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 			status := convert.GetStatus(container, cg)
 
 			if status == convert.StatusRunning {
-				return errdefs.ErrForbidden
+				return api.ErrForbidden
 			}
 		}
 	}
@@ -224,7 +224,7 @@ func (cs *aciContainerService) Delete(ctx context.Context, containerID string, r
 	cg, err := deleteACIContainerGroup(ctx, cs.ctx, groupName)
 	// Delete returns `StatusNoContent` if the group is not found
 	if cg.IsHTTPStatus(http.StatusNoContent) {
-		return errdefs.ErrNotFound
+		return api.ErrNotFound
 	}
 	if err != nil {
 		return err
@@ -244,7 +244,7 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		return containers.Container{}, err
 	}
 	if cg.IsHTTPStatus(http.StatusNoContent) || cg.ContainerGroupProperties == nil || cg.ContainerGroupProperties.Containers == nil {
-		return containers.Container{}, errdefs.ErrNotFound
+		return containers.Container{}, api.ErrNotFound
 	}
 
 	var cc containerinstance.Container
@@ -257,7 +257,7 @@ func (cs *aciContainerService) Inspect(ctx context.Context, containerID string) 
 		}
 	}
 	if !found {
-		return containers.Container{}, errdefs.ErrNotFound
+		return containers.Container{}, api.ErrNotFound
 	}
 
 	return convert.ContainerGroupToContainer(containerID, cg, cc, cs.ctx.Location), nil

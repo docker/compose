@@ -19,7 +19,7 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ type removeOptions struct {
 	volumes bool
 }
 
-func removeCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func removeCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := removeOptions{
 		projectOptions: p,
 	}
@@ -57,19 +57,19 @@ Any data which is not in a volume will be lost.`,
 	return cmd
 }
 
-func runRemove(ctx context.Context, backend compose.Service, opts removeOptions, services []string) error {
+func runRemove(ctx context.Context, backend api.Service, opts removeOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
 	if opts.stop {
-		return backend.Stop(ctx, project, compose.StopOptions{
+		return backend.Stop(ctx, project, api.StopOptions{
 			Services: services,
 		})
 	}
 
-	return backend.Remove(ctx, project, compose.RemoveOptions{
+	return backend.Remove(ctx, project, api.RemoveOptions{
 		Services: services,
 	})
 }

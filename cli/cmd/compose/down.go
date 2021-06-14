@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type downOptions struct {
@@ -36,7 +36,7 @@ type downOptions struct {
 	images        string
 }
 
-func downCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := downOptions{
 		projectOptions: p,
 	}
@@ -66,7 +66,7 @@ func downCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, backend compose.Service, opts downOptions) error {
+func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
 	name := opts.ProjectName
 	var project *types.Project
 	if opts.ProjectName == "" {
@@ -83,7 +83,7 @@ func runDown(ctx context.Context, backend compose.Service, opts downOptions) err
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return backend.Down(ctx, name, compose.DownOptions{
+	return backend.Down(ctx, name, api.DownOptions{
 		RemoveOrphans: opts.removeOrphans,
 		Project:       project,
 		Timeout:       timeout,

@@ -22,9 +22,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type logsOptions struct {
@@ -37,7 +37,7 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *projectOptions, contextType string, backend compose.Service) *cobra.Command {
+func logsCommand(p *projectOptions, contextType string, backend api.Service) *cobra.Command {
 	opts := logsOptions{
 		projectOptions: p,
 	}
@@ -60,13 +60,13 @@ func logsCommand(p *projectOptions, contextType string, backend compose.Service)
 	return logsCmd
 }
 
-func runLogs(ctx context.Context, backend compose.Service, opts logsOptions, services []string) error {
+func runLogs(ctx context.Context, backend api.Service, opts logsOptions, services []string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 	consumer := formatter.NewLogConsumer(ctx, os.Stdout, !opts.noColor, !opts.noPrefix)
-	return backend.Logs(ctx, projectName, consumer, compose.LogOptions{
+	return backend.Logs(ctx, projectName, consumer, api.LogOptions{
 		Services:   services,
 		Follow:     opts.follow,
 		Tail:       opts.tail,

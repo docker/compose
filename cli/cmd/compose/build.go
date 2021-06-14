@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type buildOptions struct {
@@ -38,7 +38,7 @@ type buildOptions struct {
 	memory   string
 }
 
-func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := buildOptions{
 		projectOptions: p,
 	}
@@ -81,13 +81,13 @@ func buildCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runBuild(ctx context.Context, backend compose.Service, opts buildOptions, services []string) error {
+func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
 	project, err := opts.toProject(services)
 	if err != nil {
 		return err
 	}
 
-	return backend.Build(ctx, project, compose.BuildOptions{
+	return backend.Build(ctx, project, api.BuildOptions{
 		Pull:     opts.pull,
 		Progress: opts.progress,
 		Args:     types.NewMappingWithEquals(opts.args),

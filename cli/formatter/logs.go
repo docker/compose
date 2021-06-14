@@ -23,11 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // NewLogConsumer creates a new LogConsumer
-func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) compose.LogConsumer {
+func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) api.LogConsumer {
 	return &logConsumer{
 		ctx:        ctx,
 		presenters: map[string]*presenter{},

@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/spf13/cobra"
 )
@@ -31,7 +31,7 @@ type eventsOpts struct {
 	json bool
 }
 
-func eventsCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func eventsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := eventsOpts{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -49,15 +49,15 @@ func eventsCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return cmd
 }
 
-func runEvents(ctx context.Context, backend compose.Service, opts eventsOpts, services []string) error {
+func runEvents(ctx context.Context, backend api.Service, opts eventsOpts, services []string) error {
 	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	return backend.Events(ctx, project, compose.EventsOptions{
+	return backend.Events(ctx, project, api.EventsOptions{
 		Services: services,
-		Consumer: func(event compose.Event) error {
+		Consumer: func(event api.Event) error {
 			if opts.json {
 				marshal, err := json.Marshal(map[string]interface{}{
 					"time":       event.Timestamp,

@@ -17,11 +17,11 @@
 package utils
 
 import (
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // FilteredLogConsumer filters logs for given services
-func FilteredLogConsumer(consumer compose.LogConsumer, services []string) compose.LogConsumer {
+func FilteredLogConsumer(consumer api.LogConsumer, services []string) api.LogConsumer {
 	if len(services) == 0 {
 		return consumer
 	}
@@ -37,7 +37,7 @@ func FilteredLogConsumer(consumer compose.LogConsumer, services []string) compos
 
 type allowListLogConsumer struct {
 	allowList map[string]bool
-	delegate  compose.LogConsumer
+	delegate  api.LogConsumer
 }
 
 func (a *allowListLogConsumer) Log(container, service, message string) {

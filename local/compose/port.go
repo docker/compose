@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, project string, service string, port int, options api.PortOptions) (string, int, error) {
 	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project),

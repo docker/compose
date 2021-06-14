@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils/prompt"
 )
 
@@ -41,7 +41,7 @@ type ContextParams struct {
 }
 
 // ErrSubscriptionNotFound is returned when a required subscription is not found
-var ErrSubscriptionNotFound = errors.Wrapf(errdefs.ErrNotFound, "subscription")
+var ErrSubscriptionNotFound = errors.Wrapf(api.ErrNotFound, "subscription")
 
 // IsSubscriptionNotFoundError returns true if the unwrapped error is IsSubscriptionNotFoundError
 func IsSubscriptionNotFoundError(err error) bool {
@@ -145,7 +145,7 @@ func (helper contextCreateACIHelper) chooseGroup(ctx context.Context, subscripti
 	group, err := helper.selector.Select("Select a resource group", groupNames)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			return resources.Group{}, errdefs.ErrCanceled
+			return resources.Group{}, api.ErrCanceled
 		}
 
 		return resources.Group{}, err

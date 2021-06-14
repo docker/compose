@@ -20,10 +20,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/local/mocks"
+	compose "github.com/docker/compose-cli/pkg/api"
 
-	apitypes "github.com/docker/docker/api/types"
+	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/golang/mock/gomock"
@@ -37,17 +37,17 @@ func TestDown(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service2", "456"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
+		[]moby.Container{testContainer("service1", "123"), testContainer("service2", "456"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", nil).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "456", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "456", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), apitypes.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]apitypes.NetworkResource{{ID: "myProject_default"}}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]moby.NetworkResource{{ID: "myProject_default"}}, nil)
 
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
@@ -62,17 +62,17 @@ func TestDownRemoveOrphans(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
+		[]moby.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "321", nil).Return(nil)
 
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "789", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "321", apitypes.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "321", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), apitypes.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]apitypes.NetworkResource{{ID: "myProject_default"}}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]moby.NetworkResource{{ID: "myProject_default"}}, nil)
 
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
@@ -87,14 +87,14 @@ func TestDownRemoveVolumes(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]apitypes.Container{testContainer("service1", "123")}, nil)
+		[]moby.Container{testContainer("service1", "123")}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
-	api.EXPECT().ContainerRemove(gomock.Any(), "123", apitypes.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), apitypes.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return(nil, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return(nil, nil)
 
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(testProject))).Return(volume.VolumeListOKBody{Volumes: []*apitypes.Volume{{Name: "myProject_volume"}}}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(testProject))).Return(volume.VolumeListOKBody{Volumes: []*moby.Volume{{Name: "myProject_volume"}}}, nil)
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
 	err := tested.Down(context.Background(), testProject, compose.DownOptions{Volumes: true})

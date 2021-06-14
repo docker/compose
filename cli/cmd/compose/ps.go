@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -39,7 +39,7 @@ type psOptions struct {
 	Services bool
 }
 
-func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := psOptions{
 		projectOptions: p,
 	}
@@ -57,12 +57,12 @@ func psCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return psCmd
 }
 
-func runPs(ctx context.Context, backend compose.Service, services []string, opts psOptions) error {
+func runPs(ctx context.Context, backend api.Service, services []string, opts psOptions) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-	containers, err := backend.Ps(ctx, projectName, compose.PsOptions{
+	containers, err := backend.Ps(ctx, projectName, api.PsOptions{
 		All:      opts.All,
 		Services: services,
 	})

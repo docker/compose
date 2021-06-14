@@ -23,17 +23,17 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (s *composeService) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
+func (s *composeService) Kill(ctx context.Context, project *types.Project, options api.KillOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.kill(ctx, project, options)
 	})
 }
 
-func (s *composeService) kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
+func (s *composeService) kill(ctx context.Context, project *types.Project, options api.KillOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	var containers Containers

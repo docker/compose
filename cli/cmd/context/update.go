@@ -17,11 +17,11 @@
 package context
 
 import (
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/mobycli"
 )
 
@@ -76,7 +76,7 @@ func runUpdate(cmd *cobra.Command, name string) error {
 	dockerContext, err := s.Get(name)
 	if err == nil && dockerContext != nil {
 		if dockerContext.Type() != store.DefaultContextType {
-			return errors.Wrapf(errdefs.ErrNotImplemented, "context update for context type %q not supported", dockerContext.Type())
+			return errors.Wrapf(api.ErrNotImplemented, "context update for context type %q not supported", dockerContext.Type())
 		}
 	}
 

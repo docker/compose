@@ -26,10 +26,10 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/compose-spec/compose-go/types"
-	apitypes "github.com/docker/docker/api/types"
+	moby "github.com/docker/docker/api/types"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/local/mocks"
+	compose "github.com/docker/compose-cli/pkg/api"
 )
 
 const testProject = "testProject"
@@ -46,7 +46,7 @@ func TestKillAll(t *testing.T) {
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
-		[]apitypes.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
+		[]moby.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
@@ -64,7 +64,7 @@ func TestKillSignal(t *testing.T) {
 	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]apitypes.Container{testContainer("service1", "123")}, nil)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]moby.Container{testContainer("service1", "123")}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
 	err := tested.kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
@@ -75,8 +75,8 @@ func testService(name string) types.ServiceConfig {
 	return types.ServiceConfig{Name: name}
 }
 
-func testContainer(service string, id string) apitypes.Container {
-	return apitypes.Container{
+func testContainer(service string, id string) moby.Container {
+	return moby.Container{
 		ID:     id,
 		Names:  []string{id},
 		Labels: containerLabels(service),
@@ -99,8 +99,8 @@ func anyCancellableContext() gomock.Matcher {
 	return gomock.AssignableToTypeOf(ctxWithCancel)
 }
 
-func projectFilterListOpt() apitypes.ContainerListOptions {
-	return apitypes.ContainerListOptions{
+func projectFilterListOpt() moby.ContainerListOptions {
+	return moby.ContainerListOptions{
 		Filters: filters.NewArgs(projectFilter(testProject)),
 		All:     true,
 	}

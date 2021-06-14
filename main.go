@@ -25,12 +25,12 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	api "github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/cmd/compose"
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/internal"
 	impl "github.com/docker/compose-cli/local/compose"
+	api "github.com/docker/compose-cli/pkg/api"
 )
 
 func main() {

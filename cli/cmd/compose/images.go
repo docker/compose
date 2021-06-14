@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 	"github.com/docker/docker/pkg/stringid"
 
@@ -39,7 +39,7 @@ type imageOptions struct {
 	Quiet bool
 }
 
-func imagesCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func imagesCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := imageOptions{
 		projectOptions: p,
 	}
@@ -54,13 +54,13 @@ func imagesCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return imgCmd
 }
 
-func runImages(ctx context.Context, backend compose.Service, opts imageOptions, services []string) error {
+func runImages(ctx context.Context, backend api.Service, opts imageOptions, services []string) error {
 	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	images, err := backend.Images(ctx, projectName, compose.ImagesOptions{
+	images, err := backend.Images(ctx, projectName, api.ImagesOptions{
 		Services: services,
 	})
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -32,7 +32,7 @@ import (
 )
 
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) compose.Service {
+func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) api.Service {
 	return &composeService{
 		apiClient:  apiClient,
 		configFile: configFile,
@@ -56,15 +56,15 @@ func getCanonicalContainerName(c moby.Container) string {
 
 func getContainerNameWithoutProject(c moby.Container) string {
 	name := getCanonicalContainerName(c)
-	project := c.Labels[compose.ProjectLabel]
-	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[compose.ServiceLabel])
+	project := c.Labels[api.ProjectLabel]
+	prefix := fmt.Sprintf("%s_%s_", project, c.Labels[api.ServiceLabel])
 	if strings.HasPrefix(name, prefix) {
 		return name[len(project)+1:]
 	}
 	return name
 }
 
-func (s *composeService) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
 	switch options.Format {
 	case "json":
 		return json.MarshalIndent(project, "", "  ")

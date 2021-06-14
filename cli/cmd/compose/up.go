@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +89,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 	return nil
 }
 
-func upCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	upCmd := &cobra.Command{
@@ -144,7 +144,7 @@ func upCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return upCmd
 }
 
-func runUp(ctx context.Context, backend compose.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
+func runUp(ctx context.Context, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
 	if len(project.Services) == 0 {
 		return fmt.Errorf("no service selected")
 	}
@@ -156,7 +156,7 @@ func runUp(ctx context.Context, backend compose.Service, createOptions createOpt
 		return err
 	}
 
-	var consumer compose.LogConsumer
+	var consumer api.LogConsumer
 	if !upOptions.Detach {
 		consumer = formatter.NewLogConsumer(ctx, os.Stdout, !upOptions.noColor, !upOptions.noPrefix)
 	}
@@ -166,7 +166,7 @@ func runUp(ctx context.Context, backend compose.Service, createOptions createOpt
 		attachTo = project.ServiceNames()
 	}
 
-	create := compose.CreateOptions{
+	create := api.CreateOptions{
 		RemoveOrphans:        createOptions.removeOrphans,
 		Recreate:             createOptions.recreateStrategy(),
 		RecreateDependencies: createOptions.dependenciesRecreateStrategy(),
@@ -179,9 +179,9 @@ func runUp(ctx context.Context, backend compose.Service, createOptions createOpt
 		return backend.Create(ctx, project, create)
 	}
 
-	return backend.Up(ctx, project, compose.UpOptions{
+	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
-		Start: compose.StartOptions{
+		Start: api.StartOptions{
 			Attach:       consumer,
 			AttachTo:     attachTo,
 			ExitCodeFrom: upOptions.exitCodeFrom,

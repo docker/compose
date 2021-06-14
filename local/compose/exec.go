@@ -26,10 +26,10 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (s *composeService) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
+func (s *composeService) Exec(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return 0, err
@@ -88,7 +88,7 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 }
 
 // inspired by https://github.com/docker/cli/blob/master/cli/command/container/exec.go#L116
-func (s *composeService) interactiveExec(ctx context.Context, opts compose.RunOptions, resp moby.HijackedResponse) error {
+func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOptions, resp moby.HijackedResponse) error {
 	outputDone := make(chan error)
 	inputDone := make(chan error)
 
@@ -122,7 +122,7 @@ func (s *composeService) interactiveExec(ctx context.Context, opts compose.RunOp
 	}
 }
 
-func (s *composeService) getExecTarget(ctx context.Context, project *types.Project, service types.ServiceConfig, opts compose.RunOptions) (moby.Container, error) {
+func (s *composeService) getExecTarget(ctx context.Context, project *types.Project, service types.ServiceConfig, opts api.RunOptions) (moby.Container, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
@@ -140,7 +140,7 @@ func (s *composeService) getExecTarget(ctx context.Context, project *types.Proje
 	return container, nil
 }
 
-func (s *composeService) getExecEnvironment(project *types.Project, service types.ServiceConfig, opts compose.RunOptions) []string {
+func (s *composeService) getExecEnvironment(project *types.Project, service types.ServiceConfig, opts api.RunOptions) []string {
 	var env []string
 	for k, v := range service.Environment.OverrideBy(types.NewMappingWithEquals(opts.Environment)).
 		Resolve(func(s string) (string, bool) {

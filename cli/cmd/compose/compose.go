@@ -33,11 +33,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/cli/metrics"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 //Command defines a compose CLI command as a func with args
@@ -60,7 +59,7 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 		}
 		err := fn(ctx, args)
 		var composeErr metrics.ComposeError
-		if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
 			err = dockercli.StatusError{
 				StatusCode: 130,
 				Status:     metrics.CanceledStatus,
@@ -120,7 +119,7 @@ func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Co
 					if s.Labels == nil {
 						s.Labels = make(map[string]string)
 					}
-					s.Labels[compose.EnvironmentFileLabel] = ef
+					s.Labels[api.EnvironmentFileLabel] = ef
 					services = append(services, s)
 				}
 			}
@@ -195,7 +194,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(contextType string, backend compose.Service) *cobra.Command {
+func RootCommand(contextType string, backend api.Service) *cobra.Command {
 	opts := projectOptions{}
 	var ansi string
 	var noAnsi bool

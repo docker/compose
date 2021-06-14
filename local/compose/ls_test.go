@@ -19,7 +19,7 @@ package compose
 import (
 	"testing"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
 	"gotest.tools/v3/assert"
@@ -30,22 +30,22 @@ func TestContainersToStacks(t *testing.T) {
 		{
 			ID:     "service1",
 			State:  "running",
-			Labels: map[string]string{compose.ProjectLabel: "project1"},
+			Labels: map[string]string{api.ProjectLabel: "project1"},
 		},
 		{
 			ID:     "service2",
 			State:  "running",
-			Labels: map[string]string{compose.ProjectLabel: "project1"},
+			Labels: map[string]string{api.ProjectLabel: "project1"},
 		},
 		{
 			ID:     "service3",
 			State:  "running",
-			Labels: map[string]string{compose.ProjectLabel: "project2"},
+			Labels: map[string]string{api.ProjectLabel: "project2"},
 		},
 	}
 	stacks, err := containersToStacks(containers)
 	assert.NilError(t, err)
-	assert.DeepEqual(t, stacks, []compose.Stack{
+	assert.DeepEqual(t, stacks, []api.Stack{
 		{
 			ID:     "project1",
 			Name:   "project1",

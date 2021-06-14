@@ -23,8 +23,8 @@ import (
 
 	moby "github.com/docker/docker/api/types"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/local/mocks"
+	compose "github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/golang/mock/gomock"

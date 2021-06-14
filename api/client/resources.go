@@ -19,8 +19,8 @@ package client
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type resourceService struct {
@@ -28,5 +28,5 @@ type resourceService struct {
 
 // Prune prune resources
 func (c *resourceService) Prune(ctx context.Context, request resources.PruneRequest) (resources.PruneResult, error) {
-	return resources.PruneResult{}, errdefs.ErrNotImplemented
+	return resources.PruneResult{}, api.ErrNotImplemented
 }

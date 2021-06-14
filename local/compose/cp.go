@@ -28,8 +28,8 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose-cli/api/compose"
-	apitypes "github.com/docker/docker/api/types"
+	"github.com/docker/compose-cli/pkg/api"
+	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/system"
@@ -44,7 +44,7 @@ const (
 	acrossServices = fromService | toService
 )
 
-func (s *composeService) Copy(ctx context.Context, project *types.Project, opts compose.CopyOptions) error {
+func (s *composeService) Copy(ctx context.Context, project *types.Project, opts api.CopyOptions) error {
 	srcService, srcPath := splitCpArg(opts.Source)
 	destService, dstPath := splitCpArg(opts.Destination)
 
@@ -69,9 +69,9 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 		serviceFilter(serviceName),
 	)
 	if !opts.All {
-		f.Add("label", fmt.Sprintf("%s=%d", compose.ContainerNumberLabel, opts.Index))
+		f.Add("label", fmt.Sprintf("%s=%d", api.ContainerNumberLabel, opts.Index))
 	}
-	containers, err := s.apiClient.ContainerList(ctx, apitypes.ContainerListOptions{Filters: f})
+	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{Filters: f})
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 	return g.Wait()
 }
 
-func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts compose.CopyOptions) error {
+func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error {
 	var err error
 	if srcPath != "-" {
 		// Get an absolute source path.
@@ -189,14 +189,14 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		content = preparedArchive
 	}
 
-	options := apitypes.CopyToContainerOptions{
+	options := moby.CopyToContainerOptions{
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                opts.CopyUIDGID,
 	}
 	return s.apiClient.CopyToContainer(ctx, containerID, resolvedDstPath, content, options)
 }
 
-func (s *composeService) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, opts compose.CopyOptions) error {
+func (s *composeService) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, opts api.CopyOptions) error {
 	var err error
 	if dstPath != "-" {
 		// Get an absolute destination path.

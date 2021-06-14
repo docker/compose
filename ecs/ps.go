@@ -19,10 +19,10 @@ package ecs
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (b *ecsAPIService) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
+func (b *ecsAPIService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	cluster, err := b.aws.GetStackClusterID(ctx, projectName)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (b *ecsAPIService) Ps(ctx context.Context, projectName string, options comp
 		return nil, nil
 	}
 
-	summary := []compose.ContainerSummary{}
+	summary := []api.ContainerSummary{}
 	for _, arn := range servicesARN {
 		service, err := b.aws.DescribeService(ctx, cluster, arn)
 		if err != nil {

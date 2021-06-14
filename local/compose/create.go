@@ -38,20 +38,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/internal"
 	convert "github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
-func (s *composeService) Create(ctx context.Context, project *types.Project, options compose.CreateOptions) error {
+func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
 	})
 }
 
-func (s *composeService) create(ctx context.Context, project *types.Project, options compose.CreateOptions) error {
+func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -140,9 +140,9 @@ func prepareVolumes(p *types.Project) error {
 
 func prepareNetworks(project *types.Project) {
 	for k, network := range project.Networks {
-		network.Labels = network.Labels.Add(compose.NetworkLabel, k)
-		network.Labels = network.Labels.Add(compose.ProjectLabel, project.Name)
-		network.Labels = network.Labels.Add(compose.VersionLabel, internal.Version)
+		network.Labels = network.Labels.Add(api.NetworkLabel, k)
+		network.Labels = network.Labels.Add(api.ProjectLabel, project.Name)
+		network.Labels = network.Labels.Add(api.VersionLabel, internal.Version)
 		project.Networks[k] = network
 	}
 }
@@ -183,9 +183,9 @@ func (s *composeService) ensureNetworks(ctx context.Context, networks types.Netw
 
 func (s *composeService) ensureProjectVolumes(ctx context.Context, project *types.Project) error {
 	for k, volume := range project.Volumes {
-		volume.Labels = volume.Labels.Add(compose.VolumeLabel, k)
-		volume.Labels = volume.Labels.Add(compose.ProjectLabel, project.Name)
-		volume.Labels = volume.Labels.Add(compose.VersionLabel, internal.Version)
+		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
+		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
+		volume.Labels = volume.Labels.Add(api.VersionLabel, internal.Version)
 		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
@@ -215,16 +215,16 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		labels[k] = v
 	}
 
-	labels[compose.ProjectLabel] = p.Name
-	labels[compose.ServiceLabel] = service.Name
-	labels[compose.VersionLabel] = internal.Version
-	if _, ok := service.Labels[compose.OneoffLabel]; !ok {
-		labels[compose.OneoffLabel] = "False"
+	labels[api.ProjectLabel] = p.Name
+	labels[api.ServiceLabel] = service.Name
+	labels[api.VersionLabel] = internal.Version
+	if _, ok := service.Labels[api.OneoffLabel]; !ok {
+		labels[api.OneoffLabel] = "False"
 	}
-	labels[compose.ConfigHashLabel] = hash
-	labels[compose.WorkingDirLabel] = p.WorkingDir
-	labels[compose.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
-	labels[compose.ContainerNumberLabel] = strconv.Itoa(number)
+	labels[api.ConfigHashLabel] = hash
+	labels[api.WorkingDirLabel] = p.WorkingDir
+	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
+	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var (
 		runCmd     strslice.StrSlice

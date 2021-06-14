@@ -29,8 +29,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/cli/cli"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type runOptions struct {
@@ -100,7 +100,7 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := runOptions{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -152,7 +152,7 @@ func notAtTTY() bool {
 	return !isatty.IsTerminal(os.Stdout.Fd())
 }
 
-func runRun(ctx context.Context, backend compose.Service, project *types.Project, opts runOptions) error {
+func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions) error {
 	err := opts.apply(project)
 	if err != nil {
 		return err
@@ -183,7 +183,7 @@ func runRun(ctx context.Context, backend compose.Service, project *types.Project
 	}
 
 	// start container and attach to container streams
-	runOpts := compose.RunOptions{
+	runOpts := api.RunOptions{
 		Name:              opts.name,
 		Service:           opts.Service,
 		Command:           opts.Command,
@@ -211,7 +211,7 @@ func runRun(ctx context.Context, backend compose.Service, project *types.Project
 	return err
 }
 
-func startDependencies(ctx context.Context, backend compose.Service, project types.Project, requestedServiceName string) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -224,8 +224,8 @@ func startDependencies(ctx context.Context, backend compose.Service, project typ
 
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
-	if err := backend.Create(ctx, &project, compose.CreateOptions{}); err != nil {
+	if err := backend.Create(ctx, &project, api.CreateOptions{}); err != nil {
 		return err
 	}
-	return backend.Start(ctx, &project, compose.StartOptions{})
+	return backend.Start(ctx, &project, api.StartOptions{})
 }

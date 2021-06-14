@@ -19,20 +19,20 @@ package compose
 import (
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/docker/api/types/filters"
 )
 
 func projectFilter(projectName string) filters.KeyValuePair {
-	return filters.Arg("label", fmt.Sprintf("%s=%s", compose.ProjectLabel, projectName))
+	return filters.Arg("label", fmt.Sprintf("%s=%s", api.ProjectLabel, projectName))
 }
 
 func serviceFilter(serviceName string) filters.KeyValuePair {
-	return filters.Arg("label", fmt.Sprintf("%s=%s", compose.ServiceLabel, serviceName))
+	return filters.Arg("label", fmt.Sprintf("%s=%s", api.ServiceLabel, serviceName))
 }
 
 func slugFilter(slug string) filters.KeyValuePair {
-	return filters.Arg("label", fmt.Sprintf("%s=%s", compose.SlugLabel, slug))
+	return filters.Arg("label", fmt.Sprintf("%s=%s", api.SlugLabel, slug))
 }
 
 func oneOffFilter(b bool) filters.KeyValuePair {
@@ -40,13 +40,13 @@ func oneOffFilter(b bool) filters.KeyValuePair {
 	if b {
 		v = "True"
 	}
-	return filters.Arg("label", fmt.Sprintf("%s=%s", compose.OneoffLabel, v))
+	return filters.Arg("label", fmt.Sprintf("%s=%s", api.OneoffLabel, v))
 }
 
 func containerNumberFilter(index int) filters.KeyValuePair {
-	return filters.Arg("label", fmt.Sprintf("%s=%d", compose.ContainerNumberLabel, index))
+	return filters.Arg("label", fmt.Sprintf("%s=%d", api.ContainerNumberLabel, index))
 }
 
 func hasProjectLabelFilter() filters.KeyValuePair {
-	return filters.Arg("label", compose.ProjectLabel)
+	return filters.Arg("label", api.ProjectLabel)
 }

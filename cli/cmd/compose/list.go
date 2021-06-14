@@ -26,9 +26,9 @@ import (
 	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type lsOptions struct {
@@ -38,7 +38,7 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(contextType string, backend compose.Service) *cobra.Command {
+func listCommand(contextType string, backend api.Service) *cobra.Command {
 	opts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls",
@@ -61,14 +61,14 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, backend compose.Service, opts lsOptions) error {
+func runList(ctx context.Context, backend api.Service, opts lsOptions) error {
 	filters := opts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
 	if err != nil {
 		return err
 	}
 
-	stackList, err := backend.List(ctx, compose.ListOptions{All: opts.All})
+	stackList, err := backend.List(ctx, api.ListOptions{All: opts.All})
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func runList(ctx context.Context, backend compose.Service, opts lsOptions) error
 	}
 
 	if filters.Len() > 0 {
-		var filtered []compose.Stack
+		var filtered []api.Stack
 		for _, s := range stackList {
 			if filters.Contains("name") && !filters.Match("name", s.Name) {
 				continue
@@ -103,7 +103,7 @@ type stackView struct {
 	Status string
 }
 
-func viewFromStackList(stackList []compose.Stack) []stackView {
+func viewFromStackList(stackList []api.Stack) []stackView {
 	retList := make([]stackView, len(stackList))
 	for i, s := range stackList {
 		retList[i] = stackView{

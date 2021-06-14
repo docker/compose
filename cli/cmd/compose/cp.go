@@ -23,7 +23,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type copyOptions struct {
@@ -37,7 +37,7 @@ type copyOptions struct {
 	copyUIDGID  bool
 }
 
-func copyCommand(p *projectOptions, backend compose.Service) *cobra.Command {
+func copyCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := copyOptions{
 		projectOptions: p,
 	}
@@ -71,13 +71,13 @@ func copyCommand(p *projectOptions, backend compose.Service) *cobra.Command {
 	return copyCmd
 }
 
-func runCopy(ctx context.Context, backend compose.Service, opts copyOptions) error {
+func runCopy(ctx context.Context, backend api.Service, opts copyOptions) error {
 	projects, err := opts.toProject(nil)
 	if err != nil {
 		return err
 	}
 
-	return backend.Copy(ctx, projects, compose.CopyOptions{
+	return backend.Copy(ctx, projects, api.CopyOptions{
 		Source:      opts.source,
 		Destination: opts.destination,
 		All:         opts.all,

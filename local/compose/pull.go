@@ -32,12 +32,12 @@ import (
 	"github.com/docker/docker/registry"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/metrics"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (s *composeService) Pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
+func (s *composeService) Pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
 	if opts.Quiet {
 		return s.pull(ctx, project, opts)
 	}
@@ -46,7 +46,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 	})
 }
 
-func (s *composeService) pull(ctx context.Context, project *types.Project, opts compose.PullOptions) error {
+func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
 	info, err := s.apiClient.Info(ctx)
 	if err != nil {
 		return err

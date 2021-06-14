@@ -30,8 +30,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/internal"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // NewContainerGroupsClient get client toi manipulate containerGrouos
@@ -88,7 +88,7 @@ func NewFileShareClient(subscriptionID string) (storage.FileSharesClient, error)
 func NewSubscriptionsClient() (subscription.SubscriptionsClient, error) {
 	authorizer, mgmtURL, err := getClientSetupData()
 	if err != nil {
-		return subscription.SubscriptionsClient{}, errors.Wrap(errdefs.ErrLoginRequired, err.Error())
+		return subscription.SubscriptionsClient{}, errors.Wrap(api.ErrLoginRequired, err.Error())
 	}
 	subc := subscription.NewSubscriptionsClientWithBaseURI(mgmtURL)
 	setupClient(&subc.Client, authorizer)
