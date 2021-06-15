@@ -11,7 +11,7 @@ docopt==0.6.2
 idna==2.10
 ipaddress==1.0.23
 jsonschema==3.2.0
-paramiko==2.7.1
+paramiko==2.7.2
 PySocks==1.7.1
 python-dotenv==0.17.0
 pywin32==301; sys_platform == 'win32'
