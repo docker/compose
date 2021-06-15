@@ -315,13 +315,19 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	if err != nil {
 		return err
 	}
+	inspectedContainer, err := s.apiClient.ContainerInspect(ctx, created.ID)
+	if err != nil {
+		return err
+	}
 	createdContainer := moby.Container{
-		ID:     created.ID,
-		Labels: containerConfig.Labels,
-		Names:  []string{"/" + name},
+		ID:     inspectedContainer.ID,
+		Labels: inspectedContainer.Config.Labels,
+		Names:  []string{inspectedContainer.Name},
+		NetworkSettings: &moby.SummaryNetworkSettings{
+			Networks: inspectedContainer.NetworkSettings.Networks,
+		},
 	}
 	cState.Add(createdContainer)
-
 	links, err := s.getLinks(ctx, service)
 	if err != nil {
 		return err
@@ -336,13 +342,30 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 				aliases = append(aliases, cfg.Aliases...)
 			}
 		}
-
+		if val, ok := createdContainer.NetworkSettings.Networks[netwrk.Name]; ok {
+			if shortIDAliasExists(createdContainer.ID, val.Aliases...) {
+				continue
+			}
+			err := s.apiClient.NetworkDisconnect(ctx, netwrk.Name, createdContainer.ID, false)
+			if err != nil {
+				return err
+			}
+		}
 		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, cfg, links, aliases...)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func shortIDAliasExists(containerID string, aliases ...string) bool {
+	for _, alias := range aliases {
+		if alias == containerID[:12] {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, cfg *types.ServiceNetworkConfig, links []string, aliases ...string) error {
@@ -354,12 +377,7 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 		ipv4ddress = cfg.Ipv4Address
 		ipv6Address = cfg.Ipv6Address
 	}
-	err := s.apiClient.NetworkDisconnect(ctx, netwrk, id, false)
-	if err != nil {
-		return err
-	}
-
-	err = s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
+	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
 		Aliases:           aliases,
 		IPAddress:         ipv4ddress,
 		GlobalIPv6Address: ipv6Address,
