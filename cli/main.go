@@ -39,7 +39,6 @@ import (
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/cmd"
-	"github.com/docker/compose-cli/cli/cmd/compose"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/logout"
@@ -49,8 +48,9 @@ import (
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
+	compose2 "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/local"
-	api "github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/api"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
@@ -225,7 +225,7 @@ func main() {
 	if ctype != store.DefaultContextType {
 		// On default context, "compose" is implemented by CLI Plugin
 		proxy := api.NewServiceProxy().WithService(service.ComposeService())
-		command := compose.RootCommand(ctype, proxy)
+		command := compose2.RootCommand(ctype, proxy)
 
 		if ctype == store.AciContextType {
 			customizeCliForACI(command, proxy)
@@ -315,9 +315,9 @@ func exit(ctx string, err error, ctype string) {
 		os.Exit(api.ExitCodeLoginRequired)
 	}
 
-	if compose.Warning != "" {
+	if compose2.Warning != "" {
 		logrus.Warn(err)
-		fmt.Fprintln(os.Stderr, compose.Warning)
+		fmt.Fprintln(os.Stderr, compose2.Warning)
 	}
 
 	if errors.Is(err, api.ErrNotImplemented) {

@@ -26,17 +26,17 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/cmd/compose"
 	"github.com/docker/compose-cli/cli/metrics"
+	commands "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/internal"
 	impl "github.com/docker/compose-cli/local/compose"
-	api "github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 func main() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
-		cmd := compose.RootCommand(store.DefaultContextType, lazyInit)
+		cmd := commands.RootCommand(store.DefaultContextType, lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
