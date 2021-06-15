@@ -29,7 +29,7 @@ import (
 
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/utils/prompt"
+	"github.com/docker/compose-cli/pkg/prompt"
 )
 
 // ContextParams options for creating ACI context

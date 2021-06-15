@@ -28,8 +28,8 @@ import (
 	"github.com/docker/compose-cli/aci/convert"
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/progress"
 	"github.com/docker/compose-cli/utils/formatter"
 )
 

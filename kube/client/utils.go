@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/utils"
+	"github.com/docker/compose-cli/pkg/utils"
+
 	corev1 "k8s.io/api/core/v1"
 )
 

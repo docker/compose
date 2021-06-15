@@ -29,8 +29,8 @@ import (
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
-	local_compose "github.com/docker/compose-cli/local/compose"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 const backendType = store.EcsLocalSimulationContextType
@@ -52,7 +52,7 @@ func service() (backend.Service, error) {
 
 	return &ecsLocalSimulation{
 		moby:    apiClient,
-		compose: local_compose.NewComposeService(apiClient, cliconfig.LoadDefaultConfigFile(os.Stderr)),
+		compose: compose.NewComposeService(apiClient, cliconfig.LoadDefaultConfigFile(os.Stderr)),
 	}, nil
 }
 

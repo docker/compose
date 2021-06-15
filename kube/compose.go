@@ -28,11 +28,12 @@ import (
 
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/kube/client"
 	"github.com/docker/compose-cli/kube/helm"
 	"github.com/docker/compose-cli/kube/resources"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/progress"
+	utils2 "github.com/docker/compose-cli/pkg/utils"
 	"github.com/docker/compose-cli/utils"
 )
 
@@ -175,7 +176,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 				state = progress.Working
 			}
 			w.Event(progress.NewEvent(pod, state, message))
-			if !utils.StringContains(events, pod) {
+			if !utils2.StringContains(events, pod) {
 				events = append(events, pod)
 			}
 		},

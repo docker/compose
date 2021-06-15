@@ -30,8 +30,8 @@ import (
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	cliopts "github.com/docker/compose-cli/cli/options"
-	local_compose "github.com/docker/compose-cli/local/compose"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 type local struct {
@@ -46,7 +46,7 @@ func NewService(apiClient client.APIClient) backend.Service {
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
-		composeService:   local_compose.NewComposeService(apiClient, file),
+		composeService:   compose.NewComposeService(apiClient, file),
 	}
 }
 

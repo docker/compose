@@ -28,7 +28,7 @@ import (
 
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/utils"
+	"github.com/docker/compose-cli/pkg/utils"
 )
 
 type psOptions struct {

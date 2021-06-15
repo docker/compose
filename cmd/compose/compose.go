@@ -35,8 +35,8 @@ import (
 
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/formatter"
-	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 //Command defines a compose CLI command as a func with args
@@ -58,11 +58,11 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 			}()
 		}
 		err := fn(ctx, args)
-		var composeErr metrics.ComposeError
+		var composeErr compose.Error
 		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
 			err = dockercli.StatusError{
 				StatusCode: 130,
-				Status:     metrics.CanceledStatus,
+				Status:     compose.CanceledStatus,
 			}
 		}
 		if errors.As(err, &composeErr) {
@@ -155,12 +155,12 @@ func (o *projectOptions) toProjectName() (string, error) {
 func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
 	options, err := o.toProjectOptions(po...)
 	if err != nil {
-		return nil, metrics.WrapComposeError(err)
+		return nil, compose.WrapComposeError(err)
 	}
 
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
-		return nil, metrics.WrapComposeError(err)
+		return nil, compose.WrapComposeError(err)
 	}
 
 	if len(services) > 0 {
@@ -209,7 +209,7 @@ func RootCommand(contextType string, backend api.Service) *cobra.Command {
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
-				StatusCode: metrics.CommandSyntaxFailure.ExitCode,
+				StatusCode: compose.CommandSyntaxFailure.ExitCode,
 				Status:     fmt.Sprintf("unknown docker command: %q", "compose "+args[0]),
 			}
 		},

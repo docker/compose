@@ -26,11 +26,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/metrics"
 	commands "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/internal"
-	impl "github.com/docker/compose-cli/local/compose"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 func main() {
@@ -42,7 +41,7 @@ func main() {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			lazyInit.WithService(impl.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
+			lazyInit.WithService(compose.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}
@@ -50,7 +49,7 @@ func main() {
 		}
 		cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 			return dockercli.StatusError{
-				StatusCode: metrics.CommandSyntaxFailure.ExitCode,
+				StatusCode: compose.CommandSyntaxFailure.ExitCode,
 				Status:     err.Error(),
 			}
 		})

@@ -39,8 +39,8 @@ import (
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/progress"
 )
 
 func createACIContainers(ctx context.Context, aciContext store.AciContext, groupDefinition containerinstance.ContainerGroup) error {

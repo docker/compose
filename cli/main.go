@@ -51,6 +51,7 @@ import (
 	compose2 "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/local"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
@@ -237,7 +238,7 @@ func main() {
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)
 	}
-	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+	metrics.Track(ctype, os.Args[1:], compose.SuccessStatus)
 }
 
 func customizeCliForACI(command *cobra.Command, proxy *api.ServiceProxy) {
@@ -271,7 +272,7 @@ func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backen
 func handleError(ctx context.Context, err error, ctype string, currentContext string, cc *store.DockerContext, root *cobra.Command) {
 	// if user canceled request, simply exit without any error message
 	if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
-		metrics.Track(ctype, os.Args[1:], metrics.CanceledStatus)
+		metrics.Track(ctype, os.Args[1:], compose.CanceledStatus)
 		os.Exit(130)
 	}
 	if ctype == store.AwsContextType {
@@ -293,20 +294,20 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 
 func exit(ctx string, err error, ctype string) {
 	if exit, ok := err.(cli.StatusError); ok {
-		metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+		metrics.Track(ctype, os.Args[1:], compose.SuccessStatus)
 		os.Exit(exit.StatusCode)
 	}
 
-	var composeErr metrics.ComposeError
-	metricsStatus := metrics.FailureStatus
+	var composeErr compose.Error
+	metricsStatus := compose.FailureStatus
 	exitCode := 1
 	if errors.As(err, &composeErr) {
 		metricsStatus = composeErr.GetMetricsFailureCategory().MetricsStatus
 		exitCode = composeErr.GetMetricsFailureCategory().ExitCode
 	}
 	if strings.HasPrefix(err.Error(), "unknown shorthand flag:") || strings.HasPrefix(err.Error(), "unknown flag:") || strings.HasPrefix(err.Error(), "unknown docker command:") {
-		metricsStatus = metrics.CommandSyntaxFailure.MetricsStatus
-		exitCode = metrics.CommandSyntaxFailure.ExitCode
+		metricsStatus = compose.CommandSyntaxFailure.MetricsStatus
+		exitCode = compose.CommandSyntaxFailure.ExitCode
 	}
 	metrics.Track(ctype, os.Args[1:], metricsStatus)
 
@@ -343,7 +344,7 @@ func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
-			metrics.Track(contextType, os.Args[1:], metrics.FailureStatus)
+			metrics.Track(contextType, os.Args[1:], compose.FailureStatus)
 			os.Exit(1)
 		}
 	}

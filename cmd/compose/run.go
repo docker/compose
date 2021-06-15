@@ -29,8 +29,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/cli/cli"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/progress"
 )
 
 type runOptions struct {

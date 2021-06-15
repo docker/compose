@@ -33,7 +33,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/utils"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 type convertOptions struct {
@@ -180,7 +180,7 @@ func runHash(opts convertOptions) error {
 		return err
 	}
 	for _, s := range project.Services {
-		hash, err := utils.ServiceHash(s)
+		hash, err := compose.ServiceHash(s)
 		if err != nil {
 			return err
 		}

@@ -24,10 +24,11 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/spf13/cobra"
+
 	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/utils"
-	"github.com/spf13/cobra"
+	"github.com/docker/compose-cli/pkg/utils"
 )
 
 // composeOptions hold options common to `up` and `run` to run compose project
