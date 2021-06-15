@@ -17,6 +17,6 @@ python-dotenv==0.17.0
 pywin32==301; sys_platform == 'win32'
 PyYAML==5.4.1
 requests==2.25.1
-texttable==1.6.2
+texttable==1.6.3
 urllib3==1.26.5; python_version == '3.3'
 websocket-client==1.1.0
