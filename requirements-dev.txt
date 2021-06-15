@@ -1,6 +1,6 @@
 Click==7.1.2
 coverage==5.5
-ddt==1.4.1
+ddt==1.4.2
 flake8==3.8.3
 gitpython==3.1.11
 mock==3.0.5
