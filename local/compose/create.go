@@ -93,7 +93,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if len(orphans) > 0 {
 		if options.RemoveOrphans {
 			w := progress.ContextWriter(ctx)
-			err := s.removeContainers(ctx, w, orphans, nil)
+			err := s.removeContainers(ctx, w, orphans, nil, false)
 			if err != nil {
 				return err
 			}

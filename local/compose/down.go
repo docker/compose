@@ -66,7 +66,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options c
 
 	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers := containers.filter(isService(service.Name))
-		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout)
+		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
 	})
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options c
 
 	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
 	if options.RemoveOrphans && len(orphans) > 0 {
-		err := s.removeContainers(ctx, w, orphans, options.Timeout)
+		err := s.removeContainers(ctx, w, orphans, options.Timeout, false)
 		if err != nil {
 			return err
 		}
@@ -215,7 +215,7 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 	return eg.Wait()
 }
 
-func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration) error {
+func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration, volumes bool) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, container := range containers {
 		toDelete := container
@@ -228,7 +228,10 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{Force: true})
+			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{
+				Force:         true,
+				RemoveVolumes: volumes,
+			})
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err

@@ -232,7 +232,7 @@ func (s *composeService) doBuild(ctx context.Context, project *types.Project, op
 	for _, c := range observedState {
 		for imageName := range opts {
 			if c.Image == imageName {
-				err = s.removeContainers(ctx, cw, []moby.Container{c}, nil)
+				err = s.removeContainers(ctx, cw, []moby.Container{c}, nil, false)
 				if err != nil {
 					return nil, err
 				}
