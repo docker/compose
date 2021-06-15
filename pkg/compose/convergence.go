@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -317,8 +318,14 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	createdContainer := moby.Container{
 		ID:     created.ID,
 		Labels: containerConfig.Labels,
+		Names:  []string{"/" + name},
 	}
 	cState.Add(createdContainer)
+
+	links, err := s.getLinks(ctx, service)
+	if err != nil {
+		return err
+	}
 	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]
 		cfg := service.Networks[netName]
@@ -330,7 +337,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			}
 		}
 
-		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, cfg, aliases...)
+		err = s.connectContainerToNetwork(ctx, created.ID, netwrk.Name, cfg, links, aliases...)
 		if err != nil {
 			return err
 		}
@@ -338,7 +345,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	return nil
 }
 
-func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, cfg *types.ServiceNetworkConfig, aliases ...string) error {
+func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, cfg *types.ServiceNetworkConfig, links []string, aliases ...string) error {
 	var (
 		ipv4ddress  string
 		ipv6Address string
@@ -347,15 +354,52 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 		ipv4ddress = cfg.Ipv4Address
 		ipv6Address = cfg.Ipv6Address
 	}
-	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
+	err := s.apiClient.NetworkDisconnect(ctx, netwrk, id, false)
+	if err != nil {
+		return err
+	}
+
+	err = s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
 		Aliases:           aliases,
 		IPAddress:         ipv4ddress,
 		GlobalIPv6Address: ipv6Address,
+		Links:             links,
 	})
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *composeService) getLinks(ctx context.Context, service types.ServiceConfig) ([]string, error) {
+	cState, err := GetContextContainerState(ctx)
+	if err != nil {
+		return nil, err
+	}
+	links := []string{}
+	for _, serviceLink := range service.Links {
+		s := strings.Split(serviceLink, ":")
+		serviceName := serviceLink
+		serviceAlias := ""
+		if len(s) == 2 {
+			serviceName = s[0]
+			serviceAlias = s[1]
+		}
+		containers := cState.GetContainers()
+		depServiceContainers := containers.filter(isService(serviceName))
+		for _, container := range depServiceContainers {
+			name := getCanonicalContainerName(container)
+			if serviceAlias != "" {
+				links = append(links,
+					fmt.Sprintf("%s:%s", name, serviceAlias))
+			}
+			links = append(links,
+				fmt.Sprintf("%s:%s", name, name),
+				fmt.Sprintf("%s:%s", name, getContainerNameWithoutProject(container)))
+		}
+	}
+	links = append(links, service.ExternalLinks...)
+	return links, nil
 }
 
 func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
