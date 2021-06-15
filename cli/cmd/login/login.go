@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/mobycli"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // Command returns the login command
@@ -56,7 +56,7 @@ func cloudLogin(cmd *cobra.Command, backendType string, params interface{}) erro
 	ctx := cmd.Context()
 	cs, err := client.GetCloudService(ctx, backendType)
 	if err != nil {
-		return errors.Wrap(errdefs.ErrLoginFailed, "cannot connect to backend")
+		return errors.Wrap(api.ErrLoginFailed, "cannot connect to backend")
 	}
 	err = cs.Login(ctx, params)
 	if errors.Is(err, context.Canceled) {

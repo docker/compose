@@ -19,10 +19,9 @@ package ecs
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (b *ecsAPIService) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
-	return nil, errdefs.ErrNotImplemented
+func (b *ecsAPIService) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
+	return nil, api.ErrNotImplemented
 }

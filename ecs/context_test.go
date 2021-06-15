@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/utils/prompt"
+	"github.com/docker/compose-cli/pkg/prompt"
 
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"

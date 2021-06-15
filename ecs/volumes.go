@@ -20,9 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/awslabs/goformation/v4/cloudformation/efs"
@@ -63,11 +62,11 @@ func (b *ecsAPIService) createAccessPoints(project *types.Project, r awsResource
 		ap := efs.AccessPoint{
 			AccessPointTags: []efs.AccessPoint_AccessPointTag{
 				{
-					Key:   compose.ProjectLabel,
+					Key:   api.ProjectLabel,
 					Value: project.Name,
 				},
 				{
-					Key:   compose.VolumeLabel,
+					Key:   api.VolumeLabel,
 					Value: name,
 				},
 				{
@@ -147,7 +146,7 @@ func (e ecsVolumeService) Delete(ctx context.Context, volumeID string, options i
 func (e ecsVolumeService) Inspect(ctx context.Context, volumeID string) (volumes.Volume, error) {
 	ok, err := e.backend.aws.ResolveFileSystem(ctx, volumeID)
 	if ok == nil {
-		err = errors.Wrapf(errdefs.ErrNotFound, "filesystem %q does not exists", volumeID)
+		err = errors.Wrapf(api.ErrNotFound, "filesystem %q does not exists", volumeID)
 	}
 	return volumes.Volume{
 		ID:          volumeID,

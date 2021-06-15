@@ -28,8 +28,8 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/ecs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 func init() {
@@ -110,7 +110,7 @@ func parseAccessKeysFile(file string, opts *ecs.ContextParams) error {
 
 func runCreateLocalSimulation(ctx context.Context, contextName string, opts ecs.ContextParams) error {
 	if contextExists(contextName) {
-		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
+		return errors.Wrapf(api.ErrAlreadyExists, "context %q", contextName)
 	}
 	cs, err := client.GetCloudService(ctx, store.EcsLocalSimulationContextType)
 	if err != nil {
@@ -125,7 +125,7 @@ func runCreateLocalSimulation(ctx context.Context, contextName string, opts ecs.
 
 func runCreateEcs(ctx context.Context, contextName string, opts ecs.ContextParams) error {
 	if contextExists(contextName) {
-		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
+		return errors.Wrapf(api.ErrAlreadyExists, "context %q", contextName)
 	}
 	contextData, description, err := getEcsContextData(ctx, opts)
 	if err != nil {

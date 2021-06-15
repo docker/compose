@@ -34,8 +34,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/local/moby"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type containerService struct {
@@ -111,7 +111,7 @@ func (cs *containerService) Run(ctx context.Context, r containers.ContainerConfi
 	for _, v := range r.Volumes {
 		tokens := strings.Split(v, ":")
 		if len(tokens) != 2 {
-			return errors.Wrapf(errdefs.ErrParsingFailed, "volume %q has invalid format", v)
+			return errors.Wrapf(api.ErrParsingFailed, "volume %q has invalid format", v)
 		}
 		src := tokens[0]
 		tgt := tokens[1]
@@ -271,7 +271,7 @@ func (cs *containerService) Delete(ctx context.Context, containerID string, requ
 		Force: request.Force,
 	})
 	if client.IsErrNotFound(err) {
-		return errors.Wrapf(errdefs.ErrNotFound, "container %q", containerID)
+		return errors.Wrapf(api.ErrNotFound, "container %q", containerID)
 	}
 	return err
 }

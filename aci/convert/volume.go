@@ -22,15 +22,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/docker/compose-cli/aci/login"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2019-12-01/containerinstance"
 	"github.com/Azure/go-autorest/autorest/to"
-
 	"github.com/compose-spec/compose-go/types"
-
-	"github.com/docker/compose-cli/aci/login"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -151,10 +149,10 @@ func (v *volumeInput) parse(name string, candidate string) error {
 
 	sourceTokens := strings.Split(tokens[0], "/")
 	if len(sourceTokens) != 2 || sourceTokens[0] == "" {
-		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage account before '/'", candidate)
+		return errors.Wrapf(api.ErrParsingFailed, "volume specification %q does not include a storage account before '/'", candidate)
 	}
 	if sourceTokens[1] == "" {
-		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q does not include a storage file fileshare after '/'", candidate)
+		return errors.Wrapf(api.ErrParsingFailed, "volume specification %q does not include a storage file fileshare after '/'", candidate)
 	}
 	v.storageAccount = sourceTokens[0]
 	v.fileshare = sourceTokens[1]
@@ -168,11 +166,11 @@ func (v *volumeInput) parse(name string, candidate string) error {
 		v.target = tokens[1]
 		permissions := strings.ToLower(tokens[2])
 		if permissions != "ro" && permissions != "rw" {
-			return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q has an invalid mode %q", candidate, permissions)
+			return errors.Wrapf(api.ErrParsingFailed, "volume specification %q has an invalid mode %q", candidate, permissions)
 		}
 		v.readonly = permissions == "ro"
 	default:
-		return errors.Wrapf(errdefs.ErrParsingFailed, "volume specification %q has invalid format", candidate)
+		return errors.Wrapf(api.ErrParsingFailed, "volume specification %q has invalid format", candidate)
 	}
 
 	return nil

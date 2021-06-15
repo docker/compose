@@ -21,7 +21,7 @@ package helm
 import (
 	"errors"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	env "helm.sh/helm/v3/pkg/cli"
@@ -123,15 +123,15 @@ func (hc *Actions) Get(name string) (*release.Release, error) {
 }
 
 // ListReleases lists chart releases
-func (hc *Actions) ListReleases() ([]compose.Stack, error) {
+func (hc *Actions) ListReleases() ([]api.Stack, error) {
 	actList := action.NewList(hc.Config)
 	releases, err := actList.Run()
 	if err != nil {
 		return nil, err
 	}
-	result := []compose.Stack{}
+	result := []api.Stack{}
 	for _, rel := range releases {
-		result = append(result, compose.Stack{
+		result = append(result, api.Stack{
 			ID:     rel.Name,
 			Name:   rel.Name,
 			Status: string(rel.Info.Status),

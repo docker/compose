@@ -21,14 +21,13 @@ import (
 
 	"github.com/docker/compose-cli/api/backend"
 	"github.com/docker/compose-cli/api/cloud"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 // New returns a backend client associated with current context
@@ -43,7 +42,7 @@ func New(ctx context.Context) (*Client, error) {
 
 	service := backend.Current()
 	if service == nil {
-		return nil, errdefs.ErrNotFound
+		return nil, api.ErrNotFound
 	}
 
 	client := NewClient(cc.Type(), service)
@@ -84,7 +83,7 @@ func (c *Client) ContainerService() containers.Service {
 }
 
 // ComposeService returns the backend service for the current context
-func (c *Client) ComposeService() compose.Service {
+func (c *Client) ComposeService() api.Service {
 	if cs := c.bs.ComposeService(); cs != nil {
 		return cs
 	}

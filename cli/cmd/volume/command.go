@@ -23,10 +23,10 @@ import (
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/cli/formatter"
-	formatter2 "github.com/docker/compose-cli/cli/formatter"
+	format "github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/ecs"
+	"github.com/docker/compose-cli/pkg/progress"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
@@ -146,7 +146,7 @@ func inspectVolume() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			outJSON, err := formatter2.ToStandardJSON(v)
+			outJSON, err := format.ToStandardJSON(v)
 			if err != nil {
 				return err
 			}

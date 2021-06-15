@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/compose-cli/pkg/progress"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/iancoleman/strcase"
-
-	"github.com/docker/compose-cli/api/progress"
 )
 
 func (b *ecsAPIService) WaitStackCompletion(ctx context.Context, name string, operation int, ignored ...string) error { //nolint:gocyclo

@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type containerService struct {
@@ -28,44 +28,44 @@ type containerService struct {
 
 // List returns all the containers
 func (c *containerService) List(context.Context, bool) ([]containers.Container, error) {
-	return nil, errdefs.ErrNotImplemented
+	return nil, api.ErrNotImplemented
 }
 
 // Start starts a stopped container
 func (c *containerService) Start(context.Context, string) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Stop stops the running container
 func (c *containerService) Stop(context.Context, string, *uint32) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (c *containerService) Kill(ctx context.Context, containerID string, signal string) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Run creates and starts a container
 func (c *containerService) Run(context.Context, containers.ContainerConfig) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Exec executes a command inside a running container
 func (c *containerService) Exec(context.Context, string, containers.ExecRequest) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Logs returns all the logs of a container
 func (c *containerService) Logs(context.Context, string, containers.LogsRequest) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Delete removes containers
 func (c *containerService) Delete(context.Context, string, containers.DeleteRequest) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 // Inspect get a specific container
 func (c *containerService) Inspect(context.Context, string) (containers.Container, error) {
-	return containers.Container{}, errdefs.ErrNotImplemented
+	return containers.Container{}, api.ErrNotImplemented
 }

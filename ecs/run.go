@@ -21,14 +21,13 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (b *ecsAPIService) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
-	return 0, errdefs.ErrNotImplemented
+func (b *ecsAPIService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+	return 0, api.ErrNotImplemented
 }
 
-func (b *ecsAPIService) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
-	return errdefs.ErrNotImplemented
+func (b *ecsAPIService) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {
+	return api.ErrNotImplemented
 }

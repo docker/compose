@@ -23,14 +23,13 @@ import (
 	"github.com/docker/compose-cli/api/backend"
 
 	"github.com/docker/compose-cli/api/cloud"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -125,7 +124,7 @@ func (b *ecsAPIService) ContainerService() containers.Service {
 	return nil
 }
 
-func (b *ecsAPIService) ComposeService() compose.Service {
+func (b *ecsAPIService) ComposeService() api.Service {
 	return b
 }
 
@@ -149,11 +148,11 @@ type ecsCloudService struct {
 }
 
 func (a ecsCloudService) Login(ctx context.Context, params interface{}) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (a ecsCloudService) Logout(ctx context.Context) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (a ecsCloudService) CreateContextData(ctx context.Context, params interface{}) (interface{}, string, error) {
