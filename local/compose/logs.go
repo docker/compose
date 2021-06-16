@@ -49,6 +49,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 				ShowStderr: true,
 				Follow:     options.Follow,
 				Since:      options.Since,
+				Until:      options.Until,
 				Tail:       options.Tail,
 				Timestamps: options.Timestamps,
 			})

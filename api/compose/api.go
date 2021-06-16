@@ -325,6 +325,7 @@ type LogOptions struct {
 	Services   []string
 	Tail       string
 	Since      string
+	Until      string
 	Follow     bool
 	Timestamps bool
 }

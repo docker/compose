@@ -33,6 +33,7 @@ type logsOptions struct {
 	follow     bool
 	tail       string
 	since      string
+	until      string
 	noColor    bool
 	noPrefix   bool
 	timestamps bool
@@ -51,7 +52,8 @@ func logsCommand(p *projectOptions, contextType string, backend compose.Service)
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")
-	flags.StringVar(&opts.since, "since", "", "Show logs since timestamp (e.g. 2013-01-02T13:23:37 or 42m)")
+	flags.StringVar(&opts.since, "since", "", "Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
+	flags.StringVar(&opts.until, "until", "", "Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)")
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps.")
@@ -73,6 +75,7 @@ func runLogs(ctx context.Context, backend compose.Service, opts logsOptions, ser
 		Follow:     opts.follow,
 		Tail:       opts.tail,
 		Since:      opts.since,
+		Until:      opts.until,
 		Timestamps: opts.timestamps,
 	})
 }
