@@ -38,7 +38,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/docker/compose-cli/internal"
 	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/progress"
 	"github.com/docker/compose-cli/pkg/utils"
@@ -141,7 +140,7 @@ func prepareNetworks(project *types.Project) {
 	for k, network := range project.Networks {
 		network.Labels = network.Labels.Add(api.NetworkLabel, k)
 		network.Labels = network.Labels.Add(api.ProjectLabel, project.Name)
-		network.Labels = network.Labels.Add(api.VersionLabel, internal.Version)
+		network.Labels = network.Labels.Add(api.VersionLabel, api.ComposeVersion)
 		project.Networks[k] = network
 	}
 }
@@ -184,7 +183,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	for k, volume := range project.Volumes {
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
-		volume.Labels = volume.Labels.Add(api.VersionLabel, internal.Version)
+		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
 		err := s.ensureVolume(ctx, volume)
 		if err != nil {
 			return err
@@ -216,7 +215,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 
 	labels[api.ProjectLabel] = p.Name
 	labels[api.ServiceLabel] = service.Name
-	labels[api.VersionLabel] = internal.Version
+	labels[api.VersionLabel] = api.ComposeVersion
 	if _, ok := service.Labels[api.OneoffLabel]; !ok {
 		labels[api.OneoffLabel] = "False"
 	}

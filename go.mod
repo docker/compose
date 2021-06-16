@@ -37,6 +37,7 @@ require (
 	github.com/google/go-cmp v0.5.5
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/hashicorp/go-uuid v1.0.2
+	github.com/hashicorp/go-version v1.3.0
 	github.com/iancoleman/strcase v0.1.2
 	github.com/joho/godotenv v1.3.0
 	github.com/kr/pty v1.1.8 // indirect

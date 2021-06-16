@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/compose-cli/internal"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
@@ -78,6 +78,6 @@ func TestPrepareNetworkLabels(t *testing.T) {
 	assert.DeepEqual(t, project.Networks["skynet"].Labels, types.Labels(map[string]string{
 		"com.docker.compose.network": "skynet",
 		"com.docker.compose.project": "myProject",
-		"com.docker.compose.version": internal.Version,
+		"com.docker.compose.version": api.ComposeVersion,
 	}))
 }
