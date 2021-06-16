@@ -16,6 +16,14 @@
 
 package api
 
+import (
+	"fmt"
+
+	"github.com/hashicorp/go-version"
+
+	"github.com/docker/compose-cli/internal"
+)
+
 const (
 	// ProjectLabel allow to track resource related to a compose project
 	ProjectLabel = "com.docker.compose.project"
@@ -42,3 +50,15 @@ const (
 	// VersionLabel stores the compose tool version used to run application
 	VersionLabel = "com.docker.compose.version"
 )
+
+var ComposeVersion string
+
+func init() {
+	v, err := version.NewVersion(internal.Version)
+	if err == nil {
+		segments := v.Segments()
+		if len(segments) > 2 {
+			ComposeVersion = fmt.Sprintf("%d.%d.%d", segments[0], segments[1], segments[2])
+		}
+	}
+}
