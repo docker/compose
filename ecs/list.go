@@ -20,19 +20,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (b *ecsAPIService) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
+func (b *ecsAPIService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
 	stacks, err := b.aws.ListStacks(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, stack := range stacks {
-		if stack.Status == compose.STARTING {
+		if stack.Status == api.STARTING {
 			if err := b.checkStackState(ctx, stack.Name); err != nil {
-				stack.Status = compose.FAILED
+				stack.Status = api.FAILED
 				stack.Reason = err.Error()
 			}
 		}

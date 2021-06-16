@@ -28,23 +28,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project, options compose.BuildOptions) error {
+func (e ecsLocalSimulation) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	return e.compose.Build(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project, options compose.PushOptions) error {
+func (e ecsLocalSimulation) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	return e.compose.Push(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project, options compose.PullOptions) error {
+func (e ecsLocalSimulation) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
 	return e.compose.Pull(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project, opts compose.CreateOptions) error {
+func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project, opts api.CreateOptions) error {
 	enhanced, err := e.enhanceForLocalSimulation(project)
 	if err != nil {
 		return err
@@ -53,27 +52,27 @@ func (e ecsLocalSimulation) Create(ctx context.Context, project *types.Project, 
 	return e.compose.Create(ctx, enhanced, opts)
 }
 
-func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, options compose.StartOptions) error {
+func (e ecsLocalSimulation) Start(ctx context.Context, project *types.Project, options api.StartOptions) error {
 	return e.compose.Start(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Restart(ctx context.Context, project *types.Project, options compose.RestartOptions) error {
+func (e ecsLocalSimulation) Restart(ctx context.Context, project *types.Project, options api.RestartOptions) error {
 	return e.compose.Restart(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Stop(ctx context.Context, project *types.Project, options compose.StopOptions) error {
+func (e ecsLocalSimulation) Stop(ctx context.Context, project *types.Project, options api.StopOptions) error {
 	return e.compose.Stop(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, options compose.UpOptions) error {
-	return errdefs.ErrNotImplemented
+func (e ecsLocalSimulation) Up(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	return api.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Kill(ctx context.Context, project *types.Project, options compose.KillOptions) error {
+func (e ecsLocalSimulation) Kill(ctx context.Context, project *types.Project, options api.KillOptions) error {
 	return e.compose.Kill(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, options compose.ConvertOptions) ([]byte, error) {
+func (e ecsLocalSimulation) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
 	enhanced, err := e.enhanceForLocalSimulation(project)
 	if err != nil {
 		return nil, err
@@ -161,57 +160,57 @@ func (e ecsLocalSimulation) enhanceForLocalSimulation(project *types.Project) (*
 	return project, nil
 }
 
-func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, options compose.DownOptions) error {
+func (e ecsLocalSimulation) Down(ctx context.Context, projectName string, options api.DownOptions) error {
 	options.RemoveOrphans = true
 	return e.compose.Down(ctx, projectName, options)
 }
 
-func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
+func (e ecsLocalSimulation) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
 	return e.compose.Logs(ctx, projectName, consumer, options)
 }
 
-func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string, options compose.PsOptions) ([]compose.ContainerSummary, error) {
+func (e ecsLocalSimulation) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	return e.compose.Ps(ctx, projectName, options)
 }
-func (e ecsLocalSimulation) List(ctx context.Context, opts compose.ListOptions) ([]compose.Stack, error) {
+func (e ecsLocalSimulation) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
 	return e.compose.List(ctx, opts)
 }
-func (e ecsLocalSimulation) RunOneOffContainer(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
-	return 0, errors.Wrap(errdefs.ErrNotImplemented, "use docker-compose run")
+func (e ecsLocalSimulation) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+	return 0, errors.Wrap(api.ErrNotImplemented, "use docker-compose run")
 }
 
-func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, options compose.RemoveOptions) error {
+func (e ecsLocalSimulation) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {
 	return e.compose.Remove(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, opts compose.RunOptions) (int, error) {
-	return 0, errdefs.ErrNotImplemented
+func (e ecsLocalSimulation) Exec(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+	return 0, api.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Copy(ctx context.Context, project *types.Project, opts compose.CopyOptions) error {
+func (e ecsLocalSimulation) Copy(ctx context.Context, project *types.Project, opts api.CopyOptions) error {
 	return e.compose.Copy(ctx, project, opts)
 }
 
-func (e ecsLocalSimulation) Pause(ctx context.Context, project string, options compose.PauseOptions) error {
+func (e ecsLocalSimulation) Pause(ctx context.Context, project string, options api.PauseOptions) error {
 	return e.compose.Pause(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) UnPause(ctx context.Context, project string, options compose.PauseOptions) error {
+func (e ecsLocalSimulation) UnPause(ctx context.Context, project string, options api.PauseOptions) error {
 	return e.compose.UnPause(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, services []string) ([]compose.ContainerProcSummary, error) {
+func (e ecsLocalSimulation) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
 	return e.compose.Top(ctx, projectName, services)
 }
 
-func (e ecsLocalSimulation) Events(ctx context.Context, project string, options compose.EventsOptions) error {
+func (e ecsLocalSimulation) Events(ctx context.Context, project string, options api.EventsOptions) error {
 	return e.compose.Events(ctx, project, options)
 }
 
-func (e ecsLocalSimulation) Port(ctx context.Context, project string, service string, port int, options compose.PortOptions) (string, int, error) {
-	return "", 0, errdefs.ErrNotImplemented
+func (e ecsLocalSimulation) Port(ctx context.Context, project string, service string, port int, options api.PortOptions) (string, int, error) {
+	return "", 0, api.ErrNotImplemented
 }
 
-func (e ecsLocalSimulation) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
-	return nil, errdefs.ErrNotImplemented
+func (e ecsLocalSimulation) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
+	return nil, api.ErrNotImplemented
 }

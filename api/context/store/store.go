@@ -24,10 +24,10 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/docker/compose-cli/pkg/api"
+
 	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
-
-	"github.com/docker/compose-cli/api/errdefs"
 )
 
 const (
@@ -130,7 +130,7 @@ func (s *store) Get(name string) (*DockerContext, error) {
 	meta := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name), metaFile)
 	m, err := read(meta)
 	if os.IsNotExist(err) {
-		return nil, errors.Wrap(errdefs.ErrNotFound, objectName(name))
+		return nil, errors.Wrap(api.ErrNotFound, objectName(name))
 	} else if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (s *store) GetEndpoint(name string, data interface{}) error {
 	}
 	contextType := meta.Type()
 	if _, ok := meta.Endpoints[contextType]; !ok {
-		return errors.Wrapf(errdefs.ErrNotFound, "endpoint of type %q", contextType)
+		return errors.Wrapf(api.ErrNotFound, "endpoint of type %q", contextType)
 	}
 
 	dstPtrValue := reflect.ValueOf(data)
@@ -155,7 +155,7 @@ func (s *store) GetEndpoint(name string, data interface{}) error {
 	valIndirect := reflect.Indirect(val)
 
 	if dstValue.Type() != valIndirect.Type() {
-		return errdefs.ErrWrongContextType
+		return api.ErrWrongContextType
 	}
 
 	dstValue.Set(valIndirect)
@@ -223,7 +223,7 @@ func (s *store) ContextExists(name string) bool {
 
 func (s *store) Create(name string, contextType string, description string, data interface{}) error {
 	if s.ContextExists(name) {
-		return errors.Wrap(errdefs.ErrAlreadyExists, objectName(name))
+		return errors.Wrap(api.ErrAlreadyExists, objectName(name))
 	}
 	dir := contextDirOf(name)
 	metaDir := filepath.Join(s.root, contextsDir, metadataDir, dir)
@@ -285,15 +285,15 @@ func (s *store) List() ([]*DockerContext, error) {
 
 func (s *store) Remove(name string) error {
 	if name == DefaultContextName {
-		return errors.Wrap(errdefs.ErrForbidden, objectName(name))
+		return errors.Wrap(api.ErrForbidden, objectName(name))
 	}
 	dir := filepath.Join(s.root, contextsDir, metadataDir, contextDirOf(name))
 	// Check if directory exists because os.RemoveAll returns nil if it doesn't
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return errors.Wrap(errdefs.ErrNotFound, objectName(name))
+		return errors.Wrap(api.ErrNotFound, objectName(name))
 	}
 	if err := os.RemoveAll(dir); err != nil {
-		return errors.Wrapf(errdefs.ErrUnknown, "unable to remove %s: %s", objectName(name), err)
+		return errors.Wrapf(api.ErrUnknown, "unable to remove %s: %s", objectName(name), err)
 	}
 	return nil
 }

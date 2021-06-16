@@ -19,11 +19,11 @@
 package context
 
 import (
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/kube"
 )
 
@@ -56,7 +56,7 @@ func createKubeCommand() *cobra.Command {
 
 func runCreateKube(contextName string, opts kube.ContextParams) error {
 	if contextExists(contextName) {
-		return errors.Wrapf(errdefs.ErrAlreadyExists, "context %q", contextName)
+		return errors.Wrapf(api.ErrAlreadyExists, "context %q", contextName)
 	}
 
 	contextData, description, err := opts.CreateContextData()

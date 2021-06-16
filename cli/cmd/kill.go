@@ -25,8 +25,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/formatter"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type killOpts struct {
@@ -60,7 +60,7 @@ func runKill(ctx context.Context, args []string, opts killOpts) error {
 	for _, id := range args {
 		err := c.ContainerService().Kill(ctx, id, opts.signal)
 		if err != nil {
-			if errdefs.IsNotFoundError(err) {
+			if api.IsNotFoundError(err) {
 				errs = multierror.Append(errs, fmt.Errorf("container %s not found", id))
 			} else {
 				errs = multierror.Append(errs, err)

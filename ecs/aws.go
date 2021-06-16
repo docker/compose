@@ -22,8 +22,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ecs"
 
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/secrets"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 const (
@@ -49,7 +49,7 @@ type API interface {
 	UpdateStack(ctx context.Context, changeset string) error
 	WaitStackComplete(ctx context.Context, name string, operation int) error
 	GetStackID(ctx context.Context, name string) (string, error)
-	ListStacks(ctx context.Context) ([]compose.Stack, error)
+	ListStacks(ctx context.Context) ([]api.Stack, error)
 	GetStackClusterID(ctx context.Context, stack string) (string, error)
 	GetServiceTaskDefinition(ctx context.Context, cluster string, serviceArns []string) (map[string]string, error)
 	ListStackServices(ctx context.Context, stack string) ([]string, error)
@@ -64,9 +64,9 @@ type API interface {
 	ListSecrets(ctx context.Context) ([]secrets.Secret, error)
 	DeleteSecret(ctx context.Context, id string, recover bool) error
 	GetLogs(ctx context.Context, name string, consumer func(container string, service string, message string), follow bool) error
-	DescribeService(ctx context.Context, cluster string, arn string) (compose.ServiceStatus, error)
-	DescribeServiceTasks(ctx context.Context, cluster string, project string, service string) ([]compose.ContainerSummary, error)
-	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]compose.PortPublisher, error)
+	DescribeService(ctx context.Context, cluster string, arn string) (api.ServiceStatus, error)
+	DescribeServiceTasks(ctx context.Context, cluster string, project string, service string) ([]api.ContainerSummary, error)
+	getURLWithPortMapping(ctx context.Context, targetGroupArns []string) ([]api.PortPublisher, error)
 	ListTasks(ctx context.Context, cluster string, family string) ([]string, error)
 	GetPublicIPs(ctx context.Context, interfaces ...string) (map[string]string, error)
 	ResolveLoadBalancer(ctx context.Context, nameOrArn string) (awsResource, string, string, []awsResource, error)

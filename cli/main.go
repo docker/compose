@@ -35,13 +35,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/backend"
-	api "github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/config"
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/cli/cmd"
-	"github.com/docker/compose-cli/cli/cmd/compose"
 	contextcmd "github.com/docker/compose-cli/cli/cmd/context"
 	"github.com/docker/compose-cli/cli/cmd/login"
 	"github.com/docker/compose-cli/cli/cmd/logout"
@@ -51,7 +48,10 @@ import (
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli"
 	cliopts "github.com/docker/compose-cli/cli/options"
+	compose2 "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/local"
+	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 
 	// Backend registrations
 	_ "github.com/docker/compose-cli/aci"
@@ -226,7 +226,7 @@ func main() {
 	if ctype != store.DefaultContextType {
 		// On default context, "compose" is implemented by CLI Plugin
 		proxy := api.NewServiceProxy().WithService(service.ComposeService())
-		command := compose.RootCommand(ctype, proxy)
+		command := compose2.RootCommand(ctype, proxy)
 
 		if ctype == store.AciContextType {
 			customizeCliForACI(command, proxy)
@@ -238,7 +238,7 @@ func main() {
 	if err = root.ExecuteContext(ctx); err != nil {
 		handleError(ctx, err, ctype, currentContext, cc, root)
 	}
-	metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+	metrics.Track(ctype, os.Args[1:], compose.SuccessStatus)
 }
 
 func customizeCliForACI(command *cobra.Command, proxy *api.ServiceProxy) {
@@ -263,7 +263,7 @@ func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backen
 		return local.GetLocalBackend(configDir, opts)
 	}
 	service, err := backend.Get(ctype)
-	if errdefs.IsNotFoundError(err) {
+	if api.IsNotFoundError(err) {
 		return service, nil
 	}
 	return service, err
@@ -271,8 +271,8 @@ func getBackend(ctype string, configDir string, opts cliopts.GlobalOpts) (backen
 
 func handleError(ctx context.Context, err error, ctype string, currentContext string, cc *store.DockerContext, root *cobra.Command) {
 	// if user canceled request, simply exit without any error message
-	if errdefs.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
-		metrics.Track(ctype, os.Args[1:], metrics.CanceledStatus)
+	if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+		metrics.Track(ctype, os.Args[1:], compose.CanceledStatus)
 		os.Exit(130)
 	}
 	if ctype == store.AwsContextType {
@@ -294,34 +294,34 @@ $ docker context create %s <name>`, cc.Type(), store.EcsContextType), ctype)
 
 func exit(ctx string, err error, ctype string) {
 	if exit, ok := err.(cli.StatusError); ok {
-		metrics.Track(ctype, os.Args[1:], metrics.SuccessStatus)
+		metrics.Track(ctype, os.Args[1:], compose.SuccessStatus)
 		os.Exit(exit.StatusCode)
 	}
 
-	var composeErr metrics.ComposeError
-	metricsStatus := metrics.FailureStatus
+	var composeErr compose.Error
+	metricsStatus := compose.FailureStatus
 	exitCode := 1
 	if errors.As(err, &composeErr) {
 		metricsStatus = composeErr.GetMetricsFailureCategory().MetricsStatus
 		exitCode = composeErr.GetMetricsFailureCategory().ExitCode
 	}
 	if strings.HasPrefix(err.Error(), "unknown shorthand flag:") || strings.HasPrefix(err.Error(), "unknown flag:") || strings.HasPrefix(err.Error(), "unknown docker command:") {
-		metricsStatus = metrics.CommandSyntaxFailure.MetricsStatus
-		exitCode = metrics.CommandSyntaxFailure.ExitCode
+		metricsStatus = compose.CommandSyntaxFailure.MetricsStatus
+		exitCode = compose.CommandSyntaxFailure.ExitCode
 	}
 	metrics.Track(ctype, os.Args[1:], metricsStatus)
 
-	if errors.Is(err, errdefs.ErrLoginRequired) {
+	if errors.Is(err, api.ErrLoginRequired) {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(errdefs.ExitCodeLoginRequired)
+		os.Exit(api.ExitCodeLoginRequired)
 	}
 
-	if compose.Warning != "" {
+	if compose2.Warning != "" {
 		logrus.Warn(err)
-		fmt.Fprintln(os.Stderr, compose.Warning)
+		fmt.Fprintln(os.Stderr, compose2.Warning)
 	}
 
-	if errors.Is(err, errdefs.ErrNotImplemented) {
+	if errors.Is(err, api.ErrNotImplemented) {
 		name := metrics.GetCommand(os.Args[1:])
 		fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s)\n", name, ctx)
 
@@ -344,7 +344,7 @@ func checkIfUnknownCommandExistInDefaultContext(err error, currentContext string
 
 		if mobycli.IsDefaultContextCommand(dockerCommand) {
 			fmt.Fprintf(os.Stderr, "Command %q not available in current context (%s), you can use the \"default\" context to run this command\n", dockerCommand, currentContext)
-			metrics.Track(contextType, os.Args[1:], metrics.FailureStatus)
+			metrics.Track(contextType, os.Args[1:], compose.FailureStatus)
 			os.Exit(1)
 		}
 	}

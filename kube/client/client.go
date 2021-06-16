@@ -27,8 +27,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/utils"
+	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/utils"
+
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +78,7 @@ func NewKubeClient(config genericclioptions.RESTClientGetter) (*KubeClient, erro
 // GetPod retrieves a service pod
 func (kc KubeClient) GetPod(ctx context.Context, projectName, serviceName string) (*corev1.Pod, error) {
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectLabel, projectName),
+		LabelSelector: fmt.Sprintf("%s=%s", api.ProjectLabel, projectName),
 	})
 	if err != nil {
 		return nil, err
@@ -87,7 +88,7 @@ func (kc KubeClient) GetPod(ctx context.Context, projectName, serviceName string
 	}
 	var pod corev1.Pod
 	for _, p := range pods.Items {
-		service := p.Labels[compose.ServiceLabel]
+		service := p.Labels[api.ServiceLabel]
 		if service == serviceName {
 			pod = p
 			break
@@ -97,7 +98,7 @@ func (kc KubeClient) GetPod(ctx context.Context, projectName, serviceName string
 }
 
 // Exec executes a command in a container
-func (kc KubeClient) Exec(ctx context.Context, projectName string, opts compose.RunOptions) error {
+func (kc KubeClient) Exec(ctx context.Context, projectName string, opts api.RunOptions) error {
 	pod, err := kc.GetPod(ctx, projectName, opts.Service)
 	if err != nil || pod == nil {
 		return err
@@ -148,24 +149,24 @@ func (kc KubeClient) Exec(ctx context.Context, projectName string, opts compose.
 }
 
 // GetContainers get containers for a given compose project
-func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all bool) ([]compose.ContainerSummary, error) {
+func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all bool) ([]api.ContainerSummary, error) {
 	fieldSelector := ""
 	if !all {
 		fieldSelector = "status.phase=Running"
 	}
 
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectLabel, projectName),
+		LabelSelector: fmt.Sprintf("%s=%s", api.ProjectLabel, projectName),
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
 		return nil, err
 	}
-	services := map[string][]compose.PortPublisher{}
-	result := []compose.ContainerSummary{}
+	services := map[string][]api.PortPublisher{}
+	result := []api.ContainerSummary{}
 	for _, pod := range pods.Items {
 		summary := podToContainerSummary(pod)
-		serviceName := pod.GetObjectMeta().GetLabels()[compose.ServiceLabel]
+		serviceName := pod.GetObjectMeta().GetLabels()[api.ServiceLabel]
 		ports, ok := services[serviceName]
 		if !ok {
 			s, err := kc.client.CoreV1().Services(kc.namespace).Get(ctx, serviceName, metav1.GetOptions{})
@@ -176,11 +177,11 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 				result = append(result, summary)
 				continue
 			}
-			ports = []compose.PortPublisher{}
+			ports = []api.PortPublisher{}
 			if s != nil {
 				if s.Spec.Type == corev1.ServiceTypeLoadBalancer {
 					if len(s.Status.LoadBalancer.Ingress) > 0 {
-						port := compose.PortPublisher{URL: s.Status.LoadBalancer.Ingress[0].IP}
+						port := api.PortPublisher{URL: s.Status.LoadBalancer.Ingress[0].IP}
 						if len(s.Spec.Ports) > 0 {
 							port.URL = fmt.Sprintf("%s:%d", port.URL, s.Spec.Ports[0].Port)
 							port.TargetPort = s.Spec.Ports[0].TargetPort.IntValue()
@@ -200,9 +201,9 @@ func (kc KubeClient) GetContainers(ctx context.Context, projectName string, all 
 }
 
 // GetLogs retrieves pod logs
-func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer compose.LogConsumer, follow bool) error {
+func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer api.LogConsumer, follow bool) error {
 	pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectLabel, projectName),
+		LabelSelector: fmt.Sprintf("%s=%s", api.ProjectLabel, projectName),
 	})
 	if err != nil {
 		return err
@@ -210,7 +211,7 @@ func (kc *KubeClient) GetLogs(ctx context.Context, projectName string, consumer 
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, pod := range pods.Items {
 		request := kc.client.CoreV1().Pods(kc.namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: follow})
-		service := pod.Labels[compose.ServiceLabel]
+		service := pod.Labels[api.ServiceLabel]
 		w := utils.GetWriter(func(line string) {
 			consumer.Log(pod.Name, service, line)
 		})
@@ -243,7 +244,7 @@ func (kc KubeClient) WaitForPodState(ctx context.Context, opts WaitForStatusOpti
 			time.Sleep(500 * time.Millisecond)
 
 			pods, err := kc.client.CoreV1().Pods(kc.namespace).List(ctx, metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", compose.ProjectLabel, opts.ProjectName),
+				LabelSelector: fmt.Sprintf("%s=%s", api.ProjectLabel, opts.ProjectName),
 			})
 			if err != nil {
 				errch <- err

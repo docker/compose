@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/server/proxy"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 var (
@@ -60,16 +61,16 @@ func metricsServerInterceptor(client metrics.Client) grpc.UnaryServerInterceptor
 
 		data, err := handler(ctx, req)
 
-		status := metrics.SuccessStatus
+		status := compose.SuccessStatus
 		if err != nil {
-			status = metrics.FailureStatus
+			status = compose.FailureStatus
 		}
 		command := methodMapping[info.FullMethod]
 		if command != "" {
 			client.Send(metrics.Command{
 				Command: command,
 				Context: contextType,
-				Source:  metrics.APISource,
+				Source:  compose.APISource,
 				Status:  status,
 			})
 		}

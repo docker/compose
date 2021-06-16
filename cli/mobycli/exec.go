@@ -24,13 +24,14 @@ import (
 	"os/signal"
 	"regexp"
 
-	"github.com/spf13/cobra"
-
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
 	"github.com/docker/compose-cli/cli/metrics"
 	"github.com/docker/compose-cli/cli/mobycli/resolvepath"
-	"github.com/docker/compose-cli/utils"
+	"github.com/spf13/cobra"
+
+	"github.com/docker/compose-cli/pkg/compose"
+	"github.com/docker/compose-cli/pkg/utils"
 )
 
 var delegatedContextTypes = []string{store.DefaultContextType}
@@ -68,10 +69,10 @@ func Exec(root *cobra.Command) {
 	if err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			exitCode := exiterr.ExitCode()
-			metrics.Track(store.DefaultContextType, os.Args[1:], metrics.ByExitCode(exitCode).MetricsStatus)
+			metrics.Track(store.DefaultContextType, os.Args[1:], compose.ByExitCode(exitCode).MetricsStatus)
 			os.Exit(exitCode)
 		}
-		metrics.Track(store.DefaultContextType, os.Args[1:], metrics.FailureStatus)
+		metrics.Track(store.DefaultContextType, os.Args[1:], compose.FailureStatus)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -79,7 +80,7 @@ func Exec(root *cobra.Command) {
 	if command == "build" && !metrics.HasQuietFlag(os.Args[1:]) {
 		utils.DisplayScanSuggestMsg()
 	}
-	metrics.Track(store.DefaultContextType, os.Args[1:], metrics.SuccessStatus)
+	metrics.Track(store.DefaultContextType, os.Args[1:], compose.SuccessStatus)
 
 	os.Exit(0)
 }

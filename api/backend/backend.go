@@ -23,12 +23,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose-cli/api/cloud"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 var (
@@ -66,7 +65,7 @@ func WithBackend(s Service) {
 // Service aggregates the service interfaces
 type Service interface {
 	ContainerService() containers.Service
-	ComposeService() compose.Service
+	ComposeService() api.Service
 	ResourceService() resources.Service
 	SecretsService() secrets.Service
 	VolumeService() volumes.Service
@@ -103,7 +102,7 @@ func Get(backendType string) (Service, error) {
 		}
 	}
 
-	return nil, errdefs.ErrNotFound
+	return nil, api.ErrNotFound
 }
 
 // GetCloudService returns the backend registered for a particular type, it returns

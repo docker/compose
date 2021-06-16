@@ -19,10 +19,9 @@ package ecs
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
-func (b *ecsAPIService) Images(ctx context.Context, projectName string, options compose.ImagesOptions) ([]compose.ImageSummary, error) {
-	return nil, errdefs.ErrNotImplemented
+func (b *ecsAPIService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
+	return nil, api.ErrNotImplemented
 }

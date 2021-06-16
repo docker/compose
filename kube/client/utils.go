@@ -22,34 +22,35 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/utils"
+	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/utils"
+
 	corev1 "k8s.io/api/core/v1"
 )
 
-func podToContainerSummary(pod corev1.Pod) compose.ContainerSummary {
-	state := compose.RUNNING
+func podToContainerSummary(pod corev1.Pod) api.ContainerSummary {
+	state := api.RUNNING
 
 	if pod.DeletionTimestamp != nil {
-		state = compose.REMOVING
+		state = api.REMOVING
 	} else {
 		for _, container := range pod.Status.ContainerStatuses {
 			if container.State.Waiting != nil || container.State.Terminated != nil {
-				state = compose.UPDATING
+				state = api.UPDATING
 				break
 			}
 		}
-		if state == compose.RUNNING && pod.Status.Phase != corev1.PodRunning {
+		if state == api.RUNNING && pod.Status.Phase != corev1.PodRunning {
 			state = string(pod.Status.Phase)
 		}
 	}
 
-	return compose.ContainerSummary{
+	return api.ContainerSummary{
 		ID:      pod.GetObjectMeta().GetName(),
 		Name:    pod.GetObjectMeta().GetName(),
-		Service: pod.GetObjectMeta().GetLabels()[compose.ServiceLabel],
+		Service: pod.GetObjectMeta().GetLabels()[api.ServiceLabel],
 		State:   state,
-		Project: pod.GetObjectMeta().GetLabels()[compose.ProjectLabel],
+		Project: pod.GetObjectMeta().GetLabels()[api.ProjectLabel],
 	}
 }
 
@@ -57,7 +58,7 @@ func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, 
 	servicePods := map[string]string{}
 	stateReached := true
 	for _, pod := range pods {
-		service := pod.Labels[compose.ServiceLabel]
+		service := pod.Labels[api.ServiceLabel]
 
 		if len(services) > 0 && !utils.StringContains(services, service) {
 			continue
@@ -71,17 +72,17 @@ func checkPodsState(services []string, pods []corev1.Pod, status string) (bool, 
 		}
 		servicePods[service] = pod.Status.Message
 
-		if status == compose.REMOVING {
+		if status == api.REMOVING {
 			continue
 		}
 		if pod.Status.Phase == corev1.PodFailed {
 			return false, servicePods, fmt.Errorf(pod.Status.Reason)
 		}
-		if status == compose.RUNNING && (pod.Status.Phase != corev1.PodRunning || !containersRunning) {
+		if status == api.RUNNING && (pod.Status.Phase != corev1.PodRunning || !containersRunning) {
 			stateReached = false
 		}
 	}
-	if status == compose.REMOVING && len(servicePods) > 0 {
+	if status == api.REMOVING && len(servicePods) > 0 {
 		stateReached = false
 	}
 	return stateReached, servicePods, nil
@@ -100,7 +101,7 @@ type WaitForStatusOptions struct {
 }
 
 // Ports holds published ports data
-type Ports []compose.PortPublisher
+type Ports []api.PortPublisher
 
 // PortMappingOptions holds the port mapping for project services
 type PortMappingOptions struct {

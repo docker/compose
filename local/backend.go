@@ -25,19 +25,19 @@ import (
 	"github.com/docker/docker/client"
 
 	"github.com/docker/compose-cli/api/backend"
-	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/containers"
 	"github.com/docker/compose-cli/api/resources"
 	"github.com/docker/compose-cli/api/secrets"
 	"github.com/docker/compose-cli/api/volumes"
 	cliopts "github.com/docker/compose-cli/cli/options"
-	local_compose "github.com/docker/compose-cli/local/compose"
+	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/compose"
 )
 
 type local struct {
 	containerService *containerService
 	volumeService    *volumeService
-	composeService   compose.Service
+	composeService   api.Service
 }
 
 // NewService build a backend for "local" context, using Docker API client
@@ -46,7 +46,7 @@ func NewService(apiClient client.APIClient) backend.Service {
 	return &local{
 		containerService: &containerService{apiClient},
 		volumeService:    &volumeService{apiClient},
-		composeService:   local_compose.NewComposeService(apiClient, file),
+		composeService:   compose.NewComposeService(apiClient, file),
 	}
 }
 
@@ -79,7 +79,7 @@ func (s *local) ContainerService() containers.Service {
 	return s.containerService
 }
 
-func (s *local) ComposeService() compose.Service {
+func (s *local) ComposeService() api.Service {
 	return s.composeService
 }
 

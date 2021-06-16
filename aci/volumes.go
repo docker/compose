@@ -30,9 +30,9 @@ import (
 
 	"github.com/docker/compose-cli/aci/login"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
-	"github.com/docker/compose-cli/api/progress"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose-cli/pkg/progress"
 )
 
 type aciVolumeService struct {
@@ -138,7 +138,7 @@ func (cs *aciVolumeService) Create(ctx context.Context, name string, options int
 	fileShare, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, *account.Name, name, "")
 	if err == nil {
 		w.Event(progress.ErrorEvent(name))
-		return volumes.Volume{}, errors.Wrapf(errdefs.ErrAlreadyExists, "Azure fileshare %q already exists", name)
+		return volumes.Volume{}, errors.Wrapf(api.ErrAlreadyExists, "Azure fileshare %q already exists", name)
 	}
 	if !fileShare.HasHTTPStatus(http.StatusNotFound) {
 		w.Event(progress.ErrorEvent(name))
@@ -212,7 +212,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 			if _, ok := account.Tags[dockerVolumeTag]; ok {
 				result, err := storageAccountsClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount)
 				if result.IsHTTPStatus(http.StatusNoContent) {
-					return errors.Wrapf(errdefs.ErrNotFound, "storage account %s does not exist", storageAccount)
+					return errors.Wrapf(api.ErrNotFound, "storage account %s does not exist", storageAccount)
 				}
 				return err
 			}
@@ -221,7 +221,7 @@ func (cs *aciVolumeService) Delete(ctx context.Context, id string, options inter
 
 	result, err := fileShareClient.Delete(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshare)
 	if result.HasHTTPStatus(http.StatusNoContent) {
-		return errors.Wrapf(errdefs.ErrNotFound, "fileshare %q", fileshare)
+		return errors.Wrapf(api.ErrNotFound, "fileshare %q", fileshare)
 	}
 	return err
 }
@@ -238,7 +238,7 @@ func (cs *aciVolumeService) Inspect(ctx context.Context, id string) (volumes.Vol
 	res, err := fileShareClient.Get(ctx, cs.aciContext.ResourceGroup, storageAccount, fileshareName, "")
 	if err != nil { // Just checks if it exists
 		if res.HasHTTPStatus(http.StatusNotFound) {
-			return volumes.Volume{}, errors.Wrapf(errdefs.ErrNotFound, "account %q, file share %q. Original message %s", storageAccount, fileshareName, err.Error())
+			return volumes.Volume{}, errors.Wrapf(api.ErrNotFound, "account %q, file share %q. Original message %s", storageAccount, fileshareName, err.Error())
 		}
 		return volumes.Volume{}, err
 	}

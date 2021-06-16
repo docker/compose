@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -406,8 +406,8 @@ volumes:
         provisioned_throughput: 1024
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.ListFileSystems(gomock.Any(), map[string]string{
-			compose.ProjectLabel: t.Name(),
-			compose.VolumeLabel:  "db-data",
+			api.ProjectLabel: t.Name(),
+			api.VolumeLabel:  "db-data",
 		}).Return(nil, nil)
 	})
 	n := volumeResourceName("db-data")
@@ -452,8 +452,8 @@ volumes:
   db-data: {}
 `, useDefaultVPC, func(m *MockAPIMockRecorder) {
 		m.ListFileSystems(gomock.Any(), map[string]string{
-			compose.ProjectLabel: t.Name(),
-			compose.VolumeLabel:  "db-data",
+			api.ProjectLabel: t.Name(),
+			api.VolumeLabel:  "db-data",
 		}).Return([]awsResource{
 			existingAWSResource{
 				id: "fs-123abc",
@@ -521,7 +521,7 @@ services:
 		for i := 0; i < tags.Len(); i++ {
 			k := tags.Index(i).FieldByName("Key").String()
 			v := tags.Index(i).FieldByName("Value").String()
-			if k == compose.ProjectLabel {
+			if k == api.ProjectLabel {
 				assert.Equal(t, v, t.Name())
 			}
 		}

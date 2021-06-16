@@ -19,11 +19,11 @@ package ecs
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/compose"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/utils"
 )
 
-func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer compose.LogConsumer, options compose.LogOptions) error {
+func (b *ecsAPIService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
 	if len(options.Services) > 0 {
 		consumer = utils.FilteredLogConsumer(consumer, options.Services)
 	}

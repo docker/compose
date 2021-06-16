@@ -19,25 +19,25 @@ package client
 import (
 	"context"
 
-	"github.com/docker/compose-cli/api/errdefs"
 	"github.com/docker/compose-cli/api/volumes"
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 type volumeService struct {
 }
 
 func (c *volumeService) List(ctx context.Context) ([]volumes.Volume, error) {
-	return nil, errdefs.ErrNotImplemented
+	return nil, api.ErrNotImplemented
 }
 
 func (c *volumeService) Create(ctx context.Context, name string, options interface{}) (volumes.Volume, error) {
-	return volumes.Volume{}, errdefs.ErrNotImplemented
+	return volumes.Volume{}, api.ErrNotImplemented
 }
 
 func (c *volumeService) Delete(ctx context.Context, id string, options interface{}) error {
-	return errdefs.ErrNotImplemented
+	return api.ErrNotImplemented
 }
 
 func (c *volumeService) Inspect(ctx context.Context, volumeID string) (volumes.Volume, error) {
-	return volumes.Volume{}, errdefs.ErrNotImplemented
+	return volumes.Volume{}, api.ErrNotImplemented
 }

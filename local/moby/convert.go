@@ -21,9 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
-	compose "github.com/compose-spec/compose-go/types"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
@@ -94,64 +92,6 @@ func ToPorts(ports []types.Port) []containers.Port {
 	}
 
 	return result
-}
-
-// ToMobyEnv convert into []string
-func ToMobyEnv(environment compose.MappingWithEquals) []string {
-	var env []string
-	for k, v := range environment {
-		if v == nil {
-			env = append(env, k)
-		} else {
-			env = append(env, fmt.Sprintf("%s=%s", k, *v))
-		}
-	}
-	return env
-}
-
-// ToMobyHealthCheck convert into container.HealthConfig
-func ToMobyHealthCheck(check *compose.HealthCheckConfig) *container.HealthConfig {
-	if check == nil {
-		return nil
-	}
-	var (
-		interval time.Duration
-		timeout  time.Duration
-		period   time.Duration
-		retries  int
-	)
-	if check.Interval != nil {
-		interval = time.Duration(*check.Interval)
-	}
-	if check.Timeout != nil {
-		timeout = time.Duration(*check.Timeout)
-	}
-	if check.StartPeriod != nil {
-		period = time.Duration(*check.StartPeriod)
-	}
-	if check.Retries != nil {
-		retries = int(*check.Retries)
-	}
-	test := check.Test
-	if check.Disable {
-		test = []string{"NONE"}
-	}
-	return &container.HealthConfig{
-		Test:        test,
-		Interval:    interval,
-		Timeout:     timeout,
-		StartPeriod: period,
-		Retries:     retries,
-	}
-}
-
-// ToSeconds convert into seconds
-func ToSeconds(d *compose.Duration) *int {
-	if d == nil {
-		return nil
-	}
-	s := int(time.Duration(*d).Seconds())
-	return &s
 }
 
 // FromPorts convert to nat.Port / nat.PortBinding

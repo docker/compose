@@ -22,9 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/compose-cli/api/compose"
-	"github.com/docker/compose-cli/api/errdefs"
-
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/awslabs/goformation/v4/cloudformation"
@@ -33,6 +30,7 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/efs"
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -156,7 +154,7 @@ func (b *ecsAPIService) parseClusterExtension(ctx context.Context, project *type
 			return nil, err
 		}
 		if !ok {
-			return nil, errors.Wrapf(errdefs.ErrNotFound, "cluster %q does not exist", cluster)
+			return nil, errors.Wrapf(api.ErrNotFound, "cluster %q does not exist", cluster)
 		}
 
 		template.Metadata["Cluster"] = cluster.ARN()
@@ -268,7 +266,7 @@ func (b *ecsAPIService) parseExternalNetworks(ctx context.Context, project *type
 			return nil, err
 		}
 		if !exists {
-			return nil, errors.Wrapf(errdefs.ErrNotFound, "security group %q doesn't exist", net.Name)
+			return nil, errors.Wrapf(api.ErrNotFound, "security group %q doesn't exist", net.Name)
 		}
 		securityGroups[name] = net.Name
 	}
@@ -289,8 +287,8 @@ func (b *ecsAPIService) parseExternalVolumes(ctx context.Context, project *types
 
 		logrus.Debugf("searching for existing filesystem as volume %q", name)
 		tags := map[string]string{
-			compose.ProjectLabel: project.Name,
-			compose.VolumeLabel:  name,
+			api.ProjectLabel: project.Name,
+			api.VolumeLabel:  name,
 		}
 		previous, err := b.aws.ListFileSystems(ctx, tags)
 		if err != nil {
@@ -397,11 +395,11 @@ func (b *ecsAPIService) ensureVolumes(r *awsResources, project *types.Project, t
 			FileSystemPolicy: nil,
 			FileSystemTags: []efs.FileSystem_ElasticFileSystemTag{
 				{
-					Key:   compose.ProjectLabel,
+					Key:   api.ProjectLabel,
 					Value: project.Name,
 				},
 				{
-					Key:   compose.VolumeLabel,
+					Key:   api.VolumeLabel,
 					Value: name,
 				},
 				{

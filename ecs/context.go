@@ -24,9 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/api/errdefs"
-	"github.com/docker/compose-cli/utils/prompt"
+	"github.com/docker/compose-cli/pkg/prompt"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/aws/aws-sdk-go/aws"
@@ -34,6 +32,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/docker/compose-cli/api/context/store"
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/pkg/errors"
 	"gopkg.in/ini.v1"
 )
@@ -92,7 +92,7 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 			return nil, "", err
 		}
 		if !contains(profilesList, opts.Profile) {
-			return nil, "", errors.Wrapf(errdefs.ErrNotFound, "profile %q not found", opts.Profile)
+			return nil, "", errors.Wrapf(api.ErrNotFound, "profile %q not found", opts.Profile)
 		}
 	} else {
 		// interactive
@@ -117,7 +117,7 @@ func (h contextCreateAWSHelper) createContextData(_ context.Context, opts Contex
 		selected, err := h.user.Select("Create a Docker context using:", options)
 		if err != nil {
 			if err == terminal.InterruptErr {
-				return nil, "", errdefs.ErrCanceled
+				return nil, "", api.ErrCanceled
 			}
 			return nil, "", err
 		}
@@ -290,7 +290,7 @@ func (h contextCreateAWSHelper) chooseProfile(profiles []string) (string, error)
 	selected, err := h.user.Select("Select AWS Profile", options)
 	if err != nil {
 		if err == terminal.InterruptErr {
-			return "", errdefs.ErrCanceled
+			return "", api.ErrCanceled
 		}
 		return "", err
 	}
