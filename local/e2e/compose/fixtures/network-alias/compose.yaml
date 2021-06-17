@@ -2,6 +2,8 @@ services:
 
   container1:
     image: nginx
+    links:
+      - container2:container
 
   container2:
     image: nginx
