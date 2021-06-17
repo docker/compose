@@ -51,6 +51,7 @@ const (
 	VersionLabel = "com.docker.compose.version"
 )
 
+// ComposeVersion is the compose tool version as declared by label VersionLabel
 var ComposeVersion string
 
 func init() {
