@@ -1,4 +1,4 @@
-Click==7.1.2
+Click==8.0.1
 coverage==5.5
 ddt==1.4.2
 flake8==3.8.3
