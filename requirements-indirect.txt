@@ -9,7 +9,7 @@ entrypoints==0.3
 filelock==3.0.12
 gitdb2==4.0.2
 mccabe==0.6.1
-more-itertools==8.6.0; python_version >= '3.5'
+more-itertools==8.8.0; python_version >= '3.5'
 more-itertools==5.0.0; python_version < '3.5'
 packaging==20.9
 pluggy==0.13.1
