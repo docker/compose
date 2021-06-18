@@ -20,7 +20,7 @@ pyflakes==2.2.0
 PyNaCl==1.4.0
 pyparsing==2.4.7
 pyrsistent==0.16.0
-smmap==3.0.4
+smmap==4.0.0
 smmap2==3.0.1
 toml==0.10.1
 tox==3.21.2
