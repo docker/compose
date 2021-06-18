@@ -1,0 +1,28 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: weekly
+    time: "14:00"
+    timezone: America/Los_Angeles
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: python-dotenv
+    versions:
+    - 0.15.0
+    - 0.16.0
+  - dependency-name: urllib3
+    versions:
+    - 1.26.2
+    - 1.26.3
+  - dependency-name: coverage
+    versions:
+    - 5.3.1
+    - "5.4"
+  - dependency-name: packaging
+    versions:
+    - "20.8"
+  - dependency-name: cached-property
+    versions:
+    - 1.5.2
