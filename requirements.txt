@@ -8,7 +8,7 @@ docker==5.0.0
 docker-pycreds==0.4.0
 dockerpty==0.4.1
 docopt==0.6.2
-idna==2.10
+idna==3.2
 ipaddress==1.0.23
 jsonschema==3.2.0
 paramiko==2.7.2
