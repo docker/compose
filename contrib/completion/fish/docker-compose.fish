@@ -1,11 +1,10 @@
 # Tab completion for docker-compose (https://github.com/docker/compose).
-# Version: 1.9.0
+# Version: 1.9.1
 
 complete -e -c docker-compose
 
 for line in (docker-compose --help | \
-             string match -r '^\s+\w+\s+[^\n]+' | \
-             string trim)
+             string replace -f -r '^\s{2}(\w+)\s{2,}([^\n]+)' '$1 $2')
   set -l doc (string split -m 1 ' ' -- $line)
   complete -c docker-compose -n '__fish_use_subcommand' -xa $doc[1] --description $doc[2]
 end
