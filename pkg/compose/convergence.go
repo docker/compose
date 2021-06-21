@@ -470,6 +470,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
 			serviceFilter(service.Name),
+			oneOffFilter(false),
 		),
 		All: true,
 	})

@@ -50,6 +50,10 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 	service.Scale = 1
 	service.StdinOpen = true
+	service.Restart = ""
+	if service.Deploy != nil {
+		service.Deploy.RestartPolicy = nil
+	}
 	service.Labels = service.Labels.Add(api.SlugLabel, slug)
 	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
 
