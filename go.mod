@@ -48,7 +48,7 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.8.2-0.20210401015549-df49b648c8bf
-	github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
+	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.1
@@ -65,7 +65,7 @@ require (
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	golang.org/x/oauth2 v0.0.0-20201109201403-9fd604954f58
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210331175145-43e1dd70ce54
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/ini.v1 v1.62.0
