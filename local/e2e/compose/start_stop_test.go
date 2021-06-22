@@ -44,7 +44,7 @@ func TestStartStop(t *testing.T) {
 	}
 
 	t.Run("Up a project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yml", "--project-name", projectName, "up", "-d")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "up", "-d")
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop_simple_1  Started"), res.Combined())
 
 		res = c.RunDockerCmd("compose", "ls", "--all")
@@ -56,7 +56,7 @@ func TestStartStop(t *testing.T) {
 	})
 
 	t.Run("stop project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yml", "--project-name", projectName, "stop")
+		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "stop")
 
 		res := c.RunDockerCmd("compose", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop"), res.Combined())
@@ -73,21 +73,21 @@ func TestStartStop(t *testing.T) {
 	})
 
 	t.Run("start project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yml", "--project-name", projectName, "start")
+		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "start")
 
 		res := c.RunDockerCmd("compose", "ls")
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
 	})
 
 	t.Run("pause project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yml", "--project-name", projectName, "pause")
+		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "pause")
 
 		res := c.RunDockerCmd("compose", "ls", "--all")
 		testify.Regexp(t, getProjectRegx("paused"), res.Stdout())
 	})
 
 	t.Run("unpause project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yml", "--project-name", projectName, "unpause")
+		c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "unpause")
 
 		res := c.RunDockerCmd("compose", "ls")
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())

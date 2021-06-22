@@ -49,21 +49,21 @@ func TestComposeMetrics(t *testing.T) {
 	t.Run("catch specific failure metrics", func(t *testing.T) {
 		s.ResetUsage()
 
-		res := c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/does-not-exist/compose.yml", "build")
-		expectedErr := "compose/fixtures/does-not-exist/compose.yml: no such file or directory"
+		res := c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/does-not-exist/compose.yaml", "build")
+		expectedErr := "compose/fixtures/does-not-exist/compose.yaml: no such file or directory"
 		if runtime.GOOS == "windows" {
-			expectedErr = "does-not-exist\\compose.yml: The system cannot find the path specified"
+			expectedErr = "does-not-exist\\compose.yaml: The system cannot find the path specified"
 		}
 		res.Assert(t, icmd.Expected{ExitCode: 14, Err: expectedErr})
-		res = c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/wrong-composefile/compose.yml", "up", "-d")
+		res = c.RunDockerOrExitError("compose", "-f", "../compose/fixtures/wrong-composefile/compose.yaml", "up", "-d")
 		res.Assert(t, icmd.Expected{ExitCode: 15, Err: "services.simple Additional property wrongField is not allowed"})
 		res = c.RunDockerOrExitError("compose", "up")
 		res.Assert(t, icmd.Expected{ExitCode: 14, Err: "can't find a suitable configuration file in this directory or any parent: not found"})
-		res = c.RunDockerOrExitError("compose", "up", "-f", "../compose/fixtures/wrong-composefile/compose.yml")
+		res = c.RunDockerOrExitError("compose", "up", "-f", "../compose/fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown shorthand flag: 'f' in -f"})
-		res = c.RunDockerOrExitError("compose", "up", "--file", "../compose/fixtures/wrong-composefile/compose.yml")
+		res = c.RunDockerOrExitError("compose", "up", "--file", "../compose/fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown flag: --file"})
-		res = c.RunDockerOrExitError("compose", "donw", "--file", "../compose/fixtures/wrong-composefile/compose.yml")
+		res = c.RunDockerOrExitError("compose", "donw", "--file", "../compose/fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: `unknown docker command: "compose donw"`})
 		res = c.RunDockerOrExitError("compose", "--file", "../compose/fixtures/wrong-composefile/build-error.yml", "build")
 		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `line 17: unknown instruction: WRONG`})

@@ -42,7 +42,7 @@ func TestRestart(t *testing.T) {
 		// This is just to ensure the containers do NOT exist
 		c.RunDockerOrExitError("compose", "--project-name", projectName, "down")
 
-		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yml", "--project-name", projectName, "up", "-d")
+		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "up", "-d")
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart_restart_1  Started"), res.Combined())
 
 		c.WaitForCmdResult(c.NewDockerCmd("compose", "--project-name", projectName, "ps", "-a", "--format", "json"),
@@ -52,7 +52,7 @@ func TestRestart(t *testing.T) {
 		res = c.RunDockerOrExitError("compose", "--project-name", projectName, "ps", "-a")
 		testify.Regexp(t, getServiceRegx("restart", "exited"), res.Stdout())
 
-		_ = c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yml", "--project-name", projectName, "restart")
+		_ = c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "restart")
 
 		// Give the same time but it must NOT exit
 		time.Sleep(time.Second)

@@ -56,7 +56,7 @@ func TestComposeCancel(t *testing.T) {
 		s.ResetUsage()
 
 		c.RunDockerCmd("compose", "ls")
-		buildProjectPath := "../compose/fixtures/build-infinite/docker-compose.yml"
+		buildProjectPath := "../compose/fixtures/build-infinite/compose.yaml"
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal

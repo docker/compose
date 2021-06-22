@@ -118,7 +118,7 @@ func TestLocalComposeBuildStaticDockerfilePath(t *testing.T) {
 		assert.NilError(t, err)
 		defer os.RemoveAll(dir) //nolint:errcheck
 
-		assert.NilError(t, ioutil.WriteFile(filepath.Join(dir, "docker-compose.yml"), []byte(`services:
+		assert.NilError(t, ioutil.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`services:
   service1:
     build:
       context: `+dir+`/service1
@@ -139,11 +139,11 @@ func TestLocalComposeBuildStaticDockerfilePath(t *testing.T) {
 		RUN echo "world"
 		`), 0644))
 
-		res := c.RunDockerCmd("compose", "-f", filepath.Join(dir, "docker-compose.yml"), "build")
+		res := c.RunDockerCmd("compose", "-f", filepath.Join(dir, "compose.yaml"), "build")
 
 		res.Assert(t, icmd.Expected{Out: `RUN echo "hello"`})
 		res.Assert(t, icmd.Expected{Out: `RUN echo "world"`})
 
-		c.RunDockerCmd("compose", "-f", filepath.Join(dir, "docker-compose.yml"), "down", "--rmi", "all")
+		c.RunDockerCmd("compose", "-f", filepath.Join(dir, "compose.yaml"), "down", "--rmi", "all")
 	})
 }
