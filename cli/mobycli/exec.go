@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 
 	apicontext "github.com/docker/compose-cli/api/context"
@@ -89,9 +90,12 @@ func Exec(root *cobra.Command) {
 func RunDocker(childExit chan bool, args ...string) error {
 	execBinary, err := resolvepath.LookPath(ComDockerCli)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, "Current PATH : "+os.Getenv("PATH"))
-		os.Exit(1)
+		execBinary = findBinary(ComDockerCli)
+		if execBinary == "" {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, "Current PATH : "+os.Getenv("PATH"))
+			os.Exit(1)
+		}
 	}
 	cmd := exec.Command(execBinary, args...)
 	cmd.Stdin = os.Stdin
@@ -121,6 +125,22 @@ func RunDocker(childExit chan bool, args ...string) error {
 	}()
 
 	return cmd.Run()
+}
+
+func findBinary(filename string) string {
+	currentBinaryPath, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	currentBinaryPath, err = filepath.EvalSymlinks(currentBinaryPath)
+	if err != nil {
+		return ""
+	}
+	binaryPath := filepath.Join(filepath.Dir(currentBinaryPath), filename)
+	if _, err := os.Stat(binaryPath); err != nil {
+		return ""
+	}
+	return binaryPath
 }
 
 // IsDefaultContextCommand checks if the command exists in the classic cli (issues a shellout --help)
