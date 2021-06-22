@@ -185,13 +185,3 @@ func filterByStatus(containers []api.ContainerSummary, status string) []api.Cont
 	}
 	return filtered
 }
-
-func psCompletion(p *projectOptions) validArgsFn {
-	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		project, err := p.toProject(nil)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return project.ServiceNames(), cobra.ShellCompDirectiveNoFileComp
-	}
-}

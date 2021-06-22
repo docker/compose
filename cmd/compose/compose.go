@@ -276,7 +276,6 @@ func RootCommand(contextType string, backend api.Service) *cobra.Command {
 		portCommand(&opts, backend),
 		imagesCommand(&opts, backend),
 		versionCommand(),
-		completionCommand(),
 	)
 
 	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
