@@ -1,0 +1,12 @@
+services:
+  foo:
+    image: alpine
+    entrypoint: ["sleep", "600"]
+    networks:
+      default:
+        ipv4_address: 10.1.0.100  # <-- Fixed IP address
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.1.0.0/16

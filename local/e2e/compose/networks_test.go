@@ -94,3 +94,26 @@ func TestNetworkAliassesAndLinks(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 }
+
+func TestIPAMConfig(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	const projectName = "ipam_e2e"
+
+	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
+		c.RunDockerOrExitError("network", "rm", projectName+"_default")
+	})
+
+	t.Run("up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
+	})
+
+	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
+		res := c.RunDockerCmd("inspect", projectName+"_foo_1", "-f", "{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
+		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
+	})
+
+	t.Run("down", func(t *testing.T) {
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+	})
+}
