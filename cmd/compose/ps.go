@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/cli/formatter"
@@ -37,24 +38,52 @@ type psOptions struct {
 	All      bool
 	Quiet    bool
 	Services bool
+	Filter   string
+	Status   string
+}
+
+func (p *psOptions) parseFilter() error {
+	if p.Filter == "" {
+		return nil
+	}
+	parts := strings.SplitN(p.Filter, "=", 2)
+	if len(parts) != 2 {
+		return errors.New("arguments to --filter should be in form KEY=VAL")
+	}
+	switch parts[0] {
+	case "status":
+		p.Status = parts[1]
+	case "source":
+		return api.ErrNotImplemented
+	default:
+		return fmt.Errorf("unknow filter %s", parts[0])
+	}
+	return nil
 }
 
 func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := psOptions{
 		projectOptions: p,
 	}
-	psCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "ps",
 		Short: "List containers",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return opts.parseFilter()
+		},
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, backend, args, opts)
 		}),
 	}
-	psCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
-	psCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
-	psCmd.Flags().BoolVar(&opts.Services, "services", false, "Display services")
-	psCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
-	return psCmd
+	flags := cmd.Flags()
+	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
+	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property")
+	flags.StringVar(&opts.Status, "status", "", "Filter services by status")
+	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
+	flags.BoolVar(&opts.Services, "services", false, "Display services")
+	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
+	flags.Lookup("filter").Hidden = true
+	return cmd
 }
 
 func runPs(ctx context.Context, backend api.Service, services []string, opts psOptions) error {
@@ -87,6 +116,10 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 		return nil
 	}
 
+	if opts.Status != "" {
+		containers = filterByStatus(containers, opts.Status)
+	}
+
 	sort.Slice(containers, func(i, j int) bool {
 		return containers[i].Name < containers[j].Name
 	})
@@ -112,4 +145,20 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 			}
 		},
 		"NAME", "SERVICE", "STATUS", "PORTS")
+}
+
+func filterByStatus(containers []api.ContainerSummary, status string) []api.ContainerSummary {
+	hasContainerWithState := map[string]struct{}{}
+	for _, c := range containers {
+		if c.State == status {
+			hasContainerWithState[c.Service] = struct{}{}
+		}
+	}
+	var filtered []api.ContainerSummary
+	for _, c := range containers {
+		if _, ok := hasContainerWithState[c.Service]; ok {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
 }
