@@ -34,8 +34,8 @@ func TestRestart(t *testing.T) {
 
 	getServiceRegx := func(service string, status string) string {
 		// match output with random spaces like:
-		// e2e-start-stop_db_1      db                  running
-		return fmt.Sprintf("%s_%s_1\\s+%s\\s+%s", projectName, service, service, status)
+		// e2e-start-stop_db_1      "echo hello"     db      running
+		return fmt.Sprintf("%s_%s_1.+%s\\s+%s", projectName, service, service, status)
 	}
 
 	t.Run("Up a project", func(t *testing.T) {
