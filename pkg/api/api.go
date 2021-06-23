@@ -285,6 +285,7 @@ type PortPublisher struct {
 type ContainerSummary struct {
 	ID         string
 	Name       string
+	Command    string
 	Project    string
 	Service    string
 	State      string

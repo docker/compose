@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/docker/compose-cli/pkg/api"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose-cli/pkg/api"
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
@@ -83,6 +84,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				Name:       getCanonicalContainerName(container),
 				Project:    container.Labels[api.ProjectLabel],
 				Service:    container.Labels[api.ServiceLabel],
+				Command:    container.Command,
 				State:      container.State,
 				Health:     health,
 				ExitCode:   exitCode,

@@ -102,13 +102,13 @@ func TestLocalComposeUp(t *testing.T) {
 
 	t.Run("check healthcheck output", func(t *testing.T) {
 		c.WaitForCmdResult(c.NewDockerCmd("compose", "-p", projectName, "ps", "--format", "json"),
-			StdoutContains(`"Name":"compose-e2e-demo_web_1","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
+			StdoutContains(`"Name":"compose-e2e-demo_web_1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
 			5*time.Second, 1*time.Second)
 
 		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
-		res.Assert(t, icmd.Expected{Out: `NAME                       SERVICE             STATUS              PORTS`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_web_1     web                 running (healthy)   0.0.0.0:90->80/tcp`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      db                  running             5432/tcp`})
+		res.Assert(t, icmd.Expected{Out: `NAME                       COMMAND                  SERVICE             STATUS              PORTS`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_web_1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp, :::90->80/tcp`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
 	})
 
 	t.Run("images", func(t *testing.T) {

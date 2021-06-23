@@ -22,8 +22,10 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
+	formatter2 "github.com/docker/cli/cli/command/formatter"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -141,10 +143,11 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 				} else if status == "exited" || status == "dead" {
 					status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
 				}
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", container.Name, container.Service, status, strings.Join(ports, ", "))
+				command := formatter2.Ellipsis(container.Command, 20)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, strings.Join(ports, ", "))
 			}
 		},
-		"NAME", "SERVICE", "STATUS", "PORTS")
+		"NAME", "COMMAND", "SERVICE", "STATUS", "PORTS")
 }
 
 func filterByStatus(containers []api.ContainerSummary, status string) []api.ContainerSummary {
