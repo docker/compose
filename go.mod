@@ -88,3 +88,5 @@ replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402
 // with incompatible signature changes. This fork adopt oras-project/oras-go which is up-to-date on containerd 1.5
 // see https://github.com/helm/helm/pull/9675
 replace helm.sh/helm/v3 => github.com/ndeloof/helm/v3 v3.1.0-rc.1.0.20210507084602-d0ceda767d95
+
+replace github.com/compose-spec/compose-go => github.com/ndeloof/compose-go v0.0.0-20210623084147-f0ea5c285885

@@ -248,8 +248,6 @@ github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnht
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20210616101828-4e2e7e7def77 h1:Rx7nb6lhOTbC25rG2B6zVG4vUbL3ygrTbtFwMsmky4E=
-github.com/compose-spec/compose-go v0.0.0-20210616101828-4e2e7e7def77/go.mod h1:5V65rPnTvvQagtoMxTneJ2QicLq6ZRQQ7fOgPN226fo=
 github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4/go.mod h1:nukgQABAEopAHvB6j7cnP5zJ+/3aVcE7hCYqvIwAHyE=
 github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989/go.mod h1:AkGGQs9NM2vtYHaUen+NljV0/baGCAPELGm2q9ZXpWU=
 github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97/go.mod h1:kL5kd6KM5TzQjR79jljyi4olc1Vrx6XBlcyj3gNv2PU=
@@ -996,6 +994,8 @@ github.com/nats-io/nkeys v0.1.0/go.mod h1:xpnFELMwJABBLVhffcfd1MZx6VsNRFpEugbxzi
 github.com/nats-io/nkeys v0.1.3/go.mod h1:xpnFELMwJABBLVhffcfd1MZx6VsNRFpEugbxziKVo7w=
 github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OSON2c=
 github.com/ncw/swift v1.0.47/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/ZM=
+github.com/ndeloof/compose-go v0.0.0-20210623084147-f0ea5c285885 h1:UnlN0My6yEvYbTswGaPy0qrWJ7gDhtCHQ8pkSRXpxuw=
+github.com/ndeloof/compose-go v0.0.0-20210623084147-f0ea5c285885/go.mod h1:5V65rPnTvvQagtoMxTneJ2QicLq6ZRQQ7fOgPN226fo=
 github.com/ndeloof/helm/v3 v3.1.0-rc.1.0.20210507084602-d0ceda767d95 h1:pvtn6rEUjgm9DnEU9STpfgWwqqfq8zI4a0h1sHbKXdU=
 github.com/ndeloof/helm/v3 v3.1.0-rc.1.0.20210507084602-d0ceda767d95/go.mod h1:tB5XHR24t66QYXQIbS0jtaxF1neOCLbH99CiyKu1gwo=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=

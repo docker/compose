@@ -179,6 +179,8 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	project.ApplyProfiles(o.Profiles)
 
+	project.WithoutUnnecessaryResources()
+
 	err = project.ForServices(services)
 	return project, err
 }
