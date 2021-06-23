@@ -553,7 +553,7 @@ func TestUpSecretsResources(t *testing.T) {
 		secret2Value = "another_password\n"
 	)
 
-	composefilePath := filepath.Join("aci_secrets_resources", "compose.yml")
+	composefilePath := filepath.Join("aci_secrets_resources", "compose.yaml")
 
 	c := NewParallelE2eCLI(t, binDir)
 	_, _, _ = setupTestResourceGroup(t, c)

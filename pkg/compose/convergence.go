@@ -370,18 +370,24 @@ func shortIDAliasExists(containerID string, aliases ...string) bool {
 
 func (s *composeService) connectContainerToNetwork(ctx context.Context, id string, netwrk string, cfg *types.ServiceNetworkConfig, links []string, aliases ...string) error {
 	var (
-		ipv4ddress  string
+		ipv4Address string
 		ipv6Address string
+		ipam        *network.EndpointIPAMConfig
 	)
 	if cfg != nil {
-		ipv4ddress = cfg.Ipv4Address
+		ipv4Address = cfg.Ipv4Address
 		ipv6Address = cfg.Ipv6Address
+		ipam = &network.EndpointIPAMConfig{
+			IPv4Address: ipv4Address,
+			IPv6Address: ipv6Address,
+		}
 	}
 	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
 		Aliases:           aliases,
-		IPAddress:         ipv4ddress,
+		IPAddress:         ipv4Address,
 		GlobalIPv6Address: ipv6Address,
 		Links:             links,
+		IPAMConfig:        ipam,
 	})
 	if err != nil {
 		return err

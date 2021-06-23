@@ -84,7 +84,7 @@ func testContainer(service string, id string) moby.Container {
 
 func containerLabels(service string) map[string]string {
 	workingdir, _ := filepath.Abs("testdata")
-	composefile := filepath.Join(workingdir, "docker-compose.yml")
+	composefile := filepath.Join(workingdir, "compose.yaml")
 	return map[string]string{
 		compose.ServiceLabel:     service,
 		compose.ConfigFilesLabel: composefile,
