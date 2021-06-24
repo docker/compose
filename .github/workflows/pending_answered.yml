@@ -1,0 +1,17 @@
+name: Continuous integration
+
+on:
+  issue_comment:
+    types: [ created ]
+
+jobs:
+  pending:
+    if: ${{ !github.event.issue.pull_request && contains(github.event.issue.labels.*.name, 'pending') }}
+    name: Remove pending label
+    runs-on: ubuntu-latest
+    steps:
+      - name: removelabel
+        uses: siegerts/pending-response@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pending-response-label: pending
