@@ -86,7 +86,7 @@ func TestNetworkAliassesAndLinks(t *testing.T) {
 	})
 
 	t.Run("curl links", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "container")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://container/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 

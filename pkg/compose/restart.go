@@ -21,6 +21,7 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose-cli/pkg/api"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose-cli/pkg/progress"
 	"github.com/docker/compose-cli/pkg/utils"
@@ -33,7 +34,7 @@ func (s *composeService) Restart(ctx context.Context, project *types.Project, op
 }
 
 func (s *composeService) restart(ctx context.Context, project *types.Project, options api.RestartOptions) error {
-	ctx, err := s.getUpdatedContainersStateContext(ctx, project.Name)
+	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
 	if err != nil {
 		return err
 	}
@@ -42,11 +43,25 @@ func (s *composeService) restart(ctx context.Context, project *types.Project, op
 		options.Services = project.ServiceNames()
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		if utils.StringContains(options.Services, service.Name) {
-			return s.restartService(ctx, service.Name, options.Timeout)
+	w := progress.ContextWriter(ctx)
+	err = InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+		if !utils.StringContains(options.Services, service) {
+			return nil
 		}
-		return nil
+		eg, ctx := errgroup.WithContext(ctx)
+		for _, c := range observedState.filter(isService(service)) {
+			container := c
+			eg.Go(func() error {
+				eventName := getContainerProgressName(container)
+				w.Event(progress.RestartingEvent(eventName))
+				err := s.apiClient.ContainerRestart(ctx, container.ID, options.Timeout)
+				if err == nil {
+					w.Event(progress.StartedEvent(eventName))
+				}
+				return err
+			})
+		}
+		return eg.Wait()
 	})
 	if err != nil {
 		return err

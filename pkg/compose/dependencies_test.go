@@ -47,8 +47,8 @@ var project = types.Project{
 func TestInDependencyUpCommandOrder(t *testing.T) {
 	order := make(chan string)
 	//nolint:errcheck, unparam
-	go InDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
-		order <- config.Name
+	go InDependencyOrder(context.TODO(), &project, func(ctx context.Context, config string) error {
+		order <- config
 		return nil
 	})
 	assert.Equal(t, <-order, "test3")
@@ -59,8 +59,8 @@ func TestInDependencyUpCommandOrder(t *testing.T) {
 func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	order := make(chan string)
 	//nolint:errcheck, unparam
-	go InReverseDependencyOrder(context.TODO(), &project, func(ctx context.Context, config types.ServiceConfig) error {
-		order <- config.Name
+	go InReverseDependencyOrder(context.TODO(), &project, func(ctx context.Context, config string) error {
+		order <- config
 		return nil
 	})
 	assert.Equal(t, <-order, "test1")

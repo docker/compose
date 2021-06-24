@@ -59,7 +59,7 @@ func TestIPC(t *testing.T) {
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
-	t.Run("stop ipc mode container", func(t *testing.T) {
-		_ = c.RunDockerCmd("stop", "ipc_mode_container")
+	t.Run("remove ipc mode container", func(t *testing.T) {
+		_ = c.RunDockerCmd("rm", "-f", "ipc_mode_container")
 	})
 }

@@ -25,7 +25,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stringid"
 )
 
@@ -34,8 +33,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	if err != nil {
 		return 0, err
 	}
-	containerState := NewContainersState(observedState)
-	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
 
 	service, err := project.GetService(opts.Service)
 	if err != nil {
@@ -63,10 +60,11 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	if err := s.waitDependencies(ctx, project, service); err != nil {
 		return 0, err
 	}
-	if err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove, opts.UseNetworkAliases); err != nil {
+	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove, opts.UseNetworkAliases)
+	if err != nil {
 		return 0, err
 	}
-	containerID := service.ContainerName
+	containerID := created.ID
 
 	if opts.Detach {
 		err := s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
@@ -77,21 +75,13 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, nil
 	}
 
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(slugFilter(slug)),
-		All:     true,
-	})
-	if err != nil {
-		return 0, err
-	}
-	oneoffContainer := containers[0]
-	restore, err := s.attachContainerStreams(ctx, oneoffContainer.ID, service.Tty, opts.Reader, opts.Writer)
+	restore, err := s.attachContainerStreams(ctx, containerID, service.Tty, opts.Reader, opts.Writer)
 	if err != nil {
 		return 0, err
 	}
 	defer restore()
 
-	statusC, errC := s.apiClient.ContainerWait(context.Background(), oneoffContainer.ID, container.WaitConditionNextExit)
+	statusC, errC := s.apiClient.ContainerWait(context.Background(), containerID, container.WaitConditionNextExit)
 
 	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
 	if err != nil {
