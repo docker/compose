@@ -16,7 +16,7 @@ to their predecessors.
 For example, consider this command line:
 
 ```
-$ docker-compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+$ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
 ```
 The `docker-compose.yml` file might specify a `webapp` service.
 
@@ -90,7 +90,7 @@ Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
 ### Set up environment variables
 
-You can set environment variables for various docker-compose options, including the `-f`, `-p` and `--profiles` flags.
+You can set environment variables for various docker compose options, including the `-f`, `-p` and `--profiles` flags.
 
 Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
 `COMPOSE_PROJECT_NAME` environment variable does the same for to the `-p` flag,
