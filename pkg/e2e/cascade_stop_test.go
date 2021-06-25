@@ -20,8 +20,6 @@ import (
 	"testing"
 
 	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestCascadeStop(t *testing.T) {

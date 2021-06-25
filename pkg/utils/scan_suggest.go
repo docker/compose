@@ -28,6 +28,9 @@ import (
 	cliConfig "github.com/docker/cli/cli/config"
 )
 
+// ScanSuggestMsg display a message after a successful build to suggest use of `docker scan` command
+const ScanSuggestMsg = "Use 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them"
+
 // DisplayScanSuggestMsg displlay a message suggesting users can scan new image
 func DisplayScanSuggestMsg() {
 	if os.Getenv("DOCKER_SCAN_SUGGEST") == "false" {
@@ -39,7 +42,7 @@ func DisplayScanSuggestMsg() {
 	if scanAlreadyInvoked() {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "\nUse 'docker scan' to run Snyk tests against images to find vulnerabilities and learn how to fix them\n")
+	fmt.Fprintf(os.Stderr, "\n"+ScanSuggestMsg+"\n")
 }
 
 func scanAlreadyInvoked() bool {

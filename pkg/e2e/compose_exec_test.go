@@ -22,8 +22,6 @@ import (
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestLocalComposeExec(t *testing.T) {

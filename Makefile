@@ -51,8 +51,11 @@ compose-plugin: ## Compile the compose cli-plugin
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
+e2e-compose: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
+	gotestsum $(TEST_FLAGS) ./pkg/e2e -- -count=1
+
 e2e-local: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
-	gotestsum $(TEST_FLAGS) ./local/e2e/compose ./local/e2e/container ./local/e2e/cli-only -- -count=1
+	gotestsum $(TEST_FLAGS) ./local/e2e/container ./local/e2e/cli-only -- -count=1
 
 e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux containers available ATM. Set E2E_TEST=TestName to run a single test
 	go test -count=1 -v $(TEST_FLAGS) ./local/e2e/cli-only

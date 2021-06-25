@@ -22,8 +22,6 @@ import (
 	"testing"
 
 	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestIPC(t *testing.T) {
