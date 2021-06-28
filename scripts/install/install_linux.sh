@@ -108,6 +108,8 @@ fi
 
 if [ "$(uname -m)" = "aarch64" ]; then
 	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-arm64" | cut -d : -f 2,3)}
+elif [ "$(uname -m)" = "s390x" ]; then
+	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-s390x" | cut -d : -f 2,3)}
 else
 	DOWNLOAD_URL=${DOWNLOAD_URL:-$(curl -s ${RELEASE_URL} | grep "browser_download_url.*docker-linux-amd64" | cut -d : -f 2,3)}
 fi
