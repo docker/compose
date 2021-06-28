@@ -4,6 +4,7 @@ package watch
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,12 +93,12 @@ func (d *naiveNotify) watchRecursively(dir string) error {
 		return errors.Wrapf(err, "watcher.Add(%q)", dir)
 	}
 
-	return filepath.Walk(dir, func(path string, mode os.FileInfo, err error) error {
+	return filepath.WalkDir(dir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !mode.IsDir() {
+		if !info.IsDir() {
 			return nil
 		}
 
@@ -163,7 +164,7 @@ func (d *naiveNotify) loop() {
 		// because it's a bit more elegant that way.
 		//
 		// TODO(dbentley): if there's a delete should we call d.watcher.Remove to prevent leaking?
-		err := filepath.Walk(e.Name, func(path string, mode os.FileInfo, err error) error {
+		err := filepath.WalkDir(e.Name, func(path string, info fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -175,7 +176,7 @@ func (d *naiveNotify) loop() {
 			// TODO(dmiller): symlinks 😭
 
 			shouldWatch := false
-			if mode.IsDir() {
+			if info.IsDir() {
 				// watch directories unless we can skip them entirely
 				shouldSkipDir, err := d.shouldSkipDir(path)
 				if err != nil {
