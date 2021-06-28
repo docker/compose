@@ -31,10 +31,8 @@ Compose v2 can be installed manually as a CLI plugin, by downloading latest v2.x
 
 To get started with Compose CLI, all you need is:
 
-* Windows: The current release of
-  [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
-* macOS: The current release of
-  [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
+* macOS, Windows, or Windows WSL2: The current release of
+  [Docker Desktop](https://www.docker.com/products/docker-desktop)
 * Linux:
   [Install script](INSTALL.md)
 * An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
