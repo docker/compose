@@ -50,7 +50,6 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	if err != nil {
 		return err
 	}
-	ctx = context.WithValue(ctx, ContainersKey{}, NewContainersState(containers))
 
 	if options.Project == nil {
 		project, err := s.projectFromContainerLabels(containers, projectName)
@@ -64,8 +63,8 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service types.ServiceConfig) error {
-		serviceContainers := containers.filter(isService(service.Name))
+	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service string) error {
+		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
 	})
@@ -236,11 +235,6 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Removing"))
 				return err
 			}
-			contextContainerState, err := GetContextContainerState(ctx)
-			if err != nil {
-				return err
-			}
-			contextContainerState.Remove(toDelete.ID)
 			w.Event(progress.RemovedEvent(eventName))
 			return nil
 		})

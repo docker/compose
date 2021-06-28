@@ -63,16 +63,16 @@ var (
 )
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
-func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
+func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
 	return visit(ctx, project, upDirectionTraversalConfig, fn, ServiceStopped)
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, types.ServiceConfig) error) error {
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
 	return visit(ctx, project, downDirectionTraversalConfig, fn, ServiceStarted)
 }
 
-func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error, initialStatus ServiceStatus) error {
+func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, string) error, initialStatus ServiceStatus) error {
 	g := NewGraph(project.Services, initialStatus)
 	if b, err := g.HasCycles(); b {
 		return err
@@ -89,12 +89,12 @@ func visit(ctx context.Context, project *types.Project, traversalConfig graphTra
 }
 
 // Note: this could be `graph.walk` or whatever
-func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, traversalConfig graphTraversalConfig, fn func(context.Context, types.ServiceConfig) error) error {
+func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, traversalConfig graphTraversalConfig, fn func(context.Context, string) error) error {
 	for _, node := range nodes {
 		n := node
 		// Don't start this service yet if all of its children have
 		// not been started yet.
-		if len(traversalConfig.filterAdjacentByStatusFn(graph, n.Service.Name, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
+		if len(traversalConfig.filterAdjacentByStatusFn(graph, n.Service, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
 			continue
 		}
 
@@ -104,7 +104,7 @@ func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex,
 				return err
 			}
 
-			graph.UpdateStatus(n.Service.Name, traversalConfig.targetServiceStatus)
+			graph.UpdateStatus(n.Service, traversalConfig.targetServiceStatus)
 
 			return run(ctx, graph, eg, traversalConfig.adjacentNodesFn(n), traversalConfig, fn)
 		})
@@ -122,7 +122,7 @@ type Graph struct {
 // Vertex represents a service in the dependencies structure
 type Vertex struct {
 	Key      string
-	Service  types.ServiceConfig
+	Service  string
 	Status   ServiceStatus
 	Children map[string]*Vertex
 	Parents  map[string]*Vertex
@@ -162,7 +162,7 @@ func NewGraph(services types.Services, initialStatus ServiceStatus) *Graph {
 	}
 
 	for _, s := range services {
-		graph.AddVertex(s.Name, s, initialStatus)
+		graph.AddVertex(s.Name, s.Name, initialStatus)
 	}
 
 	for _, s := range services {
@@ -175,7 +175,7 @@ func NewGraph(services types.Services, initialStatus ServiceStatus) *Graph {
 }
 
 // NewVertex is the constructor function for the Vertex
-func NewVertex(key string, service types.ServiceConfig, initialStatus ServiceStatus) *Vertex {
+func NewVertex(key string, service string, initialStatus ServiceStatus) *Vertex {
 	return &Vertex{
 		Key:      key,
 		Service:  service,
@@ -186,7 +186,7 @@ func NewVertex(key string, service types.ServiceConfig, initialStatus ServiceSta
 }
 
 // AddVertex adds a vertex to the Graph
-func (g *Graph) AddVertex(key string, service types.ServiceConfig, initialStatus ServiceStatus) {
+func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatus) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

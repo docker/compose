@@ -59,8 +59,6 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 	if err != nil {
 		return err
 	}
-	containerState := NewContainersState(observedState)
-	ctx = context.WithValue(ctx, ContainersKey{}, containerState)
 
 	err = s.ensureImagesExists(ctx, project, observedState, options.QuietPull)
 	if err != nil {
@@ -105,12 +103,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	prepareServicesDependsOn(project)
 
-	return InDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
-		if utils.StringContains(options.Services, service.Name) {
-			return s.ensureService(c, project, service, options.Recreate, options.Inherit, options.Timeout)
-		}
-		return s.ensureService(c, project, service, options.RecreateDependencies, options.Inherit, options.Timeout)
-	})
+	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }
 
 func prepareVolumes(p *types.Project) error {
@@ -275,12 +268,8 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 
 	resources := getDeployResources(service)
 
-	networkMode, err := getMode(ctx, service.Name, service.NetworkMode)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if networkMode == "" {
-		networkMode = getDefaultNetworkMode(p, service)
+	if service.NetworkMode == "" {
+		service.NetworkMode = getDefaultNetworkMode(p, service)
 	}
 
 	var networkConfig *network.NetworkingConfig
@@ -314,11 +303,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		break //nolint:staticcheck
 	}
 
-	ipcmode, err := getMode(ctx, service.Name, service.Ipc)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	tmpfs := map[string]string{}
 	for _, t := range service.Tmpfs {
 		if arr := strings.SplitN(t, ":", 2); len(arr) > 1 {
@@ -342,9 +326,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Mounts:         mounts,
 		CapAdd:         strslice.StrSlice(service.CapAdd),
 		CapDrop:        strslice.StrSlice(service.CapDrop),
-		NetworkMode:    container.NetworkMode(networkMode),
+		NetworkMode:    container.NetworkMode(service.NetworkMode),
 		Init:           service.Init,
-		IpcMode:        container.IpcMode(ipcmode),
+		IpcMode:        container.IpcMode(service.Ipc),
 		ReadonlyRootfs: service.ReadOnly,
 		RestartPolicy:  getRestartPolicy(service),
 		ShmSize:        int64(service.ShmSize),
@@ -911,24 +895,6 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 		aliases = append(aliases, c.Aliases...)
 	}
 	return aliases
-}
-
-func getMode(ctx context.Context, serviceName string, mode string) (string, error) {
-	cState, err := GetContextContainerState(ctx)
-	if err != nil {
-		return "", nil
-	}
-	observedState := cState.GetContainers()
-	depService := getDependentServiceFromMode(mode)
-	if depService != "" {
-		depServiceContainers := observedState.filter(isService(depService))
-		if len(depServiceContainers) > 0 {
-			return types.NetworkModeContainerPrefix + depServiceContainers[0].ID, nil
-		}
-		return "", fmt.Errorf(`no containers started for %q in service %q -> %v`,
-			mode, serviceName, observedState)
-	}
-	return mode, nil
 }
 
 func getNetworksForService(s types.ServiceConfig) map[string]*types.ServiceNetworkConfig {
