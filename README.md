@@ -15,7 +15,7 @@ using the Docker commands you already know.
 
 ## Compose v2 (a.k.a "Local Docker Compose")
 
-The `docker compose` local command is meant to be the next major version for docker-compose, and it supports the same commands and flags, in order to be used as a drop-in replacement.
+The `docker compose` local command is the next major version for docker-compose, and it supports the same commands and flags, in order to be used as a drop-in replacement.
 [Here](https://github.com/docker/compose-cli/issues/1283) is a checklist of docker-compose commands and flags that are implemented in `docker compose`.
 
 This `docker compose` local command :
@@ -31,9 +31,9 @@ Compose v2 can be installed manually as a CLI plugin, by downloading latest v2.x
 
 To get started with Compose CLI, all you need is:
 
-* Windows: The Stable or Edge release of
+* Windows: The current release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows)
-* macOS: The Stable or Edge release of
+* macOS: The current release of
   [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
 * Linux:
   [Install script](INSTALL.md)
