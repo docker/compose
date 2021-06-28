@@ -96,7 +96,7 @@ func (s *ServiceProxy) WithInterceptor(interceptors ...Interceptor) *ServiceProx
 	return s
 }
 
-//Build implements Service interface
+// Build implements Service interface
 func (s *ServiceProxy) Build(ctx context.Context, project *types.Project, options BuildOptions) error {
 	if s.BuildFn == nil {
 		return ErrNotImplemented
@@ -107,7 +107,7 @@ func (s *ServiceProxy) Build(ctx context.Context, project *types.Project, option
 	return s.BuildFn(ctx, project, options)
 }
 
-//Push implements Service interface
+// Push implements Service interface
 func (s *ServiceProxy) Push(ctx context.Context, project *types.Project, options PushOptions) error {
 	if s.PushFn == nil {
 		return ErrNotImplemented
@@ -118,7 +118,7 @@ func (s *ServiceProxy) Push(ctx context.Context, project *types.Project, options
 	return s.PushFn(ctx, project, options)
 }
 
-//Pull implements Service interface
+// Pull implements Service interface
 func (s *ServiceProxy) Pull(ctx context.Context, project *types.Project, options PullOptions) error {
 	if s.PullFn == nil {
 		return ErrNotImplemented
@@ -129,7 +129,7 @@ func (s *ServiceProxy) Pull(ctx context.Context, project *types.Project, options
 	return s.PullFn(ctx, project, options)
 }
 
-//Create implements Service interface
+// Create implements Service interface
 func (s *ServiceProxy) Create(ctx context.Context, project *types.Project, options CreateOptions) error {
 	if s.CreateFn == nil {
 		return ErrNotImplemented
@@ -140,7 +140,7 @@ func (s *ServiceProxy) Create(ctx context.Context, project *types.Project, optio
 	return s.CreateFn(ctx, project, options)
 }
 
-//Start implements Service interface
+// Start implements Service interface
 func (s *ServiceProxy) Start(ctx context.Context, project *types.Project, options StartOptions) error {
 	if s.StartFn == nil {
 		return ErrNotImplemented
@@ -151,7 +151,7 @@ func (s *ServiceProxy) Start(ctx context.Context, project *types.Project, option
 	return s.StartFn(ctx, project, options)
 }
 
-//Restart implements Service interface
+// Restart implements Service interface
 func (s *ServiceProxy) Restart(ctx context.Context, project *types.Project, options RestartOptions) error {
 	if s.RestartFn == nil {
 		return ErrNotImplemented
@@ -162,7 +162,7 @@ func (s *ServiceProxy) Restart(ctx context.Context, project *types.Project, opti
 	return s.RestartFn(ctx, project, options)
 }
 
-//Stop implements Service interface
+// Stop implements Service interface
 func (s *ServiceProxy) Stop(ctx context.Context, project *types.Project, options StopOptions) error {
 	if s.StopFn == nil {
 		return ErrNotImplemented
@@ -173,7 +173,7 @@ func (s *ServiceProxy) Stop(ctx context.Context, project *types.Project, options
 	return s.StopFn(ctx, project, options)
 }
 
-//Up implements Service interface
+// Up implements Service interface
 func (s *ServiceProxy) Up(ctx context.Context, project *types.Project, options UpOptions) error {
 	if s.UpFn == nil {
 		return ErrNotImplemented
@@ -184,7 +184,7 @@ func (s *ServiceProxy) Up(ctx context.Context, project *types.Project, options U
 	return s.UpFn(ctx, project, options)
 }
 
-//Down implements Service interface
+// Down implements Service interface
 func (s *ServiceProxy) Down(ctx context.Context, project string, options DownOptions) error {
 	if s.DownFn == nil {
 		return ErrNotImplemented
@@ -192,15 +192,15 @@ func (s *ServiceProxy) Down(ctx context.Context, project string, options DownOpt
 	return s.DownFn(ctx, project, options)
 }
 
-//Logs implements Service interface
-func (s *ServiceProxy) Logs(ctx context.Context, project string, consumer LogConsumer, options LogOptions) error {
+// Logs implements Service interface
+func (s *ServiceProxy) Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error {
 	if s.LogsFn == nil {
 		return ErrNotImplemented
 	}
-	return s.LogsFn(ctx, project, consumer, options)
+	return s.LogsFn(ctx, projectName, consumer, options)
 }
 
-//Ps implements Service interface
+// Ps implements Service interface
 func (s *ServiceProxy) Ps(ctx context.Context, project string, options PsOptions) ([]ContainerSummary, error) {
 	if s.PsFn == nil {
 		return nil, ErrNotImplemented
@@ -208,7 +208,7 @@ func (s *ServiceProxy) Ps(ctx context.Context, project string, options PsOptions
 	return s.PsFn(ctx, project, options)
 }
 
-//List implements Service interface
+// List implements Service interface
 func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, error) {
 	if s.ListFn == nil {
 		return nil, ErrNotImplemented
@@ -216,7 +216,7 @@ func (s *ServiceProxy) List(ctx context.Context, options ListOptions) ([]Stack, 
 	return s.ListFn(ctx, options)
 }
 
-//Convert implements Service interface
+// Convert implements Service interface
 func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error) {
 	if s.ConvertFn == nil {
 		return nil, ErrNotImplemented
@@ -227,7 +227,7 @@ func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, opti
 	return s.ConvertFn(ctx, project, options)
 }
 
-//Kill implements Service interface
+// Kill implements Service interface
 func (s *ServiceProxy) Kill(ctx context.Context, project *types.Project, options KillOptions) error {
 	if s.KillFn == nil {
 		return ErrNotImplemented
@@ -238,7 +238,7 @@ func (s *ServiceProxy) Kill(ctx context.Context, project *types.Project, options
 	return s.KillFn(ctx, project, options)
 }
 
-//RunOneOffContainer implements Service interface
+// RunOneOffContainer implements Service interface
 func (s *ServiceProxy) RunOneOffContainer(ctx context.Context, project *types.Project, options RunOptions) (int, error) {
 	if s.RunOneOffContainerFn == nil {
 		return 0, ErrNotImplemented
@@ -249,7 +249,7 @@ func (s *ServiceProxy) RunOneOffContainer(ctx context.Context, project *types.Pr
 	return s.RunOneOffContainerFn(ctx, project, options)
 }
 
-//Remove implements Service interface
+// Remove implements Service interface
 func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, options RemoveOptions) error {
 	if s.RemoveFn == nil {
 		return ErrNotImplemented
@@ -260,7 +260,7 @@ func (s *ServiceProxy) Remove(ctx context.Context, project *types.Project, optio
 	return s.RemoveFn(ctx, project, options)
 }
 
-//Exec implements Service interface
+// Exec implements Service interface
 func (s *ServiceProxy) Exec(ctx context.Context, project *types.Project, options RunOptions) (int, error) {
 	if s.ExecFn == nil {
 		return 0, ErrNotImplemented
@@ -271,7 +271,7 @@ func (s *ServiceProxy) Exec(ctx context.Context, project *types.Project, options
 	return s.ExecFn(ctx, project, options)
 }
 
-//Copy implements Service interface
+// Copy implements Service interface
 func (s *ServiceProxy) Copy(ctx context.Context, project *types.Project, options CopyOptions) error {
 	if s.CopyFn == nil {
 		return ErrNotImplemented
@@ -282,7 +282,7 @@ func (s *ServiceProxy) Copy(ctx context.Context, project *types.Project, options
 	return s.CopyFn(ctx, project, options)
 }
 
-//Pause implements Service interface
+// Pause implements Service interface
 func (s *ServiceProxy) Pause(ctx context.Context, project string, options PauseOptions) error {
 	if s.PauseFn == nil {
 		return ErrNotImplemented
@@ -290,7 +290,7 @@ func (s *ServiceProxy) Pause(ctx context.Context, project string, options PauseO
 	return s.PauseFn(ctx, project, options)
 }
 
-//UnPause implements Service interface
+// UnPause implements Service interface
 func (s *ServiceProxy) UnPause(ctx context.Context, project string, options PauseOptions) error {
 	if s.UnPauseFn == nil {
 		return ErrNotImplemented
@@ -298,7 +298,7 @@ func (s *ServiceProxy) UnPause(ctx context.Context, project string, options Paus
 	return s.UnPauseFn(ctx, project, options)
 }
 
-//Top implements Service interface
+// Top implements Service interface
 func (s *ServiceProxy) Top(ctx context.Context, project string, services []string) ([]ContainerProcSummary, error) {
 	if s.TopFn == nil {
 		return nil, ErrNotImplemented
@@ -306,7 +306,7 @@ func (s *ServiceProxy) Top(ctx context.Context, project string, services []strin
 	return s.TopFn(ctx, project, services)
 }
 
-//Events implements Service interface
+// Events implements Service interface
 func (s *ServiceProxy) Events(ctx context.Context, project string, options EventsOptions) error {
 	if s.EventsFn == nil {
 		return ErrNotImplemented
@@ -314,7 +314,7 @@ func (s *ServiceProxy) Events(ctx context.Context, project string, options Event
 	return s.EventsFn(ctx, project, options)
 }
 
-//Port implements Service interface
+// Port implements Service interface
 func (s *ServiceProxy) Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error) {
 	if s.PortFn == nil {
 		return "", 0, ErrNotImplemented
@@ -322,7 +322,7 @@ func (s *ServiceProxy) Port(ctx context.Context, project string, service string,
 	return s.PortFn(ctx, project, service, port, options)
 }
 
-//Images implements Service interface
+// Images implements Service interface
 func (s *ServiceProxy) Images(ctx context.Context, project string, options ImagesOptions) ([]ImageSummary, error) {
 	if s.ImagesFn == nil {
 		return nil, ErrNotImplemented
