@@ -22,9 +22,11 @@ import (
 	"io"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/term"
 
 	"github.com/docker/compose-cli/pkg/api"
 )
@@ -92,18 +94,34 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 	outputDone := make(chan error)
 	inputDone := make(chan error)
 
+	stdout := ContainerStdout{HijackedResponse: resp}
+	stdin := ContainerStdin{HijackedResponse: resp}
+	r, err := s.getEscapeKeyProxy(opts.Reader)
+	if err != nil {
+		return err
+	}
+
+	in := streams.NewIn(opts.Reader)
+	if in.IsTerminal() {
+		state, err := term.SetRawTerminal(in.FD())
+		if err != nil {
+			return err
+		}
+		defer term.RestoreTerminal(in.FD(), state) //nolint:errcheck
+	}
+
 	go func() {
 		if opts.Tty {
-			_, err := io.Copy(opts.Writer, resp.Reader)
+			_, err := io.Copy(opts.Writer, stdout)
 			outputDone <- err
 		} else {
-			_, err := stdcopy.StdCopy(opts.Writer, opts.Writer, resp.Reader)
+			_, err := stdcopy.StdCopy(opts.Writer, opts.Writer, stdout)
 			outputDone <- err
 		}
 	}()
 
 	go func() {
-		_, err := io.Copy(resp.Conn, opts.Reader)
+		_, err := io.Copy(stdin, r)
 		inputDone <- err
 	}()
 
@@ -112,6 +130,9 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 		case err := <-outputDone:
 			return err
 		case err := <-inputDone:
+			if _, ok := err.(term.EscapeError); ok {
+				return nil
+			}
 			if err != nil {
 				return err
 			}
