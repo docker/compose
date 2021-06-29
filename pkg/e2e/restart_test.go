@@ -24,8 +24,6 @@ import (
 
 	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestRestart(t *testing.T) {

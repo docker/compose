@@ -23,8 +23,6 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestLocalComposeVolume(t *testing.T) {

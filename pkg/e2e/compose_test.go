@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,21 +29,12 @@ import (
 	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 var binDir string
 
 func TestMain(m *testing.M) {
-	p, cleanup, err := SetupExistingCLI()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	binDir = p
 	exitCode := m.Run()
-	cleanup()
 	os.Exit(exitCode)
 }
 
@@ -131,36 +121,6 @@ func TestLocalComposeUp(t *testing.T) {
 		res := c.RunDockerCmd("network", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
-}
-
-func binExt() string {
-	binaryExt := ""
-	if runtime.GOOS == "windows" {
-		binaryExt = ".exe"
-	}
-	return binaryExt
-}
-func TestComposeUsingCliPlugin(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-
-	err := os.Remove(filepath.Join(c.ConfigDir, "cli-plugins", "docker-compose"+binExt()))
-	assert.NilError(t, err)
-	res := c.RunDockerOrExitError("compose", "ls")
-	res.Assert(t, icmd.Expected{Err: "'compose' is not a docker command", ExitCode: 1})
-}
-
-func TestComposeCliPluginWithoutCloudIntegration(t *testing.T) {
-	newBinFolder, cleanup, err := SetupExistingCLI() // do not share bin folder with other tests
-	assert.NilError(t, err)
-	defer cleanup()
-	c := NewParallelE2eCLI(t, newBinFolder)
-
-	err = os.Remove(filepath.Join(newBinFolder, "docker"+binExt()))
-	assert.NilError(t, err)
-	err = os.Rename(filepath.Join(newBinFolder, "com.docker.cli"+binExt()), filepath.Join(newBinFolder, "docker"+binExt()))
-	assert.NilError(t, err)
-	res := c.RunDockerOrExitError("compose", "ls")
-	res.Assert(t, icmd.Expected{Out: "NAME                STATUS", ExitCode: 0})
 }
 
 func TestComposePull(t *testing.T) {

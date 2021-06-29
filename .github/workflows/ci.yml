@@ -102,4 +102,4 @@ jobs:
         run: make -f builder.Makefile cli compose-plugin
 
       - name: E2E Test
-        run: make e2e-local
+        run: make e2e-compose

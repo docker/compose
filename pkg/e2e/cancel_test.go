@@ -29,34 +29,14 @@ import (
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
-
-	. "github.com/docker/compose-cli/utils/e2e"
 )
 
 func TestComposeCancel(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	s := NewMetricsServer(c.MetricsSocket())
-	s.Start()
-	defer s.Stop()
-
-	started := false
-
-	for i := 0; i < 30; i++ {
-		c.RunDockerCmd("help", "ps")
-		if len(s.GetUsage()) > 0 {
-			started = true
-			fmt.Printf("    [%s] Server up in %d ms\n", t.Name(), i*100)
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	assert.Assert(t, started, "Metrics mock server not available after 3 secs")
 
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
-		s.ResetUsage()
-
 		c.RunDockerCmd("compose", "ls")
-		buildProjectPath := "../compose/fixtures/build-infinite/compose.yaml"
+		buildProjectPath := "fixtures/build-infinite/compose.yaml"
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
@@ -77,12 +57,6 @@ func TestComposeCancel(t *testing.T) {
 			errors := stderr.String()
 			return strings.Contains(out, "CANCELED"), fmt.Sprintf("'CANCELED' not found in : \n%s\nStderr: \n%s\n", out, errors)
 		}, 10*time.Second, 1*time.Second)
-
-		usage := s.GetUsage()
-		assert.DeepEqual(t, []string{
-			`{"command":"compose ls","context":"moby","source":"cli","status":"success"}`,
-			`{"command":"compose build","context":"moby","source":"cli","status":"canceled"}`,
-		}, usage)
 	})
 }
 
