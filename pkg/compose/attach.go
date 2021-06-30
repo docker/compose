@@ -27,6 +27,7 @@ import (
 	"github.com/docker/compose-cli/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/term"
 
 	"github.com/docker/compose-cli/pkg/utils"
 )
@@ -77,23 +78,23 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 			Line:      line,
 		})
 	})
-	_, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
+	_, _, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
 	return err
 }
 
-func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, r io.ReadCloser, w io.Writer) (func(), error) {
+func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, r io.ReadCloser, w io.Writer) (func(), chan bool, error) {
+	detached := make(chan bool)
 	var (
 		in      *streams.In
 		restore = func() { /* noop */ }
 	)
 	if r != nil {
 		in = streams.NewIn(r)
-		restore = in.RestoreTerminal
 	}
 
 	stdin, stdout, err := s.getContainerStreams(ctx, container)
 	if err != nil {
-		return restore, err
+		return restore, detached, err
 	}
 
 	go func() {
@@ -105,12 +106,20 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	}()
 
 	if in != nil && stdin != nil {
-		err := in.SetRawTerminal()
-		if err != nil {
-			return restore, err
+		if in.IsTerminal() {
+			state, err := term.SetRawTerminal(in.FD())
+			if err != nil {
+				return restore, detached, err
+			}
+			restore = func() {
+				term.RestoreTerminal(in.FD(), state) //nolint:errcheck
+			}
 		}
 		go func() {
-			io.Copy(stdin, in) //nolint:errcheck
+			_, err := io.Copy(stdin, r)
+			if _, ok := err.(term.EscapeError); ok {
+				close(detached)
+			}
 		}()
 	}
 
@@ -123,7 +132,7 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 			}
 		}()
 	}
-	return restore, nil
+	return restore, detached, nil
 }
 
 func (s *composeService) getContainerStreams(ctx context.Context, container string) (io.WriteCloser, io.ReadCloser, error) {

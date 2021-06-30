@@ -19,13 +19,16 @@ package compose
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/stringid"
+	"github.com/moby/term"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
@@ -75,7 +78,11 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, nil
 	}
 
-	restore, err := s.attachContainerStreams(ctx, containerID, service.Tty, opts.Reader, opts.Writer)
+	r, err := s.getEscapeKeyProxy(opts.Reader)
+	if err != nil {
+		return 0, err
+	}
+	restore, detachC, err := s.attachContainerStreams(ctx, containerID, service.Tty, r, opts.Writer)
 	if err != nil {
 		return 0, err
 	}
@@ -93,10 +100,24 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	select {
 	case status := <-statusC:
 		return int(status.StatusCode), nil
+	case <-detachC:
+		return 0, nil
 	case err := <-errC:
 		return 0, err
 	}
 
+}
+
+func (s *composeService) getEscapeKeyProxy(r io.ReadCloser) (io.ReadCloser, error) {
+	var escapeKeys = []byte{16, 17}
+	if s.configFile.DetachKeys != "" {
+		customEscapeKeys, err := term.ToBytes(s.configFile.DetachKeys)
+		if err != nil {
+			return nil, err
+		}
+		escapeKeys = customEscapeKeys
+	}
+	return ioutils.NewReadCloserWrapper(term.NewEscapeProxy(r, escapeKeys), r.Close), nil
 }
 
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
