@@ -49,6 +49,11 @@ Briefly describe the problem you are having in a few paragraphs.
 
 **Additional information you deem important (e.g. issue happens only occasionally):**
 
+**Output of `docker-compose --version`: ***
+```
+(paste your output here)
+```
+
 **Output of `docker version`:**
 
 ```
