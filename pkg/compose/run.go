@@ -74,15 +74,15 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		if err != nil {
 			return 0, err
 		}
-		fmt.Fprintln(opts.Writer, containerID)
+		fmt.Fprintln(opts.Stdout, containerID)
 		return 0, nil
 	}
 
-	r, err := s.getEscapeKeyProxy(opts.Reader)
+	r, err := s.getEscapeKeyProxy(opts.Stdin)
 	if err != nil {
 		return 0, err
 	}
-	restore, detachC, err := s.attachContainerStreams(ctx, containerID, service.Tty, r, opts.Writer)
+	restore, detachC, err := s.attachContainerStreams(ctx, containerID, service.Tty, r, opts.Stdout, opts.Stderr)
 	if err != nil {
 		return 0, err
 	}

@@ -96,12 +96,12 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 
 	stdout := ContainerStdout{HijackedResponse: resp}
 	stdin := ContainerStdin{HijackedResponse: resp}
-	r, err := s.getEscapeKeyProxy(opts.Reader)
+	r, err := s.getEscapeKeyProxy(opts.Stdin)
 	if err != nil {
 		return err
 	}
 
-	in := streams.NewIn(opts.Reader)
+	in := streams.NewIn(opts.Stdin)
 	if in.IsTerminal() {
 		state, err := term.SetRawTerminal(in.FD())
 		if err != nil {
@@ -112,10 +112,10 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 
 	go func() {
 		if opts.Tty {
-			_, err := io.Copy(opts.Writer, stdout)
+			_, err := io.Copy(opts.Stdout, stdout)
 			outputDone <- err
 		} else {
-			_, err := stdcopy.StdCopy(opts.Writer, opts.Writer, stdout)
+			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout)
 			outputDone <- err
 		}
 	}()
