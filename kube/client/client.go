@@ -125,7 +125,7 @@ func (kc KubeClient) Exec(ctx context.Context, projectName string, opts api.RunO
 		TTY:       opts.Tty,
 	}
 
-	if opts.Reader == nil {
+	if opts.Stdin == nil {
 		option.Stdin = false
 	}
 
@@ -141,9 +141,9 @@ func (kc KubeClient) Exec(ctx context.Context, projectName string, opts api.RunO
 		return err
 	}
 	return exec.Stream(remotecommand.StreamOptions{
-		Stdin:  opts.Reader,
-		Stdout: opts.Writer,
-		Stderr: opts.Writer,
+		Stdin:  opts.Stdin,
+		Stdout: opts.Stdout,
+		Stderr: opts.Stdout,
 		Tty:    opts.Tty,
 	})
 }

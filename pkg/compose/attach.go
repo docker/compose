@@ -78,21 +78,21 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 			Line:      line,
 		})
 	})
-	_, _, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w)
+	_, _, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w, w)
 	return err
 }
 
-func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, r io.ReadCloser, w io.Writer) (func(), chan bool, error) {
+func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (func(), chan bool, error) {
 	detached := make(chan bool)
 	var (
 		in      *streams.In
 		restore = func() { /* noop */ }
 	)
-	if r != nil {
-		in = streams.NewIn(r)
+	if stdin != nil {
+		in = streams.NewIn(stdin)
 	}
 
-	stdin, stdout, err := s.getContainerStreams(ctx, container)
+	streamIn, streamOut, err := s.getContainerStreams(ctx, container)
 	if err != nil {
 		return restore, detached, err
 	}
@@ -102,10 +102,10 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 		if in != nil {
 			in.Close() //nolint:errcheck
 		}
-		stdout.Close() //nolint:errcheck
+		streamOut.Close() //nolint:errcheck
 	}()
 
-	if in != nil && stdin != nil {
+	if in != nil && streamIn != nil {
 		if in.IsTerminal() {
 			state, err := term.SetRawTerminal(in.FD())
 			if err != nil {
@@ -116,19 +116,19 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 			}
 		}
 		go func() {
-			_, err := io.Copy(stdin, r)
+			_, err := io.Copy(streamIn, stdin)
 			if _, ok := err.(term.EscapeError); ok {
 				close(detached)
 			}
 		}()
 	}
 
-	if w != nil {
+	if stdout != nil {
 		go func() {
 			if tty {
-				io.Copy(w, stdout) // nolint:errcheck
+				io.Copy(stdout, streamOut) // nolint:errcheck
 			} else {
-				stdcopy.StdCopy(w, w, stdout) // nolint:errcheck
+				stdcopy.StdCopy(stdout, stderr, streamOut) // nolint:errcheck
 			}
 		}()
 	}

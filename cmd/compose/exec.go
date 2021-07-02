@@ -92,8 +92,9 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 		Detach:      opts.detach,
 		WorkingDir:  opts.workingDir,
 
-		Writer: os.Stdout,
-		Reader: os.Stdin,
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
 	}
 
 	if execOpts.Tty {
@@ -107,8 +108,9 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 			}
 		}()
 
-		execOpts.Writer = con
-		execOpts.Reader = con
+		execOpts.Stdin = con
+		execOpts.Stdout = con
+		execOpts.Stderr = con
 	}
 	exitCode, err := backend.Exec(ctx, project, execOpts)
 	if exitCode != 0 {
