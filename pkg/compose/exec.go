@@ -72,7 +72,7 @@ func (s *composeService) Exec(ctx context.Context, project *types.Project, opts 
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Close()
+	defer resp.Close() //nolint:errcheck
 
 	if opts.Tty {
 		s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
@@ -118,11 +118,13 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout)
 			outputDone <- err
 		}
+		defer stdout.Close() //nolint:errcheck
 	}()
 
 	go func() {
 		_, err := io.Copy(stdin, r)
 		inputDone <- err
+		defer stdin.Close() //nolint:errcheck
 	}()
 
 	for {
