@@ -57,17 +57,16 @@ func runVersion(cmd *cobra.Command) error {
 	var versionString string
 	var err error
 	format := strings.ToLower(strings.ReplaceAll(cmd.Flag(formatOpt).Value.String(), " ", ""))
-	displayedVersion := strings.TrimPrefix(internal.Version, "v")
 	// Replace is preferred in this case to keep the order.
 	switch format {
 	case formatter.PRETTY, "":
 		versionString, err = getOutFromMoby(cmd, fixedPrettyArgs(os.Args[1:])...)
 		versionString = strings.Replace(versionString,
-			"\n Version:", "\n Cloud integration: "+displayedVersion+"\n Version:", 1)
+			"\n Version:", "\n Cloud integration: "+internal.Version+"\n Version:", 1)
 	case formatter.JSON, formatter.TemplateLegacyJSON: // Try to catch full JSON formats
 		versionString, err = getOutFromMoby(cmd, fixedJSONArgs(os.Args[1:])...)
 		versionString = strings.Replace(versionString,
-			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, displayedVersion), 1)
+			`"Version":`, fmt.Sprintf(`"CloudIntegration":%q,"Version":`, internal.Version), 1)
 	default:
 		versionString, err = getOutFromMoby(cmd)
 	}

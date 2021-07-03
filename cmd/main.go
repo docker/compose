@@ -17,8 +17,6 @@
 package main
 
 import (
-	"strings"
-
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
@@ -58,6 +56,6 @@ func main() {
 		manager.Metadata{
 			SchemaVersion: "0.1.0",
 			Vendor:        "Docker Inc.",
-			Version:       strings.TrimPrefix(internal.Version, "v"),
+			Version:       internal.Version,
 		})
 }
