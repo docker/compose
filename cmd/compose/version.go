@@ -18,7 +18,6 @@ package compose
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -52,14 +51,13 @@ func versionCommand() *cobra.Command {
 }
 
 func runVersion(opts versionOptions) {
-	displayedVersion := strings.TrimPrefix(internal.Version, "v")
 	if opts.short {
-		fmt.Println(displayedVersion)
+		fmt.Println(internal.Version)
 		return
 	}
 	if opts.format == formatter.JSON {
-		fmt.Printf(`{"version":"%s"}\n`, displayedVersion)
+		fmt.Printf(`{"version":%q}\n`, internal.Version)
 		return
 	}
-	fmt.Printf("Docker Compose version %s\n", displayedVersion)
+	fmt.Println("Docker Compose version", internal.Version)
 }
