@@ -508,11 +508,8 @@ class Project:
                 'Building',
                 limit=5,
             )
-            if len(errors):
-                combined_errors = '\n'.join([
-                    e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
-                ])
-                raise ProjectError(combined_errors)
+            if errors:
+                raise ProjectError(errors)
 
         else:
             for service in services:
@@ -702,9 +699,7 @@ class Project:
             get_deps,
         )
         if errors:
-            raise ProjectError(
-                'Encountered errors while bringing up the project.'
-            )
+            raise ProjectError(errors)
 
         return [
             container
@@ -1160,5 +1155,7 @@ class NoSuchService(Exception):
 
 
 class ProjectError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
+    def __init__(self, errors):
+        self.msg = '\n'.join([
+            e.decode('utf-8') if isinstance(e, bytes) else e for e in errors.values()
+        ])
