@@ -31,8 +31,8 @@ func init() {
 	extraCommands = append(extraCommands, createKubeCommand)
 	extraHelp = append(extraHelp, `
 Create a Kubernetes context:
-$ docker context create k8s CONTEXT [flags]
-(see docker context create k8s --help)
+$ docker context create kubernetes CONTEXT [flags]
+(see docker context create kubernetes --help)
 `)
 }
 
