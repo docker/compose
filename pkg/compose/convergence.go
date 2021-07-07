@@ -157,6 +157,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	for i, container := range containers {
 		if i > expected {
 			// Scale Down
+			container := container
 			eg.Go(func() error {
 				err := c.service.apiClient.ContainerStop(ctx, container.ID, timeout)
 				if err != nil {
@@ -178,7 +179,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerProgressName(container)
 		diverged := container.Labels[api.ConfigHashLabel] != configHash
 		if diverged || recreate == api.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
-			i := i
+			i, container := i, container
 			eg.Go(func() error {
 				recreated, err := c.service.recreateContainer(ctx, project, service, container, inherit, timeout)
 				updated[i] = recreated
@@ -197,6 +198,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		case ContainerExited:
 			w.Event(progress.CreatedEvent(name))
 		default:
+			container := container
 			eg.Go(func() error {
 				return c.service.startContainer(ctx, container)
 			})
@@ -212,6 +214,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		// Scale UP
 		number := next + i
 		name := getContainerName(project.Name, service, number)
+		i := i
 		eg.Go(func() error {
 			container, err := c.service.createContainer(ctx, project, service, name, number, false, true)
 			updated[actual+i-1] = container
@@ -542,11 +545,11 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		container := c
+	for _, container := range containers {
 		if container.State == ContainerRunning {
 			continue
 		}
+		container := container
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StartingEvent(eventName))

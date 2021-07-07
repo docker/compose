@@ -217,17 +217,17 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 func (s *composeService) removeContainers(ctx context.Context, w progress.Writer, containers []moby.Container, timeout *time.Duration, volumes bool) error {
 	eg, _ := errgroup.WithContext(ctx)
 	for _, container := range containers {
-		toDelete := container
+		container := container
 		eg.Go(func() error {
-			eventName := getContainerProgressName(toDelete)
+			eventName := getContainerProgressName(container)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.stopContainers(ctx, w, []moby.Container{toDelete}, timeout)
+			err := s.stopContainers(ctx, w, []moby.Container{container}, timeout)
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, toDelete.ID, moby.ContainerRemoveOptions{
+			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				Force:         true,
 				RemoveVolumes: volumes,
 			})

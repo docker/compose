@@ -81,9 +81,8 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 	}
 
 	g := errgroup.Group{}
-	for i := range containers {
-		containerID := containers[i].ID
-
+	for _, container := range containers {
+		containerID := container.ID
 		g.Go(func() error {
 			switch direction {
 			case fromService:

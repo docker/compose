@@ -74,12 +74,12 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		c := c
+	for _, container := range containers {
+		container := container
 		eg.Go(func() error {
-			eventName := getContainerProgressName(c)
+			eventName := getContainerProgressName(container)
 			w.Event(progress.RemovingEvent(eventName))
-			err := s.apiClient.ContainerRemove(ctx, c.ID, moby.ContainerRemoveOptions{
+			err := s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})

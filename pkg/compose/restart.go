@@ -49,8 +49,8 @@ func (s *composeService) restart(ctx context.Context, project *types.Project, op
 			return nil
 		}
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, c := range observedState.filter(isService(service)) {
-			container := c
+		for _, container := range observedState.filter(isService(service)) {
+			container := container
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.RestartingEvent(eventName))

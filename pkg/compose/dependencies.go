@@ -91,22 +91,22 @@ func visit(ctx context.Context, project *types.Project, traversalConfig graphTra
 // Note: this could be `graph.walk` or whatever
 func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex, traversalConfig graphTraversalConfig, fn func(context.Context, string) error) error {
 	for _, node := range nodes {
-		n := node
 		// Don't start this service yet if all of its children have
 		// not been started yet.
-		if len(traversalConfig.filterAdjacentByStatusFn(graph, n.Service, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
+		if len(traversalConfig.filterAdjacentByStatusFn(graph, node.Service, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
 			continue
 		}
 
+		node := node
 		eg.Go(func() error {
-			err := fn(ctx, n.Service)
+			err := fn(ctx, node.Service)
 			if err != nil {
 				return err
 			}
 
-			graph.UpdateStatus(n.Service, traversalConfig.targetServiceStatus)
+			graph.UpdateStatus(node.Service, traversalConfig.targetServiceStatus)
 
-			return run(ctx, graph, eg, traversalConfig.adjacentNodesFn(n), traversalConfig, fn)
+			return run(ctx, graph, eg, traversalConfig.adjacentNodesFn(node), traversalConfig, fn)
 		})
 	}
 

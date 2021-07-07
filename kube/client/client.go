@@ -285,8 +285,7 @@ func (kc KubeClient) MapPortsToLocalhost(ctx context.Context, opts PortMappingOp
 
 	eg, ctx := errgroup.WithContext(ctx)
 	for serviceName, servicePorts := range opts.Services {
-		serviceName := serviceName
-		servicePorts := servicePorts
+		serviceName, servicePorts := serviceName, servicePorts
 		pod, err := kc.GetPod(ctx, opts.ProjectName, serviceName)
 		if err != nil {
 			return err
