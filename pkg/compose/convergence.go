@@ -230,7 +230,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		i := i
 		eg.Go(func() error {
 			container, err := c.service.createContainer(ctx, project, service, name, number, false, true)
-			updated[actual+i-1] = container
+			updated[actual+i] = container
 			return err
 		})
 		continue
