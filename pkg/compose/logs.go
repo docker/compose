@@ -29,20 +29,20 @@ import (
 )
 
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
-	list, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 
 	if err != nil {
 		return err
 	}
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range list {
-		c := c
+	for _, c := range containers {
 		service := c.Labels[api.ServiceLabel]
 		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return err
 		}
 
+		name := getContainerNameWithoutProject(c)
 		eg.Go(func() error {
 			r, err := s.apiClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
 				ShowStdout: true,
@@ -58,7 +58,6 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			}
 			defer r.Close() // nolint errcheck
 
-			name := getContainerNameWithoutProject(c)
 			w := utils.GetWriter(func(line string) {
 				consumer.Log(name, service, line)
 			})

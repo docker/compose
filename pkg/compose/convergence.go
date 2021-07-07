@@ -55,6 +55,19 @@ const (
 type convergence struct {
 	service       *composeService
 	observedState map[string]Containers
+	stateMutex    sync.Mutex
+}
+
+func (c *convergence) getObservedState(serviceName string) Containers {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	return c.observedState[serviceName]
+}
+
+func (c *convergence) setObservedState(serviceName string, containers Containers) {
+	c.stateMutex.Lock()
+	defer c.stateMutex.Unlock()
+	c.observedState[serviceName] = containers
 }
 
 func newConvergence(services []string, state Containers, s *composeService) *convergence {
@@ -97,7 +110,7 @@ var mu sync.Mutex
 
 // updateProject updates project after service converged, so dependent services relying on `service:xx` can refer to actual containers.
 func (c *convergence) updateProject(project *types.Project, service string) {
-	containers := c.observedState[service]
+	containers := c.getObservedState(service)
 	container := containers[0]
 
 	// operation is protected by a Mutex so that we can safely update project.Services while running concurrent convergence on services
@@ -148,7 +161,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	if err != nil {
 		return err
 	}
-	containers := c.observedState[service.Name]
+	containers := c.getObservedState(service.Name)
 	actual := len(containers)
 	updated := make(Containers, expected)
 
@@ -157,6 +170,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	for i, container := range containers {
 		if i > expected {
 			// Scale Down
+			container := container
 			eg.Go(func() error {
 				err := c.service.apiClient.ContainerStop(ctx, container.ID, timeout)
 				if err != nil {
@@ -178,7 +192,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerProgressName(container)
 		diverged := container.Labels[api.ConfigHashLabel] != configHash
 		if diverged || recreate == api.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
-			i := i
+			i, container := i, container
 			eg.Go(func() error {
 				recreated, err := c.service.recreateContainer(ctx, project, service, container, inherit, timeout)
 				updated[i] = recreated
@@ -197,6 +211,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		case ContainerExited:
 			w.Event(progress.CreatedEvent(name))
 		default:
+			container := container
 			eg.Go(func() error {
 				return c.service.startContainer(ctx, container)
 			})
@@ -212,16 +227,17 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		// Scale UP
 		number := next + i
 		name := getContainerName(project.Name, service, number)
+		i := i
 		eg.Go(func() error {
 			container, err := c.service.createContainer(ctx, project, service, name, number, false, true)
-			updated[actual+i-1] = container
+			updated[actual+i] = container
 			return err
 		})
 		continue
 	}
 
 	err = eg.Wait()
-	c.observedState[service.Name] = updated
+	c.setObservedState(service.Name, updated)
 	return err
 }
 
@@ -542,11 +558,11 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		container := c
+	for _, container := range containers {
 		if container.State == ContainerRunning {
 			continue
 		}
+		container := container
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StartingEvent(eventName))

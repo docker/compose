@@ -58,8 +58,8 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 
-	for _, srv := range project.Services {
-		service := srv
+	for _, service := range project.Services {
+		service := service
 		if service.Image == "" {
 			w.Event(progress.Event{
 				ID:     service.Name,

@@ -38,9 +38,8 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 
 	summary := make([]api.ContainerSummary, len(containers))
 	eg, ctx := errgroup.WithContext(ctx)
-	for i, c := range containers {
-		container := c
-		i := i
+	for i, container := range containers {
+		i, container := i, container
 		eg.Go(func() error {
 			var publishers []api.PortPublisher
 			sort.Slice(container.Ports, func(i, j int) bool {
