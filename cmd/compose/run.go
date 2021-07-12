@@ -72,7 +72,6 @@ func (opts runOptions) apply(project *types.Project) error {
 		}
 	}
 	if len(opts.volumes) > 0 {
-		target.Volumes = []types.ServiceVolumeConfig{}
 		for _, v := range opts.volumes {
 			volume, err := loader.ParseVolume(v)
 			if err != nil {
