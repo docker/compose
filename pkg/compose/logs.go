@@ -20,54 +20,68 @@ import (
 	"context"
 	"io"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/docker/api/types"
 )
 
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
-
 	if err != nil {
 		return err
 	}
+
 	eg, ctx := errgroup.WithContext(ctx)
-	for _, c := range containers {
-		service := c.Labels[api.ServiceLabel]
-		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
-		if err != nil {
-			return err
-		}
-
-		name := getContainerNameWithoutProject(c)
+	if options.Follow {
 		eg.Go(func() error {
-			r, err := s.apiClient.ContainerLogs(ctx, container.ID, types.ContainerLogsOptions{
-				ShowStdout: true,
-				ShowStderr: true,
-				Follow:     options.Follow,
-				Since:      options.Since,
-				Until:      options.Until,
-				Tail:       options.Tail,
-				Timestamps: options.Timestamps,
+			printer := newLogPrinter(consumer)
+			return s.watchContainers(projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
+				return s.logContainers(ctx, consumer, c, options)
 			})
-			if err != nil {
-				return err
-			}
-			defer r.Close() // nolint errcheck
+		})
+	}
 
-			w := utils.GetWriter(func(line string) {
-				consumer.Log(name, service, line)
-			})
-			if container.Config.Tty {
-				_, err = io.Copy(w, r)
-			} else {
-				_, err = stdcopy.StdCopy(w, w, r)
-			}
-			return err
+	for _, c := range containers {
+		c := c
+		eg.Go(func() error {
+			return s.logContainers(ctx, consumer, c, options)
 		})
 	}
 	return eg.Wait()
+}
+
+func (s *composeService) logContainers(ctx context.Context, consumer api.LogConsumer, c types.Container, options api.LogOptions) error {
+	cnt, err := s.apiClient.ContainerInspect(ctx, c.ID)
+	if err != nil {
+		return err
+	}
+
+	service := c.Labels[api.ServiceLabel]
+	r, err := s.apiClient.ContainerLogs(ctx, cnt.ID, types.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     options.Follow,
+		Since:      options.Since,
+		Until:      options.Until,
+		Tail:       options.Tail,
+		Timestamps: options.Timestamps,
+	})
+	if err != nil {
+		return err
+	}
+	defer r.Close() // nolint errcheck
+
+	name := getContainerNameWithoutProject(c)
+	w := utils.GetWriter(func(line string) {
+		consumer.Log(name, service, line)
+	})
+	if cnt.Config.Tty {
+		_, err = io.Copy(w, r)
+	} else {
+		_, err = stdcopy.StdCopy(w, w, r)
+	}
+	return err
 }

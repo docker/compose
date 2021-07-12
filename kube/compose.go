@@ -101,7 +101,7 @@ func (s *composeService) up(ctx context.Context, project *types.Project) error {
 		})
 
 	} else {
-		//update stack
+		// update stack
 		eventName = "Updating Compose stack"
 		w.Event(progress.CreatingEvent(eventName))
 
