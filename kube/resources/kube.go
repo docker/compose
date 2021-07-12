@@ -92,12 +92,13 @@ func mapToService(project *types.Project, service types.ServiceConfig) *core.Ser
 		if p.Published != 0 {
 			serviceType = core.ServiceTypeLoadBalancer
 		}
+		protocol := toProtocol(p.Protocol)
 		ports = append(ports,
 			core.ServicePort{
-				Name:       fmt.Sprintf("%d-%s", p.Published, strings.ToLower(p.Protocol)),
+				Name:       fmt.Sprintf("%d-%s", p.Published, strings.ToLower(string(protocol))),
 				Port:       int32(p.Published),
 				TargetPort: intstr.FromInt(int(p.Target)),
-				Protocol:   toProtocol(p.Protocol),
+				Protocol:   protocol,
 			})
 	}
 	if len(ports) == 0 { // headless service
