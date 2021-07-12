@@ -68,7 +68,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "ps",
+		Use:   "ps [options] [SERVICE...]",
 		Short: "List containers",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return opts.parseFilter()
@@ -111,6 +111,21 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 		fmt.Println(strings.Join(services, "\n"))
 		return nil
 	}
+
+SERVICES:
+	for _, s := range services {
+		for _, c := range containers {
+			if c.Service == s {
+				continue SERVICES
+			}
+		}
+		return fmt.Errorf("no such service: %s", s)
+	}
+
+	if len(containers) == 0 {
+		return api.ErrNotFound
+	}
+
 	if opts.Quiet {
 		for _, s := range containers {
 			fmt.Println(s.ID)
@@ -127,27 +142,31 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 	})
 
 	return formatter.Print(containers, opts.Format, os.Stdout,
-		func(w io.Writer) {
-			for _, container := range containers {
-				var ports []string
-				for _, p := range container.Publishers {
-					if p.URL == "" {
-						ports = append(ports, fmt.Sprintf("%d/%s", p.TargetPort, p.Protocol))
-					} else {
-						ports = append(ports, fmt.Sprintf("%s->%d/%s", p.URL, p.TargetPort, p.Protocol))
-					}
-				}
-				status := container.State
-				if status == "running" && container.Health != "" {
-					status = fmt.Sprintf("%s (%s)", container.State, container.Health)
-				} else if status == "exited" || status == "dead" {
-					status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
-				}
-				command := formatter2.Ellipsis(container.Command, 20)
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, strings.Join(ports, ", "))
-			}
-		},
+		writter(containers),
 		"NAME", "COMMAND", "SERVICE", "STATUS", "PORTS")
+}
+
+func writter(containers []api.ContainerSummary) func(w io.Writer) {
+	return func(w io.Writer) {
+		for _, container := range containers {
+			var ports []string
+			for _, p := range container.Publishers {
+				if p.URL == "" {
+					ports = append(ports, fmt.Sprintf("%d/%s", p.TargetPort, p.Protocol))
+				} else {
+					ports = append(ports, fmt.Sprintf("%s->%d/%s", p.URL, p.TargetPort, p.Protocol))
+				}
+			}
+			status := container.State
+			if status == "running" && container.Health != "" {
+				status = fmt.Sprintf("%s (%s)", container.State, container.Health)
+			} else if status == "exited" || status == "dead" {
+				status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
+			}
+			command := formatter2.Ellipsis(container.Command, 20)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, strings.Join(ports, ", "))
+		}
+	}
 }
 
 func filterByStatus(containers []api.ContainerSummary, status string) []api.ContainerSummary {
