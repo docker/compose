@@ -556,6 +556,10 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		return err
 	}
 
+	if len(containers) == 0 {
+		return fmt.Errorf("no containers to start")
+	}
+
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, container := range containers {
