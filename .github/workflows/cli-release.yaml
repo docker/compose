@@ -1,11 +1,17 @@
 name: Releaser
 
 on:
-  push:
-    tags:
-      - "v1*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+      dry-run:
+        description: 'Dry run'
+        required: false
+        default: 'true'
 jobs:
-  upload-release:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go 1.16
@@ -36,7 +42,9 @@ jobs:
         run: cp packaging/* bin/
 
       - uses: ncipollo/release-action@v1
+        if: ${{ github.event.inputs.dry-run != 'true' }}
         with:
           artifacts: "bin/*"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.event.inputs.tag }}
