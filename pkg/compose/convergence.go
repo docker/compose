@@ -111,6 +111,9 @@ var mu sync.Mutex
 // updateProject updates project after service converged, so dependent services relying on `service:xx` can refer to actual containers.
 func (c *convergence) updateProject(project *types.Project, service string) {
 	containers := c.getObservedState(service)
+	if len(containers) == 0 {
+		return
+	}
 	container := containers[0]
 
 	// operation is protected by a Mutex so that we can safely update project.Services while running concurrent convergence on services
@@ -557,6 +560,9 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	}
 
 	if len(containers) == 0 {
+		if scale, err := getScale(service); err != nil && scale == 0 {
+			return nil
+		}
 		return fmt.Errorf("no containers to start")
 	}
 
