@@ -24,11 +24,11 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose-cli/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/moby/term"
 
+	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/utils"
 )
 
@@ -85,27 +85,10 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 func (s *composeService) attachContainerStreams(ctx context.Context, container string, tty bool, stdin io.ReadCloser, stdout, stderr io.Writer) (func(), chan bool, error) {
 	detached := make(chan bool)
 	var (
-		in      *streams.In
 		restore = func() { /* noop */ }
 	)
 	if stdin != nil {
-		in = streams.NewIn(stdin)
-	}
-
-	streamIn, streamOut, err := s.getContainerStreams(ctx, container)
-	if err != nil {
-		return restore, detached, err
-	}
-
-	go func() {
-		<-ctx.Done()
-		if in != nil {
-			in.Close() //nolint:errcheck
-		}
-		streamOut.Close() //nolint:errcheck
-	}()
-
-	if in != nil && streamIn != nil {
+		in := streams.NewIn(stdin)
 		if in.IsTerminal() {
 			state, err := term.SetRawTerminal(in.FD())
 			if err != nil {
@@ -115,6 +98,22 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 				term.RestoreTerminal(in.FD(), state) //nolint:errcheck
 			}
 		}
+	}
+
+	streamIn, streamOut, err := s.getContainerStreams(ctx, container)
+	if err != nil {
+		return restore, detached, err
+	}
+
+	go func() {
+		<-ctx.Done()
+		if stdin != nil {
+			stdin.Close() //nolint:errcheck
+		}
+		streamOut.Close() //nolint:errcheck
+	}()
+
+	if streamIn != nil && stdin != nil {
 		go func() {
 			_, err := io.Copy(streamIn, stdin)
 			if _, ok := err.(term.EscapeError); ok {

@@ -24,9 +24,11 @@ import (
 	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/ioutils"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/moby/term"
 )
@@ -37,9 +39,81 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	service, err := project.GetService(opts.Service)
+	containerID, err := s.prepareRun(ctx, project, observedState, opts)
 	if err != nil {
 		return 0, err
+	}
+
+	if opts.Detach {
+		err := s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
+		if err != nil {
+			return 0, err
+		}
+		fmt.Fprintln(opts.Stdout, containerID)
+		return 0, nil
+	}
+
+	r, err := s.getEscapeKeyProxy(opts.Stdin)
+	if err != nil {
+		return 0, err
+	}
+
+	stdin, stdout, err := s.getContainerStreams(ctx, containerID)
+	if err != nil {
+		return 0, err
+	}
+	defer stdin.Close()  //nolint:errcheck
+	defer stdout.Close() //nolint:errcheck
+
+	detached := make(chan bool)
+
+	in := streams.NewIn(opts.Stdin)
+	if in.IsTerminal() {
+		state, err := term.SetRawTerminal(in.FD())
+		if err != nil {
+			return 0, err
+		}
+		defer term.RestoreTerminal(in.FD(), state) //nolint:errcheck
+	}
+
+	go func() {
+		if opts.Tty {
+			io.Copy(opts.Stdout, stdout) //nolint:errcheck
+		} else {
+			stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout) //nolint:errcheck
+		}
+	}()
+
+	go func() {
+		_, err := io.Copy(stdin, r)
+		if _, ok := err.(term.EscapeError); ok {
+			detached <- true
+		}
+	}()
+
+	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	s.monitorTTySize(ctx, containerID, s.apiClient.ContainerResize)
+
+	statusC, errC := s.apiClient.ContainerWait(ctx, containerID, container.WaitConditionNextExit)
+	select {
+	case status := <-statusC:
+		return int(status.StatusCode), nil
+	case err := <-errC:
+		return 0, err
+	case <-detached:
+		return 0, err
+	}
+
+}
+
+func (s *composeService) prepareRun(ctx context.Context, project *types.Project, observedState Containers, opts api.RunOptions) (string, error) {
+	service, err := project.GetService(opts.Service)
+	if err != nil {
+		return "", err
 	}
 
 	applyRunOptions(project, &service, opts)
@@ -58,54 +132,17 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
 
 	if err := s.ensureImagesExists(ctx, project, observedState, false); err != nil { // all dependencies already checked, but might miss service img
-		return 0, err
+		return "", err
 	}
 	if err := s.waitDependencies(ctx, project, service); err != nil {
-		return 0, err
+		return "", err
 	}
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove, opts.UseNetworkAliases)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	containerID := created.ID
-
-	if opts.Detach {
-		err := s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
-		if err != nil {
-			return 0, err
-		}
-		fmt.Fprintln(opts.Stdout, containerID)
-		return 0, nil
-	}
-
-	r, err := s.getEscapeKeyProxy(opts.Stdin)
-	if err != nil {
-		return 0, err
-	}
-	restore, detachC, err := s.attachContainerStreams(ctx, containerID, service.Tty, r, opts.Stdout, opts.Stderr)
-	if err != nil {
-		return 0, err
-	}
-	defer restore()
-
-	statusC, errC := s.apiClient.ContainerWait(context.Background(), containerID, container.WaitConditionNextExit)
-
-	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
-	if err != nil {
-		return 0, err
-	}
-
-	s.monitorTTySize(ctx, containerID, s.apiClient.ContainerResize)
-
-	select {
-	case status := <-statusC:
-		return int(status.StatusCode), nil
-	case <-detachC:
-		return 0, nil
-	case err := <-errC:
-		return 0, err
-	}
-
+	return containerID, nil
 }
 
 func (s *composeService) getEscapeKeyProxy(r io.ReadCloser) (io.ReadCloser, error) {
