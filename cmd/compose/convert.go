@@ -27,6 +27,7 @@ import (
 
 	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	cliconfig "github.com/docker/cli/cli/config"
 	"github.com/opencontainers/go-digest"
@@ -153,10 +154,10 @@ func runServices(opts convertOptions) error {
 	if err != nil {
 		return err
 	}
-	for _, s := range project.Services {
+	return project.WithServices(project.ServiceNames(), func(s types.ServiceConfig) error {
 		fmt.Println(s.Name)
-	}
-	return nil
+		return nil
+	})
 }
 
 func runVolumes(opts convertOptions) error {
