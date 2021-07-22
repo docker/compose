@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/docker/registry"
-	"github.com/google/uuid"
+	"github.com/hashicorp/go-uuid"
 )
 
 const (
@@ -65,7 +65,7 @@ func isUsingDefaultRegistry(cmdArgs []string) bool {
 }
 
 func isUsingPassword(pass string) bool {
-	if _, err := uuid.Parse(pass); err == nil {
+	if _, err := uuid.ParseUUID(pass); err == nil {
 		return false
 	}
 	if strings.HasPrefix(pass, patPrefix) {
