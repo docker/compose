@@ -77,9 +77,13 @@ func Exec(root *cobra.Command) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	command := metrics.GetCommand(os.Args[1:])
-	if command == "build" && !metrics.HasQuietFlag(os.Args[1:]) {
+	commandArgs := os.Args[1:]
+	command := metrics.GetCommand(commandArgs)
+	if command == "build" && !metrics.HasQuietFlag(commandArgs) {
 		utils.DisplayScanSuggestMsg()
+	}
+	if command == "login" && !metrics.HasQuietFlag(commandArgs) {
+		displayPATSuggestMsg(commandArgs)
 	}
 	metrics.Track(store.DefaultContextType, os.Args[1:], compose.SuccessStatus)
 
