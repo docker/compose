@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
@@ -76,7 +75,7 @@ func getReader(t *testing.T, in []byte, errResult error) IO {
 		Type:  streamsv1.IOStream_STDOUT,
 		Value: in,
 	}
-	m, err := ptypes.MarshalAny(&message)
+	m, err := anypb.New(&message)
 	assert.NilError(t, err)
 
 	return IO{
@@ -90,7 +89,7 @@ func getReader(t *testing.T, in []byte, errResult error) IO {
 }
 
 func getAny(t *testing.T, in []byte) *any.Any {
-	value, err := ptypes.MarshalAny(&streamsv1.BytesMessage{
+	value, err := anypb.New(&streamsv1.BytesMessage{
 		Type:  streamsv1.IOStream_STDOUT,
 		Value: in,
 	})
