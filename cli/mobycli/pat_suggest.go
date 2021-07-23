@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package utils
+package mobycli
 
 import (
 	"fmt"
@@ -35,8 +35,8 @@ For better security, log in with a limited-privilege personal access token. Lear
 	patPrefix = "dckrp_"
 )
 
-// DisplayPATSuggestMsg displays a message suggesting users to use PATs instead of passwords to reduce scope.
-func DisplayPATSuggestMsg(cmdArgs []string) {
+// displayPATSuggestMsg displays a message suggesting users to use PATs instead of passwords to reduce scope.
+func displayPATSuggestMsg(cmdArgs []string) {
 	if os.Getenv("DOCKER_PAT_SUGGEST") == "false" {
 		return
 	}

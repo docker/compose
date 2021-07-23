@@ -83,7 +83,7 @@ func Exec(root *cobra.Command) {
 		utils.DisplayScanSuggestMsg()
 	}
 	if command == "login" && !metrics.HasQuietFlag(commandArgs) {
-		utils.DisplayPATSuggestMsg(commandArgs)
+		displayPATSuggestMsg(commandArgs)
 	}
 	metrics.Track(store.DefaultContextType, os.Args[1:], compose.SuccessStatus)
 
