@@ -52,6 +52,10 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, nil
 	}
 
+	return s.runInteractive(ctx, containerID, opts)
+}
+
+func (s *composeService) runInteractive(ctx context.Context, containerID string, opts api.RunOptions) (int, error) {
 	r, err := s.getEscapeKeyProxy(opts.Stdin)
 	if err != nil {
 		return 0, err
