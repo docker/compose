@@ -26,7 +26,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
@@ -62,10 +61,6 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	if err != nil {
 		return 0, err
 	}
-	defer stdin.Close()  //nolint:errcheck
-	defer stdout.Close() //nolint:errcheck
-
-	detached := make(chan bool)
 
 	in := streams.NewIn(opts.Stdin)
 	if in.IsTerminal() {
@@ -76,19 +71,24 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		defer term.RestoreTerminal(in.FD(), state) //nolint:errcheck
 	}
 
+	outputDone := make(chan error)
+	inputDone := make(chan error)
+
 	go func() {
 		if opts.Tty {
-			io.Copy(opts.Stdout, stdout) //nolint:errcheck
+			_, err := io.Copy(opts.Stdout, stdout) //nolint:errcheck
+			outputDone <- err
 		} else {
-			stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout) //nolint:errcheck
+			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout) //nolint:errcheck
+			outputDone <- err
 		}
+		stdout.Close() //nolint:errcheck
 	}()
 
 	go func() {
 		_, err := io.Copy(stdin, r)
-		if _, ok := err.(term.EscapeError); ok {
-			detached <- true
-		}
+		inputDone <- err
+		stdin.Close() //nolint:errcheck
 	}()
 
 	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
@@ -98,16 +98,33 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 
 	s.monitorTTySize(ctx, containerID, s.apiClient.ContainerResize)
 
-	statusC, errC := s.apiClient.ContainerWait(ctx, containerID, container.WaitConditionNextExit)
-	select {
-	case status := <-statusC:
-		return int(status.StatusCode), nil
-	case err := <-errC:
-		return 0, err
-	case <-detached:
-		return 0, err
+	for {
+		select {
+		case err := <-outputDone:
+			if err != nil {
+				return 0, err
+			}
+			inspect, err := s.apiClient.ContainerInspect(ctx, containerID)
+			if err != nil {
+				return 0, err
+			}
+			exitCode := 0
+			if inspect.State != nil {
+				exitCode = inspect.State.ExitCode
+			}
+			return exitCode, nil
+		case err := <-inputDone:
+			if _, ok := err.(term.EscapeError); ok {
+				return 0, nil
+			}
+			if err != nil {
+				return 0, err
+			}
+			// Wait for output to complete streaming
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		}
 	}
-
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, observedState Containers, opts api.RunOptions) (string, error) {
