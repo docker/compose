@@ -17,7 +17,8 @@
 package streams
 
 import (
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	streamsv1 "github.com/docker/compose-cli/cli/server/protos/streams/v1"
 )
@@ -34,7 +35,7 @@ func (io *IO) Read(p []byte) (int, error) {
 	}
 
 	var m streamsv1.BytesMessage
-	err = ptypes.UnmarshalAny(a, &m)
+	err = anypb.UnmarshalTo(a, &m, proto.UnmarshalOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -52,7 +53,7 @@ func (io *IO) Write(p []byte) (n int, err error) {
 		Value: p,
 	}
 
-	m, err := ptypes.MarshalAny(&message)
+	m, err := anypb.New(&message)
 	if err != nil {
 		return 0, err
 	}
