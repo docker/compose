@@ -75,6 +75,11 @@ func TestIsUsingPassword(t *testing.T) {
 			true,
 		},
 		{
+			"no password or sso",
+			"",
+			false,
+		},
+		{
 			"personal access token",
 			"1508b8bd-b80c-452d-9a7a-ee5607c41bcd",
 			false,
