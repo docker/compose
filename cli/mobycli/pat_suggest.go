@@ -29,7 +29,7 @@ import (
 const (
 	// patSuggestMsg is a message to suggest the use of PAT (personal access tokens).
 	patSuggestMsg = `Logging in with your password grants your terminal complete access to your account. 
-For better security, log in with a limited-privilege personal access token. Learn more at https://docs.docker.com/docker-hub/access-tokens/`
+For better security, log in with a limited-privilege personal access token. Learn more at https://docs.docker.com/go/access-tokens/`
 
 	// patPrefix represents a docker personal access token prefix.
 	patPrefix = "dckrp_"
