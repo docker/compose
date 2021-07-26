@@ -39,11 +39,12 @@ func topCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	topCmd := &cobra.Command{
-		Use:   "top",
+		Use:   "top [SERVICES...]",
 		Short: "Display the running processes",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runTop(ctx, backend, opts, args)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 	return topCmd
 }

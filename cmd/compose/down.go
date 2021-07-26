@@ -57,6 +57,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runDown(ctx, backend, opts)
 		}),
+		ValidArgsFunction: noCompletion(),
 	}
 	flags := downCmd.Flags()
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")

@@ -44,11 +44,12 @@ func logsCommand(p *projectOptions, contextType string, backend api.Service) *co
 		projectOptions: p,
 	}
 	logsCmd := &cobra.Command{
-		Use:   "logs [service...]",
+		Use:   "logs [SERVICE...]",
 		Short: "View output from containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runLogs(ctx, backend, opts, args)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 	flags := logsCmd.Flags()
 	flags.BoolVarP(&opts.follow, "follow", "f", false, "Follow log output.")

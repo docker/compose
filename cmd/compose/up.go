@@ -120,6 +120,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
 			return runUp(ctx, backend, create, up, project, services)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 	flags := upCmd.Flags()
 	flags.StringArrayVarP(&up.Environment, "environment", "e", []string{}, "Environment variables")

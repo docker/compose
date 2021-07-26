@@ -61,6 +61,7 @@ func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runExec(ctx, backend, opts)
 		}),
+		ValidArgsFunction: serviceCompletion(p),
 	}
 
 	runCmd.Flags().BoolVarP(&opts.detach, "detach", "d", false, "Detached mode: Run command in the background.")

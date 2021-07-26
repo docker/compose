@@ -41,10 +41,10 @@ import (
 	"github.com/docker/compose-cli/pkg/compose"
 )
 
-//Command defines a compose CLI command as a func with args
+// Command defines a compose CLI command as a func with args
 type Command func(context.Context, []string) error
 
-//Adapt a Command func to cobra library
+// Adapt a Command func to cobra library
 func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
