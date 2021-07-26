@@ -118,13 +118,13 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout)
 			outputDone <- err
 		}
-		defer stdout.Close() //nolint:errcheck
+		stdout.Close() //nolint:errcheck
 	}()
 
 	go func() {
 		_, err := io.Copy(stdin, r)
 		inputDone <- err
-		defer stdin.Close() //nolint:errcheck
+		stdin.Close() //nolint:errcheck
 	}()
 
 	for {
