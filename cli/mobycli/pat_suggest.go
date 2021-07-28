@@ -65,6 +65,9 @@ func isUsingDefaultRegistry(cmdArgs []string) bool {
 }
 
 func isUsingPassword(pass string) bool {
+	if pass == "" { // ignore if no password (or SSO)
+		return false
+	}
 	if _, err := uuid.ParseUUID(pass); err == nil {
 		return false
 	}
