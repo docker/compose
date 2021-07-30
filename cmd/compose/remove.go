@@ -65,9 +65,12 @@ func runRemove(ctx context.Context, backend api.Service, opts removeOptions, ser
 	}
 
 	if opts.stop {
-		return backend.Stop(ctx, project, api.StopOptions{
+		err := backend.Stop(ctx, project, api.StopOptions{
 			Services: services,
 		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return backend.Remove(ctx, project, api.RemoveOptions{

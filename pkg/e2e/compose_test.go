@@ -171,3 +171,27 @@ func TestInitContainer(t *testing.T) {
 	defer c.RunDockerOrExitError("compose", "-p", "init-container", "down")
 	testify.Regexp(t, "foo_1  | hello(?m:.*)bar_1  | world", res.Stdout())
 }
+
+func TestRm(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	const projectName = "compose-e2e-rm"
+
+	t.Run("up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
+	})
+
+	t.Run("rm -sf", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm", "-sf", "simple")
+		res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
+	})
+
+	t.Run("check containers after rm -sf", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", "--all")
+		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_simple"), res.Combined())
+	})
+
+	t.Run("down", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-p", projectName, "down")
+	})
+}
