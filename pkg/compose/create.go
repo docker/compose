@@ -527,6 +527,10 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 
 func buildContainerPorts(s types.ServiceConfig) nat.PortSet {
 	ports := nat.PortSet{}
+	for _, s := range s.Expose {
+		p := nat.Port(s)
+		ports[p] = struct{}{}
+	}
 	for _, p := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", p.Target, p.Protocol))
 		ports[p] = struct{}{}
