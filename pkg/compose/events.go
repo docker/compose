@@ -21,9 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/compose-cli/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+
+	"github.com/docker/compose-cli/pkg/api"
 
 	"github.com/docker/compose-cli/pkg/utils"
 )
@@ -40,6 +41,11 @@ func (s *composeService) Events(ctx context.Context, project string, options api
 				continue
 			}
 
+			oneOff := event.Actor.Attributes[api.OneoffLabel]
+			if oneOff == "True" {
+				// ignore
+				continue
+			}
 			service := event.Actor.Attributes[api.ServiceLabel]
 			if len(options.Services) > 0 && !utils.StringContains(options.Services, service) {
 				continue
