@@ -127,13 +127,6 @@ SERVICES:
 		return api.ErrNotFound
 	}
 
-	if opts.Quiet {
-		for _, s := range containers {
-			fmt.Println(s.ID)
-		}
-		return nil
-	}
-
 	if opts.Status != "" {
 		containers = filterByStatus(containers, opts.Status)
 	}
@@ -141,6 +134,13 @@ SERVICES:
 	sort.Slice(containers, func(i, j int) bool {
 		return containers[i].Name < containers[j].Name
 	})
+
+	if opts.Quiet {
+		for _, c := range containers {
+			fmt.Println(c.ID)
+		}
+		return nil
+	}
 
 	return formatter.Print(containers, opts.Format, os.Stdout,
 		writter(containers),
