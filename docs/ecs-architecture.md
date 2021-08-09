@@ -5,7 +5,7 @@ keywords: Docker, Amazon, Integration, ECS, Compose, architecture, mapping
 ---
 # Architecture
 
-ECS integration relies on CloudFormation to manage AWS resrouces as an atomic operation.
+ECS integration relies on CloudFormation to manage AWS resources as an atomic operation.
 This document describes the mapping between compose application model and AWS components
 
 ## Overview
