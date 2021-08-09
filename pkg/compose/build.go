@@ -111,7 +111,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	if quietPull {
 		mode = xprogress.PrinterModeQuiet
 	}
-	opts, err := s.getBuildOptions(project, images)
+	opts, imagesToBuild, err := s.getBuildOptions(project, images)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		return err
 	}
 
-	if len(builtImages) > 0 {
+	if len(imagesToBuild) > 0 {
 		utils.DisplayScanSuggestMsg()
 	}
 	for name, digest := range builtImages {
@@ -130,17 +130,18 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	for i, service := range project.Services {
 		digest, ok := images[getImageName(service, project.Name)]
 		if ok {
-			project.Services[i].Labels[api.ImageDigestLabel] = digest
+			project.Services[i].Image = digest
 		}
 	}
 	return nil
 }
 
-func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, error) {
+func (s *composeService) getBuildOptions(project *types.Project, images map[string]string) (map[string]build.Options, []string, error) {
 	opts := map[string]build.Options{}
+	imagesToBuild := []string{}
 	for _, service := range project.Services {
 		if service.Image == "" && service.Build == nil {
-			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
+			return nil, nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
 		imageName := getImageName(service, project.Name)
 		_, localImagePresent := images[imageName]
@@ -149,15 +150,16 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
+			imagesToBuild = append(imagesToBuild, imageName)
 			opt, err := s.toBuildOptions(project, service, imageName)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			opts[imageName] = opt
 			continue
 		}
 	}
-	return opts, nil
+	return opts, imagesToBuild, nil
 
 }
 
