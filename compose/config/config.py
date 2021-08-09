@@ -830,9 +830,10 @@ def process_service(service_config):
         if field in service_dict:
             service_dict[field] = to_list(service_dict[field])
 
-    service_dict = process_security_opt(process_blkio_config(process_ports(
-        process_healthcheck(service_dict)
-    )))
+    service_dict = process_security_opt(
+        working_dir,
+        process_blkio_config(process_ports(process_healthcheck(service_dict))),
+    )
 
     return service_dict
 
@@ -1434,11 +1435,11 @@ def split_path_mapping(volume_path):
         return (volume_path, None)
 
 
-def process_security_opt(service_dict):
+def process_security_opt(working_dir, service_dict):
     security_opts = service_dict.get('security_opt', [])
     result = []
     for value in security_opts:
-        result.append(SecurityOpt.parse(value))
+        result.append(SecurityOpt.parse(working_dir, value))
     if result:
         service_dict['security_opt'] = result
     return service_dict

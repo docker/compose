@@ -469,7 +469,7 @@ def normalize_port_dict(port):
 
 class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
     @classmethod
-    def parse(cls, value):
+    def parse(cls, working_dir, value):
         if not isinstance(value, str):
             return value
         # based on https://github.com/docker/cli/blob/9de1b162f/cli/command/container/opts.go#L673-L697
@@ -481,12 +481,14 @@ class SecurityOpt(namedtuple('_SecurityOpt', 'value src_file')):
 
         if con[0] == 'seccomp' and con[1] != 'unconfined':
             try:
-                with open(unquote_path(con[1])) as f:
+                # Path is resolved relative to docker-compose.yml
+                path = os.path.abspath(os.path.join(working_dir, os.path.expanduser(con[1])))
+                with open(path) as f:
                     seccomp_data = json.load(f)
             except (OSError, ValueError) as e:
                 raise ConfigurationError('Error reading seccomp profile: {}'.format(e))
             return cls(
-                'seccomp={}'.format(json.dumps(seccomp_data)), con[1]
+                'seccomp={}'.format(json.dumps(seccomp_data)), path
             )
         return cls(value, None)
 
