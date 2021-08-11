@@ -67,7 +67,7 @@ An IAM Role is created and configured as `TaskRole` to grant service access to a
 purpose, user can set `x-aws-policies` or define a fine grained `x-aws-role` IAM role document.
 
 Service's ports get mapped into security group's `IngressRule`s and load balancer `Listener`s.
-Compose application whith HTTP services only (using ports 80/443 or `x-aws-protocol` set to `http`) get an Application Load Balancer
+Compose application with HTTP services only (using ports 80/443 or `x-aws-protocol` set to `http`) get an Application Load Balancer
 created, otherwise a Network Load Balancer is used.
 
 A `TargetGroup` is created per service to dispatch traffic by load balancer to the matching containers
