@@ -1,6 +1,6 @@
 #!groovy
 
-def dockerVersions = ['19.03.13']
+def dockerVersions = ['20.10.8']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py37']
 
