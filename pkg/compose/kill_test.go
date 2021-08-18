@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
@@ -41,7 +42,7 @@ func TestKillAll(t *testing.T) {
 	api := mocks.NewMockAPIClient(mockCtrl)
 	tested.apiClient = api
 
-	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
+	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
@@ -60,7 +61,7 @@ func TestKillSignal(t *testing.T) {
 	api := mocks.NewMockAPIClient(mockCtrl)
 	tested.apiClient = api
 
-	project := types.Project{Name: testProject, Services: []types.ServiceConfig{testService("service1")}}
+	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1")}}
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]moby.Container{testContainer("service1", "123")}, nil)
@@ -89,7 +90,7 @@ func containerLabels(service string) map[string]string {
 		compose.ServiceLabel:     service,
 		compose.ConfigFilesLabel: composefile,
 		compose.WorkingDirLabel:  workingdir,
-		compose.ProjectLabel:     testProject}
+		compose.ProjectLabel:     strings.ToLower(testProject)}
 }
 
 func anyCancellableContext() gomock.Matcher {
@@ -100,7 +101,7 @@ func anyCancellableContext() gomock.Matcher {
 
 func projectFilterListOpt() moby.ContainerListOptions {
 	return moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(testProject)),
+		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
 		All:     true,
 	}
 }

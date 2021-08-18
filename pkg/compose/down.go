@@ -37,7 +37,7 @@ type downOp func() error
 
 func (s *composeService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.down(ctx, projectName, options)
+		return s.down(ctx, strings.ToLower(projectName), options)
 	})
 }
 

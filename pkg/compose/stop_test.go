@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,7 +51,7 @@ func TestStopTimeout(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "789", &timeout).Return(nil)
 
 	err := tested.Stop(ctx, &types.Project{
-		Name: testProject,
+		Name: strings.ToLower(testProject),
 		Services: []types.ServiceConfig{
 			{Name: "service1"},
 			{Name: "service2"},
