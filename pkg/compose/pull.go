@@ -58,6 +58,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 
+	var mustBuild []string
 	for _, service := range project.Services {
 		service := service
 		if service.Image == "" {
@@ -72,6 +73,9 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			err := s.pullServiceImage(ctx, service, info, s.configFile, w, false)
 			if err != nil {
 				if !opts.IgnoreFailures {
+					if service.Build != nil {
+						mustBuild = append(mustBuild, service.Name)
+					}
 					return err
 				}
 				w.TailMsgf("Pulling %s: %s", service.Name, err.Error())
@@ -80,7 +84,13 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		})
 	}
 
-	return eg.Wait()
+	err = eg.Wait()
+
+	if !opts.IgnoreFailures && len(mustBuild) > 0 {
+		w.TailMsgf("WARNING: Some service image(s) must be built from source by running:\n    docker compose build %s", strings.Join(mustBuild, " "))
+	}
+
+	return err
 }
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) error {
