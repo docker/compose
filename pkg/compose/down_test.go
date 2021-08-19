@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	compose "github.com/docker/compose-cli/pkg/api"
@@ -47,11 +48,12 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "456", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]moby.NetworkResource{{ID: "myProject_default"}}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).Return([]moby.NetworkResource{{ID: "myProject_default"}},
+		nil)
 
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
-	err := tested.Down(context.Background(), testProject, compose.DownOptions{})
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{})
 	assert.NilError(t, err)
 }
 
@@ -72,11 +74,12 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "321", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return([]moby.NetworkResource{{ID: "myProject_default"}}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).Return([]moby.NetworkResource{{ID: "myProject_default"}},
+		nil)
 
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
-	err := tested.Down(context.Background(), testProject, compose.DownOptions{RemoveOrphans: true})
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
 	assert.NilError(t, err)
 }
 
@@ -92,11 +95,11 @@ func TestDownRemoveVolumes(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
-	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(testProject))}).Return(nil, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).Return(nil, nil)
 
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(testProject))).Return(volume.VolumeListOKBody{Volumes: []*moby.Volume{{Name: "myProject_volume"}}}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).Return(volume.VolumeListOKBody{Volumes: []*moby.Volume{{Name: "myProject_volume"}}}, nil)
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
-	err := tested.Down(context.Background(), testProject, compose.DownOptions{Volumes: true})
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
 	assert.NilError(t, err)
 }

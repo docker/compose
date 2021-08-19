@@ -62,7 +62,10 @@ func TestLocalComposeUp(t *testing.T) {
 	t.Run("top", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-p", projectName, "top")
 		output := res.Stdout()
-		assert.Assert(t, strings.Contains(output, `UID    PID     PPID    C    STIME   TTY   TIME       CMD`), output)
+		head := []string{"UID", "PID", "PPID", "C", "STIME", "TTY", "TIME", "CMD"}
+		for _, h := range head {
+			assert.Assert(t, strings.Contains(output, h), output)
+		}
 		assert.Assert(t, strings.Contains(output, `java -Xmx8m -Xms8m -jar /app/words.jar`), output)
 		assert.Assert(t, strings.Contains(output, `/dispatcher`), output)
 	})
@@ -139,7 +142,7 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 
 	tmpFolder, err := ioutil.TempDir("fixtures/simple-composefile", "test-tmp")
 	assert.NilError(t, err)
-	defer os.Remove(tmpFolder) //nolint: errcheck
+	defer os.Remove(tmpFolder) // nolint: errcheck
 	projectName := filepath.Base(tmpFolder)
 
 	res := c.RunDockerCmd("compose", "--project-directory", tmpFolder, "up", "-d")

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -37,7 +38,7 @@ func TestPs(t *testing.T) {
 	tested.apiClient = api
 
 	ctx := context.Background()
-	args := filters.NewArgs(projectFilter(testProject))
+	args := filters.NewArgs(projectFilter(strings.ToLower(testProject)))
 	args.Add("label", "com.docker.compose.oneoff=False")
 	listOpts := moby.ContainerListOptions{Filters: args, All: true}
 	c1, inspect1 := containerDetails("service1", "123", "running", "healthy", 0)
@@ -49,12 +50,13 @@ func TestPs(t *testing.T) {
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "789").Return(inspect3, nil)
 
-	containers, err := tested.Ps(ctx, testProject, compose.PsOptions{})
+	containers, err := tested.Ps(ctx, strings.ToLower(testProject), compose.PsOptions{})
 
 	expected := []compose.ContainerSummary{
-		{ID: "123", Name: "123", Project: testProject, Service: "service1", State: "running", Health: "healthy", Publishers: nil},
-		{ID: "456", Name: "456", Project: testProject, Service: "service1", State: "running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost:80", TargetPort: 90, PublishedPort: 80}}},
-		{ID: "789", Name: "789", Project: testProject, Service: "service2", State: "exited", Health: "", ExitCode: 130, Publishers: nil},
+		{ID: "123", Name: "123", Project: strings.ToLower(testProject), Service: "service1", State: "running", Health: "healthy", Publishers: nil},
+		{ID: "456", Name: "456", Project: strings.ToLower(testProject), Service: "service1", State: "running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost:80", TargetPort: 90,
+			PublishedPort: 80}}},
+		{ID: "789", Name: "789", Project: strings.ToLower(testProject), Service: "service2", State: "exited", Health: "", ExitCode: 130, Publishers: nil},
 	}
 	assert.NilError(t, err)
 	assert.DeepEqual(t, containers, expected)
