@@ -101,7 +101,10 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		}
 	}
 
-	prepareServicesDependsOn(project)
+	err = prepareServicesDependsOn(project)
+	if err != nil {
+		return err
+	}
 
 	return newConvergence(options.Services, observedState, s).apply(ctx, project, options)
 }
@@ -138,28 +141,55 @@ func prepareNetworks(project *types.Project) {
 	}
 }
 
-func prepareServicesDependsOn(p *types.Project) {
-outLoop:
-	for i := range p.Services {
-		networkDependency := getDependentServiceFromMode(p.Services[i].NetworkMode)
-		ipcDependency := getDependentServiceFromMode(p.Services[i].Ipc)
-		pidDependency := getDependentServiceFromMode(p.Services[i].Pid)
+func prepareServicesDependsOn(p *types.Project) error {
+	for i, service := range p.Services {
+		var dependencies []string
+		networkDependency := getDependentServiceFromMode(service.NetworkMode)
+		if networkDependency != "" {
+			dependencies = append(dependencies, networkDependency)
+		}
 
-		if networkDependency == "" && ipcDependency == "" && pidDependency == "" {
+		ipcDependency := getDependentServiceFromMode(service.Ipc)
+		if ipcDependency != "" {
+			dependencies = append(dependencies, ipcDependency)
+		}
+
+		pidDependency := getDependentServiceFromMode(service.Pid)
+		if pidDependency != "" {
+			dependencies = append(dependencies, pidDependency)
+		}
+
+		for _, vol := range service.VolumesFrom {
+			spec := strings.Split(vol, ":")
+			if len(spec) == 0 {
+				continue
+			}
+			if spec[0] == "container" {
+				continue
+			}
+			dependencies = append(dependencies, spec[0])
+		}
+
+		if len(dependencies) == 0 {
 			continue
 		}
-		if p.Services[i].DependsOn == nil {
-			p.Services[i].DependsOn = make(types.DependsOnConfig)
+		if service.DependsOn == nil {
+			service.DependsOn = make(types.DependsOnConfig)
 		}
-		for _, service := range p.Services {
-			if service.Name == networkDependency || service.Name == ipcDependency || service.Name == pidDependency {
-				p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
+		deps, err := p.GetServices(dependencies...)
+		if err != nil {
+			return err
+		}
+		for _, d := range deps {
+			if _, ok := service.DependsOn[d.Name]; !ok {
+				service.DependsOn[d.Name] = types.ServiceDependency{
 					Condition: types.ServiceConditionStarted,
 				}
-				continue outLoop
 			}
 		}
+		p.Services[i] = service
 	}
+	return nil
 }
 
 func (s *composeService) ensureNetworks(ctx context.Context, networks types.Networks) error {
