@@ -33,12 +33,7 @@ import (
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
-	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
-	if err != nil {
-		return 0, err
-	}
-
-	containerID, err := s.prepareRun(ctx, project, observedState, opts)
+	containerID, err := s.prepareRun(ctx, project, opts)
 	if err != nil {
 		return 0, err
 	}
@@ -131,7 +126,7 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 	}
 }
 
-func (s *composeService) prepareRun(ctx context.Context, project *types.Project, observedState Containers, opts api.RunOptions) (string, error) {
+func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return "", err
@@ -152,7 +147,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	service.Labels = service.Labels.Add(api.SlugLabel, slug)
 	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
 
-	if err := s.ensureImagesExists(ctx, project, observedState, false); err != nil { // all dependencies already checked, but might miss service img
+	if err := s.ensureImagesExists(ctx, project, false); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
 	if err := s.waitDependencies(ctx, project, service); err != nil {

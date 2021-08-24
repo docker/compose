@@ -60,7 +60,7 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 		return err
 	}
 
-	err = s.ensureImagesExists(ctx, project, observedState, options.QuietPull)
+	err = s.ensureImagesExists(ctx, project, options.QuietPull)
 	if err != nil {
 		return err
 	}
