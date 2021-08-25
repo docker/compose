@@ -1,0 +1,11 @@
+name: PR cleanup
+on:
+  pull_request:
+    types: [closed]
+jobs:
+  delete_pr_artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: stefanluptak/delete-old-pr-artifacts@v1
+        with:
+          workflow_filename: ci.yaml
