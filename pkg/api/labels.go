@@ -47,6 +47,8 @@ const (
 	OneoffLabel = "com.docker.compose.oneoff"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
+	// ImageDigestLabel stores digest of the container image used to run service
+	ImageDigestLabel = "com.docker.compose.image"
 	// VersionLabel stores the compose tool version used to run application
 	VersionLabel = "com.docker.compose.version"
 )

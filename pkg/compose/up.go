@@ -37,7 +37,10 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		if err != nil {
 			return err
 		}
-		return s.start(ctx, project, options.Start, nil)
+		if options.Start.Attach == nil {
+			return s.start(ctx, project, options.Start, nil)
+		}
+		return nil
 	})
 	if err != nil {
 		return err
