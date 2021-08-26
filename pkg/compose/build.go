@@ -53,7 +53,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		return s, ok
 	}))
 
-	for _, service := range project.Services {
+	services, err := project.GetServices(options.Services...)
+	if err != nil {
+		return err
+	}
+
+	for _, service := range services {
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
@@ -79,7 +84,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
-	_, err := s.doBuild(ctx, project, opts, options.Progress)
+	_, err = s.doBuild(ctx, project, opts, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 && !options.Quiet {
 			utils.DisplayScanSuggestMsg()

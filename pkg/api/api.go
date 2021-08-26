@@ -90,6 +90,8 @@ type BuildOptions struct {
 	NoCache bool
 	// Quiet make the build process not output to the console
 	Quiet bool
+	// Services passed in the command line to be built
+	Services []string
 }
 
 // CreateOptions group options of the Create API
