@@ -1,4 +1,4 @@
-name: Continuous integration
+name: Remove pending label on answer
 
 on:
   issue_comment:
