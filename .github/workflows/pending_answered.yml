@@ -1,4 +1,4 @@
-name: Remove pending lable on answer
+name: Remove pending label on answer
 
 on:
   issue_comment:

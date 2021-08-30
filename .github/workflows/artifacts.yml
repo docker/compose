@@ -53,6 +53,6 @@ jobs:
         with:
           comment-id: ${{ github.event.comment.id }}
           body: |
-            This PR can be tested using [binaries](https://github.com/docker/compose-cli/actions/runs/${{ github.run_id }})
+            This PR can be tested using [binaries](https://github.com/docker/compose-cli/actions/runs/${{ github.run_id }}).
           reactions: eyes
 
