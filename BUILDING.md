@@ -75,7 +75,7 @@ and have created a service principal. You can create a service principle using
 the Azure CLI after you have done a `docker login azure`:
 
 ```console
-$ docker login azure
+$ az login # az login is not synced with docker azure login, need az login for next step
 $ az ad sp create-for-rbac --name 'MyTestServicePrincipal' --sdk-auth
 ```
 
@@ -108,6 +108,11 @@ You can then use the `e2e-ecs` target:
 ```console
 TEST_AWS_PROFILE=myProfile TEST_AWS_REGION=eu-west-3 make e2e-ecs
 ```
+
+## ACI CI
+
+ACI CI runs E2E tests and needs the same credentials as described above to run these. 3 secrets are defined in github settings, and accessed by the CI job.
+To rotate these secrets, run the same `az ad sp create-for-rbac` command and update 3 github secrets with the resulting new service provide info.
 
 ## Releases
 
