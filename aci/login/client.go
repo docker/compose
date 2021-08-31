@@ -34,6 +34,9 @@ import (
 	"github.com/docker/compose-cli/pkg/api"
 )
 
+// UserAgentName is the default user agent used by the cli
+const UserAgentName = "docker-cli"
+
 // NewContainerGroupsClient get client toi manipulate containerGrouos
 func NewContainerGroupsClient(subscriptionID string) (containerinstance.ContainerGroupsClient, error) {
 	authorizer, mgmtURL, err := getClientSetupData()
@@ -52,7 +55,7 @@ func NewContainerGroupsClient(subscriptionID string) (containerinstance.Containe
 }
 
 func setupClient(aciClient *autorest.Client, auth autorest.Authorizer) {
-	aciClient.UserAgent = internal.UserAgentName + "/" + internal.Version
+	aciClient.UserAgent = UserAgentName + "/" + internal.Version
 	aciClient.Authorizer = auth
 }
 

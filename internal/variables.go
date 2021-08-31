@@ -16,13 +16,6 @@
 
 package internal
 
-const (
-	// UserAgentName is the default user agent used by the cli
-	UserAgentName = "docker-cli"
-	// ECSUserAgentName is the ECS specific user agent used by the cli
-	ECSUserAgentName = "Docker CLI"
-)
-
 var (
 	// Version is the version of the CLI injected in compilation time
 	Version = "dev"
