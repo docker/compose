@@ -1,3 +1,0 @@
-NAME                TYPE                DESCRIPTION                               DOCKER ENDPOINT                  KUBERNETES ENDPOINT   ORCHESTRATOR
-default *           moby                Current DOCKER_HOST based configuration   npipe:////./pipe/docker_engine                         swarm
-test-docker         moby                                                          npipe:////./pipe/docker_engine                         swarm

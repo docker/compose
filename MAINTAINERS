@@ -26,6 +26,7 @@
 			"gtardif",
 			"ndeloof"
 			"chris-crone"
+			"ulyssessouza"
 		]
 
 [people]
@@ -55,3 +56,8 @@
 	Name = "Djordje Lukic"
 	Email = "djordje.lukic@docker.com"
 	GitHub = "rumpl"
+
+    [people.ulyssessouza]
+    Name = "Ulysses Souza"
+    Email = "<ulysses.souza@docker.com"
+    Github = "ulyssessouza"

@@ -19,8 +19,8 @@ package compose
 import (
 	"context"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/progress"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 
 	"github.com/compose-spec/compose-go/types"
 )

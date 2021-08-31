@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	compose "github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/mocks"
+	compose "github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/mocks"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"

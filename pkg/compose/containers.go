@@ -23,8 +23,8 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Containers is a set of moby Container

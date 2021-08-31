@@ -20,11 +20,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/docker/compose-cli/cmd/formatter"
+	"github.com/docker/compose/v2/cmd/formatter"
 
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 type logsOptions struct {

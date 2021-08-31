@@ -19,7 +19,7 @@ package compose
 import (
 	"github.com/docker/buildx/build"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 func (s *composeService) windowsBuild(opts map[string]build.Options, mode string) error {

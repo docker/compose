@@ -1,4 +1,3 @@
 .git/
 bin/
 dist/
-tests/node-client/node_modules/

@@ -25,7 +25,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/docker/compose-cli/cmd/formatter"
+	"github.com/docker/compose/v2/cmd/formatter"
 
 	"github.com/sirupsen/logrus"
 
@@ -37,8 +37,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/compose"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 )
 
 // Command defines a compose CLI command as a func with args

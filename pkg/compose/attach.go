@@ -28,8 +28,8 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/moby/term"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) attach(ctx context.Context, project *types.Project, listener api.ContainerEventListener, selectedServices []string) (Containers, error) {

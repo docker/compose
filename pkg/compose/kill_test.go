@@ -28,8 +28,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 
-	compose "github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/mocks"
+	compose "github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/mocks"
 )
 
 const testProject = "testProject"

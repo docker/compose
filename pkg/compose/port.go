@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"

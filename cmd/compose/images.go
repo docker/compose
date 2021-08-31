@@ -28,9 +28,9 @@ import (
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cmd/formatter"
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type imageOptions struct {

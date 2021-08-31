@@ -22,12 +22,12 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/pkg/progress"
-	"github.com/docker/compose-cli/pkg/prompt"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/prompt"
 )
 
 func (s *composeService) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {

@@ -31,19 +31,9 @@ else
 	TEST_FLAGS=-run $(E2E_TEST)
 endif
 
-all: cli compose-plugin
+all: compose-plugin
 
-protos: ## Generate go code from .proto files
-	@docker build . --target protos \
-	--output ./cli/server/protos
-
-cli: ## Compile the cli
-	@docker build . --target cli \
-	--platform local \
-	--build-arg BUILD_TAGS=e2e,kube \
-	--build-arg GIT_TAG=$(GIT_TAG) \
-	--output ./bin
-
+.PHONY: compose-plugin
 compose-plugin: ## Compile the compose cli-plugin
 	@docker build . --target compose-plugin \
 	--platform local \
@@ -51,101 +41,55 @@ compose-plugin: ## Compile the compose cli-plugin
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin
 
+.PHONY: e2e-compose
 e2e-compose: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
 	gotestsum $(TEST_FLAGS) ./pkg/e2e -- -count=1
 
-e2e-local: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
-	gotestsum $(TEST_FLAGS) ./local/e2e/container ./local/e2e/cli-only -- -count=1
-
-e2e-win-ci: ## Run end to end local tests on Windows CI, no Docker for Linux containers available ATM. Set E2E_TEST=TestName to run a single test
-	go test -count=1 -v $(TEST_FLAGS) ./local/e2e/cli-only
-
-e2e-kube: ## Run End to end Kube tests. Set E2E_TEST=TestName to run a single test
-	go test -timeout 10m -count=1 -v $(TEST_FLAGS) ./kube/e2e
-
-e2e-aci: ## Run End to end ACI tests. Set E2E_TEST=TestName to run a single test
-	go test -timeout 15m -count=1 -v $(TEST_FLAGS) ./aci/e2e
-
-e2e-ecs: ## Run End to end ECS tests. Set E2E_TEST=TestName to run a single test
-	go test -timeout 20m -count=1 -v $(TEST_FLAGS) ./ecs/e2e/ecs ./ecs/e2e/ecs-local
-
+.PHONY: cross
 cross: ## Compile the CLI for linux, darwin and windows
 	@docker build . --target cross \
 	--build-arg BUILD_TAGS \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--output ./bin \
 
+.PHONY: test
 test: ## Run unit tests
 	@docker build --progress=plain . \
 	--build-arg BUILD_TAGS=kube \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target test
 
+.PHONY: cache-clear
 cache-clear: ## Clear the builder cache
 	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
+.PHONY: lint
 lint: ## run linter(s)
 	@docker build . \
 	--build-arg BUILD_TAGS=kube,e2e \
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
+.PHONY: check-dependencies
 check-dependencies: ## check dependency updates
 	go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.}}{{end}}{{end}}' all
 
-import-restrictions: ## run import-restrictions script
-	@docker build . \
-	--target import-restrictions
-
-serve: cli ## start server
-	@./bin/docker serve --address unix:///tmp/backend.sock
-
-moby-cli-link: ## Create com.docker.cli symlink if does not already exist
-	ln -s $(MOBY_DOCKER) /usr/local/bin/com.docker.cli
-
-install: ## Link /usr/local/bin/ to current binary
-	ln -fs $(BINARY_FOLDER)/docker /usr/local/bin/docker
-
+.PHONY: validate-headers
 validate-headers: ## Check license header for all files
 	@docker build . --target check-license-headers
 
+.PHONY: go-mod-tidy
 go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and go.sum
 	@docker build . --target go-mod-tidy --output .
 
+.PHONY: validate-go-mod
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	@docker build . --target check-go-mod
 
 validate: validate-go-mod validate-headers ## Validate sources
 
-pre-commit: validate import-restrictions check-dependencies lint cli test e2e-local
-
-build-aci-sidecar:  ## build aci sidecar image locally and tag it with make build-aci-sidecar tag=0.1
-	docker build -t docker/aci-hostnames-sidecar:$(tag) aci/etchosts
-
-publish-aci-sidecar: build-aci-sidecar ## build & publish aci sidecar image with make publish-aci-sidecar tag=0.1
-	docker pull docker/aci-hostnames-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/aci-hostnames-sidecar:$(tag)
-
-build-ecs-search-sidecar:  ## build ecs search sidecar image locally and tag it with make build-ecs-search-sidecar tag=0.1
-	docker build -t docker/ecs-searchdomain-sidecar:$(tag) ecs/resolv
-
-publish-ecs-search-sidecar: build-ecs-search-sidecar ## build & publish ecs search sidecar image with make publish-ecs-search-sidecar tag=0.1
-	docker pull docker/ecs-searchdomain-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/ecs-searchdomain-sidecar:$(tag)
-
-build-ecs-secrets-sidecar:  ## build ecs secrets sidecar image locally and tag it with make build-ecs-secrets-sidecar tag=0.1
-	docker build -t docker/ecs-secrets-sidecar:$(tag) ecs/secrets
-
-publish-ecs-secrets-sidecar: build-ecs-secrets-sidecar ## build & publish ecs secrets sidecar image with make publish-ecs-secrets-sidecar tag=0.1
-	docker pull docker/ecs-secrets-sidecar:$(tag) && echo "Failure: Tag already exists" || docker push docker/ecs-secrets-sidecar:$(tag)
-
-clean-aci-e2e: ## Make sure no ACI tests are currently runnnig in the CI when invoking this. Delete ACI E2E tests resources that might have leaked when ctrl-C E2E tests.
-	@ echo "Will delete resource groups: "
-	@ az group list | jq '.[].name' | grep -i E2E-Test
-	az group list | jq '.[].name' | grep -i E2E-Test | xargs -n1 az group delete -y --no-wait -g
+pre-commit: validate check-dependencies lint compose-plugin test e2e-compose
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
-FORCE:
-
-.PHONY: all validate protos cli e2e-local cross test cache-clear lint check-dependencies serve classic-link help clean-aci-e2e go-mod-tidy

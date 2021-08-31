@@ -23,8 +23,8 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types"
 )
 

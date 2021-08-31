@@ -19,7 +19,7 @@ package compose
 import (
 	"testing"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 
 	moby "github.com/docker/docker/api/types"
 	"gotest.tools/v3/assert"

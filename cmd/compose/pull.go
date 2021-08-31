@@ -24,8 +24,8 @@ import (
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type pullOptions struct {

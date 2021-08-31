@@ -20,11 +20,11 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/pkg/progress"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Restart(ctx context.Context, project *types.Project, options api.RestartOptions) error {

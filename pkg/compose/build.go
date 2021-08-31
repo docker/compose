@@ -33,9 +33,9 @@ import (
 	"github.com/moby/buildkit/session/auth/authprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/progress"
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Build(ctx context.Context, project *types.Project, options api.BuildOptions) error {

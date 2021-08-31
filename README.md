@@ -1,57 +1,63 @@
-# Docker Compose CLI
+# Docker Compose v2
 
 [![Actions Status](https://github.com/docker/compose-cli/workflows/Continuous%20integration/badge.svg)](https://github.com/docker/compose-cli/actions)
 [![Actions Status](https://github.com/docker/compose-cli/workflows/Windows%20CI/badge.svg)](https://github.com/docker/compose-cli/actions)
 
-This Compose CLI tool makes it easy to run Docker containers and Docker Compose applications:
-* locally as a command in the docker CLI, using `docker compose ...` comands.
-* in the cloud using either Amazon Elastic Container Service
-([ECS](https://aws.amazon.com/ecs))
-or Microsoft Azure Container Instances
-([ACI](https://azure.microsoft.com/services/container-instances))
-using the Docker commands you already know.
-  
-**Note: Compose CLI is released under the 1.x tag, until "Compose v2" gets a new home**
+![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
-## Compose v2 (a.k.a "Local Docker Compose")
+Docker Compose is a tool for running multi-container applications on Docker
+defined using the [Compose file format](https://compose-spec.io).
+A Compose file is used to define how the one or more containers that make up
+your application are configured.
+Once you have a Compose file, you can create and start your application with a
+single command: `docker-compose up`.
 
-The `docker compose` local command is the next major version for docker-compose, and it supports the same commands and flags, in order to be used as a drop-in replacement.
-[Here](https://github.com/docker/compose-cli/issues/1283) is a checklist of docker-compose commands and flags that are implemented in `docker compose`.
+# Where to get Docker Compose
 
-This `docker compose` local command :
-* has a better integration with the rest of the docker ecosystem (being written in go, it's easier to share functionality with the Docker CLI and other Docker libraries)
-* is quicker and uses more parallelism to run multiple tasks in parallel. It also uses buildkit by default
-* includes additional commands, like `docker compose ls` to list current compose projects
+### Windows and macOS
 
-**Note: Compose v2 is released under the 2.x tag, until "Compose v2" gets a new home**
+Docker Compose is included in
+[Docker Desktop](https://www.docker.com/products/docker-desktop)
+for Windows and macOS.
 
-Compose v2 can be installed manually as a CLI plugin, by downloading latest v2.x release from https://github.com/docker/compose-cli/releases for your architecture and move into `~/.docker/cli-plugins/docker-compose`
+### Linux
 
-## Getting started
+You can download Docker Compose binaries from the
+[release page](https://github.com/docker/compose/releases) on this repository.
 
-To get started with Compose CLI, all you need is:
+Copy the relevant binary for your OS under `$HOME/.docker/cli-plugins/docker-compose` 
+(might require to make the downloaded file executable with `chmod +x`)
 
-* macOS, Windows, or Windows WSL2: The current release of
-  [Docker Desktop](https://www.docker.com/products/docker-desktop)
-* Linux:
-  [Install script](INSTALL.md)
-* An [AWS](https://aws.amazon.com) or [Azure](https://azure.microsoft.com)
-  account in order to use the Compose Cloud integration
+Quick Start
+-----------
 
-Please create [issues](https://github.com/docker/compose-cli/issues) to leave feedback.
+Using Docker Compose is basically a three-step process:
+1. Define your app's environment with a `Dockerfile` so it can be
+   reproduced anywhere.
+2. Define the services that make up your app in `docker-compose.yml` so
+   they can be run together in an isolated environment.
+3. Lastly, run `docker-compose up` and Compose will start and run your entire
+   app.
 
-## Examples
+A Compose file looks like this:
 
-* ECS: [Deploying Wordpress to the cloud](https://www.docker.com/blog/deploying-wordpress-to-the-cloud/)
-* ACI: [Deploying a Minecraft server to the cloud](https://www.docker.com/blog/deploying-a-minecraft-docker-server-to-the-cloud/)
-* ACI: [Setting Up Cloud Deployments Using Docker, Azure and Github Actions](https://www.docker.com/blog/setting-up-cloud-deployments-using-docker-azure-and-github-actions/)
+```yaml
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/code
+  redis:
+    image: redis
+```
 
-## Development
+Contributing
+------------
 
-See the instructions in [BUILDING.md](BUILDING.md) for how to build the CLI and
-run its tests; including the end to end tests for local containers, ACI, and
-ECS.
-The guide also includes instructions for releasing the CLI.
+Want to help develop Docker Compose? Check out our
+[contributing documentation](CONTRIBUTING.md).
 
-Before contributing, please read the [contribution guidelines](CONTRIBUTING.md)
-which includes conventions used in this project.
+If you find an issue, please report it on the
+[issue tracker](https://github.com/docker/compose/issues/new/choose).

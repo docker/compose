@@ -32,14 +32,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download
 
-FROM base AS make-protos
-ARG PROTOC_GEN_GO_VERSION
-RUN go get github.com/golang/protobuf/protoc-gen-go@${PROTOC_GEN_GO_VERSION}
-COPY . .
-RUN make -f builder.Makefile protos
-
-FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS lint-base
-
 FROM base AS lint
 ENV CGO_ENABLED=0
 COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
@@ -52,30 +44,6 @@ RUN --mount=target=. \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
     make -f builder.Makefile lint
-
-FROM base AS import-restrictions-base
-RUN go get github.com/docker/import-restrictions
-
-FROM import-restrictions-base AS import-restrictions
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    make -f builder.Makefile import-restrictions
-
-FROM base AS make-cli
-ENV CGO_ENABLED=0
-ARG TARGETOS
-ARG TARGETARCH
-ARG BUILD_TAGS
-ARG GIT_TAG
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} \
-    GOARCH=${TARGETARCH} \
-    BUILD_TAGS=${BUILD_TAGS} \
-    GIT_TAG=${GIT_TAG} \
-    make BINARY=/out/docker -f builder.Makefile cli
 
 FROM base AS make-compose-plugin
 ENV CGO_ENABLED=0
@@ -100,13 +68,7 @@ RUN --mount=target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     BUILD_TAGS=${BUILD_TAGS} \
     GIT_TAG=${GIT_TAG} \
-    make BINARY=/out/docker COMPOSE_BINARY=/out/docker-compose -f builder.Makefile cross
-
-FROM scratch AS protos
-COPY --from=make-protos /compose-cli/cli/server/protos .
-
-FROM scratch AS cli
-COPY --from=make-cli /out/* .
+    make COMPOSE_BINARY=/out/docker-compose -f builder.Makefile cross
 
 FROM scratch AS compose-plugin
 COPY --from=make-compose-plugin /out/* .

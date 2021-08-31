@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/compose-cli/pkg/utils"
+	"github.com/docker/compose/v2/pkg/utils"
 
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"

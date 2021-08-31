@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 
 	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"

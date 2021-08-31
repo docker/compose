@@ -29,8 +29,8 @@ import (
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/progress"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 )
 
 type downOp func() error

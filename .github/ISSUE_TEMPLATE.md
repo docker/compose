@@ -49,23 +49,10 @@ Briefly describe the problem you are having in a few paragraphs.
 
 **Additional information you deem important (e.g. issue happens only occasionally):**
 
-**Output of `docker-compose --version`:**
+**Output of `docker compose version`:**
 
 ```
 (paste your output here)
-```
-
-**Output of `docker version`:**
-
-```
-(paste your output here)
-```
-
-**Output of `docker context show`:**  
-You can also run `docker context inspect context-name` to give us more details but don't forget to remove sensitive content.
-
-```
-(paste your output here) 
 ```
 
 **Output of `docker info`:**
@@ -74,4 +61,4 @@ You can also run `docker context inspect context-name` to give us more details b
 (paste your output here)
 ```
 
-**Additional environment details (AWS ECS, Azure ACI, local, etc.):**
+**Additional environment details:**

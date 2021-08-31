@@ -23,10 +23,10 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	commands "github.com/docker/compose-cli/cmd/compose"
-	"github.com/docker/compose-cli/internal"
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/compose"
+	commands "github.com/docker/compose/v2/cmd/compose"
+	"github.com/docker/compose/v2/internal"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
 )
 
 func init() {

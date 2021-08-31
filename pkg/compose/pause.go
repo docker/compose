@@ -22,8 +22,8 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/docker/compose-cli/pkg/api"
-	"github.com/docker/compose-cli/pkg/progress"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/progress"
 )
 
 func (s *composeService) Pause(ctx context.Context, project string, options api.PauseOptions) error {

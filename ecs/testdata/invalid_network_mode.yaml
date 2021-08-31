@@ -1,4 +1,0 @@
-services:
-  simple:
-    image: nginx
-    network_mode: bridge

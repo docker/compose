@@ -28,7 +28,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/moby/term"
 
-	"github.com/docker/compose-cli/pkg/api"
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 func (s *composeService) Exec(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {

@@ -21,7 +21,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 
-	"github.com/docker/compose-cli/internal"
+	"github.com/docker/compose/v2/internal"
 )
 
 const (
