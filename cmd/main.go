@@ -23,17 +23,21 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/context/store"
 	commands "github.com/docker/compose-cli/cmd/compose"
 	"github.com/docker/compose-cli/internal"
 	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/compose"
 )
 
+func init() {
+	commands.Warning = "The new 'docker compose' command is currently experimental. " +
+		"To provide feedback or request new features please open issues at https://github.com/docker/compose-cli"
+}
+
 func main() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
-		cmd := commands.RootCommand(store.DefaultContextType, lazyInit)
+		cmd := commands.RootCommand(lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {

@@ -24,11 +24,12 @@ import (
 	"sort"
 	"strings"
 
+	formatter2 "github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/utils"
 )
@@ -88,7 +89,7 @@ func runImages(ctx context.Context, backend api.Service, opts imageOptions, serv
 		return images[i].ContainerName < images[j].ContainerName
 	})
 
-	return formatter.Print(images, formatter.PRETTY, os.Stdout,
+	return formatter2.Print(images, formatter2.PRETTY, os.Stdout,
 		func(w io.Writer) {
 			for _, img := range images {
 				id := stringid.TruncateID(img.ID)

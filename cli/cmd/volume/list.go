@@ -21,11 +21,12 @@ import (
 	"io"
 	"os"
 
+	formatter2 "github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/volumes"
-	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type listVolumeOpts struct {
@@ -55,14 +56,14 @@ func listVolume() *cobra.Command {
 				return nil
 			}
 			view := viewFromVolumeList(vols)
-			return formatter.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+			return formatter2.Print(view, opts.format, os.Stdout, func(w io.Writer) {
 				for _, vol := range view {
 					_, _ = fmt.Fprintf(w, "%s\t%s\n", vol.ID, vol.Description)
 				}
 			}, "ID", "DESCRIPTION")
 		},
 	}
-	cmd.Flags().StringVar(&opts.format, "format", formatter.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
+	cmd.Flags().StringVar(&opts.format, "format", formatter2.PRETTY, "Format the output. Values: [pretty | json]. (Default: pretty)")
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Only display IDs")
 	return cmd
 }

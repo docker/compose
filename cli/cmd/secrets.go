@@ -22,11 +22,12 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/secrets"
-	"github.com/docker/compose-cli/cli/formatter"
 )
 
 // SecretCommand manage secrets

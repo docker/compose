@@ -19,9 +19,10 @@ package compose
 import (
 	"fmt"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/internal"
 )
 

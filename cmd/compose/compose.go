@@ -25,6 +25,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/compose-spec/compose-go/cli"
@@ -35,8 +37,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/compose"
 )
@@ -198,7 +198,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(contextType string, backend api.Service) *cobra.Command {
+func RootCommand(backend api.Service) *cobra.Command {
 	opts := projectOptions{}
 	var (
 		ansi    string
@@ -247,10 +247,6 @@ func RootCommand(contextType string, backend api.Service) *cobra.Command {
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
 			}
-			if contextType == store.DefaultContextType || contextType == store.LocalContextType {
-				Warning = "The new 'docker compose' command is currently experimental. " +
-					"To provide feedback or request new features please open issues at https://github.com/docker/compose-cli"
-			}
 			return nil
 		},
 	}
@@ -262,8 +258,8 @@ func RootCommand(contextType string, backend api.Service) *cobra.Command {
 		restartCommand(&opts, backend),
 		stopCommand(&opts, backend),
 		psCommand(&opts, backend),
-		listCommand(contextType, backend),
-		logsCommand(&opts, contextType, backend),
+		listCommand(backend),
+		logsCommand(&opts, backend),
 		convertCommand(&opts, backend),
 		killCommand(&opts, backend),
 		runCommand(&opts, backend),
@@ -276,17 +272,12 @@ func RootCommand(contextType string, backend api.Service) *cobra.Command {
 		portCommand(&opts, backend),
 		imagesCommand(&opts, backend),
 		versionCommand(),
+		buildCommand(&opts, backend),
+		pushCommand(&opts, backend),
+		pullCommand(&opts, backend),
+		createCommand(&opts, backend),
+		copyCommand(&opts, backend),
 	)
-
-	if contextType == store.LocalContextType || contextType == store.DefaultContextType {
-		command.AddCommand(
-			buildCommand(&opts, backend),
-			pushCommand(&opts, backend),
-			pullCommand(&opts, backend),
-			createCommand(&opts, backend),
-			copyCommand(&opts, backend),
-		)
-	}
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
 	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)

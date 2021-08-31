@@ -25,11 +25,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	formatter2 "github.com/docker/cli/cli/command/formatter"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
 	"github.com/docker/compose-cli/pkg/utils"
 )

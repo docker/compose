@@ -20,11 +20,11 @@ import (
 	"context"
 	"fmt"
 
+	format "github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/docker/compose-cli/aci"
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/formatter"
-	format "github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/ecs"
 	"github.com/docker/compose-cli/pkg/progress"
 
@@ -125,7 +125,7 @@ func rmVolume() *cobra.Command {
 				}
 				fmt.Println(id)
 			}
-			formatter.SetMultiErrorFormat(errs)
+			format.SetMultiErrorFormat(errs)
 			return errs.ErrorOrNil()
 		},
 	}
