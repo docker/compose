@@ -228,7 +228,7 @@ func main() {
 
 	// On default context, "compose" is implemented by CLI Plugin
 	proxy := api.NewServiceProxy().WithService(service.ComposeService())
-	command := compose2.RootCommand(ctype, proxy)
+	command := compose2.RootCommand(proxy)
 
 	if ctype == store.AciContextType {
 		customizeCliForACI(command, proxy)

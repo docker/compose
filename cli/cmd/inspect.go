@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/pkg/errors"
@@ -27,7 +29,6 @@ import (
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
-	"github.com/docker/compose-cli/cli/formatter"
 )
 
 // InspectCommand inspects into containers

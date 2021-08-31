@@ -20,10 +20,10 @@ import (
 	"context"
 	"os"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
 )
 
@@ -39,7 +39,7 @@ type logsOptions struct {
 	timestamps bool
 }
 
-func logsCommand(p *projectOptions, contextType string, backend api.Service) *cobra.Command {
+func logsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := logsOptions{
 		projectOptions: p,
 	}
@@ -58,10 +58,7 @@ func logsCommand(p *projectOptions, contextType string, backend api.Service) *co
 	flags.BoolVar(&opts.noColor, "no-color", false, "Produce monochrome output.")
 	flags.BoolVar(&opts.noPrefix, "no-log-prefix", false, "Don't print prefix in logs.")
 	flags.BoolVarP(&opts.timestamps, "timestamps", "t", false, "Show timestamps.")
-
-	if contextType == store.DefaultContextType {
-		flags.StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
-	}
+	flags.StringVar(&opts.tail, "tail", "all", "Number of lines to show from the end of the logs for each container.")
 	return logsCmd
 }
 

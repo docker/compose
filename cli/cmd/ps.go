@@ -23,12 +23,13 @@ import (
 	"os"
 	"strings"
 
+	formatter3 "github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose-cli/api/client"
 	"github.com/docker/compose-cli/api/containers"
-	formatter2 "github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/utils/formatter"
 )
 
@@ -89,11 +90,11 @@ func runPs(ctx context.Context, opts psOpts) error {
 	}
 
 	if opts.json {
-		opts.format = formatter2.JSON
+		opts.format = formatter3.JSON
 	}
 
 	view := viewFromContainerList(containerList)
-	return formatter2.Print(view, opts.format, os.Stdout, func(w io.Writer) {
+	return formatter3.Print(view, opts.format, os.Stdout, func(w io.Writer) {
 		for _, c := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", c.ID, c.Image, c.Command, c.Status,
 				strings.Join(c.Ports, ", "))

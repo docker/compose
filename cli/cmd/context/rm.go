@@ -20,12 +20,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 
 	apicontext "github.com/docker/compose-cli/api/context"
 	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/formatter"
 )
 
 type removeOpts struct {

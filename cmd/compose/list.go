@@ -23,11 +23,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/compose-cli/cmd/formatter"
+
 	"github.com/docker/cli/opts"
 	"github.com/spf13/cobra"
 
-	"github.com/docker/compose-cli/api/context/store"
-	"github.com/docker/compose-cli/cli/formatter"
 	"github.com/docker/compose-cli/pkg/api"
 )
 
@@ -38,7 +38,7 @@ type lsOptions struct {
 	Filter opts.FilterOpt
 }
 
-func listCommand(contextType string, backend api.Service) *cobra.Command {
+func listCommand(backend api.Service) *cobra.Command {
 	opts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
 		Use:   "ls",
@@ -51,9 +51,7 @@ func listCommand(contextType string, backend api.Service) *cobra.Command {
 	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
 	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")
 	lsCmd.Flags().Var(&opts.Filter, "filter", "Filter output based on conditions provided.")
-	if contextType == store.DefaultContextType {
-		lsCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped Compose projects")
-	}
+	lsCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped Compose projects")
 
 	return lsCmd
 }
