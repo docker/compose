@@ -269,6 +269,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
+	proxyConfig := types.MappingWithEquals(s.configFile.ParseProxyConfig(s.apiClient.DaemonHost(), nil))
+	env := proxyConfig.OverrideBy(service.Environment)
+
 	containerConfig := container.Config{
 		Hostname:        service.Hostname,
 		Domainname:      service.DomainName,
@@ -288,7 +291,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		MacAddress:      service.MacAddress,
 		Labels:          labels,
 		StopSignal:      service.StopSignal,
-		Env:             ToMobyEnv(service.Environment),
+		Env:             ToMobyEnv(env),
 		Healthcheck:     ToMobyHealthCheck(service.HealthCheck),
 		Volumes:         volumeMounts,
 		StopTimeout:     ToSeconds(service.StopGracePeriod),
