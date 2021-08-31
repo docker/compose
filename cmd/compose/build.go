@@ -94,5 +94,6 @@ func runBuild(ctx context.Context, backend api.Service, opts buildOptions, servi
 		Args:     types.NewMappingWithEquals(opts.args),
 		NoCache:  opts.noCache,
 		Quiet:    opts.quiet,
+		Services: services,
 	})
 }
