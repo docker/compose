@@ -100,18 +100,7 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 	for {
 		select {
 		case err := <-outputDone:
-			if err != nil {
-				return 0, err
-			}
-			inspect, err := s.apiClient.ContainerInspect(ctx, containerID)
-			if err != nil {
-				return 0, err
-			}
-			exitCode := 0
-			if inspect.State != nil {
-				exitCode = inspect.State.ExitCode
-			}
-			return exitCode, nil
+			return s.terminateRun(ctx, containerID, opts, err)
 		case err := <-inputDone:
 			if _, ok := err.(term.EscapeError); ok {
 				return 0, nil
@@ -124,6 +113,24 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 			return 0, ctx.Err()
 		}
 	}
+}
+
+func (s *composeService) terminateRun(ctx context.Context, containerID string, opts api.RunOptions, err error) (int, error) {
+	if err != nil {
+		return 0, err
+	}
+	inspect, err := s.apiClient.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return 0, err
+	}
+	exitCode := 0
+	if inspect.State != nil {
+		exitCode = inspect.State.ExitCode
+	}
+	if opts.AutoRemove {
+		err = s.apiClient.ContainerRemove(ctx, containerID, moby.ContainerRemoveOptions{})
+	}
+	return exitCode, err
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
@@ -156,7 +163,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err := s.waitDependencies(ctx, project, service); err != nil {
 		return "", err
 	}
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.AutoRemove, opts.UseNetworkAliases)
+	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases)
 	if err != nil {
 		return "", err
 	}

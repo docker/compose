@@ -68,7 +68,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --rm", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--rm", "back", "/bin/sh", "-c", "echo Hello again")
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--rm", "back", "echo", "Hello again")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 

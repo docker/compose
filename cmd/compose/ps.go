@@ -124,10 +124,6 @@ SERVICES:
 		return fmt.Errorf("no such service: %s", s)
 	}
 
-	if len(containers) == 0 {
-		return api.ErrNotFound
-	}
-
 	if opts.Status != "" {
 		containers = filterByStatus(containers, opts.Status)
 	}
