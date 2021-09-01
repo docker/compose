@@ -29,7 +29,6 @@ install_requires = [
     'PyYAML >= 3.10, < 6',
     'requests >= 2.20.0, < 3',
     'texttable >= 0.9.0, < 2',
-    'websocket-client >= 0.32.0, < 1',
     'distro >= 1.5.0, < 2',
     'docker[ssh] >= 5',
     'dockerpty >= 0.4.1, < 1',

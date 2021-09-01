@@ -19,4 +19,3 @@ PyYAML==5.4.1
 requests==2.25.1
 texttable==1.6.3
 urllib3==1.26.5; python_version == '3.3'
-websocket-client==1.1.0
