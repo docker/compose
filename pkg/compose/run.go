@@ -127,6 +127,9 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
+	if err := prepareVolumes(project); err != nil { // all dependencies already checked, but might miss service img
+		return "", err
+	}
 	service, err := project.GetService(opts.Service)
 	if err != nil {
 		return "", err
@@ -146,9 +149,6 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 	service.Labels = service.Labels.Add(api.SlugLabel, slug)
 	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
-	if err := prepareVolumes(project); err != nil { // all dependencies already checked, but might miss service img
-		return "", err
-	}
 
 	if err := s.ensureImagesExists(ctx, project, false); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
