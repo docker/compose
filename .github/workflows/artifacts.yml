@@ -22,7 +22,7 @@ jobs:
           key: go-${{ hashFiles('**/go.sum') }}
 
       - name: Build cross platform compose-plugin binaries
-        run: make -f builder.Makefile cross-compose-plugin
+        run: make -f builder.Makefile cross
 
       - name: Upload macos-amd64 binary
         uses: actions/upload-artifact@v2
