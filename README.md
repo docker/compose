@@ -4,6 +4,11 @@ Docker Compose
 
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
+| ** Compose V2 is on his way! :star_struck: ** |
+| --- |
+| We are currently polishing the next generation of Docker Compose, to be released soon... :stopwatch: <br> - Read more on [RC1 announcement](https://www.docker.com/blog/start-dev-environments-locally-compose-v2-rc-1-and-more-in-docker-desktop-3-6/). <br> - Check the [v2 branch](https://github.com/docker/compose/tree/v2) on this repo. |
+
+
 Docker Compose is a tool for running multi-container applications on Docker
 defined using the [Compose file format](https://compose-spec.io).
 A Compose file is used to define how the one or more containers that make up
