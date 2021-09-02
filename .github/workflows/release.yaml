@@ -33,7 +33,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build
-        run: make -f builder.Makefile cross
+        run: make GIT_TAG=${{ github.event.inputs.tag }} -f builder.Makefile cross
 
       - name: License
         run: cp packaging/* bin/
