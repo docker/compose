@@ -1,9 +1,16 @@
 name: Releaser
 
 on:
-  push:
-    tags:
-      - "v2*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+      dry-run:
+        description: 'Dry run'
+        required: false
+        default: 'true'
+        
 jobs:
   upload-release:
     runs-on: ubuntu-latest
