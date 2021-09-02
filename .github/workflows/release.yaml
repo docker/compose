@@ -1,9 +1,12 @@
 name: Releaser
 
 on:
-  push:
-    tags:
-      - "v2*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+
 jobs:
   upload-release:
     runs-on: ubuntu-latest
@@ -30,7 +33,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build
-        run: make -f builder.Makefile cross-compose-plugin
+        run: make -f builder.Makefile cross
 
       - name: License
         run: cp packaging/* bin/
@@ -40,3 +43,4 @@ jobs:
           artifacts: "bin/*"
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.event.inputs.tag }}
