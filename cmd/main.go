@@ -31,7 +31,7 @@ import (
 
 func init() {
 	commands.Warning = "The new 'docker compose' command is currently experimental. " +
-		"To provide feedback or request new features please open issues at https://github.com/docker/compose-cli"
+		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
 }
 
 func main() {
