@@ -1,0 +1,102 @@
+name: Continuous integration
+
+on:
+  push:
+    branches:
+      - v2
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: "on"
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Validate go-mod is up-to-date and license headers
+        run: make validate
+
+      - name: Run golangci-lint
+        env:
+          BUILD_TAGS: e2e
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/bin/ v1.39.0
+          make -f builder.Makefile lint
+
+  # only on main branch, costs too much for the gain on every PR
+  validate-cross-build:
+    name: Validate cross build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      GO111MODULE: "on"
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      # Ensure we don't discover cross platform build issues at release time.
+      # Time used to build linux here is gained back in the build for local E2E step
+      - name: Build packages
+        run: make -f builder.Makefile cross
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: "on"
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Set up gosum
+        run: |
+          go get -u gotest.tools/gotestsum
+
+      - name: Setup docker CLI
+        run: |
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
+          sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      - name: Test
+        env:
+          BUILD_TAGS: kube
+        run: make -f builder.Makefile test
+
+      - name: Build for local E2E
+        env:
+          BUILD_TAGS: e2e
+        run: make -f builder.Makefile compose-plugin
+
+      - name: E2E Test
+        run: make e2e-compose

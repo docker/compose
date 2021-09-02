@@ -1,0 +1,58 @@
+name: Publish Artifacts
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  publish-artifacts:
+    if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/generate-artifacts')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ hashFiles('**/go.sum') }}
+
+      - name: Build cross platform compose-plugin binaries
+        run: make -f builder.Makefile cross
+
+      - name: Upload macos-amd64 binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-compose-darwin-amd64
+          path: ${{ github.workspace }}/bin/docker-compose-darwin-amd64
+
+      - name: Upload macos-arm64 binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-compose-darwin-arm64
+          path: ${{ github.workspace }}/bin/docker-compose-darwin-arm64
+
+      - name: Upload linux-amd64 binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-compose-linux-amd64
+          path: ${{ github.workspace }}/bin/docker-compose-linux-amd64
+
+      - name: Upload windows-amd64 binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-compose-windows-amd64.exe
+          path: ${{ github.workspace }}/bin/docker-compose-windows-amd64.exe
+
+      - name: Update comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: ${{ github.event.comment.id }}
+          body: |
+            This PR can be tested using [binaries](https://github.com/docker/compose-cli/actions/runs/${{ github.run_id }}).
+          reactions: eyes
+

@@ -25,11 +25,13 @@ Welcome to the docker-compose issue tracker! Before creating an issue, please he
 
 ## Context information (for bug reports)
 
-**Output of `docker-compose version`**
+- [ ] Using Compose V2 `docker compose ...`
+- [ ] Using Compose V1 `docker-compose ...`
+
+**Output of `docker(-)compose version`**
 ```
 (paste here)
 ```
-/!\ If `docker-compose version` reports v2.0...` you're using the wrong repository, please report issues on [Compose-CLI](https://github.com/docker/compose-cli/issues/new)
 
 **Output of `docker version`**
 ```
