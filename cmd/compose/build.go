@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
@@ -83,7 +84,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runBuild(ctx context.Context, backend api.Service, opts buildOptions, services []string) error {
-	project, err := opts.toProject(services)
+	project, err := opts.toProject(services, cli.WithResolvedPaths(true))
 	if err != nil {
 		return err
 	}

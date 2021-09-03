@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/mattn/go-isatty"
@@ -120,7 +121,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			project, err := p.toProject([]string{opts.Service})
+			project, err := p.toProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
 			if err != nil {
 				return err
 			}
