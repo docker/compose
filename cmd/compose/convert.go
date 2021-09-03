@@ -39,15 +39,15 @@ import (
 
 type convertOptions struct {
 	*projectOptions
-	Format        string
-	Output        string
-	quiet         bool
-	resolve       bool
-	noInterpolate bool
-	services      bool
-	volumes       bool
-	profiles      bool
-	hash          string
+	Format              string
+	Output              string
+	quiet               bool
+	resolveImageDigests bool
+	noInterpolate       bool
+	services            bool
+	volumes             bool
+	profiles            bool
+	hash                string
 }
 
 var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
@@ -90,7 +90,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")
-	flags.BoolVar(&opts.resolve, "resolve-image-digests", false, "Pin image tags to digests.")
+	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
 
@@ -108,12 +108,12 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var json []byte
-	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate))
+	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate), cli.WithResolvedPaths(false))
 	if err != nil {
 		return err
 	}
 
-	if opts.resolve {
+	if opts.resolveImageDigests {
 		configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
 
 		resolver := remotes.CreateResolver(configFile)

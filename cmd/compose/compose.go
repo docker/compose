@@ -105,7 +105,7 @@ func (o *projectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, ar
 // WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Command, args []string) error {
 	return Adapt(func(ctx context.Context, args []string) error {
-		project, err := o.toProject(args)
+		project, err := o.toProject(args, cli.WithResolvedPaths(true))
 		if err != nil {
 			return err
 		}

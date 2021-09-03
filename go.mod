@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.2.3
 	github.com/buger/goterm v1.0.0
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
-	github.com/compose-spec/compose-go v0.0.0-20210901090333-feb401cda7f7
+	github.com/compose-spec/compose-go v0.0.0-20210906143156-938b039f7805
 	github.com/containerd/console v1.0.2
 	github.com/containerd/containerd v1.5.4
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
