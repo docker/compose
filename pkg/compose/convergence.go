@@ -171,7 +171,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	eg, _ := errgroup.WithContext(ctx)
 
 	for i, container := range containers {
-		if i > expected {
+		if i >= expected {
 			// Scale Down
 			container := container
 			eg.Go(func() error {
