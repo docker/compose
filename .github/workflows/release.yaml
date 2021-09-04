@@ -42,5 +42,6 @@ jobs:
         with:
           artifacts: "bin/*"
           prerelease: true
+          commit: "v2"
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event.inputs.tag }}
