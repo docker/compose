@@ -49,6 +49,7 @@ type upOptions struct {
 	noColor            bool
 	noPrefix           bool
 	attachDependencies bool
+	attach             []string
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
@@ -107,8 +108,8 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if create.Build && create.noBuild {
 				return fmt.Errorf("--build and --no-build are incompatible")
 			}
-			if up.Detach && (up.attachDependencies || up.cascadeStop) {
-				return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit or --attach-dependencies")
+			if up.Detach && (up.attachDependencies || up.cascadeStop || len(up.attach) > 0) {
+				return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
 			}
 			if create.forceRecreate && create.noRecreate {
 				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
@@ -143,6 +144,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVarP(&create.noInherit, "renew-anon-volumes", "V", false, "Recreate anonymous volumes instead of retrieving data from the previous containers.")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
+	flags.StringArrayVar(&up.attach, "attach", []string{}, "Attach to service output.")
 
 	return upCmd
 }
@@ -165,6 +167,9 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	}
 
 	attachTo := services
+	if len(upOptions.attach) > 0 {
+		attachTo = upOptions.attach
+	}
 	if upOptions.attachDependencies {
 		attachTo = project.ServiceNames()
 	}
