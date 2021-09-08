@@ -196,7 +196,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	if len(opts.WorkingDir) > 0 {
 		service.WorkingDir = opts.WorkingDir
 	}
-	if len(opts.Entrypoint) > 0 {
+	if opts.Entrypoint != nil {
 		service.Entrypoint = opts.Entrypoint
 	}
 	if len(opts.Environment) > 0 {

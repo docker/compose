@@ -36,22 +36,23 @@ import (
 
 type runOptions struct {
 	*composeOptions
-	Service      string
-	Command      []string
-	environment  []string
-	Detach       bool
-	Remove       bool
-	noTty        bool
-	user         string
-	workdir      string
-	entrypoint   string
-	labels       []string
-	volumes      []string
-	publish      []string
-	useAliases   bool
-	servicePorts bool
-	name         string
-	noDeps       bool
+	Service       string
+	Command       []string
+	environment   []string
+	Detach        bool
+	Remove        bool
+	noTty         bool
+	user          string
+	workdir       string
+	entrypoint    string
+	entrypointCmd []string
+	labels        []string
+	volumes       []string
+	publish       []string
+	useAliases    bool
+	servicePorts  bool
+	name          string
+	noDeps        bool
 }
 
 func (opts runOptions) apply(project *types.Project) error {
@@ -110,13 +111,20 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.Service = args[0]
 			if len(args) > 1 {
 				opts.Command = args[1:]
 			}
 			if len(opts.publish) > 0 && opts.servicePorts {
 				return fmt.Errorf("--service-ports and --publish are incompatible")
+			}
+			if cmd.Flags().Changed("entrypoint") {
+				command, err := shellwords.Parse(opts.entrypoint)
+				if err != nil {
+					return err
+				}
+				opts.entrypointCmd = command
 			}
 			return nil
 		}),
@@ -166,14 +174,6 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		return err
 	}
 
-	var entrypoint []string
-	if opts.entrypoint != "" {
-		entrypoint, err = shellwords.Parse(opts.entrypoint)
-		if err != nil {
-			return err
-		}
-	}
-
 	labels := types.Labels{}
 	for _, s := range opts.labels {
 		parts := strings.SplitN(s, "=", 2)
@@ -197,7 +197,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		WorkingDir:        opts.workdir,
 		User:              opts.user,
 		Environment:       opts.environment,
-		Entrypoint:        entrypoint,
+		Entrypoint:        opts.entrypointCmd,
 		Labels:            labels,
 		UseNetworkAliases: opts.useAliases,
 		Index:             0,

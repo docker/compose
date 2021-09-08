@@ -44,8 +44,10 @@ import (
 // Command defines a compose CLI command as a func with args
 type Command func(context.Context, []string) error
 
-// Adapt a Command func to cobra library
-func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
+type CobraCommand func(context.Context, *cobra.Command, []string) error
+
+// AdaptCmd adapt a CobraCommand func to cobra library
+func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		contextString := fmt.Sprintf("%s", ctx)
@@ -59,7 +61,7 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 				cancel()
 			}()
 		}
-		err := fn(ctx, args)
+		err := fn(ctx, cmd, args)
 		var composeErr compose.Error
 		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
 			err = dockercli.StatusError{
@@ -75,6 +77,13 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 		}
 		return err
 	}
+}
+
+// Adapt a Command func to cobra library
+func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
+	return AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+		return fn(ctx, args)
+	})
 }
 
 // Warning is a global warning to be displayed to user on command failure
