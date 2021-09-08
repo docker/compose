@@ -251,10 +251,10 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		runCmd     strslice.StrSlice
 		entrypoint strslice.StrSlice
 	)
-	if len(service.Command) > 0 {
+	if service.Command != nil {
 		runCmd = strslice.StrSlice(service.Command)
 	}
-	if len(service.Entrypoint) > 0 {
+	if service.Entrypoint != nil {
 		entrypoint = strslice.StrSlice(service.Entrypoint)
 	}
 
