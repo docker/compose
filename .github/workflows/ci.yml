@@ -5,6 +5,8 @@ on:
     branches:
       - v2
   pull_request:
+    branches:
+      - v2
 
 jobs:
   lint:
