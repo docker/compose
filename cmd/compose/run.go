@@ -163,7 +163,6 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	switch name {
 	case "volumes":
 		name = "volume"
-		break
 	}
 	return pflag.NormalizedName(name)
 }
