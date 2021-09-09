@@ -353,6 +353,14 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		}
 	}
 
+	var volumesFrom []string
+	for _, v := range service.VolumesFrom {
+		if !strings.HasPrefix(v, "container:") {
+			return nil, nil, nil, fmt.Errorf("invalid volume_from: %s", v)
+		}
+		volumesFrom = append(volumesFrom, v[len("container:"):])
+	}
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     autoRemove,
 		Binds:          binds,
@@ -369,7 +377,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		PortBindings:   portBindings,
 		Resources:      resources,
 		VolumeDriver:   service.VolumeDriver,
-		VolumesFrom:    service.VolumesFrom,
+		VolumesFrom:    volumesFrom,
 		DNS:            service.DNS,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
@@ -612,7 +620,10 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 		}
 
 		firstContainer := getContainerName(project.Name, service, 1)
-		v := fmt.Sprintf("%s:%s", firstContainer, strings.Join(spec[1:], ":"))
+		v := fmt.Sprintf("container:%s", firstContainer)
+		if len(spec) > 2 {
+			v = fmt.Sprintf("container:%s:%s", firstContainer, strings.Join(spec[1:], ":"))
+		}
 		volumes = append(volumes, v)
 	}
 	return volumes, services, nil
