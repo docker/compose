@@ -28,6 +28,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
@@ -148,13 +149,23 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
 	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")
 	flags.BoolVar(&opts.noDeps, "no-deps", false, "Don't start linked services.")
-	flags.StringArrayVarP(&opts.volumes, "volumes", "v", []string{}, "Bind mount a volume.")
+	flags.StringArrayVarP(&opts.volumes, "volume", "v", []string{}, "Bind mount a volume.")
 	flags.StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
 	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 
+	flags.SetNormalizeFunc(normalizeRunFlags)
 	flags.SetInterspersed(false)
 	return cmd
+}
+
+func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
+	switch name {
+	case "volumes":
+		name = "volume"
+		break
+	}
+	return pflag.NormalizedName(name)
 }
 
 func notAtTTY() bool {
