@@ -50,8 +50,6 @@ type convertOptions struct {
 	hash                string
 }
 
-var addFlagsFuncs []func(cmd *cobra.Command, opts *convertOptions)
-
 func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := convertOptions{
 		projectOptions: p,
@@ -98,11 +96,8 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
 	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
+	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
-	// add flags for hidden backends
-	for _, f := range addFlagsFuncs {
-		f(cmd, &opts)
-	}
 	return cmd
 }
 
