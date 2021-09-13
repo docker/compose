@@ -1,7 +1,7 @@
 command: docker compose down
 short: Stop and remove containers, networks
 long: |-
-  Stops containers and removes containers, networks, volumes, and images created by ``up`.
+  Stops containers and removes containers, networks, volumes, and images created by `up`.
 
   By default, the only things removed are:
 
