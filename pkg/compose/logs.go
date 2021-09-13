@@ -37,7 +37,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	if options.Follow {
 		eg.Go(func() error {
 			printer := newLogPrinter(consumer)
-			return s.watchContainers(ctx, projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
+			return s.watchContainers(projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
 				return s.logContainers(ctx, consumer, c, options)
 			})
 		})
