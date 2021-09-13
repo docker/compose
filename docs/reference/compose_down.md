@@ -2,7 +2,7 @@
 
 ## Description
 
-Stops containers and removes containers, networks, volumes, and images created by ``up`.
+Stops containers and removes containers, networks, volumes, and images created by `up`.
 
 By default, the only things removed are:
 
