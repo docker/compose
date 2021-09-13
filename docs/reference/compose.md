@@ -15,9 +15,10 @@ to their predecessors.
 
 For example, consider this command line:
 
-```
+```console
 $ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
 ```
+
 The `docker-compose.yml` file might specify a `webapp` service.
 
 ```yaml
@@ -56,8 +57,9 @@ from the command line or by setting up a `COMPOSE_FILE` environment variable in 
 For an example of using the `-f` option at the command line, suppose you are running the Compose Rails sample, and 
 have a `compose.yaml` file in a directory called `sandbox/rails`. You can use a command like `docker compose pull` to 
 get the postgres image for the db service from anywhere by using the `-f` flag as follows: 
-```
-docker compose -f ~/sandbox/rails/compose.yaml pull db
+
+```console
+$ docker compose -f ~/sandbox/rails/compose.yaml pull db
 ```
 
 ### Use `-p` to specify a project name
@@ -69,7 +71,7 @@ Project name can also be set by `COMPOSE_PROJECT_NAME` environment variable.
 Most compose subcommand can be ran without a compose file, just passing 
 project name to retrieve the relevant resources.
 
-```
+```console
 $ docker compose -p my_project ps -a
 NAME                 SERVICE    STATUS     PORTS
 my_project_demo_1    demo       running             

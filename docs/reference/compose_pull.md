@@ -7,7 +7,7 @@ those images.
 
 ## Examples 
 
-suppose you have this `compose.yaml` file from the Quickstart: [Compose and Rails sample](compose/rails/).
+suppose you have this `compose.yaml`:
 
 ```yaml
 services:
@@ -17,18 +17,18 @@ services:
     build: .
     command: bundle exec rails s -p 3000 -b '0.0.0.0'
     volumes:
-    - .:/myapp
+      - .:/myapp
     ports:
-    - "3000:3000"
+      - "3000:3000"
     depends_on:
-    - db
+      - db
 ```
 
-If you run `docker compose pull ServiceName` in the same directory as the `ccompose.yaml` file that defines the service, 
+If you run `docker compose pull ServiceName` in the same directory as the `compose.yaml` file that defines the service, 
 Docker pulls the associated image. For example, to call the postgres image configured as the db service in our example, 
 you would run `docker compose pull db`.
 
-```
+```console
 $ docker compose pull db
 [+] Running 1/15
  ⠸ db Pulling                                                             12.4s

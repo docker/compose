@@ -3,7 +3,7 @@
 
 Lists containers for a Compose project, with current status and exposed ports.
 
-```
+```console
 $ docker compose ps
 NAME                SERVICE             STATUS              PORTS
 example_foo_1       foo                 running (healthy)   0.0.0.0:8000->80/tcp
