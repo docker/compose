@@ -368,6 +368,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if inherit {
 		inherited = &replaced
 	}
+	name = getContainerName(project.Name, service, number)
 	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true)
 	if err != nil {
 		return created, err
