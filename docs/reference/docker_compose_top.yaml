@@ -4,7 +4,7 @@ long: Displays the running processes.
 usage: docker compose top [SERVICES...]
 pname: docker compose
 plink: docker_compose.yaml
-examples: "```\n$ docker compose top\nexample_foo_1\nUID    PID      PPID     C    STIME   TTY   TIME       CMD\nroot   142353   142331   2    15:33   ?     00:00:00   ping localhost -c 5 \n```"
+examples: "```console\n$ docker compose top\nexample_foo_1\nUID    PID      PPID     C    STIME   TTY   TIME       CMD\nroot   142353   142331   2    15:33   ?     00:00:00   ping localhost -c 5 \n```"
 deprecated: false
 experimental: false
 experimentalcli: false

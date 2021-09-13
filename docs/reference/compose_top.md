@@ -5,7 +5,7 @@ Displays the running processes.
 
 ## Examples
 
-```
+```console
 $ docker compose top
 example_foo_1
 UID    PID      PPID     C    STIME   TTY   TIME       CMD

@@ -11,11 +11,11 @@ Examples
 
 ```yaml
 services:
-    service1:
-        build: .
-        image: localhost:5000/yourimage  ## goes to local registry
-    
-    service2:
-        build: .
-        image: your-dockerid/yourimage  ## goes to your repository on Docker Hub
+  service1:
+    build: .
+    image: localhost:5000/yourimage  ## goes to local registry
+
+  service2:
+    build: .
+    image: your-dockerid/yourimage  ## goes to your repository on Docker Hub
 ```
