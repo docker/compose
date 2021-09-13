@@ -18,32 +18,21 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
+	clidocstool "github.com/docker/cli-docs-tool"
 	"github.com/docker/compose/v2/cmd/compose"
-	. "github.com/docker/compose/v2/docs/yaml"
+	"github.com/spf13/cobra"
 )
-
-const descriptionSourcePath = "docs/reference/"
 
 func generateCliYaml(opts *options) error {
 	cmd := &cobra.Command{Use: "docker"}
 	cmd.AddCommand(compose.RootCommand(nil))
 	disableFlagsInUseLine(cmd)
-	source := filepath.Join(opts.source, descriptionSourcePath)
-	if err := loadLongDescription(cmd, source); err != nil {
-		return err
-	}
 
 	cmd.DisableAutoGenTag = true
-	return GenYamlTree(cmd, opts.target)
+	return clidocstool.GenYamlTree(cmd, opts.target)
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
@@ -63,54 +52,16 @@ func visitAll(root *cobra.Command, fn func(*cobra.Command)) {
 	fn(root)
 }
 
-func loadLongDescription(cmd *cobra.Command, path ...string) error {
-	for _, cmd := range cmd.Commands() {
-		if cmd.Name() == "" {
-			continue
-		}
-		fullpath := filepath.Join(path[0], strings.Join(append(path[1:], cmd.Name()), "_")+".md")
-
-		if cmd.HasSubCommands() {
-			if err := loadLongDescription(cmd, path[0], cmd.Name()); err != nil {
-				return err
-			}
-		}
-
-		if _, err := os.Stat(fullpath); err != nil {
-			log.Printf("WARN: %s does not exist, skipping\n", fullpath)
-			continue
-		}
-
-		content, err := ioutil.ReadFile(fullpath)
-		if err != nil {
-			return err
-		}
-		description, examples := ParseMDContent(string(content))
-		cmd.Long = description
-		cmd.Example = examples
-	}
-	return nil
-}
-
 type options struct {
 	source string
 	target string
 }
 
-func parseArgs() (*options, error) {
-	opts := &options{}
-	cwd, _ := os.Getwd()
-	flags := pflag.NewFlagSet(os.Args[0], pflag.ContinueOnError)
-	flags.StringVar(&opts.source, "root", cwd, "Path to project root")
-	flags.StringVar(&opts.target, "target", filepath.Join(cwd, "docs", "reference"), "Target path for generated yaml files")
-	err := flags.Parse(os.Args[1:])
-	return opts, err
-}
-
 func main() {
-	opts, err := parseArgs()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	cwd, _ := os.Getwd()
+	opts := &options{
+		source: cwd,
+		target: filepath.Join(cwd, "docs", "reference"),
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)
