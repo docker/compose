@@ -1,7 +1,6 @@
 command: docker compose pause
 short: pause services
-long: Pauses running containers of a service. They can be unpaused with `docker compose
-    unpause`.
+long: Pauses running containers of a service. They can be unpaused with `docker compose unpause`.
 usage: docker compose pause [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
