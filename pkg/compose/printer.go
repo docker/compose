@@ -27,8 +27,9 @@ import (
 // logPrinter watch application containers an collect their logs
 type logPrinter interface {
 	HandleEvent(event api.ContainerEvent)
-	Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error)
+	Run(cascadeStop bool, exitCodeFrom string, stopFn func()) (int, error)
 	Cancel()
+	Stop()
 }
 
 // newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
@@ -42,9 +43,11 @@ func newLogPrinter(consumer api.LogConsumer) logPrinter {
 }
 
 func (p *printer) Cancel() {
-	p.queue <- api.ContainerEvent{
-		Type: api.UserCancel,
-	}
+	go func() {
+		p.queue <- api.ContainerEvent{
+			Type: api.UserCancel,
+		}
+	}()
 }
 
 type printer struct {
@@ -56,7 +59,16 @@ func (p *printer) HandleEvent(event api.ContainerEvent) {
 	p.queue <- event
 }
 
-func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error) (int, error) {
+const stopEventType int = -1
+
+func (p *printer) Stop() {
+	p.queue <- api.ContainerEvent{
+		Type: stopEventType,
+	}
+}
+
+// nolint:gocyclo
+func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func()) (int, error) {
 	var (
 		aborting bool
 		exitCode int
@@ -85,10 +97,7 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 				if !aborting {
 					aborting = true
 					fmt.Println("Aborting on container exit...")
-					err := stopFn()
-					if err != nil {
-						return 0, err
-					}
+					go stopFn()
 				}
 				if exitCodeFrom == "" {
 					exitCodeFrom = event.Service
@@ -106,6 +115,8 @@ func (p *printer) Run(cascadeStop bool, exitCodeFrom string, stopFn func() error
 			if !aborting {
 				p.consumer.Log(container, event.Service, event.Line)
 			}
+		case stopEventType:
+			return exitCode, nil
 		}
 	}
 }

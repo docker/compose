@@ -55,29 +55,33 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	stopFunc := func() error {
+	stopFunc := func() {
 		ctx := context.Background()
-		return progress.Run(ctx, func(ctx context.Context) error {
+		progress.Run(ctx, func(ctx context.Context) error { // nolint:errcheck
 			go func() {
 				<-signalChan
 				s.Kill(ctx, project, api.KillOptions{}) // nolint:errcheck
 			}()
 
-			return s.Stop(ctx, project, api.StopOptions{})
+			s.Stop(ctx, project, api.StopOptions{}) // nolint:errcheck
+			printer.Stop()
+			return nil
 		})
 	}
 	go func() {
 		<-signalChan
 		printer.Cancel()
 		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
-		stopFunc() // nolint:errcheck
+		stopFunc()
 	}()
 
 	var exitCode int
 	eg, ctx := errgroup.WithContext(ctx)
+	ctx, cancelFunc := context.WithCancel(ctx)
 	eg.Go(func() error {
 		code, err := printer.Run(options.Start.CascadeStop, options.Start.ExitCodeFrom, stopFunc)
 		exitCode = code
+		cancelFunc()
 		return err
 	})
 
