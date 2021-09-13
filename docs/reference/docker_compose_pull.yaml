@@ -1,80 +1,57 @@
 command: docker compose pull
 short: Pull service images
-long: "Pulls an image associated with a service defined in a `compose.yaml` file,
-    but does not start containers based on \nthose images."
+long: "Pulls an image associated with a service defined in a `compose.yaml` file, but does not start containers based on \nthose images."
 usage: docker compose pull [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-  - option: ignore-pull-failures
-    value_type: bool
-    default_value: "false"
-    description: Pull what it can and ignores images with pull failures
-    deprecated: false
-    experimental: false
-    experimentalcli: false
-    kubernetes: false
-    swarm: false
-  - option: include-deps
-    value_type: bool
-    default_value: "false"
-    description: Also pull services declared as dependencies
-    deprecated: false
-    experimental: false
-    experimentalcli: false
-    kubernetes: false
-    swarm: false
-  - option: no-parallel
-    value_type: bool
-    default_value: "true"
-    description: DEPRECATED disable parallel pulling.
-    deprecated: false
-    experimental: false
-    experimentalcli: false
-    kubernetes: false
-    swarm: false
-  - option: parallel
-    value_type: bool
-    default_value: "true"
-    description: DEPRECATED pull multiple images in parallel.
-    deprecated: false
-    experimental: false
-    experimentalcli: false
-    kubernetes: false
-    swarm: false
-  - option: quiet
-    shorthand: q
-    value_type: bool
-    default_value: "false"
-    description: Pull without printing progress information
-    deprecated: false
-    experimental: false
-    experimentalcli: false
-    kubernetes: false
-    swarm: false
-examples: "suppose you have this `compose.yaml` file from the Quickstart: [Compose
-    and Rails sample](compose/rails/).\n\n```yaml\nservices:\n  db:\n    image: postgres\n
-    \ web:\n    build: .\n    command: bundle exec rails s -p 3000 -b '0.0.0.0'\n
-    \   volumes:\n    - .:/myapp\n    ports:\n    - \"3000:3000\"\n    depends_on:\n
-    \   - db\n```\n\nIf you run `docker compose pull ServiceName` in the same directory
-    as the `ccompose.yaml` file that defines the service, \nDocker pulls the associated
-    image. For example, to call the postgres image configured as the db service in
-    our example, \nyou would run `docker compose pull db`.\n\n```\n$ docker compose
-    pull db\n[+] Running 1/15\n ⠸ db Pulling                                                             12.4s\n
-    \  ⠿ 45b42c59be33 Already exists                                           0.0s\n
-    \  ⠹ 40adec129f1a Downloading  3.374MB/4.178MB                             9.3s\n
-    \  ⠹ b4c431d00c78 Download complete                                        9.3s\n
-    \  ⠹ 2696974e2815 Download complete                                        9.3s\n
-    \  ⠹ 564b77596399 Downloading  5.622MB/7.965MB                             9.3s\n
-    \  ⠹ 5044045cf6f2 Downloading  216.7kB/391.1kB                             9.3s\n
-    \  ⠹ d736e67e6ac3 Waiting                                                  9.3s\n
-    \  ⠹ 390c1c9a5ae4 Waiting                                                  9.3s\n
-    \  ⠹ c0e62f172284 Waiting                                                  9.3s\n
-    \  ⠹ ebcdc659c5bf Waiting                                                  9.3s\n
-    \  ⠹ 29be22cb3acc Waiting                                                  9.3s\n
-    \  ⠹ f63c47038e66 Waiting                                                  9.3s\n
-    \  ⠹ 77a0c198cde5 Waiting                                                  9.3s\n
-    \  ⠹ c8752d5b785c Waiting                                                  9.3s\n``̀"
+    - option: ignore-pull-failures
+      value_type: bool
+      default_value: "false"
+      description: Pull what it can and ignores images with pull failures
+      deprecated: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: include-deps
+      value_type: bool
+      default_value: "false"
+      description: Also pull services declared as dependencies
+      deprecated: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-parallel
+      value_type: bool
+      default_value: "true"
+      description: DEPRECATED disable parallel pulling.
+      deprecated: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: parallel
+      value_type: bool
+      default_value: "true"
+      description: DEPRECATED pull multiple images in parallel.
+      deprecated: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Pull without printing progress information
+      deprecated: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+examples: "suppose you have this `compose.yaml` file from the Quickstart: [Compose and Rails sample](compose/rails/).\n\n```yaml\nservices:\n  db:\n    image: postgres\n  web:\n    build: .\n    command: bundle exec rails s -p 3000 -b '0.0.0.0'\n    volumes:\n    - .:/myapp\n    ports:\n    - \"3000:3000\"\n    depends_on:\n    - db\n```\n\nIf you run `docker compose pull ServiceName` in the same directory as the `ccompose.yaml` file that defines the service, \nDocker pulls the associated image. For example, to call the postgres image configured as the db service in our example, \nyou would run `docker compose pull db`.\n\n```\n$ docker compose pull db\n[+] Running 1/15\n ⠸ db Pulling                                                             12.4s\n   ⠿ 45b42c59be33 Already exists                                           0.0s\n   ⠹ 40adec129f1a Downloading  3.374MB/4.178MB                             9.3s\n   ⠹ b4c431d00c78 Download complete                                        9.3s\n   ⠹ 2696974e2815 Download complete                                        9.3s\n   ⠹ 564b77596399 Downloading  5.622MB/7.965MB                             9.3s\n   ⠹ 5044045cf6f2 Downloading  216.7kB/391.1kB                             9.3s\n   ⠹ d736e67e6ac3 Waiting                                                  9.3s\n   ⠹ 390c1c9a5ae4 Waiting                                                  9.3s\n   ⠹ c0e62f172284 Waiting                                                  9.3s\n   ⠹ ebcdc659c5bf Waiting                                                  9.3s\n   ⠹ 29be22cb3acc Waiting                                                  9.3s\n   ⠹ f63c47038e66 Waiting                                                  9.3s\n   ⠹ 77a0c198cde5 Waiting                                                  9.3s\n   ⠹ c8752d5b785c Waiting                                                  9.3s\n``̀"
 deprecated: false
 experimental: false
 experimentalcli: false
