@@ -160,8 +160,10 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err := s.ensureImagesExists(ctx, project, false); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
-	if err := s.waitDependencies(ctx, project, service); err != nil {
-		return "", err
+	if !opts.NoDeps {
+		if err := s.waitDependencies(ctx, project, service); err != nil {
+			return "", err
+		}
 	}
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases)
 	if err != nil {

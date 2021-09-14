@@ -210,6 +210,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Entrypoint:        opts.entrypointCmd,
 		Labels:            labels,
 		UseNetworkAliases: opts.useAliases,
+		NoDeps:            opts.noDeps,
 		Index:             0,
 	}
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)

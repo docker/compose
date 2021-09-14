@@ -220,6 +220,7 @@ type RunOptions struct {
 	Labels            types.Labels
 	Privileged        bool
 	UseNetworkAliases bool
+	NoDeps            bool
 	// used by exec
 	Index int
 }
