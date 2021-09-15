@@ -3111,6 +3111,22 @@ services:
         assert 'hello' in result.stdout
         assert len(self.project.containers()) == 0
 
+    def test_run_with_build_flag(self):
+        pull_busybox(self.client)
+        self.base_dir = 'tests/fixtures/images-service-tag'
+        self.dispatch(['run', '--build', 'foo1'])
+        result = self.dispatch(['images'])
+
+        assert re.search(r'foo1.+test[ \t]+dev', result.stdout) is not None
+        self.base_dir = None
+
+    def test_run_with_no_build_flag(self):
+        self.base_dir = 'tests/fixtures/no-build'
+        result = self.dispatch(['run', '--no-build', 'my-alpine'])
+
+        assert 'alpine exited with code 0' in result.stdout
+        self.base_dir = None
+
     def test_stop_with_stop_process_flag(self):
         self.base_dir = 'tests/fixtures/flag-as-service-name'
         self.dispatch(['up', '-d', '--', '--test-service'])

@@ -934,6 +934,8 @@ class TopLevelCommand:
             -e KEY=VAL            Set an environment variable (can be used multiple times)
             -l, --label KEY=VAL   Add or override a label (can be used multiple times)
             -u, --user=""         Run as specified username or uid
+            --build               Build images before starting container.
+            --no-build            Don't build an image, even if it's missing.
             --no-deps             Don't start linked services.
             --rm                  Remove container after run. Ignored in detached mode.
             -p, --publish=[]      Publish a container's port(s) to the host
@@ -1427,6 +1429,7 @@ def run_one_off_container(container_options, project, service, options, toplevel
         service_names=[service.name],
         start_deps=not options['--no-deps'],
         strategy=ConvergenceStrategy.never,
+        do_build=build_action_from_opts(options),
         detached=True,
         rescale=False,
         cli=native_builder,
