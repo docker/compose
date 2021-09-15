@@ -83,7 +83,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 		if err != nil {
 			return err
 		}
-		err = setServiceScale(project, name, replicas)
+		err = setServiceScale(project, name, uint64(replicas))
 		if err != nil {
 			return err
 		}
@@ -198,14 +198,17 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	})
 }
 
-func setServiceScale(project *types.Project, name string, replicas int) error {
+func setServiceScale(project *types.Project, name string, replicas uint64) error {
 	for i, s := range project.Services {
 		if s.Name == name {
 			service, err := project.GetService(name)
 			if err != nil {
 				return err
 			}
-			service.Scale = replicas
+			if service.Deploy == nil {
+				service.Deploy = &types.DeployConfig{}
+			}
+			service.Deploy.Replicas = &replicas
 			project.Services[i] = service
 			return nil
 		}
