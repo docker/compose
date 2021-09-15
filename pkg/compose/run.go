@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/compose/v2/pkg/api"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
@@ -100,7 +100,10 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 	for {
 		select {
 		case err := <-outputDone:
-			return s.terminateRun(ctx, containerID, opts, err)
+			if err != nil {
+				return 0, err
+			}
+			return s.terminateRun(ctx, containerID, opts)
 		case err := <-inputDone:
 			if _, ok := err.(term.EscapeError); ok {
 				return 0, nil
@@ -115,22 +118,18 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 	}
 }
 
-func (s *composeService) terminateRun(ctx context.Context, containerID string, opts api.RunOptions, err error) (int, error) {
-	if err != nil {
-		return 0, err
-	}
-	inspect, err := s.apiClient.ContainerInspect(ctx, containerID)
-	if err != nil {
-		return 0, err
-	}
-	exitCode := 0
-	if inspect.State != nil {
-		exitCode = inspect.State.ExitCode
+func (s *composeService) terminateRun(ctx context.Context, containerID string, opts api.RunOptions) (exitCode int, err error) {
+	exitCh, errCh := s.apiClient.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+	select {
+	case exit := <-exitCh:
+		exitCode = int(exit.StatusCode)
+	case err = <-errCh:
+		return
 	}
 	if opts.AutoRemove {
 		err = s.apiClient.ContainerRemove(ctx, containerID, moby.ContainerRemoveOptions{})
 	}
-	return exitCode, err
+	return
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
