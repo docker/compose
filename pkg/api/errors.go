@@ -42,6 +42,8 @@ var (
 	// ErrNotImplemented is returned when a backend doesn't implement
 	// an action
 	ErrNotImplemented = errors.New("not implemented")
+	// ErrUnsupportedFlag is returned when a backend doesn't support a flag
+	ErrUnsupportedFlag = errors.New("unsupported flag")
 	// ErrCanceled is returned when the command was canceled by user
 	ErrCanceled = errors.New("canceled")
 	// ErrParsingFailed is returned when a string cannot be parsed
@@ -69,6 +71,11 @@ func IsForbiddenError(err error) bool {
 // IsUnknownError returns true if the unwrapped error is ErrUnknown
 func IsUnknownError(err error) bool {
 	return errors.Is(err, ErrUnknown)
+}
+
+// IsErrUnsupportedFlag returns true if the unwrapped error is ErrUnsupportedFlag
+func IsErrUnsupportedFlag(err error) bool {
+	return errors.Is(err, ErrUnsupportedFlag)
 }
 
 // IsErrNotImplemented returns true if the unwrapped error is ErrNotImplemented
