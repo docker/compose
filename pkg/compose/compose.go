@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -67,10 +68,24 @@ func getContainerNameWithoutProject(c moby.Container) string {
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
 	switch options.Format {
 	case "json":
-		return json.MarshalIndent(project, "", "  ")
+		marshal, err := json.MarshalIndent(project, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return escapeDollarSign(marshal), nil
 	case "yaml":
-		return yaml.Marshal(project)
+		marshal, err := yaml.Marshal(project)
+		if err != nil {
+			return nil, err
+		}
+		return escapeDollarSign(marshal), nil
 	default:
 		return nil, fmt.Errorf("unsupported format %q", options)
 	}
+}
+
+func escapeDollarSign(marshal []byte) []byte {
+	dollar := []byte{'$'}
+	escDollar := []byte{'$', '$'}
+	return bytes.ReplaceAll(marshal, dollar, escDollar)
 }
