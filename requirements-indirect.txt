@@ -24,5 +24,5 @@ smmap==3.0.4
 smmap2==3.0.1
 toml==0.10.1
 tox==3.21.2
-virtualenv==20.4.0
+virtualenv==20.8.0
 wcwidth==0.2.5
