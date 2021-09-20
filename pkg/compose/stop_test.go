@@ -40,9 +40,9 @@ func TestStopTimeout(t *testing.T) {
 	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{
-			testContainer("service1", "123"),
-			testContainer("service1", "456"),
-			testContainer("service2", "789"),
+			testContainer("service1", "123", false),
+			testContainer("service1", "456", false),
+			testContainer("service2", "789", false),
 		}, nil)
 
 	timeout := time.Duration(2) * time.Second

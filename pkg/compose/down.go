@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -52,11 +51,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Project == nil {
-		project, err := s.projectFromContainerLabels(containers, projectName)
-		if err != nil {
-			return err
-		}
-		options.Project = project
+		options.Project = s.projectFromContainerLabels(containers.filter(isNotOneOff), projectName)
 	}
 
 	if len(containers) > 0 {
@@ -242,36 +237,31 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-func (s *composeService) projectFromContainerLabels(containers Containers, projectName string) (*types.Project, error) {
-	fakeProject := &types.Project{
+func (s *composeService) projectFromContainerLabels(containers Containers, projectName string) *types.Project {
+	project := &types.Project{
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return fakeProject, nil
+		return project
 	}
-	options, err := loadProjectOptionsFromLabels(containers[0])
-	if err != nil {
-		return nil, err
+	set := map[string]moby.Container{}
+	for _, c := range containers {
+		set[c.Labels[api.ServiceLabel]] = c
 	}
-	if options.ConfigPaths[0] == "-" {
-		for _, container := range containers {
-			fakeProject.Services = append(fakeProject.Services, types.ServiceConfig{
-				Name: container.Labels[api.ServiceLabel],
-			})
+	for s, c := range set {
+		service := types.ServiceConfig{
+			Name:   s,
+			Image:  c.Image,
+			Labels: c.Labels,
 		}
-		return fakeProject, nil
+		dependencies := c.Labels[api.DependenciesLabel]
+		if len(dependencies) > 0 {
+			service.DependsOn = types.DependsOnConfig{}
+			for _, d := range strings.Split(dependencies, ",") {
+				service.DependsOn[d] = types.ServiceDependency{}
+			}
+		}
+		project.Services = append(project.Services, service)
 	}
-	project, err := cli.ProjectFromOptions(options)
-	if err != nil {
-		return nil, err
-	}
-
-	return project, nil
-}
-
-func loadProjectOptionsFromLabels(c moby.Container) (*cli.ProjectOptions, error) {
-	return cli.NewProjectOptions(strings.Split(c.Labels[api.ConfigFilesLabel], ","),
-		cli.WithOsEnv,
-		cli.WithWorkingDirectory(c.Labels[api.WorkingDirLabel]),
-		cli.WithName(c.Labels[api.ProjectLabel]))
+	return project
 }
