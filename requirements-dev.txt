@@ -2,7 +2,7 @@ Click==7.1.2
 coverage==5.5
 ddt==1.4.2
 flake8==3.8.3
-gitpython==3.1.11
+gitpython==3.1.24
 mock==3.0.5
 pytest==6.2.4; python_version >= '3.5'
 pytest==4.6.5; python_version < '3.5'
