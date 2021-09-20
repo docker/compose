@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM base AS lint
 ENV CGO_ENABLED=0
-COPY --from=lint-base /usr/bin/golangci-lint /usr/bin/golangci-lint
+COPY --from=golangci/golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
