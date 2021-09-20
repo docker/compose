@@ -36,8 +36,13 @@ func (s *composeService) Kill(ctx context.Context, project *types.Project, optio
 func (s *composeService) kill(ctx context.Context, project *types.Project, options api.KillOptions) error {
 	w := progress.ContextWriter(ctx)
 
+	services := options.Services
+	if len(services) == 0 {
+		services = project.ServiceNames()
+	}
+
 	var containers Containers
-	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
 	if err != nil {
 		return err
 	}

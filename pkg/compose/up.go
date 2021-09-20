@@ -60,10 +60,14 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return progress.Run(ctx, func(ctx context.Context) error {
 			go func() {
 				<-signalChan
-				s.Kill(ctx, project, api.KillOptions{}) // nolint:errcheck
+				s.Kill(ctx, project, api.KillOptions{ // nolint:errcheck
+					Services: options.Create.Services,
+				})
 			}()
 
-			return s.Stop(ctx, project, api.StopOptions{})
+			return s.Stop(ctx, project, api.StopOptions{
+				Services: options.Create.Services,
+			})
 		})
 	}
 	go func() {

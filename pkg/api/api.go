@@ -186,6 +186,8 @@ type ImagesOptions struct {
 
 // KillOptions group options of the Kill API
 type KillOptions struct {
+	// Services passed in the command line to be killed
+	Services []string
 	// Signal to send to containers
 	Signal string
 }
