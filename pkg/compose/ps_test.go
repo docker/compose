@@ -66,7 +66,7 @@ func containerDetails(service string, id string, status string, health string, e
 	container := moby.Container{
 		ID:     id,
 		Names:  []string{"/" + id},
-		Labels: containerLabels(service),
+		Labels: containerLabels(service, false),
 		State:  status,
 	}
 	inspect := moby.ContainerJSON{ContainerJSONBase: &moby.ContainerJSONBase{State: &moby.ContainerState{Status: status, Health: &moby.Health{Status: health}, ExitCode: exitCode}}}

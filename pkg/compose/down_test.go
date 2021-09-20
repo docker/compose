@@ -38,7 +38,12 @@ func TestDown(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]moby.Container{testContainer("service1", "123"), testContainer("service2", "456"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
+		[]moby.Container{
+			testContainer("service1", "123", false),
+			testContainer("service2", "456", false),
+			testContainer("service2", "789", false),
+			testContainer("service_orphan", "321", true),
+		}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", nil).Return(nil)
@@ -64,7 +69,11 @@ func TestDownRemoveOrphans(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]moby.Container{testContainer("service1", "123"), testContainer("service2", "789"), testContainer("service_orphan", "321")}, nil)
+		[]moby.Container{
+			testContainer("service1", "123", false),
+			testContainer("service2", "789", false),
+			testContainer("service_orphan", "321", true),
+		}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", nil).Return(nil)
@@ -90,7 +99,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 	tested.apiClient = api
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
-		[]moby.Container{testContainer("service1", "123")}, nil)
+		[]moby.Container{testContainer("service1", "123", false)}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)

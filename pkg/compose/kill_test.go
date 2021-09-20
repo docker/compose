@@ -46,7 +46,7 @@ func TestKillAll(t *testing.T) {
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
-		[]moby.Container{testContainer("service1", "123"), testContainer("service1", "456"), testContainer("service2", "789")}, nil)
+		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "789", "").Return(nil)
@@ -64,7 +64,7 @@ func TestKillSignal(t *testing.T) {
 	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]moby.Container{testContainer("service1", "123")}, nil)
+	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]moby.Container{testContainer("service1", "123", false)}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
 	err := tested.kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
@@ -75,22 +75,26 @@ func testService(name string) types.ServiceConfig {
 	return types.ServiceConfig{Name: name}
 }
 
-func testContainer(service string, id string) moby.Container {
+func testContainer(service string, id string, oneOff bool) moby.Container {
 	return moby.Container{
 		ID:     id,
 		Names:  []string{id},
-		Labels: containerLabels(service),
+		Labels: containerLabels(service, oneOff),
 	}
 }
 
-func containerLabels(service string) map[string]string {
+func containerLabels(service string, oneOff bool) map[string]string {
 	workingdir, _ := filepath.Abs("testdata")
 	composefile := filepath.Join(workingdir, "compose.yaml")
-	return map[string]string{
+	labels := map[string]string{
 		compose.ServiceLabel:     service,
 		compose.ConfigFilesLabel: composefile,
 		compose.WorkingDirLabel:  workingdir,
 		compose.ProjectLabel:     strings.ToLower(testProject)}
+	if oneOff {
+		labels[compose.OneoffLabel] = "True"
+	}
+	return labels
 }
 
 func anyCancellableContext() gomock.Matcher {

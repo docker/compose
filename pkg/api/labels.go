@@ -49,6 +49,8 @@ const (
 	SlugLabel = "com.docker.compose.slug"
 	// ImageDigestLabel stores digest of the container image used to run service
 	ImageDigestLabel = "com.docker.compose.image"
+	// DependenciesLabel stores service dependencies
+	DependenciesLabel = "com.docker.compose.depends_on"
 	// VersionLabel stores the compose tool version used to run application
 	VersionLabel = "com.docker.compose.version"
 )

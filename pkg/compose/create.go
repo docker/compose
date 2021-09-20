@@ -226,26 +226,10 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig, number int, inherit *moby.Container,
 	autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	hash, err := ServiceHash(service)
+	labels, err := s.prepareLabels(p, service, number)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	labels := map[string]string{}
-	for k, v := range service.Labels {
-		labels[k] = v
-	}
-
-	labels[api.ProjectLabel] = p.Name
-	labels[api.ServiceLabel] = service.Name
-	labels[api.VersionLabel] = api.ComposeVersion
-	if _, ok := service.Labels[api.OneoffLabel]; !ok {
-		labels[api.OneoffLabel] = "False"
-	}
-	labels[api.ConfigHashLabel] = hash
-	labels[api.WorkingDirLabel] = p.WorkingDir
-	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
-	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var (
 		runCmd     strslice.StrSlice
@@ -392,6 +376,36 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
+}
+
+func (s *composeService) prepareLabels(p *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
+	labels := map[string]string{}
+	for k, v := range service.Labels {
+		labels[k] = v
+	}
+
+	labels[api.ProjectLabel] = p.Name
+	labels[api.ServiceLabel] = service.Name
+	labels[api.VersionLabel] = api.ComposeVersion
+	if _, ok := service.Labels[api.OneoffLabel]; !ok {
+		labels[api.OneoffLabel] = "False"
+	}
+
+	hash, err := ServiceHash(service)
+	if err != nil {
+		return nil, err
+	}
+
+	labels[api.ConfigHashLabel] = hash
+	labels[api.WorkingDirLabel] = p.WorkingDir
+	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
+	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+	var dependencies []string
+	for s := range service.DependsOn {
+		dependencies = append(dependencies, s)
+	}
+	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
+	return labels, nil
 }
 
 func getDefaultNetworkMode(project *types.Project, service types.ServiceConfig) string {
