@@ -44,6 +44,7 @@ import (
 // Command defines a compose CLI command as a func with args
 type Command func(context.Context, []string) error
 
+// CobraCommand defines a cobra command function
 type CobraCommand func(context.Context, *cobra.Command, []string) error
 
 // AdaptCmd adapt a CobraCommand func to cobra library
