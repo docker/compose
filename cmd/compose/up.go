@@ -175,6 +175,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	}
 
 	create := api.CreateOptions{
+		Services:             services,
 		RemoveOrphans:        createOptions.removeOrphans,
 		Recreate:             createOptions.recreateStrategy(),
 		RecreateDependencies: createOptions.dependenciesRecreateStrategy(),

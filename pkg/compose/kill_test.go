@@ -56,18 +56,24 @@ func TestKillAll(t *testing.T) {
 }
 
 func TestKillSignal(t *testing.T) {
+	const serviceName = "service1"
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	api := mocks.NewMockAPIClient(mockCtrl)
 	tested.apiClient = api
 
-	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1")}}
+	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService(serviceName)}}
+	listOptions := moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)),
+			serviceFilter(serviceName)),
+		All: true,
+	}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return([]moby.Container{testContainer("service1", "123", false)}, nil)
+	api.EXPECT().ContainerList(ctx, listOptions).Return([]moby.Container{testContainer(serviceName, "123", false)}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "SIGTERM").Return(nil)
 
-	err := tested.kill(ctx, &project, compose.KillOptions{Signal: "SIGTERM"})
+	err := tested.kill(ctx, &project, compose.KillOptions{Services: []string{serviceName}, Signal: "SIGTERM"})
 	assert.NilError(t, err)
 }
 
