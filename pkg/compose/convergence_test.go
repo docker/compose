@@ -25,7 +25,6 @@ import (
 )
 
 func TestContainerName(t *testing.T) {
-	var replicas uint64 = 1
 	s := types.ServiceConfig{
 		Name:          "testservicename",
 		ContainerName: "testcontainername",
@@ -36,20 +35,14 @@ func TestContainerName(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, ret, s.Scale)
 
-	s.Scale = 0
-	s.Deploy.Replicas = &replicas
+	var zero uint64 // = 0
+	s.Deploy.Replicas = &zero
 	ret, err = getScale(s)
 	assert.NilError(t, err)
 	assert.Equal(t, ret, int(*s.Deploy.Replicas))
 
-	s.Deploy.Replicas = nil
-	s.Scale = 2
-	_, err = getScale(s)
-	assert.Error(t, err, fmt.Sprintf(doubledContainerNameWarning, s.Name, s.ContainerName))
-
-	replicas = 2
-	s.Deploy.Replicas = &replicas
-	s.Scale = 0
+	var two uint64 = 2
+	s.Deploy.Replicas = &two
 	_, err = getScale(s)
 	assert.Error(t, err, fmt.Sprintf(doubledContainerNameWarning, s.Name, s.ContainerName))
 }

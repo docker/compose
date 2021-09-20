@@ -315,20 +315,15 @@ func nextContainerNumber(containers []moby.Container) (int, error) {
 
 func getScale(config types.ServiceConfig) (int, error) {
 	scale := 1
-	var err error
 	if config.Deploy != nil && config.Deploy.Replicas != nil {
 		scale = int(*config.Deploy.Replicas)
 	}
-	if config.Scale != 0 {
-		scale = config.Scale
-	}
 	if scale > 1 && config.ContainerName != "" {
-		scale = -1
-		err = fmt.Errorf(doubledContainerNameWarning,
+		return 0, fmt.Errorf(doubledContainerNameWarning,
 			config.Name,
 			config.ContainerName)
 	}
-	return scale, err
+	return scale, nil
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,

@@ -39,5 +39,5 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.NilError(t, err)
 	foo, err := p.GetService("foo")
 	assert.NilError(t, err)
-	assert.Equal(t, foo.Scale, 2)
+	assert.Equal(t, *foo.Deploy.Replicas, uint64(2))
 }
