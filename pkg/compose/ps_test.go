@@ -54,7 +54,7 @@ func TestPs(t *testing.T) {
 
 	expected := []compose.ContainerSummary{
 		{ID: "123", Name: "123", Project: strings.ToLower(testProject), Service: "service1", State: "running", Health: "healthy", Publishers: nil},
-		{ID: "456", Name: "456", Project: strings.ToLower(testProject), Service: "service1", State: "running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost:80", TargetPort: 90,
+		{ID: "456", Name: "456", Project: strings.ToLower(testProject), Service: "service1", State: "running", Health: "", Publishers: []compose.PortPublisher{{URL: "localhost", TargetPort: 90,
 			PublishedPort: 80}}},
 		{ID: "789", Name: "789", Project: strings.ToLower(testProject), Service: "service2", State: "exited", Health: "", ExitCode: 130, Publishers: nil},
 	}
