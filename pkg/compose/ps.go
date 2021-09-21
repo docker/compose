@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"golang.org/x/sync/errgroup"
@@ -46,12 +45,8 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				return container.Ports[i].PrivatePort < container.Ports[j].PrivatePort
 			})
 			for _, p := range container.Ports {
-				var url string
-				if p.PublicPort != 0 {
-					url = fmt.Sprintf("%s:%d", p.IP, p.PublicPort)
-				}
 				publishers = append(publishers, api.PortPublisher{
-					URL:           url,
+					URL:           p.IP,
 					TargetPort:    int(p.PrivatePort),
 					PublishedPort: int(p.PublicPort),
 					Protocol:      p.Type,

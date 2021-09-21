@@ -147,14 +147,7 @@ SERVICES:
 func writter(containers []api.ContainerSummary) func(w io.Writer) {
 	return func(w io.Writer) {
 		for _, container := range containers {
-			var ports []string
-			for _, p := range container.Publishers {
-				if p.URL == "" {
-					ports = append(ports, fmt.Sprintf("%d/%s", p.TargetPort, p.Protocol))
-				} else {
-					ports = append(ports, fmt.Sprintf("%s->%d/%s", p.URL, p.TargetPort, p.Protocol))
-				}
-			}
+			ports := DisplayablePorts(container)
 			status := container.State
 			if status == "running" && container.Health != "" {
 				status = fmt.Sprintf("%s (%s)", container.State, container.Health)
@@ -162,7 +155,7 @@ func writter(containers []api.ContainerSummary) func(w io.Writer) {
 				status = fmt.Sprintf("%s (%d)", container.State, container.ExitCode)
 			}
 			command := formatter2.Ellipsis(container.Command, 20)
-			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, strings.Join(ports, ", "))
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", container.Name, strconv.Quote(command), container.Service, status, ports)
 		}
 	}
 }
@@ -181,4 +174,74 @@ func filterByStatus(containers []api.ContainerSummary, status string) []api.Cont
 		}
 	}
 	return filtered
+}
+
+type portRange struct {
+	pStart   int
+	pEnd     int
+	tStart   int
+	tEnd     int
+	IP       string
+	protocol string
+}
+
+func (pr portRange) String() string {
+	var (
+		pub string
+		tgt string
+	)
+
+	if pr.pEnd > pr.pStart {
+		pub = fmt.Sprintf("%s:%d-%d->", pr.IP, pr.pStart, pr.pEnd)
+	} else if pr.pStart > 0 {
+		pub = fmt.Sprintf("%s:%d->", pr.IP, pr.pStart)
+	}
+	if pr.tEnd > pr.tStart {
+		tgt = fmt.Sprintf("%d-%d", pr.tStart, pr.tEnd)
+	} else {
+		tgt = fmt.Sprintf("%d", pr.tStart)
+	}
+	return fmt.Sprintf("%s%s/%s", pub, tgt, pr.protocol)
+}
+
+// DisplayablePorts is copy pasted from https://github.com/docker/cli/pull/581/files
+func DisplayablePorts(c api.ContainerSummary) string {
+	if c.Publishers == nil {
+		return ""
+	}
+
+	sort.Sort(c.Publishers)
+
+	pr := portRange{}
+	ports := []string{}
+	for _, p := range c.Publishers {
+		prIsRange := pr.tEnd != pr.tStart
+		tOverlaps := p.TargetPort <= pr.tEnd
+
+		// Start a new port-range if:
+		// - the protocol is different from the current port-range
+		// - published or target port are not consecutive to the current port-range
+		// - the current port-range is a _range_, and the target port overlaps with the current range's target-ports
+		if p.Protocol != pr.protocol || p.URL != pr.IP || p.PublishedPort-pr.pEnd > 1 || p.TargetPort-pr.tEnd > 1 || prIsRange && tOverlaps {
+			// start a new port-range, and print the previous port-range (if any)
+			if pr.pStart > 0 {
+				ports = append(ports, pr.String())
+			}
+			pr = portRange{
+				pStart:   p.PublishedPort,
+				pEnd:     p.PublishedPort,
+				tStart:   p.TargetPort,
+				tEnd:     p.TargetPort,
+				protocol: p.Protocol,
+				IP:       p.URL,
+			}
+			continue
+		}
+		pr.pEnd = p.PublishedPort
+		pr.tEnd = p.TargetPort
+	}
+	if pr.tStart > 0 {
+		ports = append(ports, pr.String())
+	}
+	return strings.Join(ports, ", ")
 }

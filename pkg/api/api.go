@@ -297,7 +297,36 @@ type ContainerSummary struct {
 	State      string
 	Health     string
 	ExitCode   int
-	Publishers []PortPublisher
+	Publishers PortPublishers
+}
+
+// PortPublishers is a slice of PortPublisher
+type PortPublishers []PortPublisher
+
+// Len implements sort.Interface
+func (p PortPublishers) Len() int {
+	return len(p)
+}
+
+// Less implements sort.Interface
+func (p PortPublishers) Less(i, j int) bool {
+	left := p[i]
+	right := p[j]
+	if left.URL != right.URL {
+		return left.URL < right.URL
+	}
+	if left.TargetPort != right.TargetPort {
+		return left.TargetPort < right.TargetPort
+	}
+	if left.PublishedPort != right.PublishedPort {
+		return left.PublishedPort < right.PublishedPort
+	}
+	return left.Protocol < right.Protocol
+}
+
+// Swap implements sort.Interface
+func (p PortPublishers) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
 }
 
 // ContainerProcSummary holds container processes top data
