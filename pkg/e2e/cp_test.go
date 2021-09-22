@@ -51,7 +51,7 @@ func TestCopy(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/default.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
-		output := c.RunDockerCmd("exec", projectName+"_nginx_1", "cat", "/tmp/default.txt").Stdout()
+		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/default.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 
 		res = c.RunDockerOrExitError("exec", projectName+"_nginx_2", "cat", "/tmp/default.txt")
@@ -62,10 +62,10 @@ func TestCopy(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/indexed.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
-		output := c.RunDockerCmd("exec", projectName+"_nginx_3", "cat", "/tmp/indexed.txt").Stdout()
+		output := c.RunDockerCmd("exec", projectName+"-nginx-3", "cat", "/tmp/indexed.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 
-		res = c.RunDockerOrExitError("exec", projectName+"_nginx_2", "cat", "/tmp/indexed.txt")
+		res = c.RunDockerOrExitError("exec", projectName+"-nginx-2", "cat", "/tmp/indexed.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 1})
 	})
 
@@ -73,13 +73,13 @@ func TestCopy(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--all", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/all.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
-		output := c.RunDockerCmd("exec", projectName+"_nginx_1", "cat", "/tmp/all.txt").Stdout()
+		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/all.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 
-		output = c.RunDockerCmd("exec", projectName+"_nginx_2", "cat", "/tmp/all.txt").Stdout()
+		output = c.RunDockerCmd("exec", projectName+"-nginx-2", "cat", "/tmp/all.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 
-		output = c.RunDockerCmd("exec", projectName+"_nginx_3", "cat", "/tmp/all.txt").Stdout()
+		output = c.RunDockerCmd("exec", projectName+"-nginx-3", "cat", "/tmp/all.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 	})
 
@@ -105,7 +105,7 @@ func TestCopy(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-folder", "nginx:/tmp")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
-		output := c.RunDockerCmd("exec", projectName+"_nginx_1", "cat", "/tmp/cp-folder/cp-me.txt").Stdout()
+		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/cp-folder/cp-me.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world from folder`), output)
 
 		res = c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "nginx:/tmp/cp-folder", "./fixtures/cp-test/cp-folder2")

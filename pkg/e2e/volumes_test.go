@@ -44,7 +44,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("check container volume specs", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx2_1", "--format", "{{ json .Mounts }}")
+		res := c.RunDockerCmd("inspect", "compose-e2e-volume-nginx2-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
 		// nolint
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"z","RW":true,"Propagation":""`), output)
@@ -52,17 +52,17 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("check config content", func(t *testing.T) {
-		output := c.RunDockerCmd("exec", "compose-e2e-volume_nginx2_1", "cat", "/myconfig").Stdout()
+		output := c.RunDockerCmd("exec", "compose-e2e-volume-nginx2-1", "cat", "/myconfig").Stdout()
 		assert.Assert(t, strings.Contains(output, `Hello from Nginx container`), output)
 	})
 
 	t.Run("check secrets content", func(t *testing.T) {
-		output := c.RunDockerCmd("exec", "compose-e2e-volume_nginx2_1", "cat", "/run/secrets/mysecret").Stdout()
+		output := c.RunDockerCmd("exec", "compose-e2e-volume-nginx2-1", "cat", "/run/secrets/mysecret").Stdout()
 		assert.Assert(t, strings.Contains(output, `Hello from Nginx container`), output)
 	})
 
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", "compose-e2e-volume_nginx_1", "--format", "{{ json .Mounts }}")
+		res := c.RunDockerCmd("inspect", "compose-e2e-volume-nginx-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
 		// nolint
 		assert.Assert(t, strings.Contains(output, `"Type":"bind"`))
@@ -70,15 +70,15 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("should inherit anonymous volumes", func(t *testing.T) {
-		c.RunDockerOrExitError("exec", "compose-e2e-volume_nginx2_1", "touch", "/usr/src/app/node_modules/test")
+		c.RunDockerOrExitError("exec", "compose-e2e-volume-nginx2-1", "touch", "/usr/src/app/node_modules/test")
 		c.RunDockerOrExitError("compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "-d")
-		c.RunDockerOrExitError("exec", "compose-e2e-volume_nginx2_1", "ls", "/usr/src/app/node_modules/test")
+		c.RunDockerOrExitError("exec", "compose-e2e-volume-nginx2-1", "ls", "/usr/src/app/node_modules/test")
 	})
 
 	t.Run("should renew anonymous volumes", func(t *testing.T) {
-		c.RunDockerOrExitError("exec", "compose-e2e-volume_nginx2_1", "touch", "/usr/src/app/node_modules/test")
+		c.RunDockerOrExitError("exec", "compose-e2e-volume-nginx2-1", "touch", "/usr/src/app/node_modules/test")
 		c.RunDockerOrExitError("compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "--renew-anon-volumes", "-d")
-		c.RunDockerOrExitError("exec", "compose-e2e-volume_nginx2_1", "ls", "/usr/src/app/node_modules/test")
+		c.RunDockerOrExitError("exec", "compose-e2e-volume-nginx2-1", "ls", "/usr/src/app/node_modules/test")
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {

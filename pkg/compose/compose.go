@@ -32,6 +32,8 @@ import (
 	"github.com/sanathkr/go-yaml"
 )
 
+var Separator = "-"
+
 // NewComposeService create a local implementation of the compose.Service API
 func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) api.Service {
 	return &composeService{

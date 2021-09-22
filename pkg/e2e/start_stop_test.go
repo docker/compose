@@ -37,13 +37,13 @@ func TestStartStop(t *testing.T) {
 
 	getServiceRegx := func(service string, status string) string {
 		// match output with random spaces like:
-		// e2e-start-stop_db_1      "echo hello"       db          running
-		return fmt.Sprintf("%s_%s_1.+%s\\s+%s", projectName, service, service, status)
+		// e2e-start-stop-db-1      "echo hello"       db          running
+		return fmt.Sprintf("%s-%s-1.+%s\\s+%s", projectName, service, service, status)
 	}
 
 	t.Run("Up a project", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop_simple_1  Started"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-simple-1  Started"), res.Combined())
 
 		res = c.RunDockerCmd("compose", "ls", "--all")
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
@@ -63,7 +63,7 @@ func TestStartStop(t *testing.T) {
 		testify.Regexp(t, getProjectRegx("exited"), res.Stdout())
 
 		res = c.RunDockerCmd("compose", "--project-name", projectName, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop_words_1"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-words-1"), res.Combined())
 
 		res = c.RunDockerCmd("compose", "--project-name", projectName, "ps", "--all")
 		testify.Regexp(t, getServiceRegx("simple", "exited"), res.Stdout())

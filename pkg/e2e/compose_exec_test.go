@@ -32,17 +32,17 @@ func TestLocalComposeExec(t *testing.T) {
 	c.RunDockerCmd("compose", "--project-directory", "fixtures/simple-composefile", "--project-name", projectName, "up", "-d")
 
 	t.Run("exec true", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "compose-e2e-exec_simple_1", "/bin/true")
+		res := c.RunDockerOrExitError("exec", "compose-e2e-exec-simple-1", "/bin/true")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 	})
 
 	t.Run("exec false", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "compose-e2e-exec_simple_1", "/bin/false")
+		res := c.RunDockerOrExitError("exec", "compose-e2e-exec-simple-1", "/bin/false")
 		res.Assert(t, icmd.Expected{ExitCode: 1})
 	})
 
 	t.Run("exec with env set", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerCmd("exec", "-e", "FOO", "compose-e2e-exec_simple_1", "/usr/bin/env"),
+		res := icmd.RunCmd(c.NewDockerCmd("exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env"),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "FOO=BAR")
 			})
@@ -50,7 +50,7 @@ func TestLocalComposeExec(t *testing.T) {
 	})
 
 	t.Run("exec without env set", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "-e", "FOO", "compose-e2e-exec_simple_1", "/usr/bin/env")
+		res := c.RunDockerOrExitError("exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="))
 	})

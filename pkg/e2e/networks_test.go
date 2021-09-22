@@ -107,7 +107,7 @@ func TestIPAMConfig(t *testing.T) {
 	})
 
 	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", projectName+"_foo_1", "-f", "{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
+		res := c.RunDockerCmd("inspect", projectName+"-foo-1", "-f", "{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
 		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
 	})
 

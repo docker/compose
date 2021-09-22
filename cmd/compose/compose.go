@@ -91,12 +91,13 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 var Warning string
 
 type projectOptions struct {
-	ProjectName string
-	Profiles    []string
-	ConfigPaths []string
-	WorkDir     string
-	ProjectDir  string
-	EnvFile     string
+	ProjectName   string
+	Profiles      []string
+	ConfigPaths   []string
+	WorkDir       string
+	ProjectDir    string
+	EnvFile       string
+	Compatibility bool
 }
 
 // ProjectFunc does stuff within a types.Project
@@ -149,9 +150,8 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the Compose file)")
-	f.Bool("compatibility", false, "DEPRECATED")
+	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	_ = f.MarkHidden("workdir")
-	_ = f.MarkHidden("compatibility")
 }
 
 func (o *projectOptions) toProjectName() (string, error) {
@@ -258,6 +258,9 @@ func RootCommand(backend api.Service) *cobra.Command {
 				}
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
+			}
+			if opts.Compatibility || os.Getenv("COMPOSE_COMPATIBILITY") == "true" {
+				compose.Separator = "_"
 			}
 			return nil
 		},

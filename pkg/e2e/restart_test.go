@@ -32,8 +32,8 @@ func TestRestart(t *testing.T) {
 
 	getServiceRegx := func(service string, status string) string {
 		// match output with random spaces like:
-		// e2e-start-stop_db_1      "echo hello"     db      running
-		return fmt.Sprintf("%s_%s_1.+%s\\s+%s", projectName, service, service, status)
+		// e2e-start-stop-db-1      "echo hello"     db      running
+		return fmt.Sprintf("%s-%s-1.+%s\\s+%s", projectName, service, service, status)
 	}
 
 	t.Run("Up a project", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestRestart(t *testing.T) {
 		c.RunDockerOrExitError("compose", "--project-name", projectName, "down")
 
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/restart-test/compose.yaml", "--project-name", projectName, "up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart_restart_1  Started"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-restart-restart-1  Started"), res.Combined())
 
 		c.WaitForCmdResult(c.NewDockerCmd("compose", "--project-name", projectName, "ps", "-a", "--format", "json"),
 			StdoutContains(`"State":"exited"`),

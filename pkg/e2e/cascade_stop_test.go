@@ -29,13 +29,13 @@ func TestCascadeStop(t *testing.T) {
 
 	t.Run("abort-on-container-exit", func(t *testing.T) {
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
-		res.Assert(t, icmd.Expected{ExitCode: 1, Out: `should_fail_1 exited with code 1`})
+		res.Assert(t, icmd.Expected{ExitCode: 1, Out: `should_fail-1 exited with code 1`})
 		res.Assert(t, icmd.Expected{ExitCode: 1, Out: `Aborting on container exit...`})
 	})
 
 	t.Run("exit-code-from", func(t *testing.T) {
 		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=sleep")
-		res.Assert(t, icmd.Expected{ExitCode: 137, Out: `should_fail_1 exited with code 1`})
+		res.Assert(t, icmd.Expected{ExitCode: 137, Out: `should_fail-1 exited with code 1`})
 		res.Assert(t, icmd.Expected{ExitCode: 137, Out: `Aborting on container exit...`})
 	})
 
