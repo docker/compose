@@ -47,7 +47,7 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 		}
 
 		eg.Go(func() error {
-			return s.watchContainers(project.Name, options.AttachTo, listener, attached, func(container moby.Container) error {
+			return s.watchContainers(context.Background(), project.Name, options.AttachTo, listener, attached, func(container moby.Container) error {
 				return s.attachContainer(ctx, container, listener, project)
 			})
 		})
@@ -69,13 +69,13 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 type containerWatchFn func(container moby.Container) error
 
 // watchContainers uses engine events to capture container start/die and notify ContainerEventListener
-func (s *composeService) watchContainers(projectName string, services []string, listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
+func (s *composeService) watchContainers(ctx context.Context, projectName string, services []string, listener api.ContainerEventListener, containers Containers, onStart containerWatchFn) error {
 	watched := map[string]int{}
 	for _, c := range containers {
 		watched[c.ID] = 0
 	}
 
-	ctx, stop := context.WithCancel(context.Background())
+	ctx, stop := context.WithCancel(ctx)
 	err := s.Events(ctx, projectName, api.EventsOptions{
 		Services: services,
 		Consumer: func(event api.Event) error {
