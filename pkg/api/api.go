@@ -61,7 +61,7 @@ type Service interface {
 	// Remove executes the equivalent to a `compose rm`
 	Remove(ctx context.Context, project *types.Project, options RemoveOptions) error
 	// Exec executes a command in a running service container
-	Exec(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
+	Exec(ctx context.Context, project string, opts RunOptions) (int, error)
 	// Copy copies a file/folder between a service container and the local filesystem
 	Copy(ctx context.Context, project *types.Project, opts CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
