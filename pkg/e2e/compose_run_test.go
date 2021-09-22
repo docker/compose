@@ -54,7 +54,7 @@ func TestLocalComposeRun(t *testing.T) {
 				truncatedSlug = strings.Replace(containerID, "run-test_back_run_", "", 1)
 				runContainerID = containerID
 			}
-			if strings.HasPrefix(containerID, "run-test_db_1") {
+			if strings.HasPrefix(containerID, "run-test-db-1") {
 				assert.Assert(t, strings.Contains(line, "Up"), line)
 			}
 		}

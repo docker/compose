@@ -44,13 +44,13 @@ func TestIPC(t *testing.T) {
 	})
 
 	t.Run("check ipcmode in container inspect", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", projectName+"_shareable_1")
+		res := c.RunDockerCmd("inspect", projectName+"-shareable-1")
 		res.Assert(t, icmd.Expected{Out: `"IpcMode": "shareable",`})
 
-		res = c.RunDockerCmd("inspect", projectName+"_service_1")
+		res = c.RunDockerCmd("inspect", projectName+"-service-1")
 		res.Assert(t, icmd.Expected{Out: `"IpcMode": "container:`})
 
-		res = c.RunDockerCmd("inspect", projectName+"_container_1")
+		res = c.RunDockerCmd("inspect", projectName+"-container-1")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"IpcMode": "container:%s",`, cid)})
 	})
 

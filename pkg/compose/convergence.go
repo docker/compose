@@ -245,7 +245,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
-	name := fmt.Sprintf("%s_%s_%d", projectName, service.Name, number)
+	name := strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, Separator)
 	if service.ContainerName != "" {
 		name = service.ContainerName
 	}

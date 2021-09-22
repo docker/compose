@@ -71,7 +71,7 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check compose labels", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", projectName+"_web_1")
+		res := c.RunDockerCmd("inspect", projectName+"-web-1")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.container-number": "1"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": "compose-e2e-demo"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.oneoff": "False",`})
@@ -88,27 +88,27 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check user labels", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", projectName+"_web_1")
+		res := c.RunDockerCmd("inspect", projectName+"-web-1")
 		res.Assert(t, icmd.Expected{Out: `"my-label": "test"`})
 
 	})
 
 	t.Run("check healthcheck output", func(t *testing.T) {
 		c.WaitForCmdResult(c.NewDockerCmd("compose", "-p", projectName, "ps", "--format", "json"),
-			StdoutContains(`"Name":"compose-e2e-demo_web_1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
+			StdoutContains(`"Name":"compose-e2e-demo-web-1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
 			5*time.Second, 1*time.Second)
 
 		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `NAME                       COMMAND                  SERVICE             STATUS              PORTS`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_web_1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp, :::90->80/tcp`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp, :::90->80/tcp`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
 	})
 
 	t.Run("images", func(t *testing.T) {
 		res := c.RunDockerCmd("compose", "-p", projectName, "images")
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_db_1      gtardif/sentences-db    latest`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_web_1     gtardif/sentences-web   latest`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo_words_1   gtardif/sentences-api   latest`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      gtardif/sentences-db    latest`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     gtardif/sentences-web   latest`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-words-1   gtardif/sentences-api   latest`})
 	})
 
 	t.Run("down", func(t *testing.T) {
@@ -161,10 +161,10 @@ func TestAttachRestart(t *testing.T) {
 
 	c.WaitForCondition(func() (bool, string) {
 		debug := res.Combined()
-		return strings.Count(res.Stdout(), "failing_1 exited with code 1") == 3, fmt.Sprintf("'failing_1 exited with code 1' not found 3 times in : \n%s\n", debug)
+		return strings.Count(res.Stdout(), "failing-1 exited with code 1") == 3, fmt.Sprintf("'failing-1 exited with code 1' not found 3 times in : \n%s\n", debug)
 	}, 2*time.Minute, 2*time.Second)
 
-	assert.Equal(t, strings.Count(res.Stdout(), "failing_1  | world"), 3, res.Combined())
+	assert.Equal(t, strings.Count(res.Stdout(), "failing-1  | world"), 3, res.Combined())
 }
 
 func TestInitContainer(t *testing.T) {
@@ -172,7 +172,7 @@ func TestInitContainer(t *testing.T) {
 
 	res := c.RunDockerOrExitError("compose", "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
 	defer c.RunDockerOrExitError("compose", "-p", "init-container", "down")
-	testify.Regexp(t, "foo_1  | hello(?m:.*)bar_1  | world", res.Stdout())
+	testify.Regexp(t, "foo-1  | hello(?m:.*)bar-1  | world", res.Stdout())
 }
 
 func TestRm(t *testing.T) {
@@ -192,6 +192,27 @@ func TestRm(t *testing.T) {
 	t.Run("check containers after rm -sf", func(t *testing.T) {
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_simple"), res.Combined())
+	})
+
+	t.Run("down", func(t *testing.T) {
+		c.RunDockerCmd("compose", "-p", projectName, "down")
+	})
+}
+
+func TestCompatibility(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	const projectName = "compose-e2e-compatibility"
+
+	t.Run("up", func(t *testing.T) {
+		c.RunDockerCmd("compose", "--compatibility", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
+	})
+
+	t.Run("check container names", func(t *testing.T) {
+		res := c.RunDockerCmd("ps", "--format", "{{.Names}}")
+		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_web_1"})
+		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_words_1"})
+		res.Assert(t, icmd.Expected{Out: "compose-e2e-compatibility_db_1"})
 	})
 
 	t.Run("down", func(t *testing.T) {
