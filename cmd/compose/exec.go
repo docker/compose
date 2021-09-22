@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 
-	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/containerd/console"
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
@@ -78,7 +77,7 @@ func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
-	project, err := opts.toProject(nil, cgo.WithResolvedPaths(true))
+	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}

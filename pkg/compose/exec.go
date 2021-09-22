@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -31,20 +30,15 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
-func (s *composeService) Exec(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
-	service, err := project.GetService(opts.Service)
-	if err != nil {
-		return 0, err
-	}
-
-	container, err := s.getExecTarget(ctx, project, service, opts)
+func (s *composeService) Exec(ctx context.Context, project string, opts api.RunOptions) (int, error) {
+	container, err := s.getExecTarget(ctx, project, opts)
 	if err != nil {
 		return 0, err
 	}
 
 	exec, err := s.apiClient.ContainerExecCreate(ctx, container.ID, moby.ExecConfig{
 		Cmd:        opts.Command,
-		Env:        s.getExecEnvironment(project, service, opts),
+		Env:        opts.Environment,
 		User:       opts.User,
 		Privileged: opts.Privileged,
 		Tty:        opts.Tty,
@@ -145,11 +139,11 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 	}
 }
 
-func (s *composeService) getExecTarget(ctx context.Context, project *types.Project, service types.ServiceConfig, opts api.RunOptions) (moby.Container, error) {
+func (s *composeService) getExecTarget(ctx context.Context, projectName string, opts api.RunOptions) (moby.Container, error) {
 	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			projectFilter(project.Name),
-			serviceFilter(service.Name),
+			projectFilter(projectName),
+			serviceFilter(opts.Service),
 			containerNumberFilter(opts.Index),
 		),
 	})
@@ -157,23 +151,10 @@ func (s *composeService) getExecTarget(ctx context.Context, project *types.Proje
 		return moby.Container{}, err
 	}
 	if len(containers) < 1 {
-		return moby.Container{}, fmt.Errorf("container %s not running", getContainerName(project.Name, service, opts.Index))
+		return moby.Container{}, fmt.Errorf("service %q is not running container #%d", opts.Service, opts.Index)
 	}
 	container := containers[0]
 	return container, nil
-}
-
-func (s *composeService) getExecEnvironment(project *types.Project, service types.ServiceConfig, opts api.RunOptions) []string {
-	var env []string
-	for k, v := range service.Environment.OverrideBy(types.NewMappingWithEquals(opts.Environment)).
-		Resolve(func(s string) (string, bool) {
-			v, ok := project.Environment[s]
-			return v, ok
-		}).
-		RemoveEmpty() {
-		env = append(env, fmt.Sprintf("%s=%s", k, *v))
-	}
-	return env
 }
 
 func (s *composeService) getExecExitStatus(ctx context.Context, execID string) (int, error) {
