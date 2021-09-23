@@ -209,6 +209,6 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 		service.Environment.OverrideBy(projectEnv)
 	}
 	for k, v := range opts.Labels {
-		service.Labels.Add(k, v)
+		service.Labels = service.Labels.Add(k, v)
 	}
 }
