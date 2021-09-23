@@ -141,7 +141,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
-	flags.StringArrayVarP(&opts.labels, "labels", "l", []string{}, "Add or override a label")
+	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
 	flags.BoolVarP(&opts.noTty, "no-TTY", "T", notAtTTY(), "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
@@ -163,6 +163,8 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 	switch name {
 	case "volumes":
 		name = "volume"
+	case "labels":
+		name = "label"
 	}
 	return pflag.NormalizedName(name)
 }
