@@ -170,7 +170,8 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 }
 
 func notAtTTY() bool {
-	return !isatty.IsTerminal(os.Stdout.Fd())
+	b := isatty.IsTerminal(os.Stdout.Fd()) && isatty.IsTerminal(os.Stdin.Fd())
+	return !b
 }
 
 func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions) error {

@@ -226,8 +226,8 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 	return imageName
 }
 
-func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig, number int, inherit *moby.Container,
-	autoRemove bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
+func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
+	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
 	labels, err := s.prepareLabels(p, service, number)
 	if err != nil {
@@ -246,9 +246,8 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 	}
 
 	var (
-		tty         = service.Tty
-		stdinOpen   = service.StdinOpen
-		attachStdin = false
+		tty       = service.Tty
+		stdinOpen = service.StdinOpen
 	)
 
 	volumeMounts, binds, mounts, err := s.buildContainerVolumes(ctx, *p, service, inherit)
