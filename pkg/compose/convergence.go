@@ -232,7 +232,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		name := getContainerName(project.Name, service, number)
 		i := i
 		eg.Go(func() error {
-			container, err := c.service.createContainer(ctx, project, service, name, number, false, true)
+			container, err := c.service.createContainer(ctx, project, service, name, number, false, true, false)
 			updated[actual+i] = container
 			return err
 		})
@@ -327,11 +327,11 @@ func getScale(config types.ServiceConfig) (int, error) {
 }
 
 func (s *composeService) createContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, autoRemove bool, useNetworkAliases bool) (container moby.Container, err error) {
+	name string, number int, autoRemove bool, useNetworkAliases bool, attachStdin bool) (container moby.Container, err error) {
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
-	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases)
+	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin)
 	if err != nil {
 		return
 	}
@@ -364,7 +364,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		inherited = &replaced
 	}
 	name = getContainerName(project.Name, service, number)
-	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true)
+	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false)
 	if err != nil {
 		return created, err
 	}
@@ -402,9 +402,9 @@ func (s *composeService) startContainer(ctx context.Context, container moby.Cont
 }
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool) (moby.Container, error) {
+	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool) (moby.Container, error) {
 	var created moby.Container
-	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove)
+	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove, attachStdin)
 	if err != nil {
 		return created, err
 	}

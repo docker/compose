@@ -164,7 +164,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 			return "", err
 		}
 	}
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases)
+	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases, true)
 	if err != nil {
 		return "", err
 	}
@@ -186,6 +186,7 @@ func (s *composeService) getEscapeKeyProxy(r io.ReadCloser) (io.ReadCloser, erro
 
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
 	service.Tty = opts.Tty
+	service.StdinOpen = true
 	service.ContainerName = opts.Name
 
 	if len(opts.Command) > 0 {
