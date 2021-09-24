@@ -81,8 +81,8 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
-	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property")
-	flags.StringVar(&opts.Status, "status", "", "Filter services by status")
+	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property. Deprecated, use --status instead")
+	flags.StringVar(&opts.Status, "status", "", "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
