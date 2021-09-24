@@ -31,6 +31,7 @@ type createOptions struct {
 	Build         bool
 	noBuild       bool
 	removeOrphans bool
+	ignoreOrphans bool
 	forceRecreate bool
 	noRecreate    bool
 	recreateDeps  bool
@@ -57,6 +58,7 @@ func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
 			return backend.Create(ctx, project, api.CreateOptions{
 				RemoveOrphans:        opts.removeOrphans,
+				IgnoreOrphans:        opts.ignoreOrphans,
 				Recreate:             opts.recreateStrategy(),
 				RecreateDependencies: opts.dependenciesRecreateStrategy(),
 				Inherit:              !opts.noInherit,
