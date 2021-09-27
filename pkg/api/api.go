@@ -100,6 +100,8 @@ type CreateOptions struct {
 	Services []string
 	// Remove legacy containers for services that are not defined in the project
 	RemoveOrphans bool
+	// Ignore legacy containers for services that are not defined in the project
+	IgnoreOrphans bool
 	// Recreate define the strategy to apply on existing containers
 	Recreate string
 	// RecreateDependencies define the strategy to apply on dependencies services
