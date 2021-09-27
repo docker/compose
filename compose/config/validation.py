@@ -1,13 +1,9 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import json
 import logging
 import os
 import re
 import sys
 
-import six
 from docker.utils.ports import split_port
 from jsonschema import Draft4Validator
 from jsonschema import FormatChecker
@@ -75,13 +71,13 @@ def format_ports(instance):
     try:
         split_port(instance)
     except ValueError as e:
-        raise ValidationError(six.text_type(e))
+        raise ValidationError(str(e))
     return True
 
 
 @FormatChecker.cls_checks(format="expose", raises=ValidationError)
 def format_expose(instance):
-    if isinstance(instance, six.string_types):
+    if isinstance(instance, str):
         if not re.match(VALID_EXPOSE_FORMAT, instance):
             raise ValidationError(
                 "should be of the format 'PORT[/PROTOCOL]'")
@@ -91,7 +87,7 @@ def format_expose(instance):
 
 @FormatChecker.cls_checks("subnet_ip_address", raises=ValidationError)
 def format_subnet_ip_address(instance):
-    if isinstance(instance, six.string_types):
+    if isinstance(instance, str):
         if not re.match(VALID_REGEX_IPV4_CIDR, instance) and \
                 not re.match(VALID_REGEX_IPV6_CIDR, instance):
             raise ValidationError("should use the CIDR format")
@@ -104,7 +100,7 @@ def match_named_volumes(service_dict, project_volumes):
     for volume_spec in service_volumes:
         if volume_spec.is_named_volume and volume_spec.external not in project_volumes:
             raise ConfigurationError(
-                'Named volume "{0}" is used in service "{1}" but no'
+                'Named volume "{}" is used in service "{}" but no'
                 ' declaration was found in the volumes section.'.format(
                     volume_spec.repr(), service_dict.get('name')
                 )
@@ -138,7 +134,7 @@ def validate_config_section(filename, config, section):
                 type=anglicize_json_type(python_type_to_yaml_type(config))))
 
     for key, value in config.items():
-        if not isinstance(key, six.string_types):
+        if not isinstance(key, str):
             raise ConfigurationError(
                 "In file '{filename}', the {section} name {name} must be a "
                 "quoted string, i.e. '{name}'.".format(
@@ -166,7 +162,7 @@ def validate_top_level_object(config_file):
 
 def validate_ulimits(service_config):
     ulimit_config = service_config.config.get('ulimits', {})
-    for limit_name, soft_hard_values in six.iteritems(ulimit_config):
+    for limit_name, soft_hard_values in ulimit_config.items():
         if isinstance(soft_hard_values, dict):
             if not soft_hard_values['soft'] <= soft_hard_values['hard']:
                 raise ConfigurationError(
@@ -218,6 +214,21 @@ def validate_pid_mode(service_config, service_names):
     if dependency not in service_names:
         raise ConfigurationError(
             "Service '{s.name}' uses the PID namespace of service '{dep}' which "
+            "is undefined.".format(s=service_config, dep=dependency)
+        )
+
+
+def validate_ipc_mode(service_config, service_names):
+    ipc_mode = service_config.config.get('ipc')
+    if not ipc_mode:
+        return
+
+    dependency = get_service_name_from_network_mode(ipc_mode)
+    if not dependency:
+        return
+    if dependency not in service_names:
+        raise ConfigurationError(
+            "Service '{s.name}' uses the IPC namespace of service '{dep}' which "
             "is undefined.".format(s=service_config, dep=dependency)
         )
 
@@ -286,7 +297,7 @@ def handle_error_for_schema_with_id(error, path):
             invalid_config_key = parse_key_from_error_msg(error)
             return get_unsupported_config_msg(path, invalid_config_key)
 
-        if schema_id.startswith('config_schema_v'):
+        if schema_id.startswith('config_schema_'):
             invalid_config_key = parse_key_from_error_msg(error)
             return ('Invalid top-level property "{key}". Valid top-level '
                     'sections for this Compose file are: {properties}, and '
@@ -329,7 +340,7 @@ def handle_generic_error(error, path):
             required_keys)
 
     elif error.cause:
-        error_msg = six.text_type(error.cause)
+        error_msg = str(error.cause)
         msg_format = "{path} is invalid: {msg}"
 
     elif error.path:
@@ -349,7 +360,7 @@ def parse_key_from_error_msg(error):
 
 
 def path_string(path):
-    return ".".join(c for c in path if isinstance(c, six.string_types))
+    return ".".join(c for c in path if isinstance(c, str))
 
 
 def _parse_valid_types_from_validator(validator):
@@ -439,15 +450,29 @@ def process_config_schema_errors(error):
     return handle_generic_error(error, path)
 
 
-def validate_against_config_schema(config_file):
-    schema = load_jsonschema(config_file)
+def keys_to_str(config_file):
+    """
+        Non-string keys may break validator with patterned fields.
+    """
+    d = {}
+    for k, v in config_file.items():
+        d[str(k)] = v
+        if isinstance(v, dict):
+            d[str(k)] = keys_to_str(v)
+    return d
+
+
+def validate_against_config_schema(config_file, version):
+    schema = load_jsonschema(version)
+    config = keys_to_str(config_file.config)
+
     format_checker = FormatChecker(["ports", "expose", "subnet_ip_address"])
     validator = Draft4Validator(
         schema,
         resolver=RefResolver(get_resolver_path(), schema),
         format_checker=format_checker)
     handle_errors(
-        validator.iter_errors(config_file.config),
+        validator.iter_errors(config),
         process_config_schema_errors,
         config_file.filename)
 
@@ -457,7 +482,7 @@ def validate_service_constraints(config, service_name, config_file):
         return process_service_constraint_errors(
             errors, service_name, config_file.version)
 
-    schema = load_jsonschema(config_file)
+    schema = load_jsonschema(config_file.version)
     validator = Draft4Validator(schema['definitions']['constraints']['service'])
     handle_errors(validator.iter_errors(config), handler, None)
 
@@ -476,17 +501,20 @@ def get_schema_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def load_jsonschema(config_file):
+def load_jsonschema(version):
+    name = "compose_spec"
+    if version == V1:
+        name = "config_schema_v1"
+
     filename = os.path.join(
         get_schema_path(),
-        "config_schema_v{0}.json".format(config_file.version))
+        "{}.json".format(name))
 
     if not os.path.exists(filename):
         raise ConfigurationError(
             'Version in "{}" is unsupported. {}'
-            .format(config_file.filename, VERSION_EXPLANATION))
-
-    with open(filename, "r") as fh:
+            .format(filename, VERSION_EXPLANATION))
+    with open(filename) as fh:
         return json.load(fh)
 
 
@@ -506,7 +534,7 @@ def handle_errors(errors, format_error_func, filename):
     gone wrong. Process each error and pull out relevant information and re-write
     helpful error messages that are relevant.
     """
-    errors = list(sorted(errors, key=str))
+    errors = sorted(errors, key=str)
     if not errors:
         return
 

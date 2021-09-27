@@ -1,18 +1,14 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 import re
 import shutil
 import tempfile
 from distutils.spawn import find_executable
+from io import StringIO
 from os import path
 
 import pytest
 from docker.errors import APIError
 from docker.errors import ImageNotFound
-from six import StringIO
-from six import text_type
 
 from .. import mock
 from ..helpers import BUSYBOX_IMAGE_WITH_TAG
@@ -40,8 +36,10 @@ from compose.parallel import ParallelStreamWriter
 from compose.project import OneOffFilter
 from compose.project import Project
 from compose.service import BuildAction
+from compose.service import BuildError
 from compose.service import ConvergencePlan
 from compose.service import ConvergenceStrategy
+from compose.service import IpcMode
 from compose.service import NetworkMode
 from compose.service import PidMode
 from compose.service import Service
@@ -49,11 +47,6 @@ from compose.utils import parse_nanoseconds_int
 from tests.helpers import create_custom_host_file
 from tests.integration.testcases import is_cluster
 from tests.integration.testcases import no_cluster
-from tests.integration.testcases import v2_1_only
-from tests.integration.testcases import v2_2_only
-from tests.integration.testcases import v2_3_only
-from tests.integration.testcases import v2_only
-from tests.integration.testcases import v3_only
 
 
 def create_and_start_container(service, **override_options):
@@ -139,7 +132,6 @@ class ServiceTest(DockerClientTestCase):
         assert container.get('HostConfig.CpuRealtimeRuntime') == 40000
         assert container.get('HostConfig.CpuRealtimePeriod') == 150000
 
-    @v2_2_only()
     def test_create_container_with_cpu_count(self):
         self.require_api_version('1.25')
         service = self.create_service('db', cpu_count=2)
@@ -147,7 +139,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.CpuCount') == 2
 
-    @v2_2_only()
     @pytest.mark.skipif(not IS_WINDOWS_PLATFORM, reason='cpu_percent is not supported for Linux')
     def test_create_container_with_cpu_percent(self):
         self.require_api_version('1.25')
@@ -156,7 +147,6 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.CpuPercent') == 12
 
-    @v2_2_only()
     def test_create_container_with_cpus(self):
         self.require_api_version('1.25')
         service = self.create_service('db', cpus=1)
@@ -223,6 +213,9 @@ class ServiceTest(DockerClientTestCase):
         service.start_container(container)
         assert container.get('HostConfig.ReadonlyRootfs') == read_only
 
+    @pytest.mark.xfail(True, reason='Getting "Your kernel does not support '
+                                    'cgroup blkio weight and weight_device" on daemon start '
+                                    'on Linux kernel 5.3.x')
     def test_create_container_with_blkio_config(self):
         blkio_config = {
             'weight': 300,
@@ -256,7 +249,7 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('db', security_opt=security_opt)
         container = service.create_container()
         service.start_container(container)
-        assert set(container.get('HostConfig.SecurityOpt')) == set([o.repr() for o in security_opt])
+        assert set(container.get('HostConfig.SecurityOpt')) == {o.repr() for o in security_opt}
 
     @pytest.mark.xfail(True, reason='Not supported on most drivers')
     def test_create_container_with_storage_opt(self):
@@ -298,10 +291,9 @@ class ServiceTest(DockerClientTestCase):
         actual_host_path = container.get_mount(container_path)['Source']
 
         assert path.basename(actual_host_path) == path.basename(host_path), (
-            "Last component differs: %s, %s" % (actual_host_path, host_path)
+            "Last component differs: {}, {}".format(actual_host_path, host_path)
         )
 
-    @v2_3_only()
     def test_create_container_with_host_mount(self):
         host_path = '/tmp/host-path'
         container_path = '/container-path'
@@ -321,7 +313,6 @@ class ServiceTest(DockerClientTestCase):
         assert path.basename(mount['Source']) == path.basename(host_path)
         assert mount['RW'] is False
 
-    @v2_3_only()
     def test_create_container_with_tmpfs_mount(self):
         container_path = '/container-tmpfs'
         service = self.create_service(
@@ -334,7 +325,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Type'] == 'tmpfs'
 
-    @v2_3_only()
     def test_create_container_with_tmpfs_mount_tmpfs_size(self):
         container_path = '/container-tmpfs'
         service = self.create_service(
@@ -351,7 +341,6 @@ class ServiceTest(DockerClientTestCase):
             'SizeBytes': 5368709
         }
 
-    @v2_3_only()
     def test_create_container_with_volume_mount(self):
         container_path = '/container-volume'
         volume_name = 'composetest_abcde'
@@ -366,7 +355,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Name'] == volume_name
 
-    @v3_only()
     def test_create_container_with_legacy_mount(self):
         # Ensure mounts are converted to volumes if API version < 1.30
         # Needed to support long syntax in the 3.2 format
@@ -383,7 +371,6 @@ class ServiceTest(DockerClientTestCase):
         assert mount
         assert mount['Name'] == volume_name
 
-    @v3_only()
     def test_create_container_with_legacy_tmpfs_mount(self):
         # Ensure tmpfs mounts are converted to tmpfs entries if API version < 1.30
         # Needed to support long syntax in the 3.2 format
@@ -590,7 +577,6 @@ class ServiceTest(DockerClientTestCase):
 
             orig_container = new_container
 
-    @v2_3_only()
     def test_execute_convergence_plan_recreate_twice_with_mount(self):
         service = self.create_service(
             'db',
@@ -859,11 +845,11 @@ class ServiceTest(DockerClientTestCase):
         db2 = create_and_start_container(db)
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'db'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_creates_links_with_names(self):
@@ -874,11 +860,11 @@ class ServiceTest(DockerClientTestCase):
         db2 = create_and_start_container(db)
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'custom_link_name'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_container_with_external_links(self):
@@ -894,11 +880,11 @@ class ServiceTest(DockerClientTestCase):
 
         create_and_start_container(web)
 
-        assert set(get_links(web.containers()[0])) == set([
+        assert set(get_links(web.containers()[0])) == {
             db_ctnrs[0].name,
             db_ctnrs[1].name,
             'db_3'
-        ])
+        }
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_normal_container_does_not_create_links_to_its_own_service(self):
@@ -908,7 +894,7 @@ class ServiceTest(DockerClientTestCase):
         create_and_start_container(db)
 
         c = create_and_start_container(db)
-        assert set(get_links(c)) == set([])
+        assert set(get_links(c)) == set()
 
     @no_cluster('No legacy links support in Swarm')
     def test_start_one_off_container_creates_links_to_its_own_service(self):
@@ -919,11 +905,11 @@ class ServiceTest(DockerClientTestCase):
 
         c = create_and_start_container(db, one_off=OneOffFilter.only)
 
-        assert set(get_links(c)) == set([
+        assert set(get_links(c)) == {
             db1.name, db1.name_without_project,
             db2.name, db2.name_without_project,
             'db'
-        ])
+        }
 
     def test_start_container_builds_images(self):
         service = Service(
@@ -962,7 +948,12 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
             f.write("FROM busybox\n")
 
-        service = self.create_service('web', build={'context': base_dir})
+        service = self.create_service('web',
+                                      build={'context': base_dir},
+                                      environment={
+                                          'COMPOSE_DOCKER_CLI_BUILD': '0',
+                                          'DOCKER_BUILDKIT': '0',
+                                      })
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
 
@@ -978,7 +969,6 @@ class ServiceTest(DockerClientTestCase):
         service = self.create_service('web',
                                       build={'context': base_dir},
                                       environment={
-                                          'COMPOSE_DOCKER_CLI_BUILD': '1',
                                           'DOCKER_BUILDKIT': '1',
                                       })
         service.build(cli=True)
@@ -1002,6 +992,23 @@ class ServiceTest(DockerClientTestCase):
         image = self.client.inspect_image('composetest_web')
         assert image['Config']['Labels']['com.docker.compose.test']
 
+    def test_build_cli_with_build_error(self):
+        base_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, base_dir)
+
+        with open(os.path.join(base_dir, 'Dockerfile'), 'w') as f:
+            f.write('\n'.join([
+                "FROM busybox",
+                "RUN exit 2",
+            ]))
+        service = self.create_service('web',
+                                      build={
+                                          'context': base_dir,
+                                          'labels': {'com.docker.compose.test': 'true'}},
+                                      )
+        with pytest.raises(BuildError):
+            service.build(cli=True)
+
     def test_up_build_cli(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -1012,7 +1019,6 @@ class ServiceTest(DockerClientTestCase):
         web = self.create_service('web',
                                   build={'context': base_dir},
                                   environment={
-                                      'COMPOSE_DOCKER_CLI_BUILD': '1',
                                       'DOCKER_BUILDKIT': '1',
                                   })
         project = Project('composetest', [web], self.client)
@@ -1032,7 +1038,7 @@ class ServiceTest(DockerClientTestCase):
         with open(os.path.join(base_dir.encode('utf8'), b'foo\xE2bar'), 'w') as f:
             f.write("hello world\n")
 
-        service = self.create_service('web', build={'context': text_type(base_dir)})
+        service = self.create_service('web', build={'context': str(base_dir)})
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
         assert self.client.inspect_image('composetest_web')
@@ -1066,7 +1072,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
-                                      build={'context': text_type(base_dir),
+                                      build={'context': str(base_dir),
                                              'args': {"build_version": "1"}})
         service.build()
         self.addCleanup(self.client.remove_image, service.image_name)
@@ -1083,7 +1089,7 @@ class ServiceTest(DockerClientTestCase):
             f.write("RUN echo ${build_version}\n")
 
         service = self.create_service('buildwithargs',
-                                      build={'context': text_type(base_dir),
+                                      build={'context': str(base_dir),
                                              'args': {"build_version": "1"}})
         service.build(build_args_override={'build_version': '2'})
         self.addCleanup(self.client.remove_image, service.image_name)
@@ -1099,7 +1105,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('FROM busybox\n')
 
         service = self.create_service('buildlabels', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'labels': {'com.docker.compose.test': 'true'}
         })
         service.build()
@@ -1126,7 +1132,7 @@ class ServiceTest(DockerClientTestCase):
         self.client.start(net_container)
 
         service = self.create_service('buildwithnet', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'network': 'container:{}'.format(net_container['Id'])
         })
 
@@ -1135,7 +1141,6 @@ class ServiceTest(DockerClientTestCase):
 
         assert service.image()
 
-    @v2_3_only()
     @no_cluster('Not supported on UCP 2.2.0-beta1')  # FIXME: remove once support is added
     def test_build_with_target(self):
         self.require_api_version('1.30')
@@ -1150,7 +1155,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('LABEL com.docker.compose.test.target=two\n')
 
         service = self.create_service('buildtarget', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'target': 'one'
         })
 
@@ -1158,7 +1163,6 @@ class ServiceTest(DockerClientTestCase):
         assert service.image()
         assert service.image()['Config']['Labels']['com.docker.compose.test.target'] == 'one'
 
-    @v2_3_only()
     def test_build_with_extra_hosts(self):
         self.require_api_version('1.27')
         base_dir = tempfile.mkdtemp()
@@ -1172,7 +1176,7 @@ class ServiceTest(DockerClientTestCase):
             ]))
 
         service = self.create_service('build_extra_hosts', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'extra_hosts': {
                 'foobar': '127.0.0.1',
                 'baz': '127.0.0.1'
@@ -1194,12 +1198,11 @@ class ServiceTest(DockerClientTestCase):
             f.write('hello world\n')
 
         service = self.create_service('build_gzip', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
         })
         service.build(gzip=True)
         assert service.image()
 
-    @v2_1_only()
     def test_build_with_isolation(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -1207,7 +1210,7 @@ class ServiceTest(DockerClientTestCase):
             f.write('FROM busybox\n')
 
         service = self.create_service('build_isolation', build={
-            'context': text_type(base_dir),
+            'context': str(base_dir),
             'isolation': 'default',
         })
         service.build()
@@ -1221,7 +1224,7 @@ class ServiceTest(DockerClientTestCase):
         service = Service(
             'build_leading_slug', client=self.client,
             project='___-composetest', build={
-                'context': text_type(base_dir)
+                'context': str(base_dir)
             }
         )
         assert service.image_name == 'composetest_build_leading_slug'
@@ -1481,13 +1484,22 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         assert container.get('HostConfig.PidMode') == 'host'
 
-    @v2_1_only()
+    def test_ipc_mode_none_defined(self):
+        service = self.create_service('web', ipc_mode=None)
+        container = create_and_start_container(service)
+        print(container.get('HostConfig.IpcMode'))
+        assert container.get('HostConfig.IpcMode') == 'shareable'
+
+    def test_ipc_mode_host(self):
+        service = self.create_service('web', ipc_mode=IpcMode('host'))
+        container = create_and_start_container(service)
+        assert container.get('HostConfig.IpcMode') == 'host'
+
     def test_userns_mode_none_defined(self):
         service = self.create_service('web', userns_mode=None)
         container = create_and_start_container(service)
         assert container.get('HostConfig.UsernsMode') == ''
 
-    @v2_1_only()
     def test_userns_mode_host(self):
         service = self.create_service('web', userns_mode='host')
         container = create_and_start_container(service)
@@ -1563,7 +1575,6 @@ class ServiceTest(DockerClientTestCase):
         container = create_and_start_container(service)
         assert container.get('HostConfig.DnsSearch') == ['dc1.example.com', 'dc2.example.com']
 
-    @v2_only()
     def test_tmpfs(self):
         service = self.create_service('web', tmpfs=['/run'])
         container = create_and_start_container(service)
@@ -1597,7 +1608,6 @@ class ServiceTest(DockerClientTestCase):
         }.items():
             assert env[k] == v
 
-    @v3_only()
     def test_build_with_cachefrom(self):
         base_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, base_dir)
@@ -1730,14 +1740,14 @@ class ServiceTest(DockerClientTestCase):
         options = service._get_container_create_options({}, service._next_container_number())
         original = Container.create(service.client, **options)
 
-        assert set(service.containers(stopped=True)) == set([original])
+        assert set(service.containers(stopped=True)) == {original}
         assert set(service.duplicate_containers()) == set()
 
         options['name'] = 'temporary_container_name'
         duplicate = Container.create(service.client, **options)
 
-        assert set(service.containers(stopped=True)) == set([original, duplicate])
-        assert set(service.duplicate_containers()) == set([duplicate])
+        assert set(service.containers(stopped=True)) == {original, duplicate}
+        assert set(service.duplicate_containers()) == {duplicate}
 
 
 def converge(service, strategy=ConvergenceStrategy.changed):

@@ -1,0 +1,49 @@
+name: Releaser
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag'
+        required: true
+      dry-run:
+        description: 'Dry run'
+        required: false
+        default: 'true'
+        
+jobs:
+  upload-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+        id: go
+
+      - name: Setup docker CLI
+        run: |
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
+          sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
+
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: make -f builder.Makefile cross-compose-plugin
+
+      - name: License
+        run: cp packaging/* bin/
+
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "bin/*"
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-import six
 from docker.errors import DockerException
 
 from .testcases import DockerClientTestCase
@@ -22,12 +18,12 @@ class VolumeTest(DockerClientTestCase):
             except DockerException:
                 pass
         del self.tmp_volumes
-        super(VolumeTest, self).tearDown()
+        super().tearDown()
 
     def create_volume(self, name, driver=None, opts=None, external=None, custom_name=False):
         if external:
             custom_name = True
-            if isinstance(external, six.text_type):
+            if isinstance(external, str):
                 name = external
 
         vol = Volume(

@@ -1,6 +1,6 @@
 #!groovy
 
-def dockerVersions = ['19.03.8']
+def dockerVersions = ['19.03.13']
 def baseImages = ['alpine', 'debian']
 def pythonVersions = ['py37']
 
@@ -13,6 +13,9 @@ pipeline {
         timeout(time: 2, unit: 'HOURS')
         timestamps()
     }
+    environment {
+        DOCKER_BUILDKIT="1"
+    }
 
     stages {
         stage('Build test images') {
@@ -20,7 +23,7 @@ pipeline {
             parallel {
                 stage('alpine') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('alpine')
@@ -28,7 +31,7 @@ pipeline {
                 }
                 stage('debian') {
                     agent {
-                        label 'ubuntu && amd64 && !zfs'
+                        label 'ubuntu-2004 && amd64 && !zfs && cgroup1'
                     }
                     steps {
                         buildImage('debian')
@@ -59,7 +62,7 @@ pipeline {
 
 def buildImage(baseImage) {
     def scmvar = checkout(scm)
-    def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+    def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
     image = docker.image(imageName)
 
     withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -69,7 +72,7 @@ def buildImage(baseImage) {
             ansiColor('xterm') {
                 sh """docker build -t ${imageName} \\
                     --target build \\
-                    --build-arg BUILD_PLATFORM="${baseImage}" \\
+                    --build-arg DISTRO="${baseImage}" \\
                     --build-arg GIT_COMMIT="${scmvar.GIT_COMMIT}" \\
                     .\\
                 """
@@ -84,9 +87,9 @@ def buildImage(baseImage) {
 def runTests(dockerVersion, pythonVersion, baseImage) {
     return {
         stage("python=${pythonVersion} docker=${dockerVersion} ${baseImage}") {
-            node("ubuntu && amd64 && !zfs") {
+            node("ubuntu-2004 && amd64 && !zfs && cgroup1") {
                 def scmvar = checkout(scm)
-                def imageName = "dockerbuildbot/compose:${baseImage}-${scmvar.GIT_COMMIT}"
+                def imageName = "dockerpinata/compose:${baseImage}-${scmvar.GIT_COMMIT}"
                 def storageDriver = sh(script: "docker info -f \'{{.Driver}}\'", returnStdout: true).trim()
                 echo "Using local system's storage driver: ${storageDriver}"
                 withDockerRegistry(credentialsId:'dockerbuildbot-index.docker.io') {
@@ -96,6 +99,8 @@ def runTests(dockerVersion, pythonVersion, baseImage) {
                       --privileged \\
                       --volume="\$(pwd)/.git:/code/.git" \\
                       --volume="/var/run/docker.sock:/var/run/docker.sock" \\
+                      --volume="\${DOCKER_CONFIG}/config.json:/root/.docker/config.json" \\
+                      -e "DOCKER_TLS_CERTDIR=" \\
                       -e "TAG=${imageName}" \\
                       -e "STORAGE_DRIVER=${storageDriver}" \\
                       -e "DOCKER_VERSIONS=${dockerVersion}" \\

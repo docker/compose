@@ -1,29 +1,22 @@
 backports.shutil_get_terminal_size==1.0.0
-backports.ssl-match-hostname==3.5.0.1; python_version < '3'
-cached-property==1.5.1
-certifi==2020.4.5.1
+cached-property==1.5.1; python_version < '3.8'
+certifi==2021.5.30
 chardet==3.0.4
-colorama==0.4.3; sys_platform == 'win32'
+colorama==0.4.4; sys_platform == 'win32'
 distro==1.5.0
-docker==4.2.1
+docker==5.0.0
 docker-pycreds==0.4.0
 dockerpty==0.4.1
 docopt==0.6.2
-enum34==1.1.6; python_version < '3.4'
-functools32==3.2.3.post2; python_version < '3.2'
-idna==2.8
+idna==2.10
 ipaddress==1.0.23
 jsonschema==3.2.0
-paramiko==2.7.1
-pypiwin32==219; sys_platform == 'win32' and python_version < '3.6'
-pypiwin32==223; sys_platform == 'win32' and python_version >= '3.6'
+paramiko==2.7.2
 PySocks==1.7.1
-python-dotenv==0.13.0
-PyYAML==5.3
-requests==2.22.0
-six==1.12.0
-subprocess32==3.5.4; python_version < '3.2'
-texttable==1.6.2
-urllib3==1.25.9; python_version == '3.3'
-wcwidth==0.1.9
-websocket-client==0.57.0
+python-dotenv==0.17.0
+pywin32==301; sys_platform == 'win32'
+PyYAML==5.4.1
+requests==2.25.1
+texttable==1.6.3
+urllib3==1.26.5; python_version == '3.3'
+websocket-client==1.1.0

@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 
 from compose.cli import colors
@@ -43,10 +40,10 @@ class ConsoleWarningFormatterTestCase(unittest.TestCase):
         message = b'\xec\xa0\x95\xec\x88\x98\xec\xa0\x95'
         output = self.formatter.format(make_log_record(logging.WARN, message))
         expected = colors.yellow('WARNING') + ': '
-        assert output == '{0}{1}'.format(expected, message.decode('utf-8'))
+        assert output == '{}{}'.format(expected, message.decode('utf-8'))
 
     def test_format_unicode_error(self):
         message = b'\xec\xa0\x95\xec\x88\x98\xec\xa0\x95'
         output = self.formatter.format(make_log_record(logging.ERROR, message))
         expected = colors.red('ERROR') + ': '
-        assert output == '{0}{1}'.format(expected, message.decode('utf-8'))
+        assert output == '{}{}'.format(expected, message.decode('utf-8'))

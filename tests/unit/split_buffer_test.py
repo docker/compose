@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from .. import unittest
 from compose.utils import split_buffer
 
@@ -39,7 +36,7 @@ class SplitBufferTest(unittest.TestCase):
         self.assert_produces(reader, ['abc\n', 'd'])
 
     def test_preserves_unicode_sequences_within_lines(self):
-        string = u"a\u2022c\n"
+        string = "a\u2022c\n"
 
         def reader():
             yield string.encode('utf-8')

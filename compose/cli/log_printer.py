@@ -1,36 +1,37 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import _thread as thread
 import sys
 from collections import namedtuple
 from itertools import cycle
+from operator import attrgetter
+from queue import Empty
+from queue import Queue
 from threading import Thread
 
 from docker.errors import APIError
-from six.moves import _thread as thread
-from six.moves.queue import Empty
-from six.moves.queue import Queue
 
 from . import colors
-from compose import utils
 from compose.cli.signals import ShutdownException
 from compose.utils import split_buffer
 
 
-class LogPresenter(object):
+class LogPresenter:
 
-    def __init__(self, prefix_width, color_func):
+    def __init__(self, prefix_width, color_func, keep_prefix=True):
         self.prefix_width = prefix_width
         self.color_func = color_func
+        self.keep_prefix = keep_prefix
 
     def present(self, container, line):
-        prefix = container.name_without_project.ljust(self.prefix_width)
-        return '{prefix} {line}'.format(
-            prefix=self.color_func(prefix + ' |'),
-            line=line)
+        to_log = '{line}'.format(line=line)
+
+        if self.keep_prefix:
+            prefix = container.name_without_project.ljust(self.prefix_width)
+            to_log = '{prefix} '.format(prefix=self.color_func(prefix + ' |')) + to_log
+
+        return to_log
 
 
-def build_log_presenters(service_names, monochrome):
+def build_log_presenters(service_names, monochrome, keep_prefix=True):
     """Return an iterable of functions.
 
     Each function can be used to format the logs output of a container.
@@ -41,7 +42,7 @@ def build_log_presenters(service_names, monochrome):
         return text
 
     for color_func in cycle([no_color] if monochrome else colors.rainbow()):
-        yield LogPresenter(prefix_width, color_func)
+        yield LogPresenter(prefix_width, color_func, keep_prefix)
 
 
 def max_name_width(service_names, max_index_width=3):
@@ -54,7 +55,7 @@ def max_name_width(service_names, max_index_width=3):
     return max(len(name) for name in service_names) + max_index_width
 
 
-class LogPrinter(object):
+class LogPrinter:
     """Print logs from many containers to a single output stream."""
 
     def __init__(self,
@@ -67,7 +68,7 @@ class LogPrinter(object):
         self.containers = containers
         self.presenters = presenters
         self.event_stream = event_stream
-        self.output = utils.get_output_stream(output)
+        self.output = output
         self.cascade_stop = cascade_stop
         self.log_args = log_args or {}
 
@@ -137,7 +138,7 @@ def build_thread_map(initial_containers, presenters, thread_args):
         # Container order is unspecified, so they are sorted by name in order to make
         # container:presenter (log color) assignment deterministic when given a list of containers
         # with the same names.
-        for container in sorted(initial_containers, key=lambda c: c.name)
+        for container in sorted(initial_containers, key=attrgetter('name'))
     }
 
 
@@ -157,10 +158,8 @@ class QueueItem(namedtuple('_QueueItem', 'item is_stop exc')):
 
 
 def tail_container_logs(container, presenter, queue, log_args):
-    generator = get_log_generator(container)
-
     try:
-        for item in generator(container, log_args):
+        for item in build_log_generator(container, log_args):
             queue.put(QueueItem.new(presenter.present(container, item)))
     except Exception as e:
         queue.put(QueueItem.exception(e))
@@ -168,20 +167,6 @@ def tail_container_logs(container, presenter, queue, log_args):
     if log_args.get('follow'):
         queue.put(QueueItem.new(presenter.color_func(wait_on_exit(container))))
     queue.put(QueueItem.stop(container.name))
-
-
-def get_log_generator(container):
-    if container.has_api_logs:
-        return build_log_generator
-    return build_no_log_generator
-
-
-def build_no_log_generator(container, log_args):
-    """Return a generator that prints a warning about logs and waits for
-    container to exit.
-    """
-    yield "WARNING: no logs are available with the '{}' log driver\n".format(
-        container.log_driver)
 
 
 def build_log_generator(container, log_args):
@@ -198,9 +183,9 @@ def build_log_generator(container, log_args):
 def wait_on_exit(container):
     try:
         exit_code = container.wait()
-        return "%s exited with code %s\n" % (container.name, exit_code)
+        return "{} exited with code {}\n".format(container.name, exit_code)
     except APIError as e:
-        return "Unexpected API error for %s (HTTP code %s)\nResponse body:\n%s\n" % (
+        return "Unexpected API error for {} (HTTP code {})\nResponse body:\n{}\n".format(
             container.name, e.response.status_code,
             e.response.text or '[empty]'
         )

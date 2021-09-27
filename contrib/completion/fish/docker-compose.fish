@@ -21,5 +21,7 @@ complete -c docker-compose -l tlscert -r                  -d 'Path to TLS certif
 complete -c docker-compose -l tlskey -r                   -d 'Path to TLS key file'
 complete -c docker-compose -l tlsverify                   -d 'Use TLS and verify the remote'
 complete -c docker-compose -l skip-hostname-check         -d "Don't check the daemon's hostname against the name specified in the client certificate (for example if your docker host is an IP address)"
+complete -c docker-compose -l no-ansi                     -d 'Do not print ANSI control characters'
+complete -c docker-compose -l ansi -a 'never always auto' -d 'Control when to print ANSI control characters'
 complete -c docker-compose -s h -l help                   -d 'Print usage'
 complete -c docker-compose -s v -l version                -d 'Print version and exit'

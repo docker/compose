@@ -1,0 +1,19 @@
+version: "2.1"
+services:
+    db:
+      image: busybox:1.31.0-uclibc
+      command: top
+      healthcheck:
+        test: exit 1
+        interval: 1s
+        timeout: 1s
+        retries: 1
+    web:
+      image: busybox:1.31.0-uclibc
+      command: top
+      depends_on:
+        db:
+          condition: service_healthy
+    console:
+      image: busybox:1.31.0-uclibc
+      command: top

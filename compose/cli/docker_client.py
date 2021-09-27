@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import os.path
 import ssl
 
-import six
 from docker import APIClient
 from docker import Context
 from docker import ContextAPI
@@ -47,7 +43,7 @@ def get_client(environment, verbose=False, version=None, context=None):
         environment=environment, tls_version=get_tls_version(environment)
     )
     if verbose:
-        version_info = six.iteritems(client.version())
+        version_info = client.version().items()
         log.info(get_version_info('full'))
         log.info("Docker base_url: %s", client.base_url)
         log.info("Docker version: %s",
@@ -144,6 +140,11 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         if tls:
             context.set_endpoint("docker", host=host, tls_cfg=tls, skip_tls_verify=not verify)
 
+    if not context.is_docker_host():
+        raise UserError(
+            "The platform targeted with the current context is not supported.\n"
+            "Make sure the context in use targets a Docker Engine.\n")
+
     kwargs['base_url'] = context.Host
     if context.TLSConfig:
         kwargs['tls'] = context.TLSConfig
@@ -165,8 +166,8 @@ def docker_client(environment, version=None, context=None, tls_version=None):
         kwargs['credstore_env'] = {
             'LD_LIBRARY_PATH': environment.get('LD_LIBRARY_PATH_ORIG'),
         }
-
-    client = APIClient(**kwargs)
+    use_paramiko_ssh = int(environment.get('COMPOSE_PARAMIKO_SSH', 0))
+    client = APIClient(use_ssh_client=not use_paramiko_ssh, **kwargs)
     client._original_base_url = kwargs.get('base_url')
 
     return client

@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 from inspect import getdoc
 
 from docopt import docopt
@@ -14,16 +11,22 @@ def docopt_full_help(docstring, *args, **kwargs):
         raise SystemExit(docstring)
 
 
-class DocoptDispatcher(object):
+class DocoptDispatcher:
 
     def __init__(self, command_class, options):
         self.command_class = command_class
         self.options = options
 
+    @classmethod
+    def get_command_and_options(cls, doc_entity, argv, options):
+        command_help = getdoc(doc_entity)
+        opt = docopt_full_help(command_help, argv, **options)
+        command = opt['COMMAND']
+        return command_help, opt, command
+
     def parse(self, argv):
-        command_help = getdoc(self.command_class)
-        options = docopt_full_help(command_help, argv, **self.options)
-        command = options['COMMAND']
+        command_help, options, command = DocoptDispatcher.get_command_and_options(
+            self.command_class, argv, self.options)
 
         if command is None:
             raise SystemExit(command_help)
@@ -53,7 +56,7 @@ def get_handler(command_class, command):
 
 class NoSuchCommand(Exception):
     def __init__(self, command, supercommand):
-        super(NoSuchCommand, self).__init__("No such command: %s" % command)
+        super().__init__("No such command: %s" % command)
 
         self.command = command
         self.supercommand = supercommand

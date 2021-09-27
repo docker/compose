@@ -1,17 +1,13 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import itertools
+from io import StringIO
+from queue import Queue
 
 import pytest
 import requests
-import six
 from docker.errors import APIError
-from six.moves.queue import Queue
 
 from compose.cli.log_printer import build_log_generator
 from compose.cli.log_printer import build_log_presenters
-from compose.cli.log_printer import build_no_log_generator
 from compose.cli.log_printer import consume_queue
 from compose.cli.log_printer import QueueItem
 from compose.cli.log_printer import wait_on_exit
@@ -22,7 +18,7 @@ from tests import mock
 
 @pytest.fixture
 def output_stream():
-    output = six.StringIO()
+    output = StringIO()
     output.flush = mock.Mock()
     return output
 
@@ -32,7 +28,7 @@ def mock_container():
     return mock.Mock(spec=Container, name_without_project='web_1')
 
 
-class TestLogPresenter(object):
+class TestLogPresenter:
 
     def test_monochrome(self, mock_container):
         presenters = build_log_presenters(['foo', 'bar'], True)
@@ -78,15 +74,7 @@ def test_wait_on_exit_raises():
     assert expected in wait_on_exit(mock_container)
 
 
-def test_build_no_log_generator(mock_container):
-    mock_container.has_api_logs = False
-    mock_container.log_driver = 'none'
-    output, = build_no_log_generator(mock_container, None)
-    assert "WARNING: no logs are available with the 'none' log driver\n" in output
-    assert "exited with code" not in output
-
-
-class TestBuildLogGenerator(object):
+class TestBuildLogGenerator:
 
     def test_no_log_stream(self, mock_container):
         mock_container.log_stream = None
@@ -111,7 +99,7 @@ class TestBuildLogGenerator(object):
         assert next(generator) == "world"
 
     def test_unicode(self, output_stream):
-        glyph = u'\u2022\n'
+        glyph = '\u2022\n'
         mock_container.log_stream = iter([glyph.encode('utf-8')])
 
         generator = build_log_generator(mock_container, {})
@@ -128,7 +116,7 @@ def mock_presenters():
     return itertools.cycle([mock.Mock()])
 
 
-class TestWatchEvents(object):
+class TestWatchEvents:
 
     def test_stop_event(self, thread_map, mock_presenters):
         event_stream = [{'action': 'stop', 'id': 'cid'}]
@@ -170,7 +158,7 @@ class TestWatchEvents(object):
         assert container_id not in thread_map
 
 
-class TestConsumeQueue(object):
+class TestConsumeQueue:
 
     def test_item_is_an_exception(self):
 

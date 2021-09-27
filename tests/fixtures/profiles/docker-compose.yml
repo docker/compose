@@ -1,0 +1,20 @@
+version: "3"
+services:
+  foo:
+    image: busybox:1.31.0-uclibc
+  bar:
+    image: busybox:1.31.0-uclibc
+    profiles:
+      - test
+  baz:
+    image: busybox:1.31.0-uclibc
+    depends_on:
+      - bar
+    profiles:
+      - test
+  zot:
+    image: busybox:1.31.0-uclibc
+    depends_on:
+      - bar
+    profiles:
+      - debug

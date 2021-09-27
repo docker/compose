@@ -1,7 +1,3 @@
-# encoding: utf-8
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import pytest
 
 from compose.config.environment import Environment
@@ -11,9 +7,7 @@ from compose.config.interpolation import Interpolator
 from compose.config.interpolation import InvalidInterpolation
 from compose.config.interpolation import TemplateWithDefaults
 from compose.config.interpolation import UnsetRequiredSubstitution
-from compose.const import COMPOSEFILE_V2_0 as V2_0
-from compose.const import COMPOSEFILE_V2_3 as V2_3
-from compose.const import COMPOSEFILE_V3_4 as V3_4
+from compose.const import COMPOSE_SPEC as VERSION
 
 
 @pytest.fixture
@@ -66,7 +60,7 @@ def test_interpolate_environment_variables_in_services(mock_env):
             }
         }
     }
-    value = interpolate_environment_variables(V2_0, services, 'service', mock_env)
+    value = interpolate_environment_variables(VERSION, services, 'service', mock_env)
     assert value == expected
 
 
@@ -91,7 +85,7 @@ def test_interpolate_environment_variables_in_volumes(mock_env):
         },
         'other': {},
     }
-    value = interpolate_environment_variables(V2_0, volumes, 'volume', mock_env)
+    value = interpolate_environment_variables(VERSION, volumes, 'volume', mock_env)
     assert value == expected
 
 
@@ -116,7 +110,7 @@ def test_interpolate_environment_variables_in_secrets(mock_env):
         },
         'other': {},
     }
-    value = interpolate_environment_variables(V3_4, secrets, 'secret', mock_env)
+    value = interpolate_environment_variables(VERSION, secrets, 'secret', mock_env)
     assert value == expected
 
 
@@ -187,7 +181,7 @@ def test_interpolate_environment_services_convert_types_v2(mock_env):
         }
     }
 
-    value = interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'service', mock_env)
     assert value == expected
 
 
@@ -260,7 +254,7 @@ def test_interpolate_environment_services_convert_types_v3(mock_env):
         }
     }
 
-    value = interpolate_environment_variables(V3_4, entry, 'service', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'service', mock_env)
     assert value == expected
 
 
@@ -268,21 +262,21 @@ def test_interpolate_environment_services_convert_types_invalid(mock_env):
     entry = {'service1': {'privileged': '${POSINT}'}}
 
     with pytest.raises(ConfigurationError) as exc:
-        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+        interpolate_environment_variables(VERSION, entry, 'service', mock_env)
 
     assert 'Error while attempting to convert service.service1.privileged to '\
         'appropriate type: "50" is not a valid boolean value' in exc.exconly()
 
     entry = {'service1': {'cpus': '${TRUE}'}}
     with pytest.raises(ConfigurationError) as exc:
-        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+        interpolate_environment_variables(VERSION, entry, 'service', mock_env)
 
     assert 'Error while attempting to convert service.service1.cpus to '\
         'appropriate type: "True" is not a valid float' in exc.exconly()
 
     entry = {'service1': {'ulimits': {'nproc': '${FLOAT}'}}}
     with pytest.raises(ConfigurationError) as exc:
-        interpolate_environment_variables(V2_3, entry, 'service', mock_env)
+        interpolate_environment_variables(VERSION, entry, 'service', mock_env)
 
     assert 'Error while attempting to convert service.service1.ulimits.nproc to '\
         'appropriate type: "0.145" is not a valid integer' in exc.exconly()
@@ -305,7 +299,7 @@ def test_interpolate_environment_network_convert_types(mock_env):
         }
     }
 
-    value = interpolate_environment_variables(V3_4, entry, 'network', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'network', mock_env)
     assert value == expected
 
 
@@ -322,13 +316,13 @@ def test_interpolate_environment_external_resource_convert_types(mock_env):
         }
     }
 
-    value = interpolate_environment_variables(V3_4, entry, 'network', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'network', mock_env)
     assert value == expected
-    value = interpolate_environment_variables(V3_4, entry, 'volume', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'volume', mock_env)
     assert value == expected
-    value = interpolate_environment_variables(V3_4, entry, 'secret', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'secret', mock_env)
     assert value == expected
-    value = interpolate_environment_variables(V3_4, entry, 'config', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'config', mock_env)
     assert value == expected
 
 
@@ -359,7 +353,7 @@ def test_interpolate_service_name_uses_dot(mock_env):
         }
     }
 
-    value = interpolate_environment_variables(V3_4, entry, 'service', mock_env)
+    value = interpolate_environment_variables(VERSION, entry, 'service', mock_env)
     assert value == expected
 
 
@@ -422,7 +416,7 @@ def test_interpolate_mandatory_no_err_msg(defaults_interpolator):
     with pytest.raises(UnsetRequiredSubstitution) as e:
         defaults_interpolator("not ok ${BAZ?}")
 
-    assert e.value.err == ''
+    assert e.value.err == 'BAZ'
 
 
 def test_interpolate_mixed_separators(defaults_interpolator):
@@ -444,7 +438,7 @@ def test_unbraced_separators(defaults_interpolator):
 
 def test_interpolate_unicode_values():
     variable_mapping = {
-        'FOO': '十六夜　咲夜'.encode('utf-8'),
+        'FOO': '十六夜　咲夜'.encode(),
         'BAR': '十六夜　咲夜'
     }
     interpol = Interpolator(TemplateWithDefaults, variable_mapping).interpolate

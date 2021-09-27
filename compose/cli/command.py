@@ -1,17 +1,11 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 import os
 import re
-
-import six
 
 from . import errors
 from .. import config
 from .. import parallel
 from ..config.environment import Environment
-from ..const import API_VERSIONS
 from ..const import LABEL_CONFIG_FILES
 from ..const import LABEL_ENVIRONMENT_FILE
 from ..const import LABEL_WORKING_DIR
@@ -41,7 +35,7 @@ SILENT_COMMANDS = {
 
 def project_from_options(project_dir, options, additional_options=None):
     additional_options = additional_options or {}
-    override_dir = options.get('--project-directory')
+    override_dir = get_project_dir(options)
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or project_dir, environment_file)
     environment.silent = options.get('COMMAND', None) in SILENT_COMMANDS
@@ -65,15 +59,15 @@ def project_from_options(project_dir, options, additional_options=None):
 
     return get_project(
         project_dir,
-        get_config_path_from_options(project_dir, options, environment),
+        get_config_path_from_options(options, environment),
         project_name=options.get('--project-name'),
         verbose=options.get('--verbose'),
         context=context,
         environment=environment,
         override_dir=override_dir,
-        compatibility=compatibility_from_options(project_dir, options, environment),
         interpolate=(not additional_options.get('--no-interpolate')),
-        environment_file=environment_file
+        environment_file=environment_file,
+        enabled_profiles=get_profiles_from_options(options, environment)
     )
 
 
@@ -93,24 +87,31 @@ def set_parallel_limit(environment):
         parallel.GlobalLimit.set_global_limit(parallel_limit)
 
 
+def get_project_dir(options):
+    override_dir = None
+    files = get_config_path_from_options(options, os.environ)
+    if files:
+        if files[0] == '-':
+            return '.'
+        override_dir = os.path.dirname(files[0])
+    return options.get('--project-directory') or override_dir
+
+
 def get_config_from_options(base_dir, options, additional_options=None):
     additional_options = additional_options or {}
-    override_dir = options.get('--project-directory')
+    override_dir = get_project_dir(options)
     environment_file = options.get('--env-file')
     environment = Environment.from_env_file(override_dir or base_dir, environment_file)
-    config_path = get_config_path_from_options(
-        base_dir, options, environment
-    )
+    config_path = get_config_path_from_options(options, environment)
     return config.load(
         config.find(base_dir, config_path, environment, override_dir),
-        compatibility_from_options(config_path, options, environment),
         not additional_options.get('--no-interpolate')
     )
 
 
-def get_config_path_from_options(base_dir, options, environment):
+def get_config_path_from_options(options, environment):
     def unicode_paths(paths):
-        return [p.decode('utf-8') if isinstance(p, six.binary_type) else p for p in paths]
+        return [p.decode('utf-8') if isinstance(p, bytes) else p for p in paths]
 
     file_option = options.get('--file')
     if file_option:
@@ -123,20 +124,30 @@ def get_config_path_from_options(base_dir, options, environment):
     return None
 
 
+def get_profiles_from_options(options, environment):
+    profile_option = options.get('--profile')
+    if profile_option:
+        return profile_option
+
+    profiles = environment.get('COMPOSE_PROFILES')
+    if profiles:
+        return profiles.split(',')
+
+    return []
+
+
 def get_project(project_dir, config_path=None, project_name=None, verbose=False,
                 context=None, environment=None, override_dir=None,
-                compatibility=False, interpolate=True, environment_file=None):
+                interpolate=True, environment_file=None, enabled_profiles=None):
     if not environment:
         environment = Environment.from_env_file(project_dir)
     config_details = config.find(project_dir, config_path, environment, override_dir)
     project_name = get_project_name(
         config_details.working_dir, project_name, environment
     )
-    config_data = config.load(config_details, compatibility, interpolate)
+    config_data = config.load(config_details, interpolate)
 
-    api_version = environment.get(
-        'COMPOSE_API_VERSION',
-        API_VERSIONS[config_data.version])
+    api_version = environment.get('COMPOSE_API_VERSION')
 
     client = get_client(
         verbose=verbose, version=api_version, context=context, environment=environment
@@ -149,20 +160,23 @@ def get_project(project_dir, config_path=None, project_name=None, verbose=False,
             client,
             environment.get('DOCKER_DEFAULT_PLATFORM'),
             execution_context_labels(config_details, environment_file),
+            enabled_profiles,
         )
 
 
 def execution_context_labels(config_details, environment_file):
     extra_labels = [
-        '{0}={1}'.format(LABEL_WORKING_DIR, os.path.abspath(config_details.working_dir))
+        '{}={}'.format(LABEL_WORKING_DIR, os.path.abspath(config_details.working_dir))
     ]
 
     if not use_config_from_stdin(config_details):
-        extra_labels.append('{0}={1}'.format(LABEL_CONFIG_FILES, config_files_label(config_details)))
+        extra_labels.append('{}={}'.format(LABEL_CONFIG_FILES, config_files_label(config_details)))
 
     if environment_file is not None:
-        extra_labels.append('{0}={1}'.format(LABEL_ENVIRONMENT_FILE,
-                                             os.path.normpath(environment_file)))
+        extra_labels.append('{}={}'.format(
+            LABEL_ENVIRONMENT_FILE,
+            os.path.normpath(environment_file))
+            )
     return extra_labels
 
 
@@ -175,7 +189,8 @@ def use_config_from_stdin(config_details):
 
 def config_files_label(config_details):
     return ",".join(
-        map(str, (os.path.normpath(c.filename) for c in config_details.config_files)))
+        os.path.normpath(c.filename) for c in config_details.config_files
+        )
 
 
 def get_project_name(working_dir, project_name=None, environment=None):
@@ -193,13 +208,3 @@ def get_project_name(working_dir, project_name=None, environment=None):
         return normalize_name(project)
 
     return 'default'
-
-
-def compatibility_from_options(working_dir, options=None, environment=None):
-    """Get compose v3 compatibility from --compatibility option
-       or from COMPOSE_COMPATIBILITY environment variable."""
-
-    compatibility_option = options.get('--compatibility')
-    compatibility_environment = environment.get_boolean('COMPOSE_COMPATIBILITY')
-
-    return compatibility_option or compatibility_environment

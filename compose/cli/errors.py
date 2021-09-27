@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import contextlib
 import logging
 import socket
@@ -29,10 +26,8 @@ class UserError(Exception):
     def __init__(self, msg):
         self.msg = dedent(msg).strip()
 
-    def __unicode__(self):
+    def __str__(self):
         return self.msg
-
-    __str__ = __unicode__
 
 
 class ConnectionError(Exception):

@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import logging
 
 import docker
@@ -25,7 +22,7 @@ def mock_container(service, number):
         container.Container,
         service=service,
         number=number,
-        name_without_project='{0}_{1}'.format(service, number))
+        name_without_project='{}_{}'.format(service, number))
 
 
 @pytest.fixture
@@ -35,7 +32,7 @@ def logging_handler():
     return logging.StreamHandler(stream=stream)
 
 
-class TestCLIMainTestCase(object):
+class TestCLIMainTestCase:
 
     def test_filter_attached_containers(self):
         containers = [
@@ -138,27 +135,26 @@ class TestCLIMainTestCase(object):
         assert expected_docker_start_call == docker_start_call
 
 
-class TestSetupConsoleHandlerTestCase(object):
+class TestSetupConsoleHandlerTestCase:
 
-    def test_with_tty_verbose(self, logging_handler):
+    def test_with_console_formatter_verbose(self, logging_handler):
         setup_console_handler(logging_handler, True)
         assert type(logging_handler.formatter) == ConsoleWarningFormatter
         assert '%(name)s' in logging_handler.formatter._fmt
         assert '%(funcName)s' in logging_handler.formatter._fmt
 
-    def test_with_tty_not_verbose(self, logging_handler):
+    def test_with_console_formatter_not_verbose(self, logging_handler):
         setup_console_handler(logging_handler, False)
         assert type(logging_handler.formatter) == ConsoleWarningFormatter
         assert '%(name)s' not in logging_handler.formatter._fmt
         assert '%(funcName)s' not in logging_handler.formatter._fmt
 
-    def test_with_not_a_tty(self, logging_handler):
-        logging_handler.stream.isatty.return_value = False
-        setup_console_handler(logging_handler, False)
+    def test_without_console_formatter(self, logging_handler):
+        setup_console_handler(logging_handler, False, use_console_formatter=False)
         assert type(logging_handler.formatter) == logging.Formatter
 
 
-class TestConvergeStrategyFromOptsTestCase(object):
+class TestConvergeStrategyFromOptsTestCase:
 
     def test_invalid_opts(self):
         options = {'--force-recreate': True, '--no-recreate': True}
@@ -192,7 +188,7 @@ def mock_find_executable(exe):
 
 
 @mock.patch('compose.cli.main.find_executable', mock_find_executable)
-class TestCallDocker(object):
+class TestCallDocker:
     def test_simple_no_options(self):
         with mock.patch('subprocess.call') as fake_call:
             call_docker(['ps'], {}, {})

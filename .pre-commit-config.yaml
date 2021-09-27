@@ -1,25 +1,30 @@
-- repo: git://github.com/pre-commit/pre-commit-hooks
-  sha: 'v0.9.1'
-  hooks:
-    - id: check-added-large-files
-    - id: check-docstring-first
-    - id: check-merge-conflict
-    - id: check-yaml
-    - id: check-json
-    - id: debug-statements
-    - id: end-of-file-fixer
-    - id: flake8
-    - id: name-tests-test
-      exclude: 'tests/(integration/testcases\.py|helpers\.py)'
-    - id: requirements-txt-fixer
-    - id: trailing-whitespace
-- repo: git://github.com/asottile/reorder_python_imports
-  sha: v1.3.4
-  hooks:
-    - id: reorder-python-imports
-      language_version: 'python2.7'
-      args:
-        - --add-import
-        - from __future__ import absolute_import
-        - --add-import
-        - from __future__ import unicode_literals
+exclude: .github/
+repos:
+  - repo: git://github.com/pre-commit/pre-commit-hooks
+    sha: 'v0.9.1'
+    hooks:
+      - id: check-added-large-files
+      - id: check-docstring-first
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: flake8
+      - id: name-tests-test
+        exclude: 'tests/(integration/testcases\.py|helpers\.py)'
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+  - repo: git://github.com/asottile/reorder_python_imports
+    sha: v1.3.4
+    hooks:
+      - id: reorder-python-imports
+        language_version: 'python3.7'
+        args:
+          - --py3-plus
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v2.1.0
+    hooks:
+    -   id: pyupgrade
+        args:
+          - --py3-plus
