@@ -25,6 +25,12 @@ You can download Docker Compose binaries from the
 [release page](https://github.com/docker/compose/releases) on this repository.
 
 Copy the relevant binary for your OS under `$HOME/.docker/cli-plugins/docker-compose` 
+
+Or copy it into one of these folders for installing it system-wide:
+
+* `/usr/local/lib/docker/cli-plugins` OR `/usr/local/libexec/docker/cli-plugins`
+* `/usr/lib/docker/cli-plugins` OR `/usr/libexec/docker/cli-plugins`
+
 (might require to make the downloaded file executable with `chmod +x`)
 
 Quick Start
