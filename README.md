@@ -9,7 +9,7 @@ defined using the [Compose file format](https://compose-spec.io).
 A Compose file is used to define how the one or more containers that make up
 your application are configured.
 Once you have a Compose file, you can create and start your application with a
-single command: `docker-compose up`.
+single command: `docker compose up`.
 
 # Where to get Docker Compose
 
@@ -35,7 +35,7 @@ Using Docker Compose is basically a three-step process:
    reproduced anywhere.
 2. Define the services that make up your app in `docker-compose.yml` so
    they can be run together in an isolated environment.
-3. Lastly, run `docker-compose up` and Compose will start and run your entire
+3. Lastly, run `docker compose up` and Compose will start and run your entire
    app.
 
 A Compose file looks like this:
