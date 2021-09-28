@@ -30,15 +30,18 @@ def env_vars_from_file(filename, interpolate=True):
     """
     Read in a line delimited file of environment variables.
     """
-    if not os.path.exists(filename):
+    try:
+        with open(filename, encoding='utf-8-sig') as stream:
+            env = dotenv.dotenv_values(stream=stream, interpolate=interpolate)
+            for k, v in env.items():
+                env[k] = v if interpolate else v.replace('$', '$$')
+            return env
+    except PermissionError:
+        raise EnvFileNotFound("Insufficient permissions to read env file: {}".format(filename))
+    except FileNotFoundError:
         raise EnvFileNotFound("Couldn't find env file: {}".format(filename))
-    elif not os.path.isfile(filename):
+    except IsADirectoryError:
         raise EnvFileNotFound("{} is not a file.".format(filename))
-
-    env = dotenv.dotenv_values(dotenv_path=filename, encoding='utf-8-sig', interpolate=interpolate)
-    for k, v in env.items():
-        env[k] = v if interpolate else v.replace('$', '$$')
-    return env
 
 
 class Environment(dict):
