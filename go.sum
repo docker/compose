@@ -192,8 +192,10 @@ github.com/cncf/udpa/go v0.0.0-20200629203442-efcf912fb354/go.mod h1:WmhPx2Nbnht
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/compose-spec/compose-go v0.0.0-20210915092209-278f20859337 h1:/RP9uzPjZYk1Kv5YvcF+3S9E0oaSn5gRLLfWDIhieW8=
-github.com/compose-spec/compose-go v0.0.0-20210915092209-278f20859337/go.mod h1:Hnmn5ZCVA3sSBN2urjCZNNIyNqCPayRGH7PmMSaV2Q0=
+github.com/compose-spec/compose-go v1.0.1 h1:yXTL3UEefSeGIFCYam7D4acrC1Z4sBlTLtjHc/MDQ2s=
+github.com/compose-spec/compose-go v1.0.1/go.mod h1:JJXU4DzTtNGWocymZcRWMpRRWl2NbmTZEA977BQqr5w=
+github.com/compose-spec/godotenv v1.0.0 h1:TV24JYhh5GCC1G14npQVhCtxeoiwd0NcT0VdwcCQyXU=
+github.com/compose-spec/godotenv v1.0.0/go.mod h1:zF/3BOa18Z24tts5qnO/E9YURQanJTBUf7nlcCTNsyc=
 github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4/go.mod h1:nukgQABAEopAHvB6j7cnP5zJ+/3aVcE7hCYqvIwAHyE=
 github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989/go.mod h1:AkGGQs9NM2vtYHaUen+NljV0/baGCAPELGm2q9ZXpWU=
 github.com/containerd/aufs v0.0.0-20210316121734-20793ff83c97/go.mod h1:kL5kd6KM5TzQjR79jljyi4olc1Vrx6XBlcyj3gNv2PU=
@@ -1003,8 +1005,6 @@ github.com/uber/jaeger-client-go v2.25.0+incompatible/go.mod h1:WVhlPFC8FDjOFMMW
 github.com/uber/jaeger-lib v2.2.0+incompatible/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
-github.com/ulyssessouza/godotenv v1.3.1-0.20210806120901-e417b721114e h1:byEYm3QADv5mDUesYKstWwRodf2RoxxC/YuGOxtdqJw=
-github.com/ulyssessouza/godotenv v1.3.1-0.20210806120901-e417b721114e/go.mod h1:9JN/BuU6Agy5aHyEoA5EIPkBsYbk0+2R42zJgYi/SlI=
 github.com/urfave/cli v0.0.0-20171014202726-7bc6a0acffa5/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
