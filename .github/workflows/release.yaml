@@ -35,6 +35,9 @@ jobs:
       - name: Build
         run: make GIT_TAG=${{ github.event.inputs.tag }} -f builder.Makefile cross
 
+      - name: Compute checksums
+        run: cd bin; for f in *; do shasum --algorithm 256 $f > $f.sha256; done
+
       - name: License
         run: cp packaging/* bin/
 
