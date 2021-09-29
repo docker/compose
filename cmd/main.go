@@ -17,12 +17,16 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
+	cliFlags "github.com/docker/cli/cli/flags"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
 	"github.com/docker/compose/v2/pkg/api"
@@ -34,7 +38,26 @@ func init() {
 		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
 }
 
-func main() {
+func standaloneMain() int {
+	dockerCli, err := command.NewDockerCli()
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	opts := cliFlags.NewClientOptions()
+	err = dockerCli.Initialize(opts)
+	if err != nil {
+		return 1
+	}
+	lazyInit := api.NewServiceProxy().WithService(compose.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
+	rootCmd := commands.RootCommand(lazyInit)
+	if err := rootCmd.Execute(); err != nil {
+		return 1
+	}
+	return 0
+}
+
+func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
 		cmd := commands.RootCommand(lazyInit)
@@ -62,4 +85,11 @@ func main() {
 			Vendor:        "Docker Inc.",
 			Version:       internal.Version,
 		})
+}
+
+func main() {
+	if commands.RunningAsStandalone() {
+		os.Exit(standaloneMain())
+	}
+	pluginMain()
 }
