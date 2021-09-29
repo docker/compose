@@ -69,7 +69,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			buildOptions.Pull = options.Pull
 			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
 			buildOptions.NoCache = options.NoCache
-			opts[imageName] = buildOptions
 			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
 			if err != nil {
 				return err
@@ -81,6 +80,8 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 					Attrs: map[string]string{"ref": image},
 				})
 			}
+
+			opts[imageName] = buildOptions
 		}
 	}
 
