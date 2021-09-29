@@ -27,6 +27,9 @@ You can download Docker Compose binaries from the
 Copy the relevant binary for your OS under `$HOME/.docker/cli-plugins/docker-compose` 
 (might require to make the downloaded file executable with `chmod +x`)
 
+For backward compatibility with legacy docker-compose 1.xx, please consider installing [compose-switc](https://github.com/docker/compose-switch) to translate `docker-compose ...` commands into Compose V2's `docker compose ...`
+
+
 Quick Start
 -----------
 
