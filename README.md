@@ -11,9 +11,11 @@ your application are configured.
 Once you have a Compose file, you can create and start your application with a
 single command: `docker compose up`.
 
-# About v2 update compatibility breaks
+# About update and backward compatibility
 
-Docker Compose v2 is a major version bump release of Docker compose. It has been completely rewriten from scratch in Golang (v1 was in Python). The installation instructions for Compose v2 differ from v1. v2 is not a standalone binary anymore and installation scripts will have to be adjusted. Some commands are different. For a smooth transition from legacy docker-compose 1.xx, please consider installing [compose-switch](https://github.com/docker/compose-switch) to translate `docker-compose ...` commands into Compose v2's `docker compose .... `. Also check v2's `--compatibility` flag.
+Docker Compose V2 is a major version bump release of Docker compose. It has been completely rewriten from scratch in Golang (V1 was in Python). The installation instructions for Compose V2 differ from V1. V2 is not a standalone binary anymore and installation scripts will have to be adjusted. Some commands are different.
+
+For a smooth transition from legacy docker-compose 1.xx, please consider installing [compose-switch](https://github.com/docker/compose-switch) to translate `docker-compose ...` commands into Compose V2's `docker compose .... `. Also check V2's `--compatibility` flag.
 
 # Where to get Docker Compose
 
