@@ -42,7 +42,7 @@ type psOptions struct {
 	Quiet    bool
 	Services bool
 	Filter   string
-	Status   string
+	Status   []string
 }
 
 func (p *psOptions) parseFilter() error {
@@ -55,7 +55,7 @@ func (p *psOptions) parseFilter() error {
 	}
 	switch parts[0] {
 	case "status":
-		p.Status = parts[1]
+		p.Status = append(p.Status, parts[1])
 	case "source":
 		return api.ErrNotImplemented
 	default:
@@ -82,7 +82,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
 	flags.StringVar(&opts.Filter, "filter", "", "Filter services by a property. Deprecated, use --status instead")
-	flags.StringVar(&opts.Status, "status", "", "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
+	flags.StringArrayVar(&opts.Status, "status", []string{}, "Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]")
 	flags.BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs")
 	flags.BoolVar(&opts.Services, "services", false, "Display services")
 	flags.BoolVarP(&opts.All, "all", "a", false, "Show all stopped containers (including those created by the run command)")
@@ -124,7 +124,7 @@ SERVICES:
 		return fmt.Errorf("no such service: %s", s)
 	}
 
-	if opts.Status != "" {
+	if len(opts.Status) != 0 {
 		containers = filterByStatus(containers, opts.Status)
 	}
 
@@ -160,20 +160,23 @@ func writter(containers []api.ContainerSummary) func(w io.Writer) {
 	}
 }
 
-func filterByStatus(containers []api.ContainerSummary, status string) []api.ContainerSummary {
-	hasContainerWithState := map[string]struct{}{}
-	for _, c := range containers {
-		if c.State == status {
-			hasContainerWithState[c.Service] = struct{}{}
-		}
-	}
+func filterByStatus(containers []api.ContainerSummary, statuses []string) []api.ContainerSummary {
 	var filtered []api.ContainerSummary
 	for _, c := range containers {
-		if _, ok := hasContainerWithState[c.Service]; ok {
+		if hasStatus(c, statuses) {
 			filtered = append(filtered, c)
 		}
 	}
 	return filtered
+}
+
+func hasStatus(c api.ContainerSummary, statuses []string) bool {
+	for _, status := range statuses {
+		if c.State == status {
+			return true
+		}
+	}
+	return false
 }
 
 type portRange struct {
