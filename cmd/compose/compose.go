@@ -223,14 +223,9 @@ func RootCommand(backend api.Service) *cobra.Command {
 		noAnsi  bool
 		verbose bool
 	)
-	commandName := pluginName
-	if RunningAsStandalone() {
-		commandName = os.Args[0]
-	}
-
 	command := &cobra.Command{
 		Short:            "Docker Compose",
-		Use:              commandName,
+		Use:              pluginName,
 		TraverseChildren: true,
 		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -245,7 +240,7 @@ func RootCommand(backend api.Service) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			parent := cmd.Root()
-			if parent != nil && parent.Name() != commandName {
+			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
 				if parentPrerun != nil {
 					err := parentPrerun(cmd, args)

@@ -17,16 +17,15 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose-switch/redirect"
 	"github.com/spf13/cobra"
 
-	cliFlags "github.com/docker/cli/cli/flags"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
 	"github.com/docker/compose/v2/pkg/api"
@@ -36,25 +35,6 @@ import (
 func init() {
 	commands.Warning = "The new 'docker compose' command is currently experimental. " +
 		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
-}
-
-func standaloneMain() int {
-	dockerCli, err := command.NewDockerCli()
-	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	opts := cliFlags.NewClientOptions()
-	err = dockerCli.Initialize(opts)
-	if err != nil {
-		return 1
-	}
-	lazyInit := api.NewServiceProxy().WithService(compose.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
-	rootCmd := commands.RootCommand(lazyInit)
-	if err := rootCmd.Execute(); err != nil {
-		return 1
-	}
-	return 0
 }
 
 func pluginMain() {
@@ -89,7 +69,7 @@ func pluginMain() {
 
 func main() {
 	if commands.RunningAsStandalone() {
-		os.Exit(standaloneMain())
+		os.Args = append([]string{"docker"}, redirect.Convert(os.Args[1:])...)
 	}
 	pluginMain()
 }
