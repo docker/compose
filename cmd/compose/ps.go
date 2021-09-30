@@ -26,13 +26,13 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/utils"
 
 	formatter2 "github.com/docker/cli/cli/command/formatter"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type psOptions struct {
@@ -103,17 +103,6 @@ func runPs(ctx context.Context, backend api.Service, services []string, opts psO
 		return err
 	}
 
-	if opts.Services {
-		services := []string{}
-		for _, s := range containers {
-			if !utils.StringContains(services, s.Service) {
-				services = append(services, s.Service)
-			}
-		}
-		fmt.Println(strings.Join(services, "\n"))
-		return nil
-	}
-
 SERVICES:
 	for _, s := range services {
 		for _, c := range containers {
@@ -136,6 +125,17 @@ SERVICES:
 		for _, c := range containers {
 			fmt.Println(c.ID)
 		}
+		return nil
+	}
+
+	if opts.Services {
+		services := []string{}
+		for _, s := range containers {
+			if !utils.StringContains(services, s.Service) {
+				services = append(services, s.Service)
+			}
+		}
+		fmt.Println(strings.Join(services, "\n"))
 		return nil
 	}
 
