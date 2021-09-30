@@ -17,10 +17,13 @@
 package main
 
 import (
+	"os"
+
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/compose-switch/redirect"
 	"github.com/spf13/cobra"
 
 	commands "github.com/docker/compose/v2/cmd/compose"
@@ -34,7 +37,7 @@ func init() {
 		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
 }
 
-func main() {
+func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
 		cmd := commands.RootCommand(lazyInit)
@@ -62,4 +65,11 @@ func main() {
 			Vendor:        "Docker Inc.",
 			Version:       internal.Version,
 		})
+}
+
+func main() {
+	if commands.RunningAsStandalone() {
+		os.Args = append([]string{"docker"}, redirect.Convert(os.Args[1:])...)
+	}
+	pluginMain()
 }

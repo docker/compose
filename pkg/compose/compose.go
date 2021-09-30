@@ -32,6 +32,7 @@ import (
 	"github.com/sanathkr/go-yaml"
 )
 
+// Separator is used for naming components
 var Separator = "-"
 
 // NewComposeService create a local implementation of the compose.Service API

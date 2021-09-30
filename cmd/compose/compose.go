@@ -25,15 +25,14 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/docker/compose/v2/cmd/formatter"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	dockercli "github.com/docker/cli/cli"
+	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -106,7 +105,7 @@ type ProjectFunc func(ctx context.Context, project *types.Project) error
 // ProjectServicesFunc does stuff within a types.Project and a selection of services
 type ProjectServicesFunc func(ctx context.Context, project *types.Project, services []string) error
 
-// WithServices creates a cobra run command from a ProjectFunc based on configured project options and selected services
+// WithProject creates a cobra run command from a ProjectFunc based on configured project options and selected services
 func (o *projectOptions) WithProject(fn ProjectFunc) func(cmd *cobra.Command, args []string) error {
 	return o.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
 		return fn(ctx, project)
@@ -209,6 +208,13 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithName(o.ProjectName))...)
 }
 
+const pluginName = "compose"
+
+// RunningAsStandalone detects when running as a standalone program
+func RunningAsStandalone() bool {
+	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != pluginName
+}
+
 // RootCommand returns the compose command with its child commands
 func RootCommand(backend api.Service) *cobra.Command {
 	opts := projectOptions{}
@@ -219,7 +225,7 @@ func RootCommand(backend api.Service) *cobra.Command {
 	)
 	command := &cobra.Command{
 		Short:            "Docker Compose",
-		Use:              "compose",
+		Use:              pluginName,
 		TraverseChildren: true,
 		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -234,11 +240,13 @@ func RootCommand(backend api.Service) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			parent := cmd.Root()
-			parentPrerun := parent.PersistentPreRunE
-			if parentPrerun != nil {
-				err := parentPrerun(cmd, args)
-				if err != nil {
-					return err
+			if parent != nil {
+				parentPrerun := parent.PersistentPreRunE
+				if parentPrerun != nil {
+					err := parentPrerun(cmd, args)
+					if err != nil {
+						return err
+					}
 				}
 			}
 			if noAnsi {
