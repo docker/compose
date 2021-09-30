@@ -38,12 +38,13 @@ type ttyWriter struct {
 	repeated   bool
 	numLines   int
 	done       chan bool
-	mtx        *sync.RWMutex
+	mtx        *sync.Mutex
 	tailEvents []string
 }
 
 func (w *ttyWriter) Start(ctx context.Context) error {
 	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -188,7 +189,7 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 		padding = 0
 	}
 	// calculate the max length for the status text, on errors it
-	// is 2-3 lines long and breaks the line formating
+	// is 2-3 lines long and breaks the line formatting
 	maxStatusLen := terminalWidth - textLen - statusPadding - 15
 	status := event.StatusText
 	// in some cases (debugging under VS Code), terminalWidth is set to zero by goterm.Width() ; ensuring we don't tweak strings with negative char index

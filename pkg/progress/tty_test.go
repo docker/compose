@@ -78,7 +78,7 @@ func TestLineTextSingleEvent(t *testing.T) {
 func TestErrorEvent(t *testing.T) {
 	w := &ttyWriter{
 		events: map[string]Event{},
-		mtx:    &sync.RWMutex{},
+		mtx:    &sync.Mutex{},
 	}
 	e := Event{
 		ID:         "id",

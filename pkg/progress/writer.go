@@ -105,7 +105,7 @@ func NewWriter(out console.File) (Writer, error) {
 			events:   map[string]Event{},
 			repeated: false,
 			done:     make(chan bool),
-			mtx:      &sync.RWMutex{},
+			mtx:      &sync.Mutex{},
 		}, nil
 	}
 
