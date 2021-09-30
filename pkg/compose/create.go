@@ -980,7 +980,7 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 		return nil
 	}
 	return &mount.TmpfsOptions{
-		SizeBytes: tmpfs.Size,
+		SizeBytes: int64(tmpfs.Size),
 		// Mode:      , // FIXME missing from model ?
 	}
 }
