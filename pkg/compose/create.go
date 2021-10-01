@@ -46,6 +46,9 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
+// ServiceExtProjectEnvironmentFile is name of service extension that is used to pass down the project environment file
+const ServiceExtProjectEnvironmentFile = "x-dockercompose-projectenvironmentfile"
+
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
@@ -430,6 +433,9 @@ func (s *composeService) prepareLabels(p *types.Project, service types.ServiceCo
 		return nil, err
 	}
 
+	if val, ok := service.Extensions[ServiceExtProjectEnvironmentFile].(string); ok {
+		labels[api.EnvironmentFileLabel] = val
+	}
 	labels[api.ConfigHashLabel] = hash
 	labels[api.WorkingDirLabel] = p.WorkingDir
 	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
