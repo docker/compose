@@ -121,22 +121,16 @@ func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Co
 		}
 
 		if o.EnvFile != "" {
-			var services types.Services
-
 			ef := o.EnvFile
 			if !filepath.IsAbs(ef) {
 				ef = filepath.Join(project.WorkingDir, o.EnvFile)
 			}
 
-			for _, s := range project.Services {
-				if s.Extensions == nil {
-					s.Extensions = make(map[string]interface{})
-				}
-				s.Extensions[compose.ServiceExtProjectEnvironmentFile] = ef
-				services = append(services, s)
+			if project.Extensions == nil {
+				project.Extensions = make(map[string]interface{})
 			}
 
-			project.Services = services
+			project.Extensions[compose.ExtProjectEnvironmentFile] = ef
 		}
 
 		return fn(ctx, project, args)
