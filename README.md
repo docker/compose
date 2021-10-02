@@ -39,6 +39,18 @@ Or copy it into one of these folders for installing it system-wide:
 
 (might require to make the downloaded file executable with `chmod +x`)
 
+Or you can use the following command, which has been tested on ubuntu 20.04, to dynamically pull the latest version of `docker compose` and install it on your machine:
+
+```bash
+mkdir -p ~/.docker/cli-plugins && curl -SL https://api.github.com/repos/docker/compose/releases/latest | grep browser_download_url | cut -d '"' -f 4 | grep -wo https.*docker-compose-$(uname | awk '{print tolower($0)}')-$(uname -m)$ | wget -i - -O ~/.docker/cli-plugins/docker-compose && chmod +x ~/.docker/cli-plugins/docker-compose
+```
+
+You can verify that `docker compose` has been installed by executing the following command on your terminal:
+
+```bash
+docker compose version
+> Docker Compose version v2.0.1
+```
 
 Quick Start
 -----------
