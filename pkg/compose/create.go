@@ -525,6 +525,9 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		case 1:
 			src = arr[0]
 		}
+		if dst == "" {
+			dst = src
+		}
 		resources.Devices = append(resources.Devices, container.DeviceMapping{
 			PathOnHost:        src,
 			PathInContainer:   dst,
