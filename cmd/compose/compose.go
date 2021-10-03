@@ -222,6 +222,7 @@ func RootCommand(backend api.Service) *cobra.Command {
 		ansi    string
 		noAnsi  bool
 		verbose bool
+		version bool
 	)
 	command := &cobra.Command{
 		Short:            "Docker Compose",
@@ -231,6 +232,9 @@ func RootCommand(backend api.Service) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()
+			}
+			if version {
+				return versionCommand().Execute()
 			}
 			_ = cmd.Help()
 			return dockercli.StatusError{
@@ -304,6 +308,8 @@ func RootCommand(backend api.Service) *cobra.Command {
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
 	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	command.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
+	command.Flags().MarkHidden("version") //nolint:errcheck
 	command.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
 	command.Flags().MarkHidden("no-ansi") //nolint:errcheck
 	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
