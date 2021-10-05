@@ -21,10 +21,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/compose/v2/pkg/api"
-
 	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/api"
+	moby "github.com/docker/docker/api/types"
 	mountTypes "github.com/docker/docker/api/types/mount"
 	"gotest.tools/v3/assert"
 )
@@ -80,4 +80,58 @@ func TestPrepareNetworkLabels(t *testing.T) {
 		"com.docker.compose.project": "myProject",
 		"com.docker.compose.version": api.ComposeVersion,
 	}))
+}
+
+func TestBuildContainerMountOptions(t *testing.T) {
+	project := composetypes.Project{
+		Name: "myProject",
+		Services: []composetypes.ServiceConfig{
+			{
+				Name: "myService",
+				Volumes: []composetypes.ServiceVolumeConfig{
+					{
+						Type:   composetypes.VolumeTypeVolume,
+						Target: "/var/myvolume1",
+					},
+					{
+						Type:   composetypes.VolumeTypeVolume,
+						Target: "/var/myvolume2",
+					},
+				},
+			},
+		},
+		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
+			"myVolume1": {
+				Name: "myProject_myVolume1",
+			},
+			"myVolume2": {
+				Name: "myProject_myVolume2",
+			},
+		}),
+	}
+
+	inherit := &moby.Container{
+		Mounts: []moby.MountPoint{
+			{
+				Type:        composetypes.VolumeTypeVolume,
+				Destination: "/var/myvolume1",
+			},
+			{
+				Type:        composetypes.VolumeTypeVolume,
+				Destination: "/var/myvolume2",
+			},
+		},
+	}
+
+	mounts, err := buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	assert.NilError(t, err)
+	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, mounts[0].Target == "/var/myvolume1")
+	assert.Assert(t, mounts[1].Target == "/var/myvolume2")
+
+	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	assert.NilError(t, err)
+	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, mounts[0].Target == "/var/myvolume1")
+	assert.Assert(t, mounts[1].Target == "/var/myvolume2")
 }

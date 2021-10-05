@@ -750,24 +750,21 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 					}
 				}
 			}
-			for i, v := range s.Volumes {
-				if v.Target != m.Destination {
+			volumes := []types.ServiceVolumeConfig{}
+			for _, v := range s.Volumes {
+				if v.Target != m.Destination || v.Source != "" {
+					volumes = append(volumes, v)
 					continue
 				}
-				if v.Source == "" {
-					// inherit previous container's anonymous volume
-					mounts[m.Destination] = mount.Mount{
-						Type:     m.Type,
-						Source:   src,
-						Target:   m.Destination,
-						ReadOnly: !m.RW,
-					}
-					// Avoid mount to be later re-defined
-					l := len(s.Volumes) - 1
-					s.Volumes[i] = s.Volumes[l]
-					s.Volumes = s.Volumes[:l]
+				// inherit previous container's anonymous volume
+				mounts[m.Destination] = mount.Mount{
+					Type:     m.Type,
+					Source:   src,
+					Target:   m.Destination,
+					ReadOnly: !m.RW,
 				}
 			}
+			s.Volumes = volumes
 		}
 	}
 
