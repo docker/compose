@@ -126,12 +126,12 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	mounts, err := buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 2)
-	assert.Assert(t, mounts[0].Target == "/var/myvolume1")
-	assert.Assert(t, mounts[1].Target == "/var/myvolume2")
+	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
+	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 
 	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 2)
-	assert.Assert(t, mounts[0].Target == "/var/myvolume1")
-	assert.Assert(t, mounts[1].Target == "/var/myvolume2")
+	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
+	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 }
