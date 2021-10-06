@@ -35,11 +35,15 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 
 	eg, ctx := errgroup.WithContext(ctx)
 	if options.Follow {
+		printer := newLogPrinter(consumer)
 		eg.Go(func() error {
-			printer := newLogPrinter(consumer)
 			return s.watchContainers(ctx, projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
 				return s.logContainers(ctx, consumer, c, options)
 			})
+		})
+		eg.Go(func() error {
+			_, err := printer.Run(false, "", nil)
+			return err
 		})
 	}
 
