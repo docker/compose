@@ -219,3 +219,25 @@ func TestCompatibility(t *testing.T) {
 		c.RunDockerCmd("compose", "-p", projectName, "down")
 	})
 }
+
+func TestConvert(t *testing.T) {
+	const projectName = "compose-e2e-convert"
+	c := NewParallelE2eCLI(t, binDir)
+
+	wd, err := os.Getwd()
+	assert.NilError(t, err)
+
+	t.Run("up", func(t *testing.T) {
+		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`services:
+  nginx:
+    build:
+      context: %s
+      dockerfile: Dockerfile
+    networks:
+      default: null
+networks:
+  default:
+    name: compose-e2e-convert_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
+	})
+}

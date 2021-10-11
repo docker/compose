@@ -103,7 +103,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var json []byte
-	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate), cli.WithResolvedPaths(false))
+	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate), cli.WithResolvedPaths(true))
 	if err != nil {
 		return err
 	}
