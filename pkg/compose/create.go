@@ -493,6 +493,7 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		MemorySwap:         int64(s.MemSwapLimit),
 		MemorySwappiness:   swappiness,
 		MemoryReservation:  int64(s.MemReservation),
+		OomKillDisable:     &s.OomKillDisable,
 		CPUCount:           s.CPUCount,
 		CPUPeriod:          s.CPUPeriod,
 		CPUQuota:           s.CPUQuota,
@@ -501,6 +502,10 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		CPUShares:          s.CPUShares,
 		CPUPercent:         int64(s.CPUS * 100),
 		CpusetCpus:         s.CPUSet,
+	}
+
+	if s.PidsLimit != 0 {
+		resources.PidsLimit = &s.PidsLimit
 	}
 
 	setBlkio(s.BlkioConfig, &resources)
