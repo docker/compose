@@ -50,6 +50,7 @@ type upOptions struct {
 	noPrefix           bool
 	attachDependencies bool
 	attach             []string
+	wait               bool
 }
 
 func (opts upOptions) apply(project *types.Project, services []string) error {
@@ -100,22 +101,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		Short: "Create and start containers",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.timeChanged = cmd.Flags().Changed("timeout")
-			if up.exitCodeFrom != "" {
-				up.cascadeStop = true
-			}
-			if create.Build && create.noBuild {
-				return fmt.Errorf("--build and --no-build are incompatible")
-			}
-			if up.Detach && (up.attachDependencies || up.cascadeStop || len(up.attach) > 0) {
-				return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
-			}
-			if create.forceRecreate && create.noRecreate {
-				return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
-			}
-			if create.recreateDeps && create.noRecreate {
-				return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
-			}
-			return nil
+			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
 			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
@@ -148,8 +134,34 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Attach to dependent containers.")
 	flags.BoolVar(&create.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Attach to service output.")
+	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
 
 	return upCmd
+}
+
+func validateFlags(up *upOptions, create *createOptions) error {
+	if up.exitCodeFrom != "" {
+		up.cascadeStop = true
+	}
+	if up.wait {
+		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
+			return fmt.Errorf("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+		}
+		up.Detach = true
+	}
+	if create.Build && create.noBuild {
+		return fmt.Errorf("--build and --no-build are incompatible")
+	}
+	if up.Detach && (up.attachDependencies || up.cascadeStop || len(up.attach) > 0) {
+		return fmt.Errorf("--detach cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
+	}
+	if create.forceRecreate && create.noRecreate {
+		return fmt.Errorf("--force-recreate and --no-recreate are incompatible")
+	}
+	if create.recreateDeps && create.noRecreate {
+		return fmt.Errorf("--always-recreate-deps and --no-recreate are incompatible")
+	}
+	return nil
 }
 
 func runUp(ctx context.Context, backend api.Service, createOptions createOptions, upOptions upOptions, project *types.Project, services []string) error {
@@ -199,6 +211,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 			AttachTo:     attachTo,
 			ExitCodeFrom: upOptions.exitCodeFrom,
 			CascadeStop:  upOptions.cascadeStop,
+			Wait:         upOptions.wait,
 		},
 	})
 }

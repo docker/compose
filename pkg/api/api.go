@@ -124,6 +124,8 @@ type StartOptions struct {
 	CascadeStop bool
 	// ExitCodeFrom return exit code from specified service
 	ExitCodeFrom string
+	// Wait won't return until containers reached the running|healthy state
+	Wait bool
 }
 
 // RestartOptions group options of the Restart API

@@ -261,9 +261,11 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
-func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+const ServiceConditionRuningOrHealthy = "running_or_healthy"
+
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
-	for dep, config := range service.DependsOn {
+	for dep, config := range dependencies {
 		dep, config := dep, config
 		eg.Go(func() error {
 			ticker := time.NewTicker(500 * time.Millisecond)
@@ -271,8 +273,16 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			for {
 				<-ticker.C
 				switch config.Condition {
+				case ServiceConditionRuningOrHealthy:
+					healthy, err := s.isServiceHealthy(ctx, project, dep, true)
+					if err != nil {
+						return err
+					}
+					if healthy {
+						return nil
+					}
 				case types.ServiceConditionHealthy:
-					healthy, err := s.isServiceHealthy(ctx, project, dep)
+					healthy, err := s.isServiceHealthy(ctx, project, dep, false)
 					if err != nil {
 						return err
 					}
@@ -502,7 +512,7 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 	return nil
 }
 
-func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string) (bool, error) {
+func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Project, service string, fallbackRunning bool) (bool, error) {
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, service)
 	if err != nil {
 		return false, err
@@ -516,6 +526,11 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		if err != nil {
 			return false, err
 		}
+		if container.Config.Healthcheck == nil && fallbackRunning {
+			// Container does not define a health check, but we can fall back to "running" state
+			return container.State != nil && container.State.Status == "running", nil
+		}
+
 		if container.State == nil || container.State.Health == nil {
 			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
 		}
@@ -544,7 +559,7 @@ func (s *composeService) isServiceCompleted(ctx context.Context, project *types.
 }
 
 func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
-	err := s.waitDependencies(ctx, project, service)
+	err := s.waitDependencies(ctx, project, service.DependsOn)
 	if err != nil {
 		return err
 	}
