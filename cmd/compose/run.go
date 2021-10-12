@@ -121,11 +121,15 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				return fmt.Errorf("--service-ports and --publish are incompatible")
 			}
 			if cmd.Flags().Changed("entrypoint") {
-				command, err := shellwords.Parse(opts.entrypoint)
-				if err != nil {
-					return err
+				if opts.entrypoint == "" {
+					opts.entrypointCmd = []string{""}
+				} else {
+					command, err := shellwords.Parse(opts.entrypoint)
+					if err != nil {
+						return err
+					}
+					opts.entrypointCmd = command
 				}
-				opts.entrypointCmd = command
 			}
 			return nil
 		}),
