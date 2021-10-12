@@ -378,6 +378,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		PidMode:        container.PidMode(service.Pid),
 		Tmpfs:          tmpfs,
 		Isolation:      container.Isolation(service.Isolation),
+		Runtime:        service.Runtime,
 		LogConfig:      logConfig,
 	}
 
