@@ -109,53 +109,58 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 var mu sync.Mutex
 
 // updateProject updates project after service converged, so dependent services relying on `service:xx` can refer to actual containers.
-func (c *convergence) updateProject(project *types.Project, service string) {
-	containers := c.getObservedState(service)
-	if len(containers) == 0 {
-		return
-	}
-	container := containers[0]
-
+func (c *convergence) updateProject(project *types.Project, serviceName string) {
 	// operation is protected by a Mutex so that we can safely update project.Services while running concurrent convergence on services
 	mu.Lock()
 	defer mu.Unlock()
 
+	cnts := c.getObservedState(serviceName)
 	for i, s := range project.Services {
-		if d := getDependentServiceFromMode(s.NetworkMode); d == service {
-			s.NetworkMode = types.NetworkModeContainerPrefix + container.ID
-		}
-		if d := getDependentServiceFromMode(s.Ipc); d == service {
-			s.Ipc = types.NetworkModeContainerPrefix + container.ID
-		}
-		if d := getDependentServiceFromMode(s.Pid); d == service {
-			s.Pid = types.NetworkModeContainerPrefix + container.ID
-		}
-		var links []string
-		for _, serviceLink := range s.Links {
-			parts := strings.Split(serviceLink, ":")
-			serviceName := serviceLink
-			serviceAlias := ""
-			if len(parts) == 2 {
-				serviceName = parts[0]
-				serviceAlias = parts[1]
-			}
-			if serviceName != service {
-				links = append(links, serviceLink)
-				continue
-			}
-			for _, container := range containers {
-				name := getCanonicalContainerName(container)
-				if serviceAlias != "" {
-					links = append(links,
-						fmt.Sprintf("%s:%s", name, serviceAlias))
-				}
-				links = append(links,
-					fmt.Sprintf("%s:%s", name, name),
-					fmt.Sprintf("%s:%s", name, getContainerNameWithoutProject(container)))
-			}
-			s.Links = links
-		}
+		updateServices(&s, cnts)
 		project.Services[i] = s
+	}
+}
+
+func updateServices(service *types.ServiceConfig, cnts Containers) {
+	if len(cnts) == 0 {
+		return
+	}
+	cnt := cnts[0]
+	serviceName := cnt.Labels[api.ServiceLabel]
+
+	if d := getDependentServiceFromMode(service.NetworkMode); d == serviceName {
+		service.NetworkMode = types.NetworkModeContainerPrefix + cnt.ID
+	}
+	if d := getDependentServiceFromMode(service.Ipc); d == serviceName {
+		service.Ipc = types.NetworkModeContainerPrefix + cnt.ID
+	}
+	if d := getDependentServiceFromMode(service.Pid); d == serviceName {
+		service.Pid = types.NetworkModeContainerPrefix + cnt.ID
+	}
+	var links []string
+	for _, serviceLink := range service.Links {
+		parts := strings.Split(serviceLink, ":")
+		serviceName := serviceLink
+		serviceAlias := ""
+		if len(parts) == 2 {
+			serviceName = parts[0]
+			serviceAlias = parts[1]
+		}
+		if serviceName != service.Name {
+			links = append(links, serviceLink)
+			continue
+		}
+		for _, container := range cnts {
+			name := getCanonicalContainerName(container)
+			if serviceAlias != "" {
+				links = append(links,
+					fmt.Sprintf("%s:%s", name, serviceAlias))
+			}
+			links = append(links,
+				fmt.Sprintf("%s:%s", name, name),
+				fmt.Sprintf("%s:%s", name, getContainerNameWithoutProject(container)))
+		}
+		service.Links = links
 	}
 }
 
