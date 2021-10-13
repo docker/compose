@@ -43,10 +43,8 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	downCmd := &cobra.Command{
 		Use:   "down",
 		Short: "Stop and remove containers, networks",
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
-		},
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.images != "" {
 				if opts.images != "all" && opts.images != "local" {
 					return fmt.Errorf("invalid value for --rmi: %q", opts.images)
