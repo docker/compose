@@ -115,3 +115,19 @@ func TestIPAMConfig(t *testing.T) {
 		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
 	})
 }
+
+func TestNetworkModes(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	const projectName = "network_mode_service_run"
+
+	t.Run("run with service mode dependency", func(t *testing.T) {
+		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "mydb", "echo", "success")
+		res.Assert(t, icmd.Expected{Out: "success"})
+
+	})
+
+	t.Run("down", func(t *testing.T) {
+		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+	})
+}

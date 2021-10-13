@@ -164,6 +164,13 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 			return "", err
 		}
 	}
+
+	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return "", err
+	}
+	updateServices(&service, observedState)
+
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases, true)
 	if err != nil {
 		return "", err
