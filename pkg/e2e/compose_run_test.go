@@ -105,8 +105,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --entrypoint=\"\"", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--entrypoint=\"\"", "front")
-		assert.Assert(t, strings.Contains(res.Stderr(), "Error response from daemon: No command specified"), res.Stderr())
-		assert.Assert(t, res.ExitCode == 1, "Exit code 1")
+		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/run-entrypoint/compose.yaml", "run", "--entrypoint=\"\"", "dummy")
+		res.Assert(t, icmd.Expected{Err: "Error response from daemon: No command specified", ExitCode: 1})
 	})
 }
