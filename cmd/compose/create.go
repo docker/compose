@@ -126,7 +126,7 @@ func (opts createOptions) Apply(project *types.Project) {
 	if opts.noBuild {
 		for i, service := range project.Services {
 			service.Build = nil
-			if service.Image != "" {
+			if service.Image == "" {
 				service.Image = project.Name + "_" + service.Name
 			}
 			project.Services[i] = service
