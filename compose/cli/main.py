@@ -778,7 +778,9 @@ class TopLevelCommand:
         Options:
             -q, --quiet          Only display IDs
             --services           Display services
-            --filter KEY=VAL     Filter services by a property
+            --filter KEY=VAL     Filter services by a property. KEY is either:
+                                 1. `source` with values `image`, or `build`;
+                                 2. `status` with values `running`, `stopped`, `paused`, or `restarted`.
             -a, --all            Show all stopped containers (including those created by the run command)
         """
         if options['--quiet'] and options['--services']:
