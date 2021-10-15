@@ -25,10 +25,12 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
-	"github.com/docker/buildx/driver"
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
+	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
+	"github.com/docker/docker/client"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -192,63 +194,23 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 }
 
 func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
-	info, err := s.apiClient.Info(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if info.OSType == "windows" {
-		// no support yet for Windows container builds in Buildkit
-		// https://docs.docker.com/develop/develop-images/build_enhancements/#limitations
-		err := s.windowsBuild(opts, mode)
-		return nil, WrapCategorisedComposeError(err, BuildFailure)
-	}
 	if len(opts) == 0 {
 		return nil, nil
 	}
-	const drivername = "default"
-
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, s.configFile, nil, nil, "", nil, nil, project.WorkingDir)
+	dockerCli, err := command.NewDockerCli()
 	if err != nil {
 		return nil, err
 	}
-	driverInfo := []build.DriverInfo{
-		{
-			Name:   "default",
-			Driver: d,
-		},
-	}
-
-	// Progress needs its own context that lives longer than the
-	// build one otherwise it won't read all the messages from
-	// build and will lock
-	progressCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	w := xprogress.NewPrinter(progressCtx, os.Stdout, mode)
-
-	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	response, err := build.Build(ctx, driverInfo, opts, nil, nil, w)
-	errW := w.Wait()
-	if err == nil {
-		err = errW
-	}
+	err = dockerCli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
+		return s.apiClient, nil
+	}))
 	if err != nil {
-		return nil, WrapCategorisedComposeError(err, BuildFailure)
+		return nil, err
 	}
-
-	imagesBuilt := map[string]string{}
-	for name, img := range response {
-		if img == nil || len(img.ExporterResponse) == 0 {
-			continue
-		}
-		digest, ok := img.ExporterResponse["containerimage.digest"]
-		if !ok {
-			continue
-		}
-		imagesBuilt[name] = digest
+	if buildkitEnabled, err := command.BuildKitEnabled(dockerCli.ServerInfo()); err != nil || !buildkitEnabled {
+		return s.doBuildClassic(ctx, dockerCli, opts)
 	}
-
-	return imagesBuilt, err
+	return s.doBuildBuildkit(ctx, project, opts, mode)
 }
 
 func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string) (build.Options, error) {
