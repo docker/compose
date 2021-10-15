@@ -771,6 +771,7 @@ github.com/moby/sys/mountinfo v0.1.3/go.mod h1:w2t2Avltqx8vE7gX5l+QiBKxODu2TX0+S
 github.com/moby/sys/mountinfo v0.4.0/go.mod h1:rEr8tzG/lsIZHBtN/JjGG+LMYx9eXgW2JI+6q0qou+A=
 github.com/moby/sys/mountinfo v0.4.1 h1:1O+1cHA1aujwEwwVMa2Xm2l+gIpUHyd3+D+d7LZh1kM=
 github.com/moby/sys/mountinfo v0.4.1/go.mod h1:rEr8tzG/lsIZHBtN/JjGG+LMYx9eXgW2JI+6q0qou+A=
+github.com/moby/sys/symlink v0.1.0 h1:MTFZ74KtNI6qQQpuBxU+uKCim4WtOMokr03hCfJcazE=
 github.com/moby/sys/symlink v0.1.0/go.mod h1:GGDODQmbFOjFsXvfLVn3+ZRxkch54RkSiGqsZeMYowQ=
 github.com/moby/term v0.0.0-20200312100748-672ec06f55cd/go.mod h1:DdlQx2hp0Ss5/fLikoLlEeIYiATotOjgB//nb973jeo=
 github.com/moby/term v0.0.0-20201110203204-bea5bbe245bf/go.mod h1:FBS0z0QWA44HXygs7VXDUOGoN/1TV3RuWkLO04am3wc=
