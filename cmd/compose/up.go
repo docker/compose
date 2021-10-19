@@ -98,10 +98,8 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	upCmd := &cobra.Command{
 		Use:   "up [SERVICE...]",
 		Short: "Create and start containers",
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.timeChanged = cmd.Flags().Changed("timeout")
-		},
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if up.exitCodeFrom != "" {
 				up.cascadeStop = true
 			}
