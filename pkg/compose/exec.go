@@ -90,7 +90,7 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 
 	stdout := ContainerStdout{HijackedResponse: resp}
 	stdin := ContainerStdin{HijackedResponse: resp}
-	r, err := s.getEscapeKeyProxy(opts.Stdin)
+	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
 	if err != nil {
 		return err
 	}
