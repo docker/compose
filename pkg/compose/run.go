@@ -180,7 +180,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 }
 
 func (s *composeService) getEscapeKeyProxy(r io.ReadCloser, isTty bool) (io.ReadCloser, error) {
-	if isTty {
+	if !isTty {
 		return r, nil
 	}
 	var escapeKeys = []byte{16, 17}
