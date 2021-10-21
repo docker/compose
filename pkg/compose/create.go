@@ -1034,6 +1034,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 				Options:    n.DriverOpts,
 				Internal:   n.Internal,
 				Attachable: n.Attachable,
+				EnableIPv6: n.EnableIPv6,
 				IPAM:       ipam,
 			}
 
