@@ -199,10 +199,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
+			cli.WithWorkingDirectory(o.ProjectDir),
 			cli.WithEnvFile(o.EnvFile),
 			cli.WithDotEnv,
 			cli.WithOsEnv,
-			cli.WithWorkingDirectory(o.ProjectDir),
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
