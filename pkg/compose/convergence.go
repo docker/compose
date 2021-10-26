@@ -559,6 +559,10 @@ func (s *composeService) isServiceCompleted(ctx context.Context, project *types.
 }
 
 func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
+		return nil
+	}
+
 	err := s.waitDependencies(ctx, project, service.DependsOn)
 	if err != nil {
 		return err
@@ -579,7 +583,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		if scale, err := getScale(service); err != nil && scale == 0 {
 			return nil
 		}
-		return fmt.Errorf("no containers to start")
+		return fmt.Errorf("service %q has no container to start", service.Name)
 	}
 
 	w := progress.ContextWriter(ctx)
