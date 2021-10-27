@@ -20,7 +20,7 @@ The GitHub issue tracker is for bug reports and feature requests.
 General support can be found at the following locations:
 
 - Docker Support Forums - https://forums.docker.com
-- Docker Community Slack - https://dockr.ly/community
+- Docker Community Slack - https://dockr.ly/slack
 - Post a question on StackOverflow, using the Docker tag
 
 ---------------------------------------------------

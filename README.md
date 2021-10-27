@@ -30,7 +30,7 @@ for Windows and macOS.
 You can download Docker Compose binaries from the
 [release page](https://github.com/docker/compose/releases) on this repository.
 
-Copy the relevant binary for your OS under `$HOME/.docker/cli-plugins/docker-compose` 
+Rename the relevant binary for your OS to `docker-compose` and copy it to `$HOME/.docker/cli-plugins` 
 
 Or copy it into one of these folders for installing it system-wide:
 
