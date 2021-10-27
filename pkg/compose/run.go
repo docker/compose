@@ -51,7 +51,7 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 }
 
 func (s *composeService) runInteractive(ctx context.Context, containerID string, opts api.RunOptions) (int, error) {
-	r, err := s.getEscapeKeyProxy(opts.Stdin)
+	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
 	if err != nil {
 		return 0, err
 	}
@@ -164,6 +164,13 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 			return "", err
 		}
 	}
+
+	observedState, err := s.getContainers(ctx, project.Name, oneOffInclude, true)
+	if err != nil {
+		return "", err
+	}
+	updateServices(&service, observedState)
+
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases, true)
 	if err != nil {
 		return "", err
@@ -172,7 +179,10 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	return containerID, nil
 }
 
-func (s *composeService) getEscapeKeyProxy(r io.ReadCloser) (io.ReadCloser, error) {
+func (s *composeService) getEscapeKeyProxy(r io.ReadCloser, isTty bool) (io.ReadCloser, error) {
+	if !isTty {
+		return r, nil
+	}
 	var escapeKeys = []byte{16, 17}
 	if s.configFile.DetachKeys != "" {
 		customEscapeKeys, err := term.ToBytes(s.configFile.DetachKeys)

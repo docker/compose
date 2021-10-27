@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
@@ -271,7 +272,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
-			DockerfilePath: service.Build.Dockerfile,
+			DockerfilePath: filepath.Join(service.Build.Context, service.Build.Dockerfile),
 		},
 		BuildArgs:   buildArgs,
 		Tags:        tags,

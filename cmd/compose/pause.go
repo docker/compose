@@ -34,7 +34,7 @@ func pauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "pause [SERVICE...]",
-		Short: "pause services",
+		Short: "Pause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPause(ctx, backend, opts, args)
 		}),
@@ -64,7 +64,7 @@ func unpauseCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "unpause [SERVICE...]",
-		Short: "unpause services",
+		Short: "Unpause services",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runUnPause(ctx, backend, opts, args)
 		}),

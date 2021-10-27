@@ -1,3 +1,5 @@
 services:
   nginx:
-    build: nginx-build
+    build:
+      context: nginx-build
+      dockerfile: Dockerfile
