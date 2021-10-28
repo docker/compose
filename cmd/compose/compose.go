@@ -176,6 +176,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	if o.Compatibility || project.Environment["COMPOSE_COMPATIBILITY"] == "true" {
+		compose.Separator = "_"
+	}
+
 	if len(services) > 0 {
 		s, err := project.GetServices(services...)
 		if err != nil {
@@ -270,9 +274,6 @@ func RootCommand(backend api.Service) *cobra.Command {
 				}
 				opts.ProjectDir = opts.WorkDir
 				fmt.Fprint(os.Stderr, aec.Apply("option '--workdir' is DEPRECATED at root level! Please use '--project-directory' instead.\n", aec.RedF))
-			}
-			if opts.Compatibility || os.Getenv("COMPOSE_COMPATIBILITY") == "true" {
-				compose.Separator = "_"
 			}
 			return nil
 		},
