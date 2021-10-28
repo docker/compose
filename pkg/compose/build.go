@@ -261,6 +261,13 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}))
 
 	var plats []specs.Platform
+	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
+		p, err := platforms.Parse(platform)
+		if err != nil {
+			return build.Options{}, err
+		}
+		plats = append(plats, p)
+	}
 	if service.Platform != "" {
 		p, err := platforms.Parse(service.Platform)
 		if err != nil {
