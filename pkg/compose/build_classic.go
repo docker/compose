@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	buildx "github.com/docker/buildx/build"
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/image/build"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
@@ -42,11 +41,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, dockerCli *command.DockerCli, opts map[string]buildx.Options) (map[string]string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, opts map[string]buildx.Options) (map[string]string, error) {
 	var nameDigests = make(map[string]string)
 	var errs error
 	for name, o := range opts {
-		digest, err := doBuildClassicSimpleImage(ctx, dockerCli, o)
+		digest, err := s.doBuildClassicSimpleImage(ctx, o)
 		if err != nil {
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
@@ -57,7 +56,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, dockerCli *command.
 }
 
 // nolint: gocyclo
-func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli, options buildx.Options) (string, error) {
+func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
 		dockerfileCtx io.ReadCloser
@@ -70,8 +69,8 @@ func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli
 
 	dockerfileName := options.Inputs.DockerfilePath
 	specifiedContext := options.Inputs.ContextPath
-	progBuff := dockerCli.Out()
-	buildBuff := dockerCli.Out()
+	progBuff := os.Stdout
+	buildBuff := os.Stdout
 	if options.ImageIDFile != "" {
 		// Avoid leaving a stale file if we eventually fail
 		if err := os.Remove(options.ImageIDFile); err != nil && !os.IsNotExist(err) {
@@ -144,24 +143,19 @@ func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli
 		return "", err
 	}
 
-	// Setup an upload progress bar
-	progressOutput := streamformatter.NewProgressOutput(progBuff)
-	if !dockerCli.Out().IsTerminal() {
-		progressOutput = &lastProgressOutput{output: progressOutput}
-	}
-
 	// if up to this point nothing has set the context then we must have another
 	// way for sending it(streaming) and set the context to the Dockerfile
 	if dockerfileCtx != nil && buildCtx == nil {
 		buildCtx = dockerfileCtx
 	}
 
+	progressOutput := streamformatter.NewProgressOutput(progBuff)
 	var body io.Reader
 	if buildCtx != nil {
 		body = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 	}
 
-	configFile := dockerCli.ConfigFile()
+	configFile := s.configFile
 	creds, _ := configFile.GetAllCredentials()
 	authConfigs := make(map[string]dockertypes.AuthConfig, len(creds))
 	for k, auth := range creds {
@@ -174,7 +168,7 @@ func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	response, err := dockerCli.Client().ImageBuild(ctx, body, buildOptions)
+	response, err := s.apiClient.ImageBuild(ctx, body, buildOptions)
 	if err != nil {
 		return "", err
 	}
@@ -184,13 +178,13 @@ func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli
 	aux := func(msg jsonmessage.JSONMessage) {
 		var result dockertypes.BuildResult
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
-			fmt.Fprintf(dockerCli.Err(), "Failed to parse aux message: %s", err)
+			fmt.Fprintf(os.Stderr, "Failed to parse aux message: %s", err)
 		} else {
 			imageID = result.ID
 		}
 	}
 
-	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, dockerCli.Out().FD(), dockerCli.Out().IsTerminal(), aux)
+	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.Fd(), true, aux)
 	if err != nil {
 		if jerr, ok := err.(*jsonmessage.JSONError); ok {
 			// If no error code is set, default to 1
@@ -206,7 +200,7 @@ func doBuildClassicSimpleImage(ctx context.Context, dockerCli *command.DockerCli
 	// daemon isn't running Windows.
 	if response.OSType != "windows" && runtime.GOOS == "windows" {
 		// if response.OSType != "windows" && runtime.GOOS == "windows" && !options.quiet {
-		fmt.Fprintln(dockerCli.Out(), "SECURITY WARNING: You are building a Docker "+
+		fmt.Fprintln(os.Stdout, "SECURITY WARNING: You are building a Docker "+
 			"image from Windows against a non-Windows Docker host. All files and "+
 			"directories added to build context will have '-rwxr-xr-x' permissions. "+
 			"It is recommended to double check and reset permissions for sensitive "+

@@ -29,8 +29,6 @@ import (
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/cli/cli/flags"
-	"github.com/docker/docker/client"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -193,22 +191,29 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return images, nil
 }
 
+func (s *composeService) serverInfo(ctx context.Context) (command.ServerInfo, error) {
+	ping, err := s.apiClient.Ping(ctx)
+	if err != nil {
+		return command.ServerInfo{}, err
+	}
+	serverInfo := command.ServerInfo{
+		HasExperimental: ping.Experimental,
+		OSType:          ping.OSType,
+		BuildkitVersion: ping.BuilderVersion,
+	}
+	return serverInfo, err
+}
+
 func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
 	if len(opts) == 0 {
 		return nil, nil
 	}
-	dockerCli, err := command.NewDockerCli()
+	serverInfo, err := s.serverInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = dockerCli.Initialize(flags.NewClientOptions(), command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
-		return s.apiClient, nil
-	}))
-	if err != nil {
-		return nil, err
-	}
-	if buildkitEnabled, err := command.BuildKitEnabled(dockerCli.ServerInfo()); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, dockerCli, opts)
+	if buildkitEnabled, err := command.BuildKitEnabled(serverInfo); err != nil || !buildkitEnabled {
+		return s.doBuildClassic(ctx, opts)
 	}
 	return s.doBuildBuildkit(ctx, project, opts, mode)
 }
