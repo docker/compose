@@ -19,6 +19,7 @@ package compose
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
@@ -124,12 +125,18 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	}
 
 	mounts, err := buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	sort.Slice(mounts, func(i, j int) bool {
+		return mounts[i].Target < mounts[j].Target
+	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 2)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 
 	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
+	sort.Slice(mounts, func(i, j int) bool {
+		return mounts[i].Target < mounts[j].Target
+	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 2)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
