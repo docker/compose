@@ -114,7 +114,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		}
 
 		if err := build.ValidateContextDirectory(contextDir, excludes); err != nil {
-			return "", errors.Errorf("error checking context: '%s'.", err)
+			return "", errors.Wrap(err, "checking context")
 		}
 
 		// And canonicalize dockerfile name to a platform-independent one
@@ -123,7 +123,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		excludes = build.TrimBuildFilesFromExcludes(excludes, relDockerfile, false)
 		buildCtx, err = archive.TarWithOptions(contextDir, &archive.TarOptions{
 			ExcludePatterns: excludes,
-			ChownOpts:       &idtools.Identity{UID: 0, GID: 0},
+			ChownOpts:       &idtools.Identity{},
 		})
 		if err != nil {
 			return "", err
@@ -156,7 +156,10 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	}
 
 	configFile := s.configFile
-	creds, _ := configFile.GetAllCredentials()
+	creds, err := configFile.GetAllCredentials()
+	if err != nil {
+		return "", err
+	}
 	authConfigs := make(map[string]dockertypes.AuthConfig, len(creds))
 	for k, auth := range creds {
 		authConfigs[k] = dockertypes.AuthConfig(auth)
@@ -240,24 +243,7 @@ func imageBuildOptions(options buildx.Options) dockertypes.ImageBuildOptions {
 func toMapStringStringPtr(source map[string]string) map[string]*string {
 	dest := make(map[string]*string)
 	for k, v := range source {
-		v := v
 		dest[k] = &v
 	}
 	return dest
-}
-
-// lastProgressOutput is the same as progress.Output except
-// that it only output with the last update. It is used in
-// non terminal scenarios to suppress verbose messages
-type lastProgressOutput struct {
-	output progress.Output
-}
-
-// WriteProgress formats progress information from a ProgressReader.
-func (out *lastProgressOutput) WriteProgress(prog progress.Progress) error {
-	if !prog.LastUpdate {
-		return nil
-	}
-
-	return out.output.WriteProgress(prog)
 }
