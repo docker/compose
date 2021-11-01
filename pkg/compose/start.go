@@ -79,7 +79,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 	err := s.Events(ctx, projectName, api.EventsOptions{
 		Services: services,
 		Consumer: func(event api.Event) error {
-			if (event.Status == "destroy") {
+			if event.Status == "destroy" {
 				// This container can't be inspected, because it's gone.
 				// Its already been removed from the watched map.
 				return nil
