@@ -7,10 +7,10 @@ jobs:
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/generate-artifacts')
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go 1.17
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
         id: go
 
       - name: Checkout code into the Go module directory
@@ -55,4 +55,3 @@ jobs:
           body: |
             This PR can be tested using [binaries](https://github.com/docker/compose-cli/actions/runs/${{ github.run_id }}).
           reactions: eyes
-
