@@ -13,7 +13,7 @@ single command: `docker compose up`.
 
 # About update and backward compatibility
 
-Docker Compose V2 is a major version bump release of Docker compose. It has been completely rewriten from scratch in Golang (V1 was in Python). The installation instructions for Compose V2 differ from V1. V2 is not a standalone binary anymore and installation scripts will have to be adjusted. Some commands are different.
+Docker Compose V2 is a major version bump release of Docker Compose. It has been completely rewritten from scratch in Golang (V1 was in Python). The installation instructions for Compose V2 differ from V1. V2 is not a standalone binary anymore, and installation scripts will have to be adjusted. Some commands are different.
 
 For a smooth transition from legacy docker-compose 1.xx, please consider installing [compose-switch](https://github.com/docker/compose-switch) to translate `docker-compose ...` commands into Compose V2's `docker compose .... `. Also check V2's `--compatibility` flag.
 
