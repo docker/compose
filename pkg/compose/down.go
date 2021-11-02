@@ -75,7 +75,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
-	ops, err := s.ensureNetwoksDown(ctx, projectName)
+	ops, err := s.ensureNetworksDown(ctx, projectName)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, projectName strin
 	return ops
 }
 
-func (s *composeService) ensureNetwoksDown(ctx context.Context, projectName string) ([]downOp, error) {
+func (s *composeService) ensureNetworksDown(ctx context.Context, projectName string) ([]downOp, error) {
 	var ops []downOp
 	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
 	if err != nil {
