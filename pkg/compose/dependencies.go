@@ -93,7 +93,7 @@ func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex,
 	for _, node := range nodes {
 		// Don't start this service yet if all of its children have
 		// not been started yet.
-		if len(traversalConfig.filterAdjacentByStatusFn(graph, node.Service, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
+		if len(traversalConfig.filterAdjacentByStatusFn(graph, node.Key, traversalConfig.adjacentServiceStatusToSkip)) != 0 {
 			continue
 		}
 
@@ -104,7 +104,7 @@ func run(ctx context.Context, graph *Graph, eg *errgroup.Group, nodes []*Vertex,
 				return err
 			}
 
-			graph.UpdateStatus(node.Service, traversalConfig.targetServiceStatus)
+			graph.UpdateStatus(node.Key, traversalConfig.targetServiceStatus)
 
 			return run(ctx, graph, eg, traversalConfig.adjacentNodesFn(node), traversalConfig, fn)
 		})
