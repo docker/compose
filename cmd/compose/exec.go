@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/console"
 	"github.com/docker/cli/cli"
-	"github.com/spf13/cobra"
-
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/spf13/cobra"
 )
 
 type execOpts struct {
@@ -77,15 +78,22 @@ func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
-	project, err := opts.toProjectName()
+	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
-
+	projectOptions, err := opts.composeOptions.toProjectOptions()
+	if err != nil {
+		return err
+	}
+	lookupFn := func(k string) (string, bool) {
+		v, ok := projectOptions.Environment[k]
+		return v, ok
+	}
 	execOpts := api.RunOptions{
 		Service:     opts.service,
 		Command:     opts.command,
-		Environment: opts.environment,
+		Environment: compose.ToMobyEnv(types.NewMappingWithEquals(opts.environment).Resolve(lookupFn)),
 		Tty:         !opts.noTty,
 		User:        opts.user,
 		Privileged:  opts.privileged,
@@ -113,7 +121,7 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 		execOpts.Stdout = con
 		execOpts.Stderr = con
 	}
-	exitCode, err := backend.Exec(ctx, project, execOpts)
+	exitCode, err := backend.Exec(ctx, projectName, execOpts)
 	if exitCode != 0 {
 		errMsg := ""
 		if err != nil {
