@@ -261,7 +261,7 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
-const ServiceConditionRuningOrHealthy = "running_or_healthy"
+const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
@@ -273,7 +273,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			for {
 				<-ticker.C
 				switch config.Condition {
-				case ServiceConditionRuningOrHealthy:
+				case ServiceConditionRunningOrHealthy:
 					healthy, err := s.isServiceHealthy(ctx, project, dep, true)
 					if err != nil {
 						return err
