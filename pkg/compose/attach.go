@@ -142,7 +142,7 @@ func (s *composeService) getContainerStreams(ctx context.Context, container stri
 		Stdin:  true,
 		Stdout: true,
 		Stderr: true,
-		Logs:   false,
+		Logs:   true,
 	})
 	if err == nil {
 		stdout = ContainerStdout{HijackedResponse: cnx}
