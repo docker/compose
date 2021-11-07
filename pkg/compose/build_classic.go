@@ -243,6 +243,7 @@ func imageBuildOptions(options buildx.Options) dockertypes.ImageBuildOptions {
 func toMapStringStringPtr(source map[string]string) map[string]*string {
 	dest := make(map[string]*string)
 	for k, v := range source {
+		v := v
 		dest[k] = &v
 	}
 	return dest
