@@ -115,7 +115,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1
 				// Container terminated.
-				willRestart := inspected.HostConfig.RestartPolicy.MaximumRetryCount > restarted
+				willRestart := willContainerRestart(inspected, restarted)
 
 				listener(api.ContainerEvent{
 					Type:       api.ContainerEventExit,
@@ -161,4 +161,15 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 		return nil
 	}
 	return err
+}
+
+func willContainerRestart(container moby.ContainerJSON, restarted int) bool {
+	policy := container.HostConfig.RestartPolicy
+	if policy.IsAlways() || policy.IsUnlessStopped() {
+		return true
+	}
+	if policy.IsOnFailure() {
+		return container.State.ExitCode != 0 && policy.MaximumRetryCount > restarted
+	}
+	return false
 }
