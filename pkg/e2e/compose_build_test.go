@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +27,18 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
-func TestLocalComposeBuild(t *testing.T) {
+func TestLocalComposeBuild_Classic(t *testing.T) {
+	os.Setenv("DOCKER_BUILDKIT", "0")    //nolint:errcheck
+	defer os.Unsetenv("DOCKER_BUILDKIT") //nolint:errcheck
+	localComposeBuild(t)
+}
+func TestLocalComposeBuild_Buildkit(t *testing.T) {
+	os.Setenv("DOCKER_BUILDKIT", "1")    //nolint:errcheck
+	defer os.Unsetenv("DOCKER_BUILDKIT") //nolint:errcheck
+	localComposeBuild(t)
+}
+
+func localComposeBuild(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("build named and unnamed images", func(t *testing.T) {
