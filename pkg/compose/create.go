@@ -952,8 +952,8 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 		if volume.Bind != nil {
 			logrus.Warnf("mount of type `tmpfs` should not define `bind` option")
 		}
-		if volume.Tmpfs != nil {
-			logrus.Warnf("mount of type `tmpfs` should not define `volumeZ` option")
+		if volume.Volume != nil {
+			logrus.Warnf("mount of type `tmpfs` should not define `volume` option")
 		}
 		return nil, nil, buildTmpfsOptions(volume.Tmpfs)
 	}
