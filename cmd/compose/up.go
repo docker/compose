@@ -40,7 +40,6 @@ type composeOptions struct {
 type upOptions struct {
 	*composeOptions
 	Detach             bool
-	Environment        []string
 	noStart            bool
 	noDeps             bool
 	cascadeStop        bool
@@ -114,7 +113,6 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: serviceCompletion(p),
 	}
 	flags := upCmd.Flags()
-	flags.StringArrayVarP(&up.Environment, "environment", "e", []string{}, "Environment variables")
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
