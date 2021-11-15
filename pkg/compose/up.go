@@ -80,7 +80,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	var exitCode int
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		code, err := printer.Run(options.Start.CascadeStop, options.Start.ExitCodeFrom, stopFunc)
+		code, err := printer.Run(context.Background(), options.Start.CascadeStop, options.Start.ExitCodeFrom, stopFunc)
 		exitCode = code
 		return err
 	})
