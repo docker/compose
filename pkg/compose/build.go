@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
@@ -246,7 +247,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
-			DockerfilePath: filepath.Join(service.Build.Context, service.Build.Dockerfile),
+			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 		},
 		BuildArgs:   buildArgs,
 		Tags:        tags,
@@ -284,4 +285,11 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 		}
 	}
 	return merged
+}
+
+func dockerFilePath(context string, dockerfile string) string {
+	if path.IsAbs(dockerfile) {
+		return dockerfile
+	}
+	return filepath.Join(context, dockerfile)
 }
