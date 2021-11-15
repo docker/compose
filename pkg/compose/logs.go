@@ -42,7 +42,7 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 			})
 		})
 		eg.Go(func() error {
-			_, err := printer.Run(false, "", nil)
+			_, err := printer.Run(ctx, false, "", nil)
 			return err
 		})
 	}
