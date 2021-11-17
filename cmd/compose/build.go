@@ -61,6 +61,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				fmt.Println("WARNING --memory is ignored as not supported in buildkit.")
 			}
 			if opts.quiet {
+				opts.progress = buildx.PrinterModeQuiet
 				devnull, err := os.Open(os.DevNull)
 				if err != nil {
 					return err
