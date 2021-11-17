@@ -30,6 +30,7 @@ import (
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/docker/pkg/urlutil"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -288,7 +289,7 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 }
 
 func dockerFilePath(context string, dockerfile string) string {
-	if path.IsAbs(dockerfile) {
+	if urlutil.IsGitURL(context) || path.IsAbs(dockerfile) {
 		return dockerfile
 	}
 	return filepath.Join(context, dockerfile)
