@@ -20,9 +20,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	buildx "github.com/docker/buildx/util/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -37,6 +40,13 @@ type buildOptions struct {
 	args     []string
 	noCache  bool
 	memory   string
+}
+
+var printerModes = []string{
+	buildx.PrinterModeAuto,
+	buildx.PrinterModeTty,
+	buildx.PrinterModePlain,
+	buildx.PrinterModeQuiet,
 }
 
 func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -57,6 +67,9 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
+			if !utils.StringContains(printerModes, opts.progress) {
+				return fmt.Errorf("unsupported --progress value %q", opts.progress)
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -66,7 +79,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&opts.quiet, "quiet", "q", false, "Don't print anything to STDOUT")
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
-	cmd.Flags().StringVar(&opts.progress, "progress", "auto", `Set type of progress output ("auto", "plain", "noTty")`)
+	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
