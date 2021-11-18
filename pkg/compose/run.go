@@ -62,7 +62,7 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 	}
 
 	in := streams.NewIn(opts.Stdin)
-	if in.IsTerminal() {
+	if in.IsTerminal() && opts.Tty {
 		state, err := term.SetRawTerminal(in.FD())
 		if err != nil {
 			return 0, err
