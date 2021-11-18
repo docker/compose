@@ -69,7 +69,7 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 		depends := types.DependsOnConfig{}
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
-				Condition: ServiceConditionRuningOrHealthy,
+				Condition: ServiceConditionRunningOrHealthy,
 			}
 		}
 		err = s.waitDependencies(ctx, project, depends)
