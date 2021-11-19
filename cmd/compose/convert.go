@@ -44,6 +44,7 @@ type convertOptions struct {
 	quiet               bool
 	resolveImageDigests bool
 	noInterpolate       bool
+	noNormalize         bool
 	services            bool
 	volumes             bool
 	profiles            bool
@@ -65,6 +66,9 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 					return err
 				}
 				os.Stdout = devnull
+			}
+			if p.Compatibility {
+				opts.noNormalize = true
 			}
 			return nil
 		}),
@@ -91,6 +95,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
+	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model.")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
@@ -103,7 +108,10 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var json []byte
-	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate), cli.WithResolvedPaths(true))
+	project, err := opts.toProject(services,
+		cli.WithInterpolation(!opts.noInterpolate),
+		cli.WithResolvedPaths(true),
+		cli.WithNormalization(!opts.noNormalize))
 	if err != nil {
 		return err
 	}
