@@ -210,7 +210,7 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 		volume.Labels = volume.Labels.Add(api.VolumeLabel, k)
 		volume.Labels = volume.Labels.Add(api.ProjectLabel, project.Name)
 		volume.Labels = volume.Labels.Add(api.VersionLabel, api.ComposeVersion)
-		err := s.ensureVolume(ctx, volume)
+		err := s.ensureVolume(ctx, volume, project.Name)
 		if err != nil {
 			return err
 		}
@@ -1086,27 +1086,42 @@ func (s *composeService) removeNetwork(ctx context.Context, networkID string, ne
 	return nil
 }
 
-func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig) error {
-	// TODO could identify volume by label vs name
-	_, err := s.apiClient.VolumeInspect(ctx, volume.Name)
+func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) error {
+	inspected, err := s.apiClient.VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return err
 		}
-		eventName := fmt.Sprintf("Volume %q", volume.Name)
-		w := progress.ContextWriter(ctx)
-		w.Event(progress.CreatingEvent(eventName))
-		_, err := s.apiClient.VolumeCreate(ctx, volume_api.VolumeCreateBody{
-			Labels:     volume.Labels,
-			Name:       volume.Name,
-			Driver:     volume.Driver,
-			DriverOpts: volume.DriverOpts,
-		})
-		if err != nil {
-			w.Event(progress.ErrorEvent(eventName))
-			return err
-		}
-		w.Event(progress.CreatedEvent(eventName))
+		err := s.createVolume(ctx, volume)
+		return err
 	}
+
+	// Volume exists with name, but let's double check this is the expected one
+	// (better safe than sorry when it comes to user's data)
+	p, ok := inspected.Labels[api.ProjectLabel]
+	if !ok {
+		return fmt.Errorf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
+	}
+	if p != project {
+		return fmt.Errorf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
+	}
+	return nil
+}
+
+func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
+	eventName := fmt.Sprintf("Volume %q", volume.Name)
+	w := progress.ContextWriter(ctx)
+	w.Event(progress.CreatingEvent(eventName))
+	_, err := s.apiClient.VolumeCreate(ctx, volume_api.VolumeCreateBody{
+		Labels:     volume.Labels,
+		Name:       volume.Name,
+		Driver:     volume.Driver,
+		DriverOpts: volume.DriverOpts,
+	})
+	if err != nil {
+		w.Event(progress.ErrorEvent(eventName))
+		return err
+	}
+	w.Event(progress.CreatedEvent(eventName))
 	return nil
 }
