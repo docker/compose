@@ -696,21 +696,22 @@ func getDependentServiceFromMode(mode string) string {
 
 func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Project, service types.ServiceConfig,
 	inherit *moby.Container) (map[string]struct{}, []string, []mount.Mount, error) {
-	var mounts = []mount.Mount{}
 
+	for i, v := range service.Volumes {
+		service.Volumes[i].Target = path.Clean(v.Target)
+	}
+	var mounts []mount.Mount
 	image := getImageName(service, p.Name)
 	imgInspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, image)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
 	mountOptions, err := buildContainerMountOptions(p, service, imgInspect, inherit)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
 	volumeMounts := map[string]struct{}{}
-	binds := []string{}
+	var binds []string
 MOUNTS:
 	for _, m := range mountOptions {
 		volumeMounts[m.Target] = struct{}{}
@@ -736,15 +737,14 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 	var mounts = map[string]mount.Mount{}
 	if inherit != nil {
 		for _, m := range inherit.Mounts {
-			if m.Type == "tmpfs" {
+			if m.Type == mount.TypeTmpfs {
 				continue
 			}
 			src := m.Source
-			if m.Type == "volume" {
+			if m.Type == mount.TypeVolume {
 				src = m.Name
 			}
 			m.Destination = path.Clean(m.Destination)
-
 			if img.Config != nil {
 				if _, ok := img.Config.Volumes[m.Destination]; ok {
 					// inherit previous container's anonymous volume
@@ -756,7 +756,7 @@ func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby
 					}
 				}
 			}
-			volumes := []types.ServiceVolumeConfig{}
+			var volumes []types.ServiceVolumeConfig
 			for _, v := range s.Volumes {
 				if v.Target != m.Destination || v.Source != "" {
 					volumes = append(volumes, v)
@@ -830,6 +830,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 		} else if !isUnixAbs(config.Target) {
 			target = configsBaseDir + config.Target
 		}
+		target = path.Clean(target)
 
 		definedConfig := p.Configs[config.Source]
 		if definedConfig.External.External {
@@ -865,6 +866,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		} else if !isUnixAbs(secret.Target) {
 			target = secretsDir + secret.Target
 		}
+		target = path.Clean(target)
 
 		definedSecret := p.Secrets[secret.Source]
 		if definedSecret.External.External {
@@ -913,11 +915,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 			}
 		}
 	}
-
 	bind, vol, tmpfs := buildMountOptions(volume)
-
-	volume.Target = path.Clean(volume.Target)
-
 	return mount.Mount{
 		Type:          mount.Type(volume.Type),
 		Source:        source,

@@ -17,32 +17,251 @@
 package compose
 
 import (
+	"context"
 	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/mocks"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	mountTypes "github.com/docker/docker/api/types/mount"
+	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 )
 
-func TestBuildBindMount(t *testing.T) {
-	project := composetypes.Project{}
-	volume := composetypes.ServiceVolumeConfig{
-		Type:   composetypes.VolumeTypeBind,
-		Source: "",
-		Target: "/data",
-	}
-	mount, err := buildMount(project, volume)
+func TestBuildContainerVolumesBindsFromVolumes(t *testing.T) {
+	testBuildContainerVolumesBindsFromVolumes(t, "/data")
+	testBuildContainerVolumesBindsFromVolumes(t, "/data/")
+}
+
+func TestBuildContainerVolumesMountsFromVolumes(t *testing.T) {
+	testBuildContainerVolumesMountsFromVolumes(t, "/data")
+	testBuildContainerVolumesMountsFromVolumes(t, "/data/")
+}
+
+func TestBuildContainerVolumesMountsFromImageInherited(t *testing.T) {
+	testBuildContainerVolumesMountsFromImageInherited(t, "/data")
+	testBuildContainerVolumesMountsFromImageInherited(t, "/data/")
+}
+
+func TestBuildContainerVolumesMountsFromVolumeInherited(t *testing.T) {
+	testBuildContainerVolumesMountsFromVolumeInherited(t, "/data")
+	testBuildContainerVolumesMountsFromVolumeInherited(t, "/data/")
+}
+
+func TestBuildContainerVolumesMountsFromConfig(t *testing.T) {
+	testBuildContainerVolumesMountsFromConfig(t, "/data")
+	testBuildContainerVolumesMountsFromConfig(t, "/data/")
+}
+
+func TestBuildContainerVolumesMountsFromSecret(t *testing.T) {
+	testBuildContainerVolumesMountsFromSecret(t, "/data")
+	testBuildContainerVolumesMountsFromSecret(t, "/data/")
+}
+
+func testBuildContainerVolumesBindsFromVolumes(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{},
+		[]composetypes.ServiceVolumeConfig{
+			{
+				Type:   composetypes.VolumeTypeBind,
+				Source: "",
+				Target: target,
+				Bind: &composetypes.ServiceVolumeBind{
+					CreateHostPath: true,
+				},
+			},
+		}, nil, nil, nil)
 	assert.NilError(t, err)
-	assert.Assert(t, filepath.IsAbs(mount.Source))
-	_, err = os.Stat(mount.Source)
+
+	source, err := os.Getwd()
 	assert.NilError(t, err)
-	assert.Equal(t, mount.Type, mountTypes.TypeBind)
+	assert.DeepEqual(t, []string{
+		source + ":/data:rw",
+	}, binds)
+	assert.Equal(t, 0, len(mounts))
+}
+
+func testBuildContainerVolumesMountsFromVolumes(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{},
+		[]composetypes.ServiceVolumeConfig{
+			{
+				Type:   composetypes.VolumeTypeBind,
+				Source: "",
+				Target: target,
+			},
+		}, nil, nil, nil)
+	assert.NilError(t, err)
+
+	assert.Equal(t, 0, len(binds))
+	source, err := os.Getwd()
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []mountTypes.Mount{
+		{
+			Type:   mountTypes.TypeBind,
+			Source: source,
+			Target: "/data",
+		},
+	}, mounts)
+}
+
+func testBuildContainerVolumesMountsFromImageInherited(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{
+			Config: &container.Config{
+				Volumes: map[string]struct{}{
+					path.Clean(target): {}},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		&moby.Container{
+			Mounts: []moby.MountPoint{
+				{
+					Type:        mountTypes.TypeBind,
+					Source:      "source",
+					Destination: target,
+					RW:          true,
+				},
+			},
+		})
+	assert.NilError(t, err)
+
+	assert.Equal(t, 0, len(binds))
+	assert.DeepEqual(t, []mountTypes.Mount{
+		{
+			Type:   mountTypes.TypeBind,
+			Source: "source",
+			Target: "/data",
+		},
+	}, mounts)
+}
+
+func testBuildContainerVolumesMountsFromVolumeInherited(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{},
+		[]types.ServiceVolumeConfig{
+			{
+				Type:   composetypes.VolumeTypeBind,
+				Target: target,
+			},
+		},
+		nil,
+		nil,
+		&moby.Container{
+			Mounts: []moby.MountPoint{
+				{
+					Type:        mountTypes.TypeBind,
+					Source:      "source",
+					Destination: path.Clean(target),
+					RW:          true,
+				},
+			},
+		})
+	assert.NilError(t, err)
+
+	assert.Equal(t, 0, len(binds))
+	assert.DeepEqual(t, []mountTypes.Mount{
+		{
+			Type:   mountTypes.TypeBind,
+			Source: "source",
+			Target: "/data",
+		},
+	}, mounts)
+}
+
+func testBuildContainerVolumesMountsFromConfig(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{},
+		[]types.ServiceVolumeConfig{
+			{
+				Type:   composetypes.VolumeTypeBind,
+				Target: target,
+			},
+		},
+		[]types.ServiceConfigObjConfig{
+			{
+				Target: target,
+			},
+		}, nil, nil)
+	assert.NilError(t, err)
+
+	assert.Equal(t, 0, len(binds))
+	source, err := os.Getwd()
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []mountTypes.Mount{
+		{
+			Type:   mountTypes.TypeBind,
+			Source: source,
+			Target: "/data",
+		},
+	}, mounts)
+}
+
+func testBuildContainerVolumesMountsFromSecret(t *testing.T, target string) {
+	binds, mounts, err := testBuildContainerVolumes(t,
+		moby.ImageInspect{},
+		[]types.ServiceVolumeConfig{
+			{
+				Type:   composetypes.VolumeTypeBind,
+				Target: target,
+			},
+		},
+		nil,
+		[]types.ServiceSecretConfig{
+			{
+				Target: target,
+			},
+		}, nil)
+	assert.NilError(t, err)
+
+	assert.Equal(t, 0, len(binds))
+	source, err := os.Getwd()
+	assert.NilError(t, err)
+	assert.DeepEqual(t, []mountTypes.Mount{
+		{
+			Type:   mountTypes.TypeBind,
+			Source: source,
+			Target: "/data",
+		},
+	}, mounts)
+}
+
+func testBuildContainerVolumes(
+	t *testing.T,
+	image moby.ImageInspect,
+	volumes []composetypes.ServiceVolumeConfig,
+	configs []composetypes.ServiceConfigObjConfig,
+	secrets []composetypes.ServiceSecretConfig,
+	inherit *moby.Container) ([]string, []mountTypes.Mount, error) {
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI := mocks.NewMockAPIClient(mockCtrl)
+	ctx := context.Background()
+	mockAPI.EXPECT().ImageInspectWithRaw(gomock.Any(), gomock.Any()).Return(image, nil, nil)
+
+	s := &composeService{apiClient: mockAPI}
+	volumeMounts, binds, mounts, err := s.buildContainerVolumes(ctx,
+		composetypes.Project{},
+		composetypes.ServiceConfig{
+			Volumes: volumes,
+			Configs: configs,
+			Secrets: secrets,
+		}, inherit)
+
+	assert.NilError(t, err)
+	assert.DeepEqual(t, map[string]struct{}{
+		"/data": {},
+	}, volumeMounts)
+	return binds, mounts, err
 }
 
 func TestBuildVolumeMount(t *testing.T) {
