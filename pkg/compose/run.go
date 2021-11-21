@@ -156,7 +156,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	service.Labels = service.Labels.Add(api.SlugLabel, slug)
 	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
 
-	if err := s.ensureImagesExists(ctx, project, false); err != nil { // all dependencies already checked, but might miss service img
+	if err := s.ensureImagesExists(ctx, project, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
 	}
 	if !opts.NoDeps {
