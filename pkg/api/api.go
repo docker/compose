@@ -227,6 +227,8 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
+	// QuietPull makes the pulling process quiet
+	QuietPull bool
 	// used by exec
 	Index int
 }

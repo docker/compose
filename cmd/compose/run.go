@@ -54,6 +54,7 @@ type runOptions struct {
 	servicePorts  bool
 	name          string
 	noDeps        bool
+	quietPull     bool
 }
 
 func (opts runOptions) apply(project *types.Project) error {
@@ -158,6 +159,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
 	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
+	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
 	flags.SetInterspersed(false)
@@ -220,6 +222,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		UseNetworkAliases: opts.useAliases,
 		NoDeps:            opts.noDeps,
 		Index:             0,
+		QuietPull:         opts.quietPull,
 	}
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
