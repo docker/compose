@@ -48,6 +48,7 @@ type convertOptions struct {
 	services            bool
 	volumes             bool
 	profiles            bool
+	images              bool
 	hash                string
 }
 
@@ -85,6 +86,9 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if opts.profiles {
 				return runProfiles(opts, args)
 			}
+			if opts.images {
+				return runConfigImages(opts, args)
+			}
 
 			return runConvert(ctx, backend, opts, args)
 		}),
@@ -100,6 +104,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
 	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
+	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
@@ -212,6 +217,21 @@ func runProfiles(opts convertOptions, services []string) error {
 	sort.Strings(profiles)
 	for _, p := range profiles {
 		fmt.Println(p)
+	}
+	return nil
+}
+
+func runConfigImages(opts convertOptions, services []string) error {
+	project, err := opts.toProject(services)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		if s.Image != "" {
+			fmt.Println(s.Image)
+		} else {
+			fmt.Printf("%s_%s\n", project.Name, s.Name)
+		}
 	}
 	return nil
 }
