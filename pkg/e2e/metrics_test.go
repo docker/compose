@@ -36,7 +36,7 @@ func TestComposeMetrics(t *testing.T) {
 		res = c.RunDockerOrExitError("compose", "-f", "fixtures/wrong-composefile/compose.yaml", "up", "-d")
 		res.Assert(t, icmd.Expected{ExitCode: 15, Err: "services.simple Additional property wrongField is not allowed"})
 		res = c.RunDockerOrExitError("compose", "up")
-		res.Assert(t, icmd.Expected{ExitCode: 14, Err: "can't find a suitable configuration file in this directory or any parent: not found"})
+		res.Assert(t, icmd.Expected{ExitCode: 14, Err: "no configuration file provided: not found"})
 		res = c.RunDockerOrExitError("compose", "up", "-f", "fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown shorthand flag: 'f' in -f"})
 		res = c.RunDockerOrExitError("compose", "up", "--file", "fixtures/wrong-composefile/compose.yaml")
