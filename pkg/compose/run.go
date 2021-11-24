@@ -153,8 +153,9 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if service.Deploy != nil {
 		service.Deploy.RestartPolicy = nil
 	}
-	service.Labels = service.Labels.Add(api.SlugLabel, slug)
-	service.Labels = service.Labels.Add(api.OneoffLabel, "True")
+	service.CustomLabels = service.CustomLabels.
+		Add(api.SlugLabel, slug).
+		Add(api.OneoffLabel, "True")
 
 	if err := s.ensureImagesExists(ctx, project, opts.QuietPull); err != nil { // all dependencies already checked, but might miss service img
 		return "", err
