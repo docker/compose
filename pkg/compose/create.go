@@ -229,7 +229,7 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
 	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	labels, err := s.prepareLabels(p, service, number)
+	labels, err := s.prepareLabels(service, number)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -414,28 +414,23 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, error
 	return securityOpts, nil
 }
 
-func (s *composeService) prepareLabels(p *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
+func (s *composeService) prepareLabels(service types.ServiceConfig, number int) (map[string]string, error) {
 	labels := map[string]string{}
 	for k, v := range service.Labels {
 		labels[k] = v
 	}
-
-	labels[api.ProjectLabel] = p.Name
-	labels[api.ServiceLabel] = service.Name
-	labels[api.VersionLabel] = api.ComposeVersion
-	if _, ok := service.Labels[api.OneoffLabel]; !ok {
-		labels[api.OneoffLabel] = "False"
+	for k, v := range service.CustomLabels {
+		labels[k] = v
 	}
 
 	hash, err := ServiceHash(service)
 	if err != nil {
 		return nil, err
 	}
-
 	labels[api.ConfigHashLabel] = hash
-	labels[api.WorkingDirLabel] = p.WorkingDir
-	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
+
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+
 	var dependencies []string
 	for s := range service.DependsOn {
 		dependencies = append(dependencies, s)
