@@ -104,9 +104,9 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 }
 
 func dirContents(dir string) []string {
-	res := []string{}
+	var res []string
 	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		res = append(res, filepath.Join(dir, path))
+		res = append(res, path)
 		return nil
 	})
 	return res
