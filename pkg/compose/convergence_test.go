@@ -17,10 +17,16 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/mocks"
+	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/golang/mock/gomock"
 	"gotest.tools/assert"
 )
 
@@ -45,4 +51,129 @@ func TestContainerName(t *testing.T) {
 	s.Deploy.Replicas = &two
 	_, err = getScale(s)
 	assert.Error(t, err, fmt.Sprintf(doubledContainerNameWarning, s.Name, s.ContainerName))
+}
+
+func TestServiceLinks(t *testing.T) {
+	const dbContainerName = "/" + testProject + "-db-1"
+	const webContainerName = "/" + testProject + "-web-1"
+	s := types.ServiceConfig{
+		Name:  "web",
+		Scale: 1,
+	}
+
+	containerListOptions := moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(testProject),
+			serviceFilter("db"),
+			oneOffFilter(false),
+		),
+		All: true,
+	}
+
+	t.Run("service links default", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		tested.apiClient = apiClient
+
+		s.Links = []string{"db"}
+
+		c := testContainer("db", dbContainerName, false)
+		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
+
+		links := tested.getLinks(context.Background(), testProject, s, 1)
+
+		assert.Equal(t, len(links), 3)
+		assert.Equal(t, links[0], "testProject-db-1:db")
+		assert.Equal(t, links[1], "testProject-db-1:db-1")
+		assert.Equal(t, links[2], "testProject-db-1:testProject-db-1")
+	})
+
+	t.Run("service links", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		tested.apiClient = apiClient
+
+		s.Links = []string{"db:db"}
+
+		c := testContainer("db", dbContainerName, false)
+
+		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
+		links := tested.getLinks(context.Background(), testProject, s, 1)
+
+		assert.Equal(t, len(links), 3)
+		assert.Equal(t, links[0], "testProject-db-1:db")
+		assert.Equal(t, links[1], "testProject-db-1:db-1")
+		assert.Equal(t, links[2], "testProject-db-1:testProject-db-1")
+	})
+
+	t.Run("service links name", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		tested.apiClient = apiClient
+
+		s.Links = []string{"db:dbname"}
+
+		c := testContainer("db", dbContainerName, false)
+		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
+
+		links := tested.getLinks(context.Background(), testProject, s, 1)
+
+		assert.Equal(t, len(links), 3)
+		assert.Equal(t, links[0], "testProject-db-1:dbname")
+		assert.Equal(t, links[1], "testProject-db-1:db-1")
+		assert.Equal(t, links[2], "testProject-db-1:testProject-db-1")
+	})
+
+	t.Run("service links external links", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		tested.apiClient = apiClient
+
+		s.Links = []string{"db:dbname"}
+		s.ExternalLinks = []string{"db1:db2"}
+
+		c := testContainer("db", dbContainerName, false)
+		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
+
+		links := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.Equal(t, len(links), 4)
+		assert.Equal(t, links[0], "testProject-db-1:dbname")
+		assert.Equal(t, links[1], "testProject-db-1:db-1")
+		assert.Equal(t, links[2], "testProject-db-1:testProject-db-1")
+
+		// ExternalLink
+		assert.Equal(t, links[3], "db1:db2")
+	})
+
+	t.Run("service links itself oneoff", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient := mocks.NewMockAPIClient(mockCtrl)
+		tested.apiClient = apiClient
+
+		s.Links = []string{}
+		s.ExternalLinks = []string{}
+		s.Labels = s.Labels.Add(api.OneoffLabel, "True")
+
+		c := testContainer("web", webContainerName, true)
+		containerListOptionsOneOff := moby.ContainerListOptions{
+			Filters: filters.NewArgs(
+				projectFilter(testProject),
+				serviceFilter("web"),
+				oneOffFilter(false),
+			),
+			All: true,
+		}
+		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptionsOneOff).Return([]moby.Container{c}, nil)
+
+		links := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.Equal(t, len(links), 3)
+		assert.Equal(t, links[0], "testProject-web-1:web")
+		assert.Equal(t, links[1], "testProject-web-1:web-1")
+		assert.Equal(t, links[2], "testProject-web-1:testProject-web-1")
+	})
 }
