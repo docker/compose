@@ -448,7 +448,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Networks: inspectedContainer.NetworkSettings.Networks,
 		},
 	}
-	links := append(service.Links, service.ExternalLinks...)
+	links := s.getLinks(ctx, project.Name, service, number)
 	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]
 		cfg := service.Networks[netName]
@@ -474,6 +474,64 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		}
 	}
 	return created, err
+}
+
+// getLinks mimics V1 compose/service.py::Service::_get_links()
+func (s composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) []string {
+	var links []string
+	format := func(k, v string) string {
+		return fmt.Sprintf("%s:%s", k, v)
+	}
+	getServiceContainers := func(serviceName string) (Containers, error) {
+		return s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	}
+
+	for _, rawLink := range service.Links {
+		linkSplit := strings.Split(rawLink, ":")
+		linkServiceName := linkSplit[0]
+		l := linkServiceName
+		if len(linkSplit) == 2 {
+			l = linkSplit[1] // linkName if informed like in: "serviceName:linkName"
+		}
+		cnts, err := getServiceContainers(linkServiceName)
+		if err != nil {
+			return nil
+		}
+		for _, c := range cnts {
+			containerName := getCanonicalContainerName(c)
+			links = append(links,
+				format(containerName, l),
+				format(containerName, strings.Join([]string{linkServiceName, strconv.Itoa(number)}, Separator)),
+				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, Separator)),
+			)
+		}
+	}
+
+	if service.Labels[api.OneoffLabel] == "True" {
+		cnts, err := getServiceContainers(service.Name)
+		if err != nil {
+			return nil
+		}
+		for _, c := range cnts {
+			containerName := getCanonicalContainerName(c)
+			links = append(links,
+				format(containerName, service.Name),
+				format(containerName, strings.TrimPrefix(containerName, projectName+Separator)),
+				format(containerName, containerName),
+			)
+		}
+	}
+
+	for _, rawExtLink := range service.ExternalLinks {
+		extLinkSplit := strings.Split(rawExtLink, ":")
+		externalLink := extLinkSplit[0]
+		linkName := externalLink
+		if len(extLinkSplit) == 2 {
+			linkName = extLinkSplit[1]
+		}
+		links = append(links, format(externalLink, linkName))
+	}
+	return links
 }
 
 func shortIDAliasExists(containerID string, aliases ...string) bool {
