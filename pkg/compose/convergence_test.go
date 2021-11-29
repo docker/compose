@@ -81,7 +81,8 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
 
-		links := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
 		assert.Equal(t, links[0], "testProject-db-1:db")
@@ -100,7 +101,8 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
-		links := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
 		assert.Equal(t, links[0], "testProject-db-1:db")
@@ -119,7 +121,8 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
 
-		links := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.NilError(t, err)
 
 		assert.Equal(t, len(links), 3)
 		assert.Equal(t, links[0], "testProject-db-1:dbname")
@@ -139,7 +142,9 @@ func TestServiceLinks(t *testing.T) {
 		c := testContainer("db", dbContainerName, false)
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptions).Return([]moby.Container{c}, nil)
 
-		links := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.NilError(t, err)
+
 		assert.Equal(t, len(links), 4)
 		assert.Equal(t, links[0], "testProject-db-1:dbname")
 		assert.Equal(t, links[1], "testProject-db-1:db-1")
@@ -170,7 +175,9 @@ func TestServiceLinks(t *testing.T) {
 		}
 		apiClient.EXPECT().ContainerList(gomock.Any(), containerListOptionsOneOff).Return([]moby.Container{c}, nil)
 
-		links := tested.getLinks(context.Background(), testProject, s, 1)
+		links, err := tested.getLinks(context.Background(), testProject, s, 1)
+		assert.NilError(t, err)
+
 		assert.Equal(t, len(links), 3)
 		assert.Equal(t, links[0], "testProject-web-1:web")
 		assert.Equal(t, links[1], "testProject-web-1:web-1")
