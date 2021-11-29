@@ -261,6 +261,7 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
+// ServiceConditionRunningOrHealthy is a service condition on statys running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
@@ -448,7 +449,10 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Networks: inspectedContainer.NetworkSettings.Networks,
 		},
 	}
-	links := s.getLinks(ctx, project.Name, service, number)
+	links, err := s.getLinks(ctx, project.Name, service, number)
+	if err != nil {
+		return created, err
+	}
 	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]
 		cfg := service.Networks[netName]
@@ -477,7 +481,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 }
 
 // getLinks mimics V1 compose/service.py::Service::_get_links()
-func (s composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) []string {
+func (s composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
 	var links []string
 	format := func(k, v string) string {
 		return fmt.Sprintf("%s:%s", k, v)
@@ -495,7 +499,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 		}
 		cnts, err := getServiceContainers(linkServiceName)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 		for _, c := range cnts {
 			containerName := getCanonicalContainerName(c)
@@ -510,7 +514,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 	if service.Labels[api.OneoffLabel] == "True" {
 		cnts, err := getServiceContainers(service.Name)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 		for _, c := range cnts {
 			containerName := getCanonicalContainerName(c)
@@ -531,7 +535,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 		}
 		links = append(links, format(externalLink, linkName))
 	}
-	return links
+	return links, nil
 }
 
 func shortIDAliasExists(containerID string, aliases ...string) bool {
