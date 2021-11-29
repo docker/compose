@@ -1,0 +1,9 @@
+services:
+  multiargs:
+    build:
+      context: .
+      args:
+        IMAGE: alpine
+        TAG: latest
+      labels:
+        - RESULT=SUCCESS
