@@ -489,9 +489,9 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 	for _, rawLink := range service.Links {
 		linkSplit := strings.Split(rawLink, ":")
 		linkServiceName := linkSplit[0]
-		l := linkServiceName
+		linkName := linkServiceName
 		if len(linkSplit) == 2 {
-			l = linkSplit[1] // linkName if informed like in: "serviceName:linkName"
+			linkName = linkSplit[1] // linkName if informed like in: "serviceName:linkName"
 		}
 		cnts, err := getServiceContainers(linkServiceName)
 		if err != nil {
@@ -500,7 +500,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 		for _, c := range cnts {
 			containerName := getCanonicalContainerName(c)
 			links = append(links,
-				format(containerName, l),
+				format(containerName, linkName),
 				format(containerName, strings.Join([]string{linkServiceName, strconv.Itoa(number)}, Separator)),
 				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, Separator)),
 			)
