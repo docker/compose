@@ -23,7 +23,6 @@ import (
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/compose-switch/redirect"
 	"github.com/spf13/cobra"
 
 	commands "github.com/docker/compose/v2/cmd/compose"
@@ -69,7 +68,7 @@ func pluginMain() {
 
 func main() {
 	if commands.RunningAsStandalone() {
-		os.Args = append([]string{"docker"}, redirect.Convert(os.Args[1:])...)
+		os.Args = append([]string{"docker"}, convert(os.Args[1:])...)
 	}
 	pluginMain()
 }
