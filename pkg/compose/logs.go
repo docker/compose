@@ -34,25 +34,43 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
-	if options.Follow {
-		printer := newLogPrinter(consumer)
-		eg.Go(func() error {
-			return s.watchContainers(ctx, projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
-				return s.logContainers(ctx, consumer, c, options)
-			})
-		})
-		eg.Go(func() error {
-			_, err := printer.Run(ctx, false, "", nil)
-			return err
-		})
-	}
-
 	for _, c := range containers {
 		c := c
 		eg.Go(func() error {
 			return s.logContainers(ctx, consumer, c, options)
 		})
 	}
+
+	if options.Follow {
+		printer := newLogPrinter(consumer)
+		eg.Go(func() error {
+			for _, c := range containers {
+				printer.HandleEvent(api.ContainerEvent{
+					Type:      api.ContainerEventAttach,
+					Container: getContainerNameWithoutProject(c),
+					Service:   c.Labels[api.ServiceLabel],
+				})
+			}
+			return nil
+		})
+
+		eg.Go(func() error {
+			return s.watchContainers(ctx, projectName, options.Services, printer.HandleEvent, containers, func(c types.Container) error {
+				printer.HandleEvent(api.ContainerEvent{
+					Type:      api.ContainerEventAttach,
+					Container: getContainerNameWithoutProject(c),
+					Service:   c.Labels[api.ServiceLabel],
+				})
+				return s.logContainers(ctx, consumer, c, options)
+			})
+		})
+
+		eg.Go(func() error {
+			_, err := printer.Run(ctx, false, "", nil)
+			return err
+		})
+	}
+
 	return eg.Wait()
 }
 
