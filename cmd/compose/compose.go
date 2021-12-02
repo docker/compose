@@ -212,11 +212,11 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithName(o.ProjectName))...)
 }
 
-const pluginName = "compose"
+const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program
 func RunningAsStandalone() bool {
-	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != pluginName
+	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
 }
 
 // RootCommand returns the compose command with its child commands
@@ -230,7 +230,7 @@ func RootCommand(backend api.Service) *cobra.Command {
 	)
 	command := &cobra.Command{
 		Short:            "Docker Compose",
-		Use:              pluginName,
+		Use:              PluginName,
 		TraverseChildren: true,
 		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
 		RunE: func(cmd *cobra.Command, args []string) error {

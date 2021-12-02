@@ -353,8 +353,6 @@ github.com/docker/cli v20.10.7+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHv
 github.com/docker/cli-docs-tool v0.1.1 h1:c6vuTMvogCkSFQCXIr6Mb4gFgUpdZ+28YMbCBfaQLik=
 github.com/docker/cli-docs-tool v0.1.1/go.mod h1:oMzPNt1wC3TcxuY22GMnOODNOxkwGH51gV3AhqAjFQ4=
 github.com/docker/compose-on-kubernetes v0.4.19-0.20190128150448-356b2919c496/go.mod h1:iT2pYfi580XlpaV4KmK0T6+4/9+XoKmk/fhoDod1emE=
-github.com/docker/compose-switch v1.0.2 h1:chXFNNcnRvmtQYzwTaVsv/KSLRt8riSRAiSav89mLfk=
-github.com/docker/compose-switch v1.0.2/go.mod h1:uyPj8S3oH1O9rSZ5QVozw28OIjdNIflSSYElC2P0plQ=
 github.com/docker/distribution v0.0.0-20190905152932-14b96e55d84c/go.mod h1:0+TTO4EOBfRPhZXAeF1Vu+W3hHZ8eLp8PgKVZlcvtFY=
 github.com/docker/distribution v2.6.0-rc.1.0.20180327202408-83389a148052+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/distribution v2.7.0+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
@@ -967,7 +965,6 @@ github.com/spf13/cobra v0.0.3/go.mod h1:1l0Ry5zgKvJasoi3XT1TypsSe7PqH0Sj9dhYf7v3
 github.com/spf13/cobra v0.0.5/go.mod h1:3K3wKZymM7VvHMDS9+Akkh4K60UwM26emMESw8tLCHU=
 github.com/spf13/cobra v1.0.0/go.mod h1:/6GTrnGXV9HjY+aR4k0oJ5tcvakLuG6EuKReYlHNrgE=
 github.com/spf13/cobra v1.1.1/go.mod h1:WnodtKOvamDL/PwE2M4iKs8aMDBZ5Q5klgD3qfVJQMI=
-github.com/spf13/cobra v1.1.3/go.mod h1:pGADOWyqRD/YMrPZigI/zbliZ2wVD/23d+is3pSWzOo=
 github.com/spf13/cobra v1.2.1 h1:+KmjbUw1hriSNMF55oPrkZcb27aECyrj8V2ytv7kWDw=
 github.com/spf13/cobra v1.2.1/go.mod h1:ExllRjgxM/piMAM+3tAZvg8fsklGAf3tPfi+i8t68Nk=
 github.com/spf13/jwalterweatherman v1.0.0/go.mod h1:cQK4TGJAtQXfYWX+Ddv3mKDzgVb68N+wFjFa4jdeBTo=
