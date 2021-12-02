@@ -1103,14 +1103,13 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		return nil
 	}
 
-	// Volume exists with name, but let's double check this is the expected one
-	// (better safe than sorry when it comes to user's data)
+	// Volume exists with name, but let's double-check this is the expected one
 	p, ok := inspected.Labels[api.ProjectLabel]
 	if !ok {
-		return fmt.Errorf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
+		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
 	}
-	if p != project {
-		return fmt.Errorf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
+	if ok && p != project {
+		logrus.Warnf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
 	}
 	return nil
 }
