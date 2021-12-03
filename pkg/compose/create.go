@@ -380,6 +380,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Isolation:      container.Isolation(service.Isolation),
 		Runtime:        service.Runtime,
 		LogConfig:      logConfig,
+		GroupAdd:       service.GroupAdd,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
