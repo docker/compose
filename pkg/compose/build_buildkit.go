@@ -18,7 +18,9 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
@@ -46,6 +48,12 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 	defer cancel()
 	w := xprogress.NewPrinter(progressCtx, os.Stdout, mode)
 
+	var servicesName []string
+	for name := range opts {
+		servicesName = append(servicesName, name[strings.LastIndex(name, "_")+1:])
+	}
+	fmt.Printf("building %s\n", strings.Join(servicesName, ", "))
+
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	response, err := build.Build(ctx, driverInfo, opts, nil, nil, w)
 	errW := w.Wait()
@@ -66,6 +74,15 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 			continue
 		}
 		imagesBuilt[name] = digest
+	}
+	if len(servicesName) > 1 {
+		fmt.Printf("WARNING: Images for services %s were built because they did not already exist. "+
+			"To rebuild those images you must use `docker compose build` or `docker compose up --build`.\n",
+			strings.Join(servicesName, ", "))
+	} else {
+		fmt.Printf("WARNING: Image for service %s was built because it did not already exist. "+
+			"To rebuild this image you must use `docker compose build` or `docker compose up --build`.\n",
+			servicesName[0])
 	}
 
 	return imagesBuilt, err

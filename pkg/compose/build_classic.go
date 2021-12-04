@@ -45,11 +45,14 @@ func (s *composeService) doBuildClassic(ctx context.Context, opts map[string]bui
 	var nameDigests = make(map[string]string)
 	var errs error
 	for name, o := range opts {
+		serviceName := name[strings.LastIndex(name, "_")+1:]
+		fmt.Printf("building %s\n", serviceName)
 		digest, err := s.doBuildClassicSimpleImage(ctx, o)
 		if err != nil {
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
 		nameDigests[name] = digest
+		fmt.Printf("WARNING: Image for service %s was built because it did not already exist. To rebuild this image you must use `docker compose build` or `docker compose up --build`.\n", serviceName)
 	}
 
 	return nameDigests, errs
