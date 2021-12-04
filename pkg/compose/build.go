@@ -86,6 +86,10 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 	}
 
+	if options.Quiet {
+		options.Progress = xprogress.PrinterModeQuiet
+	}
+
 	_, err = s.doBuild(ctx, project, opts, options.Progress)
 	if err == nil {
 		if len(imagesToBuild) > 0 && !options.Quiet {
@@ -291,7 +295,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts,
+		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
 	}, nil
 }

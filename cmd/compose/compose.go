@@ -321,6 +321,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		pullCommand(&opts, backend),
 		createCommand(&opts, backend),
 		copyCommand(&opts, backend),
+		watchCommand(&opts, backend),
 	)
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
