@@ -50,6 +50,7 @@ type convertOptions struct {
 	profiles            bool
 	images              bool
 	hash                string
+	onlyBuilt           bool
 }
 
 func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -105,6 +106,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
 	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
 	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
+	flags.BoolVar(&opts.onlyBuilt, "only-built", false, "filter only services which uses built images")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
@@ -227,11 +229,16 @@ func runConfigImages(opts convertOptions, services []string) error {
 		return err
 	}
 	for _, s := range project.Services {
-		if s.Image != "" {
-			fmt.Println(s.Image)
-		} else {
-			fmt.Printf("%s_%s\n", project.Name, s.Name)
+		if !opts.onlyBuilt || (opts.onlyBuilt && s.Build != nil) {
+			fmt.Println(getImageName(s, *project))
 		}
 	}
 	return nil
+}
+
+func getImageName(s types.ServiceConfig, p types.Project) string {
+	if s.Image != "" {
+		return s.Image
+	}
+	return fmt.Sprintf("%s_%s", p.Name, s.Name)
 }
