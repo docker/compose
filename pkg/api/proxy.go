@@ -48,6 +48,7 @@ type ServiceProxy struct {
 	EventsFn             func(ctx context.Context, project string, options EventsOptions) error
 	PortFn               func(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
 	ImagesFn             func(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	WatchFn              func(ctx context.Context, project *types.Project, options WatchOptions) error
 	interceptors         []Interceptor
 }
 
@@ -87,6 +88,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.EventsFn = service.Events
 	s.PortFn = service.Port
 	s.ImagesFn = service.Images
+	s.WatchFn = service.Watch
 	return s
 }
 
@@ -325,4 +327,12 @@ func (s *ServiceProxy) Images(ctx context.Context, project string, options Image
 		return nil, ErrNotImplemented
 	}
 	return s.ImagesFn(ctx, project, options)
+}
+
+// Watch implements Service interface
+func (s *ServiceProxy) Watch(ctx context.Context, project *types.Project, options WatchOptions) error {
+	if s.WatchFn == nil {
+		return ErrNotImplemented
+	}
+	return s.WatchFn(ctx, project, options)
 }

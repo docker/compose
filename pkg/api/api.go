@@ -76,6 +76,12 @@ type Service interface {
 	Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	// Watch services' build context and rebuild/restart image on changes
+	Watch(ctx context.Context, project *types.Project, options WatchOptions) error
+}
+
+// WatchOptions group options of the Watch API
+type WatchOptions struct {
 }
 
 // BuildOptions group options of the Build API

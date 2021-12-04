@@ -82,7 +82,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 					Attrs: map[string]string{"ref": image},
 				})
 			}
-
 			opts[imageName] = buildOptions
 		}
 	}
