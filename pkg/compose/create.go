@@ -1014,6 +1014,14 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			if n.External.External {
+				if n.Driver == "overlay" {
+					// Swarm nodes do not register overlay networks that were
+					// created on a different node unless they're in use.
+					// Here we assume `driver` is relevant for a network we don't manage
+					// which is a non-sense, but this is our legacy ¯\(ツ)/¯
+					// networkAttach will later fail anyway if network actually doesn't exists
+					return nil
+				}
 				return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 			}
 			var ipam *network.IPAM
