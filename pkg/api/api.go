@@ -63,7 +63,7 @@ type Service interface {
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project string, opts RunOptions) (int, error)
 	// Copy copies a file/folder between a service container and the local filesystem
-	Copy(ctx context.Context, project *types.Project, opts CopyOptions) error
+	Copy(ctx context.Context, project string, options CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
 	Pause(ctx context.Context, project string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`

@@ -41,7 +41,7 @@ type ServiceProxy struct {
 	RunOneOffContainerFn func(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	RemoveFn             func(ctx context.Context, project *types.Project, options RemoveOptions) error
 	ExecFn               func(ctx context.Context, project string, opts RunOptions) (int, error)
-	CopyFn               func(ctx context.Context, project *types.Project, opts CopyOptions) error
+	CopyFn               func(ctx context.Context, project string, options CopyOptions) error
 	PauseFn              func(ctx context.Context, project string, options PauseOptions) error
 	UnPauseFn            func(ctx context.Context, project string, options PauseOptions) error
 	TopFn                func(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
@@ -269,12 +269,9 @@ func (s *ServiceProxy) Exec(ctx context.Context, project string, options RunOpti
 }
 
 // Copy implements Service interface
-func (s *ServiceProxy) Copy(ctx context.Context, project *types.Project, options CopyOptions) error {
+func (s *ServiceProxy) Copy(ctx context.Context, project string, options CopyOptions) error {
 	if s.CopyFn == nil {
 		return ErrNotImplemented
-	}
-	for _, i := range s.interceptors {
-		i(ctx, project)
 	}
 	return s.CopyFn(ctx, project, options)
 }
