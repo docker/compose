@@ -212,6 +212,7 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 			cli.WithName(o.ProjectName))...)
 }
 
+// PluginName is the name of the plugin
 const PluginName = "compose"
 
 // RunningAsStandalone detects when running as a standalone program

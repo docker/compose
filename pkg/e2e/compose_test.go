@@ -33,22 +33,17 @@ import (
 
 var binDir string
 
-func TestMain(m *testing.M) {
-	exitCode := m.Run()
-	os.Exit(exitCode)
-}
-
 func TestLocalComposeUp(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	const projectName = "compose-e2e-demo"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check accessing running app", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:90"
@@ -60,7 +55,7 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("top", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "top")
+		res := c.RunDockerComposeCmd("-p", projectName, "top")
 		output := res.Stdout()
 		head := []string{"UID", "PID", "PPID", "C", "STIME", "TTY", "TIME", "CMD"}
 		for _, h := range head {
@@ -98,21 +93,21 @@ func TestLocalComposeUp(t *testing.T) {
 			StdoutContains(`"Name":"compose-e2e-demo-web-1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
 			5*time.Second, 1*time.Second)
 
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `NAME                       COMMAND                  SERVICE             STATUS              PORTS`})
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp, :::90->80/tcp`})
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
 	})
 
 	t.Run("images", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "images")
+		res := c.RunDockerComposeCmd("-p", projectName, "images")
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      gtardif/sentences-db    latest`})
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     gtardif/sentences-web   latest`})
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-words-1   gtardif/sentences-api   latest`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 
 	t.Run("check containers after down", func(t *testing.T) {
@@ -137,7 +132,6 @@ func TestComposePull(t *testing.T) {
 }
 
 func TestDownComposefileInParentFolder(t *testing.T) {
-
 	c := NewParallelE2eCLI(t, binDir)
 
 	tmpFolder, err := ioutil.TempDir("fixtures/simple-composefile", "test-tmp")
@@ -145,10 +139,10 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 	defer os.Remove(tmpFolder) // nolint: errcheck
 	projectName := filepath.Base(tmpFolder)
 
-	res := c.RunDockerCmd("compose", "--project-directory", tmpFolder, "up", "-d")
+	res := c.RunDockerComposeCmd("--project-directory", tmpFolder, "up", "-d")
 	res.Assert(t, icmd.Expected{Err: "Started", ExitCode: 0})
 
-	res = c.RunDockerCmd("compose", "-p", projectName, "down")
+	res = c.RunDockerComposeCmd("-p", projectName, "down")
 	res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
 }
 
@@ -181,11 +175,11 @@ func TestRm(t *testing.T) {
 	const projectName = "compose-e2e-rm"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "up", "-d")
 	})
 
 	t.Run("rm -sf", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm", "-sf", "simple")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm", "-sf", "simple")
 		res.Assert(t, icmd.Expected{Err: "Removed", ExitCode: 0})
 	})
 
@@ -195,7 +189,7 @@ func TestRm(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-p", projectName, "down")
+		c.RunDockerComposeCmd("-p", projectName, "down")
 	})
 }
 
@@ -205,7 +199,7 @@ func TestCompatibility(t *testing.T) {
 	const projectName = "compose-e2e-compatibility"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "--compatibility", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("--compatibility", "-f", "./fixtures/sentences/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check container names", func(t *testing.T) {
@@ -216,7 +210,7 @@ func TestCompatibility(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-p", projectName, "down")
+		c.RunDockerComposeCmd("-p", projectName, "down")
 	})
 }
 
@@ -228,7 +222,7 @@ func TestConvert(t *testing.T) {
 	assert.NilError(t, err)
 
 	t.Run("up", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/simple-build-test/compose.yaml", "-p", projectName, "convert")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`services:
   nginx:
     build:

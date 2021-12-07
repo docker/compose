@@ -31,7 +31,7 @@ func TestCopy(t *testing.T) {
 	const projectName = "copy_e2e"
 
 	t.Cleanup(func() {
-		c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "down")
+		c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "down")
 
 		os.Remove("./fixtures/cp-test/from-default.txt") //nolint:errcheck
 		os.Remove("./fixtures/cp-test/from-indexed.txt") //nolint:errcheck
@@ -39,16 +39,16 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("start service", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "up", "--scale", "nginx=5", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "--project-name", projectName, "up", "--scale", "nginx=5", "-d")
 	})
 
 	t.Run("make sure service is running", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `nginx               running`})
 	})
 
 	t.Run("copy to container copies the file to the first container by default", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/default.txt")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/default.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/default.txt").Stdout()
@@ -59,7 +59,7 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("copy to container with a given index copies the file to the given container", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/indexed.txt")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/indexed.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		output := c.RunDockerCmd("exec", projectName+"-nginx-3", "cat", "/tmp/indexed.txt").Stdout()
@@ -70,7 +70,7 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("copy to container with the all flag copies the file to all containers", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--all", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/all.txt")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--all", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/all.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/all.txt").Stdout()
@@ -84,7 +84,7 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("copy from a container copies the file to the host from the first container by default", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "nginx:/tmp/default.txt", "./fixtures/cp-test/from-default.txt")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "nginx:/tmp/default.txt", "./fixtures/cp-test/from-default.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		data, err := os.ReadFile("./fixtures/cp-test/from-default.txt")
@@ -93,7 +93,7 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("copy from a container with a given index copies the file to host", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3", "nginx:/tmp/indexed.txt", "./fixtures/cp-test/from-indexed.txt")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--index=3", "nginx:/tmp/indexed.txt", "./fixtures/cp-test/from-indexed.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		data, err := os.ReadFile("./fixtures/cp-test/from-indexed.txt")
@@ -102,13 +102,13 @@ func TestCopy(t *testing.T) {
 	})
 
 	t.Run("copy to and from a container also work with folder", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-folder", "nginx:/tmp")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-folder", "nginx:/tmp")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/cp-folder/cp-me.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world from folder`), output)
 
-		res = c.RunDockerCmd("compose", "-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "nginx:/tmp/cp-folder", "./fixtures/cp-test/cp-folder2")
+		res = c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "nginx:/tmp/cp-folder", "./fixtures/cp-test/cp-folder2")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		data, err := os.ReadFile("./fixtures/cp-test/cp-folder2/cp-me.txt")
