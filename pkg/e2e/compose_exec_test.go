@@ -29,7 +29,7 @@ func TestLocalComposeExec(t *testing.T) {
 
 	const projectName = "compose-e2e-exec"
 
-	c.RunDockerCmd("compose", "--project-directory", "fixtures/simple-composefile", "--project-name", projectName, "up", "-d")
+	c.RunDockerComposeCmd("--project-directory", "fixtures/simple-composefile", "--project-name", projectName, "up", "-d")
 
 	t.Run("exec true", func(t *testing.T) {
 		res := c.RunDockerOrExitError("exec", "compose-e2e-exec-simple-1", "/bin/true")

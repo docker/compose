@@ -35,7 +35,7 @@ func TestLocalComposeVolume(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "compose-e2e-volume_nginx")
 		c.RunDockerOrExitError("volume", "rm", projectName+"_staticVol")
 		c.RunDockerOrExitError("volume", "rm", "myvolume")
-		c.RunDockerCmd("compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("access bind mount data", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	})
 
 	t.Run("cleanup volume project", func(t *testing.T) {
-		c.RunDockerCmd("compose", "--project-name", projectName, "down", "--volumes")
+		c.RunDockerComposeCmd("--project-name", projectName, "down", "--volumes")
 		res := c.RunDockerCmd("volume", "ls")
 		assert.Assert(t, !strings.Contains(res.Stdout(), projectName+"_staticVol"))
 		assert.Assert(t, !strings.Contains(res.Stdout(), "myvolume"))

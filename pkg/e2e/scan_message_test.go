@@ -36,18 +36,18 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	c.RunDockerOrExitError("scan", "--help")
 
 	t.Run("display on compose build", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-compose-build", "build")
+		res := c.RunDockerComposeCmd("-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-compose-build", "build")
 		defer c.RunDockerOrExitError("rmi", "-f", "scan-msg-test-compose-build_nginx")
 		res.Assert(t, icmd.Expected{Err: utils.ScanSuggestMsg})
 	})
 
 	t.Run("do not display on compose build with quiet flag", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-quiet", "build", "--quiet")
+		res := c.RunDockerComposeCmd("-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-quiet", "build", "--quiet")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 		res = c.RunDockerCmd("rmi", "-f", "scan-msg-test-quiet_nginx")
 		assert.Assert(t, !strings.Contains(res.Combined(), "No such image"))
 
-		res = c.RunDockerCmd("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-q", "build", "-q")
+		res = c.RunDockerComposeCmd("-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test-q", "build", "-q")
 		defer c.RunDockerOrExitError("rmi", "-f", "scan-msg-test-q_nginx")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})
@@ -55,13 +55,13 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	_ = c.RunDockerOrExitError("rmi", "scan-msg-test_nginx")
 
 	t.Run("display on compose up if image is built", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "up", "-d")
+		res := c.RunDockerComposeCmd("-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "up", "-d")
 		defer c.RunDockerOrExitError("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "down")
 		res.Assert(t, icmd.Expected{Err: utils.ScanSuggestMsg})
 	})
 
 	t.Run("do not display on compose up if no image built", func(t *testing.T) { // re-run the same Compose aproject
-		res := c.RunDockerCmd("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "up", "-d")
+		res := c.RunDockerComposeCmd("-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "up", "-d")
 		defer c.RunDockerOrExitError("compose", "-f", "fixtures/simple-build-test/compose.yaml", "-p", "scan-msg-test", "down", "--rmi", "all")
 		assert.Assert(t, !strings.Contains(res.Combined(), "docker scan"), res.Combined())
 	})

@@ -29,11 +29,11 @@ func TestLocalComposeRun(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("compose run", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "back")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
-		res = c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello one more time")
+		res = c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello one more time")
 		lines = Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello one more time", res.Stdout())
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
@@ -68,7 +68,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --rm", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--rm", "back", "echo", "Hello again")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--rm", "back", "echo", "Hello again")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 
@@ -77,7 +77,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "down")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "down")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
@@ -85,7 +85,7 @@ func TestLocalComposeRun(t *testing.T) {
 	t.Run("compose run --volumes", func(t *testing.T) {
 		wd, err := os.Getwd()
 		assert.NilError(t, err)
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--volumes", wd+":/foo", "back", "/bin/sh", "-c", "ls /foo")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--volumes", wd+":/foo", "back", "/bin/sh", "-c", "ls /foo")
 		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
 
 		res = c.RunDockerCmd("ps", "--all")
@@ -93,13 +93,13 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "--publish", "8081:80", "-d", "back", "/bin/sh", "-c", "sleep 1")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--publish", "8081:80", "-d", "back", "/bin/sh", "-c", "sleep 1")
 		res := c.RunDockerCmd("ps")
 		assert.Assert(t, strings.Contains(res.Stdout(), "8081->80/tcp"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "down")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "down")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})

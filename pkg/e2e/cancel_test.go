@@ -36,7 +36,7 @@ func TestComposeCancel(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
-		c.RunDockerCmd("compose", "ls")
+		c.RunDockerComposeCmd("ls")
 		buildProjectPath := "fixtures/build-infinite/compose.yaml"
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
