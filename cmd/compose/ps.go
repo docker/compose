@@ -59,7 +59,7 @@ func (p *psOptions) parseFilter() error {
 	case "source":
 		return api.ErrNotImplemented
 	default:
-		return fmt.Errorf("unknow filter %s", parts[0])
+		return fmt.Errorf("unknown filter %s", parts[0])
 	}
 	return nil
 }
