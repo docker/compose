@@ -79,7 +79,7 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 				}
 				containers[container] = struct{}{}
 				p.consumer.Register(container)
-			case api.ContainerEventExit:
+			case api.ContainerEventExit, api.ContainerEventStopped:
 				if !event.Restarting {
 					delete(containers, container)
 				}

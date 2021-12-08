@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package main
+package compatibility
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ func getStringFlags() []string {
 	}
 }
 
-func convert(args []string) []string {
+func Convert(args []string) []string {
 	var rootFlags []string
 	command := []string{compose.PluginName}
 	l := len(args)
