@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package main
+package compatibility
 
 import (
 	"testing"
@@ -71,7 +71,7 @@ func Test_convert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := convert(tt.args)
+			got := Convert(tt.args)
 			assert.DeepEqual(t, tt.want, got)
 		})
 	}
