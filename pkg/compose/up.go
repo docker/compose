@@ -73,6 +73,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	go func() {
 		<-signalChan
 		printer.Cancel()
+		s.stopping = true
 		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
 		stopFunc() // nolint:errcheck
 	}()

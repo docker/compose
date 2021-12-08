@@ -115,7 +115,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1
 				// Container terminated.
-				willRestart := willContainerRestart(inspected, restarted)
+				willRestart := !s.stopping && willContainerRestart(inspected, restarted)
 
 				listener(api.ContainerEvent{
 					Type:       api.ContainerEventExit,

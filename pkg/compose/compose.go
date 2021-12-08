@@ -46,6 +46,7 @@ func NewComposeService(apiClient client.APIClient, configFile *configfile.Config
 type composeService struct {
 	apiClient  client.APIClient
 	configFile *configfile.ConfigFile
+	stopping   bool
 }
 
 func getCanonicalContainerName(c moby.Container) string {
