@@ -436,6 +436,8 @@ const (
 	ContainerEventLog = iota
 	// ContainerEventAttach is a ContainerEvent of type attach. First event sent about a container
 	ContainerEventAttach
+	// ContainerEventStopped is a ContainerEvent of type stopped.
+	ContainerEventStopped
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
 	// UserCancel user cancelled compose up, we are stopping containers

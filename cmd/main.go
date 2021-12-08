@@ -25,6 +25,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v2/cmd/compatibility"
 	commands "github.com/docker/compose/v2/cmd/compose"
 	"github.com/docker/compose/v2/internal"
 	"github.com/docker/compose/v2/pkg/api"
@@ -68,7 +69,7 @@ func pluginMain() {
 
 func main() {
 	if commands.RunningAsStandalone() {
-		os.Args = append([]string{"docker"}, convert(os.Args[1:])...)
+		os.Args = append([]string{"docker"}, compatibility.Convert(os.Args[1:])...)
 	}
 	pluginMain()
 }
