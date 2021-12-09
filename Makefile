@@ -42,8 +42,16 @@ compose-plugin: ## Compile the compose cli-plugin
 	--output ./bin
 
 .PHONY: e2e-compose
-e2e-compose: ## Run End to end local tests. Set E2E_TEST=TestName to run a single test
-	gotestsum $(TEST_FLAGS) ./pkg/e2e -- -count=1
+e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
+
+.PHONY: e2e-compose-standalone
+e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
+	go test $(TEST_FLAGS) -count=1 --tags=standalone ./pkg/e2e
+
+
+.PHONY: e2e
+e2e: e2e-compose e2e-compose-standalone ## Run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
 
 .PHONY: cross
 cross: ## Compile the CLI for linux, darwin and windows

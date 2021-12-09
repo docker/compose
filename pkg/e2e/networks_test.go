@@ -37,11 +37,11 @@ func TestNetworks(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:80"
@@ -54,12 +54,12 @@ func TestNetworks(t *testing.T) {
 	})
 
 	t.Run("port", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "--project-name", projectName, "port", "words", "8080")
+		res := c.RunDockerComposeCmd("--project-name", projectName, "port", "words", "8080")
 		res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 
 	t.Run("check networks after down", func(t *testing.T) {
@@ -75,21 +75,21 @@ func TestNetworkAliassesAndLinks(t *testing.T) {
 	const projectName = "network_alias_e2e"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("curl alias", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://alias-of-container2/")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://alias-of-container2/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
 	t.Run("curl links", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://container/")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://container/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }
 
@@ -103,7 +103,7 @@ func TestIPAMConfig(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestIPAMConfig(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }
 
@@ -128,6 +128,6 @@ func TestNetworkModes(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }

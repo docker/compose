@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/compose/v2/cmd/compose"
 	"github.com/pkg/errors"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
@@ -39,11 +40,19 @@ import (
 var (
 	// DockerExecutableName is the OS dependent Docker CLI binary name
 	DockerExecutableName = "docker"
+
+	// DockerComposeExecutableName is the OS dependent Docker CLI binary name
+	DockerComposeExecutableName = "docker-" + compose.PluginName
+
+	// DockerScanExecutableName is the OS dependent Docker CLI binary name
+	DockerScanExecutableName = "docker-scan"
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
 		DockerExecutableName = DockerExecutableName + ".exe"
+		DockerComposeExecutableName = DockerComposeExecutableName + ".exe"
+		DockerScanExecutableName = DockerScanExecutableName + ".exe"
 	}
 }
 
@@ -78,23 +87,17 @@ func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
 	})
 
 	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
-	composePluginFile := "docker-compose"
-	scanPluginFile := "docker-scan"
-	if runtime.GOOS == "windows" {
-		composePluginFile += ".exe"
-		scanPluginFile += ".exe"
-	}
-	composePlugin, err := findExecutable(composePluginFile, []string{"../../bin", "../../../bin"})
+	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 	if os.IsNotExist(err) {
 		fmt.Println("WARNING: docker-compose cli-plugin not found")
 	}
 	if err == nil {
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", composePluginFile))
+		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerComposeExecutableName))
 		if err != nil {
 			panic(err)
 		}
 		// We don't need a functional scan plugin, but a valid plugin binary
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", scanPluginFile))
+		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerScanExecutableName))
 		if err != nil {
 			panic(err)
 		}
@@ -191,7 +194,25 @@ func (c *E2eCLI) RunCmd(args ...string) *icmd.Result {
 
 // RunDockerCmd runs a docker command, expects no error and returns a result
 func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
+	if len(args) > 0 && args[0] == compose.PluginName {
+		c.test.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
+	}
 	res := c.RunDockerOrExitError(args...)
+	res.Assert(c.test, icmd.Success)
+	return res
+}
+
+// RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
+func (c *E2eCLI) RunDockerComposeCmd(args ...string) *icmd.Result {
+	if composeStandaloneMode {
+		composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
+		assert.NilError(c.test, err)
+		res := icmd.RunCmd(c.NewCmd(composeBinary, args...))
+		res.Assert(c.test, icmd.Success)
+		return res
+	}
+	args = append([]string{"compose"}, args...)
+	res := icmd.RunCmd(c.NewCmd(DockerExecutableName, args...))
 	res.Assert(c.test, icmd.Success)
 	return res
 }
@@ -230,7 +251,7 @@ func (c *E2eCLI) WaitForCondition(predicate func() (bool, string), timeout time.
 	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
 }
 
-//Lines split output into lines
+// Lines split output into lines
 func Lines(output string) []string {
 	return strings.Split(strings.TrimSpace(output), "\n")
 }
