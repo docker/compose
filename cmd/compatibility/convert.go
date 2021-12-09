@@ -43,6 +43,7 @@ func getStringFlags() []string {
 	}
 }
 
+// Convert transforms standalone docker-compose args into CLI plugin compliant ones
 func Convert(args []string) []string {
 	var rootFlags []string
 	command := []string{compose.PluginName}
