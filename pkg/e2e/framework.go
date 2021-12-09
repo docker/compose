@@ -202,12 +202,9 @@ func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 	return res
 }
 
-const composeStandaloneEnvVar = "COMPOSE_STANDALONE_MODE"
-
 // RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
 func (c *E2eCLI) RunDockerComposeCmd(args ...string) *icmd.Result {
-	composeStandaloneMode := os.Getenv(composeStandaloneEnvVar)
-	if composeStandaloneMode == "true" || composeStandaloneMode == "1" {
+	if composeStandaloneMode {
 		composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 		assert.NilError(c.test, err)
 		res := icmd.RunCmd(c.NewCmd(composeBinary, args...))
