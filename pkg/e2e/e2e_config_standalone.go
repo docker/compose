@@ -1,3 +1,5 @@
+//go:build standalone
+
 /*
    Copyright 2020 Docker Compose CLI authors
 
@@ -16,12 +18,4 @@
 
 package e2e
 
-import (
-	"os"
-	"testing"
-)
-
-func TestMain(m *testing.M) {
-	exitCode := m.Run()
-	os.Exit(exitCode)
-}
+const composeStandaloneMode = true
