@@ -45,7 +45,9 @@ func TestKillAll(t *testing.T) {
 	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(ctx, projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+	}).Return(
 		[]moby.Container{testContainer("service1", "123", false), testContainer("service1", "456", false), testContainer("service2", "789", false)}, nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "123", "").Return(nil)
 	api.EXPECT().ContainerKill(anyCancellableContext(), "456", "").Return(nil)
@@ -64,9 +66,7 @@ func TestKillSignal(t *testing.T) {
 
 	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService(serviceName)}}
 	listOptions := moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)),
-			serviceFilter(serviceName)),
-		All: true,
+		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)), serviceFilter(serviceName)),
 	}
 
 	ctx := context.Background()
