@@ -27,7 +27,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-const ddevVersion = "v1.18.2"
+const ddevVersion = "v1.19.1"
 
 func TestComposeRunDdev(t *testing.T) {
 	if !composeStandaloneMode {
@@ -65,9 +65,6 @@ func TestComposeRunDdev(t *testing.T) {
 			compressedFilename))
 
 	c.RunCmdInDir(dir, "tar", "-xzf", compressedFilename)
-	c.RunCmdInDir(dir, "curl", "-L", "-o", "mkcert", "https://github.com/FiloSottile/mkcert/releases/download/v1.4.3/mkcert-v1.4.3-linux-amd64")
-	c.RunCmdInDir(dir, "chmod", "a+x", "mkcert")
-	c.RunCmdInDir(dir, "mkcert", "-install")
 
 	c.RunDockerCmd("pull", "drud/ddev-ssh-agent:v1.18.0")
 	c.RunDockerCmd("pull", "busybox:stable")
@@ -89,9 +86,6 @@ func TestComposeRunDdev(t *testing.T) {
 	c.RunCmdInDir(dir, "./ddev", "poweroff")
 
 	c.RunCmdInDir(dir, "./ddev", "start", "-y")
-
-	// This assertion is irrelevant because c.RunCmdInDir() does its own assertion.
-	//assert.Equal(c.test, startRes.ExitCode, 0, "Could not start project")
 
 	curlRes := c.RunCmdInDir(dir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
 	out = curlRes.Stdout()
