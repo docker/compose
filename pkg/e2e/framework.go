@@ -192,6 +192,17 @@ func (c *E2eCLI) RunCmd(args ...string) *icmd.Result {
 	return res
 }
 
+// RunCmdInDir runs a command in a given dir, expects no error and returns a result
+func (c *E2eCLI) RunCmdInDir(dir string, args ...string) *icmd.Result {
+	fmt.Printf("\t[%s] %s\n", c.test.Name(), strings.Join(args, " "))
+	assert.Assert(c.test, len(args) >= 1, "require at least one command in parameters")
+	cmd := c.NewCmd(args[0], args[1:]...)
+	cmd.Dir = dir
+	res := icmd.RunCmd(cmd)
+	res.Assert(c.test, icmd.Success)
+	return res
+}
+
 // RunDockerCmd runs a docker command, expects no error and returns a result
 func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 	if len(args) > 0 && args[0] == compose.PluginName {

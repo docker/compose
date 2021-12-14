@@ -90,7 +90,7 @@ jobs:
       - name: Build for local E2E
         env:
           BUILD_TAGS: e2e
-        run: make -f builder.Makefile compose-plugin
+        run: make GIT_TAG=e2e-PR-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }} -f builder.Makefile compose-plugin
 
       - name: E2E Test in plugin mode
         run: make e2e-compose
@@ -123,7 +123,7 @@ jobs:
       - name: Build for local E2E
         env:
           BUILD_TAGS: e2e
-        run: make -f builder.Makefile compose-plugin
+        run: make GIT_TAG=e2e-PR-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }} -f builder.Makefile compose-plugin
 
       - name: E2E Test in standalone mode
         run: make e2e-compose-standalone
