@@ -26,11 +26,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/system"
 	"github.com/pkg/errors"
@@ -44,7 +42,7 @@ const (
 	acrossServices = fromService | toService
 )
 
-func (s *composeService) Copy(ctx context.Context, project *types.Project, opts api.CopyOptions) error {
+func (s *composeService) Copy(ctx context.Context, project string, opts api.CopyOptions) error {
 	srcService, srcPath := splitCpArg(opts.Source)
 	destService, dstPath := splitCpArg(opts.Destination)
 
@@ -64,20 +62,17 @@ func (s *composeService) Copy(ctx context.Context, project *types.Project, opts 
 		serviceName = destService
 	}
 
-	f := filters.NewArgs(
-		projectFilter(project.Name),
-		serviceFilter(serviceName),
-	)
-	if !opts.All {
-		f.Add("label", fmt.Sprintf("%s=%d", api.ContainerNumberLabel, opts.Index))
-	}
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{Filters: f})
+	containers, err := s.getContainers(ctx, project, oneOffExclude, true, serviceName)
 	if err != nil {
 		return err
 	}
 
 	if len(containers) < 1 {
-		return fmt.Errorf("service %s not running", serviceName)
+		return fmt.Errorf("no container found for service %q", serviceName)
+	}
+
+	if !opts.All {
+		containers = containers.filter(indexed(opts.Index))
 	}
 
 	g := errgroup.Group{}
