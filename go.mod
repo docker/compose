@@ -13,7 +13,7 @@ require (
 	github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc
 	github.com/docker/cli v20.10.7+incompatible
 	github.com/docker/cli-docs-tool v0.1.1
-	github.com/docker/docker v20.10.7+incompatible
+	github.com/docker/docker v20.10.12+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/golang/mock v1.6.0
