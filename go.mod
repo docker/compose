@@ -11,7 +11,7 @@ require (
 	github.com/containerd/containerd v1.5.8
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
 	github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc
-	github.com/docker/cli v20.10.7+incompatible
+	github.com/docker/cli v20.10.12+incompatible
 	github.com/docker/cli-docs-tool v0.1.1
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
