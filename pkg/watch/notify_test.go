@@ -181,10 +181,11 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 
 	// change something inside sub directory
 	changeFilePath := filepath.Join(subPath, "change")
-	_, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(changeFilePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_ = file.Close()
 	f.assertEvents(subPath, changeFilePath)
 }
 
