@@ -27,6 +27,7 @@ type ServiceProxy struct {
 	BuildFn              func(ctx context.Context, project *types.Project, options BuildOptions) error
 	PushFn               func(ctx context.Context, project *types.Project, options PushOptions) error
 	PullFn               func(ctx context.Context, project *types.Project, opts PullOptions) error
+	TagFn                func(ctx context.Context, project *types.Project, options TagOptions) error
 	CreateFn             func(ctx context.Context, project *types.Project, opts CreateOptions) error
 	StartFn              func(ctx context.Context, project *types.Project, options StartOptions) error
 	RestartFn            func(ctx context.Context, project *types.Project, options RestartOptions) error
@@ -66,6 +67,7 @@ func (s *ServiceProxy) WithService(service Service) *ServiceProxy {
 	s.BuildFn = service.Build
 	s.PushFn = service.Push
 	s.PullFn = service.Pull
+	s.TagFn = service.Tag
 	s.CreateFn = service.Create
 	s.StartFn = service.Start
 	s.RestartFn = service.Restart
@@ -127,6 +129,17 @@ func (s *ServiceProxy) Pull(ctx context.Context, project *types.Project, options
 		i(ctx, project)
 	}
 	return s.PullFn(ctx, project, options)
+}
+
+// Tag implements Service interface
+func (s *ServiceProxy) Tag(ctx context.Context, project *types.Project, options TagOptions) error {
+	if s.TagFn == nil {
+		return ErrNotImplemented
+	}
+	for _, i := range s.interceptors {
+		i(ctx, project)
+	}
+	return s.TagFn(ctx, project, options)
 }
 
 // Create implements Service interface

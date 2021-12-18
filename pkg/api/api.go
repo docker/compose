@@ -76,6 +76,8 @@ type Service interface {
 	Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
+	// Tag executes the equivalent to a `docker tag`
+	Tag(ctx context.Context, project *types.Project, options TagOptions) error
 }
 
 // BuildOptions group options of the Build API
@@ -443,3 +445,10 @@ const (
 	// UserCancel user cancelled compose up, we are stopping containers
 	UserCancel
 )
+
+// TagOptions group options of the Tag API
+type TagOptions struct {
+	Template           string
+	Push               bool
+	IgnorePushFailures bool
+}
