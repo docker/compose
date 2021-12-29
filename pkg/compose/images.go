@@ -33,6 +33,7 @@ import (
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
 	allContainers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+		All:     true,
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	if err != nil {

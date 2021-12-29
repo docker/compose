@@ -261,6 +261,7 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
+// ServiceConditionRunningOrHealthy is a service condition on statys running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
@@ -448,7 +449,10 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			Networks: inspectedContainer.NetworkSettings.Networks,
 		},
 	}
-	links := append(service.Links, service.ExternalLinks...)
+	links, err := s.getLinks(ctx, project.Name, service, number)
+	if err != nil {
+		return created, err
+	}
 	for _, netName := range service.NetworksByPriority() {
 		netwrk := project.Networks[netName]
 		cfg := service.Networks[netName]
@@ -474,6 +478,64 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		}
 	}
 	return created, err
+}
+
+// getLinks mimics V1 compose/service.py::Service::_get_links()
+func (s composeService) getLinks(ctx context.Context, projectName string, service types.ServiceConfig, number int) ([]string, error) {
+	var links []string
+	format := func(k, v string) string {
+		return fmt.Sprintf("%s:%s", k, v)
+	}
+	getServiceContainers := func(serviceName string) (Containers, error) {
+		return s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	}
+
+	for _, rawLink := range service.Links {
+		linkSplit := strings.Split(rawLink, ":")
+		linkServiceName := linkSplit[0]
+		linkName := linkServiceName
+		if len(linkSplit) == 2 {
+			linkName = linkSplit[1] // linkName if informed like in: "serviceName:linkName"
+		}
+		cnts, err := getServiceContainers(linkServiceName)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range cnts {
+			containerName := getCanonicalContainerName(c)
+			links = append(links,
+				format(containerName, linkName),
+				format(containerName, strings.Join([]string{linkServiceName, strconv.Itoa(number)}, Separator)),
+				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, Separator)),
+			)
+		}
+	}
+
+	if service.Labels[api.OneoffLabel] == "True" {
+		cnts, err := getServiceContainers(service.Name)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range cnts {
+			containerName := getCanonicalContainerName(c)
+			links = append(links,
+				format(containerName, service.Name),
+				format(containerName, strings.TrimPrefix(containerName, projectName+Separator)),
+				format(containerName, containerName),
+			)
+		}
+	}
+
+	for _, rawExtLink := range service.ExternalLinks {
+		extLinkSplit := strings.Split(rawExtLink, ":")
+		externalLink := extLinkSplit[0]
+		linkName := externalLink
+		if len(extLinkSplit) == 2 {
+			linkName = extLinkSplit[1]
+		}
+		links = append(links, format(externalLink, linkName))
+	}
+	return links, nil
 }
 
 func shortIDAliasExists(containerID string, aliases ...string) bool {
@@ -559,6 +621,10 @@ func (s *composeService) isServiceCompleted(ctx context.Context, project *types.
 }
 
 func (s *composeService) startService(ctx context.Context, project *types.Project, service types.ServiceConfig) error {
+	if service.Deploy != nil && service.Deploy.Replicas != nil && *service.Deploy.Replicas == 0 {
+		return nil
+	}
+
 	err := s.waitDependencies(ctx, project, service.DependsOn)
 	if err != nil {
 		return err
@@ -579,7 +645,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		if scale, err := getScale(service); err != nil && scale == 0 {
 			return nil
 		}
-		return fmt.Errorf("no containers to start")
+		return fmt.Errorf("service %q has no container to start", service.Name)
 	}
 
 	w := progress.ContextWriter(ctx)

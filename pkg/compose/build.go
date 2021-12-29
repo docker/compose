@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
@@ -289,7 +288,7 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 }
 
 func dockerFilePath(context string, dockerfile string) string {
-	if urlutil.IsGitURL(context) || path.IsAbs(dockerfile) {
+	if urlutil.IsGitURL(context) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
 	return filepath.Join(context, dockerfile)

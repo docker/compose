@@ -380,6 +380,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Isolation:      container.Isolation(service.Isolation),
 		Runtime:        service.Runtime,
 		LogConfig:      logConfig,
+		GroupAdd:       service.GroupAdd,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
@@ -1014,6 +1015,14 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			if n.External.External {
+				if n.Driver == "overlay" {
+					// Swarm nodes do not register overlay networks that were
+					// created on a different node unless they're in use.
+					// Here we assume `driver` is relevant for a network we don't manage
+					// which is a non-sense, but this is our legacy ¯\(ツ)/¯
+					// networkAttach will later fail anyway if network actually doesn't exists
+					return nil
+				}
 				return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
 			}
 			var ipam *network.IPAM
@@ -1092,18 +1101,24 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 		if !errdefs.IsNotFound(err) {
 			return err
 		}
+		if volume.External.External {
+			return fmt.Errorf("external volume %q not found", volume.External.Name)
+		}
 		err := s.createVolume(ctx, volume)
 		return err
 	}
 
-	// Volume exists with name, but let's double check this is the expected one
-	// (better safe than sorry when it comes to user's data)
+	if volume.External.External {
+		return nil
+	}
+
+	// Volume exists with name, but let's double-check this is the expected one
 	p, ok := inspected.Labels[api.ProjectLabel]
 	if !ok {
-		return fmt.Errorf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
+		logrus.Warnf("volume %q already exists but was not created by Docker Compose. Use `external: true` to use an existing volume", volume.Name)
 	}
-	if p != project {
-		return fmt.Errorf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
+	if ok && p != project {
+		logrus.Warnf("volume %q already exists but was not created for project %q. Use `external: true` to use an existing volume", volume.Name, p)
 	}
 	return nil
 }

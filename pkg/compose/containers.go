@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"sort"
+	"strconv"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -84,6 +85,14 @@ func isNotService(services ...string) containerPredicate {
 func isNotOneOff(c moby.Container) bool {
 	v, ok := c.Labels[api.OneoffLabel]
 	return !ok || v == "False"
+}
+
+func indexed(index int) containerPredicate {
+	return func(c moby.Container) bool {
+		number := c.Labels[api.ContainerNumberLabel]
+		idx, err := strconv.Atoi(number)
+		return err == nil && index == idx
+	}
 }
 
 // filter return Containers with elements to match predicate

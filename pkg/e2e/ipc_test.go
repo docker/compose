@@ -35,11 +35,11 @@ func TestIPC(t *testing.T) {
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerCmd("compose", "-f", "./fixtures/ipc-test/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/ipc-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerCmd("compose", "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `shareable`})
 	})
 
@@ -55,7 +55,7 @@ func TestIPC(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerCmd("compose", "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 	t.Run("remove ipc mode container", func(t *testing.T) {
 		_ = c.RunDockerCmd("rm", "-f", "ipc_mode_container")

@@ -44,9 +44,11 @@ type convertOptions struct {
 	quiet               bool
 	resolveImageDigests bool
 	noInterpolate       bool
+	noNormalize         bool
 	services            bool
 	volumes             bool
 	profiles            bool
+	images              bool
 	hash                string
 }
 
@@ -66,6 +68,9 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
+			if p.Compatibility {
+				opts.noNormalize = true
+			}
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
@@ -81,6 +86,9 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if opts.profiles {
 				return runProfiles(opts, args)
 			}
+			if opts.images {
+				return runConfigImages(opts, args)
+			}
 
 			return runConvert(ctx, backend, opts, args)
 		}),
@@ -91,10 +99,12 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.resolveImageDigests, "resolve-image-digests", false, "Pin image tags to digests.")
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
+	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model.")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
 	flags.BoolVar(&opts.profiles, "profiles", false, "Print the profile names, one per line.")
+	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
 
@@ -103,7 +113,10 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
 	var json []byte
-	project, err := opts.toProject(services, cli.WithInterpolation(!opts.noInterpolate), cli.WithResolvedPaths(true))
+	project, err := opts.toProject(services,
+		cli.WithInterpolation(!opts.noInterpolate),
+		cli.WithResolvedPaths(true),
+		cli.WithNormalization(!opts.noNormalize))
 	if err != nil {
 		return err
 	}
@@ -204,6 +217,21 @@ func runProfiles(opts convertOptions, services []string) error {
 	sort.Strings(profiles)
 	for _, p := range profiles {
 		fmt.Println(p)
+	}
+	return nil
+}
+
+func runConfigImages(opts convertOptions, services []string) error {
+	project, err := opts.toProject(services)
+	if err != nil {
+		return err
+	}
+	for _, s := range project.Services {
+		if s.Image != "" {
+			fmt.Println(s.Image)
+		} else {
+			fmt.Printf("%s_%s\n", project.Name, s.Name)
+		}
 	}
 	return nil
 }

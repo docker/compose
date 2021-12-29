@@ -63,7 +63,7 @@ type Service interface {
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, project string, opts RunOptions) (int, error)
 	// Copy copies a file/folder between a service container and the local filesystem
-	Copy(ctx context.Context, project *types.Project, opts CopyOptions) error
+	Copy(ctx context.Context, project string, options CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
 	Pause(ctx context.Context, project string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`
@@ -227,6 +227,8 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
+	// QuietPull makes the pulling process quiet
+	QuietPull bool
 	// used by exec
 	Index int
 }
@@ -434,6 +436,8 @@ const (
 	ContainerEventLog = iota
 	// ContainerEventAttach is a ContainerEvent of type attach. First event sent about a container
 	ContainerEventAttach
+	// ContainerEventStopped is a ContainerEvent of type stopped.
+	ContainerEventStopped
 	// ContainerEventExit is a ContainerEvent of type exit. ExitCode is set
 	ContainerEventExit
 	// UserCancel user cancelled compose up, we are stopping containers

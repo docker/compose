@@ -111,6 +111,21 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 			}
 			name := getContainerNameWithoutProject(container)
 
+			if event.Status == "stop" {
+				listener(api.ContainerEvent{
+					Type:      api.ContainerEventStopped,
+					Container: name,
+					Service:   container.Labels[api.ServiceLabel],
+				})
+
+				delete(watched, container.ID)
+				if len(watched) == 0 {
+					// all project containers stopped, we're done
+					stop()
+				}
+				return nil
+			}
+
 			if event.Status == "die" {
 				restarted := watched[container.ID]
 				watched[container.ID] = restarted + 1

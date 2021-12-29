@@ -25,7 +25,6 @@ import (
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/mattn/go-isatty"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -54,6 +53,7 @@ type runOptions struct {
 	servicePorts  bool
 	name          string
 	noDeps        bool
+	quietPull     bool
 }
 
 func (opts runOptions) apply(project *types.Project) error {
@@ -143,7 +143,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", notAtTTY(), "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
@@ -153,6 +153,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.publish, "publish", "p", []string{}, "Publish a container's port(s) to the host.")
 	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
+	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
 	flags.SetInterspersed(false)
@@ -167,11 +168,6 @@ func normalizeRunFlags(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		name = "label"
 	}
 	return pflag.NormalizedName(name)
-}
-
-func notAtTTY() bool {
-	b := isatty.IsTerminal(os.Stdout.Fd()) && isatty.IsTerminal(os.Stdin.Fd())
-	return !b
 }
 
 func runRun(ctx context.Context, backend api.Service, project *types.Project, opts runOptions) error {
@@ -215,6 +211,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		UseNetworkAliases: opts.useAliases,
 		NoDeps:            opts.noDeps,
 		Index:             0,
+		QuietPull:         opts.quietPull,
 	}
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
