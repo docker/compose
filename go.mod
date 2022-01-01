@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/buger/goterm v1.0.3
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
-	github.com/compose-spec/compose-go v1.0.8
+	github.com/compose-spec/compose-go v1.0.9-0.20220101154228-91ed80f52afe
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.5.8
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
@@ -128,5 +128,3 @@ require (
 
 // (for buildx)
 replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
-
-replace github.com/compose-spec/compose-go v1.0.8 => github.com/compose-spec/compose-go v1.0.9-0.20220101154228-91ed80f52afe
