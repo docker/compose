@@ -723,6 +723,9 @@ MOUNTS:
 					if m.ReadOnly {
 						mode = "ro"
 					}
+					if v.Bind.SELinux != "" {
+						mode += "," + v.Bind.SELinux
+					}
 					binds = append(binds, fmt.Sprintf("%s:%s:%s", m.Source, m.Target, mode))
 					continue MOUNTS
 				}
