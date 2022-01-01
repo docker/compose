@@ -142,3 +142,12 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 }
+
+func TestGetBindMode(t *testing.T) {
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{}, false), "rw")
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{}, true), "ro")
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxShared}, false), "rw,z")
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxPrivate}, false), "rw,Z")
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxShared}, true), "ro,z")
+	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxPrivate}, true), "ro,Z")
+}
