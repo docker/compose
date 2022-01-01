@@ -129,4 +129,4 @@ require (
 // (for buildx)
 replace github.com/jaguilar/vt100 => github.com/tonistiigi/vt100 v0.0.0-20190402012908-ad4c4a574305
 
-replace github.com/compose-spec/compose-go v1.0.8 => github.com/tymonx/compose-go v1.0.9-0.20220101124603-978e4cff0f03
+replace github.com/compose-spec/compose-go v1.0.8 => github.com/compose-spec/compose-go v1.0.9-0.20220101154228-91ed80f52afe
