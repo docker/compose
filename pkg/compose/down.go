@@ -51,7 +51,10 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Project == nil {
-		options.Project = s.projectFromContainerLabels(containers.filter(isNotOneOff), projectName)
+		options.Project, err = s.projectFromLabels(ctx, containers.filter(isNotOneOff), projectName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(containers) > 0 {
@@ -85,11 +88,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		rm, err := s.ensureVolumesDown(ctx, projectName, w)
-		if err != nil {
-			return err
-		}
-		ops = append(ops, rm...)
+		ops = append(ops, s.ensureVolumesDown(ctx, options.Project, w)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -103,19 +102,15 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, projectName string, w progress.Writer) ([]downOp, error) {
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
-	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
-	if err != nil {
-		return ops, err
-	}
-	for _, vol := range volumes.Volumes {
-		id := vol.Name
+	for _, vol := range project.Volumes {
+		volumeName := vol.Name
 		ops = append(ops, func() error {
-			return s.removeVolume(ctx, id, w)
+			return s.removeVolume(ctx, volumeName, w)
 		})
 	}
-	return ops, nil
+	return ops
 }
 
 func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options api.DownOptions, w progress.Writer) []downOp {
@@ -237,12 +232,13 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-func (s *composeService) projectFromContainerLabels(containers Containers, projectName string) *types.Project {
+// projectFromLabels builds a types.Project based on actual resources with compose labels set
+func (s *composeService) projectFromLabels(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	project := &types.Project{
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project
+		return project, nil
 	}
 	set := map[string]moby.Container{}
 	for _, c := range containers {
@@ -263,5 +259,20 @@ func (s *composeService) projectFromContainerLabels(containers Containers, proje
 		}
 		project.Services = append(project.Services, service)
 	}
-	return project
+
+	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	if err != nil {
+		return nil, err
+	}
+
+	project.Volumes = types.Volumes{}
+	for _, vol := range volumes.Volumes {
+		project.Volumes[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
+			Name:   vol.Name,
+			Driver: vol.Driver,
+			Labels: vol.Labels,
+		}
+	}
+
+	return project, nil
 }
