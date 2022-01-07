@@ -68,6 +68,21 @@ func StartedEvent(ID string) Event {
 	return NewEvent(ID, Done, "Started")
 }
 
+// Waiting creates a new waiting event
+func Waiting(ID string) Event {
+	return NewEvent(ID, Working, "Waiting")
+}
+
+// Healthy creates a new healthy event
+func Healthy(ID string) Event {
+	return NewEvent(ID, Done, "Healthy")
+}
+
+// Exited creates a new exited event
+func Exited(ID string) Event {
+	return NewEvent(ID, Done, "Exited")
+}
+
 // RestartingEvent creates a new Restarting in progress Event
 func RestartingEvent(ID string) Event {
 	return NewEvent(ID, Working, "Restarting")
