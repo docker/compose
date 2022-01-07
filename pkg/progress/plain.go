@@ -40,6 +40,12 @@ func (p *plainWriter) Event(e Event) {
 	fmt.Fprintln(p.out, e.ID, e.Text, e.StatusText)
 }
 
+func (p *plainWriter) Events(events []Event) {
+	for _, e := range events {
+		p.Event(e)
+	}
+}
+
 func (p *plainWriter) TailMsgf(m string, args ...interface{}) {
 	fmt.Fprintln(p.out, append([]interface{}{m}, args...)...)
 }

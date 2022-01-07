@@ -31,6 +31,7 @@ type Writer interface {
 	Start(context.Context) error
 	Stop()
 	Event(Event)
+	Events([]Event)
 	TailMsgf(string, ...interface{})
 }
 
