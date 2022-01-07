@@ -261,6 +261,14 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
+func containerEvents(containers Containers, eventFunc func(string) progress.Event) []progress.Event {
+	events := []progress.Event{}
+	for _, container := range containers {
+		events = append(events, eventFunc(getContainerProgressName(container)))
+	}
+	return events
+}
+
 // ServiceConditionRunningOrHealthy is a service condition on statys running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
@@ -277,9 +285,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		if err != nil {
 			return err
 		}
-		for _, container := range containers {
-			w.Event(progress.Waiting(getContainerProgressName(container)))
-		}
+		w.Events(containerEvents(containers, progress.Waiting))
 
 		dep, config := dep, config
 		eg.Go(func() error {
@@ -294,9 +300,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
-						for _, container := range containers {
-							w.Event(progress.Healthy(getContainerProgressName(container)))
-						}
+						w.Events(containerEvents(containers, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionHealthy:
@@ -305,9 +309,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
-						for _, container := range containers {
-							w.Event(progress.Healthy(getContainerProgressName(container)))
-						}
+						w.Events(containerEvents(containers, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionCompletedSuccessfully:
@@ -316,9 +318,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if exited {
-						for _, container := range containers {
-							w.Event(progress.Exited(getContainerProgressName(container)))
-						}
+						w.Events(containerEvents(containers, progress.Exited))
 						if code != 0 {
 							return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, code)
 						}
