@@ -266,7 +266,21 @@ const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
+	w := progress.ContextWriter(ctx)
 	for dep, config := range dependencies {
+		if config.Condition == types.ServiceConditionStarted {
+			// already managed by InDependencyOrder
+			return nil
+		}
+
+		containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, dep)
+		if err != nil {
+			return err
+		}
+		for _, container := range containers {
+			w.Event(progress.Waiting(getContainerProgressName(container)))
+		}
+
 		dep, config := dep, config
 		eg.Go(func() error {
 			ticker := time.NewTicker(500 * time.Millisecond)
@@ -280,6 +294,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
+						for _, container := range containers {
+							w.Event(progress.Healthy(getContainerProgressName(container)))
+						}
 						return nil
 					}
 				case types.ServiceConditionHealthy:
@@ -288,6 +305,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
+						for _, container := range containers {
+							w.Event(progress.Healthy(getContainerProgressName(container)))
+						}
 						return nil
 					}
 				case types.ServiceConditionCompletedSuccessfully:
@@ -296,14 +316,14 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if exited {
+						for _, container := range containers {
+							w.Event(progress.Exited(getContainerProgressName(container)))
+						}
 						if code != 0 {
 							return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, code)
 						}
 						return nil
 					}
-				case types.ServiceConditionStarted:
-					// already managed by InDependencyOrder
-					return nil
 				default:
 					logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
 					return nil
