@@ -1,0 +1,14 @@
+services:
+  fail:
+    image: alpine
+    command: sleep infinity
+    healthcheck:
+      test: "false"
+      interval: 1s
+      retries: 3
+  depends:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      fail:
+        condition: service_healthy

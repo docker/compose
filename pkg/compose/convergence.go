@@ -596,8 +596,15 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		if container.State == nil || container.State.Health == nil {
 			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
 		}
-		if container.State.Health.Status != moby.Healthy {
+		switch container.State.Health.Status {
+		case moby.Healthy:
+			// Continue by checking the next container.
+		case moby.Unhealthy:
+			return false, fmt.Errorf("container for service %q is unhealthy", service)
+		case moby.Starting:
 			return false, nil
+		default:
+			return false, fmt.Errorf("container for service %q had unexpected health status %q", service, container.State.Health.Status)
 		}
 	}
 	return true, nil
