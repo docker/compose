@@ -728,13 +728,16 @@ class TopLevelCommand:
             'timestamps': options['--timestamps']
         }
         print("Attaching to", list_containers(containers))
-        log_printer_from_project(
-            self.project,
-            containers,
-            options['--no-color'],
-            log_args,
-            event_stream=self.project.events(service_names=options['SERVICE']),
-            keep_prefix=not options['--no-log-prefix']).run()
+        try:
+            log_printer_from_project(
+                self.project,
+                containers,
+                options['--no-color'],
+                log_args,
+                event_stream=self.project.events(service_names=options['SERVICE']),
+                keep_prefix=not options['--no-log-prefix']).run()
+        except KeyboardInterrupt:
+            pass
 
     @metrics()
     def pause(self, options):
