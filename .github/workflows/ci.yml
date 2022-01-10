@@ -125,5 +125,5 @@ jobs:
           BUILD_TAGS: e2e
         run: make -f builder.Makefile compose-plugin
 
-      - name: E2E Test in standalone mode
-        run: make e2e-compose-standalone
+      # - name: E2E Test in standalone mode
+      #   run: make e2e-compose-standalone
