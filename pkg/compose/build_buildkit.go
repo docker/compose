@@ -27,17 +27,26 @@ import (
 )
 
 func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
-	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, s.configFile, nil, nil, "", nil, nil, project.WorkingDir)
+	ic := driver.InitConfig{
+		DockerAPI:       s.apiClient,
+		Name:            "default",
+		ContextPathHash: project.WorkingDir,
+	}
+
+	f, err := driver.GetDefaultFactory(ctx, ic.DockerAPI, false)
 	if err != nil {
 		return nil, err
 	}
-	driverInfo := []build.DriverInfo{
-		{
-			Name:   drivername,
-			Driver: d,
-		},
+
+	d, err := f.New(ctx, ic)
+	if err != nil {
+		return nil, err
 	}
+
+	driverInfo := []build.DriverInfo{{
+		Name:   ic.Name,
+		Driver: d,
+	}}
 
 	// Progress needs its own context that lives longer than the
 	// build one otherwise it won't read all the messages from
@@ -47,7 +56,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 	w := xprogress.NewPrinter(progressCtx, os.Stdout, mode)
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	response, err := build.Build(ctx, driverInfo, opts, nil, nil, w)
+	response, err := build.Build(ctx, driverInfo, opts, nil, s.configFile.Filename, w)
 	errW := w.Wait()
 	if err == nil {
 		err = errW
