@@ -232,6 +232,7 @@ func imageBuildOptions(options buildx.Options) dockertypes.ImageBuildOptions {
 		Tags:        options.Tags,
 		NoCache:     options.NoCache,
 		Remove:      true,
+		ForceRemove: true,
 		PullParent:  options.Pull,
 		BuildArgs:   toMapStringStringPtr(options.BuildArgs),
 		Labels:      options.Labels,
