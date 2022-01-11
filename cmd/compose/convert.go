@@ -116,7 +116,9 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 	project, err := opts.toProject(services,
 		cli.WithInterpolation(!opts.noInterpolate),
 		cli.WithResolvedPaths(true),
-		cli.WithNormalization(!opts.noNormalize))
+		cli.WithNormalization(!opts.noNormalize),
+		cli.WithDiscardEnvFile)
+
 	if err != nil {
 		return err
 	}
