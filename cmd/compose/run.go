@@ -53,6 +53,7 @@ type runOptions struct {
 	servicePorts  bool
 	name          string
 	noDeps        bool
+	ignoreOrphans bool
 	quietPull     bool
 }
 
@@ -134,6 +135,8 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
+			opts.ignoreOrphans = strings.ToLower(ignore) == "true"
 			return runRun(ctx, backend, project, opts)
 		}),
 		ValidArgsFunction: serviceCompletion(p),
@@ -182,7 +185,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	}
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
-		return startDependencies(ctx, backend, *project, opts.Service)
+		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)
 	})
 	if err != nil {
 		return err
@@ -229,7 +232,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	return err
 }
 
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string, ignoreOrphans bool) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -242,7 +245,9 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
-	if err := backend.Create(ctx, &project, api.CreateOptions{}); err != nil {
+	if err := backend.Create(ctx, &project, api.CreateOptions{
+		IgnoreOrphans: ignoreOrphans,
+	}); err != nil {
 		return err
 	}
 	return backend.Start(ctx, project.Name, api.StartOptions{})

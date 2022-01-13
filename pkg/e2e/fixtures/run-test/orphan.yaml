@@ -1,0 +1,5 @@
+version: '3.8'
+services:
+  simple:
+    image: alpine
+    command: echo "Hi there!!"
