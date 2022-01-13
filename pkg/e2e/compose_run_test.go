@@ -98,8 +98,22 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Stdout(), "8081->80/tcp"), res.Stdout())
 	})
 
+	t.Run("compose run orphan", func(t *testing.T) {
+		// Use different compose files to get an orphan container
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/orphan.yaml", "run", "simple")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
+		assert.Assert(t, strings.Contains(res.Combined(), "orphan"))
+
+		cmd := c.NewDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
+		res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "COMPOSE_IGNORE_ORPHANS=True")
+		})
+		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
+	})
+
 	t.Run("down", func(t *testing.T) {
 		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "down")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/orphan.yaml", "down")
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
