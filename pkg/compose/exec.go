@@ -96,7 +96,7 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 	}
 
 	in := streams.NewIn(opts.Stdin)
-	if in.IsTerminal() {
+	if in.IsTerminal() && opts.Tty {
 		state, err := term.SetRawTerminal(in.FD())
 		if err != nil {
 			return err
