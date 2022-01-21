@@ -44,6 +44,8 @@ func TestDown(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", nil).Return(nil)
@@ -74,6 +76,8 @@ func TestDownRemoveOrphans(t *testing.T) {
 			testContainer("service2", "789", false),
 			testContainer("service_orphan", "321", true),
 		}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", nil).Return(nil)
@@ -100,13 +104,16 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{
+			Volumes: []*moby.Volume{{Name: "myProject_volume"}},
+		}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).Return(nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).Return(nil, nil)
 
-	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).Return(volume.VolumeListOKBody{Volumes: []*moby.Volume{{Name: "myProject_volume"}}}, nil)
 	api.EXPECT().VolumeRemove(gomock.Any(), "myProject_volume", true).Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
