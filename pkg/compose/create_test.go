@@ -151,3 +151,74 @@ func TestGetBindMode(t *testing.T) {
 	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxShared}, true), "ro,z")
 	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxPrivate}, true), "ro,Z")
 }
+
+func TestGetDefaultNetworkMode(t *testing.T) {
+	t.Run("returns the network with the highest priority when service has multiple networks", func(t *testing.T) {
+		service := composetypes.ServiceConfig{
+			Name: "myService",
+			Networks: map[string]*composetypes.ServiceNetworkConfig{
+				"myNetwork1": {
+					Priority: 10,
+				},
+				"myNetwork2": {
+					Priority: 1000,
+				},
+			},
+		}
+		project := composetypes.Project{
+			Name: "myProject",
+			Services: []composetypes.ServiceConfig{
+				service,
+			},
+			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
+				"myNetwork1": {
+					Name: "myProject_myNetwork1",
+				},
+				"myNetwork2": {
+					Name: "myProject_myNetwork2",
+				},
+			}),
+		}
+
+		assert.Equal(t, getDefaultNetworkMode(&project, service), "myProject_myNetwork2")
+	})
+
+	t.Run("returns default network when service has no networks", func(t *testing.T) {
+		service := composetypes.ServiceConfig{
+			Name: "myService",
+		}
+		project := composetypes.Project{
+			Name: "myProject",
+			Services: []composetypes.ServiceConfig{
+				service,
+			},
+			Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{
+				"myNetwork1": {
+					Name: "myProject_myNetwork1",
+				},
+				"myNetwork2": {
+					Name: "myProject_myNetwork2",
+				},
+				"default": {
+					Name: "myProject_default",
+				},
+			}),
+		}
+
+		assert.Equal(t, getDefaultNetworkMode(&project, service), "myProject_default")
+	})
+
+	t.Run("returns none if project has no networks", func(t *testing.T) {
+		service := composetypes.ServiceConfig{
+			Name: "myService",
+		}
+		project := composetypes.Project{
+			Name: "myProject",
+			Services: []composetypes.ServiceConfig{
+				service,
+			},
+		}
+
+		assert.Equal(t, getDefaultNetworkMode(&project, service), "none")
+	})
+}
