@@ -445,14 +445,16 @@ func (s *composeService) prepareLabels(p *types.Project, service types.ServiceCo
 }
 
 func getDefaultNetworkMode(project *types.Project, service types.ServiceConfig) string {
-	mode := "none"
-	if len(project.Networks) > 0 {
-		for name := range getNetworksForService(service) {
-			mode = project.Networks[name].Name
-			break
-		}
+	if len(project.Networks) == 0 {
+		return "none"
 	}
-	return mode
+
+	if len(service.Networks) > 0 {
+		name := service.NetworksByPriority()[0]
+		return project.Networks[name].Name
+	}
+
+	return project.Networks["default"].Name
 }
 
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
@@ -1011,16 +1013,6 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 		aliases = append(aliases, c.Aliases...)
 	}
 	return aliases
-}
-
-func getNetworksForService(s types.ServiceConfig) map[string]*types.ServiceNetworkConfig {
-	if len(s.Networks) > 0 {
-		return s.Networks
-	}
-	if s.NetworkMode != "" {
-		return nil
-	}
-	return map[string]*types.ServiceNetworkConfig{"default": nil}
 }
 
 func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
