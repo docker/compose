@@ -33,7 +33,7 @@ func (s *composeService) Pause(ctx context.Context, project string, options api.
 }
 
 func (s *composeService) pause(ctx context.Context, project string, options api.PauseOptions) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
+	containers, err := s.getContainers(ctx, project, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *composeService) UnPause(ctx context.Context, project string, options ap
 }
 
 func (s *composeService) unPause(ctx context.Context, project string, options api.PauseOptions) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, true, options.Services...)
+	containers, err := s.getContainers(ctx, project, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
 	}
