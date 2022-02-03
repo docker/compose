@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
-	github.com/buger/goterm v1.0.1
+	github.com/buger/goterm v1.0.4
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
 	github.com/compose-spec/compose-go v1.0.9-0.20220101154228-91ed80f52afe
 	github.com/containerd/console v1.0.3
