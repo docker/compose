@@ -38,7 +38,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			return err
 		}
 		if options.Start.Attach == nil {
-			return s.start(ctx, project, options.Start, nil)
+			return s.start(ctx, project.Name, options.Start, nil)
 		}
 		return nil
 	})
@@ -65,7 +65,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 				})
 			}()
 
-			return s.Stop(ctx, project, api.StopOptions{
+			return s.Stop(ctx, project.Name, api.StopOptions{
 				Services: options.Create.Services,
 			})
 		})
@@ -85,7 +85,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	})
 
-	err = s.start(ctx, project, options.Start, printer.HandleEvent)
+	err = s.start(ctx, project.Name, options.Start, printer.HandleEvent)
 	if err != nil {
 		return err
 	}

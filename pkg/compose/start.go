@@ -28,16 +28,20 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) Start(ctx context.Context, project *types.Project, options api.StartOptions) error {
+func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, project, options, nil)
+		return s.start(ctx, projectName, options, nil)
 	})
 }
 
-func (s *composeService) start(ctx context.Context, project *types.Project, options api.StartOptions, listener api.ContainerEventListener) error {
-	if len(options.AttachTo) == 0 {
-		options.AttachTo = project.ServiceNames()
+func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
+	var containers Containers
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true, options.AttachTo...)
+	if err != nil {
+		return err
 	}
+
+	project := s.projectFromName(containers, projectName)
 
 	eg, ctx := errgroup.WithContext(ctx)
 	if listener != nil {
@@ -53,7 +57,7 @@ func (s *composeService) start(ctx context.Context, project *types.Project, opti
 		})
 	}
 
-	err := InDependencyOrder(ctx, project, func(c context.Context, name string) error {
+	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err

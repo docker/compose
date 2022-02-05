@@ -21,28 +21,30 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-
-	"github.com/compose-spec/compose-go/types"
+	//"github.com/compose-spec/compose-go/types"
 )
 
-func (s *composeService) Stop(ctx context.Context, project *types.Project, options api.StopOptions) error {
+func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.stop(ctx, project, options)
+		return s.stop(ctx, projectName, options)
 	})
 }
 
-func (s *composeService) stop(ctx context.Context, project *types.Project, options api.StopOptions) error {
+func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	services := options.Services
 	if len(services) == 0 {
-		services = project.ServiceNames()
+		services = []string{}
 	}
+
 	var containers Containers
-	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true, services...)
 	if err != nil {
 		return err
 	}
+
+	project := s.projectFromName(containers, projectName)
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		return s.stopContainers(ctx, w, containers.filter(isService(service)), options.Timeout)

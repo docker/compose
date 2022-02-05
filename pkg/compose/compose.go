@@ -92,3 +92,34 @@ func escapeDollarSign(marshal []byte) []byte {
 	escDollar := []byte{'$', '$'}
 	return bytes.ReplaceAll(marshal, dollar, escDollar)
 }
+
+// projectFromName builds a types.Project based on actual resources with compose labels set
+func (s *composeService) projectFromName(containers Containers, projectName string) *types.Project {
+	project := &types.Project{
+		Name: projectName,
+	}
+	if len(containers) == 0 {
+		return project
+	}
+	set := map[string]moby.Container{}
+	for _, c := range containers {
+		set[c.Labels[api.ServiceLabel]] = c
+	}
+	for s, c := range set {
+		service := types.ServiceConfig{
+			Name:   s,
+			Image:  c.Image,
+			Labels: c.Labels,
+		}
+		dependencies := c.Labels[api.DependenciesLabel]
+		if len(dependencies) > 0 {
+			service.DependsOn = types.DependsOnConfig{}
+			for _, d := range strings.Split(dependencies, ",") {
+				service.DependsOn[d] = types.ServiceDependency{}
+			}
+		}
+		project.Services = append(project.Services, service)
+	}
+
+	return project
+}
