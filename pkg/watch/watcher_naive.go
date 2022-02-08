@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/tilt-dev/fsnotify"
 
+	"github.com/tilt-dev/fsnotify"
 	"github.com/tilt-dev/tilt/internal/ospath"
 	"github.com/tilt-dev/tilt/pkg/logger"
 )
