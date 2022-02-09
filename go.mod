@@ -8,7 +8,7 @@ require (
 	github.com/cnabio/cnab-to-oci v0.3.1-beta1
 	github.com/compose-spec/compose-go v1.0.9
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.5.8
+	github.com/containerd/containerd v1.5.9
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
 	github.com/docker/buildx v0.5.2-0.20210422185057-908a856079fc
 	github.com/docker/cli v20.10.7+incompatible
