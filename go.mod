@@ -18,7 +18,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/golang/mock v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/go-version v1.3.0
+	github.com/hashicorp/go-version v1.4.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.8.2-0.20210401015549-df49b648c8bf
