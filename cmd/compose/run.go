@@ -57,6 +57,7 @@ type runOptions struct {
 	noDeps        bool
 	ignoreOrphans bool
 	quietPull     bool
+	EnvFiles      []string
 }
 
 func (opts runOptions) apply(project *types.Project) error {
@@ -156,6 +157,7 @@ func runCommand(p *ProjectOptions, streams api.Streams, backend api.Service) *co
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
+	flags.StringArrayVar(&opts.EnvFiles, "env-file", []string{}, "Read in a file of environment variables")
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
 	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !streams.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
@@ -233,6 +235,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		NoDeps:            opts.noDeps,
 		Index:             0,
 		QuietPull:         opts.quietPull,
+		EnvFiles:          opts.EnvFiles,
 	}
 
 	for i, service := range project.Services {
