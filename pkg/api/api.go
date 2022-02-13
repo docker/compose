@@ -183,6 +183,7 @@ type ConvertOptions struct {
 
 // PushOptions group options of the Push API
 type PushOptions struct {
+	Quiet          bool
 	IgnoreFailures bool
 }
 
