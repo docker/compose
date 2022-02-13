@@ -117,6 +117,16 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: env-from-file
+      value_type: stringArray
+      default_value: '[]'
+      description: Set environment variables from file
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: interactive
       shorthand: i
       value_type: bool

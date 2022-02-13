@@ -178,4 +178,10 @@ func TestLocalComposeRun(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Combined(), "backend Pulling"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "backend Pulled"), res.Combined())
 	})
+
+	t.Run("compose run --env-from-file", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "--env-from-file", "./fixtures/run-test/run.env",
+			"front", "env")
+		res.Assert(t, icmd.Expected{Out: "FOO=BAR"})
+	})
 }
