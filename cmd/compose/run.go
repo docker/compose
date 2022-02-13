@@ -19,8 +19,10 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
@@ -44,6 +46,7 @@ type runOptions struct {
 	Service       string
 	Command       []string
 	environment   []string
+	envFiles      []string
 	Detach        bool
 	Remove        bool
 	noTty         bool
@@ -116,6 +119,29 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	return project, nil
 }
 
+func (options runOptions) getEnvironment() (types.Mapping, error) {
+	environment := types.NewMappingWithEquals(options.environment).Resolve(os.LookupEnv).ToMapping()
+	for _, file := range options.envFiles {
+		f, err := os.Open(file)
+		if err != nil {
+			return nil, err
+		}
+		vars, err := dotenv.ParseWithLookup(f, func(k string) (string, bool) {
+			value, ok := environment[k]
+			return value, ok
+		})
+		if err != nil {
+			return nil, nil
+		}
+		for k, v := range vars {
+			if _, ok := environment[k]; !ok {
+				environment[k] = v
+			}
+		}
+	}
+	return environment, nil
+}
+
 func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	options := runOptions{
 		composeOptions: &composeOptions{
@@ -175,6 +201,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backend api.Service) *
 	flags := cmd.Flags()
 	flags.BoolVarP(&options.Detach, "detach", "d", false, "Run container in background and print container ID")
 	flags.StringArrayVarP(&options.environment, "env", "e", []string{}, "Set environment variables")
+	flags.StringArrayVar(&options.envFiles, "env-from-file", []string{}, "Set environment variables from file")
 	flags.StringArrayVarP(&options.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&options.Remove, "rm", false, "Automatically remove the container when it exits")
 	flags.BoolVarP(&options.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected)")
@@ -264,6 +291,11 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		buildForRun = &bo
 	}
 
+	environment, err := options.getEnvironment()
+	if err != nil {
+		return err
+	}
+
 	// start container and attach to container streams
 	runOpts := api.RunOptions{
 		Build:             buildForRun,
@@ -278,7 +310,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		User:              options.user,
 		CapAdd:            options.capAdd.GetAll(),
 		CapDrop:           options.capDrop.GetAll(),
-		Environment:       options.environment,
+		Environment:       environment.Values(),
 		Entrypoint:        options.entrypointCmd,
 		Labels:            labels,
 		UseNetworkAliases: options.useAliases,
