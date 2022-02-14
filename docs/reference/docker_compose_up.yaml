@@ -5,7 +5,7 @@ long: |-
 
   Unless they are already running, this command also starts any linked services.
 
-  The `docker compose up` command aggregates the output of each container (liked `docker compose logs --follow` does).
+  The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
   When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
   background and leaves them running.
 

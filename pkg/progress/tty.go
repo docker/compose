@@ -95,6 +95,12 @@ func (w *ttyWriter) Event(e Event) {
 	}
 }
 
+func (w *ttyWriter) Events(events []Event) {
+	for _, e := range events {
+		w.Event(e)
+	}
+}
+
 func (w *ttyWriter) TailMsgf(msg string, args ...interface{}) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 
@@ -52,7 +53,7 @@ func versionCommand() *cobra.Command {
 
 func runVersion(opts versionOptions) {
 	if opts.short {
-		fmt.Println(internal.Version)
+		fmt.Println(strings.TrimPrefix(internal.Version, "v"))
 		return
 	}
 	if opts.format == formatter.JSON {

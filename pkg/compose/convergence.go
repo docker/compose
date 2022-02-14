@@ -261,12 +261,32 @@ func getContainerProgressName(container moby.Container) string {
 	return "Container " + getCanonicalContainerName(container)
 }
 
+func containerEvents(containers Containers, eventFunc func(string) progress.Event) []progress.Event {
+	events := []progress.Event{}
+	for _, container := range containers {
+		events = append(events, eventFunc(getContainerProgressName(container)))
+	}
+	return events
+}
+
 // ServiceConditionRunningOrHealthy is a service condition on statys running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
 func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependencies types.DependsOnConfig) error {
 	eg, _ := errgroup.WithContext(ctx)
+	w := progress.ContextWriter(ctx)
 	for dep, config := range dependencies {
+		if config.Condition == types.ServiceConditionStarted {
+			// already managed by InDependencyOrder
+			return nil
+		}
+
+		containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, dep)
+		if err != nil {
+			return err
+		}
+		w.Events(containerEvents(containers, progress.Waiting))
+
 		dep, config := dep, config
 		eg.Go(func() error {
 			ticker := time.NewTicker(500 * time.Millisecond)
@@ -280,6 +300,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
+						w.Events(containerEvents(containers, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionHealthy:
@@ -288,6 +309,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if healthy {
+						w.Events(containerEvents(containers, progress.Healthy))
 						return nil
 					}
 				case types.ServiceConditionCompletedSuccessfully:
@@ -296,14 +318,12 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 						return err
 					}
 					if exited {
+						w.Events(containerEvents(containers, progress.Exited))
 						if code != 0 {
 							return fmt.Errorf("service %q didn't completed successfully: exit %d", dep, code)
 						}
 						return nil
 					}
-				case types.ServiceConditionStarted:
-					// already managed by InDependencyOrder
-					return nil
 				default:
 					logrus.Warnf("unsupported depends_on condition: %s", config.Condition)
 					return nil
@@ -596,8 +616,15 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		if container.State == nil || container.State.Health == nil {
 			return false, fmt.Errorf("container for service %q has no healthcheck configured", service)
 		}
-		if container.State.Health.Status != moby.Healthy {
+		switch container.State.Health.Status {
+		case moby.Healthy:
+			// Continue by checking the next container.
+		case moby.Unhealthy:
+			return false, fmt.Errorf("container for service %q is unhealthy", service)
+		case moby.Starting:
 			return false, nil
+		default:
+			return false, fmt.Errorf("container for service %q had unexpected health status %q", service, container.State.Health.Status)
 		}
 	}
 	return true, nil

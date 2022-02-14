@@ -14,42 +14,20 @@
    limitations under the License.
 */
 
-package progress
+package e2e
 
 import (
-	"context"
-	"fmt"
-	"io"
+	"testing"
+
+	"gotest.tools/v3/icmd"
 )
 
-type plainWriter struct {
-	out  io.Writer
-	done chan bool
-}
+func TestStartFail(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+	const projectName = "e2e-start-fail"
 
-func (p *plainWriter) Start(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-p.done:
-		return nil
-	}
-}
+	res := c.RunDockerOrExitError("compose", "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
+	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
 
-func (p *plainWriter) Event(e Event) {
-	fmt.Fprintln(p.out, e.ID, e.Text, e.StatusText)
-}
-
-func (p *plainWriter) Events(events []Event) {
-	for _, e := range events {
-		p.Event(e)
-	}
-}
-
-func (p *plainWriter) TailMsgf(m string, args ...interface{}) {
-	fmt.Fprintln(p.out, append([]interface{}{m}, args...)...)
-}
-
-func (p *plainWriter) Stop() {
-	p.done <- true
+	c.RunDockerComposeCmd("--project-name", projectName, "down")
 }

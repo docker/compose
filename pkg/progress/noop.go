@@ -27,7 +27,10 @@ func (p *noopWriter) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *noopWriter) Event(e Event) {
+func (p *noopWriter) Event(Event) {
+}
+
+func (p *noopWriter) Events([]Event) {
 }
 
 func (p *noopWriter) TailMsgf(_ string, _ ...interface{}) {
