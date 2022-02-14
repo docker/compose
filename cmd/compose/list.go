@@ -92,22 +92,24 @@ func runList(ctx context.Context, backend api.Service, opts lsOptions) error {
 	view := viewFromStackList(stackList)
 	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
 		for _, stack := range view {
-			_, _ = fmt.Fprintf(w, "%s\t%s\n", stack.Name, stack.Status)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
 		}
-	}, "NAME", "STATUS")
+	}, "NAME", "STATUS", "CONFIG FILES")
 }
 
 type stackView struct {
-	Name   string
-	Status string
+	Name        string
+	Status      string
+	ConfigFiles string
 }
 
 func viewFromStackList(stackList []api.Stack) []stackView {
 	retList := make([]stackView, len(stackList))
 	for i, s := range stackList {
 		retList[i] = stackView{
-			Name:   s.Name,
-			Status: strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
+			Name:        s.Name,
+			Status:      strings.TrimSpace(fmt.Sprintf("%s %s", s.Status, s.Reason)),
+			ConfigFiles: s.ConfigFiles,
 		}
 	}
 	return retList
