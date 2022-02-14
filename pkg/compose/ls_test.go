@@ -30,31 +30,33 @@ func TestContainersToStacks(t *testing.T) {
 		{
 			ID:     "service1",
 			State:  "running",
-			Labels: map[string]string{api.ProjectLabel: "project1"},
+			Labels: map[string]string{api.ProjectLabel: "project1", api.ConfigFilesLabel: "/home/docker-compose.yaml"},
 		},
 		{
 			ID:     "service2",
 			State:  "running",
-			Labels: map[string]string{api.ProjectLabel: "project1"},
+			Labels: map[string]string{api.ProjectLabel: "project1", api.ConfigFilesLabel: "/home/docker-compose.yaml"},
 		},
 		{
 			ID:     "service3",
 			State:  "running",
-			Labels: map[string]string{api.ProjectLabel: "project2"},
+			Labels: map[string]string{api.ProjectLabel: "project2", api.ConfigFilesLabel: "/home/project2-docker-compose.yaml"},
 		},
 	}
 	stacks, err := containersToStacks(containers)
 	assert.NilError(t, err)
 	assert.DeepEqual(t, stacks, []api.Stack{
 		{
-			ID:     "project1",
-			Name:   "project1",
-			Status: "running(2)",
+			ID:          "project1",
+			Name:        "project1",
+			Status:      "running(2)",
+			ConfigFiles: "/home/docker-compose.yaml",
 		},
 		{
-			ID:     "project2",
-			Name:   "project2",
-			Status: "running(1)",
+			ID:          "project2",
+			Name:        "project2",
+			Status:      "running(1)",
+			ConfigFiles: "/home/project2-docker-compose.yaml",
 		},
 	})
 }
