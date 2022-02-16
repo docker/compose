@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/command/image/build"
+	"github.com/docker/compose/v2/pkg/api"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/pkg/archive"
@@ -45,7 +46,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	var nameDigests = make(map[string]string)
 	var errs error
 	err := project.WithServices(nil, func(service types.ServiceConfig) error {
-		imageName := getImageName(service, project.Name)
+		imageName := api.GetImageNameOrDefault(service, project.Name)
 		o, ok := opts[imageName]
 		if !ok {
 			return nil

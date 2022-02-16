@@ -227,14 +227,6 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
-func getImageName(service types.ServiceConfig, projectName string) string {
-	imageName := service.Image
-	if imageName == "" {
-		imageName = projectName + "_" + service.Name
-	}
-	return imageName
-}
-
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
 	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
@@ -279,7 +271,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
-		Image:           getImageName(service, p.Name),
+		Image:           api.GetImageNameOrDefault(service, p.Name),
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
@@ -712,7 +704,7 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	inherit *moby.Container) (map[string]struct{}, []string, []mount.Mount, error) {
 	var mounts = []mount.Mount{}
 
-	image := getImageName(service, p.Name)
+	image := api.GetImageNameOrDefault(service, p.Name)
 	imgInspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, image)
 	if err != nil {
 		return nil, nil, nil, err

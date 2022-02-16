@@ -195,7 +195,7 @@ func (s *composeService) getServiceImages(options api.DownOptions, project *type
 			continue
 		}
 		if image == "" {
-			image = getImageName(service, project.Name)
+			image = api.GetImageNameOrDefault(service, project.Name)
 		}
 		images[image] = struct{}{}
 	}
