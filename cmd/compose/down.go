@@ -22,7 +22,9 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -62,6 +64,14 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
 	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
 	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
+	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		switch name {
+		case "volume":
+			name = "volumes"
+			logrus.Warn("--volume is deprecated, please use --volumes")
+		}
+		return pflag.NormalizedName(name)
+	})
 	return downCmd
 }
 
