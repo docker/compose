@@ -11,7 +11,6 @@ import (
 
 func TestGreatestExistingAncestor(t *testing.T) {
 	f := tempdir.NewTempDirFixture(t)
-	defer f.TearDown()
 
 	p, err := greatestExistingAncestor(f.Path())
 	assert.NoError(t, err)

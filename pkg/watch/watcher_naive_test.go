@@ -23,7 +23,6 @@ func TestDontWatchEachFile(t *testing.T) {
 	// this test uses a Linux way to get the number of watches to make sure we're watching
 	// per-directory, not per-file
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	watched := f.TempDir("watched")
 
