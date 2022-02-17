@@ -28,9 +28,9 @@ jobs:
       - name: Run golangci-lint
         env:
           BUILD_TAGS: e2e
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b /usr/bin/ v1.39.0
-          make -f builder.Makefile lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          args: --timeout=180s
 
   # only on main branch, costs too much for the gain on every PR
   validate-cross-build:
