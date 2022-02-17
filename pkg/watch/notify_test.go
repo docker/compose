@@ -39,13 +39,11 @@ func TestWindowsBufferSize(t *testing.T) {
 
 func TestNoEvents(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 	f.assertEvents()
 }
 
 func TestNoWatches(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 	f.paths = nil
 	f.rebuildWatcher()
 	f.assertEvents()
@@ -58,7 +56,6 @@ func TestEventOrdering(t *testing.T) {
 		return
 	}
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	count := 8
 	dirs := make([]string, count)
@@ -90,7 +87,6 @@ func TestEventOrdering(t *testing.T) {
 // them all quickly. Make sure there are no errors.
 func TestGitBranchSwitch(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	count := 10
 	dirs := make([]string, count)
@@ -144,7 +140,6 @@ func TestGitBranchSwitch(t *testing.T) {
 
 func TestWatchesAreRecursive(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 
@@ -166,7 +161,6 @@ func TestWatchesAreRecursive(t *testing.T) {
 
 func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 
@@ -191,7 +185,6 @@ func TestNewDirectoriesAreRecursivelyWatched(t *testing.T) {
 
 func TestWatchNonExistentPath(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	path := filepath.Join(root, "change")
@@ -206,7 +199,6 @@ func TestWatchNonExistentPath(t *testing.T) {
 
 func TestWatchNonExistentPathDoesNotFireSiblingEvent(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	watchedFile := filepath.Join(root, "a.txt")
@@ -222,7 +214,6 @@ func TestWatchNonExistentPathDoesNotFireSiblingEvent(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	path := filepath.Join(root, "change")
@@ -242,7 +233,6 @@ func TestRemove(t *testing.T) {
 
 func TestRemoveAndAddBack(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	path := filepath.Join(f.paths[0], "change")
 
@@ -272,7 +262,6 @@ func TestRemoveAndAddBack(t *testing.T) {
 
 func TestSingleFile(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	path := filepath.Join(root, "change")
@@ -296,7 +285,6 @@ func TestWriteBrokenLink(t *testing.T) {
 		t.Skip("no user-space symlinks on windows")
 	}
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	link := filepath.Join(f.paths[0], "brokenLink")
 	missingFile := filepath.Join(f.paths[0], "missingFile")
@@ -313,7 +301,6 @@ func TestWriteGoodLink(t *testing.T) {
 		t.Skip("no user-space symlinks on windows")
 	}
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	goodFile := filepath.Join(f.paths[0], "goodFile")
 	err := ioutil.WriteFile(goodFile, []byte("hello"), 0644)
@@ -335,7 +322,6 @@ func TestWatchBrokenLink(t *testing.T) {
 		t.Skip("no user-space symlinks on windows")
 	}
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	newRoot, err := NewDir(t.Name())
 	if err != nil {
@@ -363,7 +349,6 @@ func TestWatchBrokenLink(t *testing.T) {
 
 func TestMoveAndReplace(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	file := filepath.Join(root, "myfile")
@@ -383,7 +368,6 @@ func TestMoveAndReplace(t *testing.T) {
 
 func TestWatchBothDirAndFile(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	dir := f.JoinPath("foo")
 	fileA := f.JoinPath("foo", "a")
@@ -402,7 +386,6 @@ func TestWatchBothDirAndFile(t *testing.T) {
 
 func TestWatchNonexistentFileInNonexistentDirectoryCreatedSimultaneously(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
@@ -420,7 +403,6 @@ func TestWatchNonexistentFileInNonexistentDirectoryCreatedSimultaneously(t *test
 
 func TestWatchNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
@@ -450,7 +432,6 @@ func TestWatchNonexistentDirectory(t *testing.T) {
 
 func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.JoinPath("root")
 	err := os.Mkdir(root, 0777)
@@ -475,7 +456,6 @@ func TestWatchNonexistentFileInNonexistentDirectory(t *testing.T) {
 
 func TestWatchCountInnerFile(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.paths[0]
 	a := f.JoinPath(root, "a")
@@ -493,7 +473,6 @@ func TestWatchCountInnerFile(t *testing.T) {
 
 func TestWatchCountInnerFileWithIgnore(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.paths[0]
 	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{
@@ -517,7 +496,6 @@ func TestWatchCountInnerFileWithIgnore(t *testing.T) {
 
 func TestIgnoreCreatedDir(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.paths[0]
 	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
@@ -538,7 +516,6 @@ func TestIgnoreCreatedDir(t *testing.T) {
 
 func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.paths[0]
 	ignore, _ := dockerignore.NewDockerPatternMatcher(root,
@@ -564,7 +541,6 @@ func TestIgnoreCreatedDirWithExclusions(t *testing.T) {
 
 func TestIgnoreInitialDir(t *testing.T) {
 	f := newNotifyFixture(t)
-	defer f.tearDown()
 
 	root := f.TempDir("root")
 	ignore, _ := dockerignore.NewDockerPatternMatcher(root, []string{"a/b"})
@@ -612,6 +588,7 @@ func newNotifyFixture(t *testing.T) *notifyFixture {
 		out:            out,
 	}
 	nf.watch(nf.TempDir("watched"))
+	t.Cleanup(nf.tearDown)
 	return nf
 }
 
@@ -759,6 +736,5 @@ func (f *notifyFixture) closeWatcher() {
 func (f *notifyFixture) tearDown() {
 	f.cancel()
 	f.closeWatcher()
-	f.TempDirFixture.TearDown()
 	numberOfWatches.Set(0)
 }
