@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/buildx/build"
@@ -28,7 +29,7 @@ import (
 
 func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
 	const drivername = "default"
-	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, s.configFile, nil, nil, "", nil, nil, project.WorkingDir)
+	d, err := driver.GetDriver(ctx, drivername, nil, s.apiClient, s.configFile, nil, nil, nil, nil, nil, project.WorkingDir)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 	w := xprogress.NewPrinter(progressCtx, os.Stdout, mode)
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	response, err := build.Build(ctx, driverInfo, opts, nil, nil, w)
+	response, err := build.Build(ctx, driverInfo, opts, nil, filepath.Dir(s.configFile.Filename), w)
 	errW := w.Wait()
 	if err == nil {
 		err = errW

@@ -32,7 +32,16 @@ func generateCliYaml(opts *options) error {
 	disableFlagsInUseLine(cmd)
 
 	cmd.DisableAutoGenTag = true
-	return clidocstool.GenYamlTree(cmd, opts.target)
+	tool, err := clidocstool.New(clidocstool.Options{
+		Root:      cmd,
+		SourceDir: opts.source,
+		TargetDir: opts.target,
+		Plugin:    true,
+	})
+	if err != nil {
+		return err
+	}
+	return tool.GenYamlTree(cmd)
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
