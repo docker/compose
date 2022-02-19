@@ -280,6 +280,12 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 			// already managed by InDependencyOrder
 			return nil
 		}
+		if service, err := project.GetService(dep); err != nil {
+			return err
+		} else if service.Scale == 0 {
+			// don't wait for the dependency which configured to have 0 containers running
+			continue
+		}
 
 		containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, dep)
 		if err != nil {
