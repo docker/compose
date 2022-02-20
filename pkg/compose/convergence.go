@@ -276,14 +276,9 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 	for dep, config := range dependencies {
-		if config.Condition == types.ServiceConditionStarted {
-			// already managed by InDependencyOrder
-			continue
-		}
-		if service, err := project.GetService(dep); err != nil {
+		if shouldWait, err := shouldWaitForDependency(dep, config, project); err != nil {
 			return err
-		} else if service.Scale == 0 {
-			// don't wait for the dependency which configured to have 0 containers running
+		} else if !shouldWait {
 			continue
 		}
 
@@ -338,6 +333,20 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		})
 	}
 	return eg.Wait()
+}
+
+func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
+	if dependencyConfig.Condition == types.ServiceConditionStarted {
+		// already managed by InDependencyOrder
+		return false, nil
+	}
+	if service, err := project.GetService(serviceName); err != nil {
+		return false, err
+	} else if service.Scale == 0 {
+		// don't wait for the dependency which configured to have 0 containers running
+		return false, nil
+	}
+	return true, nil
 }
 
 func nextContainerNumber(containers []moby.Container) (int, error) {
