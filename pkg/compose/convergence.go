@@ -278,7 +278,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 	for dep, config := range dependencies {
 		if config.Condition == types.ServiceConditionStarted {
 			// already managed by InDependencyOrder
-			return nil
+			continue
 		}
 		if service, err := project.GetService(dep); err != nil {
 			return err

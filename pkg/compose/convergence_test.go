@@ -202,4 +202,14 @@ func TestWaitDependencies(t *testing.T) {
 		}
 		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
 	})
+	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
+		dbService := types.ServiceConfig{Name: "db", Scale: 1}
+		redisService := types.ServiceConfig{Name: "redis", Scale: 1}
+		project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{dbService, redisService}}
+		dependencies := types.DependsOnConfig{
+			"db":    {Condition: types.ServiceConditionStarted},
+			"redis": {Condition: types.ServiceConditionStarted},
+		}
+		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
+	})
 }
