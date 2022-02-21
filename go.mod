@@ -12,7 +12,7 @@ require (
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
 	github.com/docker/buildx v0.7.1
 	github.com/docker/cli v20.10.12+incompatible
-	github.com/docker/cli-docs-tool v0.2.1
+	github.com/docker/cli-docs-tool v0.3.1
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
