@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -46,13 +48,38 @@ func containersToStacks(containers []moby.Container) ([]api.Stack, error) {
 	}
 	var projects []api.Stack
 	for _, project := range keys {
+		configFiles, err := combinedConfigFiles(containersByLabel[project])
+		if err != nil {
+			return nil, err
+		}
+
 		projects = append(projects, api.Stack{
-			ID:     project,
-			Name:   project,
-			Status: combinedStatus(containerToState(containersByLabel[project])),
+			ID:          project,
+			Name:        project,
+			Status:      combinedStatus(containerToState(containersByLabel[project])),
+			ConfigFiles: configFiles,
 		})
 	}
 	return projects, nil
+}
+
+func combinedConfigFiles(containers []moby.Container) (string, error) {
+	configFiles := []string{}
+
+	for _, c := range containers {
+		files, ok := c.Labels[api.ConfigFilesLabel]
+		if !ok {
+			return "", fmt.Errorf("No label %q set on container %q of compose project", api.ConfigFilesLabel, c.ID)
+		}
+
+		for _, f := range strings.Split(files, ",") {
+			if !utils.StringContains(configFiles, f) {
+				configFiles = append(configFiles, f)
+			}
+		}
+	}
+
+	return strings.Join(configFiles, ","), nil
 }
 
 func containerToState(containers []moby.Container) []string {

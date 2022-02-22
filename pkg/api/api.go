@@ -404,10 +404,11 @@ const (
 
 // Stack holds the name and state of a compose application/stack
 type Stack struct {
-	ID     string
-	Name   string
-	Status string
-	Reason string
+	ID          string
+	Name        string
+	Status      string
+	ConfigFiles string
+	Reason      string
 }
 
 // LogConsumer is a callback to process log messages from services
