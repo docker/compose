@@ -27,7 +27,7 @@ import (
 )
 
 func (s *composeService) Port(ctx context.Context, project string, service string, port int, options api.PortOptions) (string, int, error) {
-	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project),
 			serviceFilter(service),

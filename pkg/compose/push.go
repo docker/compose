@@ -45,7 +45,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
-	info, err := s.apiClient.Info(ctx)
+	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 		}
 		service := service
 		eg.Go(func() error {
-			err := s.pushServiceImage(ctx, service, info, s.configFile, w)
+			err := s.pushServiceImage(ctx, service, info, s.configFile(), w)
 			if err != nil {
 				if !options.IgnoreFailures {
 					return err
@@ -103,7 +103,7 @@ func (s *composeService) pushServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	stream, err := s.apiClient.ImagePush(ctx, service.Image, moby.ImagePushOptions{
+	stream, err := s.apiClient().ImagePush(ctx, service.Image, moby.ImagePushOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 	})
 	if err != nil {

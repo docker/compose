@@ -79,7 +79,7 @@ func (s *composeService) remove(ctx context.Context, containers Containers, opti
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.RemovingEvent(eventName))
-			err := s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err := s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})

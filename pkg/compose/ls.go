@@ -30,7 +30,7 @@ import (
 )
 
 func (s *composeService) List(ctx context.Context, opts api.ListOptions) ([]api.Stack, error) {
-	list, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(hasProjectLabelFilter()),
 		All:     opts.All,
 	})

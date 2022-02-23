@@ -18,11 +18,8 @@ package compose
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/containerd/console"
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
@@ -100,27 +97,8 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 		Index:       opts.index,
 		Detach:      opts.detach,
 		WorkingDir:  opts.workingDir,
-
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
 	}
 
-	if execOpts.Tty {
-		con := console.Current()
-		if err := con.SetRaw(); err != nil {
-			return err
-		}
-		defer func() {
-			if err := con.Reset(); err != nil {
-				fmt.Println("Unable to close the console")
-			}
-		}()
-
-		execOpts.Stdin = con
-		execOpts.Stdout = con
-		execOpts.Stderr = con
-	}
 	exitCode, err := backend.Exec(ctx, projectName, execOpts)
 	if exitCode != 0 {
 		errMsg := ""

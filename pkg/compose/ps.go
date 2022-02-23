@@ -53,7 +53,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				})
 			}
 
-			inspect, err := s.apiClient.ContainerInspect(ctx, container.ID)
+			inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
 			if err != nil {
 				return err
 			}

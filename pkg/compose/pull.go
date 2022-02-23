@@ -46,7 +46,7 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, opts 
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
-	info, err := s.apiClient.Info(ctx)
+	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, info, s.configFile, w, false)
+			err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
 			if err != nil {
 				if !opts.IgnoreFailures {
 					if service.Build != nil {
@@ -124,7 +124,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
+	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 		Platform:     service.Platform,
 	})
@@ -162,7 +162,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
-	info, err := s.apiClient.Info(ctx)
+	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		for _, service := range needPull {
 			service := service
 			eg.Go(func() error {
-				err := s.pullServiceImage(ctx, service, info, s.configFile, w, quietPull)
+				err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
 				if err != nil && service.Build != nil {
 					// image can be built, so we can ignore pull failure
 					return nil

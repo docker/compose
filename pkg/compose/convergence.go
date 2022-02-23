@@ -180,11 +180,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			// Scale Down
 			container := container
 			eg.Go(func() error {
-				err := c.service.apiClient.ContainerStop(ctx, container.ID, timeout)
+				err := c.service.apiClient().ContainerStop(ctx, container.ID, timeout)
 				if err != nil {
 					return err
 				}
-				return c.service.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
+				return c.service.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{})
 			})
 			continue
 		}
@@ -395,13 +395,13 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	var created moby.Container
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
-	err := s.apiClient.ContainerStop(ctx, replaced.ID, timeout)
+	err := s.apiClient().ContainerStop(ctx, replaced.ID, timeout)
 	if err != nil {
 		return created, err
 	}
 	name := getCanonicalContainerName(replaced)
 	tmpName := fmt.Sprintf("%s_%s", replaced.ID[:12], name)
-	err = s.apiClient.ContainerRename(ctx, replaced.ID, tmpName)
+	err = s.apiClient().ContainerRename(ctx, replaced.ID, tmpName)
 	if err != nil {
 		return created, err
 	}
@@ -419,7 +419,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	if err != nil {
 		return created, err
 	}
-	err = s.apiClient.ContainerRemove(ctx, replaced.ID, moby.ContainerRemoveOptions{})
+	err = s.apiClient().ContainerRemove(ctx, replaced.ID, moby.ContainerRemoveOptions{})
 	if err != nil {
 		return created, err
 	}
@@ -444,7 +444,7 @@ func setDependentLifecycle(project *types.Project, service string, strategy stri
 func (s *composeService) startContainer(ctx context.Context, container moby.Container) error {
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(container), progress.Working, "Restart"))
-	err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+	err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
@@ -468,11 +468,11 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 		}
 		plat = &p
 	}
-	response, err := s.apiClient.ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
+	response, err := s.apiClient().ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
 	if err != nil {
 		return created, err
 	}
-	inspectedContainer, err := s.apiClient.ContainerInspect(ctx, response.ID)
+	inspectedContainer, err := s.apiClient().ContainerInspect(ctx, response.ID)
 	if err != nil {
 		return created, err
 	}
@@ -502,7 +502,7 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 			if shortIDAliasExists(created.ID, val.Aliases...) {
 				continue
 			}
-			err = s.apiClient.NetworkDisconnect(ctx, netwrk.Name, created.ID, false)
+			err = s.apiClient().NetworkDisconnect(ctx, netwrk.Name, created.ID, false)
 			if err != nil {
 				return created, err
 			}
@@ -596,7 +596,7 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 			IPv6Address: ipv6Address,
 		}
 	}
-	err := s.apiClient.NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
+	err := s.apiClient().NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
 		Aliases:           aliases,
 		IPAddress:         ipv4Address,
 		GlobalIPv6Address: ipv6Address,
@@ -619,7 +619,7 @@ func (s *composeService) isServiceHealthy(ctx context.Context, project *types.Pr
 		return false, nil
 	}
 	for _, c := range containers {
-		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
+		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, err
 		}
@@ -651,7 +651,7 @@ func (s *composeService) isServiceCompleted(ctx context.Context, project *types.
 		return false, 0, err
 	}
 	for _, c := range containers {
-		container, err := s.apiClient.ContainerInspect(ctx, c.ID)
+		container, err := s.apiClient().ContainerInspect(ctx, c.ID)
 		if err != nil {
 			return false, 0, err
 		}
@@ -671,7 +671,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 	if err != nil {
 		return err
 	}
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(project.Name),
 			serviceFilter(service.Name),
@@ -700,7 +700,7 @@ func (s *composeService) startService(ctx context.Context, project *types.Projec
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StartingEvent(eventName))
-			err := s.apiClient.ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
+			err := s.apiClient().ContainerStart(ctx, container.ID, moby.ContainerStartOptions{})
 			if err == nil {
 				w.Event(progress.StartedEvent(eventName))
 			}

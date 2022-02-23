@@ -75,13 +75,13 @@ func (s *composeService) Logs(ctx context.Context, projectName string, consumer 
 }
 
 func (s *composeService) logContainers(ctx context.Context, consumer api.LogConsumer, c types.Container, options api.LogOptions) error {
-	cnt, err := s.apiClient.ContainerInspect(ctx, c.ID)
+	cnt, err := s.apiClient().ContainerInspect(ctx, c.ID)
 	if err != nil {
 		return err
 	}
 
 	service := c.Labels[api.ServiceLabel]
-	r, err := s.apiClient.ContainerLogs(ctx, cnt.ID, types.ContainerLogsOptions{
+	r, err := s.apiClient().ContainerLogs(ctx, cnt.ID, types.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     options.Follow,
