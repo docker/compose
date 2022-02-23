@@ -433,7 +433,7 @@ func (s *composeService) prepareLabels(service types.ServiceConfig, number int) 
 
 	var dependencies []string
 	for s := range service.DependsOn {
-		dependencies = append(dependencies, s)
+		dependencies = append(dependencies, s+":"+service.DependsOn[s].Condition)
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 	return labels, nil
