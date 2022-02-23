@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
@@ -182,5 +183,33 @@ func TestServiceLinks(t *testing.T) {
 		assert.Equal(t, links[0], "testProject-web-1:web")
 		assert.Equal(t, links[1], "testProject-web-1:web-1")
 		assert.Equal(t, links[2], "testProject-web-1:testProject-web-1")
+	})
+}
+
+func TestWaitDependencies(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	api := mocks.NewMockAPIClient(mockCtrl)
+	tested.apiClient = api
+
+	t.Run("should skip dependencies with scale 0", func(t *testing.T) {
+		dbService := types.ServiceConfig{Name: "db", Scale: 0}
+		redisService := types.ServiceConfig{Name: "redis", Scale: 0}
+		project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{dbService, redisService}}
+		dependencies := types.DependsOnConfig{
+			"db":    {Condition: ServiceConditionRunningOrHealthy},
+			"redis": {Condition: ServiceConditionRunningOrHealthy},
+		}
+		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
+	})
+	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
+		dbService := types.ServiceConfig{Name: "db", Scale: 1}
+		redisService := types.ServiceConfig{Name: "redis", Scale: 1}
+		project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{dbService, redisService}}
+		dependencies := types.DependsOnConfig{
+			"db":    {Condition: types.ServiceConditionStarted},
+			"redis": {Condition: types.ServiceConditionStarted},
+		}
+		assert.NilError(t, tested.waitDependencies(context.Background(), &project, dependencies))
 	})
 }
