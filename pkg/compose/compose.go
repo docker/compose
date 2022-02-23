@@ -114,8 +114,16 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		dependencies := c.Labels[api.DependenciesLabel]
 		if len(dependencies) > 0 {
 			service.DependsOn = types.DependsOnConfig{}
-			for _, d := range strings.Split(dependencies, ",") {
-				service.DependsOn[d] = types.ServiceDependency{Condition: ServiceConditionRunningOrHealthy}
+			for _, dc := range strings.Split(dependencies, ",") {
+				dcArr := strings.Split(dc, ":")
+				condition := ServiceConditionRunningOrHealthy
+				dependency := dcArr[0]
+
+				// backward compatibility
+				if len(dcArr) > 1 {
+					condition = dcArr[1]
+				}
+				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition}
 			}
 		}
 		project.Services = append(project.Services, service)
