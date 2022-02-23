@@ -467,8 +467,6 @@ github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e/go.mo
 github.com/dnaeon/go-vcr v1.0.1/go.mod h1:aBB1+wY4s93YsC3HHjMBMrwTj2R9FHDzUr9KyGc8n1E=
 github.com/docker/buildx v0.7.1 h1:l2DlW8YDbB3pH2bUFY5Q9pPQdhd42wqlnO5hoyWrjYM=
 github.com/docker/buildx v0.7.1/go.mod h1:PzxALHhYWPNhw/8JajPOJBkvx1w2tgOnppL4ESg0wOY=
-github.com/docker/cli v20.10.3-0.20210702143511-f782d1355eff+incompatible h1:CaaxCD/l9Dxogu6lxf7AQautlv3sHULrasPadayp0fM=
-github.com/docker/cli v20.10.3-0.20210702143511-f782d1355eff+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.2.1 h1:ffZhhdws6kE+dCKHLMlYROZz8z01RtWbz+g4xz0eBIU=
 github.com/docker/cli-docs-tool v0.2.1/go.mod h1:rgW5KKdNpLMBIuH4WQ/1RNh38nH+/Ay5jgL4P0ZMPpY=
 github.com/docker/compose-on-kubernetes v0.4.19-0.20190128150448-356b2919c496/go.mod h1:iT2pYfi580XlpaV4KmK0T6+4/9+XoKmk/fhoDod1emE=
@@ -1086,6 +1084,8 @@ github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f/go.mod h1:ZdcZmHo+
 github.com/nakabonne/nestif v0.3.0/go.mod h1:dI314BppzXjJ4HsCnbo7XzrJHPszZsjnk5wEBSYHI2c=
 github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d/go.mod h1:o96djdrsSGy3AWPyBgZMAGfxZNfgntdJG+11KU4QvbU=
 github.com/ncw/swift v1.0.47/go.mod h1:23YIA4yWVnGwv2dQlN4bB7egfYX6YLn0Yo/S6zZO/ZM=
+github.com/ndeloof/cli v0.0.0-20220222095154-9145a1b2e6a6 h1:PSmURWsOn7VfWBafKAISoFgPQKDvQ2/YL+X9YXpD6ek=
+github.com/ndeloof/cli v0.0.0-20220222095154-9145a1b2e6a6/go.mod h1:wxmb4t3v3ZwISBr3B/B631+3VJe+erAxkl3vXQwXj2c=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nkovacs/streamquote v0.0.0-20170412213628-49af9bddb229/go.mod h1:0aYXnNPJ8l7uZxf45rWW1a/uME32OF0rhiYGNQ2oF2E=

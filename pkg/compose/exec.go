@@ -19,124 +19,41 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io"
-
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/cli"
+	"github.com/docker/cli/cli/command/container"
+	cliopts "github.com/docker/cli/opts"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/moby/term"
-
-	"github.com/docker/compose/v2/pkg/api"
 )
 
 func (s *composeService) Exec(ctx context.Context, project string, opts api.RunOptions) (int, error) {
-	container, err := s.getExecTarget(ctx, project, opts)
+	target, err := s.getExecTarget(ctx, project, opts)
 	if err != nil {
 		return 0, err
 	}
 
-	exec, err := s.apiClient.ContainerExecCreate(ctx, container.ID, moby.ExecConfig{
-		Cmd:        opts.Command,
-		Env:        opts.Environment,
-		User:       opts.User,
-		Privileged: opts.Privileged,
-		Tty:        opts.Tty,
-		Detach:     opts.Detach,
-		WorkingDir: opts.WorkingDir,
+	env := cliopts.NewListOpts(nil)
+	for _, s := range opts.Environment {
+		env.Set(s) // nolint:errcheck - ListOpts has no validator
+	}
 
-		AttachStdin:  true,
-		AttachStdout: true,
-		AttachStderr: true,
+	err = container.RunExec(s.dockerCli(), container.ExecOptions{
+		Interactive: true,
+		Tty:         opts.Tty,
+		Detach:      opts.Detach,
+		User:        opts.User,
+		Privileged:  opts.Privileged,
+		Env:         env,
+		EnvFile:     cliopts.NewListOpts(nil),
+		Workdir:     opts.WorkingDir,
+		Container:   target.ID,
+		Command:     opts.Command,
 	})
-	if err != nil {
-		return 0, err
+	if sterr, ok := err.(cli.StatusError); ok {
+		return sterr.StatusCode, nil
 	}
-
-	if opts.Detach {
-		return 0, s.apiClient.ContainerExecStart(ctx, exec.ID, moby.ExecStartCheck{
-			Detach: true,
-			Tty:    opts.Tty,
-		})
-	}
-
-	resp, err := s.apiClient.ContainerExecAttach(ctx, exec.ID, moby.ExecStartCheck{
-		Tty: opts.Tty,
-	})
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Close() //nolint:errcheck
-
-	if opts.Tty {
-		s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	err = s.interactiveExec(ctx, opts, resp)
-	if err != nil {
-		return 0, err
-	}
-
-	return s.getExecExitStatus(ctx, exec.ID)
-}
-
-// inspired by https://github.com/docker/cli/blob/master/cli/command/container/exec.go#L116
-func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOptions, resp moby.HijackedResponse) error {
-	outputDone := make(chan error)
-	inputDone := make(chan error)
-
-	stdout := ContainerStdout{HijackedResponse: resp}
-	stdin := ContainerStdin{HijackedResponse: resp}
-	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
-	if err != nil {
-		return err
-	}
-
-	in := streams.NewIn(opts.Stdin)
-	if in.IsTerminal() && opts.Tty {
-		state, err := term.SetRawTerminal(in.FD())
-		if err != nil {
-			return err
-		}
-		defer term.RestoreTerminal(in.FD(), state) //nolint:errcheck
-	}
-
-	go func() {
-		if opts.Tty {
-			_, err := io.Copy(opts.Stdout, stdout)
-			outputDone <- err
-		} else {
-			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout)
-			outputDone <- err
-		}
-		stdout.Close() //nolint:errcheck
-	}()
-
-	go func() {
-		_, err := io.Copy(stdin, r)
-		inputDone <- err
-		stdin.Close() //nolint:errcheck
-	}()
-
-	for {
-		select {
-		case err := <-outputDone:
-			return err
-		case err := <-inputDone:
-			if _, ok := err.(term.EscapeError); ok {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			// Wait for output to complete streaming
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
+	return 0, err
 }
 
 func (s *composeService) getExecTarget(ctx context.Context, projectName string, opts api.RunOptions) (moby.Container, error) {
@@ -155,12 +72,4 @@ func (s *composeService) getExecTarget(ctx context.Context, projectName string, 
 	}
 	container := containers[0]
 	return container, nil
-}
-
-func (s *composeService) getExecExitStatus(ctx context.Context, execID string) (int, error) {
-	resp, err := s.apiClient.ContainerExecInspect(ctx, execID)
-	if err != nil {
-		return 0, err
-	}
-	return resp.ExitCode, nil
 }
