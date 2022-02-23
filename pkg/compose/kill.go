@@ -54,7 +54,7 @@ func (s *composeService) kill(ctx context.Context, project *types.Project, optio
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.KillingEvent(eventName))
-				err := s.apiClient.ContainerKill(ctx, container.ID, options.Signal)
+				err := s.apiClient().ContainerKill(ctx, container.ID, options.Signal)
 				if err != nil {
 					w.Event(progress.ErrorMessageEvent(eventName, "Error while Killing"))
 					return err

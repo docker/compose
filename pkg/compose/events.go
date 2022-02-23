@@ -30,7 +30,7 @@ import (
 )
 
 func (s *composeService) Events(ctx context.Context, project string, options api.EventsOptions) error {
-	events, errors := s.apiClient.Events(ctx, moby.EventsOptions{
+	events, errors := s.apiClient().Events(ctx, moby.EventsOptions{
 		Filters: filters.NewArgs(projectFilter(project)),
 	})
 	for {

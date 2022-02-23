@@ -19,7 +19,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -216,9 +215,6 @@ type RunOptions struct {
 	Entrypoint        []string
 	Detach            bool
 	AutoRemove        bool
-	Stdin             io.ReadCloser
-	Stdout            io.WriteCloser
-	Stderr            io.WriteCloser
 	Tty               bool
 	WorkingDir        string
 	User              string

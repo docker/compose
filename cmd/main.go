@@ -46,7 +46,7 @@ func pluginMain() {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			lazyInit.WithService(compose.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
+			lazyInit.WithService(compose.NewComposeService(dockerCli))
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}

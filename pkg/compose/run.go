@@ -22,7 +22,6 @@ import (
 	"io"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/cli/cli/streams"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -39,11 +38,11 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 	}
 
 	if opts.Detach {
-		err := s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
+		err := s.apiClient().ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
 		if err != nil {
 			return 0, err
 		}
-		fmt.Fprintln(opts.Stdout, containerID)
+		fmt.Fprintln(s.stdout(), containerID)
 		return 0, nil
 	}
 
@@ -51,7 +50,8 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 }
 
 func (s *composeService) runInteractive(ctx context.Context, containerID string, opts api.RunOptions) (int, error) {
-	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
+	in := s.stdin()
+	r, err := s.getEscapeKeyProxy(in, opts.Tty)
 	if err != nil {
 		return 0, err
 	}
@@ -61,7 +61,6 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 		return 0, err
 	}
 
-	in := streams.NewIn(opts.Stdin)
 	if in.IsTerminal() && opts.Tty {
 		state, err := term.SetRawTerminal(in.FD())
 		if err != nil {
@@ -75,10 +74,10 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 
 	go func() {
 		if opts.Tty {
-			_, err := io.Copy(opts.Stdout, stdout) //nolint:errcheck
+			_, err := io.Copy(s.stdout(), stdout) //nolint:errcheck
 			outputDone <- err
 		} else {
-			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout) //nolint:errcheck
+			_, err := stdcopy.StdCopy(s.stdout(), s.stderr(), stdout) //nolint:errcheck
 			outputDone <- err
 		}
 		stdout.Close() //nolint:errcheck
@@ -90,12 +89,12 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 		stdin.Close() //nolint:errcheck
 	}()
 
-	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
+	err = s.apiClient().ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
 	if err != nil {
 		return 0, err
 	}
 
-	s.monitorTTySize(ctx, containerID, s.apiClient.ContainerResize)
+	s.monitorTTySize(ctx, containerID, s.apiClient().ContainerResize)
 
 	for {
 		select {
@@ -119,7 +118,7 @@ func (s *composeService) runInteractive(ctx context.Context, containerID string,
 }
 
 func (s *composeService) terminateRun(ctx context.Context, containerID string, opts api.RunOptions) (exitCode int, err error) {
-	exitCh, errCh := s.apiClient.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+	exitCh, errCh := s.apiClient().ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
 	select {
 	case exit := <-exitCh:
 		exitCode = int(exit.StatusCode)
@@ -127,7 +126,7 @@ func (s *composeService) terminateRun(ctx context.Context, containerID string, o
 		return
 	}
 	if opts.AutoRemove {
-		err = s.apiClient.ContainerRemove(ctx, containerID, moby.ContainerRemoveOptions{})
+		err = s.apiClient().ContainerRemove(ctx, containerID, moby.ContainerRemoveOptions{})
 	}
 	return
 }
@@ -185,8 +184,8 @@ func (s *composeService) getEscapeKeyProxy(r io.ReadCloser, isTty bool) (io.Read
 		return r, nil
 	}
 	var escapeKeys = []byte{16, 17}
-	if s.configFile.DetachKeys != "" {
-		customEscapeKeys, err := term.ToBytes(s.configFile.DetachKeys)
+	if s.configFile().DetachKeys != "" {
+		customEscapeKeys, err := term.ToBytes(s.configFile().DetachKeys)
 		if err != nil {
 			return nil, err
 		}

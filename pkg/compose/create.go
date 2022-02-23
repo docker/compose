@@ -255,7 +255,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
-	proxyConfig := types.MappingWithEquals(s.configFile.ParseProxyConfig(s.apiClient.DaemonHost(), nil))
+	proxyConfig := types.MappingWithEquals(s.configFile().ParseProxyConfig(s.apiClient().DaemonHost(), nil))
 	env := proxyConfig.OverrideBy(service.Environment)
 
 	containerConfig := container.Config{
@@ -694,7 +694,7 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	var mounts = []mount.Mount{}
 
 	image := getImageName(service, p.Name)
-	imgInspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, image)
+	imgInspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, image)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1008,7 +1008,7 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 }
 
 func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
-	_, err := s.apiClient.NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+	_, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			if n.External.External {
@@ -1066,7 +1066,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 			networkEventName := fmt.Sprintf("Network %s", n.Name)
 			w := progress.ContextWriter(ctx)
 			w.Event(progress.CreatingEvent(networkEventName))
-			if _, err := s.apiClient.NetworkCreate(ctx, n.Name, createOpts); err != nil {
+			if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
 				w.Event(progress.ErrorEvent(networkEventName))
 				return errors.Wrapf(err, "failed to create network %s", n.Name)
 			}
@@ -1083,7 +1083,7 @@ func (s *composeService) removeNetwork(ctx context.Context, networkID string, ne
 	eventName := fmt.Sprintf("Network %s", networkName)
 	w.Event(progress.RemovingEvent(eventName))
 
-	if err := s.apiClient.NetworkRemove(ctx, networkID); err != nil {
+	if err := s.apiClient().NetworkRemove(ctx, networkID); err != nil {
 		w.Event(progress.ErrorEvent(eventName))
 		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", networkID))
 	}
@@ -1093,7 +1093,7 @@ func (s *composeService) removeNetwork(ctx context.Context, networkID string, ne
 }
 
 func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeConfig, project string) error {
-	inspected, err := s.apiClient.VolumeInspect(ctx, volume.Name)
+	inspected, err := s.apiClient().VolumeInspect(ctx, volume.Name)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return err
@@ -1124,7 +1124,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 	eventName := fmt.Sprintf("Volume %q", volume.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(eventName))
-	_, err := s.apiClient.VolumeCreate(ctx, volume_api.VolumeCreateBody{
+	_, err := s.apiClient().VolumeCreate(ctx, volume_api.VolumeCreateBody{
 		Labels:     volume.Labels,
 		Name:       volume.Name,
 		Driver:     volume.Driver,

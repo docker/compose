@@ -52,7 +52,7 @@ func (s *composeService) getContainers(ctx context.Context, project string, oneO
 		f = append(f, oneOffFilter(false))
 	case oneOffInclude:
 	}
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(f...),
 		All:     stopped,
 	})

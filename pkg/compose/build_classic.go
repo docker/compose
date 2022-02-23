@@ -69,8 +69,8 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 
 	dockerfileName := options.Inputs.DockerfilePath
 	specifiedContext := options.Inputs.ContextPath
-	progBuff := os.Stdout
-	buildBuff := os.Stdout
+	progBuff := s.stdout()
+	buildBuff := s.stdout()
 	if options.ImageIDFile != "" {
 		// Avoid leaving a stale file if we eventually fail
 		if err := os.Remove(options.ImageIDFile); err != nil && !os.IsNotExist(err) {
@@ -155,7 +155,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		body = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 	}
 
-	configFile := s.configFile
+	configFile := s.configFile()
 	creds, err := configFile.GetAllCredentials()
 	if err != nil {
 		return "", err
@@ -171,7 +171,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	response, err := s.apiClient.ImageBuild(ctx, body, buildOptions)
+	response, err := s.apiClient().ImageBuild(ctx, body, buildOptions)
 	if err != nil {
 		return "", err
 	}
@@ -181,13 +181,13 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	aux := func(msg jsonmessage.JSONMessage) {
 		var result dockertypes.BuildResult
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to parse aux message: %s", err)
+			fmt.Fprintf(s.stderr(), "Failed to parse aux message: %s", err)
 		} else {
 			imageID = result.ID
 		}
 	}
 
-	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.Fd(), true, aux)
+	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
 		if jerr, ok := err.(*jsonmessage.JSONError); ok {
 			// If no error code is set, default to 1
@@ -203,7 +203,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	// daemon isn't running Windows.
 	if response.OSType != "windows" && runtime.GOOS == "windows" {
 		// if response.OSType != "windows" && runtime.GOOS == "windows" && !options.quiet {
-		fmt.Fprintln(os.Stdout, "SECURITY WARNING: You are building a Docker "+
+		fmt.Fprintln(s.stdout(), "SECURITY WARNING: You are building a Docker "+
 			"image from Windows against a non-Windows Docker host. All files and "+
 			"directories added to build context will have '-rwxr-xr-x' permissions. "+
 			"It is recommended to double check and reset permissions for sensitive "+
