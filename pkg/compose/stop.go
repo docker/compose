@@ -43,7 +43,10 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	project := s.projectFromName(containers, projectName)
+	project, err := s.projectFromName(containers, projectName, services...)
+	if err != nil {
+		return err
+	}
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		return s.stopContainers(ctx, w, containers.filter(isService(service)), options.Timeout)

@@ -39,7 +39,10 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		return err
 	}
 
-	project := s.projectFromName(observedState, projectName)
+	project, err := s.projectFromName(observedState, projectName, options.Services...)
+	if err != nil {
+		return err
+	}
 
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
