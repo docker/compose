@@ -101,17 +101,19 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	if len(containers) == 0 {
 		return project
 	}
-	set := map[string]moby.Container{}
+	set := map[string]types.ServiceConfig{}
 	for _, c := range containers {
-		set[c.Labels[api.ServiceLabel]] = c
-	}
-	for s, c := range set {
-		service := types.ServiceConfig{
-			Name:   s,
+		sc := types.ServiceConfig{
+			Name:   c.Labels[api.ServiceLabel],
 			Image:  c.Image,
 			Labels: c.Labels,
 		}
-		dependencies := c.Labels[api.DependenciesLabel]
+		sc.Scale += 1
+		set[sc.Name] = sc
+
+	}
+	for _, service := range set {
+		dependencies := service.Labels[api.DependenciesLabel]
 		if len(dependencies) > 0 {
 			service.DependsOn = types.DependsOnConfig{}
 			for _, dc := range strings.Split(dependencies, ",") {
