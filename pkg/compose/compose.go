@@ -109,7 +109,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 			Image:  c.Image,
 			Labels: c.Labels,
 		}
-		sc.Scale += 1
+		sc.Scale++
 		set[sc.Name] = sc
 
 	}
