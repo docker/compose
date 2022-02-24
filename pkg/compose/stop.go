@@ -21,7 +21,6 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	//"github.com/compose-spec/compose-go/types"
 )
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
