@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -94,12 +95,12 @@ func escapeDollarSign(marshal []byte) []byte {
 }
 
 // projectFromName builds a types.Project based on actual resources with compose labels set
-func (s *composeService) projectFromName(containers Containers, projectName string) *types.Project {
+func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
 	project := &types.Project{
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project
+		return project, nil
 	}
 	set := map[string]types.ServiceConfig{}
 	for _, c := range containers {
@@ -130,6 +131,15 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		}
 		project.Services = append(project.Services, service)
 	}
+SERVICES:
+	for _, qs := range services {
+		for _, es := range project.Services {
+			if es.Name == qs {
+				continue SERVICES
+			}
+		}
+		return project, errors.New("no such service: " + qs)
+	}
 
-	return project
+	return project, nil
 }

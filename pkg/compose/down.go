@@ -235,7 +235,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 
 func (s *composeService) getProjectWithVolumes(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	project := s.projectFromName(containers, projectName)
+	project, _ := s.projectFromName(containers, projectName)
 	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
 	if err != nil {
 		return nil, err

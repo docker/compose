@@ -41,7 +41,10 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		return err
 	}
 
-	project := s.projectFromName(containers, projectName)
+	project, err := s.projectFromName(containers, projectName, options.AttachTo...)
+	if err != nil {
+		return err
+	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 	if listener != nil {
