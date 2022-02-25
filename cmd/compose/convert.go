@@ -92,7 +92,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 
 			return runConvert(ctx, backend, opts, args)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opts.Format, "format", "yaml", "Format the output. Values: [yaml | json]")

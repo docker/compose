@@ -109,7 +109,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			}
 			return runUp(ctx, backend, create, up, project, services)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := upCmd.Flags()
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")

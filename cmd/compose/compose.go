@@ -28,7 +28,6 @@ import (
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	dockercli "github.com/docker/cli/cli"
-	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
@@ -224,11 +223,6 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 // PluginName is the name of the plugin
 const PluginName = "compose"
 
-// RunningAsStandalone detects when running as a standalone program
-func RunningAsStandalone() bool {
-	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName && os.Args[1] != PluginName
-}
-
 // RootCommand returns the compose command with its child commands
 func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := projectOptions{}
@@ -324,6 +318,17 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	)
 	command.Flags().SetInterspersed(false)
 	opts.addProjectFlags(command.Flags())
+	command.RegisterFlagCompletionFunc( //nolint:errcheck
+		"project-name",
+		completeProjectNames(backend),
+	)
+	command.RegisterFlagCompletionFunc( //nolint:errcheck
+		"file",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
+
 	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	command.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
 	command.Flags().MarkHidden("version") //nolint:errcheck

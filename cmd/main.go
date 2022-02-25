@@ -59,6 +59,7 @@ func pluginMain() {
 			SchemaVersion: "0.1.0",
 			Vendor:        "Docker Inc.",
 			Version:       internal.Version,
+			Completion:    true,
 		})
 }
 

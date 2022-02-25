@@ -41,7 +41,7 @@ func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPush(ctx, backend, opts, args)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
 

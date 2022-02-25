@@ -91,20 +91,6 @@ func (mr *MockCliMockRecorder) Client() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Client", reflect.TypeOf((*MockCli)(nil).Client))
 }
 
-// ClientInfo mocks base method.
-func (m *MockCli) ClientInfo() command.ClientInfo {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClientInfo")
-	ret0, _ := ret[0].(command.ClientInfo)
-	return ret0
-}
-
-// ClientInfo indicates an expected call of ClientInfo.
-func (mr *MockCliMockRecorder) ClientInfo() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClientInfo", reflect.TypeOf((*MockCli)(nil).ClientInfo))
-}
-
 // ConfigFile mocks base method.
 func (m *MockCli) ConfigFile() *configfile.ConfigFile {
 	m.ctrl.T.Helper()

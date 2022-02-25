@@ -40,7 +40,7 @@ func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runRestart(ctx, backend, opts, args)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := restartCmd.Flags()
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")

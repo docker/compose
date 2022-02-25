@@ -52,7 +52,7 @@ func portCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPort(ctx, backend, opts, args[0])
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	cmd.Flags().StringVar(&opts.protocol, "protocol", "tcp", "tcp or udp")
 	cmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if service has multiple replicas")
