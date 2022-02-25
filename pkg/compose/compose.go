@@ -102,16 +102,18 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	if len(containers) == 0 {
 		return project, errors.New("no such project: " + projectName)
 	}
-	set := map[string]types.ServiceConfig{}
+	set := map[string]*types.ServiceConfig{}
 	for _, c := range containers {
-		sc := types.ServiceConfig{
-			Name:   c.Labels[api.ServiceLabel],
-			Image:  c.Image,
-			Labels: c.Labels,
+		serviceLabel := c.Labels[api.ServiceLabel]
+		_, ok := set[serviceLabel]
+		if !ok {
+			set[serviceLabel] = &types.ServiceConfig{
+				Name:   serviceLabel,
+				Image:  c.Image,
+				Labels: c.Labels,
+			}
 		}
-		sc.Scale++
-		set[sc.Name] = sc
-
+		set[serviceLabel].Scale++
 	}
 	for _, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]
@@ -129,7 +131,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition}
 			}
 		}
-		project.Services = append(project.Services, service)
+		project.Services = append(project.Services, *service)
 	}
 SERVICES:
 	for _, qs := range services {
