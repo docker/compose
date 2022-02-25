@@ -100,7 +100,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project, nil
+		return project, errors.New("no such project: " + projectName)
 	}
 	set := map[string]types.ServiceConfig{}
 	for _, c := range containers {
