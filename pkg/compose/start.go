@@ -36,7 +36,7 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
 	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.AttachTo...)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
