@@ -142,6 +142,10 @@ SERVICES:
 		}
 		return project, errors.New("no such service: " + qs)
 	}
+	err := project.ForServices(services)
+	if err != nil {
+		return project, err
+	}
 
 	return project, nil
 }
