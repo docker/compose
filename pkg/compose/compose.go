@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -91,4 +92,60 @@ func escapeDollarSign(marshal []byte) []byte {
 	dollar := []byte{'$'}
 	escDollar := []byte{'$', '$'}
 	return bytes.ReplaceAll(marshal, dollar, escDollar)
+}
+
+// projectFromName builds a types.Project based on actual resources with compose labels set
+func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
+	project := &types.Project{
+		Name: projectName,
+	}
+	if len(containers) == 0 {
+		return project, errors.New("no such project: " + projectName)
+	}
+	set := map[string]*types.ServiceConfig{}
+	for _, c := range containers {
+		serviceLabel := c.Labels[api.ServiceLabel]
+		_, ok := set[serviceLabel]
+		if !ok {
+			set[serviceLabel] = &types.ServiceConfig{
+				Name:   serviceLabel,
+				Image:  c.Image,
+				Labels: c.Labels,
+			}
+		}
+		set[serviceLabel].Scale++
+	}
+	for _, service := range set {
+		dependencies := service.Labels[api.DependenciesLabel]
+		if len(dependencies) > 0 {
+			service.DependsOn = types.DependsOnConfig{}
+			for _, dc := range strings.Split(dependencies, ",") {
+				dcArr := strings.Split(dc, ":")
+				condition := ServiceConditionRunningOrHealthy
+				dependency := dcArr[0]
+
+				// backward compatibility
+				if len(dcArr) > 1 {
+					condition = dcArr[1]
+				}
+				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition}
+			}
+		}
+		project.Services = append(project.Services, *service)
+	}
+SERVICES:
+	for _, qs := range services {
+		for _, es := range project.Services {
+			if es.Name == qs {
+				continue SERVICES
+			}
+		}
+		return project, errors.New("no such service: " + qs)
+	}
+	err := project.ForServices(services)
+	if err != nil {
+		return project, err
+	}
+
+	return project, nil
 }

@@ -49,13 +49,13 @@ func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runRestart(ctx context.Context, backend api.Service, opts restartOptions, services []string) error {
-	project, err := opts.toProject(services)
+	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	timeout := time.Duration(opts.timeout) * time.Second
-	return backend.Restart(ctx, project, api.RestartOptions{
+	return backend.Restart(ctx, projectName, api.RestartOptions{
 		Timeout:  &timeout,
 		Services: services,
 	})

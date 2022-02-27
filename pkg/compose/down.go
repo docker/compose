@@ -41,6 +41,7 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
+	builtFromResources := options.Project == nil
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -50,8 +51,8 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	if options.Project == nil {
-		options.Project, err = s.projectFromLabels(ctx, containers.filter(isNotOneOff), projectName)
+	if builtFromResources {
+		options.Project, err = s.getProjectWithVolumes(ctx, containers, projectName)
 		if err != nil {
 			return err
 		}
@@ -232,34 +233,9 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-// projectFromLabels builds a types.Project based on actual resources with compose labels set
-func (s *composeService) projectFromLabels(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
-	project := &types.Project{
-		Name: projectName,
-	}
-	if len(containers) == 0 {
-		return project, nil
-	}
-	set := map[string]moby.Container{}
-	for _, c := range containers {
-		set[c.Labels[api.ServiceLabel]] = c
-	}
-	for s, c := range set {
-		service := types.ServiceConfig{
-			Name:   s,
-			Image:  c.Image,
-			Labels: c.Labels,
-		}
-		dependencies := c.Labels[api.DependenciesLabel]
-		if len(dependencies) > 0 {
-			service.DependsOn = types.DependsOnConfig{}
-			for _, d := range strings.Split(dependencies, ",") {
-				service.DependsOn[d] = types.ServiceDependency{}
-			}
-		}
-		project.Services = append(project.Services, service)
-	}
-
+func (s *composeService) getProjectWithVolumes(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
+	containers = containers.filter(isNotOneOff)
+	project, _ := s.projectFromName(containers, projectName)
 	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
 	if err != nil {
 		return nil, err
@@ -273,6 +249,5 @@ func (s *composeService) projectFromLabels(ctx context.Context, containers Conta
 			Labels: vol.Labels,
 		}
 	}
-
 	return project, nil
 }

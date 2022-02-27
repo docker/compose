@@ -28,9 +28,9 @@ type ServiceProxy struct {
 	PushFn               func(ctx context.Context, project *types.Project, options PushOptions) error
 	PullFn               func(ctx context.Context, project *types.Project, opts PullOptions) error
 	CreateFn             func(ctx context.Context, project *types.Project, opts CreateOptions) error
-	StartFn              func(ctx context.Context, project *types.Project, options StartOptions) error
-	RestartFn            func(ctx context.Context, project *types.Project, options RestartOptions) error
-	StopFn               func(ctx context.Context, project *types.Project, options StopOptions) error
+	StartFn              func(ctx context.Context, projectName string, options StartOptions) error
+	RestartFn            func(ctx context.Context, projectName string, options RestartOptions) error
+	StopFn               func(ctx context.Context, projectName string, options StopOptions) error
 	UpFn                 func(ctx context.Context, project *types.Project, options UpOptions) error
 	DownFn               func(ctx context.Context, projectName string, options DownOptions) error
 	LogsFn               func(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
@@ -141,36 +141,27 @@ func (s *ServiceProxy) Create(ctx context.Context, project *types.Project, optio
 }
 
 // Start implements Service interface
-func (s *ServiceProxy) Start(ctx context.Context, project *types.Project, options StartOptions) error {
+func (s *ServiceProxy) Start(ctx context.Context, projectName string, options StartOptions) error {
 	if s.StartFn == nil {
 		return ErrNotImplemented
 	}
-	for _, i := range s.interceptors {
-		i(ctx, project)
-	}
-	return s.StartFn(ctx, project, options)
+	return s.StartFn(ctx, projectName, options)
 }
 
 // Restart implements Service interface
-func (s *ServiceProxy) Restart(ctx context.Context, project *types.Project, options RestartOptions) error {
+func (s *ServiceProxy) Restart(ctx context.Context, projectName string, options RestartOptions) error {
 	if s.RestartFn == nil {
 		return ErrNotImplemented
 	}
-	for _, i := range s.interceptors {
-		i(ctx, project)
-	}
-	return s.RestartFn(ctx, project, options)
+	return s.RestartFn(ctx, projectName, options)
 }
 
 // Stop implements Service interface
-func (s *ServiceProxy) Stop(ctx context.Context, project *types.Project, options StopOptions) error {
+func (s *ServiceProxy) Stop(ctx context.Context, projectName string, options StopOptions) error {
 	if s.StopFn == nil {
 		return ErrNotImplemented
 	}
-	for _, i := range s.interceptors {
-		i(ctx, project)
-	}
-	return s.StopFn(ctx, project, options)
+	return s.StopFn(ctx, projectName, options)
 }
 
 // Up implements Service interface

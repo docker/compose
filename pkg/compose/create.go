@@ -432,8 +432,8 @@ func (s *composeService) prepareLabels(service types.ServiceConfig, number int) 
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 
 	var dependencies []string
-	for s := range service.DependsOn {
-		dependencies = append(dependencies, s)
+	for s, d := range service.DependsOn {
+		dependencies = append(dependencies, s+":"+d.Condition)
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 	return labels, nil
