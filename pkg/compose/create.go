@@ -1102,7 +1102,7 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 			return err
 		}
 		if volume.External.External {
-			return fmt.Errorf("external volume %q not found", volume.External.Name)
+			return fmt.Errorf("external volume %q not found", volume.Name)
 		}
 		err := s.createVolume(ctx, volume)
 		return err
