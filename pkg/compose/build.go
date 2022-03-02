@@ -234,11 +234,24 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		plats = append(plats, p)
 	}
 
+	cacheFrom, err := buildflags.ParseCacheEntry(service.Build.CacheFrom)
+	if err != nil {
+		return build.Options{}, err
+	}
+	cacheTo, err := buildflags.ParseCacheEntry(service.Build.CacheTo)
+	if err != nil {
+		return build.Options{}, err
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
 			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 		},
+		CacheFrom:   cacheFrom,
+		CacheTo:     cacheTo,
+		NoCache:     service.Build.NoCache,
+		Pull:        service.Build.Pull,
 		BuildArgs:   buildArgs,
 		Tags:        tags,
 		Target:      service.Build.Target,
