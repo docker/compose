@@ -99,3 +99,6 @@ Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f
 and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
 
 If flags are explicitly set on command line, associated environment variable is ignored
+
+Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned 
+containers for the project.
