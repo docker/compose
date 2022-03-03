@@ -39,8 +39,11 @@ var tested = composeService{}
 func TestKillAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService("service1"), testService("service2")}}
 
@@ -61,8 +64,11 @@ func TestKillSignal(t *testing.T) {
 	const serviceName = "service1"
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	project := types.Project{Name: strings.ToLower(testProject), Services: []types.ServiceConfig{testService(serviceName)}}
 	listOptions := moby.ContainerListOptions{

@@ -71,6 +71,10 @@ func (s *composeService) stderr() io.Writer {
 }
 
 func getCanonicalContainerName(c moby.Container) string {
+	if len(c.Names) == 0 {
+		// corner case, sometime happens on removal. return short ID as a safeguard value
+		return c.ID[:12]
+	}
 	// Names return container canonical name /foo  + link aliases /linked_by/foo
 	for _, name := range c.Names {
 		if strings.LastIndex(name, "/") == 0 {
