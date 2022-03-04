@@ -16,6 +16,11 @@
 
 package utils
 
+import (
+	"strconv"
+	"strings"
+)
+
 // StringContains check if an array contains a specific value
 func StringContains(array []string, needle string) bool {
 	for _, val := range array {
@@ -24,4 +29,10 @@ func StringContains(array []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// StringToBool converts a string to a boolean ignoring errors
+func StringToBool(s string) bool {
+	b, _ := strconv.ParseBool(strings.ToLower(strings.TrimSpace(s)))
+	return b
 }

@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -62,7 +62,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		ValidArgsFunction: noCompletion(),
 	}
 	flags := downCmd.Flags()
-	removeOrphans := strings.ToLower(os.Getenv("COMPOSE_REMOVE_ORPHANS ")) == "true"
+	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS "))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
 	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
