@@ -30,6 +30,7 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -158,7 +159,7 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
-	if o.Compatibility || project.Environment["COMPOSE_COMPATIBILITY"] == "true" {
+	if o.Compatibility || utils.StringToBool(project.Environment["COMPOSE_COMPATIBILITY"]) {
 		compose.Separator = "_"
 	}
 
