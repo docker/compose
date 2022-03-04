@@ -160,6 +160,11 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 
+	cmd.Flags().BoolP("interactive", "i", true, "Keep STDIN open even if not attached. DEPRECATED")
+	cmd.Flags().MarkHidden("interactive") //nolint:errcheck
+	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY. DEPRECATED")
+	cmd.Flags().MarkHidden("tty") //nolint:errcheck
+
 	flags.SetNormalizeFunc(normalizeRunFlags)
 	flags.SetInterspersed(false)
 	return cmd
