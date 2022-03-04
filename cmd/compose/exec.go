@@ -73,6 +73,11 @@ func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
 
+	runCmd.Flags().BoolP("interactive", "i", true, "Keep STDIN open even if not attached. DEPRECATED")
+	runCmd.Flags().MarkHidden("interactive") //nolint:errcheck
+	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY. DEPRECATED")
+	runCmd.Flags().MarkHidden("tty") //nolint:errcheck
+
 	runCmd.Flags().SetInterspersed(false)
 	return runCmd
 }
