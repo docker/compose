@@ -127,8 +127,28 @@ func TestComposePull(t *testing.T) {
 	res := c.RunDockerOrExitError("compose", "--project-directory", "fixtures/simple-composefile", "pull")
 	output := res.Combined()
 
-	assert.Assert(t, strings.Contains(output, "simple Pulled"))
-	assert.Assert(t, strings.Contains(output, "another Pulled"))
+	expected := []string{
+		"Skipped - No image to be pulled",
+		"Skipped - Image is already present locally",
+		"Skipped - Image is already being pulled by",
+		"simple Pulled",
+		"another Pulled",
+	}
+
+	assert.Assert(t, contains(output, expected))
+}
+
+func contains(str string, array []string) bool {
+	found := false
+
+	for _, val := range array {
+		if strings.Contains(str, val) {
+			found = true
+			break
+		}
+	}
+
+	return found
 }
 
 func TestDownComposefileInParentFolder(t *testing.T) {
