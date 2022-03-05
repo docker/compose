@@ -229,7 +229,7 @@ func getImageName(service types.ServiceConfig, projectName string) string {
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
 	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
-	labels, err := s.prepareLabels(p, service, number)
+	labels, err := s.prepareLabels(service, number)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -414,31 +414,26 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, error
 	return securityOpts, nil
 }
 
-func (s *composeService) prepareLabels(p *types.Project, service types.ServiceConfig, number int) (map[string]string, error) {
+func (s *composeService) prepareLabels(service types.ServiceConfig, number int) (map[string]string, error) {
 	labels := map[string]string{}
 	for k, v := range service.Labels {
 		labels[k] = v
 	}
-
-	labels[api.ProjectLabel] = p.Name
-	labels[api.ServiceLabel] = service.Name
-	labels[api.VersionLabel] = api.ComposeVersion
-	if _, ok := service.Labels[api.OneoffLabel]; !ok {
-		labels[api.OneoffLabel] = "False"
+	for k, v := range service.CustomLabels {
+		labels[k] = v
 	}
 
 	hash, err := ServiceHash(service)
 	if err != nil {
 		return nil, err
 	}
-
 	labels[api.ConfigHashLabel] = hash
-	labels[api.WorkingDirLabel] = p.WorkingDir
-	labels[api.ConfigFilesLabel] = strings.Join(p.ComposeFiles, ",")
+
 	labels[api.ContainerNumberLabel] = strconv.Itoa(number)
+
 	var dependencies []string
-	for s := range service.DependsOn {
-		dependencies = append(dependencies, s)
+	for s, d := range service.DependsOn {
+		dependencies = append(dependencies, s+":"+d.Condition)
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
 	return labels, nil
@@ -643,15 +638,11 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 	bindings := nat.PortMap{}
 	for _, port := range s.Ports {
 		p := nat.Port(fmt.Sprintf("%d/%s", port.Target, port.Protocol))
-		bind := bindings[p]
 		binding := nat.PortBinding{
-			HostIP: port.HostIP,
+			HostIP:   port.HostIP,
+			HostPort: port.Published,
 		}
-		if port.Published > 0 {
-			binding.HostPort = fmt.Sprint(port.Published)
-		}
-		bind = append(bind, binding)
-		bindings[p] = bind
+		bindings[p] = append(bindings[p], binding)
 	}
 	return bindings
 }
@@ -1107,7 +1098,7 @@ func (s *composeService) ensureVolume(ctx context.Context, volume types.VolumeCo
 			return err
 		}
 		if volume.External.External {
-			return fmt.Errorf("external volume %q not found", volume.External.Name)
+			return fmt.Errorf("external volume %q not found", volume.Name)
 		}
 		err := s.createVolume(ctx, volume)
 		return err

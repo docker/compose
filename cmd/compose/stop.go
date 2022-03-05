@@ -53,7 +53,7 @@ func stopCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runStop(ctx context.Context, backend api.Service, opts stopOptions, services []string) error {
-	project, err := opts.toProject(services)
+	projectName, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func runStop(ctx context.Context, backend api.Service, opts stopOptions, service
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return backend.Stop(ctx, project, api.StopOptions{
+	return backend.Stop(ctx, projectName, api.StopOptions{
 		Timeout:  timeout,
 		Services: services,
 	})

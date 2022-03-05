@@ -37,11 +37,11 @@ type Service interface {
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
 	// Start executes the equivalent to a `compose start`
-	Start(ctx context.Context, project *types.Project, options StartOptions) error
+	Start(ctx context.Context, projectName string, options StartOptions) error
 	// Restart restarts containers
-	Restart(ctx context.Context, project *types.Project, options RestartOptions) error
+	Restart(ctx context.Context, projectName string, options RestartOptions) error
 	// Stop executes the equivalent to a `compose stop`
-	Stop(ctx context.Context, project *types.Project, options StopOptions) error
+	Stop(ctx context.Context, projectName string, options StopOptions) error
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`
@@ -404,10 +404,11 @@ const (
 
 // Stack holds the name and state of a compose application/stack
 type Stack struct {
-	ID     string
-	Name   string
-	Status string
-	Reason string
+	ID          string
+	Name        string
+	Status      string
+	ConfigFiles string
+	Reason      string
 }
 
 // LogConsumer is a callback to process log messages from services

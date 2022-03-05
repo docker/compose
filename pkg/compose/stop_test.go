@@ -25,7 +25,6 @@ import (
 	compose "github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
 
-	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -50,13 +49,7 @@ func TestStopTimeout(t *testing.T) {
 	api.EXPECT().ContainerStop(gomock.Any(), "456", &timeout).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "789", &timeout).Return(nil)
 
-	err := tested.Stop(ctx, &types.Project{
-		Name: strings.ToLower(testProject),
-		Services: []types.ServiceConfig{
-			{Name: "service1"},
-			{Name: "service2"},
-		},
-	}, compose.StopOptions{
+	err := tested.Stop(ctx, strings.ToLower(testProject), compose.StopOptions{
 		Timeout: &timeout,
 	})
 	assert.NilError(t, err)

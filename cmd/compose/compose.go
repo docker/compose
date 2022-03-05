@@ -120,24 +120,6 @@ func (o *projectOptions) WithServices(fn ProjectServicesFunc) func(cmd *cobra.Co
 			return err
 		}
 
-		if o.EnvFile != "" {
-			var services types.Services
-			for _, s := range project.Services {
-				ef := o.EnvFile
-				if ef != "" {
-					if !filepath.IsAbs(ef) {
-						ef = filepath.Join(project.WorkingDir, o.EnvFile)
-					}
-					if s.Labels == nil {
-						s.Labels = make(map[string]string)
-					}
-					s.Labels[api.EnvironmentFileLabel] = ef
-					services = append(services, s)
-				}
-			}
-			project.Services = services
-		}
-
 		return fn(ctx, project, args)
 	})
 }
@@ -178,6 +160,25 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	if o.Compatibility || project.Environment["COMPOSE_COMPATIBILITY"] == "true" {
 		compose.Separator = "_"
+	}
+
+	ef := o.EnvFile
+	if ef != "" && !filepath.IsAbs(ef) {
+		ef = filepath.Join(project.WorkingDir, o.EnvFile)
+	}
+	for i, s := range project.Services {
+		s.CustomLabels = map[string]string{
+			api.ProjectLabel:     project.Name,
+			api.ServiceLabel:     s.Name,
+			api.VersionLabel:     api.ComposeVersion,
+			api.WorkingDirLabel:  project.WorkingDir,
+			api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
+			api.OneoffLabel:      "False", // default, will be overridden by `run` command
+		}
+		if ef != "" {
+			s.CustomLabels[api.EnvironmentFileLabel] = ef
+		}
+		project.Services[i] = s
 	}
 
 	if len(services) > 0 {
