@@ -44,7 +44,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 	}
 
 	project, err := s.projectFromName(containers, projectName, services...)
-	if err != nil {
+	if err != nil && !api.IsNotFoundError(err) {
 		return err
 	}
 
