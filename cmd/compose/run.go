@@ -245,10 +245,15 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
-	if err := backend.Create(ctx, &project, api.CreateOptions{
+	err := backend.Create(ctx, &project, api.CreateOptions{
 		IgnoreOrphans: ignoreOrphans,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-	return backend.Start(ctx, project.Name, api.StartOptions{})
+
+	if len(dependencies) > 0 {
+		return backend.Start(ctx, project.Name, api.StartOptions{})
+	}
+	return nil
 }
