@@ -57,7 +57,7 @@ func runVersion(opts versionOptions) {
 		return
 	}
 	if opts.format == formatter.JSON {
-		fmt.Printf(`{"version":%q}\n`, internal.Version)
+		fmt.Printf("{\"version\":%q}\n", internal.Version)
 		return
 	}
 	fmt.Println("Docker Compose version", internal.Version)
