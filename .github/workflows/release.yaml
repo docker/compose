@@ -44,7 +44,8 @@ jobs:
       - uses: ncipollo/release-action@v1
         with:
           artifacts: "bin/*"
-          prerelease: true
+          generateReleaseNotes: true
+          draft: true
           commit: "v2"
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event.inputs.tag }}
