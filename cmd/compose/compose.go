@@ -29,16 +29,17 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Command defines a compose CLI command as a func with args
@@ -271,6 +272,12 @@ func RootCommand(backend api.Service) *cobra.Command {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 			formatter.SetANSIMode(ansi)
+			switch ansi {
+			case "never":
+				progress.Mode = progress.ModePlain
+			case "tty":
+				progress.Mode = progress.ModeTTY
+			}
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
