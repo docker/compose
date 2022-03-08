@@ -48,6 +48,10 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		return err
 	}
 
+	if len(services) > 0 {
+		containers = containers.filter(isService(services...))
+	}
+
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		return s.stopContainers(ctx, w, containers.filter(isService(service)), options.Timeout)
 	})
