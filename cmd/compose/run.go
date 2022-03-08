@@ -42,6 +42,7 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
+	interactive   bool
 	user          string
 	workdir       string
 	entrypoint    string
@@ -158,9 +159,8 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
 
-	cmd.Flags().BoolP("interactive", "i", true, "Keep STDIN open even if not attached. DEPRECATED")
-	cmd.Flags().MarkHidden("interactive") //nolint:errcheck
-	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY. DEPRECATED")
+	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
+	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
 	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
@@ -221,6 +221,14 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Index:             0,
 		QuietPull:         opts.quietPull,
 	}
+
+	for i, service := range project.Services {
+		if service.Name == opts.Service {
+			service.StdinOpen = opts.interactive
+			project.Services[i] = service
+		}
+	}
+
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
 		errMsg := ""
