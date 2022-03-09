@@ -65,6 +65,7 @@ options:
   default_value: "false"
   description: Run container in background and print container ID
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -73,6 +74,7 @@ options:
   value_type: string
   description: Override the entrypoint of the image
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -83,6 +85,7 @@ options:
   default_value: '[]'
   description: Set environment variables
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -93,6 +96,7 @@ options:
   default_value: "true"
   description: Keep STDIN open even if not attached.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -103,6 +107,7 @@ options:
   default_value: '[]'
   description: Add or override a label
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -111,6 +116,7 @@ options:
   value_type: string
   description: Assign a name to the container
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -122,6 +128,7 @@ options:
   description: |
     Disable pseudo-noTty allocation. By default docker compose run allocates a TTY
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -131,6 +138,7 @@ options:
   default_value: "false"
   description: Don't start linked services.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -141,6 +149,7 @@ options:
   default_value: '[]'
   description: Publish a container's port(s) to the host.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -150,6 +159,7 @@ options:
   default_value: "false"
   description: Pull without printing progress information.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -159,6 +169,7 @@ options:
   default_value: "false"
   description: Automatically remove the container when it exits
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -169,6 +180,7 @@ options:
   description: |
     Run command with the service's ports enabled and mapped to the host.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -179,6 +191,7 @@ options:
   default_value: "true"
   description: Allocate a pseudo-TTY.
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -189,6 +202,7 @@ options:
   description: |
     Use the service's network useAliases in the network(s) the container connects to.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -198,6 +212,7 @@ options:
   value_type: string
   description: Run as specified username or uid
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -208,6 +223,7 @@ options:
   default_value: '[]'
   description: Bind mount a volume.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -217,6 +233,7 @@ options:
   value_type: string
   description: Working directory inside the container
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

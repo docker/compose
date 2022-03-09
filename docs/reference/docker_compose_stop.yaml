@@ -12,6 +12,7 @@ options:
   default_value: "10"
   description: Specify a shutdown timeout in seconds
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

@@ -27,6 +27,7 @@ options:
   description: |
     Stops all containers if any container was stopped. Incompatible with -d
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -36,6 +37,7 @@ options:
   default_value: "false"
   description: Recreate dependent containers. Incompatible with --no-recreate.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -45,6 +47,7 @@ options:
   default_value: '[]'
   description: Attach to service output.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -54,6 +57,7 @@ options:
   default_value: "false"
   description: Attach to dependent containers.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -63,6 +67,7 @@ options:
   default_value: "false"
   description: Build images before starting containers.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -73,6 +78,7 @@ options:
   default_value: "false"
   description: 'Detached mode: Run containers in the background'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -82,6 +88,7 @@ options:
   description: |
     Return the exit code of the selected service container. Implies --abort-on-container-exit
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -92,6 +99,7 @@ options:
   description: |
     Recreate containers even if their configuration and image haven't changed.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -101,6 +109,7 @@ options:
   default_value: "false"
   description: Don't build an image, even if it's missing.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -110,6 +119,7 @@ options:
   default_value: "false"
   description: Produce monochrome output.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -119,6 +129,7 @@ options:
   default_value: "false"
   description: Don't start linked services.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -128,6 +139,7 @@ options:
   default_value: "false"
   description: Don't print prefix in logs.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -138,6 +150,7 @@ options:
   description: |
     If containers already exist, don't recreate them. Incompatible with --force-recreate.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -147,6 +160,7 @@ options:
   default_value: "false"
   description: Don't start the services after creating them.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -156,6 +170,7 @@ options:
   default_value: "false"
   description: Pull without printing progress information.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -165,6 +180,7 @@ options:
   default_value: "false"
   description: Remove containers for services not defined in the Compose file.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -176,6 +192,7 @@ options:
   description: |
     Recreate anonymous volumes instead of retrieving data from the previous containers.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -186,6 +203,7 @@ options:
   description: |
     Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -197,6 +215,7 @@ options:
   description: |
     Use this timeout in seconds for container shutdown when attached or when containers are already running.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -206,6 +225,7 @@ options:
   default_value: "false"
   description: Wait for services to be running|healthy. Implies detached mode.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

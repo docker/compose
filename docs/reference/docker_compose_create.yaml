@@ -10,6 +10,7 @@ options:
   default_value: "false"
   description: Build images before starting containers.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -20,6 +21,7 @@ options:
   description: |
     Recreate containers even if their configuration and image haven't changed.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -29,6 +31,7 @@ options:
   default_value: "false"
   description: Don't build an image, even if it's missing.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -39,6 +42,7 @@ options:
   description: |
     If containers already exist, don't recreate them. Incompatible with --force-recreate.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

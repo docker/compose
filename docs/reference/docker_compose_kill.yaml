@@ -16,6 +16,7 @@ options:
   default_value: SIGKILL
   description: SIGNAL to send to the container.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

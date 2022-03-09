@@ -12,6 +12,7 @@ options:
   default_value: "false"
   description: Pull what it can and ignores images with pull failures
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -21,6 +22,7 @@ options:
   default_value: "false"
   description: Also pull services declared as dependencies
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -30,6 +32,7 @@ options:
   default_value: "true"
   description: DEPRECATED disable parallel pulling.
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -39,6 +42,7 @@ options:
   default_value: "true"
   description: DEPRECATED pull multiple images in parallel.
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -49,6 +53,7 @@ options:
   default_value: "false"
   description: Pull without printing progress information
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

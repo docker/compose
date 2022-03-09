@@ -11,6 +11,7 @@ options:
   default_value: "false"
   description: Show all stopped Compose projects
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -19,6 +20,7 @@ options:
   value_type: filter
   description: Filter output based on conditions provided.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -28,6 +30,7 @@ options:
   default_value: pretty
   description: 'Format the output. Values: [pretty | json].'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -38,6 +41,7 @@ options:
   default_value: "false"
   description: Only display IDs.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
