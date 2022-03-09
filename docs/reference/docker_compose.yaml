@@ -163,6 +163,7 @@ options:
   description: |
     Control when to print ANSI control characters ("never"|"always"|"auto")
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -172,6 +173,7 @@ options:
   default_value: "false"
   description: Run compose in backward compatibility mode
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -180,6 +182,7 @@ options:
   value_type: string
   description: Specify an alternate environment file.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -190,6 +193,7 @@ options:
   default_value: '[]'
   description: Compose configuration files
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -199,6 +203,7 @@ options:
   default_value: "false"
   description: Do not print ANSI control characters (DEPRECATED)
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -208,6 +213,7 @@ options:
   default_value: '[]'
   description: Specify a profile to enable
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -218,6 +224,7 @@ options:
     Specify an alternate working directory
     (default: the path of the Compose file)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -227,6 +234,7 @@ options:
   value_type: string
   description: Project name
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -236,6 +244,7 @@ options:
   default_value: "false"
   description: Show more output
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -246,6 +255,7 @@ options:
   default_value: "false"
   description: Show the Docker Compose version information
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -257,6 +267,7 @@ options:
     Specify an alternate working directory
     (default: the path of the Compose file)
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false

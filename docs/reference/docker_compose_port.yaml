@@ -10,6 +10,7 @@ options:
   default_value: "1"
   description: index of the container if service has multiple replicas
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -19,6 +20,7 @@ options:
   default_value: tcp
   description: tcp or udp
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

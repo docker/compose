@@ -26,6 +26,7 @@ options:
   default_value: "false"
   description: Deprecated - no effect
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -36,6 +37,7 @@ options:
   default_value: "false"
   description: Don't ask to confirm removal
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -46,6 +48,7 @@ options:
   default_value: "false"
   description: Stop the containers, if required, before removing
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -56,6 +59,7 @@ options:
   default_value: "false"
   description: Remove any anonymous volumes attached to containers
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

@@ -10,6 +10,7 @@ options:
   value_type: string
   description: 'Format the output. Values: [pretty | json]. (Default: pretty)'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -19,6 +20,7 @@ options:
   default_value: "false"
   description: Shows only Compose's version number.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

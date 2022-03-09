@@ -23,6 +23,7 @@ options:
   default_value: "false"
   description: Remove containers for services not defined in the Compose file.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -32,6 +33,7 @@ options:
   description: |
     Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -42,6 +44,7 @@ options:
   default_value: "10"
   description: Specify a shutdown timeout in seconds
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -53,6 +56,7 @@ options:
   description: |
     Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

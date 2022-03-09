@@ -20,6 +20,7 @@ options:
   description: |
     Show all stopped containers (including those created by the run command)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -28,6 +29,7 @@ options:
   value_type: string
   description: Filter services by a property. Deprecated, use --status instead
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -37,6 +39,7 @@ options:
   default_value: pretty
   description: 'Format the output. Values: [pretty | json]'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -47,6 +50,7 @@ options:
   default_value: "false"
   description: Only display IDs
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -56,6 +60,7 @@ options:
   default_value: "false"
   description: Display services
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -66,6 +71,7 @@ options:
   description: |
     Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

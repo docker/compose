@@ -11,6 +11,7 @@ options:
   default_value: "false"
   description: Copy to all the containers of the service.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -21,6 +22,7 @@ options:
   default_value: "false"
   description: Archive mode (copy all uid/gid information)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -31,6 +33,7 @@ options:
   default_value: "false"
   description: Always follow symbol link in SRC_PATH
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -41,6 +44,7 @@ options:
   description: |
     Index of the container if there are multiple instances of a service [default: 1].
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
