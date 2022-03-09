@@ -42,7 +42,7 @@ func (s *composeService) pause(ctx context.Context, project string, options api.
 	eg, ctx := errgroup.WithContext(ctx)
 	containers.forEach(func(container moby.Container) {
 		eg.Go(func() error {
-			err := s.apiClient.ContainerPause(ctx, container.ID)
+			err := s.apiClient().ContainerPause(ctx, container.ID)
 			if err == nil {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.NewEvent(eventName, progress.Done, "Paused"))
@@ -70,7 +70,7 @@ func (s *composeService) unPause(ctx context.Context, project string, options ap
 	eg, ctx := errgroup.WithContext(ctx)
 	containers.forEach(func(container moby.Container) {
 		eg.Go(func() error {
-			err = s.apiClient.ContainerUnpause(ctx, container.ID)
+			err = s.apiClient().ContainerUnpause(ctx, container.ID)
 			if err == nil {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.NewEvent(eventName, progress.Done, "Unpaused"))

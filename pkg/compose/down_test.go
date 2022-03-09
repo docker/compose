@@ -34,8 +34,11 @@ import (
 func TestDown(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{
@@ -67,8 +70,11 @@ func TestDown(t *testing.T) {
 func TestDownRemoveOrphans(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{
@@ -99,8 +105,11 @@ func TestDownRemoveOrphans(t *testing.T) {
 func TestDownRemoveVolumes(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)

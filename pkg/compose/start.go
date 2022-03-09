@@ -107,7 +107,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				return nil
 			}
 
-			inspected, err := s.apiClient.ContainerInspect(ctx, event.Container)
+			inspected, err := s.apiClient().ContainerInspect(ctx, event.Container)
 			if err != nil {
 				return err
 			}

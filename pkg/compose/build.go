@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
@@ -193,7 +192,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 }
 
 func (s *composeService) serverInfo(ctx context.Context) (command.ServerInfo, error) {
-	ping, err := s.apiClient.Ping(ctx)
+	ping, err := s.apiClient().Ping(ctx)
 	if err != nil {
 		return command.ServerInfo{}, err
 	}
@@ -258,7 +257,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		NetworkMode: service.Build.Network,
 		ExtraHosts:  service.Build.ExtraHosts,
 		Session: []session.Attachable{
-			authprovider.NewDockerAuthProvider(os.Stderr),
+			authprovider.NewDockerAuthProvider(s.stderr()),
 		},
 	}, nil
 }

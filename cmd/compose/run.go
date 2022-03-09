@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	cgo "github.com/compose-spec/compose-go/cli"
@@ -207,9 +206,6 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Command:           opts.Command,
 		Detach:            opts.Detach,
 		AutoRemove:        opts.Remove,
-		Stdin:             os.Stdin,
-		Stdout:            os.Stdout,
-		Stderr:            os.Stderr,
 		Tty:               !opts.noTty,
 		WorkingDir:        opts.workdir,
 		User:              opts.user,

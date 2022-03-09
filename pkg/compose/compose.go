@@ -21,13 +21,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/pkg/errors"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/sanathkr/go-yaml"
@@ -37,19 +40,41 @@ import (
 var Separator = "-"
 
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) api.Service {
+func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
-		apiClient:  apiClient,
-		configFile: configFile,
+		dockerCli: dockerCli,
 	}
 }
 
 type composeService struct {
-	apiClient  client.APIClient
-	configFile *configfile.ConfigFile
+	dockerCli command.Cli
+}
+
+func (s *composeService) apiClient() client.APIClient {
+	return s.dockerCli.Client()
+}
+
+func (s *composeService) configFile() *configfile.ConfigFile {
+	return s.dockerCli.ConfigFile()
+}
+
+func (s *composeService) stdout() *streams.Out {
+	return s.dockerCli.Out()
+}
+
+func (s *composeService) stdin() *streams.In {
+	return s.dockerCli.In()
+}
+
+func (s *composeService) stderr() io.Writer {
+	return s.dockerCli.Err()
 }
 
 func getCanonicalContainerName(c moby.Container) string {
+	if len(c.Names) == 0 {
+		// corner case, sometime happens on removal. return short ID as a safeguard value
+		return c.ID[:12]
+	}
 	// Names return container canonical name /foo  + link aliases /linked_by/foo
 	for _, name := range c.Names {
 		if strings.LastIndex(name, "/") == 0 {

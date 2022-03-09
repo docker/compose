@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -36,7 +35,7 @@ func (s *composeService) Exec(ctx context.Context, project string, opts api.RunO
 		return 0, err
 	}
 
-	exec, err := s.apiClient.ContainerExecCreate(ctx, container.ID, moby.ExecConfig{
+	exec, err := s.apiClient().ContainerExecCreate(ctx, container.ID, moby.ExecConfig{
 		Cmd:        opts.Command,
 		Env:        opts.Environment,
 		User:       opts.User,
@@ -54,13 +53,13 @@ func (s *composeService) Exec(ctx context.Context, project string, opts api.RunO
 	}
 
 	if opts.Detach {
-		return 0, s.apiClient.ContainerExecStart(ctx, exec.ID, moby.ExecStartCheck{
+		return 0, s.apiClient().ContainerExecStart(ctx, exec.ID, moby.ExecStartCheck{
 			Detach: true,
 			Tty:    opts.Tty,
 		})
 	}
 
-	resp, err := s.apiClient.ContainerExecAttach(ctx, exec.ID, moby.ExecStartCheck{
+	resp, err := s.apiClient().ContainerExecAttach(ctx, exec.ID, moby.ExecStartCheck{
 		Tty: opts.Tty,
 	})
 	if err != nil {
@@ -69,7 +68,7 @@ func (s *composeService) Exec(ctx context.Context, project string, opts api.RunO
 	defer resp.Close() //nolint:errcheck
 
 	if opts.Tty {
-		s.monitorTTySize(ctx, exec.ID, s.apiClient.ContainerExecResize)
+		s.monitorTTySize(ctx, exec.ID, s.apiClient().ContainerExecResize)
 		if err != nil {
 			return 0, err
 		}
@@ -90,12 +89,12 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 
 	stdout := ContainerStdout{HijackedResponse: resp}
 	stdin := ContainerStdin{HijackedResponse: resp}
-	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
+	r, err := s.getEscapeKeyProxy(s.stdin(), opts.Tty)
 	if err != nil {
 		return err
 	}
 
-	in := streams.NewIn(opts.Stdin)
+	in := s.stdin()
 	if in.IsTerminal() && opts.Tty {
 		state, err := term.SetRawTerminal(in.FD())
 		if err != nil {
@@ -106,10 +105,10 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 
 	go func() {
 		if opts.Tty {
-			_, err := io.Copy(opts.Stdout, stdout)
+			_, err := io.Copy(s.stdout(), stdout)
 			outputDone <- err
 		} else {
-			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout)
+			_, err := stdcopy.StdCopy(s.stdout(), s.stderr(), stdout)
 			outputDone <- err
 		}
 		stdout.Close() //nolint:errcheck
@@ -140,7 +139,7 @@ func (s *composeService) interactiveExec(ctx context.Context, opts api.RunOption
 }
 
 func (s *composeService) getExecTarget(ctx context.Context, projectName string, opts api.RunOptions) (moby.Container, error) {
-	containers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
 			projectFilter(projectName),
 			serviceFilter(opts.Service),
@@ -158,7 +157,7 @@ func (s *composeService) getExecTarget(ctx context.Context, projectName string, 
 }
 
 func (s *composeService) getExecExitStatus(ctx context.Context, execID string) (int, error) {
-	resp, err := s.apiClient.ContainerExecInspect(ctx, execID)
+	resp, err := s.apiClient().ContainerExecInspect(ctx, execID)
 	if err != nil {
 		return 0, err
 	}

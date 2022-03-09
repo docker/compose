@@ -127,7 +127,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, projectName strin
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, projectName string) ([]downOp, error) {
 	var ops []downOp
-	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
 	if err != nil {
 		return ops, err
 	}
@@ -159,7 +159,7 @@ func (s *composeService) getServiceImages(options api.DownOptions, projectName s
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
 	id := fmt.Sprintf("Image %s", image)
 	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
-	_, err := s.apiClient.ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	_, err := s.apiClient().ImageRemove(ctx, image, moby.ImageRemoveOptions{})
 	if err == nil {
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
@@ -174,7 +174,7 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 func (s *composeService) removeVolume(ctx context.Context, id string, w progress.Writer) error {
 	resource := fmt.Sprintf("Volume %s", id)
 	w.Event(progress.NewEvent(resource, progress.Working, "Removing"))
-	err := s.apiClient.VolumeRemove(ctx, id, true)
+	err := s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
 		return nil
@@ -193,7 +193,7 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.apiClient.ContainerStop(ctx, container.ID, timeout)
+			err := s.apiClient().ContainerStop(ctx, container.ID, timeout)
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
@@ -218,7 +218,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err = s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				Force:         true,
 				RemoveVolumes: volumes,
 			})
@@ -236,7 +236,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 func (s *composeService) getProjectWithVolumes(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
 	project, _ := s.projectFromName(containers, projectName)
-	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	volumes, err := s.apiClient().VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
 	if err != nil {
 		return nil, err
 	}

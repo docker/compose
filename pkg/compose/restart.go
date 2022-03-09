@@ -59,7 +59,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.RestartingEvent(eventName))
-				err := s.apiClient.ContainerRestart(ctx, container.ID, options.Timeout)
+				err := s.apiClient().ContainerRestart(ctx, container.ID, options.Timeout)
 				if err == nil {
 					w.Event(progress.StartedEvent(eventName))
 				}

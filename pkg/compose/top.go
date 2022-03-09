@@ -37,7 +37,7 @@ func (s *composeService) Top(ctx context.Context, projectName string, services [
 	for i, container := range containers {
 		i, container := i, container
 		eg.Go(func() error {
-			topContent, err := s.apiClient.ContainerTop(ctx, container.ID, []string{})
+			topContent, err := s.apiClient().ContainerTop(ctx, container.ID, []string{})
 			if err != nil {
 				return err
 			}
