@@ -82,7 +82,7 @@ options:
 - option: progress
   value_type: string
   default_value: auto
-  description: Set type of progress output ("auto", "plain", "noTty")
+  description: Set type of progress output (auto, tty, plain, quiet)
   deprecated: false
   experimental: false
   experimentalcli: false

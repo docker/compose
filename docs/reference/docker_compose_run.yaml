@@ -87,7 +87,17 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
-- option: labels
+- option: interactive
+  shorthand: i
+  value_type: bool
+  default_value: "true"
+  description: Keep STDIN open even if not attached.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: label
   shorthand: l
   value_type: stringArray
   default_value: '[]'
@@ -135,6 +145,15 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
+- option: quiet-pull
+  value_type: bool
+  default_value: "false"
+  description: Pull without printing progress information.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
 - option: rm
   value_type: bool
   default_value: "false"
@@ -149,6 +168,16 @@ options:
   default_value: "false"
   description: |
     Run command with the service's ports enabled and mapped to the host.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: tty
+  shorthand: t
+  value_type: bool
+  default_value: "true"
+  description: Allocate a pseudo-TTY.
   deprecated: false
   experimental: false
   experimentalcli: false

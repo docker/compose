@@ -27,11 +27,13 @@ import (
 )
 
 func generateCliYaml(opts *options) error {
-	cmd := &cobra.Command{Use: "docker"}
+	cmd := &cobra.Command{
+		Use:               "docker",
+		DisableAutoGenTag: true,
+	}
 	cmd.AddCommand(compose.RootCommand(nil))
 	disableFlagsInUseLine(cmd)
 
-	cmd.DisableAutoGenTag = true
 	tool, err := clidocstool.New(clidocstool.Options{
 		Root:      cmd,
 		SourceDir: opts.source,
@@ -69,12 +71,12 @@ type options struct {
 func main() {
 	cwd, _ := os.Getwd()
 	opts := &options{
-		source: cwd,
+		source: filepath.Join(cwd, "docs", "reference"),
 		target: filepath.Join(cwd, "docs", "reference"),
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)
 	if err := generateCliYaml(opts); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to generate yaml files: %s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to generate yaml files: %s\n", err.Error())
 	}
 }

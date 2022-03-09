@@ -98,7 +98,7 @@ long: |-
   and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
 
   If flags are explicitly set on command line, associated environment variable is ignored
-  
+
   Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
   containers for the project.
 usage: docker compose
@@ -129,6 +129,7 @@ cname:
 - docker compose top
 - docker compose unpause
 - docker compose up
+- docker compose version
 clink:
 - docker_compose_build.yaml
 - docker_compose_convert.yaml
@@ -154,12 +155,22 @@ clink:
 - docker_compose_top.yaml
 - docker_compose_unpause.yaml
 - docker_compose_up.yaml
+- docker_compose_version.yaml
 options:
 - option: ansi
   value_type: string
   default_value: auto
   description: |
     Control when to print ANSI control characters ("never"|"always"|"auto")
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: compatibility
+  value_type: bool
+  default_value: "false"
+  description: Run compose in backward compatibility mode
   deprecated: false
   experimental: false
   experimentalcli: false
@@ -224,6 +235,16 @@ options:
   value_type: bool
   default_value: "false"
   description: Show more output
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: version
+  shorthand: v
+  value_type: bool
+  default_value: "false"
+  description: Show the Docker Compose version information
   deprecated: false
   experimental: false
   experimentalcli: false
