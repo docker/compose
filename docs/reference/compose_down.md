@@ -1,4 +1,19 @@
+# docker compose down
 
+<!---MARKER_GEN_START-->
+Stop and remove containers, networks
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--remove-orphans` |  |  | Remove containers for services not defined in the Compose file. |
+| `--rmi` | `string` |  | Remove images used by services. "local" remove only images that don't have a custom tag ("local"\|"all") |
+| `-t`, `--timeout` | `int` | `10` | Specify a shutdown timeout in seconds |
+| `-v`, `--volumes` |  |  |  Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers. |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 

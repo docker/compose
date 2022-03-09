@@ -1,3 +1,16 @@
+# docker compose kill
+
+<!---MARKER_GEN_START-->
+Force stop service containers.
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-s`, `--signal` | `string` | `SIGKILL` | SIGNAL to send to the container. |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 

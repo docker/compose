@@ -1,3 +1,23 @@
+# docker compose rm
+
+<!---MARKER_GEN_START-->
+Removes stopped service containers
+
+By default, anonymous volumes attached to containers will not be removed. You
+can override this with -v. To list all volumes, use "docker volume ls".
+
+Any data which is not in a volume will be lost.
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-f`, `--force` |  |  | Don't ask to confirm removal |
+| `-s`, `--stop` |  |  | Stop the containers, if required, before removing |
+| `-v`, `--volumes` |  |  | Remove any anonymous volumes attached to containers |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 
