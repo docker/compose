@@ -32,24 +32,9 @@ func (s *composeService) Stop(ctx context.Context, projectName string, options a
 func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
-	services := options.Services
-	if len(services) == 0 {
-		services = []string{}
-	}
-
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true, services...)
+	containers, project, err := s.actualState(ctx, projectName, options.Services)
 	if err != nil {
 		return err
-	}
-
-	project, err := s.projectFromName(containers, projectName, services...)
-	if err != nil && !api.IsNotFoundError(err) {
-		return err
-	}
-
-	if len(services) > 0 {
-		containers = containers.filter(isService(services...))
 	}
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
