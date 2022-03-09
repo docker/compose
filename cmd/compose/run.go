@@ -62,6 +62,9 @@ func (opts runOptions) apply(project *types.Project) error {
 	if err != nil {
 		return err
 	}
+
+	target.Tty = !opts.noTty
+	target.StdinOpen = opts.interactive
 	if !opts.servicePorts {
 		target.Ports = []types.ServicePortConfig{}
 	}
@@ -212,6 +215,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Detach:            opts.Detach,
 		AutoRemove:        opts.Remove,
 		Tty:               !opts.noTty,
+		Interactive:       opts.interactive,
 		WorkingDir:        opts.workdir,
 		User:              opts.user,
 		Environment:       opts.environment,
