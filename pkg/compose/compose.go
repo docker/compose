@@ -149,3 +149,23 @@ SERVICES:
 
 	return project, nil
 }
+
+// actualState list resources labelled by projectName to rebuild compose project model
+func (s *composeService) actualState(ctx context.Context, projectName string, services []string) (Containers, *types.Project, error) {
+	var containers Containers
+	// don't filter containers by options.Services so projectFromName can rebuild project with all existing resources
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	project, err := s.projectFromName(containers, projectName, services...)
+	if err != nil && !api.IsNotFoundError(err) {
+		return nil, nil, err
+	}
+
+	if len(services) > 0 {
+		containers = containers.filter(isService(services...))
+	}
+	return containers, project, nil
+}
