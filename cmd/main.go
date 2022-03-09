@@ -68,7 +68,7 @@ func pluginMain() {
 }
 
 func main() {
-	if commands.RunningAsStandalone() {
+	if plugin.RunningStandalone() {
 		os.Args = append([]string{"docker"}, compatibility.Convert(os.Args[1:])...)
 	}
 	pluginMain()
