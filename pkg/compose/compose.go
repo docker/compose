@@ -165,7 +165,7 @@ SERVICES:
 				continue SERVICES
 			}
 		}
-		return project, errors.New("no such service: " + qs)
+		return project, errors.Wrapf(api.ErrNotFound, "no such service: %q", qs)
 	}
 	err := project.ForServices(services)
 	if err != nil {

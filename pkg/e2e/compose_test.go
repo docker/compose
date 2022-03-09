@@ -188,6 +188,11 @@ func TestRm(t *testing.T) {
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName+"_simple"), res.Combined())
 	})
 
+	t.Run("rm -sf <none>", func(t *testing.T) {
+		res := c.RunDockerComposeCmd("-f", "./fixtures/simple-composefile/compose.yaml", "-p", projectName, "rm", "-sf", "simple")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+	})
+
 	t.Run("down", func(t *testing.T) {
 		c.RunDockerComposeCmd("-p", projectName, "down")
 	})
