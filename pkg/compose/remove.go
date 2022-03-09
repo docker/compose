@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
@@ -30,13 +29,8 @@ import (
 	"github.com/docker/compose/v2/pkg/prompt"
 )
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {
-	services := options.Services
-	if len(services) == 0 {
-		services = project.ServiceNames()
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
+func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+	containers, _, err := s.actualState(ctx, projectName, options.Services)
 	if err != nil {
 		return err
 	}

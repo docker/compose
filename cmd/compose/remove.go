@@ -59,13 +59,13 @@ Any data which is not in a volume will be lost.`,
 }
 
 func runRemove(ctx context.Context, backend api.Service, opts removeOptions, services []string) error {
-	project, err := opts.toProject(services)
+	project, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
 	if opts.stop {
-		err := backend.Stop(ctx, project.Name, api.StopOptions{
+		err := backend.Stop(ctx, project, api.StopOptions{
 			Services: services,
 		})
 		if err != nil {
