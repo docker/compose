@@ -28,10 +28,37 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
+- option: images
+  value_type: bool
+  default_value: "false"
+  description: Print the image names, one per line.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
 - option: no-interpolate
   value_type: bool
   default_value: "false"
   description: Don't interpolate environment variables.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: no-normalize
+  value_type: bool
+  default_value: "false"
+  description: Don't normalize compose model.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: output
+  shorthand: o
+  value_type: string
+  description: Save to file (default to stdout)
   deprecated: false
   experimental: false
   experimentalcli: false

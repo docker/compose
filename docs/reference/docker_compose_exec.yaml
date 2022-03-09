@@ -39,6 +39,16 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
+- option: interactive
+  shorthand: i
+  value_type: bool
+  default_value: "true"
+  description: Keep STDIN open even if not attached. DEPRECATED
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
 - option: no-TTY
   shorthand: T
   value_type: bool
@@ -54,6 +64,16 @@ options:
   value_type: bool
   default_value: "false"
   description: Give extended privileges to the process.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: tty
+  shorthand: t
+  value_type: bool
+  default_value: "true"
+  description: Allocate a pseudo-TTY. DEPRECATED
   deprecated: false
   experimental: false
   experimentalcli: false

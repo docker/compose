@@ -77,16 +77,6 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
-- option: environment
-  shorthand: e
-  value_type: stringArray
-  default_value: '[]'
-  description: Environment variables
-  deprecated: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
 - option: exit-code-from
   value_type: string
   description: |
@@ -206,6 +196,15 @@ options:
   default_value: "10"
   description: |
     Use this timeout in seconds for container shutdown when attached or when containers are already running.
+  deprecated: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: wait
+  value_type: bool
+  default_value: "false"
+  description: Wait for services to be running|healthy. Implies detached mode.
   deprecated: false
   experimental: false
   experimentalcli: false
