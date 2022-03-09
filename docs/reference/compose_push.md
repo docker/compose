@@ -1,3 +1,16 @@
+# docker compose push
+
+<!---MARKER_GEN_START-->
+Push service images
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--ignore-push-failures` |  |  | Push what it can and ignores images with push failures |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 
