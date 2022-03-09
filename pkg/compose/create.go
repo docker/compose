@@ -500,6 +500,7 @@ func getDeployResources(s types.ServiceConfig) container.Resources {
 		CPUShares:          s.CPUShares,
 		CPUPercent:         int64(s.CPUS * 100),
 		CpusetCpus:         s.CPUSet,
+		DeviceCgroupRules:  s.DeviceCgroupRules,
 	}
 
 	if s.PidsLimit != 0 {
