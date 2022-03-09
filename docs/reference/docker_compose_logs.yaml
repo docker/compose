@@ -11,6 +11,7 @@ options:
   default_value: "false"
   description: Follow log output.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -20,6 +21,7 @@ options:
   default_value: "false"
   description: Produce monochrome output.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -29,6 +31,7 @@ options:
   default_value: "false"
   description: Don't print prefix in logs.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -38,6 +41,7 @@ options:
   description: |
     Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -48,6 +52,7 @@ options:
   description: |
     Number of lines to show from the end of the logs for each container.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -58,6 +63,7 @@ options:
   default_value: "false"
   description: Show timestamps.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -67,6 +73,7 @@ options:
   description: |
     Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

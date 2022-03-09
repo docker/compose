@@ -29,6 +29,7 @@ options:
   default_value: "false"
   description: Output events as a stream of json objects
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

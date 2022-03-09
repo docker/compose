@@ -77,6 +77,6 @@ func main() {
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)
 	if err := generateCliYaml(opts); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Failed to generate yaml files: %s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to generate documentation: %s\n", err.Error())
 	}
 }

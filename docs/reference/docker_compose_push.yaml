@@ -28,6 +28,7 @@ options:
   default_value: "false"
   description: Push what it can and ignores images with push failures
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
