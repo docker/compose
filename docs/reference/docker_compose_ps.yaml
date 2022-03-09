@@ -26,7 +26,7 @@ options:
   swarm: false
 - option: filter
   value_type: string
-  description: Filter services by a property
+  description: Filter services by a property. Deprecated, use --status instead
   deprecated: false
   experimental: false
   experimentalcli: false
@@ -61,8 +61,10 @@ options:
   kubernetes: false
   swarm: false
 - option: status
-  value_type: string
-  description: Filter services by status
+  value_type: stringArray
+  default_value: '[]'
+  description: |
+    Filter services by status. Values: [paused | restarting | removing | running | dead | created | exited]
   deprecated: false
   experimental: false
   experimentalcli: false
