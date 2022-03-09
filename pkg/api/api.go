@@ -216,6 +216,7 @@ type RunOptions struct {
 	Detach            bool
 	AutoRemove        bool
 	Tty               bool
+	Interactive       bool
 	WorkingDir        string
 	User              string
 	Environment       []string
