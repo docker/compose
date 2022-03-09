@@ -1,3 +1,31 @@
+# docker compose run
+
+<!---MARKER_GEN_START-->
+Run a one-off command on a service.
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-d`, `--detach` |  |  | Run container in background and print container ID |
+| `--entrypoint` | `string` |  | Override the entrypoint of the image |
+| `-e`, `--env` | `stringArray` |  | Set environment variables |
+| `-i`, `--interactive` |  |  | Keep STDIN open even if not attached. |
+| `-l`, `--label` | `stringArray` |  | Add or override a label |
+| `--name` | `string` |  |  Assign a name to the container |
+| `-T`, `--no-TTY` |  |  | Disable pseudo-noTty allocation. By default docker compose run allocates a TTY |
+| `--no-deps` |  |  | Don't start linked services. |
+| `-p`, `--publish` | `stringArray` |  | Publish a container's port(s) to the host. |
+| `--quiet-pull` |  |  | Pull without printing progress information. |
+| `--rm` |  |  | Automatically remove the container when it exits |
+| `--service-ports` |  |  | Run command with the service's ports enabled and mapped to the host. |
+| `--use-aliases` |  |  | Use the service's network useAliases in the network(s) the container connects to. |
+| `-u`, `--user` | `string` |  | Run as specified username or uid |
+| `-v`, `--volume` | `stringArray` |  | Bind mount a volume. |
+| `-w`, `--workdir` | `string` |  | Working directory inside the container |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 

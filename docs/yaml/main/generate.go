@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func generateCliYaml(opts *options) error {
+func generateDocs(opts *options) error {
 	cmd := &cobra.Command{
 		Use:               "docker",
 		DisableAutoGenTag: true,
@@ -43,7 +43,7 @@ func generateCliYaml(opts *options) error {
 	if err != nil {
 		return err
 	}
-	return tool.GenYamlTree(cmd)
+	return tool.GenAllTree()
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
@@ -76,7 +76,7 @@ func main() {
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)
-	if err := generateCliYaml(opts); err != nil {
+	if err := generateDocs(opts); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to generate documentation: %s\n", err.Error())
 	}
 }
