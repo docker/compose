@@ -188,6 +188,15 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	for name, info := range imgs {
 		images[name] = info.ID
 	}
+
+	for _, s := range project.Services {
+		imgName := getImageName(s, project.Name)
+		digest, ok := images[imgName]
+		if ok {
+			s.CustomLabels[api.ImageDigestLabel] = digest
+		}
+	}
+
 	return images, nil
 }
 
