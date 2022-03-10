@@ -93,7 +93,6 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 			tag := ""
 			repository := ""
 			if len(inspect.RepoTags) > 0 {
-
 				repotag := strings.Split(inspect.RepoTags[0], ":")
 				repository = repotag[0]
 				if len(repotag) > 1 {

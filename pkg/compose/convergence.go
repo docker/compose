@@ -189,17 +189,11 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			continue
 		}
 
-		if recreate == api.RecreateNever {
-			continue
-		}
-		// Re-create diverged containers
-		configHash, err := ServiceHash(service)
+		mustRecreate, err := mustRecreate(service, container, recreate)
 		if err != nil {
 			return err
 		}
-		name := getContainerProgressName(container)
-		diverged := container.Labels[api.ConfigHashLabel] != configHash
-		if diverged || recreate == api.RecreateForce || service.Extensions[extLifecycle] == forceRecreate {
+		if mustRecreate {
 			i, container := i, container
 			eg.Go(func() error {
 				recreated, err := c.service.recreateContainer(ctx, project, service, container, inherit, timeout)
@@ -211,6 +205,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 
 		// Enforce non-diverged containers are running
 		w := progress.ContextWriter(ctx)
+		name := getContainerProgressName(container)
 		switch container.State {
 		case ContainerRunning:
 			w.Event(progress.RunningEvent(name))
@@ -247,6 +242,22 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 	err = eg.Wait()
 	c.setObservedState(service.Name, updated)
 	return err
+}
+
+func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy string) (bool, error) {
+	if policy == api.RecreateNever {
+		return false, nil
+	}
+	if policy == api.RecreateForce || expected.Extensions[extLifecycle] == forceRecreate {
+		return true, nil
+	}
+	configHash, err := ServiceHash(expected)
+	if err != nil {
+		return false, err
+	}
+	configChanged := actual.Labels[api.ConfigHashLabel] != configHash
+	imageUpdated := actual.Labels[api.ImageDigestLabel] != expected.CustomLabels[api.ImageDigestLabel]
+	return configChanged || imageUpdated, nil
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
