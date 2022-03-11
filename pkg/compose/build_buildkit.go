@@ -45,7 +45,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 	// build and will lock
 	progressCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := xprogress.NewPrinter(progressCtx, os.Stdout, mode)
+	w := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	response, err := build.Build(ctx, driverInfo, opts, nil, filepath.Dir(s.configFile().Filename), w)

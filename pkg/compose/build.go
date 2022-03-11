@@ -27,7 +27,6 @@ import (
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/pkg/urlutil"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
@@ -200,28 +199,11 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return images, nil
 }
 
-func (s *composeService) serverInfo(ctx context.Context) (command.ServerInfo, error) {
-	ping, err := s.apiClient().Ping(ctx)
-	if err != nil {
-		return command.ServerInfo{}, err
-	}
-	serverInfo := command.ServerInfo{
-		HasExperimental: ping.Experimental,
-		OSType:          ping.OSType,
-		BuildkitVersion: ping.BuilderVersion,
-	}
-	return serverInfo, err
-}
-
 func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
 	if len(opts) == 0 {
 		return nil, nil
 	}
-	serverInfo, err := s.serverInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if buildkitEnabled, err := command.BuildKitEnabled(serverInfo); err != nil || !buildkitEnabled {
+	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
 		return s.doBuildClassic(ctx, opts)
 	}
 	return s.doBuildBuildkit(ctx, project, opts, mode)
