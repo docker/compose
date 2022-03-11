@@ -62,6 +62,21 @@ func (mr *MockCliMockRecorder) Apply(arg0 ...interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockCli)(nil).Apply), arg0...)
 }
 
+// BuildKitEnabled mocks base method.
+func (m *MockCli) BuildKitEnabled() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BuildKitEnabled")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BuildKitEnabled indicates an expected call of BuildKitEnabled.
+func (mr *MockCliMockRecorder) BuildKitEnabled() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildKitEnabled", reflect.TypeOf((*MockCli)(nil).BuildKitEnabled))
+}
+
 // Client mocks base method.
 func (m *MockCli) Client() client0.APIClient {
 	m.ctrl.T.Helper()
@@ -283,19 +298,4 @@ func (m *MockCli) SetIn(arg0 *streams.In) {
 func (mr *MockCliMockRecorder) SetIn(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetIn", reflect.TypeOf((*MockCli)(nil).SetIn), arg0)
-}
-
-// StackOrchestrator mocks base method.
-func (m *MockCli) StackOrchestrator(arg0 string) (command.Orchestrator, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StackOrchestrator", arg0)
-	ret0, _ := ret[0].(command.Orchestrator)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// StackOrchestrator indicates an expected call of StackOrchestrator.
-func (mr *MockCliMockRecorder) StackOrchestrator(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StackOrchestrator", reflect.TypeOf((*MockCli)(nil).StackOrchestrator), arg0)
 }
