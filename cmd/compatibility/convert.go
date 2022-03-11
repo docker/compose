@@ -23,6 +23,13 @@ import (
 	"github.com/docker/compose/v2/cmd/compose"
 )
 
+func getCompletionCommands() []string {
+	return []string{
+		"__complete",
+		"__completeNoDesc",
+	}
+}
+
 func getBoolFlags() []string {
 	return []string{
 		"--debug", "-D",
@@ -50,6 +57,10 @@ func Convert(args []string) []string {
 	l := len(args)
 	for i := 0; i < l; i++ {
 		arg := args[i]
+		if contains(getCompletionCommands(), arg) {
+			command = append([]string{arg}, command...)
+			continue
+		}
 		if len(arg) > 0 && arg[0] != '-' {
 			// not a top-level flag anymore, keep the rest of the command unmodified
 			if arg == compose.PluginName {
