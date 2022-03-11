@@ -73,3 +73,5 @@ Want to help develop Docker Compose? Check out our
 
 If you find an issue, please report it on the
 [issue tracker](https://github.com/docker/compose/issues/new/choose).
+
+[![Docker Image CI](https://github.com/fruityxsamsung/compose/actions/workflows/docker-image.yml/badge.svg?branch=Master&event=deployment)](https://github.com/fruityxsamsung/compose/actions/workflows/docker-image.yml)
