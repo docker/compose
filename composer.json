@@ -1,0 +1,79 @@
+{
+    "name": "amphp/http-server",
+    "homepage": "https://github.com/amphp/http-server",
+    "description": "A non-blocking HTTP application server for PHP based on Amp.",
+    "keywords": [
+        "http",
+        "server",
+        "async",
+        "non-blocking",
+        "amp",
+        "amphp"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Daniel Lowrey",
+            "email": "rdlowrey@php.net"
+        },
+        {
+            "name": "Bob Weinand"
+        },
+        {
+            "name": "Niklas Keller",
+            "email": "me@kelunik.com"
+        },
+        {
+            "name": "Aaron Piotrowski",
+            "email": "aaron@trowski.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.2",
+        "amphp/amp": "^2",
+        "amphp/byte-stream": "^1.3",
+        "amphp/hpack": "^3",
+        "amphp/http": "^1.6",
+        "amphp/socket": "^1",
+        "league/uri": "^6",
+        "psr/http-message": "^1",
+        "psr/log": "^1",
+        "cash/lrucache": "^1"
+    },
+    "require-dev": {
+        "amphp/phpunit-util": "^1.1",
+        "amphp/http-client": "^4",
+        "amphp/log": "^1",
+        "amphp/php-cs-fixer-config": "dev-master",
+        "league/uri-components": "^2",
+        "monolog/monolog": "^2 || ^1.23",
+        "phpunit/phpunit": "^8 || ^7",
+        "infection/infection": "^0.9.2"
+    },
+    "suggest": {
+        "ext-zlib": "Allows GZip compression of response bodies"
+    },
+    "autoload": {
+        "psr-4": {
+            "Amp\\Http\\Server\\": "src"
+        },
+        "files": [
+            "src/Middleware/functions.php",
+            "src/functions.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Amp\\Http\\Server\\Test\\": "test"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "2.x-dev"
+        }
+    },
+    "scripts": {
+        "test": "@php -dzend.assertions=1 -dassert.exception=1 ./vendor/bin/phpunit",
+        "code-style": "@php ./vendor/bin/php-cs-fixer fix"
+    }
+}
