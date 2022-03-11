@@ -30,35 +30,40 @@ Use the commands below to provide key information from your environment:
 You do NOT have to include this information if this is a FEATURE REQUEST
 -->
 
-**Description**
+## Description
 
 <!--
 Briefly describe the problem you are having in a few paragraphs.
 -->
 
-**Steps to reproduce the issue:**
+## Steps to reproduce the issue
+
 1.
 2.
 3.
 
-**Describe the results you received:**
+## Describe the results you received
 
 
-**Describe the results you expected:**
+## Describe the results you expected
 
 
-**Additional information you deem important (e.g. issue happens only occasionally):**
+## Additional information you deem important
 
-**Output of `docker compose version`:**
+<!--
+e.g. issue happens only occasionally
+-->
 
-```
-(paste your output here)
-```
-
-**Output of `docker info`:**
+## Output of `docker compose version`
 
 ```
 (paste your output here)
 ```
 
-**Additional environment details:**
+## Output of `docker info`
+
+```
+(paste your output here)
+```
+
+## Additional environment details
