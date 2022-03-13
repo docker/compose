@@ -70,6 +70,16 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
+- option: parameters
+  value_type: bool
+  default_value: "false"
+  description: Print the variables from the compose files
+  deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
 - option: profiles
   value_type: bool
   default_value: "false"

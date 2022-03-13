@@ -50,6 +50,7 @@ type convertOptions struct {
 	profiles            bool
 	images              bool
 	hash                string
+	parameters          bool
 }
 
 func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -89,6 +90,9 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if opts.images {
 				return runConfigImages(opts, args)
 			}
+			if opts.parameters {
+				return runParameters(opts)
+			}
 
 			return runConvert(ctx, backend, opts, args)
 		}),
@@ -107,6 +111,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.images, "images", false, "Print the image names, one per line.")
 	flags.StringVar(&opts.hash, "hash", "", "Print the service config hash, one per line.")
 	flags.StringVarP(&opts.Output, "output", "o", "", "Save to file (default to stdout)")
+	flags.BoolVar(&opts.parameters, "parameters", false, "Print the variables from the compose files")
 
 	return cmd
 }
@@ -235,5 +240,14 @@ func runConfigImages(opts convertOptions, services []string) error {
 			fmt.Printf("%s_%s\n", project.Name, s.Name)
 		}
 	}
+	return nil
+}
+
+func runParameters(opts convertOptions) error {
+	parameters, err := getParameters(opts)
+	if err != nil {
+		return err
+	}
+	fmt.Print(parameters)
 	return nil
 }

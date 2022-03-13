@@ -17,6 +17,7 @@ Converts the compose file to platform's canonical format
 | `--no-interpolate` |  |  | Don't interpolate environment variables. |
 | `--no-normalize` |  |  | Don't normalize compose model. |
 | `-o`, `--output` | `string` |  | Save to file (default to stdout) |
+| `--parameters` |  |  | Print the variables from the compose files |
 | `--profiles` |  |  | Print the profile names, one per line. |
 | `-q`, `--quiet` |  |  | Only validate the configuration, don't print anything. |
 | `--resolve-image-digests` |  |  | Pin image tags to digests. |

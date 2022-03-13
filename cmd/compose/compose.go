@@ -17,15 +17,20 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"text/tabwriter"
 
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/loader"
+	"github.com/compose-spec/compose-go/template"
 	"github.com/compose-spec/compose-go/types"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
@@ -327,4 +332,115 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	command.Flags().MarkHidden("verbose") //nolint:errcheck
 	return command
+}
+
+// Parameter item to collect information about variables from compose.yml files.
+type Parameter struct {
+	Name     string
+	Required bool
+	Default  string
+	Actual   string
+	Source   string
+}
+
+// Parameters Map the keys are parameter name
+type Parameters map[string]Parameter
+
+// To print formatted Parameter's as a table to standard output
+func (p Parameters) String() string {
+	var buff bytes.Buffer
+
+	w := tabwriter.NewWriter(&buff, 0, 0, 3, ' ', tabwriter.FilterHTML)
+	fmt.Fprintf(w, "NAME\tDEFAULT\tREQUIRED\tACTUAL\tSOURCE\n")
+	for _, parameter := range p {
+		_, err := fmt.Fprintf(
+			w,
+			"%s\t%s\t%t\t%s\t%s\n",
+			parameter.Name, parameter.Default, parameter.Required, parameter.Actual, parameter.Source,
+		)
+		if err != nil {
+			fmt.Print(err)
+			return ""
+		}
+	}
+	err := w.Flush()
+	if err != nil {
+		fmt.Print(err)
+		return ""
+	}
+	return buff.String()
+}
+
+func getParameters(opts convertOptions) (Parameters, error) {
+	envs := make(map[string]map[string]string)
+
+	commonOpts := []cli.ProjectOptionsFn{cli.WithWorkingDirectory(opts.ProjectDir), cli.WithDefaultConfigPath, cli.WithConfigFileEnv}
+
+	var projectOpts []cli.ProjectOptionsFn
+	var envFileName string
+	if opts.EnvFile != "" {
+		projectOpts = append(commonOpts, cli.WithEnvFile(opts.EnvFile), cli.WithDotEnv)
+		envFileName = opts.EnvFile
+	} else {
+		projectOpts = append(commonOpts, cli.WithDotEnv)
+		envFileName = ".env"
+	}
+
+	op, err := cli.NewProjectOptions(opts.ConfigPaths, projectOpts...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	configPaths := op.ConfigPaths
+	envs["dot_env"] = op.Environment
+
+	op, err = cli.NewProjectOptions(opts.ConfigPaths, append(commonOpts, cli.WithOsEnv)...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	envs["os_env"] = op.Environment
+	parameters := make(Parameters)
+
+	for _, pathFile := range configPaths {
+		file, err := ioutil.ReadFile(pathFile)
+		if err != nil {
+			return nil, err
+		}
+
+		dict, err := loader.ParseYAML(file)
+		if err != nil {
+			return nil, err
+		}
+
+		extractedVars := template.ExtractVariables(dict, nil)
+
+		for key, val := range extractedVars {
+			parameter := Parameter{
+				Name:     val.Name,
+				Required: val.Required,
+				Default:  val.DefaultValue,
+				Actual:   val.DefaultValue,
+				Source:   pathFile,
+			}
+			parameters[key] = parameter
+
+			paramEnvVal, ok := envs["dot_env"][key]
+			if ok {
+				parameter.Actual = paramEnvVal
+				parameter.Source = envFileName
+				parameters[key] = parameter
+			}
+
+			paramEnvVal, ok = envs["os_env"][key]
+			if ok {
+				parameter.Actual = paramEnvVal
+				parameter.Source = "os.Env"
+				parameters[key] = parameter
+			}
+		}
+	}
+	return parameters, nil
 }
