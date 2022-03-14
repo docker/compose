@@ -24,15 +24,15 @@ import (
 	"io"
 	"strings"
 
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/pkg/errors"
-
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 )
 
@@ -193,4 +193,40 @@ func (s *composeService) actualState(ctx context.Context, projectName string, se
 		containers = containers.filter(isService(services...))
 	}
 	return containers, project, nil
+}
+
+func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
+	volumes, err := s.apiClient().VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	if err != nil {
+		return nil, err
+	}
+
+	actual := types.Volumes{}
+	for _, vol := range volumes.Volumes {
+		actual[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
+			Name:   vol.Name,
+			Driver: vol.Driver,
+			Labels: vol.Labels,
+		}
+	}
+	return actual, nil
+}
+
+func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	actual := types.Networks{}
+	for _, net := range networks {
+		actual[net.Labels[api.NetworkLabel]] = types.NetworkConfig{
+			Name:   net.Name,
+			Driver: net.Driver,
+			Labels: net.Labels,
+		}
+	}
+	return actual, nil
 }
