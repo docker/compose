@@ -19,25 +19,44 @@ package compose
 import (
 	"context"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
 
+type killOptions struct {
+	*projectOptions
+	signal string
+}
+
 func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
-	var opts api.KillOptions
+	opts := killOptions{
+		projectOptions: p,
+	}
 	cmd := &cobra.Command{
 		Use:   "kill [options] [SERVICE...]",
 		Short: "Force stop service containers.",
-		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
-			return backend.Kill(ctx, project, opts)
+		RunE: Adapt(func(ctx context.Context, args []string) error {
+			return runKill(ctx, backend, opts, args)
 		}),
 		ValidArgsFunction: serviceCompletion(p),
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&opts.Signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container.")
+	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container.")
 
 	return cmd
+}
+
+func runKill(ctx context.Context, backend api.Service, opts killOptions, services []string) error {
+	projectName, err := opts.toProjectName()
+	if err != nil {
+		return err
+	}
+
+	return backend.Kill(ctx, projectName, api.KillOptions{
+		Services: services,
+		Signal:   opts.signal,
+	})
+
 }

@@ -37,7 +37,7 @@ type ServiceProxy struct {
 	PsFn                 func(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	ListFn               func(ctx context.Context, options ListOptions) ([]Stack, error)
 	ConvertFn            func(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
-	KillFn               func(ctx context.Context, project *types.Project, options KillOptions) error
+	KillFn               func(ctx context.Context, project string, options KillOptions) error
 	RunOneOffContainerFn func(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	RemoveFn             func(ctx context.Context, project string, options RemoveOptions) error
 	ExecFn               func(ctx context.Context, project string, opts RunOptions) (int, error)
@@ -219,12 +219,9 @@ func (s *ServiceProxy) Convert(ctx context.Context, project *types.Project, opti
 }
 
 // Kill implements Service interface
-func (s *ServiceProxy) Kill(ctx context.Context, project *types.Project, options KillOptions) error {
+func (s *ServiceProxy) Kill(ctx context.Context, project string, options KillOptions) error {
 	if s.KillFn == nil {
 		return ErrNotImplemented
-	}
-	for _, i := range s.interceptors {
-		i(ctx, project)
 	}
 	return s.KillFn(ctx, project, options)
 }

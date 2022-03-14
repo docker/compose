@@ -54,7 +54,7 @@ type Service interface {
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
-	Kill(ctx context.Context, project *types.Project, options KillOptions) error
+	Kill(ctx context.Context, project string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
