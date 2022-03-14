@@ -1078,14 +1078,13 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	return nil
 }
 
-func (s *composeService) removeNetwork(ctx context.Context, networkID string, networkName string) error {
-	w := progress.ContextWriter(ctx)
-	eventName := fmt.Sprintf("Network %s", networkName)
+func (s *composeService) removeNetwork(ctx context.Context, network string, w progress.Writer) error {
+	eventName := fmt.Sprintf("Network %s", network)
 	w.Event(progress.RemovingEvent(eventName))
 
-	if err := s.apiClient().NetworkRemove(ctx, networkID); err != nil {
+	if err := s.apiClient().NetworkRemove(ctx, network); err != nil {
 		w.Event(progress.ErrorEvent(eventName))
-		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", networkID))
+		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", network))
 	}
 
 	w.Event(progress.RemovedEvent(eventName))
