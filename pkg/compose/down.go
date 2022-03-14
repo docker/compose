@@ -24,7 +24,6 @@ import (
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
 
@@ -41,7 +40,6 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
-	builtFromResources := options.Project == nil
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -51,8 +49,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	if builtFromResources {
-		options.Project, err = s.getProjectWithVolumes(ctx, containers, projectName)
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
 		if err != nil {
 			return err
 		}
@@ -62,7 +61,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service string) error {
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
@@ -71,7 +70,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
+	orphans := containers.filter(isNotService(project.ServiceNames()...))
 	if options.RemoveOrphans && len(orphans) > 0 {
 		err := s.removeContainers(ctx, w, orphans, options.Timeout, false)
 		if err != nil {
@@ -79,17 +78,14 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
-	ops, err := s.ensureNetworksDown(ctx, projectName)
-	if err != nil {
-		return err
-	}
+	ops := s.ensureNetworksDown(ctx, project, w)
 
 	if options.Images != "" {
 		ops = append(ops, s.ensureImagesDown(ctx, projectName, options, w)...)
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, options.Project, w)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project, w)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -106,6 +102,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
+		if vol.External.External {
+			continue
+		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
 			return s.removeVolume(ctx, volumeName, w)
@@ -125,20 +124,18 @@ func (s *composeService) ensureImagesDown(ctx context.Context, projectName strin
 	return ops
 }
 
-func (s *composeService) ensureNetworksDown(ctx context.Context, projectName string) ([]downOp, error) {
+func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
-	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
-	if err != nil {
-		return ops, err
-	}
-	for _, n := range networks {
-		networkID := n.ID
+	for _, n := range project.Networks {
+		if n.External.External {
+			continue
+		}
 		networkName := n.Name
 		ops = append(ops, func() error {
-			return s.removeNetwork(ctx, networkID, networkName)
+			return s.removeNetwork(ctx, networkName, w)
 		})
 	}
-	return ops, nil
+	return ops
 }
 
 func (s *composeService) getServiceImages(options api.DownOptions, projectName string) map[string]struct{} {
@@ -233,21 +230,20 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-func (s *composeService) getProjectWithVolumes(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
+func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
 	project, _ := s.projectFromName(containers, projectName)
-	volumes, err := s.apiClient().VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+
+	volumes, err := s.actualVolumes(ctx, projectName)
 	if err != nil {
 		return nil, err
 	}
+	project.Volumes = volumes
 
-	project.Volumes = types.Volumes{}
-	for _, vol := range volumes.Volumes {
-		project.Volumes[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
-			Name:   vol.Name,
-			Driver: vol.Driver,
-			Labels: vol.Labels,
-		}
+	networks, err := s.actualNetworks(ctx, projectName)
+	if err != nil {
+		return nil, err
 	}
+	project.Networks = networks
 	return project, nil
 }
