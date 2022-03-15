@@ -29,11 +29,11 @@ func TestLocalComposeRun(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	t.Run("compose run", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "back")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello there!!", res.Stdout())
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
-		res = c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "back", "echo", "Hello one more time")
+		res = c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello one more time")
 		lines = Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello one more time", res.Stdout())
 		assert.Assert(t, !strings.Contains(res.Combined(), "orphan"))
@@ -68,7 +68,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --rm", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "--rm", "back", "echo", "Hello again")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--rm", "back", "echo", "Hello again")
 		lines := Lines(res.Stdout())
 		assert.Equal(t, lines[len(lines)-1], "Hello again", res.Stdout())
 
@@ -85,7 +85,7 @@ func TestLocalComposeRun(t *testing.T) {
 	t.Run("compose run --volumes", func(t *testing.T) {
 		wd, err := os.Getwd()
 		assert.NilError(t, err)
-		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "--volumes", wd+":/foo", "back", "/bin/sh", "-c", "ls /foo")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--volumes", wd+":/foo", "back", "/bin/sh", "-c", "ls /foo")
 		res.Assert(t, icmd.Expected{Out: "compose_run_test.go"})
 
 		res = c.RunDockerCmd("ps", "--all")
@@ -93,18 +93,18 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("compose run --publish", func(t *testing.T) {
-		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "--publish", "8081:80", "-d", "back", "/bin/sh", "-c", "sleep 1")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "--publish", "8081:80", "-d", "back", "/bin/sh", "-c", "sleep 1")
 		res := c.RunDockerCmd("ps")
 		assert.Assert(t, strings.Contains(res.Stdout(), "8081->80/tcp"), res.Stdout())
 	})
 
 	t.Run("compose run orphan", func(t *testing.T) {
 		// Use different compose files to get an orphan container
-		c.RunDockerComposeCmd("-f", "./fixtures/run-test/orphan.yaml", "run", "-T", "simple")
-		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "-T", "back", "echo", "Hello")
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/orphan.yaml", "run", "simple")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
 		assert.Assert(t, strings.Contains(res.Combined(), "orphan"))
 
-		cmd := c.NewDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "-T", "back", "echo", "Hello")
+		cmd := c.NewDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
 		res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
 			cmd.Env = append(cmd.Env, "COMPOSE_IGNORE_ORPHANS=True")
 		})

@@ -40,7 +40,7 @@ func init() {
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
-		cmd := commands.RootCommand(lazyInit)
+		cmd := commands.RootCommand(dockerCli, lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {

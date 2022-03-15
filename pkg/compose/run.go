@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli"
 	cmd "github.com/docker/cli/cli/command/container"
@@ -54,6 +55,10 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 
 	applyRunOptions(project, &service, opts)
+
+	if err := s.dockerCli.In().CheckTty(opts.Interactive, service.Tty); err != nil {
+		return "", err
+	}
 
 	slug := stringid.GenerateRandomID()
 	if service.ContainerName == "" {

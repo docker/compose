@@ -24,6 +24,7 @@ import (
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -106,7 +107,7 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := runOptions{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -154,7 +155,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
