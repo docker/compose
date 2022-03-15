@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -224,7 +225,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(backend api.Service) *cobra.Command {
+func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := projectOptions{}
 	var (
 		ansi    string
@@ -300,9 +301,9 @@ func RootCommand(backend api.Service) *cobra.Command {
 		logsCommand(&opts, backend),
 		convertCommand(&opts, backend),
 		killCommand(&opts, backend),
-		runCommand(&opts, backend),
+		runCommand(&opts, dockerCli, backend),
 		removeCommand(&opts, backend),
-		execCommand(&opts, backend),
+		execCommand(&opts, dockerCli, backend),
 		pauseCommand(&opts, backend),
 		unpauseCommand(&opts, backend),
 		topCommand(&opts, backend),
