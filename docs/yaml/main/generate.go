@@ -31,7 +31,7 @@ func generateDocs(opts *options) error {
 		Use:               "docker",
 		DisableAutoGenTag: true,
 	}
-	cmd.AddCommand(compose.RootCommand(nil))
+	cmd.AddCommand(compose.RootCommand(nil, nil))
 	disableFlagsInUseLine(cmd)
 
 	tool, err := clidocstool.New(clidocstool.Options{
