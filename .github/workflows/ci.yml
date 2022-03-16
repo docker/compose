@@ -22,7 +22,7 @@ jobs:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Validate go-mod is up-to-date and license headers
+      - name: Validate go-mod, license headers and docs are up-to-date
         run: make validate
 
       - name: Run golangci-lint
