@@ -46,7 +46,7 @@ options:
   shorthand: i
   value_type: bool
   default_value: "true"
-  description: Keep STDIN open even if not attached. DEPRECATED
+  description: Keep STDIN open even if not attached.
   deprecated: false
   hidden: true
   experimental: false
@@ -56,7 +56,7 @@ options:
 - option: no-TTY
   shorthand: T
   value_type: bool
-  default_value: "false"
+  default_value: "true"
   description: |
     Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.
   deprecated: false
@@ -79,7 +79,7 @@ options:
   shorthand: t
   value_type: bool
   default_value: "true"
-  description: Allocate a pseudo-TTY. DEPRECATED
+  description: Allocate a pseudo-TTY.
   deprecated: false
   hidden: true
   experimental: false
