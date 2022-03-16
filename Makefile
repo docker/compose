@@ -82,6 +82,19 @@ lint: ## run linter(s)
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
+.PHONY: docs
+docs: ## generate documentation
+	@docker build . \
+	--output type=local,dest=./docs/ \
+	-f ./docs/docs.Dockerfile \
+	--target update
+
+.PHONY: validate-docs
+validate-docs: ## validate the doc does not change
+	@docker build . \
+	-f ./docs/docs.Dockerfile \
+	--target validate
+
 .PHONY: check-dependencies
 check-dependencies: ## check dependency updates
 	go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.}}{{end}}{{end}}' all
@@ -98,7 +111,7 @@ go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and g
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	@docker build . --target check-go-mod
 
-validate: validate-go-mod validate-headers ## Validate sources
+validate: validate-go-mod validate-headers validate-docs ## Validate sources
 
 pre-commit: validate check-dependencies lint compose-plugin test e2e-compose
 
