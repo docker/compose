@@ -70,7 +70,3 @@ check-license-headers:
 .PHONY: check-go-mod
 check-go-mod:
 	./scripts/validate/check-go-mod
-
-.PHONY: yamldocs
-yamldocs:
-	go run docs/yaml/main/generate.go
