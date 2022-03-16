@@ -22,16 +22,21 @@ import (
 	"path/filepath"
 
 	clidocstool "github.com/docker/cli-docs-tool"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/compose"
 	"github.com/spf13/cobra"
 )
 
 func generateDocs(opts *options) error {
+	dockerCLI, err := command.NewDockerCli()
+	if err != nil {
+		return err
+	}
 	cmd := &cobra.Command{
 		Use:               "docker",
 		DisableAutoGenTag: true,
 	}
-	cmd.AddCommand(compose.RootCommand(nil, nil))
+	cmd.AddCommand(compose.RootCommand(dockerCLI, nil))
 	disableFlagsInUseLine(cmd)
 
 	tool, err := clidocstool.New(clidocstool.Options{
