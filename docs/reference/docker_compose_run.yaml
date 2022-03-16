@@ -124,7 +124,7 @@ options:
 - option: no-TTY
   shorthand: T
   value_type: bool
-  default_value: "false"
+  default_value: "true"
   description: |
     Disable pseudo-noTty allocation. By default docker compose run allocates a TTY
   deprecated: false
