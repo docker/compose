@@ -125,8 +125,7 @@ options:
   shorthand: T
   value_type: bool
   default_value: "true"
-  description: |
-    Disable pseudo-noTty allocation. By default docker compose run allocates a TTY
+  description: 'Disable pseudo-noTty allocation (default: auto-detected).'
   deprecated: false
   hidden: false
   experimental: false
