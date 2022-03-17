@@ -84,10 +84,14 @@ lint: ## run linter(s)
 
 .PHONY: docs
 docs: ## generate documentation
-	@docker build . \
-	--output type=local,dest=./docs/ \
+	$(eval $@_TMP_OUT := $(shell mktemp -d -t dockercli-output.XXXXXXXXXX))
+	docker build . \
+	--output type=local,dest=$($@_TMP_OUT) \
 	-f ./docs/docs.Dockerfile \
 	--target update
+	rm -rf ./docs/internal
+	cp -R "$($@_TMP_OUT)"/out/* ./docs/
+	rm -rf "$($@_TMP_OUT)"/*
 
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change

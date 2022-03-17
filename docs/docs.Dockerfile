@@ -39,7 +39,7 @@ cp -r docs/reference /out
 EOT
 
 FROM scratch AS update
-COPY --from=gen /out /
+COPY --from=gen /out /out
 
 FROM gen AS validate
 RUN --mount=target=/context \
