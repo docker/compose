@@ -1,0 +1,23 @@
+name: dispatch release event to downstream repositories
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  dispatch_release_version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'docker',
+              repo: 'docker.github.io',
+              workflow_id: 'compose_release',
+              ref: 'master',
+              inputs: {
+                release: ${{ GITHUB_REF }},
+              },
+            })
