@@ -10,7 +10,7 @@ require (
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.1
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
-	github.com/docker/buildx v0.8.0 // when updating, also update the replace rules accordingly
+	github.com/docker/buildx v0.8.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.12+incompatible
 	github.com/docker/cli-docs-tool v0.4.0
 	github.com/docker/docker v20.10.7+incompatible
@@ -94,7 +94,7 @@ require (
 	github.com/qri-io/jsonpointer v0.1.0 // indirect
 	github.com/qri-io/jsonschema v0.1.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
-	github.com/tonistiigi/fsutil v0.0.0-20220115021204-b19f7f9cb274 // indirect
+	github.com/tonistiigi/fsutil v0.0.0-20220315205639-9ed612626da3 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20210615222946-8066bb97264f // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
@@ -140,7 +140,7 @@ replace (
 	// upgraded to the version specified in containerd, which is not relevant to the
 	// version needed.
 	// See https://github.com/docker/buildx/pull/948 for details.
-	// https://github.com/docker/buildx/blob/v0.8.0/go.mod#L62-L64
+	// https://github.com/docker/buildx/blob/v0.8.1/go.mod#L62-L64
 	k8s.io/api => k8s.io/api v0.22.4
 	k8s.io/apimachinery => k8s.io/apimachinery v0.22.4
 	k8s.io/client-go => k8s.io/client-go v0.22.4
