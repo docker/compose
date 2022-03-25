@@ -469,8 +469,8 @@ github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/
 github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e h1:n81KvOMrLZa+VWHwST7dun9f0G98X3zREHS1ztYzZKU=
 github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e/go.mod h1:xpWTC2KnJMiDLkoawhsPQcXjvwATEBcbq0xevG2YR9M=
 github.com/dnaeon/go-vcr v1.0.1/go.mod h1:aBB1+wY4s93YsC3HHjMBMrwTj2R9FHDzUr9KyGc8n1E=
-github.com/docker/buildx v0.8.0 h1:T2DGt7dDCg95WQm82iz4z7Ci3SMByixXPJQ+Q4OurKg=
-github.com/docker/buildx v0.8.0/go.mod h1:J4+2AlJbm/x0OSWafh++zsrAfkayoFSCHWayfLEt0SA=
+github.com/docker/buildx v0.8.1 h1:XcVCxhDkUI8QvkBYAoCl3gcHUGFc03jZDzKdh8IJmPs=
+github.com/docker/buildx v0.8.1/go.mod h1:9v3laulRPwglXHuPulXa5onXQPlgrIq6LnCXc7SgHJw=
 github.com/docker/cli v20.10.3-0.20220309205733-2b52f62e9627+incompatible h1:RWXvuBczWuSIMjI69AnkNklNNVX2gmS0X+15AttGDVk=
 github.com/docker/cli v20.10.3-0.20220309205733-2b52f62e9627+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/cli-docs-tool v0.4.0 h1:MdfKoErGEbFqIxQ8an9BsZ+YzKUGd58RBVkV+Q82GPo=
@@ -1367,8 +1367,9 @@ github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802/go.mod h1
 github.com/tommy-muehle/go-mnd v1.1.1/go.mod h1:dSUh0FtTP8VhvkL1S+gUR1OKd9ZnSaozuI6r3m6wOig=
 github.com/tommy-muehle/go-mnd v1.3.1-0.20200224220436-e6f9a994e8fa/go.mod h1:dSUh0FtTP8VhvkL1S+gUR1OKd9ZnSaozuI6r3m6wOig=
 github.com/tonistiigi/fsutil v0.0.0-20201103201449-0834f99b7b85/go.mod h1:a7cilN64dG941IOXfhJhlH0qB92hxJ9A1ewrdUmJ6xo=
-github.com/tonistiigi/fsutil v0.0.0-20220115021204-b19f7f9cb274 h1:wbyZxD6IPFp0sl5uscMOJRsz5UKGFiNiD16e+MVfKZY=
 github.com/tonistiigi/fsutil v0.0.0-20220115021204-b19f7f9cb274/go.mod h1:oPAfvw32vlUJSjyDcQ3Bu0nb2ON2B+G0dtVN/SZNJiA=
+github.com/tonistiigi/fsutil v0.0.0-20220315205639-9ed612626da3 h1:T1pEe+WB3SCPVAfVquvfPfagKZU2Z8c1OP3SuGB+id0=
+github.com/tonistiigi/fsutil v0.0.0-20220315205639-9ed612626da3/go.mod h1:oPAfvw32vlUJSjyDcQ3Bu0nb2ON2B+G0dtVN/SZNJiA=
 github.com/tonistiigi/go-actions-cache v0.0.0-20211202175116-9642704158ff/go.mod h1:qqvyZqkfwkoJuPU/bw61bItaoO0SJ8YSW0vSVRRvsRg=
 github.com/tonistiigi/go-archvariant v1.0.0/go.mod h1:TxFmO5VS6vMq2kvs3ht04iPXtu2rUT/erOnGFYfk5Ho=
 github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea h1:SXhTLE6pb6eld/v/cCndK0AMpt1wiVFb/YYmqB3/QG0=
