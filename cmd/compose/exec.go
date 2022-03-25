@@ -35,11 +35,12 @@ type execOpts struct {
 	environment []string
 	workingDir  string
 
-	noTty      bool
-	user       string
-	detach     bool
-	index      int
-	privileged bool
+	noTty       bool
+	user        string
+	detach      bool
+	index       int
+	privileged  bool
+	interactive bool
 }
 
 func execCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
@@ -71,7 +72,7 @@ func execCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) 
 	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
 
-	runCmd.Flags().BoolP("interactive", "i", true, "Keep STDIN open even if not attached.")
+	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
 	runCmd.Flags().MarkHidden("interactive") //nolint:errcheck
 	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
 	runCmd.Flags().MarkHidden("tty") //nolint:errcheck
@@ -103,6 +104,7 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 		Index:       opts.index,
 		Detach:      opts.detach,
 		WorkingDir:  opts.workingDir,
+		Interactive: opts.interactive,
 	}
 
 	exitCode, err := backend.Exec(ctx, projectName, execOpts)
