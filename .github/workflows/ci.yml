@@ -5,6 +5,12 @@ on:
     branches:
       - v2
   pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'To run with tmate enter "debug_enabled"'
+        required: false
+        default: "false"
 
 jobs:
   lint:
@@ -124,6 +130,14 @@ jobs:
         env:
           BUILD_TAGS: e2e
         run: make GIT_TAG=e2e-PR-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }} -f builder.Makefile compose-plugin
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+
 
       - name: E2E Test in standalone mode
         run: make e2e-compose-standalone
