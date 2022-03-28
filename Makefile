@@ -51,7 +51,7 @@ e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2
 	rm -f /usr/local/bin/docker-compose
 	cp bin/docker-compose /usr/local/bin
 	docker-compose version
-	go test $(TEST_FLAGS) -count=1 --tags=standalone ./pkg/e2e
+	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
 .PHONY: mocks
 mocks:

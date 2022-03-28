@@ -27,7 +27,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-const ddevVersion = "v1.18.2"
+const ddevVersion = "v1.19.1"
 
 func TestComposeRunDdev(t *testing.T) {
 	if !composeStandaloneMode {
@@ -36,9 +36,14 @@ func TestComposeRunDdev(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Running on Windows. Skipping...")
 	}
+	_ = os.Setenv("DDEV_DEBUG", "true")
+
 	c := NewParallelE2eCLI(t, binDir)
 	dir, err := os.MkdirTemp("", t.Name()+"-")
 	assert.NilError(t, err)
+
+	// ddev needs to be able to find mkcert to figure out where certs are.
+	_ = os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), dir))
 
 	siteName := filepath.Base(dir)
 
@@ -60,31 +65,22 @@ func TestComposeRunDdev(t *testing.T) {
 			compressedFilename))
 
 	c.RunCmdInDir(dir, "tar", "-xzf", compressedFilename)
-	c.RunDockerCmd("pull", "drud/ddev-ssh-agent:v1.18.0")
-	c.RunDockerCmd("pull", "busybox:stable")
-	c.RunDockerCmd("pull", "phpmyadmin:5")
-
-	c.RunDockerCmd("pull", tagged("drud/ddev-router"))
-	c.RunDockerCmd("pull", tagged("drud/ddev-dbserver-mariadb-10.3"))
-	c.RunDockerCmd("pull", tagged("drud/ddev-webserver"))
 
 	// Create a simple index.php we can test against.
 	c.RunCmdInDir(dir, "sh", "-c", "echo '<?php\nprint \"ddev is working\";' >index.php")
 
 	c.RunCmdInDir(dir, "./ddev", "config", "--auto")
 	c.RunCmdInDir(dir, "./ddev", "config", "global", "--use-docker-compose-from-path")
+	vRes := c.RunCmdInDir(dir, "./ddev", "version")
+	out := vRes.Stdout()
+	fmt.Printf("ddev version: %s\n", out)
 
 	c.RunCmdInDir(dir, "./ddev", "poweroff")
 
-	startRes := c.RunCmdInDir(dir, "./ddev", "start", "-y")
-	assert.Equal(c.test, startRes.ExitCode, 0, "Could not start project")
+	c.RunCmdInDir(dir, "./ddev", "start", "-y")
 
 	curlRes := c.RunCmdInDir(dir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
-	out := curlRes.Stdout()
+	out = curlRes.Stdout()
 	fmt.Println(out)
 	assert.Assert(c.test, strings.Contains(out, "ddev is working"), "Could not start project")
-}
-
-func tagged(img string) string {
-	return fmt.Sprintf("%s:%s", img, ddevVersion)
 }
