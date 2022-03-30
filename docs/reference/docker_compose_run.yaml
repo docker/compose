@@ -125,7 +125,7 @@ options:
   shorthand: T
   value_type: bool
   default_value: "true"
-  description: 'Disable pseudo-noTty allocation (default: auto-detected).'
+  description: 'Disable pseudo-TTY allocation (default: auto-detected).'
   deprecated: false
   hidden: false
   experimental: false
