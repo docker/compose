@@ -117,6 +117,16 @@ options:
   experimentalcli: false
   kubernetes: false
   swarm: false
+- option: ssh
+  value_type: string
+  description: |
+    Set SSH authentications used when building service images. (use 'default' for using you default SSH Agent)
+  deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false
