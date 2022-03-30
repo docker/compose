@@ -12,6 +12,7 @@ Build or rebuild services
 | `--progress` | `string` | `auto` | Set type of progress output (auto, tty, plain, quiet) |
 | `--pull` |  |  | Always attempt to pull a newer version of the image. |
 | `-q`, `--quiet` |  |  | Don't print anything to STDOUT |
+| `--ssh` | `string` |  | Set SSH authentications used when building service images. (use 'default' for using you default SSH Agent) |
 
 
 <!---MARKER_GEN_END-->

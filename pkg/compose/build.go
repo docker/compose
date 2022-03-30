@@ -31,6 +31,7 @@ import (
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
+	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -79,6 +80,14 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 					Type:  "registry",
 					Attrs: map[string]string{"ref": image},
 				})
+			}
+
+			if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
+				sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))
+				if err != nil {
+					return err
+				}
+				buildOptions.Session = append(buildOptions.Session, sshAgentProvider)
 			}
 
 			opts[imageName] = buildOptions
@@ -295,4 +304,15 @@ func dockerFilePath(context string, dockerfile string) string {
 		return dockerfile
 	}
 	return filepath.Join(context, dockerfile)
+}
+
+func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
+	sshConfig := make([]sshprovider.AgentConfig, 0, len(sshKeys))
+	for _, sshKey := range sshKeys {
+		sshConfig = append(sshConfig, sshprovider.AgentConfig{
+			ID:    sshKey.ID,
+			Paths: []string{sshKey.Path},
+		})
+	}
+	return sshprovider.NewSSHAgentProvider(sshConfig)
 }

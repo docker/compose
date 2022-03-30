@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,20 @@ func TestLocalComposeBuild(t *testing.T) {
 
 		res := c.RunDockerCmd("image", "inspect", "multi-args_multiargs")
 		res.Assert(t, icmd.Expected{Out: `"RESULT": "SUCCESS"`})
+	})
+
+	t.Run("build failed with ssh default value", func(t *testing.T) {
+		//unset SSH_AUTH_SOCK to be sure we don't have a default value for the SSH Agent
+		defaultSSHAUTHSOCK := os.Getenv("SSH_AUTH_SOCK")
+		os.Unsetenv("SSH_AUTH_SOCK")                         //nolint:errcheck
+		defer os.Setenv("SSH_AUTH_SOCK", defaultSSHAUTHSOCK) //nolint:errcheck
+
+		res := c.RunDockerComposeCmdNoCheck("--project-directory", "fixtures/build-test", "build", "--ssh", "")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "invalid empty ssh agent socket: make sure SSH_AUTH_SOCK is set",
+		})
+
 	})
 
 	t.Run("build as part of up", func(t *testing.T) {

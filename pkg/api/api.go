@@ -91,6 +91,8 @@ type BuildOptions struct {
 	Quiet bool
 	// Services passed in the command line to be built
 	Services []string
+	// Ssh authentications passed in the command line
+	SSHs []types.SSHKey
 }
 
 // CreateOptions group options of the Create API
