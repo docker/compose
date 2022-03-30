@@ -243,10 +243,22 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		return build.Options{}, err
 	}
 
+	// Let buildkit know about other service being built, so that we can rely on a service image to build another one
+	otherServices := map[string]build.NamedContext{}
+	for _, s := range project.Services {
+		if s.Build != nil {
+			name := getImageName(service, project.Name)
+			otherServices[name] = build.NamedContext{
+				Path: s.Build.Context,
+			}
+		}
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
 			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
+			NamedContexts:  otherServices,
 		},
 		CacheFrom:   cacheFrom,
 		CacheTo:     cacheTo,
