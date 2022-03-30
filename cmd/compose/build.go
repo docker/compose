@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/cli"
+	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -40,6 +41,28 @@ type buildOptions struct {
 	args     []string
 	noCache  bool
 	memory   string
+	ssh      string
+}
+
+func (opts buildOptions) toAPIBuildOptions(services []string) (api.BuildOptions, error) {
+	var SSHKeys []types.SSHKey
+	var err error
+	if opts.ssh != "" {
+		SSHKeys, err = loader.ParseShortSSHSyntax(opts.ssh)
+		if err != nil {
+			return api.BuildOptions{}, err
+		}
+	}
+
+	return api.BuildOptions{
+		Pull:     opts.pull,
+		Progress: opts.progress,
+		Args:     types.NewMappingWithEquals(opts.args),
+		NoCache:  opts.noCache,
+		Quiet:    opts.quiet,
+		Services: services,
+		SSHs:     SSHKeys,
+	}, nil
 }
 
 var printerModes = []string{
@@ -73,7 +96,10 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			}
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("ssh") && opts.ssh == "" {
+				opts.ssh = "default"
+			}
 			return runBuild(ctx, backend, opts, args)
 		}),
 		ValidArgsFunction: serviceCompletion(p),
@@ -82,6 +108,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
+	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using you default SSH Agent)")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().Bool("compress", true, "Compress the build context using gzip. DEPRECATED")
@@ -103,12 +130,9 @@ func runBuild(ctx context.Context, backend api.Service, opts buildOptions, servi
 		return err
 	}
 
-	return backend.Build(ctx, project, api.BuildOptions{
-		Pull:     opts.pull,
-		Progress: opts.progress,
-		Args:     types.NewMappingWithEquals(opts.args),
-		NoCache:  opts.noCache,
-		Quiet:    opts.quiet,
-		Services: services,
-	})
+	apiBuildOptions, err := opts.toAPIBuildOptions(services)
+	if err != nil {
+		return err
+	}
+	return backend.Build(ctx, project, apiBuildOptions)
 }

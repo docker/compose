@@ -204,17 +204,20 @@ func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
 
 // RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
 func (c *E2eCLI) RunDockerComposeCmd(args ...string) *icmd.Result {
+	res := c.RunDockerComposeCmdNoCheck(args...)
+	res.Assert(c.test, icmd.Success)
+	return res
+}
+
+// RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
+func (c *E2eCLI) RunDockerComposeCmdNoCheck(args ...string) *icmd.Result {
 	if composeStandaloneMode {
 		composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 		assert.NilError(c.test, err)
-		res := icmd.RunCmd(c.NewCmd(composeBinary, args...))
-		res.Assert(c.test, icmd.Success)
-		return res
+		return icmd.RunCmd(c.NewCmd(composeBinary, args...))
 	}
 	args = append([]string{"compose"}, args...)
-	res := icmd.RunCmd(c.NewCmd(DockerExecutableName, args...))
-	res.Assert(c.test, icmd.Success)
-	return res
+	return icmd.RunCmd(c.NewCmd(DockerExecutableName, args...))
 }
 
 // StdoutContains returns a predicate on command result expecting a string in stdout
