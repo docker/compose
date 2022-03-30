@@ -155,7 +155,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-noTty allocation (default: auto-detected).")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")

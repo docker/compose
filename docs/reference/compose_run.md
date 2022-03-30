@@ -13,7 +13,7 @@ Run a one-off command on a service.
 | `-i`, `--interactive` |  |  | Keep STDIN open even if not attached. |
 | `-l`, `--label` | `stringArray` |  | Add or override a label |
 | `--name` | `string` |  |  Assign a name to the container |
-| `-T`, `--no-TTY` |  |  | Disable pseudo-noTty allocation (default: auto-detected). |
+| `-T`, `--no-TTY` |  |  | Disable pseudo-TTY allocation (default: auto-detected). |
 | `--no-deps` |  |  | Don't start linked services. |
 | `-p`, `--publish` | `stringArray` |  | Publish a container's port(s) to the host. |
 | `--quiet-pull` |  |  | Pull without printing progress information. |
