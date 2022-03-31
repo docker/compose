@@ -143,6 +143,11 @@ func (o *projectOptions) toProjectName() (string, error) {
 		return o.ProjectName, nil
 	}
 
+	envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
+	if envProjectName != "" {
+		return envProjectName, nil
+	}
+
 	project, err := o.toProject(nil)
 	if err != nil {
 		return "", err
