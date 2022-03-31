@@ -120,7 +120,7 @@ options:
 - option: ssh
   value_type: string
   description: |
-    Set SSH authentications used when building service images. (use 'default' for using you default SSH Agent)
+    Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)
   deprecated: false
   hidden: false
   experimental: false
