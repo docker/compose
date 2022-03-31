@@ -27,7 +27,7 @@ import (
 
 func TestStartStop(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
-	const projectName = "e2e-start-stop"
+	const projectName = "e2e-start-stop-no-dependencies"
 
 	getProjectRegx := func(status string) string {
 		// match output with random spaces like:
@@ -43,7 +43,7 @@ func TestStartStop(t *testing.T) {
 
 	t.Run("Up a project", func(t *testing.T) {
 		res := c.RunDockerComposeCmd("-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "up", "-d")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-simple-1  Started"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-no-dependencies-simple-1  Started"), res.Combined())
 
 		res = c.RunDockerComposeCmd("ls", "--all")
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
@@ -57,13 +57,13 @@ func TestStartStop(t *testing.T) {
 		c.RunDockerComposeCmd("-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "stop")
 
 		res := c.RunDockerComposeCmd("ls")
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-no-dependencies"), res.Combined())
 
 		res = c.RunDockerComposeCmd("ls", "--all")
 		testify.Regexp(t, getProjectRegx("exited"), res.Stdout())
 
 		res = c.RunDockerComposeCmd("--project-name", projectName, "ps")
-		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-words-1"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-no-dependencies-words-1"), res.Combined())
 
 		res = c.RunDockerComposeCmd("--project-name", projectName, "ps", "--all")
 		testify.Regexp(t, getServiceRegx("simple", "exited"), res.Stdout())
