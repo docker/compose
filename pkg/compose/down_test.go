@@ -23,7 +23,6 @@ import (
 
 	compose "github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
-
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
@@ -60,6 +59,7 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "456", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
+	api.EXPECT().NetworkInspect(gomock.Any(), "myProject_default", moby.NetworkInspectOptions{}).Return(moby.NetworkResource{Name: "myProject_default"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{})
@@ -94,6 +94,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "321", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
+	api.EXPECT().NetworkInspect(gomock.Any(), "myProject_default", moby.NetworkInspectOptions{}).Return(moby.NetworkResource{Name: "myProject_default"}, nil)
 	api.EXPECT().NetworkRemove(gomock.Any(), "myProject_default").Return(nil)
 
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{RemoveOrphans: true})
