@@ -108,7 +108,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.pull, "pull", false, "Always attempt to pull a newer version of the image.")
 	cmd.Flags().StringVar(&opts.progress, "progress", buildx.PrinterModeAuto, fmt.Sprintf(`Set type of progress output (%s)`, strings.Join(printerModes, ", ")))
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
-	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using you default SSH Agent)")
+	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
 	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().Bool("compress", true, "Compress the build context using gzip. DEPRECATED")
