@@ -94,6 +94,33 @@ func TestLocalComposeBuild(t *testing.T) {
 
 	})
 
+	t.Run("build succeed with ssh from Compose file", func(t *testing.T) {
+		c.RunDockerOrExitError("rmi", "build-test-ssh")
+
+		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "build")
+		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+	})
+
+	t.Run("build succeed with ssh from CLI", func(t *testing.T) {
+		c.RunDockerOrExitError("rmi", "build-test-ssh")
+
+		c.RunDockerComposeCmd("-f", "fixtures/build-test/ssh/compose-without-ssh.yaml", "--project-directory",
+			"fixtures/build-test/ssh", "build", "--no-cache", "--ssh", "fake-ssh=./fixtures/build-test/ssh/fake_rsa")
+		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+	})
+
+	t.Run("build failed with wrong ssh key id from CLI", func(t *testing.T) {
+		c.RunDockerOrExitError("rmi", "build-test-ssh")
+
+		res := c.RunDockerComposeCmdNoCheck("-f", "fixtures/build-test/ssh/compose-without-ssh.yaml",
+			"--project-directory", "fixtures/build-test/ssh", "build", "--no-cache", "--ssh",
+			"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 17,
+			Err:      "failed to solve: rpc error: code = Unknown desc = unset ssh forward key fake-ssh",
+		})
+	})
+
 	t.Run("build as part of up", func(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
