@@ -89,9 +89,6 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	})
 }
 
-// Warning is a global warning to be displayed to user on command failure
-var Warning string
-
 type projectOptions struct {
 	ProjectName   string
 	Profiles      []string
