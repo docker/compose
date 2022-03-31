@@ -32,11 +32,6 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 )
 
-func init() {
-	commands.Warning = "The new 'docker compose' command is currently experimental. " +
-		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
-}
-
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
