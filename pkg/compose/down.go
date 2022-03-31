@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/registry/client"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/errdefs"
 	"golang.org/x/sync/errgroup"
@@ -131,6 +132,11 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 			continue
 		}
 		networkName := n.Name
+		_, err := s.apiClient().NetworkInspect(ctx, networkName, moby.NetworkInspectOptions{})
+		if client.IsNotFound(err) {
+			return nil
+		}
+
 		ops = append(ops, func() error {
 			return s.removeNetwork(ctx, networkName, w)
 		})
