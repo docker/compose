@@ -132,7 +132,23 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
+require (
+	github.com/a8m/envsubst v1.3.0 // indirect
+	github.com/elliotchance/orderedmap v1.4.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
+	github.com/goccy/go-yaml v1.9.5 // indirect
+	github.com/jinzhu/copier v0.3.5 // indirect
+	github.com/magiconair/properties v1.8.6 // indirect
+	github.com/mikefarah/yq/v4 v4.24.2 // indirect
+	github.com/timtadh/data-structures v0.5.3 // indirect
+	github.com/timtadh/lexmachine v0.2.2 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	gopkg.in/op/go-logging.v1 v1.0.0-20160211212156-b2cb9fa56473 // indirect
+)
+
 replace (
+	github.com/compose-spec/compose-go => ./compose-go
+
 	github.com/docker/cli => github.com/docker/cli v20.10.3-0.20220309205733-2b52f62e9627+incompatible
 	github.com/docker/docker => github.com/docker/docker v20.10.3-0.20220309172631-83b51522df43+incompatible
 
