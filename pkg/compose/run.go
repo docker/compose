@@ -89,7 +89,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	updateServices(&service, observedState)
 
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1,
-		opts.Detach && opts.AutoRemove, opts.UseNetworkAliases, opts.Interactive)
+		opts.AutoRemove, opts.UseNetworkAliases, opts.Interactive)
 	if err != nil {
 		return "", err
 	}
