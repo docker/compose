@@ -63,7 +63,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(project, service, imageName)
+			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
 			if err != nil {
 				return err
 			}
@@ -81,15 +81,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 					Attrs: map[string]string{"ref": image},
 				})
 			}
-
-			if len(options.SSHs) > 0 || len(service.Build.SSH) > 0 {
-				sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, options.SSHs...))
-				if err != nil {
-					return err
-				}
-				buildOptions.Session = append(buildOptions.Session, sshAgentProvider)
-			}
-
 			opts[imageName] = buildOptions
 		}
 	}
@@ -168,7 +159,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
-			opt, err := s.toBuildOptions(project, service, imageName)
+			opt, err := s.toBuildOptions(project, service, imageName, []types.SSHKey{})
 			if err != nil {
 				return nil, err
 			}
@@ -218,7 +209,7 @@ func (s *composeService) doBuild(ctx context.Context, project *types.Project, op
 	return s.doBuildBuildkit(ctx, project, opts, mode)
 }
 
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string) (build.Options, error) {
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
@@ -252,6 +243,17 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		return build.Options{}, err
 	}
 
+	sessionConfig := []session.Attachable{
+		authprovider.NewDockerAuthProvider(s.stderr()),
+	}
+	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
+		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))
+		if err != nil {
+			return build.Options{}, err
+		}
+		sessionConfig = append(sessionConfig, sshAgentProvider)
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
@@ -269,9 +271,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
 		ExtraHosts:  service.Build.ExtraHosts,
-		Session: []session.Attachable{
-			authprovider.NewDockerAuthProvider(s.stderr()),
-		},
+		Session:     sessionConfig,
 	}, nil
 }
 
