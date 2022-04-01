@@ -121,6 +121,16 @@ func TestLocalComposeBuild(t *testing.T) {
 		})
 	})
 
+	t.Run("build succeed as part of up with ssh from Compose file", func(t *testing.T) {
+		c.RunDockerOrExitError("rmi", "build-test-ssh")
+
+		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "up", "-d", "--build")
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "down")
+		})
+		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+	})
+
 	t.Run("build as part of up", func(t *testing.T) {
 		c.RunDockerOrExitError("rmi", "build-test_nginx")
 		c.RunDockerOrExitError("rmi", "custom-nginx")
