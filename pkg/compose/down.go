@@ -82,7 +82,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops := s.ensureNetworksDown(ctx, project, w)
 
 	if options.Images != "" {
-		ops = append(ops, s.ensureImagesDown(ctx, projectName, options, w)...)
+		ops = append(ops, s.ensureImagesDown(ctx, project, options, w)...)
 	}
 
 	if options.Volumes {
@@ -114,9 +114,9 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options api.DownOptions, w progress.Writer) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) []downOp {
 	var ops []downOp
-	for image := range s.getServiceImages(options, projectName) {
+	for image := range s.getServiceImages(options, project) {
 		image := image
 		ops = append(ops, func() error {
 			return s.removeImage(ctx, image, w)
@@ -144,15 +144,15 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 	return ops
 }
 
-func (s *composeService) getServiceImages(options api.DownOptions, projectName string) map[string]struct{} {
+func (s *composeService) getServiceImages(options api.DownOptions, project *types.Project) map[string]struct{} {
 	images := map[string]struct{}{}
-	for _, service := range options.Project.Services {
+	for _, service := range project.Services {
 		image := service.Image
 		if options.Images == "local" && image != "" {
 			continue
 		}
 		if image == "" {
-			image = getImageName(service, projectName)
+			image = getImageName(service, project.Name)
 		}
 		images[image] = struct{}{}
 	}
