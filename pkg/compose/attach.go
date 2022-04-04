@@ -48,7 +48,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	fmt.Printf("Attaching to %s\n", strings.Join(names, ", "))
 
 	for _, container := range containers {
-		err := s.attachContainer(ctx, container, listener, project)
+		err := s.attachContainer(ctx, container, listener)
 		if err != nil {
 			return nil, err
 		}
@@ -56,13 +56,9 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	return containers, err
 }
 
-func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener api.ContainerEventListener, project *types.Project) error {
+func (s *composeService) attachContainer(ctx context.Context, container moby.Container, listener api.ContainerEventListener) error {
 	serviceName := container.Labels[api.ServiceLabel]
 	containerName := getContainerNameWithoutProject(container)
-	service, err := project.GetService(serviceName)
-	if err != nil {
-		return err
-	}
 
 	listener(api.ContainerEvent{
 		Type:      api.ContainerEventAttach,
@@ -78,7 +74,13 @@ func (s *composeService) attachContainer(ctx context.Context, container moby.Con
 			Line:      line,
 		})
 	})
-	_, _, err = s.attachContainerStreams(ctx, container.ID, service.Tty, nil, w, w)
+
+	inspect, err := s.dockerCli.Client().ContainerInspect(ctx, container.ID)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = s.attachContainerStreams(ctx, container.ID, inspect.Config.Tty, nil, w, w)
 	return err
 }
 
