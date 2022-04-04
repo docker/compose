@@ -55,7 +55,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 		eg.Go(func() error {
 			return s.watchContainers(context.Background(), project.Name, options.AttachTo, listener, attached, func(container moby.Container) error {
-				return s.attachContainer(ctx, container, listener, project)
+				return s.attachContainer(ctx, container, listener)
 			})
 		})
 	}
