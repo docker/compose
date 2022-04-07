@@ -204,6 +204,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
+			Project:      project,
 			Attach:       consumer,
 			AttachTo:     attachTo,
 			ExitCodeFrom: upOptions.exitCodeFrom,
