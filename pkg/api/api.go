@@ -117,6 +117,8 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran `start` just with project name
+	Project *types.Project
 	// Attach to container and forward logs if not nil
 	Attach LogConsumer
 	// AttachTo set the services to attach to
