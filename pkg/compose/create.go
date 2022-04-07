@@ -162,17 +162,6 @@ func prepareServicesDependsOn(p *types.Project) error {
 			dependencies = append(dependencies, pidDependency)
 		}
 
-		for _, vol := range service.VolumesFrom {
-			spec := strings.Split(vol, ":")
-			if len(spec) == 0 {
-				continue
-			}
-			if spec[0] == "container" {
-				continue
-			}
-			dependencies = append(dependencies, spec[0])
-		}
-
 		if len(dependencies) == 0 {
 			continue
 		}
@@ -661,7 +650,7 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 			continue
 		}
 		if spec[0] == "container" {
-			volumes = append(volumes, strings.Join(spec[1:], ":"))
+			volumes = append(volumes, vol)
 			continue
 		}
 		serviceName := spec[0]
