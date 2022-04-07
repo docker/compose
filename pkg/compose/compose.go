@@ -156,6 +156,14 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition}
 			}
 		}
+
+		links := service.Labels[api.LinksLabel]
+		if len(links) > 0 {
+			for _, link := range strings.Split(links, ",") {
+				l := strings.Split(link, ":")[0]
+				service.Links = append(service.Links, l)
+			}
+		}
 		project.Services = append(project.Services, *service)
 	}
 SERVICES:

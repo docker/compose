@@ -51,6 +51,8 @@ const (
 	ImageDigestLabel = "com.docker.compose.image"
 	// DependenciesLabel stores service dependencies
 	DependenciesLabel = "com.docker.compose.depends_on"
+	// LinksLabel stores service links
+	LinksLabel = "com.docker.compose.links"
 	// VersionLabel stores the compose tool version used to run application
 	VersionLabel = "com.docker.compose.version"
 )

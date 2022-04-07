@@ -436,6 +436,8 @@ func (s *composeService) prepareLabels(service types.ServiceConfig, number int) 
 		dependencies = append(dependencies, s+":"+d.Condition)
 	}
 	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
+	labels[api.LinksLabel] = strings.Join(service.Links, ",")
+
 	return labels, nil
 }
 

@@ -3,6 +3,12 @@ services:
     image: nginx:alpine
     depends_on:
       - bar
+    links:
+      - bar:first_web
+      - baz:second_web
 
   bar:
+    image: nginx:alpine
+
+  baz:
     image: nginx:alpine

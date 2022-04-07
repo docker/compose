@@ -106,6 +106,7 @@ func TestStartStopWithDependencies(t *testing.T) {
 		res := c.RunDockerComposeCmd("-f", "./fixtures/dependencies/compose.yaml", "--project-name", projectName, "up", "-d")
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-foo-1  Started"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-bar-1  Started"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-baz-1  Started"), res.Combined())
 	})
 
 	t.Run("stop foo", func(t *testing.T) {
@@ -114,19 +115,24 @@ func TestStartStopWithDependencies(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-foo-1  Stopped"), res.Combined())
 
 		res = c.RunDockerComposeCmd("--project-name", projectName, "ps", "--status", "running")
+		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-baz-1"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-bar-1"), res.Combined())
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-foo-1"), res.Combined())
 	})
 
 	t.Run("start foo", func(t *testing.T) {
 		res := c.RunDockerComposeCmd("--project-name", projectName, "stop")
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-baz-1  Stopped"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-bar-1  Stopped"), res.Combined())
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-foo-1  Stopped"), res.Combined())
 
 		res = c.RunDockerComposeCmd("--project-name", projectName, "start", "foo")
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-baz-1  Started"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-bar-1  Started"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-foo-1  Started"), res.Combined())
 
 		res = c.RunDockerComposeCmd("--project-name", projectName, "ps", "--status", "running")
+		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-baz-1"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-bar-1"), res.Combined())
 		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-foo-1"), res.Combined())
 	})
