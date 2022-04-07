@@ -1059,7 +1059,10 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 
 			for _, ipamConfig := range n.Ipam.Config {
 				config := network.IPAMConfig{
-					Subnet: ipamConfig.Subnet,
+					Subnet:     ipamConfig.Subnet,
+					IPRange:    ipamConfig.IPRange,
+					Gateway:    ipamConfig.Gateway,
+					AuxAddress: ipamConfig.AuxiliaryAddresses,
 				}
 				createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
 			}
