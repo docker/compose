@@ -173,6 +173,10 @@ func prepareServicesDependsOn(p *types.Project) error {
 			dependencies = append(dependencies, spec[0])
 		}
 
+		for _, link := range service.Links {
+			dependencies = append(dependencies, strings.Split(link, ":")[0])
+		}
+
 		if len(dependencies) == 0 {
 			continue
 		}
