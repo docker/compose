@@ -95,7 +95,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		}
 
 		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
+			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
 			if err != nil {
 				if !opts.IgnoreFailures {
 					if service.Build != nil {
@@ -118,7 +118,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	return err
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) error {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
@@ -126,12 +126,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	})
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	key := repoInfo.Index.Name
@@ -141,12 +141,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 
 	authConfig, err := configFile.GetAuthConfig(key)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
@@ -159,7 +159,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: progress.Error,
 			Text:   "Error",
 		})
-		return WrapCategorisedComposeError(err, PullFailure)
+		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
 
 	dec := json.NewDecoder(stream)
@@ -169,10 +169,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			if err == io.EOF {
 				break
 			}
-			return WrapCategorisedComposeError(err, PullFailure)
+			return "", WrapCategorisedComposeError(err, PullFailure)
 		}
 		if jm.Error != nil {
-			return WrapCategorisedComposeError(errors.New(jm.Error.Message), PullFailure)
+			return "", WrapCategorisedComposeError(errors.New(jm.Error.Message), PullFailure)
 		}
 		if !quietPull {
 			toPullProgressEvent(service.Name, jm, w)
@@ -183,7 +183,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Status: progress.Done,
 		Text:   "Pulled",
 	})
-	return nil
+
+	inspected, _, err := s.dockerCli.Client().ImageInspectWithRaw(ctx, service.Image)
+	if err != nil {
+		return "", err
+	}
+	return inspected.ID, nil
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
@@ -220,10 +225,12 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	return progress.Run(ctx, func(ctx context.Context) error {
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, service := range needPull {
-			service := service
+		pulledImages := make([]string, len(needPull))
+		for i, service := range needPull {
+			i, service := i, service
 			eg.Go(func() error {
-				err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
+				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
+				pulledImages[i] = id
 				if err != nil && service.Build != nil {
 					// image can be built, so we can ignore pull failure
 					return nil
@@ -231,7 +238,16 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 				return err
 			})
 		}
-		return eg.Wait()
+		for i, service := range needPull {
+			if pulledImages[i] != "" {
+				images[service.Image] = pulledImages[i]
+			}
+		}
+		err := eg.Wait()
+		if err != nil {
+			return err
+		}
+		return err
 	})
 }
 
