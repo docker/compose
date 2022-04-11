@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -79,15 +78,9 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
-	name := opts.ProjectName
-	var project *types.Project
-	if opts.ProjectName == "" {
-		p, err := opts.toProject(nil)
-		if err != nil {
-			return err
-		}
-		project = p
-		name = p.Name
+	project, name, err := opts.projectOrName()
+	if err != nil {
+		return err
 	}
 
 	var timeout *time.Duration

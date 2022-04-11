@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,9 +111,15 @@ func anyCancellableContext() gomock.Matcher {
 	return gomock.AssignableToTypeOf(ctxWithCancel)
 }
 
-func projectFilterListOpt() moby.ContainerListOptions {
+func projectFilterListOpt(withOneOff bool) moby.ContainerListOptions {
+	filter := filters.NewArgs(
+		projectFilter(strings.ToLower(testProject)),
+	)
+	if !withOneOff {
+		filter.Add("label", fmt.Sprintf("%s=False", compose.OneoffLabel))
+	}
 	return moby.ContainerListOptions{
-		Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject))),
+		Filters: filter,
 		All:     true,
 	}
 }

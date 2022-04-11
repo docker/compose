@@ -34,15 +34,17 @@ func (s *composeService) Restart(ctx context.Context, projectName string, option
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
-
-	observedState, err := s.getContainers(ctx, projectName, oneOffExclude, true)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
 
-	project, err := s.projectFromName(observedState, projectName, options.Services...)
-	if err != nil {
-		return err
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(options.Services) == 0 {
@@ -50,12 +52,12 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	}
 
 	w := progress.ContextWriter(ctx)
-	err = InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		if !utils.StringContains(options.Services, service) {
 			return nil
 		}
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, container := range observedState.filter(isService(service)) {
+		for _, container := range containers.filter(isService(service)) {
 			container := container
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
@@ -69,8 +71,4 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 		}
 		return eg.Wait()
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }

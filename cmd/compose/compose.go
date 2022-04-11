@@ -136,6 +136,20 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	_ = f.MarkHidden("workdir")
 }
 
+func (o *projectOptions) projectOrName() (*types.Project, string, error) {
+	name := o.ProjectName
+	var project *types.Project
+	if o.ProjectName == "" {
+		p, err := o.toProject(nil)
+		if err != nil {
+			return nil, "", err
+		}
+		project = p
+		name = p.Name
+	}
+	return project, name, nil
+}
+
 func (o *projectOptions) toProjectName() (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil

@@ -43,12 +43,13 @@ func startCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runStart(ctx context.Context, backend api.Service, opts startOptions, services []string) error {
-	projectName, err := opts.toProjectName()
+	project, name, err := opts.projectOrName()
 	if err != nil {
 		return err
 	}
 
-	return backend.Start(ctx, projectName, api.StartOptions{
+	return backend.Start(ctx, name, api.StartOptions{
 		AttachTo: services,
+		Project:  project,
 	})
 }
