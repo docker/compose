@@ -55,6 +55,11 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		info.IndexServerAddress = registry.IndexServer
 	}
 
+	images, err := s.getLocalImagesDigests(ctx, project)
+	if err != nil {
+		return err
+	}
+
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -69,6 +74,26 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			})
 			continue
 		}
+
+		switch service.PullPolicy {
+		case types.PullPolicyNever, types.PullPolicyBuild:
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   "Skipped",
+			})
+			continue
+		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+			if _, ok := images[service.Image]; ok {
+				w.Event(progress.Event{
+					ID:     service.Name,
+					Status: progress.Done,
+					Text:   "Exists",
+				})
+				continue
+			}
+		}
+
 		eg.Go(func() error {
 			err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
 			if err != nil {
