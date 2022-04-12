@@ -133,7 +133,7 @@ func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
 	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
-	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
+	f.BoolVar(&o.Compatibility, "compatibility", true, "Run compose in backward compatibility mode")
 	_ = f.MarkHidden("workdir")
 }
 

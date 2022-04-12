@@ -8,12 +8,17 @@
 - [Contributing](#contributing)
 # Docker Compose v2
 
-[![GitHub release](https://img.shields.io/github/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
-[![PkgGoDev](https://img.shields.io/badge/go.dev-docs-007d9c?style=flat-square&logo=go&logoColor=white)](https://pkg.go.dev/github.com/docker/compose/v2)
-[![Build Status](https://img.shields.io/github/workflow/status/docker/compose/ci?label=ci&logo=github&style=flat-square)](https://github.com/docker/compose/actions?query=workflow%3Aci)
-[![Go Report Card](https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square)](https://goreportcard.com/report/github.com/docker/compose/v2)
-[![Codecov](https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu)](https://codecov.io/gh/docker/compose)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/docker/compose/badge)](https://api.securityscorecards.dev/projects/github.com/docker/compose)
+## ** Codefresh fork **
+
+This repository fork is required because we need to build the docker image for the Codefresh managed docker-compose [image](https://hub.docker.com/repository/docker/codefresh/compose)
+
+The image is based on the official docker-compose github repo. The reason why it is not based on the official docker-compose image is because at the moment there is no ARM version of the docker-compose image and we need to keep codebase the same for AMD64 and ARM versions of the images.
+
+*Also This fork contains a minor change that is to run with the `--compatibility` flag turned on by default. This is to prevent any broken of the behavior of the v1 docker-compose tool.
+
+
+[![Actions Status](https://github.com/docker/compose/workflows/Continuous%20integration/badge.svg)](https://github.com/docker/compose/actions)
+
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
 Docker Compose is a tool for running multi-container applications on Docker
