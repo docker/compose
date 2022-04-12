@@ -238,7 +238,10 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	project, _ := s.projectFromName(containers, projectName)
+	project, err := s.projectFromName(containers, projectName)
+	if err != nil {
+		return nil, err
+	}
 
 	volumes, err := s.actualVolumes(ctx, projectName)
 	if err != nil {
