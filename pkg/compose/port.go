@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 
@@ -26,10 +27,11 @@ import (
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Port(ctx context.Context, project string, service string, port int, options api.PortOptions) (string, int, error) {
+func (s *composeService) Port(ctx context.Context, projectName string, service string, port int, options api.PortOptions) (string, int, error) {
+	projectName = strings.ToLower(projectName)
 	list, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(
-			projectFilter(project),
+			projectFilter(projectName),
 			serviceFilter(service),
 			containerNumberFilter(options.Index),
 		),

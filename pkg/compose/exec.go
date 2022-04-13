@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
@@ -27,22 +28,23 @@ import (
 	"github.com/docker/docker/api/types/filters"
 )
 
-func (s *composeService) Exec(ctx context.Context, project string, opts api.RunOptions) (int, error) {
-	target, err := s.getExecTarget(ctx, project, opts)
+func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+	projectName = strings.ToLower(projectName)
+	target, err := s.getExecTarget(ctx, projectName, options)
 	if err != nil {
 		return 0, err
 	}
 
 	exec := container.NewExecOptions()
-	exec.Interactive = opts.Interactive
-	exec.TTY = opts.Tty
-	exec.Detach = opts.Detach
-	exec.User = opts.User
-	exec.Privileged = opts.Privileged
-	exec.Workdir = opts.WorkingDir
+	exec.Interactive = options.Interactive
+	exec.TTY = options.Tty
+	exec.Detach = options.Detach
+	exec.User = options.User
+	exec.Privileged = options.Privileged
+	exec.Workdir = options.WorkingDir
 	exec.Container = target.ID
-	exec.Command = opts.Command
-	for _, v := range opts.Environment {
+	exec.Command = options.Command
+	for _, v := range options.Environment {
 		err := exec.Env.Set(v)
 		if err != nil {
 			return 0, err

@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"io"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
@@ -28,6 +29,7 @@ import (
 )
 
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
+	projectName = strings.ToLower(projectName)
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err
