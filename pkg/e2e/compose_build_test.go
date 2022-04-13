@@ -169,3 +169,15 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerCmd("rmi", "custom-nginx")
 	})
 }
+
+func TestBuildSecrets(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("build with secrets", func(t *testing.T) {
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("rmi", "build-test-secret")
+
+		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/secrets", "build")
+		res.Assert(t, icmd.Success)
+	})
+}
