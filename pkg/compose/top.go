@@ -18,12 +18,14 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
+	projectName = strings.ToLower(projectName)
 	var containers Containers
 	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false)
 	if err != nil {

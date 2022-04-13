@@ -30,6 +30,7 @@ import (
 )
 
 func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+	projectName = strings.ToLower(projectName)
 	containers, _, err := s.actualState(ctx, projectName, options.Services)
 	if err != nil {
 		if api.IsNotFoundError(err) {

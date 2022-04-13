@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
@@ -26,9 +27,9 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) Pause(ctx context.Context, project string, options api.PauseOptions) error {
+func (s *composeService) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.pause(ctx, project, options)
+		return s.pause(ctx, strings.ToLower(projectName), options)
 	})
 }
 
@@ -54,14 +55,14 @@ func (s *composeService) pause(ctx context.Context, project string, options api.
 	return eg.Wait()
 }
 
-func (s *composeService) UnPause(ctx context.Context, project string, options api.PauseOptions) error {
+func (s *composeService) UnPause(ctx context.Context, projectName string, options api.PauseOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.unPause(ctx, project, options)
+		return s.unPause(ctx, strings.ToLower(projectName), options)
 	})
 }
 
-func (s *composeService) unPause(ctx context.Context, project string, options api.PauseOptions) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, false, options.Services...)
+func (s *composeService) unPause(ctx context.Context, projectName string, options api.PauseOptions) error {
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
 	}

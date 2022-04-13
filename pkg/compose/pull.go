@@ -36,12 +36,12 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) Pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
-	if opts.Quiet {
-		return s.pull(ctx, project, opts)
+func (s *composeService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
+	if options.Quiet {
+		return s.pull(ctx, project, options)
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.pull(ctx, project, opts)
+		return s.pull(ctx, project, options)
 	})
 }
 

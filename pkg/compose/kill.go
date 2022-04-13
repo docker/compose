@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
@@ -27,19 +28,19 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) Kill(ctx context.Context, project string, options api.KillOptions) error {
+func (s *composeService) Kill(ctx context.Context, projectName string, options api.KillOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.kill(ctx, project, options)
+		return s.kill(ctx, strings.ToLower(projectName), options)
 	})
 }
 
-func (s *composeService) kill(ctx context.Context, project string, options api.KillOptions) error {
+func (s *composeService) kill(ctx context.Context, projectName string, options api.KillOptions) error {
 	w := progress.ContextWriter(ctx)
 
 	services := options.Services
 
 	var containers Containers
-	containers, err := s.getContainers(ctx, project, oneOffInclude, false, services...)
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, false, services...)
 	if err != nil {
 		return err
 	}
