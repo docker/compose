@@ -713,11 +713,13 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 MOUNTS:
 	for _, m := range mountOptions {
 		volumeMounts[m.Target] = struct{}{}
-		// `Bind` API is used when host path need to be created if missing, `Mount` is preferred otherwise
 		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
+			// `Mount` is preferred but does not offer option to created host path if missing
+			// so `Bind` API is used here with raw volume string
+			// see https://github.com/moby/moby/issues/43483
 			for _, v := range service.Volumes {
 				if v.Target == m.Target && v.Bind != nil && v.Bind.CreateHostPath {
-					binds = append(binds, fmt.Sprintf("%s:%s:%s", m.Source, m.Target, getBindMode(v.Bind, m.ReadOnly)))
+					binds = append(binds, v.String())
 					continue MOUNTS
 				}
 			}
@@ -725,23 +727,6 @@ MOUNTS:
 		mounts = append(mounts, m)
 	}
 	return volumeMounts, binds, mounts, nil
-}
-
-func getBindMode(bind *types.ServiceVolumeBind, readOnly bool) string {
-	mode := "rw"
-
-	if readOnly {
-		mode = "ro"
-	}
-
-	switch bind.SELinux {
-	case types.SELinuxShared:
-		mode += ",z"
-	case types.SELinuxPrivate:
-		mode += ",Z"
-	}
-
-	return mode
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
