@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -30,7 +31,7 @@ import (
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, projectName, options, nil)
+		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	})
 }
 

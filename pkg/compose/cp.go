@@ -42,9 +42,10 @@ const (
 	acrossServices = fromService | toService
 )
 
-func (s *composeService) Copy(ctx context.Context, project string, opts api.CopyOptions) error {
-	srcService, srcPath := splitCpArg(opts.Source)
-	destService, dstPath := splitCpArg(opts.Destination)
+func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
+	projectName = strings.ToLower(projectName)
+	srcService, srcPath := splitCpArg(options.Source)
+	destService, dstPath := splitCpArg(options.Destination)
 
 	var direction copyDirection
 	var serviceName string
@@ -53,7 +54,7 @@ func (s *composeService) Copy(ctx context.Context, project string, opts api.Copy
 		serviceName = srcService
 
 		// copying from multiple containers of a services doesn't make sense.
-		if opts.All {
+		if options.All {
 			return errors.New("cannot use the --all flag when copying from a service")
 		}
 	}
@@ -62,7 +63,7 @@ func (s *composeService) Copy(ctx context.Context, project string, opts api.Copy
 		serviceName = destService
 	}
 
-	containers, err := s.getContainers(ctx, project, oneOffExclude, true, serviceName)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
 	if err != nil {
 		return err
 	}
@@ -71,8 +72,8 @@ func (s *composeService) Copy(ctx context.Context, project string, opts api.Copy
 		return fmt.Errorf("no container found for service %q", serviceName)
 	}
 
-	if !opts.All {
-		containers = containers.filter(indexed(opts.Index))
+	if !options.All {
+		containers = containers.filter(indexed(options.Index))
 	}
 
 	g := errgroup.Group{}
@@ -81,9 +82,9 @@ func (s *composeService) Copy(ctx context.Context, project string, opts api.Copy
 		g.Go(func() error {
 			switch direction {
 			case fromService:
-				return s.copyFromContainer(ctx, containerID, srcPath, dstPath, opts)
+				return s.copyFromContainer(ctx, containerID, srcPath, dstPath, options)
 			case toService:
-				return s.copyToContainer(ctx, containerID, srcPath, dstPath, opts)
+				return s.copyToContainer(ctx, containerID, srcPath, dstPath, options)
 			case acrossServices:
 				return errors.New("copying between services is not supported")
 			default:
