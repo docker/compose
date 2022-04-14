@@ -42,6 +42,12 @@ jobs:
           name: docker-compose-linux-amd64
           path: ${{ github.workspace }}/bin/docker-compose-linux-amd64
 
+      - name: Upload linux-ppc64le binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-compose-linux-ppc64le
+          path: ${{ github.workspace }}/bin/docker-compose-linux-ppc64le
+
       - name: Upload windows-amd64 binary
         uses: actions/upload-artifact@v2
         with:
