@@ -128,10 +128,15 @@ SERVICES:
 	}
 
 	if opts.Services {
+		project, err := opts.toProject(services)
+		if err != nil {
+			return err
+		}
+
 		services := []string{}
-		for _, s := range containers {
-			if !utils.StringContains(services, s.Service) {
-				services = append(services, s.Service)
+		for _, s := range project.Services {
+			if !utils.StringContains(services, s.Name) {
+				services = append(services, s.Name)
 			}
 		}
 		fmt.Println(strings.Join(services, "\n"))
