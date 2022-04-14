@@ -36,7 +36,7 @@ jobs:
         run: make GIT_TAG=${{ github.event.inputs.tag }} -f builder.Makefile cross
 
       - name: Compute checksums
-        run: cd bin; for f in *; do shasum --algorithm 256 $f > $f.sha256; done
+        run: cd bin; for f in *; do shasum --binary --algorithm 256 $f | tee -a checksums.txt > $f.sha256; done
 
       - name: License
         run: cp packaging/* bin/
