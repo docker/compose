@@ -727,8 +727,12 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	binds := []string{}
 MOUNTS:
 	for _, m := range mountOptions {
+		if m.Type == mount.TypeNamedPipe {
+			mounts = append(mounts, m)
+			continue
+		}
 		volumeMounts[m.Target] = struct{}{}
-		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
+		if m.Type == mount.TypeBind {
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
