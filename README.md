@@ -45,26 +45,10 @@ the Docker CLI. You can read more about how to do this:
 Where to get Docker Compose
 ----------------------------
 
-### Windows and macOS
+All the instructions to install the Python version of Docker Compose, aka `v1`, 
+are described in the [installation guide](./INSTALL.md). 
 
-Docker Compose is included in
-[Docker Desktop](https://www.docker.com/products/docker-desktop)
-for Windows and macOS.
-
-### Linux
-
-You can download Docker Compose binaries from the
-[release page](https://github.com/docker/compose/releases) on this repository.
-
-### Using pip
-
-If your platform is not supported, you can download Docker Compose using `pip`:
-
-```console
-pip install docker-compose
-```
-
-> **Note:** Docker Compose requires Python 3.6 or later.
+> ⚠️ This version is a deprecated version of Compose. We recommend that you use the [latest version of Docker Compose](https://docs.docker.com/compose/install/).
 
 Quick Start
 -----------
