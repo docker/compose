@@ -5,8 +5,8 @@ import (
 	"github.com/tilt-dev/tilt/pkg/model"
 )
 
-// Filter out spurious changes that we don't want to rebuild on, like IDE
-// temp/lock files.
+// EphemeralPathMatcher filters out spurious changes that we don't want to
+// rebuild on, like IDE temp/lock files.
 //
 // This isn't an ideal solution. In an ideal world, the user would put
 // everything to ignore in their tiltignore/dockerignore files. This is a
@@ -29,12 +29,17 @@ func initEphemeralPathMatcher() model.PathMatcher {
 	// files, but it doesn't have the "incrememnting" character problem mentioned
 	// above
 	katePatterns := []string{"**/.*.kate-swp"}
+	// go stdlib creates tmpfiles to determine umask for setting permissions
+	// during file creation; they are then immediately deleted
+	// https://github.com/golang/go/blob/0b5218cf4e3e5c17344ea113af346e8e0836f6c4/src/cmd/go/internal/work/exec.go#L1764
+	goPatterns := []string{"**/*-go-tmp-umask"}
 
 	allPatterns := []string{}
 	allPatterns = append(allPatterns, golandPatterns...)
 	allPatterns = append(allPatterns, emacsPatterns...)
 	allPatterns = append(allPatterns, vimPatterns...)
 	allPatterns = append(allPatterns, katePatterns...)
+	allPatterns = append(allPatterns, goPatterns...)
 
 	matcher, err := dockerignore.NewDockerPatternMatcher("/", allPatterns)
 	if err != nil {
