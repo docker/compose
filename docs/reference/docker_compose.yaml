@@ -222,7 +222,7 @@ options:
   value_type: string
   description: |-
     Specify an alternate working directory
-    (default: the path of the Compose file)
+    (default: the path of the, first specified, Compose file)
   deprecated: false
   hidden: false
   experimental: false
@@ -265,7 +265,7 @@ options:
   description: |-
     DEPRECATED! USE --project-directory INSTEAD.
     Specify an alternate working directory
-    (default: the path of the Compose file)
+    (default: the path of the, first specified, Compose file)
   deprecated: false
   hidden: true
   experimental: false
