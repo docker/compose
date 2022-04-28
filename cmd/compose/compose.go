@@ -169,7 +169,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	ef := o.EnvFile
 	if ef != "" && !filepath.IsAbs(ef) {
-		ef = filepath.Join(project.WorkingDir, o.EnvFile)
+		ef, err = filepath.Abs(ef)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
