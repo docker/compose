@@ -57,6 +57,10 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 		if options.All {
 			return errors.New("cannot use the --all flag when copying from a service")
 		}
+		// due to remove of the --all flag, restore the default value to 1 when copying from a service container to the host.
+		if options.Index == 0 {
+			options.Index = 1
+		}
 	}
 	if destService != "" {
 		direction |= toService
@@ -72,7 +76,7 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 		return fmt.Errorf("no container found for service %q", serviceName)
 	}
 
-	if !options.All {
+	if direction == fromService || (direction == toService && options.Index > 0) {
 		containers = containers.filter(indexed(options.Index))
 	}
 
