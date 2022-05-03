@@ -47,15 +47,18 @@ func TestCopy(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `nginx               running`})
 	})
 
-	t.Run("copy to container copies the file to the first container by default", func(t *testing.T) {
+	t.Run("copy to container copies the file to the all containers by default", func(t *testing.T) {
 		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/default.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 0})
 
 		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/default.txt").Stdout()
 		assert.Assert(t, strings.Contains(output, `hello world`), output)
 
-		res = c.RunDockerOrExitError("exec", projectName+"_nginx_2", "cat", "/tmp/default.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 1})
+		output = c.RunDockerCmd("exec", projectName+"-nginx-2", "cat", "/tmp/default.txt").Stdout()
+		assert.Assert(t, strings.Contains(output, `hello world`), output)
+
+		output = c.RunDockerCmd("exec", projectName+"-nginx-3", "cat", "/tmp/default.txt").Stdout()
+		assert.Assert(t, strings.Contains(output, `hello world`), output)
 	})
 
 	t.Run("copy to container with a given index copies the file to the given container", func(t *testing.T) {
@@ -67,20 +70,6 @@ func TestCopy(t *testing.T) {
 
 		res = c.RunDockerOrExitError("exec", projectName+"-nginx-2", "cat", "/tmp/indexed.txt")
 		res.Assert(t, icmd.Expected{ExitCode: 1})
-	})
-
-	t.Run("copy to container with the all flag copies the file to all containers", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/cp-test/compose.yaml", "-p", projectName, "cp", "--all", "./fixtures/cp-test/cp-me.txt", "nginx:/tmp/all.txt")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-
-		output := c.RunDockerCmd("exec", projectName+"-nginx-1", "cat", "/tmp/all.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-
-		output = c.RunDockerCmd("exec", projectName+"-nginx-2", "cat", "/tmp/all.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
-
-		output = c.RunDockerCmd("exec", projectName+"-nginx-3", "cat", "/tmp/all.txt").Stdout()
-		assert.Assert(t, strings.Contains(output, `hello world`), output)
 	})
 
 	t.Run("copy from a container copies the file to the host from the first container by default", func(t *testing.T) {
