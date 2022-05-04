@@ -64,7 +64,7 @@ func copyCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 
 	flags := copyCmd.Flags()
-	flags.IntVar(&opts.index, "index", 0, "Index of the container if there are multiple instances of a service [default: 1 when copying from a container].")
+	flags.IntVar(&opts.index, "index", 0, "Index of the container if there are multiple instances of a service .")
 	flags.BoolVar(&opts.all, "all", false, "Copy to all the containers of the service.")
 	flags.MarkHidden("all")                                                                                                      //nolint:errcheck
 	flags.MarkDeprecated("all", "By default all the containers of the service will get the source file/directory to be copied.") //nolint:errcheck
