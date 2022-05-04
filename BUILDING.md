@@ -43,6 +43,7 @@ make e2e-compose
 ```
 
 Note that this requires a local Docker Engine to be running.
+Make sure you have built the CLI (see "Building the CLI"). Otherwise it uses `docker compose` available in your system.
 
 ## Releases
 
