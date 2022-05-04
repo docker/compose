@@ -50,10 +50,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	opts := map[string]build.Options{}
 	imagesToBuild := []string{}
 
-	args := flatten(options.Args.Resolve(func(s string) (string, bool) {
-		s, ok := project.Environment[s]
-		return s, ok
-	}))
+	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
 	services, err := project.GetServices(options.Services...)
 	if err != nil {
@@ -214,10 +211,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	var tags []string
 	tags = append(tags, imageTag)
 
-	buildArgs := flatten(service.Build.Args.Resolve(func(s string) (string, bool) {
-		s, ok := project.Environment[s]
-		return s, ok
-	}))
+	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
 	var plats []specs.Platform
 	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
