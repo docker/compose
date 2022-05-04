@@ -66,18 +66,23 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 		direction |= toService
 		serviceName = destService
 	}
-
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
-	if err != nil {
-		return err
-	}
-
-	if len(containers) < 1 {
-		return fmt.Errorf("no container found for service %q", serviceName)
-	}
-
+	var containers Containers
+	var err error
 	if direction == fromService || (direction == toService && options.Index > 0) {
-		containers = containers.filter(indexed(options.Index))
+		container, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, options.Index)
+		if err != nil {
+			return err
+		}
+		containers = append(containers, container)
+	} else {
+		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+		if err != nil {
+			return err
+		}
+
+		if len(containers) < 1 {
+			return fmt.Errorf("no container found for service %q", serviceName)
+		}
 	}
 
 	g := errgroup.Group{}

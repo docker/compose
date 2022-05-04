@@ -18,14 +18,12 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 )
 
 func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
@@ -59,19 +57,5 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) getExecTarget(ctx context.Context, projectName string, opts api.RunOptions) (moby.Container, error) {
-	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
-		Filters: filters.NewArgs(
-			projectFilter(projectName),
-			serviceFilter(opts.Service),
-			containerNumberFilter(opts.Index),
-		),
-	})
-	if err != nil {
-		return moby.Container{}, err
-	}
-	if len(containers) < 1 {
-		return moby.Container{}, fmt.Errorf("service %q is not running container #%d", opts.Service, opts.Index)
-	}
-	container := containers[0]
-	return container, nil
+	return s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, opts.Service, opts.Index)
 }
