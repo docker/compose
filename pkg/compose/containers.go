@@ -18,14 +18,13 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"sort"
-	"strconv"
-
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/utils"
+	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 )
 
 // Containers is a set of moby Container
@@ -41,17 +40,7 @@ const (
 
 func (s *composeService) getContainers(ctx context.Context, project string, oneOff oneOff, stopped bool, selectedServices ...string) (Containers, error) {
 	var containers Containers
-	f := []filters.KeyValuePair{projectFilter(project)}
-	if len(selectedServices) == 1 {
-		f = append(f, serviceFilter(selectedServices[0]))
-	}
-	switch oneOff {
-	case oneOffOnly:
-		f = append(f, oneOffFilter(true))
-	case oneOffExclude:
-		f = append(f, oneOffFilter(false))
-	case oneOffInclude:
-	}
+	f := getDefaultFilters(project, oneOff, selectedServices...)
 	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		Filters: filters.NewArgs(f...),
 		All:     stopped,
@@ -63,6 +52,40 @@ func (s *composeService) getContainers(ctx context.Context, project string, oneO
 		containers = containers.filter(isService(selectedServices...))
 	}
 	return containers, nil
+}
+
+func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...string) []filters.KeyValuePair {
+	f := []filters.KeyValuePair{projectFilter(projectName)}
+	if len(selectedServices) == 1 {
+		f = append(f, serviceFilter(selectedServices[0]))
+	}
+	switch oneOff {
+	case oneOffOnly:
+		f = append(f, oneOffFilter(true))
+	case oneOffExclude:
+		f = append(f, oneOffFilter(false))
+	case oneOffInclude:
+	}
+	return f
+}
+
+func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName string, oneOff oneOff, stopped bool, serviceName string, containerIndex int) (moby.Container, error) {
+	defaultFilters := getDefaultFilters(projectName, oneOff, serviceName)
+	defaultFilters = append(defaultFilters, containerNumberFilter(containerIndex))
+	containers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
+		Filters: filters.NewArgs(
+			defaultFilters...,
+		),
+		All: stopped,
+	})
+	if err != nil {
+		return moby.Container{}, err
+	}
+	if len(containers) < 1 {
+		return moby.Container{}, fmt.Errorf("service %q is not running container #%d", serviceName, containerIndex)
+	}
+	container := containers[0]
+	return container, nil
 }
 
 // containerPredicate define a predicate we want container to satisfy for filtering operations
@@ -85,14 +108,6 @@ func isNotService(services ...string) containerPredicate {
 func isNotOneOff(c moby.Container) bool {
 	v, ok := c.Labels[api.OneoffLabel]
 	return !ok || v == "False"
-}
-
-func indexed(index int) containerPredicate {
-	return func(c moby.Container) bool {
-		number := c.Labels[api.ContainerNumberLabel]
-		idx, err := strconv.Atoi(number)
-		return err == nil && index == idx
-	}
 }
 
 // filter return Containers with elements to match predicate
