@@ -26,6 +26,10 @@ type naiveNotify struct {
 	// Paths that we're watching that should be passed up to the caller.
 	// Note that we may have to watch ancestors of these paths
 	// in order to fulfill the API promise.
+	//
+	// We often need to check if paths are a child of a path in
+	// the notify list. It might be better to store this in a tree
+	// structure, so we can filter the list quickly.
 	notifyList map[string]bool
 
 	ignore PathMatcher
@@ -226,7 +230,7 @@ func (d *naiveNotify) shouldNotify(path string) bool {
 		}
 		return true
 	}
-	// TODO(dmiller): maybe use a prefix tree here?
+
 	for root := range d.notifyList {
 		if ospath.IsChild(root, path) {
 			return true
@@ -245,7 +249,29 @@ func (d *naiveNotify) shouldSkipDir(path string) (bool, error) {
 	if err != nil {
 		return false, errors.Wrap(err, "shouldSkipDir")
 	}
-	return skip, nil
+
+	if skip {
+		return true, nil
+	}
+
+	// Suppose we're watching
+	// /src/.tiltignore
+	// but the .tiltignore file doesn't exist.
+	//
+	// Our watcher will create an inotify watch on /src/.
+	//
+	// But then we want to make sure we don't recurse from /src/ down to /src/node_modules.
+	//
+	// To handle this case, we only want to traverse dirs that are:
+	// - A child of a directory that's in our notify list, or
+	// - A parent of a directory that's in our notify list
+	//   (i.e., to cover the "path doesn't exist" case).
+	for root := range d.notifyList {
+		if ospath.IsChild(root, path) || ospath.IsChild(path, root) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (d *naiveNotify) add(path string) error {
