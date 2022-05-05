@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDontWatchEachFile(t *testing.T) {
@@ -96,20 +99,48 @@ func TestDontWatchEachFile(t *testing.T) {
 	}
 	f.events = nil
 
+	n, err := inotifyNodes()
+	require.NoError(t, err)
+	if n > 10 {
+		t.Fatalf("watching more than 10 files: %d", n)
+	}
+}
+
+func inotifyNodes() (int, error) {
 	pid := os.Getpid()
 
 	output, err := exec.Command("bash", "-c", fmt.Sprintf(
 		"find /proc/%d/fd -lname anon_inode:inotify -printf '%%hinfo/%%f\n' | xargs cat | grep -c '^inotify'", pid)).Output()
 	if err != nil {
-		t.Fatalf("error running command to determine number of watched files: %v", err)
+		return 0, fmt.Errorf("error running command to determine number of watched files: %v", err)
 	}
 
 	n, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
-		t.Fatalf("couldn't parse number of watched files: %v", err)
+		return 0, fmt.Errorf("couldn't parse number of watched files: %v", err)
+	}
+	return n, nil
+}
+
+func TestDontRecurseWhenWatchingParentsOfNonExistentFiles(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("This test uses linux-specific inotify checks")
 	}
 
-	if n > 10 {
-		t.Fatalf("watching more than 10 files: %d", n)
+	f := newNotifyFixture(t)
+
+	watched := f.TempDir("watched")
+	f.watch(filepath.Join(watched, ".tiltignore"))
+
+	excludedDir := f.JoinPath(watched, "excluded")
+	for i := 0; i < 10; i++ {
+		f.WriteFile(f.JoinPath(excludedDir, fmt.Sprintf("%d", i), "data.txt"), "initial data")
+	}
+	f.fsync()
+
+	n, err := inotifyNodes()
+	require.NoError(t, err)
+	if n > 5 {
+		t.Fatalf("watching more than 5 files: %d", n)
 	}
 }
