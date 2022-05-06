@@ -90,7 +90,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
-		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
+		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", projectName)
 	}
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -239,7 +239,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
 	project, err := s.projectFromName(containers, projectName)
-	if err != nil {
+	if err != nil && !api.IsNotFoundError(err) {
 		return nil, err
 	}
 
