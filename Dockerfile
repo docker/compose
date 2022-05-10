@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.17-alpine
+ARG GO_VERSION=1.18.2-alpine
 ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
 
@@ -88,7 +88,7 @@ RUN --mount=target=. \
     make -f builder.Makefile test
 
 FROM base AS check-license-headers
-RUN go get -u github.com/kunalkushwaha/ltag
+RUN go install github.com/kunalkushwaha/ltag@latest
 RUN --mount=target=. \
     make -f builder.Makefile check-license-headers
 
