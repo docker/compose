@@ -24,7 +24,16 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	"github.com/docker/buildx/build"
-	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
+
+	// required to get default driver registered
+	_ "github.com/docker/buildx/driver/docker"
+	_ "github.com/docker/buildx/driver/docker-container"
+	_ "github.com/docker/buildx/driver/kubernetes"
+
+	// required for some of the buildx drivers
+	_ "github.com/moby/buildkit/util/tracing/detect/delegated"
+	_ "github.com/moby/buildkit/util/tracing/env"
+
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
 	"github.com/docker/docker/pkg/urlutil"
