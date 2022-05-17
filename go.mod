@@ -32,7 +32,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	github.com/theupdateframework/notary v0.6.1
+	github.com/theupdateframework/notary v0.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.2.0
@@ -42,7 +42,6 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cnabio/cnab-go v0.10.0-beta1 // indirect
