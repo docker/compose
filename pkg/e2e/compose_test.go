@@ -117,6 +117,11 @@ func TestLocalComposeUp(t *testing.T) {
 		res := c.RunDockerCmd(t, "network", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
+
+	t.Run("up with security options file and replicas", func(t *testing.T) {
+		res := c.RunDockerComposeCmd("-f", "./fixtures/seccomp-and-replica/compose.yaml", "--project-name", projectName, "up", "-d")
+		res.Assert(t, icmd.Expected{ExitCode: 0})
+	})
 }
 
 func TestComposePull(t *testing.T) {

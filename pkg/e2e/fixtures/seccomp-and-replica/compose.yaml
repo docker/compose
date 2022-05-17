@@ -1,0 +1,8 @@
+services:
+  seccomp-and-replica:
+    image: nginx:alpine
+    security_opt:
+      - "seccomp:seccomp.json" # From https://github.com/moby/moby/blob/master/profiles/seccomp/default.json
+    deploy:
+      mode: replicated
+      replicas: 2

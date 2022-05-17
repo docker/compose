@@ -361,7 +361,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		return nil, nil, nil, err
 	}
 
-	securityOpts, err := parseSecurityOpts(p, service.SecurityOpt)
+	var securityOptDeepCopy = make([]string, len(service.SecurityOpt))
+	copy(securityOptDeepCopy, service.SecurityOpt)
+	securityOpts, err := parseSecurityOpts(p, securityOptDeepCopy)
 	if err != nil {
 		return nil, nil, nil, err
 	}
