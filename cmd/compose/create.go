@@ -30,6 +30,7 @@ import (
 type createOptions struct {
 	Build         bool
 	noBuild       bool
+	Pull          string
 	removeOrphans bool
 	ignoreOrphans bool
 	forceRecreate bool
@@ -71,6 +72,7 @@ func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&opts.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
+	flags.StringVar(&opts.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&opts.forceRecreate, "force-recreate", false, "Recreate containers even if their configuration and image haven't changed.")
 	flags.BoolVar(&opts.noRecreate, "no-recreate", false, "If containers already exist, don't recreate them. Incompatible with --force-recreate.")
 	return cmd
@@ -105,6 +107,12 @@ func (opts createOptions) GetTimeout() *time.Duration {
 }
 
 func (opts createOptions) Apply(project *types.Project) {
+	if opts.Pull != "" {
+		for i, service := range project.Services {
+			service.PullPolicy = opts.Pull
+			project.Services[i] = service
+		}
+	}
 	if opts.Build {
 		for i, service := range project.Services {
 			if service.Build == nil {

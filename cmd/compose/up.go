@@ -115,6 +115,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
+	flags.StringVar(&create.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&up.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
