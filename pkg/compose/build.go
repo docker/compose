@@ -291,7 +291,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts,
+		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
 	}, nil
 }
