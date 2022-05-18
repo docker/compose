@@ -83,7 +83,10 @@ func (w *ttyWriter) Event(e Event) {
 		last.Status = e.Status
 		last.Text = e.Text
 		last.StatusText = e.StatusText
-		last.ParentID = e.ParentID
+		// allow set/unset of parent, but not swapping otherwise prompt is flickering
+		if last.ParentID == "" || e.ParentID == "" {
+			last.ParentID = e.ParentID
+		}
 		w.events[e.ID] = last
 	} else {
 		e.startTime = time.Now()
