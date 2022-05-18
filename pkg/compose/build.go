@@ -275,6 +275,10 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		sessionConfig = append(sessionConfig, p)
 	}
 
+	if len(service.Build.Tags) > 0 {
+		tags = append(tags, service.Build.Tags...)
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
