@@ -134,7 +134,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			}
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
+		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			project, err := p.toProject([]string{opts.Service}, cgo.WithResolvedPaths(true))
 			if err != nil {
 				return err
