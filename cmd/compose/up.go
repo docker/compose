@@ -185,6 +185,9 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	if upOptions.attachDependencies {
 		attachTo = project.ServiceNames()
 	}
+	if len(attachTo) == 0 {
+		attachTo = project.ServiceNames()
+	}
 
 	create := api.CreateOptions{
 		Services:             services,
