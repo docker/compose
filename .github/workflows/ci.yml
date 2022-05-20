@@ -139,4 +139,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
 
       - name: E2E Test in standalone mode
-        run: make e2e-compose-standalone
+        run: |
+          rm -f /usr/local/bin/docker-compose
+          cp bin/docker-compose /usr/local/bin
+          make e2e-compose-standalone
