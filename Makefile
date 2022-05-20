@@ -43,11 +43,15 @@ compose-plugin: ## Compile the compose cli-plugin
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+	docker compose version
 	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) -count=1 --tags=standalone ./pkg/e2e
+	rm -f /usr/local/bin/docker-compose
+	cp bin/docker-compose /usr/local/bin
+	docker-compose version
+	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
 .PHONY: mocks
 mocks:
