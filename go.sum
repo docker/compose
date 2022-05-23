@@ -301,8 +301,8 @@ github.com/cockroachdb/errors v1.2.4/go.mod h1:rQD95gz6FARkaKkQXUksEje/d9a6wBJoC
 github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f/go.mod h1:i/u985jwjWRlyHXQbwatDASoW0RMlZ/3i9yJHE2xLkI=
 github.com/codahale/hdrhistogram v0.0.0-20160425231609-f8ad88b59a58/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/compose-spec/compose-go v1.0.8/go.mod h1:REnCbBugoIdHB7S1sfkN/aJ7AJpNApGNjNiVjA9L8x4=
-github.com/compose-spec/compose-go v1.2.5 h1:yGaACRJrWTQMFW89/ck2o1qd3gIxAji4EQkgewH3hqc=
-github.com/compose-spec/compose-go v1.2.5/go.mod h1:a/H2RY5UejNRhzbNXHygSAxBARTpLmLlaCkh58xfStM=
+github.com/compose-spec/compose-go v1.2.6 h1:9l2Y/yNn/OSngnkUBP8h8CchTmMcf1MW4BeUEaZXy8k=
+github.com/compose-spec/compose-go v1.2.6/go.mod h1:cg8yTeI+7rfQsEW9XHOLx0sNVjGKEXr6XwVB4fxmG3A=
 github.com/compose-spec/godotenv v1.1.1/go.mod h1:zF/3BOa18Z24tts5qnO/E9YURQanJTBUf7nlcCTNsyc=
 github.com/containerd/aufs v0.0.0-20200908144142-dab0cbea06f4/go.mod h1:nukgQABAEopAHvB6j7cnP5zJ+/3aVcE7hCYqvIwAHyE=
 github.com/containerd/aufs v0.0.0-20201003224125-76a6863f2989/go.mod h1:AkGGQs9NM2vtYHaUen+NljV0/baGCAPELGm2q9ZXpWU=
