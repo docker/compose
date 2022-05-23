@@ -19,10 +19,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.2
         id: go
 
       - name: Checkout code into the Go module directory
@@ -46,10 +46,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.2
         id: go
 
       - name: Checkout code into the Go module directory
@@ -71,10 +71,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.2
         id: go
 
       - name: Setup docker CLI
@@ -107,10 +107,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.2
         id: go
 
       - name: Setup docker CLI
