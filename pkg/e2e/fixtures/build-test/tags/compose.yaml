@@ -1,0 +1,9 @@
+services:
+  nginx:
+    image: build-test-tags
+    build:
+      context: .
+      tags:
+        - docker.io/docker/build-test-tags:1.0.0
+        - other-image-name:v1.0.0
+
