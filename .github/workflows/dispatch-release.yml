@@ -12,11 +12,11 @@ jobs:
           github-token: ${{ secrets.PAT_DOC_TOKEN }}
           script: |
             await github.rest.actions.createWorkflowDispatch({
-              owner: 'docker',
+              owner: 'crazy-max',
               repo: 'docker.github.io',
               workflow_id: 'compose_release',
-              ref: 'compose-api-upstream',
+              ref: 'master',
               inputs: {
-                release: "${{ env.GITHUB_REF }}"
+                release: "v2.5.1"
               }
             })
