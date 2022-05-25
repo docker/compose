@@ -7,16 +7,10 @@ jobs:
   dispatch_release_version:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v6
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v2
         with:
-          github-token: ${{ secrets.PAT_DOC_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: 'crazy-max',
-              repo: 'docker.github.io',
-              workflow_id: 'compose_release',
-              ref: 'master',
-              inputs: {
-                release: "v2.5.1"
-              }
-            })
+          token: ${{ secrets.PAT_DOC_TOKEN }}
+          repository: crazy-max/docker.github.io
+          event-type: my-event
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
