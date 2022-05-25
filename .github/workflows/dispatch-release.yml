@@ -15,7 +15,7 @@ jobs:
               owner: 'docker',
               repo: 'docker.github.io',
               workflow_id: 'compose_release',
-              ref: 'master',
+              ref: 'compose-api-upstream',
               inputs: {
                 release: ${{ GITHUB_REF }},
               },
