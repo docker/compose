@@ -1,8 +1,7 @@
 name: dispatch release event to downstream repositories
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 jobs:
   dispatch_release_version:
