@@ -183,7 +183,11 @@ func prepareServicesDependsOn(p *types.Project) error {
 		if service.DependsOn == nil {
 			service.DependsOn = make(types.DependsOnConfig)
 		}
-		deps, err := p.GetServices(dependencies...)
+
+		// Verify dependencies exist in the project, whether disabled or not
+		projAllServices := types.Project{}
+		projAllServices.Services = p.AllServices()
+		deps, err := projAllServices.GetServices(dependencies...)
 		if err != nil {
 			return err
 		}
