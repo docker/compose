@@ -43,7 +43,7 @@ func getStringFlags() []string {
 	}
 }
 
-var argToActualFlag = map[string]string{
+var argToActualArgument = map[string]string{
 	"--verbose": "--debug",
 	// docker cli has deprecated -h to avoid ambiguity with -H, while docker-compose still support it
 	"-h": "--help",
@@ -67,8 +67,8 @@ func Convert(args []string) []string {
 			command = append(command, args[i:]...)
 			break
 		}
-		if actualFlag, ok := argToActualFlag[arg]; ok {
-			arg = actualFlag
+		if actualArgument, ok := argToActualArgument[arg]; ok {
+			arg = actualArgument
 		}
 		if contains(getBoolFlags(), arg) {
 			rootFlags = append(rootFlags, arg)
