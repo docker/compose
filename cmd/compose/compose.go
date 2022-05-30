@@ -27,6 +27,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	composegoutils "github.com/compose-spec/compose-go/utils"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
@@ -257,6 +258,10 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := setEnvWithDotEnv(&opts)
+			if err != nil {
+				return err
+			}
 			parent := cmd.Root()
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
@@ -332,4 +337,28 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	command.Flags().MarkHidden("verbose") //nolint:errcheck
 	return command
+}
+
+func setEnvWithDotEnv(prjOpts *projectOptions) error {
+	options, err := prjOpts.toProjectOptions()
+	if err != nil {
+		return compose.WrapComposeError(err)
+	}
+	workingDir, err := options.GetWorkingDir()
+	if err != nil {
+		return err
+	}
+
+	envFromFile, err := cli.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFile)
+	if err != nil {
+		return err
+	}
+	for k, v := range envFromFile {
+		if _, ok := os.LookupEnv(k); !ok {
+			if err = os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
