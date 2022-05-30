@@ -1,0 +1,6 @@
+services:
+  env-interpolation:
+    image: bash
+    environment:
+      IMAGE: ${IMAGE}
+    command: echo "$IMAGE"
