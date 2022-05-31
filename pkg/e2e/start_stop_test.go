@@ -131,10 +131,11 @@ func TestStartStopWithDependencies(t *testing.T) {
 		assert.Assert(t, strings.Contains(res.Combined(), "e2e-start-stop-with-dependencies-foo-1"), res.Combined())
 	})
 
-	t.Run("Up no-deps", func(t *testing.T) {
+	t.Run("Up no-deps links", func(t *testing.T) {
 		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
-		res := c.RunDockerComposeCmd("-f", "./fixtures/dependencies/compose.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "foo")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/links/compose.yaml", "--project-name", projectName, "up", "--no-deps", "-d", "foo")
 		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-foo-1  Started"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-with-dependencies-bar-1  Started"), res.Combined())
 	})
 
 	t.Run("down", func(t *testing.T) {
