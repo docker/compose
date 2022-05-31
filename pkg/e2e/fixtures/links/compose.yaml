@@ -1,0 +1,8 @@
+services:
+  foo:
+    image: nginx:alpine
+    links:
+      - bar
+
+  bar:
+    image: nginx:alpine
