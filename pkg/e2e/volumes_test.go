@@ -18,11 +18,14 @@ package e2e
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestLocalComposeVolume(t *testing.T) {
@@ -86,5 +89,32 @@ func TestLocalComposeVolume(t *testing.T) {
 		ls := c.RunDockerCmd("volume", "ls").Stdout()
 		assert.Assert(t, !strings.Contains(ls, projectName+"_staticVol"))
 		assert.Assert(t, !strings.Contains(ls, "myvolume"))
+	})
+}
+
+func TestProjectVolumeBind(t *testing.T) {
+	if composeStandaloneMode {
+		t.Skip()
+	}
+	c := NewParallelE2eCLI(t, binDir)
+	const projectName = "compose-e2e-project-volume-bind"
+
+	t.Run("up with build and no image name, volume", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", projectName)
+		assert.NilError(t, err)
+		defer os.RemoveAll(tmpDir)
+
+		c.RunDockerComposeCmd("--project-directory", "fixtures/project-volume-bind-test", "--project-name", projectName, "down")
+
+		c.RunDockerOrExitError("volume", "rm", "-f", projectName+"_project_data").Assert(t, icmd.Success)
+		cmd := c.NewCmdWithEnv([]string{"TEST_DIR=" + tmpDir},
+			"docker", "compose", "--project-directory", "fixtures/project-volume-bind-test", "--project-name", projectName, "up", "-d")
+		icmd.RunCmd(cmd).Assert(t, icmd.Success)
+		defer c.RunDockerComposeCmd("--project-directory", "fixtures/project-volume-bind-test", "--project-name", projectName, "down")
+
+		c.RunCmd("sh", "-c", "echo SUCCESS > "+filepath.Join(tmpDir, "resultfile")).Assert(t, icmd.Success)
+
+		ret := c.RunDockerOrExitError("exec", "frontend", "bash", "-c", "cat /data/resultfile").Assert(t, icmd.Success)
+		assert.Assert(t, strings.Contains(ret.Stdout(), "SUCCESS"))
 	})
 }

@@ -167,6 +167,19 @@ func (c *E2eCLI) NewCmd(command string, args ...string) icmd.Cmd {
 	}
 }
 
+// NewCmdWithEnv creates a cmd object configured with the test environment set with additional env vars
+func (c *E2eCLI) NewCmdWithEnv(envvars []string, command string, args ...string) icmd.Cmd {
+	env := append(os.Environ(),
+		append(envvars,
+			"DOCKER_CONFIG="+c.ConfigDir,
+			"KUBECONFIG=invalid")...
+	)
+	return icmd.Cmd{
+		Command: append([]string{command}, args...),
+		Env:     env,
+	}
+}
+
 // MetricsSocket get the path where test metrics will be sent
 func (c *E2eCLI) MetricsSocket() string {
 	return filepath.Join(c.ConfigDir, "./docker-cli.sock")
