@@ -729,9 +729,15 @@ MOUNTS:
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
 			for _, v := range service.Volumes {
-				if v.Target == m.Target && v.Bind != nil && v.Bind.CreateHostPath {
-					binds = append(binds, v.String())
-					continue MOUNTS
+				if v.Target == m.Target {
+					switch {
+					case string(m.Type) != v.Type:
+						v.Source = m.Source
+						fallthrough
+					case v.Bind != nil && v.Bind.CreateHostPath:
+						binds = append(binds, v.String())
+						continue MOUNTS
+					}
 				}
 			}
 		}
@@ -922,9 +928,13 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
-	bind, vol, tmpfs := buildMountOptions(volume)
+	bind, vol, tmpfs := buildMountOptions(project, volume)
 
 	volume.Target = path.Clean(volume.Target)
+
+	if bind != nil {
+		volume.Type = types.VolumeTypeBind
+	}
 
 	return mount.Mount{
 		Type:          mount.Type(volume.Type),
@@ -938,7 +948,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}, nil
 }
 
-func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
 	switch volume.Type {
 	case "bind":
 		if volume.Volume != nil {
@@ -954,6 +964,11 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 		}
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
+		}
+		if v, ok := project.Volumes[volume.Source]; ok && v.DriverOpts["o"] == types.VolumeTypeBind {
+			return buildBindOption(&types.ServiceVolumeBind{
+				CreateHostPath: true,
+			}), nil, nil
 		}
 		return nil, buildVolumeOptions(volume.Volume), nil
 	case "tmpfs":
