@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.2
+          go-version: 1.18.3
         id: go
 
       - name: Setup docker CLI
