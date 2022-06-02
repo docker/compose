@@ -84,6 +84,19 @@ func TestEnvPriority(t *testing.T) {
 	// 3. Environment file <-- Result expected
 	// 4. Dockerfile
 	// 5. Variable is not defined
+	t.Run("override env file from compose", func(t *testing.T) {
+		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose-with-env-file.yaml",
+			"--project-directory", projectDir,
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
+	})
+
+	//  No Compose file & no env variable but override env file
+	// 1. Compose file
+	// 2. Shell environment variables
+	// 3. Environment file <-- Result expected
+	// 4. Dockerfile
+	// 5. Variable is not defined
 	t.Run("override env file", func(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
 			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
