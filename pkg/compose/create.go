@@ -356,11 +356,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		volumesFrom = append(volumesFrom, v[len("container:"):])
 	}
 
-	links, err := s.getLinks(ctx, p.Name, service, number)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	securityOpts, err := parseSecurityOpts(p, service.SecurityOpt)
 	if err != nil {
 		return nil, nil, nil, err
@@ -395,7 +390,6 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Runtime:        service.Runtime,
 		LogConfig:      logConfig,
 		GroupAdd:       service.GroupAdd,
-		Links:          links,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil

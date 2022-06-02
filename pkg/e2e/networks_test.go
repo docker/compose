@@ -69,7 +69,7 @@ func TestNetworks(t *testing.T) {
 	})
 }
 
-func TestNetworkAliasses(t *testing.T) {
+func TestNetworkAliassesAndLinks(t *testing.T) {
 	c := NewParallelE2eCLI(t, binDir)
 
 	const projectName = "network_alias_e2e"
@@ -85,25 +85,6 @@ func TestNetworkAliasses(t *testing.T) {
 
 	t.Run("curl links", func(t *testing.T) {
 		res := c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "exec", "-T", "container1", "curl", "http://container/")
-		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
-	})
-
-	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
-	})
-}
-
-func TestNetworkLinks(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-
-	const projectName = "network_link_e2e"
-
-	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd("-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName, "up", "-d")
-	})
-
-	t.Run("curl links in default bridge network", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName, "exec", "-T", "container2", "curl", "http://container1/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
