@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.18.2
+ARG GO_VERSION=1.18.3
 ARG FORMATS=md,yaml
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS docsgen
