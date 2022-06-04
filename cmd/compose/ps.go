@@ -226,7 +226,7 @@ func DisplayablePorts(c api.ContainerSummary) string {
 		// - the current port-range is a _range_, and the target port overlaps with the current range's target-ports
 		if p.Protocol != pr.protocol || p.URL != pr.IP || p.PublishedPort-pr.pEnd > 1 || p.TargetPort-pr.tEnd > 1 || prIsRange && tOverlaps {
 			// start a new port-range, and print the previous port-range (if any)
-			if pr.pStart > 0 {
+			if pr.tStart > 0 {
 				ports = append(ports, pr.String())
 			}
 			pr = portRange{
