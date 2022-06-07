@@ -27,150 +27,196 @@ import (
 func TestEnvPriority(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	projectDir := "./fixtures/environment/env-priority"
-
 	t.Run("up", func(t *testing.T) {
 		c.RunDockerOrExitError(t, "rmi", "env-compose-priority")
 		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
-			"--project-directory", projectDir, "up", "-d", "--build")
+			"up", "-d", "--build")
 	})
 
 	// Full options activated
-	// 1. Compose file <-- Result expected
-	// 2. Shell environment variables
-	// 3. Environment file
-	// 4. Dockerfile
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("compose file priority", func(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
-			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run",
-			"--rm", "-e", "WHEREAMI", "env-compose-priority")
+			"--env-file", "./fixtures/environment/env-priority/.env.override",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
-		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Compose File")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
+	})
+
+	// Full options activated
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("compose file priority", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override",
+			"run", "--rm", "-e", "WHEREAMI=shell", "env-compose-priority")
+		res := icmd.RunCmd(cmd)
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
 	})
 
 	// No Compose file, all other options
-	// 1. Compose file
-	// 2. Shell environment variables <-- Result expected
-	// 3. Environment file
-	// 4. Dockerfile
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("shell priority", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
-			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
-			"WHEREAMI", "env-compose-priority")
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
+		res := icmd.RunCmd(cmd)
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
+	})
+
+	// No Compose file, all other options with env variable from OS environment
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("shell priority file with default value", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override.with.default",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
 	})
 
-	//  No Compose file and env variable pass to the run command
-	// 1. Compose file
-	// 2. Shell environment variables <-- Result expected
-	// 3. Environment file
-	// 4. Dockerfile
+	// No Compose file, all other options with env variable from OS environment
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment default value from file in --env-file)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("shell priority implicitly set", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override.with.default",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		res := icmd.RunCmd(cmd)
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "EnvFileDefaultValue")
+	})
+
+	// No Compose file and env variable pass to the run command
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("shell priority from run command", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
-			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
-			"WHEREAMI=shell-run", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override",
+			"run", "--rm", "-e", "WHEREAMI=shell-run", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell-run")
 	})
 
-	//  No Compose file & no env variable but override env file
-	// 1. Compose file
-	// 2. Shell environment variables
-	// 3. Environment file <-- Result expected
-	// 4. Dockerfile
+	// No Compose file & no env variable but override env file
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by .env as a default --env-file value)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("override env file from compose", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose-with-env-file.yaml",
-			"--project-directory", projectDir,
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env-file.yaml",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File")
+	})
+
+	// No Compose file & no env variable but override by default env file
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file value)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("override env file", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.override",
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
 	})
 
-	//  No Compose file & no env variable but override env file
-	// 1. Compose file
-	// 2. Shell environment variables
-	// 3. Environment file <-- Result expected
-	// 4. Dockerfile
-	// 5. Variable is not defined
-	t.Run("override env file", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
-			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
-			"WHEREAMI", "env-compose-priority")
-		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
-	})
-
-	//  No Compose file & no env variable but override env file
-	// 1. Compose file
-	// 2. Shell environment variables
-	// 3. Environment file <-- Result expected
-	// 4. Dockerfile
+	// No Compose file & no env variable but override env file
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file value)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("env file", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
-			projectDir, "run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File")
 	})
 
-	//  No Compose file & no env variable, using an empty override env file
-	// 1. Compose file
-	// 2. Shell environment variables
-	// 3. Environment file
-	// 4. Dockerfile   <-- Result expected
+	// No Compose file & no env variable, using an empty override env file
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
+	// 2. Compose File (service::environment section)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive <-- Result expected
 	// 5. Variable is not defined
 	t.Run("use Dockerfile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
-			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.empty", "run", "--rm", "-e", "WHEREAMI",
-			"env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
+			"--env-file", "./fixtures/environment/env-priority/.env.empty",
+			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Dockerfile")
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "--project-directory", projectDir, "down")
+		c.RunDockerComposeCmd(t, "--project-name", "env-priority", "down")
 	})
 }
 
 func TestEnvInterpolation(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	projectDir := "./fixtures/environment/env-interpolation"
-
-	//  No variable defined in the Compose file and env variable pass to the run command
-	// 1. Compose file
-	// 2. Shell environment variables <-- Result expected
-	// 3. Environment file
-	// 4. Dockerfile
+	// No variable defined in the Compose file and nor env variable pass to the run command
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
+	// 2. Compose File (service::environment section) <-- Result expected (From environment patched by .env as a default --env-file value)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
 	// 5. Variable is not defined
 	t.Run("shell priority from run command", func(t *testing.T) {
-		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation/compose.yaml",
-			"--project-directory", projectDir, "config")
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation/compose.yaml", "config")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
-		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:shell`})
+		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:EnvFile`})
+	})
+
+	// No variable defined in the Compose file and env variable pass to the run command
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)
+	// 2. Compose File (service::environment section) <-- Result expected (From environment patched by .env as a default --env-file value.
+	// This variable has a default value in case of an absent variable in the OS environment)
+	// 3. Compose File (service::env_file section file)
+	// 4. Container Image ENV directive
+	// 5. Variable is not defined
+	t.Run("shell priority from run command using default value fallback", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation-default-value/compose.yaml", "config").
+			Assert(t, icmd.Expected{Out: `IMAGE: default_env:EnvFileDefaultValue`})
 	})
 }
 
 func TestCommentsInEnvFile(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	projectDir := "./fixtures/environment/env-file-comments"
-
 	t.Run("comments in env files", func(t *testing.T) {
 		c.RunDockerOrExitError(t, "rmi", "env-file-comments")
 
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-file-comments/compose.yaml", "--project-directory",
-			projectDir, "up", "-d", "--build")
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-file-comments/compose.yaml", "up", "-d", "--build")
 
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-file-comments/compose.yaml",
-			"--project-directory", projectDir, "run", "--rm", "-e", "COMMENT", "-e", "NO_COMMENT", "env-file-comments")
+			"run", "--rm", "-e", "COMMENT", "-e", "NO_COMMENT", "env-file-comments")
 
 		res.Assert(t, icmd.Expected{Out: `COMMENT=1234`})
 		res.Assert(t, icmd.Expected{Out: `NO_COMMENT=1234#5`})
 
-		c.RunDockerComposeCmd(t, "--project-directory", projectDir, "down", "--rmi", "all")
+		c.RunDockerComposeCmd(t, "--project-name", "env-file-comments", "down", "--rmi", "all")
 	})
 }

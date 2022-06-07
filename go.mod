@@ -151,3 +151,5 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.22.4
 	k8s.io/client-go => k8s.io/client-go v0.22.4
 )
+
+replace github.com/compose-spec/compose-go => github.com/compose-spec/compose-go v1.2.9-0.20220712021117-dcfe0889b601 // TODO Remove and bump require section when PR is merged
