@@ -10,7 +10,7 @@ require (
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.2
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
-	github.com/docker/buildx v0.8.1 // when updating, also update the replace rules accordingly
+	github.com/docker/buildx v0.8.2 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.13+incompatible
 	github.com/docker/cli-docs-tool v0.4.0
 	github.com/docker/docker v20.10.13+incompatible
@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-version v1.5.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-shellwords v1.0.12
-	github.com/moby/buildkit v0.10.0-rc2.0.20220308185020-fdecd0ae108b
+	github.com/moby/buildkit v0.10.1-0.20220403220257-10e6f94bf90d
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
