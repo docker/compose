@@ -885,6 +885,10 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			return nil, fmt.Errorf("unsupported external secret %s", definedSecret.Name)
 		}
 
+		if definedSecret.Environment != "" {
+			continue
+		}
+
 		mount, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
