@@ -599,6 +599,9 @@ func setLimits(limits *types.Resource, resources *container.Resources) {
 			resources.NanoCPUs = int64(f * 1e9)
 		}
 	}
+	if limits.PIds > 0 {
+		resources.PidsLimit = &limits.PIds
+	}
 }
 
 func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
