@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 func TestPs(t *testing.T) {
@@ -57,37 +59,34 @@ func TestPs(t *testing.T) {
 
 	t.Run("json", func(t *testing.T) {
 		res = c.RunDockerComposeCmd("-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps", "--format", "json")
-		var output []map[string]interface{}
+		var output []api.ContainerSummary
 		err := json.Unmarshal([]byte(res.Combined()), &output)
 		assert.NoError(t, err)
 
 		count := 0
 		assert.Equal(t, 2, len(output))
 		for _, service := range output {
-			publishers := service["Publishers"].([]interface{})
-			if service["Name"] == "e2e-ps-busybox-1" {
+			publishers := service.Publishers
+			if service.Name == "e2e-ps-busybox-1" {
 				assert.Equal(t, 1, len(publishers))
-				publisher := publishers[0].(map[string]interface{})
-				assert.Equal(t, "127.0.0.1", publisher["URL"])
-				assert.Equal(t, 8000.0, publisher["TargetPort"])
-				assert.Equal(t, 8001.0, publisher["PublishedPort"])
-				assert.Equal(t, "tcp", publisher["Protocol"])
+				assert.Equal(t, api.PortPublishers{
+					{
+						URL:           "127.0.0.1",
+						TargetPort:    8000,
+						PublishedPort: 8001,
+						Protocol:      "tcp",
+					},
+				}, publishers)
 				count++
 			}
-			if service["Name"] == "e2e-ps-nginx-1" {
+			if service.Name == "e2e-ps-nginx-1" {
 				assert.Equal(t, 3, len(publishers))
-				publisher := publishers[0].(map[string]interface{})
-				assert.Equal(t, 80.0, publisher["TargetPort"])
-				assert.Equal(t, 0.0, publisher["PublishedPort"])
-				assert.Equal(t, "tcp", publisher["Protocol"])
-				publisher = publishers[1].(map[string]interface{})
-				assert.Equal(t, 443.0, publisher["TargetPort"])
-				assert.Equal(t, 0.0, publisher["PublishedPort"])
-				assert.Equal(t, "tcp", publisher["Protocol"])
-				publisher = publishers[2].(map[string]interface{})
-				assert.Equal(t, 8080.0, publisher["TargetPort"])
-				assert.Equal(t, 0.0, publisher["PublishedPort"])
-				assert.Equal(t, "tcp", publisher["Protocol"])
+				assert.Equal(t, api.PortPublishers{
+					{TargetPort: 80, Protocol: "tcp"},
+					{TargetPort: 443, Protocol: "tcp"},
+					{TargetPort: 8080, Protocol: "tcp"},
+				}, publishers)
+
 				count++
 			}
 		}
