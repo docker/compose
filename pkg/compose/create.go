@@ -595,8 +595,12 @@ func setLimits(limits *types.Resource, resources *container.Resources) {
 		resources.Memory = int64(limits.MemoryBytes)
 	}
 	if limits.NanoCPUs != "" {
-		i, _ := strconv.ParseInt(limits.NanoCPUs, 10, 64)
-		resources.NanoCPUs = i
+		if f, err := strconv.ParseFloat(limits.NanoCPUs, 64); err == nil {
+			resources.NanoCPUs = int64(f * 1e9)
+		}
+	}
+	if limits.PIds > 0 {
+		resources.PidsLimit = &limits.PIds
 	}
 }
 
