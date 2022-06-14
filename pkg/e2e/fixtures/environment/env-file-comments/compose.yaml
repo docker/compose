@@ -1,0 +1,5 @@
+services:
+  env-file-comments:
+    build:
+      context: .
+    image: env-file-comments

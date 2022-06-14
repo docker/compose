@@ -27,6 +27,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	composegoutils "github.com/compose-spec/compose-go/utils"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
@@ -129,8 +130,8 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
-	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the Compose file)")
+	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
+	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	_ = f.MarkHidden("workdir")
 }
@@ -169,7 +170,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	ef := o.EnvFile
 	if ef != "" && !filepath.IsAbs(ef) {
-		ef = filepath.Join(project.WorkingDir, o.EnvFile)
+		ef, err = filepath.Abs(ef)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -210,9 +214,9 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithOsEnv,
 			cli.WithEnvFile(o.EnvFile),
 			cli.WithDotEnv,
-			cli.WithOsEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
@@ -254,6 +258,10 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := setEnvWithDotEnv(&opts)
+			if err != nil {
+				return err
+			}
 			parent := cmd.Root()
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
@@ -329,4 +337,28 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	command.Flags().MarkHidden("verbose") //nolint:errcheck
 	return command
+}
+
+func setEnvWithDotEnv(prjOpts *projectOptions) error {
+	options, err := prjOpts.toProjectOptions()
+	if err != nil {
+		return compose.WrapComposeError(err)
+	}
+	workingDir, err := options.GetWorkingDir()
+	if err != nil {
+		return err
+	}
+
+	envFromFile, err := cli.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFile)
+	if err != nil {
+		return err
+	}
+	for k, v := range envFromFile {
+		if _, ok := os.LookupEnv(k); !ok {
+			if err = os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -143,15 +143,6 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
 }
 
-func TestGetBindMode(t *testing.T) {
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{}, false), "rw")
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{}, true), "ro")
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxShared}, false), "rw,z")
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxPrivate}, false), "rw,Z")
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxShared}, true), "ro,z")
-	assert.Equal(t, getBindMode(&composetypes.ServiceVolumeBind{SELinux: composetypes.SELinuxPrivate}, true), "ro,Z")
-}
-
 func TestGetDefaultNetworkMode(t *testing.T) {
 	t.Run("returns the network with the highest priority when service has multiple networks", func(t *testing.T) {
 		service := composetypes.ServiceConfig{

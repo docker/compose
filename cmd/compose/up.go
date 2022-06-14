@@ -185,6 +185,9 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	if upOptions.attachDependencies {
 		attachTo = project.ServiceNames()
 	}
+	if len(attachTo) == 0 {
+		attachTo = project.ServiceNames()
+	}
 
 	create := api.CreateOptions{
 		Services:             services,
@@ -204,6 +207,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
+			Project:      project,
 			Attach:       consumer,
 			AttachTo:     attachTo,
 			ExitCodeFrom: upOptions.exitCodeFrom,

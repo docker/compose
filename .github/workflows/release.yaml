@@ -11,10 +11,10 @@ jobs:
   upload-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.3
         id: go
 
       - name: Setup docker CLI
@@ -36,7 +36,7 @@ jobs:
         run: make GIT_TAG=${{ github.event.inputs.tag }} -f builder.Makefile cross
 
       - name: Compute checksums
-        run: cd bin; for f in *; do shasum --algorithm 256 $f > $f.sha256; done
+        run: cd bin; for f in *; do shasum --binary --algorithm 256 $f | tee -a checksums.txt > $f.sha256; done
 
       - name: License
         run: cp packaging/* bin/

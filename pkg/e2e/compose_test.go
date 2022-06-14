@@ -95,7 +95,7 @@ func TestLocalComposeUp(t *testing.T) {
 
 		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `NAME                       COMMAND                  SERVICE             STATUS              PORTS`})
-		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp, :::90->80/tcp`})
+		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-web-1     "/dispatcher"            web                 running (healthy)   0.0.0.0:90->80/tcp`})
 		res.Assert(t, icmd.Expected{Out: `compose-e2e-demo-db-1      "docker-entrypoint.s…"   db                  running             5432/tcp`})
 	})
 

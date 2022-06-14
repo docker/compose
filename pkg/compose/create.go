@@ -31,6 +31,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -162,13 +163,21 @@ func prepareServicesDependsOn(p *types.Project) error {
 			dependencies = append(dependencies, pidDependency)
 		}
 
+		for _, link := range service.Links {
+			dependencies = append(dependencies, strings.Split(link, ":")[0])
+		}
+
 		if len(dependencies) == 0 {
 			continue
 		}
 		if service.DependsOn == nil {
 			service.DependsOn = make(types.DependsOnConfig)
 		}
-		deps, err := p.GetServices(dependencies...)
+
+		// Verify dependencies exist in the project, whether disabled or not
+		projAllServices := types.Project{}
+		projAllServices.Services = p.AllServices()
+		deps, err := projAllServices.GetServices(dependencies...)
 		if err != nil {
 			return err
 		}
@@ -336,6 +345,11 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		volumesFrom = append(volumesFrom, v[len("container:"):])
 	}
 
+	links, err := s.getLinks(ctx, p.Name, service, number)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	securityOpts, err := parseSecurityOpts(p, service.SecurityOpt)
 	if err != nil {
 		return nil, nil, nil, err
@@ -360,7 +374,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		DNS:            service.DNS,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
-		ExtraHosts:     service.ExtraHosts,
+		ExtraHosts:     service.ExtraHosts.AsList(),
 		SecurityOpt:    securityOpts,
 		UsernsMode:     container.UsernsMode(service.UserNSMode),
 		Privileged:     service.Privileged,
@@ -370,6 +384,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		Runtime:        service.Runtime,
 		LogConfig:      logConfig,
 		GroupAdd:       service.GroupAdd,
+		Links:          links,
 	}
 
 	return &containerConfig, &hostConfig, networkConfig, nil
@@ -569,8 +584,12 @@ func setLimits(limits *types.Resource, resources *container.Resources) {
 		resources.Memory = int64(limits.MemoryBytes)
 	}
 	if limits.NanoCPUs != "" {
-		i, _ := strconv.ParseInt(limits.NanoCPUs, 10, 64)
-		resources.NanoCPUs = i
+		if f, err := strconv.ParseFloat(limits.NanoCPUs, 64); err == nil {
+			resources.NanoCPUs = int64(f * 1e9)
+		}
+	}
+	if limits.PIds > 0 {
+		resources.PidsLimit = &limits.PIds
 	}
 }
 
@@ -698,35 +717,26 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 MOUNTS:
 	for _, m := range mountOptions {
 		volumeMounts[m.Target] = struct{}{}
-		// `Bind` API is used when host path need to be created if missing, `Mount` is preferred otherwise
 		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
+			// `Mount` is preferred but does not offer option to created host path if missing
+			// so `Bind` API is used here with raw volume string
+			// see https://github.com/moby/moby/issues/43483
 			for _, v := range service.Volumes {
-				if v.Target == m.Target && v.Bind != nil && v.Bind.CreateHostPath {
-					binds = append(binds, fmt.Sprintf("%s:%s:%s", m.Source, m.Target, getBindMode(v.Bind, m.ReadOnly)))
-					continue MOUNTS
+				if v.Target == m.Target {
+					switch {
+					case string(m.Type) != v.Type:
+						v.Source = m.Source
+						fallthrough
+					case v.Bind != nil && v.Bind.CreateHostPath:
+						binds = append(binds, v.String())
+						continue MOUNTS
+					}
 				}
 			}
 		}
 		mounts = append(mounts, m)
 	}
 	return volumeMounts, binds, mounts, nil
-}
-
-func getBindMode(bind *types.ServiceVolumeBind, readOnly bool) string {
-	mode := "rw"
-
-	if readOnly {
-		mode = "ro"
-	}
-
-	switch bind.SELinux {
-	case types.SELinuxShared:
-		mode += ",z"
-	case types.SELinuxPrivate:
-		mode += ",Z"
-	}
-
-	return mode
 }
 
 func buildContainerMountOptions(p types.Project, s types.ServiceConfig, img moby.ImageInspect, inherit *moby.Container) ([]mount.Mount, error) {
@@ -911,9 +921,13 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		}
 	}
 
-	bind, vol, tmpfs := buildMountOptions(volume)
+	bind, vol, tmpfs := buildMountOptions(project, volume)
 
 	volume.Target = path.Clean(volume.Target)
+
+	if bind != nil {
+		volume.Type = types.VolumeTypeBind
+	}
 
 	return mount.Mount{
 		Type:          mount.Type(volume.Type),
@@ -927,7 +941,7 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 	}, nil
 }
 
-func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
+func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions) {
 	switch volume.Type {
 	case "bind":
 		if volume.Volume != nil {
@@ -943,6 +957,11 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 		}
 		if volume.Tmpfs != nil {
 			logrus.Warnf("mount of type `volume` should not define `tmpfs` option")
+		}
+		if v, ok := project.Volumes[volume.Source]; ok && v.DriverOpts["o"] == types.VolumeTypeBind {
+			return buildBindOption(&types.ServiceVolumeBind{
+				CreateHostPath: true,
+			}), nil, nil
 		}
 		return nil, buildVolumeOptions(volume.Volume), nil
 	case "tmpfs":
@@ -997,72 +1016,81 @@ func getAliases(s types.ServiceConfig, c *types.ServiceNetworkConfig) []string {
 }
 
 func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfig) error {
-	_, err := s.apiClient().NetworkInspect(ctx, n.Name, moby.NetworkInspectOptions{})
+	// NetworkInspect will match on ID prefix, so NetworkList with a name
+	// filter is used to look for an exact match to prevent e.g. a network
+	// named `db` from getting erroneously matched to a network with an ID
+	// like `db9086999caf`
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", n.Name)),
+	})
 	if err != nil {
-		if errdefs.IsNotFound(err) {
-			if n.External.External {
-				if n.Driver == "overlay" {
-					// Swarm nodes do not register overlay networks that were
-					// created on a different node unless they're in use.
-					// Here we assume `driver` is relevant for a network we don't manage
-					// which is a non-sense, but this is our legacy ¯\(ツ)/¯
-					// networkAttach will later fail anyway if network actually doesn't exists
-					return nil
-				}
-				return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
-			}
-			var ipam *network.IPAM
-			if n.Ipam.Config != nil {
-				var config []network.IPAMConfig
-				for _, pool := range n.Ipam.Config {
-					config = append(config, network.IPAMConfig{
-						Subnet:     pool.Subnet,
-						IPRange:    pool.IPRange,
-						Gateway:    pool.Gateway,
-						AuxAddress: pool.AuxiliaryAddresses,
-					})
-				}
-				ipam = &network.IPAM{
-					Driver: n.Ipam.Driver,
-					Config: config,
-				}
-			}
-			createOpts := moby.NetworkCreate{
-				// TODO NameSpace Labels
-				Labels:     n.Labels,
-				Driver:     n.Driver,
-				Options:    n.DriverOpts,
-				Internal:   n.Internal,
-				Attachable: n.Attachable,
-				IPAM:       ipam,
-				EnableIPv6: n.EnableIPv6,
-			}
-
-			if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
-				createOpts.IPAM = &network.IPAM{}
-			}
-
-			if n.Ipam.Driver != "" {
-				createOpts.IPAM.Driver = n.Ipam.Driver
-			}
-
-			for _, ipamConfig := range n.Ipam.Config {
-				config := network.IPAMConfig{
-					Subnet: ipamConfig.Subnet,
-				}
-				createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
-			}
-			networkEventName := fmt.Sprintf("Network %s", n.Name)
-			w := progress.ContextWriter(ctx)
-			w.Event(progress.CreatingEvent(networkEventName))
-			if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
-				w.Event(progress.ErrorEvent(networkEventName))
-				return errors.Wrapf(err, "failed to create network %s", n.Name)
-			}
-			w.Event(progress.CreatedEvent(networkEventName))
-			return nil
-		}
 		return err
+	}
+	if len(networks) == 0 {
+		if n.External.External {
+			if n.Driver == "overlay" {
+				// Swarm nodes do not register overlay networks that were
+				// created on a different node unless they're in use.
+				// Here we assume `driver` is relevant for a network we don't manage
+				// which is a non-sense, but this is our legacy ¯\(ツ)/¯
+				// networkAttach will later fail anyway if network actually doesn't exists
+				return nil
+			}
+			return fmt.Errorf("network %s declared as external, but could not be found", n.Name)
+		}
+		var ipam *network.IPAM
+		if n.Ipam.Config != nil {
+			var config []network.IPAMConfig
+			for _, pool := range n.Ipam.Config {
+				config = append(config, network.IPAMConfig{
+					Subnet:     pool.Subnet,
+					IPRange:    pool.IPRange,
+					Gateway:    pool.Gateway,
+					AuxAddress: pool.AuxiliaryAddresses,
+				})
+			}
+			ipam = &network.IPAM{
+				Driver: n.Ipam.Driver,
+				Config: config,
+			}
+		}
+		createOpts := moby.NetworkCreate{
+			// TODO NameSpace Labels
+			Labels:     n.Labels,
+			Driver:     n.Driver,
+			Options:    n.DriverOpts,
+			Internal:   n.Internal,
+			Attachable: n.Attachable,
+			IPAM:       ipam,
+			EnableIPv6: n.EnableIPv6,
+		}
+
+		if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 {
+			createOpts.IPAM = &network.IPAM{}
+		}
+
+		if n.Ipam.Driver != "" {
+			createOpts.IPAM.Driver = n.Ipam.Driver
+		}
+
+		for _, ipamConfig := range n.Ipam.Config {
+			config := network.IPAMConfig{
+				Subnet:     ipamConfig.Subnet,
+				IPRange:    ipamConfig.IPRange,
+				Gateway:    ipamConfig.Gateway,
+				AuxAddress: ipamConfig.AuxiliaryAddresses,
+			}
+			createOpts.IPAM.Config = append(createOpts.IPAM.Config, config)
+		}
+		networkEventName := fmt.Sprintf("Network %s", n.Name)
+		w := progress.ContextWriter(ctx)
+		w.Event(progress.CreatingEvent(networkEventName))
+		if _, err := s.apiClient().NetworkCreate(ctx, n.Name, createOpts); err != nil {
+			w.Event(progress.ErrorEvent(networkEventName))
+			return errors.Wrapf(err, "failed to create network %s", n.Name)
+		}
+		w.Event(progress.CreatedEvent(networkEventName))
+		return nil
 	}
 	return nil
 }

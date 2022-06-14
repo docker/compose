@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -30,20 +31,23 @@ import (
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, projectName, options, nil)
+		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	})
 }
 
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
-	if err != nil {
-		return err
-	}
+	project := options.Project
+	if project == nil {
+		var containers Containers
+		containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
+		if err != nil {
+			return err
+		}
 
-	project, err := s.projectFromName(containers, projectName, options.AttachTo...)
-	if err != nil {
-		return err
+		project, err = s.projectFromName(containers, projectName, options.AttachTo...)
+		if err != nil {
+			return err
+		}
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -60,7 +64,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		})
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
+	err := InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err

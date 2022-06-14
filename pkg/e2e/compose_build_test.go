@@ -169,3 +169,36 @@ func TestLocalComposeBuild(t *testing.T) {
 		c.RunDockerCmd("rmi", "custom-nginx")
 	})
 }
+
+func TestBuildSecrets(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("build with secrets", func(t *testing.T) {
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("rmi", "build-test-secret")
+
+		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/secrets", "build")
+		res.Assert(t, icmd.Success)
+	})
+}
+
+func TestBuildTags(t *testing.T) {
+	c := NewParallelE2eCLI(t, binDir)
+
+	t.Run("build with tags", func(t *testing.T) {
+
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError("rmi", "build-test-tags")
+
+		c.RunDockerComposeCmd("--project-directory", "./fixtures/build-test/tags", "build", "--no-cache")
+
+		res := c.RunDockerCmd("image", "inspect", "build-test-tags")
+		expectedOutput := `"RepoTags": [
+            "docker/build-test-tags:1.0.0",
+            "build-test-tags:latest",
+            "other-image-name:v1.0.0"
+        ],
+`
+		res.Assert(t, icmd.Expected{Out: expectedOutput})
+	})
+}

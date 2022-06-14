@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
@@ -28,7 +29,7 @@ import (
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.restart(ctx, projectName, options)
+		return s.restart(ctx, strings.ToLower(projectName), options)
 	})
 }
 

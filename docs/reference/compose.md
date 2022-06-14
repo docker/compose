@@ -44,7 +44,7 @@ Docker Compose
 | `-f`, `--file` | `stringArray` |  | Compose configuration files |
 | `--profile` | `stringArray` |  | Specify a profile to enable |
 | `--project-directory` | `string` |  | Specify an alternate working directory
-(default: the path of the Compose file) |
+(default: the path of the, first specified, Compose file) |
 | `-p`, `--project-name` | `string` |  | Project name |
 
 

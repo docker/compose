@@ -117,4 +117,16 @@ func TestLocalComposeRun(t *testing.T) {
 		res := c.RunDockerCmd("ps", "--all")
 		assert.Assert(t, !strings.Contains(res.Stdout(), "run-test"), res.Stdout())
 	})
+
+	t.Run("run starts only container and dependencies", func(t *testing.T) {
+		// ensure that even if another service is up run does not start it: https://github.com/docker/compose/issues/9459
+		res := c.RunDockerComposeCmd("-f", "./fixtures/run-test/deps.yaml", "up", "service_b")
+		res.Assert(t, icmd.Success)
+
+		res = c.RunDockerComposeCmd("-f", "./fixtures/run-test/deps.yaml", "run", "service_a")
+		assert.Assert(t, strings.Contains(res.Combined(), "shared_dep"), res.Combined())
+		assert.Assert(t, !strings.Contains(res.Combined(), "service_b"), res.Combined())
+
+		c.RunDockerComposeCmd("-f", "./fixtures/run-test/deps.yaml", "down", "--remove-orphans")
+	})
 }

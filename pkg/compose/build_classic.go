@@ -143,17 +143,8 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		return "", err
 	}
 
-	// if up to this point nothing has set the context then we must have another
-	// way for sending it(streaming) and set the context to the Dockerfile
-	if dockerfileCtx != nil && buildCtx == nil {
-		buildCtx = dockerfileCtx
-	}
-
 	progressOutput := streamformatter.NewProgressOutput(progBuff)
-	var body io.Reader
-	if buildCtx != nil {
-		body = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
-	}
+	body := progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 
 	configFile := s.configFile()
 	creds, err := configFile.GetAllCredentials()

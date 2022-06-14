@@ -10,8 +10,8 @@ options:
   value_type: bool
   default_value: "false"
   description: Copy to all the containers of the service.
-  deprecated: false
-  hidden: false
+  deprecated: true
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -40,9 +40,9 @@ options:
   swarm: false
 - option: index
   value_type: int
-  default_value: "1"
+  default_value: "0"
   description: |
-    Index of the container if there are multiple instances of a service [default: 1].
+    Index of the container if there are multiple instances of a service .
   deprecated: false
   hidden: false
   experimental: false

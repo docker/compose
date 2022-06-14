@@ -31,6 +31,7 @@ import (
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
+	"github.com/moby/buildkit/session/secrets/secretsprovider"
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -254,6 +255,30 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		sessionConfig = append(sessionConfig, sshAgentProvider)
 	}
 
+	if len(service.Build.Secrets) > 0 {
+		var sources []secretsprovider.Source
+		for _, secret := range service.Build.Secrets {
+			config := project.Secrets[secret.Source]
+			if config.File == "" {
+				return build.Options{}, fmt.Errorf("build.secrets only supports file-based secrets: %q", secret.Source)
+			}
+			sources = append(sources, secretsprovider.Source{
+				ID:       secret.Source,
+				FilePath: config.File,
+			})
+		}
+		store, err := secretsprovider.NewStore(sources)
+		if err != nil {
+			return build.Options{}, err
+		}
+		p := secretsprovider.NewSecretProvider(store)
+		sessionConfig = append(sessionConfig, p)
+	}
+
+	if len(service.Build.Tags) > 0 {
+		tags = append(tags, service.Build.Tags...)
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
@@ -270,7 +295,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts,
+		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
 	}, nil
 }

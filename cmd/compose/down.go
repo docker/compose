@@ -59,6 +59,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runDown(ctx, backend, opts)
 		}),
+		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
 	flags := downCmd.Flags()
