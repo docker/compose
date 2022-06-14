@@ -140,11 +140,11 @@ SERVICES:
 	}
 
 	return formatter.Print(containers, opts.Format, os.Stdout,
-		writter(containers),
+		writer(containers),
 		"NAME", "COMMAND", "SERVICE", "STATUS", "PORTS")
 }
 
-func writter(containers []api.ContainerSummary) func(w io.Writer) {
+func writer(containers []api.ContainerSummary) func(w io.Writer) {
 	return func(w io.Writer) {
 		for _, container := range containers {
 			ports := displayablePorts(container)

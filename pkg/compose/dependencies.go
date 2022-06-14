@@ -132,7 +132,7 @@ func getParents(v *Vertex) []*Vertex {
 	return v.GetParents()
 }
 
-// GetParents returns a slice with the parent vertexes of the a Vertex
+// GetParents returns a slice with the parent vertices of the a Vertex
 func (v *Vertex) GetParents() []*Vertex {
 	var res []*Vertex
 	for _, p := range v.Parents {
@@ -145,7 +145,7 @@ func getChildren(v *Vertex) []*Vertex {
 	return v.GetChildren()
 }
 
-// GetChildren returns a slice with the child vertexes of the a Vertex
+// GetChildren returns a slice with the child vertices of the a Vertex
 func (v *Vertex) GetChildren() []*Vertex {
 	var res []*Vertex
 	for _, p := range v.Children {
@@ -194,7 +194,7 @@ func (g *Graph) AddVertex(key string, service string, initialStatus ServiceStatu
 	g.Vertices[key] = v
 }
 
-// AddEdge adds a relationship of dependency between vertexes `source` and `destination`
+// AddEdge adds a relationship of dependency between vertices `source` and `destination`
 func (g *Graph) AddEdge(source string, destination string) error {
 	g.lock.Lock()
 	defer g.lock.Unlock()
