@@ -284,7 +284,7 @@ func Lines(output string) []string {
 }
 
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.
-// In the case of an error or the response status is not the expeted one, it retries the same request,
+// In the case of an error or the response status is not the expected one, it retries the same request,
 // returning the response body as a string (empty if we could not reach it)
 func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDelay time.Duration, timeout time.Duration) string {
 	var (
