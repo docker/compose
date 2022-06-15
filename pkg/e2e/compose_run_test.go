@@ -108,7 +108,7 @@ func TestLocalComposeRun(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
 		assert.Assert(t, strings.Contains(res.Combined(), "orphan"))
 
-		cmd := c.NewDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "run", "back", "echo", "Hello")
 		res = icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
 			cmd.Env = append(cmd.Env, "COMPOSE_IGNORE_ORPHANS=True")
 		})
@@ -116,7 +116,7 @@ func TestLocalComposeRun(t *testing.T) {
 	})
 
 	t.Run("down", func(t *testing.T) {
-		cmd := c.NewDockerCmd("compose", "-f", "./fixtures/run-test/compose.yaml", "down")
+		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/run-test/compose.yaml", "down")
 		icmd.RunCmd(cmd, func(c *icmd.Cmd) {
 			c.Env = append(c.Env, "COMPOSE_REMOVE_ORPHANS=True")
 		})

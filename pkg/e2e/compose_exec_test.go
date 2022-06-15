@@ -43,7 +43,7 @@ func TestLocalComposeExec(t *testing.T) {
 	})
 
 	t.Run("exec with env set", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerCmd("exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env"),
+		res := icmd.RunCmd(c.NewDockerCmd(t, "exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env"),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "FOO=BAR")
 			})

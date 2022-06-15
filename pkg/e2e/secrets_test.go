@@ -26,7 +26,7 @@ func TestSecretFromEnv(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("compose run", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerCmd("compose", "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),
+		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "SECRET=BAR")
 			})

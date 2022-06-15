@@ -150,7 +150,7 @@ func TestNetworkModes(t *testing.T) {
 	const projectName = "network_mode_service_run"
 
 	t.Run("run with service mode dependency", func(t *testing.T) {
-		res := c.RunDockerOrExitError(t, "compose", "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
 		res.Assert(t, icmd.Expected{Out: "success"})
 
 	})

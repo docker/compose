@@ -28,7 +28,7 @@ func TestDown(t *testing.T) {
 	const projectName = "e2e-down"
 
 	t.Run("no resource to remove", func(t *testing.T) {
-		res := c.RunDockerOrExitError(t, "compose", "--project-name", projectName, "down")
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 		res.Assert(t, icmd.Expected{ExitCode: 0, Err: `No resource found to remove for project "e2e-down"`})
 	})
 }
