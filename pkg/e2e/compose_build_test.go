@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -81,11 +80,6 @@ func TestLocalComposeBuild(t *testing.T) {
 	})
 
 	t.Run("build failed with ssh default value", func(t *testing.T) {
-		//unset SSH_AUTH_SOCK to be sure we don't have a default value for the SSH Agent
-		defaultSSHAUTHSOCK := os.Getenv("SSH_AUTH_SOCK")
-		os.Unsetenv("SSH_AUTH_SOCK")                         //nolint:errcheck
-		defer os.Setenv("SSH_AUTH_SOCK", defaultSSHAUTHSOCK) //nolint:errcheck
-
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--ssh", "")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,

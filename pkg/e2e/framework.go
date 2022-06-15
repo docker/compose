@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
@@ -154,28 +155,29 @@ func CopyFile(sourceFile string, destinationFile string) error {
 	return err
 }
 
+// BaseEnvironment provides the minimal environment variables used across all
+// Docker / Compose commands.
+func (c *CLI) BaseEnvironment() []string {
+	return []string{
+		"DOCKER_CONFIG=" + c.ConfigDir,
+		"KUBECONFIG=invalid",
+	}
+}
+
 // NewCmd creates a cmd object configured with the test environment set
 func (c *CLI) NewCmd(command string, args ...string) icmd.Cmd {
-	env := append(os.Environ(),
-		"DOCKER_CONFIG="+c.ConfigDir,
-		"KUBECONFIG=invalid",
-	)
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
-		Env:     env,
+		Env:     c.BaseEnvironment(),
 	}
 }
 
 // NewCmdWithEnv creates a cmd object configured with the test environment set with additional env vars
 func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) icmd.Cmd {
-	env := append(os.Environ(),
-		append(envvars,
-			"DOCKER_CONFIG="+c.ConfigDir,
-			"KUBECONFIG=invalid")...,
-	)
+	cmdEnv := append(c.BaseEnvironment(), envvars...)
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
-		Env:     env,
+		Env:     cmdEnv,
 	}
 }
 
@@ -234,13 +236,34 @@ func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
 func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
+	return icmd.RunCmd(c.NewDockerComposeCmd(t, args...))
+}
+
+// NewDockerComposeCmd creates a command object for Compose, either in plugin
+// or standalone mode (based on build tags).
+func (c *CLI) NewDockerComposeCmd(t testing.TB, args ...string) icmd.Cmd {
+	t.Helper()
 	if composeStandaloneMode {
-		composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
-		assert.NilError(t, err)
-		return icmd.RunCmd(c.NewCmd(composeBinary, args...))
+		return c.NewCmd(ComposeStandalonePath(t), args...)
 	}
 	args = append([]string{"compose"}, args...)
-	return icmd.RunCmd(c.NewCmd(DockerExecutableName, args...))
+	return c.NewCmd(DockerExecutableName, args...)
+}
+
+// ComposeStandalonePath returns the path to the locally-built Compose
+// standalone binary from the repo.
+//
+// This function will fail the test immediately if invoked when not running
+// in standalone test mode.
+func ComposeStandalonePath(t testing.TB) string {
+	t.Helper()
+	if !composeStandaloneMode {
+		require.Fail(t, "Not running in standalone mode")
+	}
+	composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
+	require.NoError(t, err, "Could not find standalone Compose binary (%q)",
+		DockerComposeExecutableName)
+	return composeBinary
 }
 
 // StdoutContains returns a predicate on command result expecting a string in stdout
