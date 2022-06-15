@@ -228,14 +228,19 @@ func (c *CLI) MetricsSocket() string {
 }
 
 // NewDockerCmd creates a docker cmd without running it
-func (c *CLI) NewDockerCmd(args ...string) icmd.Cmd {
+func (c *CLI) NewDockerCmd(t testing.TB, args ...string) icmd.Cmd {
+	for _, arg := range args {
+		if arg == compose.PluginName {
+			t.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
+		}
+	}
 	return c.NewCmd(DockerExecutableName, args...)
 }
 
 // RunDockerOrExitError runs a docker command and returns a result
 func (c *CLI) RunDockerOrExitError(t testing.TB, args ...string) *icmd.Result {
 	fmt.Printf("\t[%s] docker %s\n", t.Name(), strings.Join(args, " "))
-	return icmd.RunCmd(c.NewDockerCmd(args...))
+	return icmd.RunCmd(c.NewDockerCmd(t, args...))
 }
 
 // RunCmd runs a command, expects no error and returns a result
@@ -260,9 +265,6 @@ func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) *icmd.Result
 
 // RunDockerCmd runs a docker command, expects no error and returns a result
 func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
-	if len(args) > 0 && args[0] == compose.PluginName {
-		t.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
-	}
 	res := c.RunDockerOrExitError(t, args...)
 	res.Assert(t, icmd.Success)
 	return res

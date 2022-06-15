@@ -88,7 +88,7 @@ func TestLocalComposeUp(t *testing.T) {
 	})
 
 	t.Run("check healthcheck output", func(t *testing.T) {
-		c.WaitForCmdResult(t, c.NewDockerCmd("compose", "-p", projectName, "ps", "--format", "json"),
+		c.WaitForCmdResult(t, c.NewDockerComposeCmd(t, "-p", projectName, "ps", "--format", "json"),
 			StdoutContains(`"Name":"compose-e2e-demo-web-1","Command":"/dispatcher","Project":"compose-e2e-demo","Service":"web","State":"running","Health":"healthy"`),
 			5*time.Second, 1*time.Second)
 
@@ -123,7 +123,7 @@ func TestLocalComposeUp(t *testing.T) {
 func TestComposePull(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	res := c.RunDockerOrExitError(t, "compose", "--project-directory", "fixtures/simple-composefile", "pull")
+	res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/simple-composefile", "pull")
 	output := res.Combined()
 
 	assert.Assert(t, strings.Contains(output, "simple Pulled"))
@@ -148,9 +148,9 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 func TestAttachRestart(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	cmd := c.NewDockerCmd("compose", "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
+	cmd := c.NewDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
 	res := icmd.StartCmd(cmd)
-	defer c.RunDockerOrExitError(t, "compose", "-p", "attach-restart", "down")
+	defer c.RunDockerComposeCmd(t, "-p", "attach-restart", "down")
 
 	c.WaitForCondition(t, func() (bool, string) {
 		debug := res.Combined()
@@ -165,8 +165,8 @@ func TestAttachRestart(t *testing.T) {
 func TestInitContainer(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	res := c.RunDockerOrExitError(t, "compose", "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
-	defer c.RunDockerOrExitError(t, "compose", "-p", "init-container", "down")
+	res := c.RunDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/init-container", "up")
+	defer c.RunDockerComposeCmd(t, "-p", "init-container", "down")
 	testify.Regexp(t, "foo-1  | hello(?m:.*)bar-1  | world", res.Stdout())
 }
 

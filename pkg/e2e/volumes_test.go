@@ -75,13 +75,13 @@ func TestLocalComposeVolume(t *testing.T) {
 
 	t.Run("should inherit anonymous volumes", func(t *testing.T) {
 		c.RunDockerOrExitError(t, "exec", "compose-e2e-volume-nginx2-1", "touch", "/usr/src/app/node_modules/test")
-		c.RunDockerOrExitError(t, "compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "-d")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "-d")
 		c.RunDockerOrExitError(t, "exec", "compose-e2e-volume-nginx2-1", "ls", "/usr/src/app/node_modules/test")
 	})
 
 	t.Run("should renew anonymous volumes", func(t *testing.T) {
 		c.RunDockerOrExitError(t, "exec", "compose-e2e-volume-nginx2-1", "touch", "/usr/src/app/node_modules/test")
-		c.RunDockerOrExitError(t, "compose", "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "--renew-anon-volumes", "-d")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up", "--force-recreate", "--renew-anon-volumes", "-d")
 		c.RunDockerOrExitError(t, "exec", "compose-e2e-volume-nginx2-1", "ls", "/usr/src/app/node_modules/test")
 	})
 
