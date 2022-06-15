@@ -23,7 +23,7 @@ import (
 )
 
 func TestSecretFromEnv(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	t.Run("compose run", func(t *testing.T) {
 		res := icmd.RunCmd(c.NewDockerCmd("compose", "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),

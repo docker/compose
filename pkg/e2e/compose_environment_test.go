@@ -26,13 +26,13 @@ import (
 )
 
 func TestEnvPriority(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	projectDir := "./fixtures/environment/env-priority"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "env-compose-priority")
-		c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
+		c.RunDockerOrExitError(t, "rmi", "env-compose-priority")
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
 			"--project-directory", projectDir, "up", "-d", "--build")
 	})
 
@@ -46,7 +46,7 @@ func TestEnvPriority(t *testing.T) {
 		os.Setenv("WHEREAMI", "shell") //nolint:errcheck
 		defer os.Unsetenv("WHEREAMI")  //nolint:errcheck
 
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
 			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override",
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 
@@ -63,7 +63,7 @@ func TestEnvPriority(t *testing.T) {
 		os.Setenv("WHEREAMI", "shell") //nolint:errcheck
 		defer os.Unsetenv("WHEREAMI")  //nolint:errcheck
 
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose.yaml",
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml",
 			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override",
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
@@ -76,9 +76,9 @@ func TestEnvPriority(t *testing.T) {
 	// 4. Dockerfile
 	// 5. Variable is not defined
 	t.Run("shell priority from run command", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose.yaml",
-			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override",
-			"run", "--rm", "-e", "WHEREAMI=shell-run", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
+			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
+			"WHEREAMI=shell-run", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell-run")
 	})
 
@@ -89,9 +89,9 @@ func TestEnvPriority(t *testing.T) {
 	// 4. Dockerfile
 	// 5. Variable is not defined
 	t.Run("override env file", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose.yaml",
-			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override",
-			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
+			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
+			"WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
 	})
 
@@ -102,8 +102,8 @@ func TestEnvPriority(t *testing.T) {
 	// 4. Dockerfile
 	// 5. Variable is not defined
 	t.Run("env file", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose.yaml",
-			"--project-directory", projectDir, "run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
+			projectDir, "run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Env File")
 	})
 
@@ -114,19 +114,19 @@ func TestEnvPriority(t *testing.T) {
 	// 4. Dockerfile   <-- Result expected
 	// 5. Variable is not defined
 	t.Run("use Dockerfile", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-priority/compose.yaml",
-			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.empty",
-			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
+			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.empty", "run", "--rm", "-e", "WHEREAMI",
+			"env-compose-priority")
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Dockerfile")
 	})
 
 	t.Run("down", func(t *testing.T) {
-		c.RunDockerComposeCmd("--project-directory", projectDir, "down")
+		c.RunDockerComposeCmd(t, "--project-directory", projectDir, "down")
 	})
 }
 
 func TestEnvInterpolation(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	projectDir := "./fixtures/environment/env-interpolation"
 
@@ -139,7 +139,7 @@ func TestEnvInterpolation(t *testing.T) {
 	t.Run("shell priority from run command", func(t *testing.T) {
 		os.Setenv("WHEREAMI", "shell") //nolint:errcheck
 		defer os.Unsetenv("WHEREAMI")  //nolint:errcheck
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-interpolation/compose.yaml",
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation/compose.yaml",
 			"--project-directory", projectDir, "config")
 
 		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:shell`})
@@ -147,23 +147,22 @@ func TestEnvInterpolation(t *testing.T) {
 }
 
 func TestCommentsInEnvFile(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	projectDir := "./fixtures/environment/env-file-comments"
 
 	t.Run("comments in env files", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "env-file-comments")
+		c.RunDockerOrExitError(t, "rmi", "env-file-comments")
 
-		c.RunDockerComposeCmd("-f", "./fixtures/environment/env-file-comments/compose.yaml",
-			"--project-directory", projectDir, "up", "-d", "--build")
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-file-comments/compose.yaml", "--project-directory",
+			projectDir, "up", "-d", "--build")
 
-		res := c.RunDockerComposeCmd("-f", "./fixtures/environment/env-file-comments/compose.yaml",
-			"--project-directory", projectDir, "run", "--rm",
-			"-e", "COMMENT", "-e", "NO_COMMENT", "env-file-comments")
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/environment/env-file-comments/compose.yaml",
+			"--project-directory", projectDir, "run", "--rm", "-e", "COMMENT", "-e", "NO_COMMENT", "env-file-comments")
 
 		res.Assert(t, icmd.Expected{Out: `COMMENT=1234`})
 		res.Assert(t, icmd.Expected{Out: `NO_COMMENT=1234#5`})
 
-		c.RunDockerComposeCmd("--project-directory", projectDir, "down", "--rmi", "all")
+		c.RunDockerComposeCmd(t, "--project-directory", projectDir, "down", "--rmi", "all")
 	})
 }

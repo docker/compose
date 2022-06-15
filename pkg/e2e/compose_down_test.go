@@ -23,12 +23,12 @@ import (
 )
 
 func TestDown(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	const projectName = "e2e-down"
 
 	t.Run("no resource to remove", func(t *testing.T) {
-		res := c.RunDockerOrExitError("compose", "--project-name", projectName, "down")
+		res := c.RunDockerOrExitError(t, "compose", "--project-name", projectName, "down")
 		res.Assert(t, icmd.Expected{ExitCode: 0, Err: `No resource found to remove for project "e2e-down"`})
 	})
 }
