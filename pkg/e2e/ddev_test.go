@@ -38,7 +38,7 @@ func TestComposeRunDdev(t *testing.T) {
 	}
 	_ = os.Setenv("DDEV_DEBUG", "true")
 
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 	dir, err := os.MkdirTemp("", t.Name()+"-")
 	assert.NilError(t, err)
 
@@ -48,8 +48,8 @@ func TestComposeRunDdev(t *testing.T) {
 	siteName := filepath.Base(dir)
 
 	t.Cleanup(func() {
-		_ = c.RunCmdInDir(dir, "./ddev", "delete", "-Oy")
-		_ = c.RunCmdInDir(dir, "./ddev", "poweroff")
+		_ = c.RunCmdInDir(t, dir, "./ddev", "delete", "-Oy")
+		_ = c.RunCmdInDir(t, dir, "./ddev", "poweroff")
 		_ = os.RemoveAll(dir)
 	})
 
@@ -59,28 +59,28 @@ func TestComposeRunDdev(t *testing.T) {
 	}
 
 	compressedFilename := fmt.Sprintf("ddev_%s-%s.%s.tar.gz", osName, runtime.GOARCH, ddevVersion)
-	c.RunCmdInDir(dir, "curl", "-LO",
+	c.RunCmdInDir(t, dir, "curl", "-LO",
 		fmt.Sprintf("https://github.com/drud/ddev/releases/download/%s/%s",
 			ddevVersion,
 			compressedFilename))
 
-	c.RunCmdInDir(dir, "tar", "-xzf", compressedFilename)
+	c.RunCmdInDir(t, dir, "tar", "-xzf", compressedFilename)
 
 	// Create a simple index.php we can test against.
-	c.RunCmdInDir(dir, "sh", "-c", "echo '<?php\nprint \"ddev is working\";' >index.php")
+	c.RunCmdInDir(t, dir, "sh", "-c", "echo '<?php\nprint \"ddev is working\";' >index.php")
 
-	c.RunCmdInDir(dir, "./ddev", "config", "--auto")
-	c.RunCmdInDir(dir, "./ddev", "config", "global", "--use-docker-compose-from-path")
-	vRes := c.RunCmdInDir(dir, "./ddev", "version")
+	c.RunCmdInDir(t, dir, "./ddev", "config", "--auto")
+	c.RunCmdInDir(t, dir, "./ddev", "config", "global", "--use-docker-compose-from-path")
+	vRes := c.RunCmdInDir(t, dir, "./ddev", "version")
 	out := vRes.Stdout()
 	fmt.Printf("ddev version: %s\n", out)
 
-	c.RunCmdInDir(dir, "./ddev", "poweroff")
+	c.RunCmdInDir(t, dir, "./ddev", "poweroff")
 
-	c.RunCmdInDir(dir, "./ddev", "start", "-y")
+	c.RunCmdInDir(t, dir, "./ddev", "start", "-y")
 
-	curlRes := c.RunCmdInDir(dir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
+	curlRes := c.RunCmdInDir(t, dir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
 	out = curlRes.Stdout()
 	fmt.Println(out)
-	assert.Assert(c.test, strings.Contains(out, "ddev is working"), "Could not start project")
+	assert.Assert(t, strings.Contains(out, "ddev is working"), "Could not start project")
 }

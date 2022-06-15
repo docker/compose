@@ -25,39 +25,40 @@ import (
 )
 
 func TestIPC(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	const projectName = "ipc_e2e"
 	var cid string
 	t.Run("create ipc mode container", func(t *testing.T) {
-		res := c.RunDockerCmd("run", "-d", "--rm", "--ipc=shareable", "--name", "ipc_mode_container", "alpine", "top")
+		res := c.RunDockerCmd(t, "run", "-d", "--rm", "--ipc=shareable", "--name", "ipc_mode_container", "alpine",
+			"top")
 		cid = strings.Trim(res.Stdout(), "\n")
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd("-f", "./fixtures/ipc-test/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/ipc-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("-p", projectName, "ps")
+		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `shareable`})
 	})
 
 	t.Run("check ipcmode in container inspect", func(t *testing.T) {
-		res := c.RunDockerCmd("inspect", projectName+"-shareable-1")
+		res := c.RunDockerCmd(t, "inspect", projectName+"-shareable-1")
 		res.Assert(t, icmd.Expected{Out: `"IpcMode": "shareable",`})
 
-		res = c.RunDockerCmd("inspect", projectName+"-service-1")
+		res = c.RunDockerCmd(t, "inspect", projectName+"-service-1")
 		res.Assert(t, icmd.Expected{Out: `"IpcMode": "container:`})
 
-		res = c.RunDockerCmd("inspect", projectName+"-container-1")
+		res = c.RunDockerCmd(t, "inspect", projectName+"-container-1")
 		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`"IpcMode": "container:%s",`, cid)})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 	t.Run("remove ipc mode container", func(t *testing.T) {
-		_ = c.RunDockerCmd("rm", "-f", "ipc_mode_container")
+		_ = c.RunDockerCmd(t, "rm", "-f", "ipc_mode_container")
 	})
 }
