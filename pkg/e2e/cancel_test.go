@@ -41,7 +41,8 @@ func TestComposeCancel(t *testing.T) {
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
-		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerCmd("compose", "-f", buildProjectPath, "build", "--progress", "plain"))
+		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build",
+			"--progress", "plain"))
 		assert.NilError(t, err)
 
 		c.WaitForCondition(t, func() (bool, string) {

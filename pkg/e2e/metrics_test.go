@@ -27,29 +27,29 @@ func TestComposeMetrics(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("catch specific failure metrics", func(t *testing.T) {
-		res := c.RunDockerOrExitError(t, "compose", "-f", "fixtures/does-not-exist/compose.yaml", "build")
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/does-not-exist/compose.yaml", "build")
 		expectedErr := "fixtures/does-not-exist/compose.yaml: no such file or directory"
 		if runtime.GOOS == "windows" {
 			expectedErr = "does-not-exist\\compose.yaml: The system cannot find the path specified"
 		}
 		res.Assert(t, icmd.Expected{ExitCode: 14, Err: expectedErr})
-		res = c.RunDockerOrExitError(t, "compose", "-f", "fixtures/wrong-composefile/compose.yaml", "up", "-d")
+		res = c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/wrong-composefile/compose.yaml", "up", "-d")
 		res.Assert(t, icmd.Expected{ExitCode: 15, Err: "services.simple Additional property wrongField is not allowed"})
-		res = c.RunDockerOrExitError(t, "compose", "up")
+		res = c.RunDockerComposeCmdNoCheck(t, "up")
 		res.Assert(t, icmd.Expected{ExitCode: 14, Err: "no configuration file provided: not found"})
-		res = c.RunDockerOrExitError(t, "compose", "up", "-f", "fixtures/wrong-composefile/compose.yaml")
+		res = c.RunDockerComposeCmdNoCheck(t, "up", "-f", "fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown shorthand flag: 'f' in -f"})
-		res = c.RunDockerOrExitError(t, "compose", "up", "--file", "fixtures/wrong-composefile/compose.yaml")
+		res = c.RunDockerComposeCmdNoCheck(t, "up", "--file", "fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: "unknown flag: --file"})
-		res = c.RunDockerOrExitError(t, "compose", "donw", "--file", "fixtures/wrong-composefile/compose.yaml")
+		res = c.RunDockerComposeCmdNoCheck(t, "donw", "--file", "fixtures/wrong-composefile/compose.yaml")
 		res.Assert(t, icmd.Expected{ExitCode: 16, Err: `unknown docker command: "compose donw"`})
-		res = c.RunDockerOrExitError(t, "compose", "--file", "fixtures/wrong-composefile/build-error.yml", "build")
+		res = c.RunDockerComposeCmdNoCheck(t, "--file", "fixtures/wrong-composefile/build-error.yml", "build")
 		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `line 17: unknown instruction: WRONG`})
-		res = c.RunDockerOrExitError(t, "compose", "--file", "fixtures/wrong-composefile/build-error.yml", "up")
+		res = c.RunDockerComposeCmdNoCheck(t, "--file", "fixtures/wrong-composefile/build-error.yml", "up")
 		res.Assert(t, icmd.Expected{ExitCode: 17, Err: `line 17: unknown instruction: WRONG`})
-		res = c.RunDockerOrExitError(t, "compose", "--file", "fixtures/wrong-composefile/unknown-image.yml", "pull")
+		res = c.RunDockerComposeCmdNoCheck(t, "--file", "fixtures/wrong-composefile/unknown-image.yml", "pull")
 		res.Assert(t, icmd.Expected{ExitCode: 18, Err: `pull access denied for unknownimage, repository does not exist or may require 'docker login'`})
-		res = c.RunDockerOrExitError(t, "compose", "--file", "fixtures/wrong-composefile/unknown-image.yml", "up")
+		res = c.RunDockerComposeCmdNoCheck(t, "--file", "fixtures/wrong-composefile/unknown-image.yml", "up")
 		res.Assert(t, icmd.Expected{ExitCode: 18, Err: `pull access denied for unknownimage, repository does not exist or may require 'docker login'`})
 	})
 }
