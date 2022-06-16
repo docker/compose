@@ -110,36 +110,31 @@ func WithEnv(env ...string) CLIOption {
 
 // initializePlugins copies the necessary plugin files to the temporary config
 // directory for the test.
-func initializePlugins(t testing.TB, d string) {
+func initializePlugins(t testing.TB, configDir string) {
 	t.Helper()
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			conf, _ := ioutil.ReadFile(filepath.Join(d, "config.json"))
-			t.Errorf("Config: %s\n", string(conf))
-			t.Error("Contents of config dir:")
-			for _, p := range dirContents(d) {
-				t.Errorf(p)
+			if conf, err := ioutil.ReadFile(filepath.Join(configDir, "config.json")); err == nil {
+				t.Logf("Config: %s\n", string(conf))
+			}
+			t.Log("Contents of config dir:")
+			for _, p := range dirContents(configDir) {
+				t.Logf("  - %s", p)
 			}
 		}
-		_ = os.RemoveAll(d)
 	})
 
-	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
+	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0755),
+		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 	if os.IsNotExist(err) {
-		fmt.Println("WARNING: docker-compose cli-plugin not found")
+		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
 	if err == nil {
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerComposeExecutableName))
-		if err != nil {
-			panic(err)
-		}
+		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerComposeExecutableName))
 		// We don't need a functional scan plugin, but a valid plugin binary
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerScanExecutableName))
-		if err != nil {
-			panic(err)
-		}
+		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
 	}
 }
 
@@ -170,26 +165,21 @@ func findExecutable(executableName string, paths []string) (string, error) {
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
-func CopyFile(sourceFile string, destinationFile string) error {
+func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
+	t.Helper()
+
 	src, err := os.Open(sourceFile)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err, "Failed to open source file: %s")
 	// nolint: errcheck
 	defer src.Close()
 
 	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
 	// nolint: errcheck
 	defer dst.Close()
 
-	if _, err = io.Copy(dst, src); err != nil {
-		return err
-	}
-
-	return err
+	_, err = io.Copy(dst, src)
+	require.NoError(t, err, "Failed to copy file: %s", sourceFile)
 }
 
 // BaseEnvironment provides the minimal environment variables used across all
@@ -229,6 +219,7 @@ func (c *CLI) MetricsSocket() string {
 
 // NewDockerCmd creates a docker cmd without running it
 func (c *CLI) NewDockerCmd(t testing.TB, args ...string) icmd.Cmd {
+	t.Helper()
 	for _, arg := range args {
 		if arg == compose.PluginName {
 			t.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
@@ -239,13 +230,15 @@ func (c *CLI) NewDockerCmd(t testing.TB, args ...string) icmd.Cmd {
 
 // RunDockerOrExitError runs a docker command and returns a result
 func (c *CLI) RunDockerOrExitError(t testing.TB, args ...string) *icmd.Result {
-	fmt.Printf("\t[%s] docker %s\n", t.Name(), strings.Join(args, " "))
+	t.Helper()
+	t.Logf("\t[%s] docker %s\n", t.Name(), strings.Join(args, " "))
 	return icmd.RunCmd(c.NewDockerCmd(t, args...))
 }
 
 // RunCmd runs a command, expects no error and returns a result
 func (c *CLI) RunCmd(t testing.TB, args ...string) *icmd.Result {
-	fmt.Printf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
+	t.Helper()
+	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
 	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
 	res := icmd.RunCmd(c.NewCmd(args[0], args[1:]...))
 	res.Assert(t, icmd.Success)
@@ -254,7 +247,8 @@ func (c *CLI) RunCmd(t testing.TB, args ...string) *icmd.Result {
 
 // RunCmdInDir runs a command in a given dir, expects no error and returns a result
 func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) *icmd.Result {
-	fmt.Printf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
+	t.Helper()
+	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
 	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
 	cmd := c.NewCmd(args[0], args[1:]...)
 	cmd.Dir = dir
@@ -265,6 +259,7 @@ func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) *icmd.Result
 
 // RunDockerCmd runs a docker command, expects no error and returns a result
 func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
 	res := c.RunDockerOrExitError(t, args...)
 	res.Assert(t, icmd.Success)
 	return res
@@ -272,6 +267,7 @@ func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
 
 // RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
 func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
 	res := c.RunDockerComposeCmdNoCheck(t, args...)
 	res.Assert(t, icmd.Success)
 	return res
@@ -279,6 +275,7 @@ func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
 
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
 func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
 	return icmd.RunCmd(c.NewDockerComposeCmd(t, args...))
 }
 
@@ -317,7 +314,14 @@ func StdoutContains(expected string) func(*icmd.Result) bool {
 }
 
 // WaitForCmdResult try to execute a cmd until resulting output matches given predicate
-func (c *CLI) WaitForCmdResult(t testing.TB, command icmd.Cmd, predicate func(*icmd.Result) bool, timeout time.Duration, delay time.Duration) {
+func (c *CLI) WaitForCmdResult(
+	t testing.TB,
+	command icmd.Cmd,
+	predicate func(*icmd.Result) bool,
+	timeout time.Duration,
+	delay time.Duration,
+) {
+	t.Helper()
 	assert.Assert(t, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
 	var res *icmd.Result
 	checkStopped := func(logt poll.LogT) poll.Result {
@@ -332,7 +336,13 @@ func (c *CLI) WaitForCmdResult(t testing.TB, command icmd.Cmd, predicate func(*i
 }
 
 // WaitForCondition wait for predicate to execute to true
-func (c *CLI) WaitForCondition(t testing.TB, predicate func() (bool, string), timeout time.Duration, delay time.Duration) {
+func (c *CLI) WaitForCondition(
+	t testing.TB,
+	predicate func() (bool, string),
+	timeout time.Duration,
+	delay time.Duration,
+) {
+	t.Helper()
 	checkStopped := func(logt poll.LogT) poll.Result {
 		pass, description := predicate()
 		if !pass {
@@ -351,7 +361,14 @@ func Lines(output string) []string {
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.
 // In the case of an error or the response status is not the expected one, it retries the same request,
 // returning the response body as a string (empty if we could not reach it)
-func HTTPGetWithRetry(t testing.TB, endpoint string, expectedStatus int, retryDelay time.Duration, timeout time.Duration) string {
+func HTTPGetWithRetry(
+	t testing.TB,
+	endpoint string,
+	expectedStatus int,
+	retryDelay time.Duration,
+	timeout time.Duration,
+) string {
+	t.Helper()
 	var (
 		r   *http.Response
 		err error
