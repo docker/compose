@@ -28,3 +28,15 @@ the image is tagged with that name, substituting any variables beforehand. See
 
 If you change a service's `Dockerfile` or the contents of its build directory,
 run `docker compose build` to rebuild it.
+
+### Native build using the docker CLI
+
+Compose by default uses the `docker` CLI to perform builds (also known as "native
+build"). By using the `docker` CLI, Compose can take advantage of features such
+as [BuildKit](../../develop/develop-images/build_enhancements.md), which are not
+supported by Compose itself. BuildKit is enabled by default on Docker Desktop,
+but requires the `DOCKER_BUILDKIT=1` environment variable to be set on other
+platforms.
+
+Refer to the [Compose CLI environment variables](envvars.md#compose_docker_cli_build)
+section to learn how to switch between "native build" and "compose build".
