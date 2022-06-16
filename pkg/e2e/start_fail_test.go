@@ -23,11 +23,11 @@ import (
 )
 
 func TestStartFail(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 	const projectName = "e2e-start-fail"
 
-	res := c.RunDockerOrExitError("compose", "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
+	res := c.RunDockerOrExitError(t, "compose", "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
 
-	c.RunDockerComposeCmd("--project-name", projectName, "down")
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 }

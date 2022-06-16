@@ -28,55 +28,55 @@ import (
 )
 
 func TestLocalComposeBuild(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	t.Run("build named and unnamed images", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "build-test_nginx")
-		c.RunDockerOrExitError("rmi", "custom-nginx")
+		c.RunDockerOrExitError(t, "rmi", "build-test_nginx")
+		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
 
-		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "build")
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build")
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		c.RunDockerCmd("image", "inspect", "build-test_nginx")
-		c.RunDockerCmd("image", "inspect", "custom-nginx")
+		c.RunDockerCmd(t, "image", "inspect", "build-test_nginx")
+		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
 	})
 
 	t.Run("build with build-arg", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "build-test_nginx")
-		c.RunDockerOrExitError("rmi", "custom-nginx")
+		c.RunDockerOrExitError(t, "rmi", "build-test_nginx")
+		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
 
-		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO=BAR")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO=BAR")
 
-		res := c.RunDockerCmd("image", "inspect", "build-test_nginx")
+		res := c.RunDockerCmd(t, "image", "inspect", "build-test_nginx")
 		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
 	})
 
 	t.Run("build with build-arg set by env", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "build-test_nginx")
-		c.RunDockerOrExitError("rmi", "custom-nginx")
+		c.RunDockerOrExitError(t, "rmi", "build-test_nginx")
+		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
 
 		icmd.RunCmd(c.NewDockerCmd("compose", "--project-directory", "fixtures/build-test", "build", "--build-arg", "FOO"),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "FOO=BAR")
 			})
 
-		res := c.RunDockerCmd("image", "inspect", "build-test_nginx")
+		res := c.RunDockerCmd(t, "image", "inspect", "build-test_nginx")
 		res.Assert(t, icmd.Expected{Out: `"FOO": "BAR"`})
 	})
 
 	t.Run("build with multiple build-args ", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "-f", "multi-args_multiargs")
+		c.RunDockerOrExitError(t, "rmi", "-f", "multi-args_multiargs")
 		cmd := c.NewDockerCmd("compose", "--project-directory", "fixtures/build-test/multi-args", "build")
 
 		icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
 			cmd.Env = append(cmd.Env, "DOCKER_BUILDKIT=0")
 		})
 
-		res := c.RunDockerCmd("image", "inspect", "multi-args_multiargs")
+		res := c.RunDockerCmd(t, "image", "inspect", "multi-args_multiargs")
 		res.Assert(t, icmd.Expected{Out: `"RESULT": "SUCCESS"`})
 	})
 
@@ -86,7 +86,7 @@ func TestLocalComposeBuild(t *testing.T) {
 		os.Unsetenv("SSH_AUTH_SOCK")                         //nolint:errcheck
 		defer os.Setenv("SSH_AUTH_SOCK", defaultSSHAUTHSOCK) //nolint:errcheck
 
-		res := c.RunDockerComposeCmdNoCheck("--project-directory", "fixtures/build-test", "build", "--ssh", "")
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--ssh", "")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
 			Err:      "invalid empty ssh agent socket: make sure SSH_AUTH_SOCK is set",
@@ -95,24 +95,24 @@ func TestLocalComposeBuild(t *testing.T) {
 	})
 
 	t.Run("build succeed with ssh from Compose file", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "build-test-ssh")
+		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
 
-		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "build")
-		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/ssh", "build")
+		c.RunDockerCmd(t, "image", "inspect", "build-test-ssh")
 	})
 
 	t.Run("build succeed with ssh from CLI", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "build-test-ssh")
+		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
 
-		c.RunDockerComposeCmd("-f", "fixtures/build-test/ssh/compose-without-ssh.yaml", "--project-directory",
+		c.RunDockerComposeCmd(t, "-f", "fixtures/build-test/ssh/compose-without-ssh.yaml", "--project-directory",
 			"fixtures/build-test/ssh", "build", "--no-cache", "--ssh", "fake-ssh=./fixtures/build-test/ssh/fake_rsa")
-		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+		c.RunDockerCmd(t, "image", "inspect", "build-test-ssh")
 	})
 
 	t.Run("build failed with wrong ssh key id from CLI", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "build-test-ssh")
+		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
 
-		res := c.RunDockerComposeCmdNoCheck("-f", "fixtures/build-test/ssh/compose-without-ssh.yaml",
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/build-test/ssh/compose-without-ssh.yaml",
 			"--project-directory", "fixtures/build-test/ssh", "build", "--no-cache", "--ssh",
 			"wrong-ssh=./fixtures/build-test/ssh/fake_rsa")
 		res.Assert(t, icmd.Expected{
@@ -122,22 +122,22 @@ func TestLocalComposeBuild(t *testing.T) {
 	})
 
 	t.Run("build succeed as part of up with ssh from Compose file", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "build-test-ssh")
+		c.RunDockerOrExitError(t, "rmi", "build-test-ssh")
 
-		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "up", "-d", "--build")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/ssh", "up", "-d", "--build")
 		t.Cleanup(func() {
-			c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/ssh", "down")
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/ssh", "down")
 		})
-		c.RunDockerCmd("image", "inspect", "build-test-ssh")
+		c.RunDockerCmd(t, "image", "inspect", "build-test-ssh")
 	})
 
 	t.Run("build as part of up", func(t *testing.T) {
-		c.RunDockerOrExitError("rmi", "build-test_nginx")
-		c.RunDockerOrExitError("rmi", "custom-nginx")
+		c.RunDockerOrExitError(t, "rmi", "build-test_nginx")
+		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
 
-		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "up", "-d")
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
 		t.Cleanup(func() {
-			c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "down")
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
 		})
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
@@ -146,53 +146,53 @@ func TestLocalComposeBuild(t *testing.T) {
 		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
 
-		c.RunDockerCmd("image", "inspect", "build-test_nginx")
-		c.RunDockerCmd("image", "inspect", "custom-nginx")
+		c.RunDockerCmd(t, "image", "inspect", "build-test_nginx")
+		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
 	})
 
 	t.Run("no rebuild when up again", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "up", "-d")
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
 
 		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
 	})
 
 	t.Run("rebuild when up --build", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("--workdir", "fixtures/build-test", "up", "-d", "--build")
+		res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
 
 		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
 		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
 	})
 
 	t.Run("cleanup build project", func(t *testing.T) {
-		c.RunDockerComposeCmd("--project-directory", "fixtures/build-test", "down")
-		c.RunDockerCmd("rmi", "build-test_nginx")
-		c.RunDockerCmd("rmi", "custom-nginx")
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
+		c.RunDockerCmd(t, "rmi", "build-test_nginx")
+		c.RunDockerCmd(t, "rmi", "custom-nginx")
 	})
 }
 
 func TestBuildSecrets(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	t.Run("build with secrets", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "build-test-secret")
+		c.RunDockerOrExitError(t, "rmi", "build-test-secret")
 
-		res := c.RunDockerComposeCmd("--project-directory", "fixtures/build-test/secrets", "build")
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
 		res.Assert(t, icmd.Success)
 	})
 }
 
 func TestBuildTags(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	t.Run("build with tags", func(t *testing.T) {
 
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError("rmi", "build-test-tags")
+		c.RunDockerOrExitError(t, "rmi", "build-test-tags")
 
-		c.RunDockerComposeCmd("--project-directory", "./fixtures/build-test/tags", "build", "--no-cache")
+		c.RunDockerComposeCmd(t, "--project-directory", "./fixtures/build-test/tags", "build", "--no-cache")
 
-		res := c.RunDockerCmd("image", "inspect", "build-test-tags")
+		res := c.RunDockerCmd(t, "image", "inspect", "build-test-tags")
 		expectedOutput := `"RepoTags": [
             "docker/build-test-tags:1.0.0",
             "build-test-tags:latest",
