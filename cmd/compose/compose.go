@@ -277,7 +277,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
 				}
 				ansi = "never"
-				fmt.Fprint(os.Stderr, aec.Apply("option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n", aec.RedF))
+				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
 			}
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
