@@ -59,8 +59,15 @@ func init() {
 
 // CLI is used to wrap the CLI for end to end testing
 type CLI struct {
+	// ConfigDir for Docker configuration (set as DOCKER_CONFIG)
 	ConfigDir string
 
+	// HomeDir for tools that look for user files (set as HOME)
+	HomeDir string
+
+	// env overrides to apply to every invoked command
+	//
+	// To populate, use WithEnv when creating a CLI instance.
 	env []string
 }
 
@@ -84,6 +91,7 @@ func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
 
 	c := &CLI{
 		ConfigDir: configDir,
+		HomeDir:   t.TempDir(),
 	}
 
 	for _, opt := range opts {
@@ -188,6 +196,8 @@ func CopyFile(sourceFile string, destinationFile string) error {
 // Docker / Compose commands.
 func (c *CLI) BaseEnvironment() []string {
 	return []string{
+		"HOME=" + c.HomeDir,
+		"USER=" + os.Getenv("USER"),
 		"DOCKER_CONFIG=" + c.ConfigDir,
 		"KUBECONFIG=invalid",
 	}

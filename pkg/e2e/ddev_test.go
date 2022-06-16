@@ -56,8 +56,6 @@ func TestComposeRunDdev(t *testing.T) {
 
 	c := NewCLI(t, WithEnv(
 		"DDEV_DEBUG=true",
-		fmt.Sprintf("HOME=%s", t.TempDir()),
-		fmt.Sprintf("USER=%s", os.Getenv("USER")),
 		fmt.Sprintf("PATH=%s", pathDir),
 	))
 
