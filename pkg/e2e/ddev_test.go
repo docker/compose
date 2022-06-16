@@ -42,15 +42,17 @@ func TestComposeRunDdev(t *testing.T) {
 	// ddev shells out to `docker` and `docker-compose` (standalone), so a
 	// temporary directory is created with symlinks to system Docker and the
 	// locally-built standalone Compose binary to use as PATH
+	requiredTools := []string{
+		findToolInPath(t, DockerExecutableName),
+		ComposeStandalonePath(t),
+		findToolInPath(t, "tar"),
+		findToolInPath(t, "gzip"),
+	}
 	pathDir := t.TempDir()
-	dockerBin, err := exec.LookPath(DockerExecutableName)
-	require.NoError(t, err, "Could not find %q in path", DockerExecutableName)
-	require.NoError(t, os.Symlink(dockerBin, filepath.Join(pathDir, DockerExecutableName)),
-		"Could not create %q symlink", DockerExecutableName)
-
-	composeBin := ComposeStandalonePath(t)
-	require.NoError(t, os.Symlink(composeBin, filepath.Join(pathDir, DockerComposeExecutableName)),
-		"Could not create %q symlink", DockerComposeExecutableName)
+	for _, tool := range requiredTools {
+		require.NoError(t, os.Symlink(tool, filepath.Join(pathDir, filepath.Base(tool))),
+			"Could not create symlink for %q", tool)
+	}
 
 	c := NewCLI(t, WithEnv(
 		"DDEV_DEBUG=true",
@@ -96,4 +98,11 @@ func TestComposeRunDdev(t *testing.T) {
 	out = curlRes.Stdout()
 	fmt.Println(out)
 	assert.Assert(t, strings.Contains(out, "ddev is working"), "Could not start project")
+}
+
+func findToolInPath(t testing.TB, name string) string {
+	t.Helper()
+	binPath, err := exec.LookPath(name)
+	require.NoError(t, err, "Could not find %q in path", name)
+	return binPath
 }
