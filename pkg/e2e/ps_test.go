@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -41,7 +42,7 @@ func TestPs(t *testing.T) {
 
 	t.Run("pretty", func(t *testing.T) {
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
-		lines := strings.Split(res.Combined(), "\n")
+		lines := strings.Split(res.Stdout(), "\n")
 		assert.Equal(t, 4, len(lines))
 		count := 0
 		for _, line := range lines[1:3] {
@@ -61,8 +62,8 @@ func TestPs(t *testing.T) {
 		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps",
 			"--format", "json")
 		var output []api.ContainerSummary
-		err := json.Unmarshal([]byte(res.Combined()), &output)
-		assert.NoError(t, err)
+		err := json.Unmarshal([]byte(res.Stdout()), &output)
+		require.NoError(t, err, "Failed to unmarshal ps JSON output")
 
 		count := 0
 		assert.Equal(t, 2, len(output))
