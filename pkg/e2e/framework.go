@@ -32,7 +32,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
 
@@ -61,18 +60,50 @@ func init() {
 // CLI is used to wrap the CLI for end to end testing
 type CLI struct {
 	ConfigDir string
+
+	env []string
 }
 
-// NewParallelCLI returns a configured CLI with t.Parallel() set
-func NewParallelCLI(t *testing.T) *CLI {
+// CLIOption to customize behavior for all commands for a CLI instance.
+type CLIOption func(c *CLI)
+
+// NewParallelCLI marks the parent test as parallel and returns a CLI instance
+// suitable for usage across child tests.
+func NewParallelCLI(t *testing.T, opts ...CLIOption) *CLI {
+	t.Helper()
 	t.Parallel()
-	return NewCLI(t)
+	return NewCLI(t, opts...)
 }
 
-// NewCLI returns a CLI to use for E2E tests
-func NewCLI(t testing.TB) *CLI {
-	d, err := ioutil.TempDir("", "")
-	assert.Check(t, is.Nil(err))
+// NewCLI creates a CLI instance for running E2E tests.
+func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
+	t.Helper()
+
+	configDir := t.TempDir()
+	initializePlugins(t, configDir)
+
+	c := &CLI{
+		ConfigDir: configDir,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
+}
+
+// WithEnv sets environment variables that will be passed to commands.
+func WithEnv(env ...string) CLIOption {
+	return func(c *CLI) {
+		c.env = append(c.env, env...)
+	}
+}
+
+// initializePlugins copies the necessary plugin files to the temporary config
+// directory for the test.
+func initializePlugins(t testing.TB, d string) {
+	t.Helper()
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -102,8 +133,6 @@ func NewCLI(t testing.TB) *CLI {
 			panic(err)
 		}
 	}
-
-	return &CLI{ConfigDir: d}
 }
 
 func dirContents(dir string) []string {
@@ -168,13 +197,15 @@ func (c *CLI) BaseEnvironment() []string {
 func (c *CLI) NewCmd(command string, args ...string) icmd.Cmd {
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
-		Env:     c.BaseEnvironment(),
+		Env:     append(c.BaseEnvironment(), c.env...),
 	}
 }
 
 // NewCmdWithEnv creates a cmd object configured with the test environment set with additional env vars
 func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) icmd.Cmd {
-	cmdEnv := append(c.BaseEnvironment(), envvars...)
+	// base env -> CLI overrides -> cmd overrides
+	cmdEnv := append(c.BaseEnvironment(), c.env...)
+	cmdEnv = append(cmdEnv, envvars...)
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
 		Env:     cmdEnv,
