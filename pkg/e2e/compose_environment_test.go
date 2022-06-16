@@ -45,7 +45,8 @@ func TestEnvPriority(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose-with-env.yaml",
 			"--project-directory", projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run",
 			"--rm", "-e", "WHEREAMI", "env-compose-priority")
-		res := icmd.RunCmd(cmd, icmd.WithEnv("WHEREAMI=shell"))
+		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
+		res := icmd.RunCmd(cmd)
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "Compose File")
 	})
 
@@ -59,7 +60,8 @@ func TestEnvPriority(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-priority/compose.yaml", "--project-directory",
 			projectDir, "--env-file", "./fixtures/environment/env-priority/.env.override", "run", "--rm", "-e",
 			"WHEREAMI", "env-compose-priority")
-		res := icmd.RunCmd(cmd, icmd.WithEnv("WHEREAMI=shell"))
+		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
+		res := icmd.RunCmd(cmd)
 		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
 	})
 
@@ -133,7 +135,8 @@ func TestEnvInterpolation(t *testing.T) {
 	t.Run("shell priority from run command", func(t *testing.T) {
 		cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/environment/env-interpolation/compose.yaml",
 			"--project-directory", projectDir, "config")
-		res := icmd.RunCmd(cmd, icmd.WithEnv("WHEREAMI=shell"))
+		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
+		res := icmd.RunCmd(cmd)
 		res.Assert(t, icmd.Expected{Out: `IMAGE: default_env:shell`})
 	})
 }
