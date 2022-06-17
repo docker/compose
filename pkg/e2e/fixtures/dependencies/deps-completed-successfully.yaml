@@ -1,0 +1,11 @@
+version: '3'
+services:
+  oneshot:
+    image: ubuntu
+    command: echo 'hello world'
+  longrunning:
+    image: ubuntu
+    depends_on:
+      oneshot:
+        condition: service_completed_successfully
+    command: sleep infinity
