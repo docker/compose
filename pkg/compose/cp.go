@@ -49,9 +49,11 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 
 	var direction copyDirection
 	var serviceName string
+	var copyFunc func(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error
 	if srcService != "" {
 		direction |= fromService
 		serviceName = srcService
+		copyFunc = s.copyFromContainer
 
 		// copying from multiple containers of a services doesn't make sense.
 		if options.All {
@@ -61,39 +63,57 @@ func (s *composeService) Copy(ctx context.Context, projectName string, options a
 	if destService != "" {
 		direction |= toService
 		serviceName = destService
+		copyFunc = s.copyToContainer
+	}
+	if direction == acrossServices {
+		return errors.New("copying between services is not supported")
 	}
 
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	if direction == 0 {
+		return errors.New("unknown copy direction")
+	}
+
+	containers, err := s.listContainersTargetedForCopy(ctx, projectName, options.Index, direction, serviceName)
 	if err != nil {
 		return err
-	}
-
-	if len(containers) < 1 {
-		return fmt.Errorf("no container found for service %q", serviceName)
-	}
-
-	if !options.All {
-		containers = containers.filter(indexed(options.Index))
 	}
 
 	g := errgroup.Group{}
 	for _, container := range containers {
 		containerID := container.ID
 		g.Go(func() error {
-			switch direction {
-			case fromService:
-				return s.copyFromContainer(ctx, containerID, srcPath, dstPath, options)
-			case toService:
-				return s.copyToContainer(ctx, containerID, srcPath, dstPath, options)
-			case acrossServices:
-				return errors.New("copying between services is not supported")
-			default:
-				return errors.New("unknown copy direction")
-			}
+			return copyFunc(ctx, containerID, srcPath, dstPath, options)
 		})
 	}
 
 	return g.Wait()
+}
+
+func (s *composeService) listContainersTargetedForCopy(ctx context.Context, projectName string, index int, direction copyDirection, serviceName string) (Containers, error) {
+	var containers Containers
+	var err error
+	switch {
+	case index > 0:
+		container, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, index)
+		if err != nil {
+			return nil, err
+		}
+		return append(containers, container), nil
+	default:
+		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(containers) < 1 {
+			return nil, fmt.Errorf("no container found for service %q", serviceName)
+		}
+		if direction == fromService {
+			return containers[:1], err
+
+		}
+		return containers, err
+	}
 }
 
 func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error {

@@ -1,0 +1,12 @@
+services:
+  nginx:
+    image: nginx:latest
+    expose:
+    - '80'
+    - '443'
+    - '8080'
+  busybox:
+    image: busybox
+    command: busybox httpd -f -p 8000
+    ports:
+    - '127.0.0.1:8001:8000'

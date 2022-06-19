@@ -269,6 +269,10 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		sessionConfig = append(sessionConfig, p)
 	}
 
+	if len(service.Build.Tags) > 0 {
+		tags = append(tags, service.Build.Tags...)
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
@@ -285,7 +289,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts,
+		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
 	}, nil
 }

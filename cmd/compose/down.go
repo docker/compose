@@ -59,10 +59,11 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runDown(ctx, backend, opts)
 		}),
+		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
 	flags := downCmd.Flags()
-	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS "))
+	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS"))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
 	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")

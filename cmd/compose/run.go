@@ -262,7 +262,9 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 	}
 
 	if len(dependencies) > 0 {
-		return backend.Start(ctx, project.Name, api.StartOptions{})
+		return backend.Start(ctx, project.Name, api.StartOptions{
+			Project: &project,
+		})
 	}
 	return nil
 }
