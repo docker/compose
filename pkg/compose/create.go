@@ -1070,6 +1070,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 			}
 		}
 		createOpts := moby.NetworkCreate{
+			CheckDuplicate: true,
 			// TODO NameSpace Labels
 			Labels:     n.Labels,
 			Driver:     n.Driver,
@@ -1107,19 +1108,6 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 		w.Event(progress.CreatedEvent(networkEventName))
 		return nil
 	}
-	return nil
-}
-
-func (s *composeService) removeNetwork(ctx context.Context, network string, w progress.Writer) error {
-	eventName := fmt.Sprintf("Network %s", network)
-	w.Event(progress.RemovingEvent(eventName))
-
-	if err := s.apiClient().NetworkRemove(ctx, network); err != nil {
-		w.Event(progress.ErrorEvent(eventName))
-		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", network))
-	}
-
-	w.Event(progress.RemovedEvent(eventName))
 	return nil
 }
 
