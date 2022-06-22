@@ -27,6 +27,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/command/image/build"
 	dockertypes "github.com/docker/docker/api/types"
@@ -41,15 +42,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, opts map[string]buildx.Options) (map[string]string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
 	var nameDigests = make(map[string]string)
 	var errs error
-	for name, o := range opts {
+	err := project.WithServices(nil, func(service types.ServiceConfig) error {
+		imageName := getImageName(service, project.Name)
+		o, ok := opts[imageName]
+		if !ok {
+			return nil
+		}
 		digest, err := s.doBuildClassicSimpleImage(ctx, o)
 		if err != nil {
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
-		nameDigests[name] = digest
+		nameDigests[imageName] = digest
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return nameDigests, errs
