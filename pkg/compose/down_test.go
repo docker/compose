@@ -49,8 +49,14 @@ func TestDown(t *testing.T) {
 		}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
 		Return(volume.VolumeListOKBody{}, nil)
+
+	// network names are not guaranteed to be unique, ensure Compose handles
+	// cleanup properly if duplicates are inadvertently created
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
-		Return([]moby.NetworkResource{{Name: "myProject_default"}}, nil)
+		Return([]moby.NetworkResource{
+			{ID: "abc123", Name: "myProject_default"},
+			{ID: "def456", Name: "myProject_default"},
+		}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
 	api.EXPECT().ContainerStop(gomock.Any(), "456", nil).Return(nil)
@@ -60,8 +66,6 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "456", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", moby.ContainerRemoveOptions{Force: true}).Return(nil)
 
-	// network names are not guaranteed to be unique, ensure Compose handles
-	// cleanup properly if duplicates are inadvertently created
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", "myProject_default")),
 	}).Return([]moby.NetworkResource{
