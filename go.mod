@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/buger/goterm v1.0.4
 	github.com/cnabio/cnab-to-oci v0.3.3
-	github.com/compose-spec/compose-go v1.2.7
+	github.com/compose-spec/compose-go v1.2.8
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.6
 	github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e
@@ -35,7 +35,7 @@ require (
 	github.com/theupdateframework/notary v0.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gotest.tools v2.2.0+incompatible
-	gotest.tools/v3 v3.2.0
+	gotest.tools/v3 v3.3.0
 )
 
 require (
