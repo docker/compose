@@ -205,7 +205,7 @@ func (s *composeService) doBuild(ctx context.Context, project *types.Project, op
 		return nil, nil
 	}
 	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, opts)
+		return s.doBuildClassic(ctx, project, opts)
 	}
 	return s.doBuildBuildkit(ctx, project, opts, mode)
 }
