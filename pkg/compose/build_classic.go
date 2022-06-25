@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -215,7 +214,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		if imageID == "" {
 			return "", errors.Errorf("Server did not provide an image ID. Cannot write %s", options.ImageIDFile)
 		}
-		if err := ioutil.WriteFile(options.ImageIDFile, []byte(imageID), 0666); err != nil {
+		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0666); err != nil {
 			return "", err
 		}
 	}
