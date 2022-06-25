@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -133,7 +132,7 @@ func TestComposePull(t *testing.T) {
 func TestDownComposefileInParentFolder(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	tmpFolder, err := ioutil.TempDir("fixtures/simple-composefile", "test-tmp")
+	tmpFolder, err := os.MkdirTemp("fixtures/simple-composefile", "test-tmp")
 	assert.NilError(t, err)
 	defer os.Remove(tmpFolder) // nolint: errcheck
 	projectName := filepath.Base(tmpFolder)
