@@ -1778,20 +1778,28 @@ class ConfigTest(unittest.TestCase):
             assert service[0]['entrypoint'] == entrypoint
 
     def test_logs_warning_for_boolean_in_environment(self):
-        config_details = build_config_details({
-            'version': str(VERSION),
-            'services': {
-                'web': {
-                    'image': 'busybox',
-                    'environment': {'SHOW_STUFF': True}
-                }
-            }
-        })
+        ENABLED = True
 
-        with pytest.raises(ConfigurationError) as exc:
-            config.load(config_details)
+        services = config.load(
+            build_config_details(
+                {
+                    'version': str(VERSION),
+                    'services': {
+                        'web': {
+                            'image': 'sg',
+                            'environment': {
+                                'ENABLED': ENABLED
+                            }
+                        }
+                    }
+                },
+                'working_dir',
+                'filename.yml'
+            )
+        ).services
 
-        assert "contains true, which is an invalid type" in exc.exconly()
+        assert services[0]['environment']['ENABLED'] == ENABLED
+
 
     def test_config_valid_environment_dict_key_contains_dashes(self):
         services = config.load(

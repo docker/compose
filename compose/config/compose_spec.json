@@ -260,7 +260,7 @@
             "options": {
               "type": "object",
               "patternProperties": {
-                "^.+$": {"type": ["string", "number", "null"]}
+                "^.+$": {"type": ["string", "number", "boolean", "null"]}
               }
             }
           },
@@ -768,7 +768,7 @@
           "type": "object",
           "patternProperties": {
             ".+": {
-              "type": ["string", "number", "null"]
+              "type": ["string", "number", "boolean", "null"]
             }
           },
           "additionalProperties": false
