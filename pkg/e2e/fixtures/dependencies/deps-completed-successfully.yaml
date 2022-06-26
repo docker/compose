@@ -1,10 +1,9 @@
-version: '3'
 services:
   oneshot:
-    image: ubuntu
+    image: alpine
     command: echo 'hello world'
   longrunning:
-    image: ubuntu
+    image: alpine
     depends_on:
       oneshot:
         condition: service_completed_successfully
