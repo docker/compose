@@ -1,0 +1,10 @@
+services:
+  oneshot:
+    image: alpine
+    command: echo 'hello world'
+  longrunning:
+    image: alpine
+    depends_on:
+      oneshot:
+        condition: service_completed_successfully
+    command: sleep infinity
