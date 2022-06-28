@@ -50,7 +50,7 @@ func Convert(args []string) []string {
 	l := len(args)
 	for i := 0; i < l; i++ {
 		arg := args[i]
-		if arg[0] != '-' {
+		if len(arg) > 0 && arg[0] != '-' {
 			// not a top-level flag anymore, keep the rest of the command unmodified
 			if arg == compose.PluginName {
 				i++

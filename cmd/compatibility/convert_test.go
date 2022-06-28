@@ -68,6 +68,11 @@ func Test_convert(t *testing.T) {
 			args: []string{"--log-level", "INFO", "up"},
 			want: []string{"--log-level", "INFO", "compose", "up"},
 		},
+		{
+			name: "empty string argument",
+			args: []string{"--project-directory", "", "ps"},
+			want: []string{"compose", "--project-directory", "", "ps"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
