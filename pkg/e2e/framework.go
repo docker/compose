@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -115,7 +114,7 @@ func initializePlugins(t testing.TB, configDir string) {
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			if conf, err := ioutil.ReadFile(filepath.Join(configDir, "config.json")); err == nil {
+			if conf, err := os.ReadFile(filepath.Join(configDir, "config.json")); err == nil {
 				t.Logf("Config: %s\n", string(conf))
 			}
 			t.Log("Contents of config dir:")
@@ -389,7 +388,7 @@ func HTTPGetWithRetry(
 	}
 	poll.WaitOn(t, checkUp, poll.WithDelay(retryDelay), poll.WithTimeout(timeout))
 	if r != nil {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		assert.NilError(t, err)
 		return string(b)
 	}

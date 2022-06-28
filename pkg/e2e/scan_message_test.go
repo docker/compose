@@ -17,7 +17,6 @@
 package e2e
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +73,7 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	t.Run("do not display if scan already invoked", func(t *testing.T) {
 		_ = os.MkdirAll(filepath.Join(c.ConfigDir, "scan"), 0755)
 		scanConfigFile := filepath.Join(c.ConfigDir, "scan", "config.json")
-		err := ioutil.WriteFile(scanConfigFile, []byte(`{"optin":true}`), 0644)
+		err := os.WriteFile(scanConfigFile, []byte(`{"optin":true}`), 0644)
 		assert.NilError(t, err)
 
 		res := c.RunDockerCmd(t, "build", "-t", "test-image-scan-msg", "fixtures/simple-build-test/nginx-build")
