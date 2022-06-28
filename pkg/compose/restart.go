@@ -35,7 +35,7 @@ func (s *composeService) Restart(ctx context.Context, projectName string, option
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 
-	observedState, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	observedState, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
