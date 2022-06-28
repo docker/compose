@@ -78,20 +78,6 @@ func TestStartStop(t *testing.T) {
 		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
 	})
 
-	t.Run("pause project", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "pause")
-
-		res := c.RunDockerComposeCmd(t, "ls", "--all")
-		testify.Regexp(t, getProjectRegx("paused"), res.Stdout())
-	})
-
-	t.Run("unpause project", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "--project-name", projectName, "unpause")
-
-		res := c.RunDockerComposeCmd(t, "ls")
-		testify.Regexp(t, getProjectRegx("running"), res.Stdout())
-	})
-
 	t.Run("down", func(t *testing.T) {
 		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
