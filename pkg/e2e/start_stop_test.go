@@ -23,6 +23,7 @@ import (
 
 	testify "github.com/stretchr/testify/assert"
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestStartStop(t *testing.T) {
@@ -181,4 +182,67 @@ func TestStartStopWithOneOffs(t *testing.T) {
 		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "ps", "-a", "--status", "running")
 		assert.Assert(t, !strings.Contains(res.Combined(), "e2e-start-stop-with-oneoffs-bar"), res.Combined())
 	})
+}
+
+func TestStartAlreadyRunning(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-already-running",
+		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
+	})
+
+	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
+
+	res := cli.RunDockerComposeCmd(t, "start", "simple")
+	assert.Equal(t, res.Stdout(), "", "No output should have been written to stdout")
+}
+
+func TestStopAlreadyStopped(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-already-stopped",
+		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
+	})
+
+	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
+
+	// stop the container
+	cli.RunDockerComposeCmd(t, "stop", "simple")
+
+	// attempt to stop it again
+	res := cli.RunDockerComposeCmdNoCheck(t, "stop", "simple")
+	// TODO: for consistency, this should NOT write any output because the
+	// 		container is already stopped
+	res.Assert(t, icmd.Expected{
+		ExitCode: 0,
+		Err:      "Container e2e-start-stop-svc-already-stopped-simple-1  Stopped",
+	})
+}
+
+func TestStartStopMultipleServices(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple",
+		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
+	})
+
+	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
+
+	res := cli.RunDockerComposeCmd(t, "stop", "simple", "another")
+	services := []string{"simple", "another"}
+	for _, svc := range services {
+		stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Stopped", svc)
+		assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
+			fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
+	}
+
+	res = cli.RunDockerComposeCmd(t, "start", "simple", "another")
+	for _, svc := range services {
+		startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Started", svc)
+		assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
+			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
+	}
 }
