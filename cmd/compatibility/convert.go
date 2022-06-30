@@ -43,15 +43,6 @@ func getStringFlags() []string {
 	}
 }
 
-var argToActualArgument = map[string]string{
-	"--verbose": "--debug",
-	// docker cli has deprecated -h to avoid ambiguity with -H, while docker-compose still support it
-	"-h": "--help",
-	// redirect --version pseudo-command to actual command
-	"--version": "version",
-	"-v":        "version",
-}
-
 // Convert transforms standalone docker-compose args into CLI plugin compliant ones
 func Convert(args []string) []string {
 	var rootFlags []string
@@ -67,9 +58,18 @@ func Convert(args []string) []string {
 			command = append(command, args[i:]...)
 			break
 		}
-		if actualArgument, ok := argToActualArgument[arg]; ok {
-			arg = actualArgument
+
+		switch arg {
+		case "--verbose":
+			arg = "--debug"
+		case "-h":
+			// docker cli has deprecated -h to avoid ambiguity with -H, while docker-compose still support it
+			arg = "--help"
+		case "--version", "-v":
+			// redirect --version pseudo-command to actual command
+			arg = "version"
 		}
+
 		if contains(getBoolFlags(), arg) {
 			rootFlags = append(rootFlags, arg)
 			continue
