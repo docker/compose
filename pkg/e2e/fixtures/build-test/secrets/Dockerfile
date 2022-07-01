@@ -20,3 +20,7 @@ FROM alpine
 RUN echo "foo" > /tmp/expected
 RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /tmp/actual
 RUN diff /tmp/expected /tmp/actual
+
+RUN echo "bar" > /tmp/expected
+RUN --mount=type=secret,id=envsecret cat /run/secrets/envsecret > tmp/actual
+RUN diff --ignore-all-space /tmp/expected /tmp/actual

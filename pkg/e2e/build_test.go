@@ -176,7 +176,12 @@ func TestBuildSecrets(t *testing.T) {
 		// ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError(t, "rmi", "build-test-secret")
 
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
+
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "SOME_SECRET=bar")
+		})
+
 		res.Assert(t, icmd.Success)
 	})
 }
