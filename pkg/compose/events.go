@@ -29,9 +29,10 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
-func (s *composeService) Events(ctx context.Context, project string, options api.EventsOptions) error {
-	events, errors := s.apiClient.Events(ctx, moby.EventsOptions{
-		Filters: filters.NewArgs(projectFilter(project)),
+func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
+	projectName = strings.ToLower(projectName)
+	events, errors := s.apiClient().Events(ctx, moby.EventsOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
 	for {
 		select {

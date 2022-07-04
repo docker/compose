@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"golang.org/x/sync/errgroup"
@@ -28,13 +29,13 @@ import (
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.restart(ctx, projectName, options)
+		return s.restart(ctx, strings.ToLower(projectName), options)
 	})
 }
 
 func (s *composeService) restart(ctx context.Context, projectName string, options api.RestartOptions) error {
 
-	observedState, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	observedState, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			eg.Go(func() error {
 				eventName := getContainerProgressName(container)
 				w.Event(progress.RestartingEvent(eventName))
-				err := s.apiClient.ContainerRestart(ctx, container.ID, options.Timeout)
+				err := s.apiClient().ContainerRestart(ctx, container.ID, options.Timeout)
 				if err == nil {
 					w.Event(progress.StartedEvent(eventName))
 				}

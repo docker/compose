@@ -19,17 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/cli"
+	cmd "github.com/docker/cli/cli/command/container"
 	"github.com/docker/compose/v2/pkg/api"
-	moby "github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/ioutils"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/moby/term"
 )
 
 func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.Project, opts api.RunOptions) (int, error) {
@@ -38,98 +33,16 @@ func (s *composeService) RunOneOffContainer(ctx context.Context, project *types.
 		return 0, err
 	}
 
-	if opts.Detach {
-		err := s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
-		if err != nil {
-			return 0, err
-		}
-		fmt.Fprintln(opts.Stdout, containerID)
-		return 0, nil
+	start := cmd.NewStartOptions()
+	start.OpenStdin = !opts.Detach && opts.Interactive
+	start.Attach = !opts.Detach
+	start.Containers = []string{containerID}
+
+	err = cmd.RunStart(s.dockerCli, &start)
+	if sterr, ok := err.(cli.StatusError); ok {
+		return sterr.StatusCode, nil
 	}
-
-	return s.runInteractive(ctx, containerID, opts)
-}
-
-func (s *composeService) runInteractive(ctx context.Context, containerID string, opts api.RunOptions) (int, error) {
-	r, err := s.getEscapeKeyProxy(opts.Stdin, opts.Tty)
-	if err != nil {
-		return 0, err
-	}
-
-	stdin, stdout, err := s.getContainerStreams(ctx, containerID)
-	if err != nil {
-		return 0, err
-	}
-
-	in := streams.NewIn(opts.Stdin)
-	if in.IsTerminal() && opts.Tty {
-		state, err := term.SetRawTerminal(in.FD())
-		if err != nil {
-			return 0, err
-		}
-		defer term.RestoreTerminal(in.FD(), state) //nolint:errcheck
-	}
-
-	outputDone := make(chan error)
-	inputDone := make(chan error)
-
-	go func() {
-		if opts.Tty {
-			_, err := io.Copy(opts.Stdout, stdout) //nolint:errcheck
-			outputDone <- err
-		} else {
-			_, err := stdcopy.StdCopy(opts.Stdout, opts.Stderr, stdout) //nolint:errcheck
-			outputDone <- err
-		}
-		stdout.Close() //nolint:errcheck
-	}()
-
-	go func() {
-		_, err := io.Copy(stdin, r)
-		inputDone <- err
-		stdin.Close() //nolint:errcheck
-	}()
-
-	err = s.apiClient.ContainerStart(ctx, containerID, moby.ContainerStartOptions{})
-	if err != nil {
-		return 0, err
-	}
-
-	s.monitorTTySize(ctx, containerID, s.apiClient.ContainerResize)
-
-	for {
-		select {
-		case err := <-outputDone:
-			if err != nil {
-				return 0, err
-			}
-			return s.terminateRun(ctx, containerID, opts)
-		case err := <-inputDone:
-			if _, ok := err.(term.EscapeError); ok {
-				return 0, nil
-			}
-			if err != nil {
-				return 0, err
-			}
-			// Wait for output to complete streaming
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		}
-	}
-}
-
-func (s *composeService) terminateRun(ctx context.Context, containerID string, opts api.RunOptions) (exitCode int, err error) {
-	exitCh, errCh := s.apiClient.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
-	select {
-	case exit := <-exitCh:
-		exitCode = int(exit.StatusCode)
-	case err = <-errCh:
-		return
-	}
-	if opts.AutoRemove {
-		err = s.apiClient.ContainerRemove(ctx, containerID, moby.ContainerRemoveOptions{})
-	}
-	return
+	return 0, err
 }
 
 func (s *composeService) prepareRun(ctx context.Context, project *types.Project, opts api.RunOptions) (string, error) {
@@ -143,12 +56,15 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 
 	applyRunOptions(project, &service, opts)
 
+	if err := s.dockerCli.In().CheckTty(opts.Interactive, service.Tty); err != nil {
+		return "", err
+	}
+
 	slug := stringid.GenerateRandomID()
 	if service.ContainerName == "" {
 		service.ContainerName = fmt.Sprintf("%s_%s_run_%s", project.Name, service.Name, stringid.TruncateID(slug))
 	}
 	service.Scale = 1
-	service.StdinOpen = true
 	service.Restart = ""
 	if service.Deploy != nil {
 		service.Deploy.RestartPolicy = nil
@@ -172,32 +88,17 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 	updateServices(&service, observedState)
 
-	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1, opts.Detach && opts.AutoRemove, opts.UseNetworkAliases, true)
+	created, err := s.createContainer(ctx, project, service, service.ContainerName, 1,
+		opts.AutoRemove, opts.UseNetworkAliases, opts.Interactive)
 	if err != nil {
 		return "", err
 	}
-	containerID := created.ID
-	return containerID, nil
-}
-
-func (s *composeService) getEscapeKeyProxy(r io.ReadCloser, isTty bool) (io.ReadCloser, error) {
-	if !isTty {
-		return r, nil
-	}
-	var escapeKeys = []byte{16, 17}
-	if s.configFile.DetachKeys != "" {
-		customEscapeKeys, err := term.ToBytes(s.configFile.DetachKeys)
-		if err != nil {
-			return nil, err
-		}
-		escapeKeys = customEscapeKeys
-	}
-	return ioutils.NewReadCloserWrapper(term.NewEscapeProxy(r, escapeKeys), r.Close), nil
+	return created.ID, nil
 }
 
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts api.RunOptions) {
 	service.Tty = opts.Tty
-	service.StdinOpen = true
+	service.StdinOpen = opts.Interactive
 	service.ContainerName = opts.Name
 
 	if len(opts.Command) > 0 {
@@ -215,6 +116,9 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	if len(opts.Environment) > 0 {
 		env := types.NewMappingWithEquals(opts.Environment)
 		projectEnv := env.Resolve(func(s string) (string, bool) {
+			if _, ok := service.Environment[s]; ok {
+				return "", false
+			}
 			v, ok := project.Environment[s]
 			return v, ok
 		}).RemoveEmpty()

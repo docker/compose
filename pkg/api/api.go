@@ -19,7 +19,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -33,9 +32,9 @@ type Service interface {
 	// Push executes the equivalent ot a `compose push`
 	Push(ctx context.Context, project *types.Project, options PushOptions) error
 	// Pull executes the equivalent of a `compose pull`
-	Pull(ctx context.Context, project *types.Project, opts PullOptions) error
+	Pull(ctx context.Context, project *types.Project, options PullOptions) error
 	// Create executes the equivalent to a `compose create`
-	Create(ctx context.Context, project *types.Project, opts CreateOptions) error
+	Create(ctx context.Context, project *types.Project, options CreateOptions) error
 	// Start executes the equivalent to a `compose start`
 	Start(ctx context.Context, projectName string, options StartOptions) error
 	// Restart restarts containers
@@ -55,25 +54,25 @@ type Service interface {
 	// Convert translate compose model into backend's native format
 	Convert(ctx context.Context, project *types.Project, options ConvertOptions) ([]byte, error)
 	// Kill executes the equivalent to a `compose kill`
-	Kill(ctx context.Context, project *types.Project, options KillOptions) error
+	Kill(ctx context.Context, projectName string, options KillOptions) error
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
 	// Remove executes the equivalent to a `compose rm`
-	Remove(ctx context.Context, project *types.Project, options RemoveOptions) error
+	Remove(ctx context.Context, projectName string, options RemoveOptions) error
 	// Exec executes a command in a running service container
-	Exec(ctx context.Context, project string, opts RunOptions) (int, error)
+	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
 	// Copy copies a file/folder between a service container and the local filesystem
-	Copy(ctx context.Context, project string, options CopyOptions) error
+	Copy(ctx context.Context, projectName string, options CopyOptions) error
 	// Pause executes the equivalent to a `compose pause`
-	Pause(ctx context.Context, project string, options PauseOptions) error
+	Pause(ctx context.Context, projectName string, options PauseOptions) error
 	// UnPause executes the equivalent to a `compose unpause`
-	UnPause(ctx context.Context, project string, options PauseOptions) error
+	UnPause(ctx context.Context, projectName string, options PauseOptions) error
 	// Top executes the equivalent to a `compose top`
 	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	// Events executes the equivalent to a `compose events`
-	Events(ctx context.Context, project string, options EventsOptions) error
+	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
+	Port(ctx context.Context, projectName string, service string, port int, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 }
@@ -92,6 +91,8 @@ type BuildOptions struct {
 	Quiet bool
 	// Services passed in the command line to be built
 	Services []string
+	// Ssh authentications passed in the command line
+	SSHs []types.SSHKey
 }
 
 // CreateOptions group options of the Create API
@@ -116,6 +117,8 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran `start` just with project name
+	Project *types.Project
 	// Attach to container and forward logs if not nil
 	Attach LogConsumer
 	// AttachTo set the services to attach to
@@ -216,10 +219,8 @@ type RunOptions struct {
 	Entrypoint        []string
 	Detach            bool
 	AutoRemove        bool
-	Stdin             io.ReadCloser
-	Stdout            io.WriteCloser
-	Stderr            io.WriteCloser
 	Tty               bool
+	Interactive       bool
 	WorkingDir        string
 	User              string
 	Environment       []string

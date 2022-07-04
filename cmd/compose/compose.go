@@ -27,17 +27,21 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	composegoutils "github.com/compose-spec/compose-go/utils"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
-	"github.com/docker/compose/v2/cmd/formatter"
+	"github.com/docker/cli/cli/command"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
+	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 // Command defines a compose CLI command as a func with args
@@ -86,9 +90,6 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 	})
 }
 
-// Warning is a global warning to be displayed to user on command failure
-var Warning string
-
 type projectOptions struct {
 	ProjectName   string
 	Profiles      []string
@@ -129,8 +130,8 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
-	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the Compose file)")
+	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
+	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	_ = f.MarkHidden("workdir")
 }
@@ -138,6 +139,11 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 func (o *projectOptions) toProjectName() (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
+	}
+
+	envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
+	if envProjectName != "" {
+		return envProjectName, nil
 	}
 
 	project, err := o.toProject(nil)
@@ -158,13 +164,16 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
-	if o.Compatibility || project.Environment["COMPOSE_COMPATIBILITY"] == "true" {
+	if o.Compatibility || utils.StringToBool(project.Environment["COMPOSE_COMPATIBILITY"]) {
 		compose.Separator = "_"
 	}
 
 	ef := o.EnvFile
 	if ef != "" && !filepath.IsAbs(ef) {
-		ef = filepath.Join(project.WorkingDir, o.EnvFile)
+		ef, err = filepath.Abs(ef)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -205,9 +214,9 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithOsEnv,
 			cli.WithEnvFile(o.EnvFile),
 			cli.WithDotEnv,
-			cli.WithOsEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
@@ -222,7 +231,7 @@ func RunningAsStandalone() bool {
 }
 
 // RootCommand returns the compose command with its child commands
-func RootCommand(backend api.Service) *cobra.Command {
+func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := projectOptions{}
 	var (
 		ansi    string
@@ -249,6 +258,10 @@ func RootCommand(backend api.Service) *cobra.Command {
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := setEnvWithDotEnv(&opts)
+			if err != nil {
+				return err
+			}
 			parent := cmd.Root()
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
@@ -264,12 +277,18 @@ func RootCommand(backend api.Service) *cobra.Command {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
 				}
 				ansi = "never"
-				fmt.Fprint(os.Stderr, aec.Apply("option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n", aec.RedF))
+				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
 			}
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 			formatter.SetANSIMode(ansi)
+			switch ansi {
+			case "never":
+				progress.Mode = progress.ModePlain
+			case "tty":
+				progress.Mode = progress.ModeTTY
+			}
 			if opts.WorkDir != "" {
 				if opts.ProjectDir != "" {
 					return errors.New(`cannot specify DEPRECATED "--workdir" and "--project-directory". Please use only "--project-directory" instead`)
@@ -292,9 +311,9 @@ func RootCommand(backend api.Service) *cobra.Command {
 		logsCommand(&opts, backend),
 		convertCommand(&opts, backend),
 		killCommand(&opts, backend),
-		runCommand(&opts, backend),
+		runCommand(&opts, dockerCli, backend),
 		removeCommand(&opts, backend),
-		execCommand(&opts, backend),
+		execCommand(&opts, dockerCli, backend),
 		pauseCommand(&opts, backend),
 		unpauseCommand(&opts, backend),
 		topCommand(&opts, backend),
@@ -318,4 +337,28 @@ func RootCommand(backend api.Service) *cobra.Command {
 	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
 	command.Flags().MarkHidden("verbose") //nolint:errcheck
 	return command
+}
+
+func setEnvWithDotEnv(prjOpts *projectOptions) error {
+	options, err := prjOpts.toProjectOptions()
+	if err != nil {
+		return compose.WrapComposeError(err)
+	}
+	workingDir, err := options.GetWorkingDir()
+	if err != nil {
+		return err
+	}
+
+	envFromFile, err := cli.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFile)
+	if err != nil {
+		return err
+	}
+	for k, v := range envFromFile {
+		if _, ok := os.LookupEnv(k); !ok {
+			if err = os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

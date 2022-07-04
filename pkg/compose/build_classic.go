@@ -21,12 +21,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/command/image/build"
 	dockertypes "github.com/docker/docker/api/types"
@@ -41,15 +41,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, opts map[string]buildx.Options) (map[string]string, error) {
+func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
 	var nameDigests = make(map[string]string)
 	var errs error
-	for name, o := range opts {
+	err := project.WithServices(nil, func(service types.ServiceConfig) error {
+		imageName := getImageName(service, project.Name)
+		o, ok := opts[imageName]
+		if !ok {
+			return nil
+		}
 		digest, err := s.doBuildClassicSimpleImage(ctx, o)
 		if err != nil {
 			errs = multierror.Append(errs, err).ErrorOrNil()
 		}
-		nameDigests[name] = digest
+		nameDigests[imageName] = digest
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return nameDigests, errs
@@ -69,8 +78,8 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 
 	dockerfileName := options.Inputs.DockerfilePath
 	specifiedContext := options.Inputs.ContextPath
-	progBuff := os.Stdout
-	buildBuff := os.Stdout
+	progBuff := s.stdout()
+	buildBuff := s.stdout()
 	if options.ImageIDFile != "" {
 		// Avoid leaving a stale file if we eventually fail
 		if err := os.Remove(options.ImageIDFile); err != nil && !os.IsNotExist(err) {
@@ -143,19 +152,10 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		return "", err
 	}
 
-	// if up to this point nothing has set the context then we must have another
-	// way for sending it(streaming) and set the context to the Dockerfile
-	if dockerfileCtx != nil && buildCtx == nil {
-		buildCtx = dockerfileCtx
-	}
-
 	progressOutput := streamformatter.NewProgressOutput(progBuff)
-	var body io.Reader
-	if buildCtx != nil {
-		body = progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
-	}
+	body := progress.NewProgressReader(buildCtx, progressOutput, 0, "", "Sending build context to Docker daemon")
 
-	configFile := s.configFile
+	configFile := s.configFile()
 	creds, err := configFile.GetAllCredentials()
 	if err != nil {
 		return "", err
@@ -171,7 +171,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	response, err := s.apiClient.ImageBuild(ctx, body, buildOptions)
+	response, err := s.apiClient().ImageBuild(ctx, body, buildOptions)
 	if err != nil {
 		return "", err
 	}
@@ -181,13 +181,13 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	aux := func(msg jsonmessage.JSONMessage) {
 		var result dockertypes.BuildResult
 		if err := json.Unmarshal(*msg.Aux, &result); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to parse aux message: %s", err)
+			fmt.Fprintf(s.stderr(), "Failed to parse aux message: %s", err)
 		} else {
 			imageID = result.ID
 		}
 	}
 
-	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.Fd(), true, aux)
+	err = jsonmessage.DisplayJSONMessagesStream(response.Body, buildBuff, progBuff.FD(), true, aux)
 	if err != nil {
 		if jerr, ok := err.(*jsonmessage.JSONError); ok {
 			// If no error code is set, default to 1
@@ -203,7 +203,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	// daemon isn't running Windows.
 	if response.OSType != "windows" && runtime.GOOS == "windows" {
 		// if response.OSType != "windows" && runtime.GOOS == "windows" && !options.quiet {
-		fmt.Fprintln(os.Stdout, "SECURITY WARNING: You are building a Docker "+
+		fmt.Fprintln(s.stdout(), "SECURITY WARNING: You are building a Docker "+
 			"image from Windows against a non-Windows Docker host. All files and "+
 			"directories added to build context will have '-rwxr-xr-x' permissions. "+
 			"It is recommended to double check and reset permissions for sensitive "+
@@ -214,7 +214,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		if imageID == "" {
 			return "", errors.Errorf("Server did not provide an image ID. Cannot write %s", options.ImageIDFile)
 		}
-		if err := ioutil.WriteFile(options.ImageIDFile, []byte(imageID), 0666); err != nil {
+		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0666); err != nil {
 			return "", err
 		}
 	}

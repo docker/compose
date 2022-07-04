@@ -15,6 +15,7 @@ options:
   default_value: "false"
   description: 'Detached mode: Run command in the background.'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -25,6 +26,7 @@ options:
   default_value: '[]'
   description: Set environment variables
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -35,6 +37,18 @@ options:
   description: |
     index of the container if there are multiple instances of a service [default: 1].
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: interactive
+  shorthand: i
+  value_type: bool
+  default_value: "true"
+  description: Keep STDIN open even if not attached.
+  deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -42,10 +56,11 @@ options:
 - option: no-TTY
   shorthand: T
   value_type: bool
-  default_value: "false"
+  default_value: "true"
   description: |
     Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -55,6 +70,18 @@ options:
   default_value: "false"
   description: Give extended privileges to the process.
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: tty
+  shorthand: t
+  value_type: bool
+  default_value: "true"
+  description: Allocate a pseudo-TTY.
+  deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -64,6 +91,7 @@ options:
   value_type: string
   description: Run the command as this user.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -73,6 +101,7 @@ options:
   value_type: string
   description: Path to workdir directory for this command.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

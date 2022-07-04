@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"golang.org/x/sync/errgroup"
@@ -30,14 +29,14 @@ import (
 	"github.com/docker/compose/v2/pkg/prompt"
 )
 
-func (s *composeService) Remove(ctx context.Context, project *types.Project, options api.RemoveOptions) error {
-	services := options.Services
-	if len(services) == 0 {
-		services = project.ServiceNames()
-	}
-
-	containers, err := s.getContainers(ctx, project.Name, oneOffInclude, true, services...)
+func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
+	projectName = strings.ToLower(projectName)
+	containers, _, err := s.actualState(ctx, projectName, options.Services)
 	if err != nil {
+		if api.IsNotFoundError(err) {
+			fmt.Fprintln(s.stderr(), "No stopped containers")
+			return nil
+		}
 		return err
 	}
 
@@ -51,7 +50,7 @@ func (s *composeService) Remove(ctx context.Context, project *types.Project, opt
 	})
 
 	if len(names) == 0 {
-		fmt.Println("No stopped containers")
+		fmt.Fprintln(s.stderr(), "No stopped containers")
 		return nil
 	}
 	msg := fmt.Sprintf("Going to remove %s", strings.Join(names, ", "))
@@ -79,7 +78,7 @@ func (s *composeService) remove(ctx context.Context, containers Containers, opti
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.RemovingEvent(eventName))
-			err := s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err := s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})

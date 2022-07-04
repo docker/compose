@@ -33,30 +33,34 @@ import (
 )
 
 func TestComposeCancel(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
-		c.RunDockerComposeCmd("ls")
+		c.RunDockerComposeCmd(t, "ls")
 		buildProjectPath := "fixtures/build-infinite/compose.yaml"
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
-		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerCmd("compose", "-f", buildProjectPath, "build", "--progress", "plain"))
+		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build",
+			"--progress", "plain"))
 		assert.NilError(t, err)
 
-		c.WaitForCondition(func() (bool, string) {
+		c.WaitForCondition(t, func() (bool, string) {
 			out := stdout.String()
 			errors := stderr.String()
-			return strings.Contains(out, "RUN sleep infinity"), fmt.Sprintf("'RUN sleep infinity' not found in : \n%s\nStderr: \n%s\n", out, errors)
+			return strings.Contains(out,
+					"RUN sleep infinity"), fmt.Sprintf("'RUN sleep infinity' not found in : \n%s\nStderr: \n%s\n", out,
+					errors)
 		}, 30*time.Second, 1*time.Second)
 
 		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) // simulate Ctrl-C : send signal to processGroup, children will have same groupId by default
 
 		assert.NilError(t, err)
-		c.WaitForCondition(func() (bool, string) {
+		c.WaitForCondition(t, func() (bool, string) {
 			out := stdout.String()
 			errors := stderr.String()
-			return strings.Contains(out, "CANCELED"), fmt.Sprintf("'CANCELED' not found in : \n%s\nStderr: \n%s\n", out, errors)
+			return strings.Contains(out, "CANCELED"), fmt.Sprintf("'CANCELED' not found in : \n%s\nStderr: \n%s\n", out,
+				errors)
 		}, 10*time.Second, 1*time.Second)
 	})
 }

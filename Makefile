@@ -43,12 +43,19 @@ compose-plugin: ## Compile the compose cli-plugin
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+	docker compose version
 	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
-	go test $(TEST_FLAGS) -count=1 --tags=standalone ./pkg/e2e
+	docker-compose version
+	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
+.PHONY: mocks
+mocks:
+	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
+	mockgen -destination pkg/mocks/mock_docker_api.go -package mocks github.com/docker/docker/client APIClient
+	mockgen -destination pkg/mocks/mock_docker_compose_api.go -package mocks -source=./pkg/api/api.go Service
 
 .PHONY: e2e
 e2e: e2e-compose e2e-compose-standalone ## Run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
@@ -78,6 +85,23 @@ lint: ## run linter(s)
 	--build-arg GIT_TAG=$(GIT_TAG) \
 	--target lint
 
+.PHONY: docs
+docs: ## generate documentation
+	$(eval $@_TMP_OUT := $(shell mktemp -d -t dockercli-output.XXXXXXXXXX))
+	docker build . \
+	--output type=local,dest=$($@_TMP_OUT) \
+	-f ./docs/docs.Dockerfile \
+	--target update
+	rm -rf ./docs/internal
+	cp -R "$($@_TMP_OUT)"/out/* ./docs/
+	rm -rf "$($@_TMP_OUT)"/*
+
+.PHONY: validate-docs
+validate-docs: ## validate the doc does not change
+	@docker build . \
+	-f ./docs/docs.Dockerfile \
+	--target validate
+
 .PHONY: check-dependencies
 check-dependencies: ## check dependency updates
 	go list -u -m -f '{{if not .Indirect}}{{if .Update}}{{.}}{{end}}{{end}}' all
@@ -94,7 +118,7 @@ go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and g
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	@docker build . --target check-go-mod
 
-validate: validate-go-mod validate-headers ## Validate sources
+validate: validate-go-mod validate-headers validate-docs ## Validate sources
 
 pre-commit: validate check-dependencies lint compose-plugin test e2e-compose
 

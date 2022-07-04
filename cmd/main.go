@@ -32,21 +32,16 @@ import (
 	"github.com/docker/compose/v2/pkg/compose"
 )
 
-func init() {
-	commands.Warning = "The new 'docker compose' command is currently experimental. " +
-		"To provide feedback or request new features please open issues at https://github.com/docker/compose"
-}
-
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
 		lazyInit := api.NewServiceProxy()
-		cmd := commands.RootCommand(lazyInit)
+		cmd := commands.RootCommand(dockerCli, lazyInit)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			lazyInit.WithService(compose.NewComposeService(dockerCli.Client(), dockerCli.ConfigFile()))
+			lazyInit.WithService(compose.NewComposeService(dockerCli))
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}
@@ -68,7 +63,7 @@ func pluginMain() {
 }
 
 func main() {
-	if commands.RunningAsStandalone() {
+	if plugin.RunningStandalone() {
 		os.Args = append([]string{"docker"}, compatibility.Convert(os.Args[1:])...)
 	}
 	pluginMain()

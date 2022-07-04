@@ -22,12 +22,14 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
-func TestStartFail(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
-	const projectName = "e2e-start-fail"
+func TestSecretFromEnv(t *testing.T) {
+	c := NewParallelCLI(t)
 
-	res := c.RunDockerOrExitError("compose", "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
-
-	c.RunDockerComposeCmd("--project-name", projectName, "down")
+	t.Run("compose run", func(t *testing.T) {
+		res := icmd.RunCmd(c.NewDockerComposeCmd(t, "-f", "./fixtures/env-secret/compose.yaml", "run", "foo"),
+			func(cmd *icmd.Cmd) {
+				cmd.Env = append(cmd.Env, "SECRET=BAR")
+			})
+		res.Assert(t, icmd.Expected{Out: "BAR"})
+	})
 }

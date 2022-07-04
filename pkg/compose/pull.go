@@ -37,17 +37,17 @@ import (
 	"github.com/docker/compose/v2/pkg/progress"
 )
 
-func (s *composeService) Pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
-	if opts.Quiet {
-		return s.pull(ctx, project, opts)
+func (s *composeService) Pull(ctx context.Context, project *types.Project, options api.PullOptions) error {
+	if options.Quiet {
+		return s.pull(ctx, project, options)
 	}
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.pull(ctx, project, opts)
+		return s.pull(ctx, project, options)
 	})
 }
 
 func (s *composeService) pull(ctx context.Context, project *types.Project, opts api.PullOptions) error {
-	info, err := s.apiClient.Info(ctx)
+	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -56,15 +56,15 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		info.IndexServerAddress = registry.IndexServer
 	}
 
-	w := progress.ContextWriter(ctx)
-	eg, ctx := errgroup.WithContext(ctx)
-
-	var mustBuild []string
-
 	images, err := s.getLocalImagesDigests(ctx, project)
 	if err != nil {
 		return err
 	}
+
+	w := progress.ContextWriter(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
+
+	var mustBuild []string
 
 	imagesBeingPulled := map[string]string{}
 
@@ -79,13 +79,23 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			continue
 		}
 
-		if _, ok := images[service.Image]; ok {
+		switch service.PullPolicy {
+		case types.PullPolicyNever, types.PullPolicyBuild:
 			w.Event(progress.Event{
 				ID:     service.Name,
 				Status: progress.Done,
-				Text:   "Skipped - Image is already present locally",
+				Text:   "Skipped",
 			})
 			continue
+		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
+			if _, ok := images[service.Image]; ok {
+				w.Event(progress.Event{
+					ID:     service.Name,
+					Status: progress.Done,
+					Text:   "Exists",
+				})
+				continue
+			}
 		}
 
 		if s, ok := imagesBeingPulled[service.Image]; ok {
@@ -98,8 +108,9 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		}
 
 		imagesBeingPulled[service.Image] = service.Name
+
 		eg.Go(func() error {
-			err := s.pullServiceImage(ctx, service, info, s.configFile, w, false)
+			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
 			if err != nil {
 				if !opts.IgnoreFailures {
 					if service.Build != nil {
@@ -122,7 +133,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	return err
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) error {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
@@ -130,12 +141,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	})
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	repoInfo, err := registry.ParseRepositoryInfo(ref)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	key := repoInfo.Index.Name
@@ -145,15 +156,15 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 
 	authConfig, err := configFile.GetAuthConfig(key)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	stream, err := s.apiClient.ImagePull(ctx, service.Image, moby.ImagePullOptions{
+	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 		Platform:     service.Platform,
 	})
@@ -163,7 +174,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			Status: progress.Error,
 			Text:   "Error",
 		})
-		return WrapCategorisedComposeError(err, PullFailure)
+		return "", WrapCategorisedComposeError(err, PullFailure)
 	}
 
 	dec := json.NewDecoder(stream)
@@ -173,10 +184,10 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			if err == io.EOF {
 				break
 			}
-			return WrapCategorisedComposeError(err, PullFailure)
+			return "", WrapCategorisedComposeError(err, PullFailure)
 		}
 		if jm.Error != nil {
-			return WrapCategorisedComposeError(errors.New(jm.Error.Message), PullFailure)
+			return "", WrapCategorisedComposeError(errors.New(jm.Error.Message), PullFailure)
 		}
 		if !quietPull {
 			toPullProgressEvent(service.Name, jm, w)
@@ -187,11 +198,16 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		Status: progress.Done,
 		Text:   "Pulled",
 	})
-	return nil
+
+	inspected, _, err := s.dockerCli.Client().ImageInspectWithRaw(ctx, service.Image)
+	if err != nil {
+		return "", err
+	}
+	return inspected.ID, nil
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
-	info, err := s.apiClient.Info(ctx)
+	info, err := s.apiClient().Info(ctx)
 	if err != nil {
 		return err
 	}
@@ -224,10 +240,12 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	return progress.Run(ctx, func(ctx context.Context) error {
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
-		for _, service := range needPull {
-			service := service
+		pulledImages := make([]string, len(needPull))
+		for i, service := range needPull {
+			i, service := i, service
 			eg.Go(func() error {
-				err := s.pullServiceImage(ctx, service, info, s.configFile, w, quietPull)
+				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
+				pulledImages[i] = id
 				if err != nil && service.Build != nil {
 					// image can be built, so we can ignore pull failure
 					return nil
@@ -235,7 +253,16 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 				return err
 			})
 		}
-		return eg.Wait()
+		for i, service := range needPull {
+			if pulledImages[i] != "" {
+				images[service.Image] = pulledImages[i]
+			}
+		}
+		err := eg.Wait()
+		if err != nil {
+			return err
+		}
+		return err
 	})
 }
 

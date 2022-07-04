@@ -26,33 +26,33 @@ import (
 )
 
 func TestLocalComposeLogs(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	const projectName = "compose-e2e-logs"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd("-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd(t, "-f", "./fixtures/logs-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("logs", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("--project-name", projectName, "logs")
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		res.Assert(t, icmd.Expected{Out: `hello`})
 	})
 
 	t.Run("logs ping", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("--project-name", projectName, "logs", "ping")
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "ping")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		assert.Assert(t, !strings.Contains(res.Stdout(), "hello"))
 	})
 
 	t.Run("logs hello", func(t *testing.T) {
-		res := c.RunDockerComposeCmd("--project-name", projectName, "logs", "hello", "ping")
+		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "logs", "hello", "ping")
 		res.Assert(t, icmd.Expected{Out: `PING localhost (127.0.0.1)`})
 		res.Assert(t, icmd.Expected{Out: `hello`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 }

@@ -19,6 +19,7 @@ options:
   default_value: '[]'
   description: Set build-time variables for services.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -28,6 +29,7 @@ options:
   default_value: "true"
   description: Compress the build context using gzip. DEPRECATED
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -37,6 +39,7 @@ options:
   default_value: "true"
   description: Always remove intermediate containers. DEPRECATED
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -47,6 +50,7 @@ options:
   description: |
     Set memory limit for the build container. Not supported on buildkit yet.
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -56,6 +60,7 @@ options:
   default_value: "false"
   description: Do not use cache when building the image
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -66,6 +71,7 @@ options:
   description: |
     Do not remove intermediate containers after a successful build. DEPRECATED
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -75,6 +81,7 @@ options:
   default_value: "true"
   description: Build images in parallel. DEPRECATED
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -82,8 +89,9 @@ options:
 - option: progress
   value_type: string
   default_value: auto
-  description: Set type of progress output ("auto", "plain", "noTty")
+  description: Set type of progress output (auto, tty, plain, quiet)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -93,6 +101,7 @@ options:
   default_value: "false"
   description: Always attempt to pull a newer version of the image.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -103,6 +112,17 @@ options:
   default_value: "false"
   description: Don't print anything to STDOUT
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: ssh
+  value_type: string
+  description: |
+    Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)
+  deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

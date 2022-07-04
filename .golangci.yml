@@ -1,12 +1,11 @@
+run:
+  concurrency: 2
 linters:
-  run:
-    concurrency: 2
-    skip-dirs:
-      - tests/composefiles
   enable-all: false
   disable-all: true
   enable:
     - deadcode
+    - depguard
     - errcheck
     - gocyclo
     - gofmt
@@ -26,6 +25,13 @@ linters:
     - unused
     - varcheck
 linters-settings:
+  depguard:
+    list-type: blacklist
+    include-go-root: true
+    packages:
+      # The io/ioutil package has been deprecated.
+      # https://go.dev/doc/go1.16#ioutil
+      - io/ioutil
   gocyclo:
     min-complexity: 16
   lll:

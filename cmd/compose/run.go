@@ -19,12 +19,12 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	cgo "github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -42,6 +42,7 @@ type runOptions struct {
 	Detach        bool
 	Remove        bool
 	noTty         bool
+	interactive   bool
 	user          string
 	workdir       string
 	entrypoint    string
@@ -53,6 +54,7 @@ type runOptions struct {
 	servicePorts  bool
 	name          string
 	noDeps        bool
+	ignoreOrphans bool
 	quietPull     bool
 }
 
@@ -61,6 +63,9 @@ func (opts runOptions) apply(project *types.Project) error {
 	if err != nil {
 		return err
 	}
+
+	target.Tty = !opts.noTty
+	target.StdinOpen = opts.interactive
 	if !opts.servicePorts {
 		target.Ports = []types.ServicePortConfig{}
 	}
@@ -102,7 +107,7 @@ func (opts runOptions) apply(project *types.Project) error {
 	return nil
 }
 
-func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := runOptions{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -134,6 +139,8 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
+			opts.ignoreOrphans = strings.ToLower(ignore) == "true"
 			return runRun(ctx, backend, project, opts)
 		}),
 		ValidArgsFunction: serviceCompletion(p),
@@ -143,7 +150,7 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.StringArrayVarP(&opts.environment, "env", "e", []string{}, "Set environment variables")
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
-	flags.BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-noTty allocation. By default docker compose run allocates a TTY")
+	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
 	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
@@ -154,6 +161,10 @@ func runCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVar(&opts.useAliases, "use-aliases", false, "Use the service's network useAliases in the network(s) the container connects to.")
 	flags.BoolVar(&opts.servicePorts, "service-ports", false, "Run command with the service's ports enabled and mapped to the host.")
 	flags.BoolVar(&opts.quietPull, "quiet-pull", false, "Pull without printing progress information.")
+
+	cmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
+	cmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
+	cmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	flags.SetNormalizeFunc(normalizeRunFlags)
 	flags.SetInterspersed(false)
@@ -177,7 +188,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	}
 
 	err = progress.Run(ctx, func(ctx context.Context) error {
-		return startDependencies(ctx, backend, *project, opts.Service)
+		return startDependencies(ctx, backend, *project, opts.Service, opts.ignoreOrphans)
 	})
 	if err != nil {
 		return err
@@ -199,10 +210,8 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Command:           opts.Command,
 		Detach:            opts.Detach,
 		AutoRemove:        opts.Remove,
-		Stdin:             os.Stdin,
-		Stdout:            os.Stdout,
-		Stderr:            os.Stderr,
 		Tty:               !opts.noTty,
+		Interactive:       opts.interactive,
 		WorkingDir:        opts.workdir,
 		User:              opts.user,
 		Environment:       opts.environment,
@@ -213,6 +222,14 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 		Index:             0,
 		QuietPull:         opts.quietPull,
 	}
+
+	for i, service := range project.Services {
+		if service.Name == opts.Service {
+			service.StdinOpen = opts.interactive
+			project.Services[i] = service
+		}
+	}
+
 	exitCode, err := backend.RunOneOffContainer(ctx, project, runOpts)
 	if exitCode != 0 {
 		errMsg := ""
@@ -224,7 +241,7 @@ func runRun(ctx context.Context, backend api.Service, project *types.Project, op
 	return err
 }
 
-func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string) error {
+func startDependencies(ctx context.Context, backend api.Service, project types.Project, requestedServiceName string, ignoreOrphans bool) error {
 	dependencies := types.Services{}
 	var requestedService types.ServiceConfig
 	for _, service := range project.Services {
@@ -237,8 +254,17 @@ func startDependencies(ctx context.Context, backend api.Service, project types.P
 
 	project.Services = dependencies
 	project.DisabledServices = append(project.DisabledServices, requestedService)
-	if err := backend.Create(ctx, &project, api.CreateOptions{}); err != nil {
+	err := backend.Create(ctx, &project, api.CreateOptions{
+		IgnoreOrphans: ignoreOrphans,
+	})
+	if err != nil {
 		return err
 	}
-	return backend.Start(ctx, project.Name, api.StartOptions{})
+
+	if len(dependencies) > 0 {
+		return backend.Start(ctx, project.Name, api.StartOptions{
+			Project: &project,
+		})
+	}
+	return nil
 }

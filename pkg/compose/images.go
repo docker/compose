@@ -32,7 +32,8 @@ import (
 )
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
-	allContainers, err := s.apiClient.ContainerList(ctx, moby.ContainerListOptions{
+	projectName = strings.ToLower(projectName)
+	allContainers, err := s.apiClient().ContainerList(ctx, moby.ContainerListOptions{
 		All:     true,
 		Filters: filters.NewArgs(projectFilter(projectName)),
 	})
@@ -83,7 +84,7 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 	for _, img := range images {
 		img := img
 		eg.Go(func() error {
-			inspect, _, err := s.apiClient.ImageInspectWithRaw(ctx, img)
+			inspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, img)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil
@@ -93,7 +94,6 @@ func (s *composeService) getImages(ctx context.Context, images []string) (map[st
 			tag := ""
 			repository := ""
 			if len(inspect.RepoTags) > 0 {
-
 				repotag := strings.Split(inspect.RepoTags[0], ":")
 				repository = repotag[0]
 				if len(repotag) > 1 {

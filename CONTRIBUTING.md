@@ -83,7 +83,7 @@ don't get discouraged! Our contributor's guide explains
   <tr>
     <td>Community Slack</td>
     <td>
-      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://dockercommunity.slack.com/ssb/redirect" target="_blank">with this link</a>.
+      The Docker Community has a dedicated Slack chat to discuss features and issues.  You can sign-up <a href="https://www.docker.com/docker-community" target="_blank">with this link</a>.
     </td>
   </tr>
   <tr>

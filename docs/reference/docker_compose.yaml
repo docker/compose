@@ -98,6 +98,9 @@ long: |-
   and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
 
   If flags are explicitly set on command line, associated environment variable is ignored
+
+  Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
+  containers for the project.
 usage: docker compose
 pname: docker
 plink: docker.yaml
@@ -126,6 +129,7 @@ cname:
 - docker compose top
 - docker compose unpause
 - docker compose up
+- docker compose version
 clink:
 - docker_compose_build.yaml
 - docker_compose_convert.yaml
@@ -151,6 +155,7 @@ clink:
 - docker_compose_top.yaml
 - docker_compose_unpause.yaml
 - docker_compose_up.yaml
+- docker_compose_version.yaml
 options:
 - option: ansi
   value_type: string
@@ -158,6 +163,17 @@ options:
   description: |
     Control when to print ANSI control characters ("never"|"always"|"auto")
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: compatibility
+  value_type: bool
+  default_value: "false"
+  description: Run compose in backward compatibility mode
+  deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -166,6 +182,7 @@ options:
   value_type: string
   description: Specify an alternate environment file.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -176,6 +193,7 @@ options:
   default_value: '[]'
   description: Compose configuration files
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -185,6 +203,7 @@ options:
   default_value: "false"
   description: Do not print ANSI control characters (DEPRECATED)
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -194,6 +213,7 @@ options:
   default_value: '[]'
   description: Specify a profile to enable
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -202,8 +222,9 @@ options:
   value_type: string
   description: |-
     Specify an alternate working directory
-    (default: the path of the Compose file)
+    (default: the path of the, first specified, Compose file)
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -213,6 +234,7 @@ options:
   value_type: string
   description: Project name
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -222,6 +244,18 @@ options:
   default_value: "false"
   description: Show more output
   deprecated: false
+  hidden: true
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: version
+  shorthand: v
+  value_type: bool
+  default_value: "false"
+  description: Show the Docker Compose version information
+  deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -231,8 +265,9 @@ options:
   description: |-
     DEPRECATED! USE --project-directory INSTEAD.
     Specify an alternate working directory
-    (default: the path of the Compose file)
+    (default: the path of the, first specified, Compose file)
   deprecated: false
+  hidden: true
   experimental: false
   experimentalcli: false
   kubernetes: false

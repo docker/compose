@@ -21,15 +21,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/pkg/errors"
-
 	"github.com/compose-spec/compose-go/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/cli/cli/streams"
+	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 	"github.com/sanathkr/go-yaml"
 )
 
@@ -37,19 +40,41 @@ import (
 var Separator = "-"
 
 // NewComposeService create a local implementation of the compose.Service API
-func NewComposeService(apiClient client.APIClient, configFile *configfile.ConfigFile) api.Service {
+func NewComposeService(dockerCli command.Cli) api.Service {
 	return &composeService{
-		apiClient:  apiClient,
-		configFile: configFile,
+		dockerCli: dockerCli,
 	}
 }
 
 type composeService struct {
-	apiClient  client.APIClient
-	configFile *configfile.ConfigFile
+	dockerCli command.Cli
+}
+
+func (s *composeService) apiClient() client.APIClient {
+	return s.dockerCli.Client()
+}
+
+func (s *composeService) configFile() *configfile.ConfigFile {
+	return s.dockerCli.ConfigFile()
+}
+
+func (s *composeService) stdout() *streams.Out {
+	return s.dockerCli.Out()
+}
+
+func (s *composeService) stdin() *streams.In {
+	return s.dockerCli.In()
+}
+
+func (s *composeService) stderr() io.Writer {
+	return s.dockerCli.Err()
 }
 
 func getCanonicalContainerName(c moby.Container) string {
+	if len(c.Names) == 0 {
+		// corner case, sometime happens on removal. return short ID as a safeguard value
+		return c.ID[:12]
+	}
 	// Names return container canonical name /foo  + link aliases /linked_by/foo
 	for _, name := range c.Names {
 		if strings.LastIndex(name, "/") == 0 {
@@ -100,7 +125,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		Name: projectName,
 	}
 	if len(containers) == 0 {
-		return project, errors.New("no such project: " + projectName)
+		return project, errors.Wrap(api.ErrNotFound, fmt.Sprintf("no container found for project %q", projectName))
 	}
 	set := map[string]*types.ServiceConfig{}
 	for _, c := range containers {
@@ -140,7 +165,7 @@ SERVICES:
 				continue SERVICES
 			}
 		}
-		return project, errors.New("no such service: " + qs)
+		return project, errors.Wrapf(api.ErrNotFound, "no such service: %q", qs)
 	}
 	err := project.ForServices(services)
 	if err != nil {
@@ -148,4 +173,60 @@ SERVICES:
 	}
 
 	return project, nil
+}
+
+// actualState list resources labelled by projectName to rebuild compose project model
+func (s *composeService) actualState(ctx context.Context, projectName string, services []string) (Containers, *types.Project, error) {
+	var containers Containers
+	// don't filter containers by options.Services so projectFromName can rebuild project with all existing resources
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	project, err := s.projectFromName(containers, projectName, services...)
+	if err != nil && !api.IsNotFoundError(err) {
+		return nil, nil, err
+	}
+
+	if len(services) > 0 {
+		containers = containers.filter(isService(services...))
+	}
+	return containers, project, nil
+}
+
+func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
+	volumes, err := s.apiClient().VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
+	if err != nil {
+		return nil, err
+	}
+
+	actual := types.Volumes{}
+	for _, vol := range volumes.Volumes {
+		actual[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
+			Name:   vol.Name,
+			Driver: vol.Driver,
+			Labels: vol.Labels,
+		}
+	}
+	return actual, nil
+}
+
+func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(projectFilter(projectName)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	actual := types.Networks{}
+	for _, net := range networks {
+		actual[net.Labels[api.NetworkLabel]] = types.NetworkConfig{
+			Name:   net.Name,
+			Driver: net.Driver,
+			Labels: net.Labels,
+		}
+	}
+	return actual, nil
 }

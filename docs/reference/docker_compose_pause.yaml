@@ -1,5 +1,5 @@
 command: docker compose pause
-short: pause services
+short: Pause services
 long: |
   Pauses running containers of a service. They can be unpaused with `docker compose unpause`.
 usage: docker compose pause [SERVICE...]

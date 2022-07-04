@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -26,6 +27,7 @@ import (
 )
 
 func (s *composeService) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
+	projectName = strings.ToLower(projectName)
 	oneOff := oneOffExclude
 	if options.All {
 		oneOff = oneOffInclude
@@ -53,7 +55,7 @@ func (s *composeService) Ps(ctx context.Context, projectName string, options api
 				})
 			}
 
-			inspect, err := s.apiClient.ContainerInspect(ctx, container.ID)
+			inspect, err := s.apiClient().ContainerInspect(ctx, container.ID)
 			if err != nil {
 				return err
 			}

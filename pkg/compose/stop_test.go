@@ -33,8 +33,11 @@ import (
 func TestStopTimeout(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
+
 	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(

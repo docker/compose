@@ -1,0 +1,9 @@
+services:
+  a:
+    image:  nginx:alpine
+    ports: [80]
+  b:
+    image:  nginx:alpine
+    ports: [80]
+    depends_on:
+      - a

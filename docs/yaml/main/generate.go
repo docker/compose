@@ -22,16 +22,23 @@ import (
 	"path/filepath"
 
 	clidocstool "github.com/docker/cli-docs-tool"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/cmd/compose"
 	"github.com/spf13/cobra"
 )
 
-func generateCliYaml(opts *options) error {
-	cmd := &cobra.Command{Use: "docker"}
-	cmd.AddCommand(compose.RootCommand(nil))
+func generateDocs(opts *options) error {
+	dockerCLI, err := command.NewDockerCli()
+	if err != nil {
+		return err
+	}
+	cmd := &cobra.Command{
+		Use:               "docker",
+		DisableAutoGenTag: true,
+	}
+	cmd.AddCommand(compose.RootCommand(dockerCLI, nil))
 	disableFlagsInUseLine(cmd)
 
-	cmd.DisableAutoGenTag = true
 	tool, err := clidocstool.New(clidocstool.Options{
 		Root:      cmd,
 		SourceDir: opts.source,
@@ -41,7 +48,7 @@ func generateCliYaml(opts *options) error {
 	if err != nil {
 		return err
 	}
-	return tool.GenYamlTree(cmd)
+	return tool.GenAllTree()
 }
 
 func disableFlagsInUseLine(cmd *cobra.Command) {
@@ -69,12 +76,12 @@ type options struct {
 func main() {
 	cwd, _ := os.Getwd()
 	opts := &options{
-		source: cwd,
+		source: filepath.Join(cwd, "docs", "reference"),
 		target: filepath.Join(cwd, "docs", "reference"),
 	}
 	fmt.Printf("Project root: %s\n", opts.source)
 	fmt.Printf("Generating yaml files into %s\n", opts.target)
-	if err := generateCliYaml(opts); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to generate yaml files: %s\n", err.Error())
+	if err := generateDocs(opts); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to generate documentation: %s\n", err.Error())
 	}
 }

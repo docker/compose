@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -30,20 +31,23 @@ import (
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, projectName, options, nil)
+		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	})
 }
 
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions, listener api.ContainerEventListener) error {
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
-	if err != nil {
-		return err
-	}
+	project := options.Project
+	if project == nil {
+		var containers Containers
+		containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
+		if err != nil {
+			return err
+		}
 
-	project, err := s.projectFromName(containers, projectName, options.AttachTo...)
-	if err != nil {
-		return err
+		project, err = s.projectFromName(containers, projectName, options.AttachTo...)
+		if err != nil {
+			return err
+		}
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -55,12 +59,12 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 		eg.Go(func() error {
 			return s.watchContainers(context.Background(), project.Name, options.AttachTo, listener, attached, func(container moby.Container) error {
-				return s.attachContainer(ctx, container, listener, project)
+				return s.attachContainer(ctx, container, listener)
 			})
 		})
 	}
 
-	err = InDependencyOrder(ctx, project, func(c context.Context, name string) error {
+	err := InDependencyOrder(ctx, project, func(c context.Context, name string) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
@@ -76,7 +80,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		depends := types.DependsOnConfig{}
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
-				Condition: ServiceConditionRunningOrHealthy,
+				Condition: getDependencyCondition(s, project),
 			}
 		}
 		err = s.waitDependencies(ctx, project, depends)
@@ -86,6 +90,20 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	}
 
 	return eg.Wait()
+}
+
+// getDependencyCondition checks if service is depended on by other services
+// with service_completed_successfully condition, and applies that condition
+// instead, or --wait will never finish waiting for one-shot containers
+func getDependencyCondition(service types.ServiceConfig, project *types.Project) string {
+	for _, services := range project.Services {
+		for dependencyService, dependencyConfig := range services.DependsOn {
+			if dependencyService == service.Name && dependencyConfig.Condition == types.ServiceConditionCompletedSuccessfully {
+				return types.ServiceConditionCompletedSuccessfully
+			}
+		}
+	}
+	return ServiceConditionRunningOrHealthy
 }
 
 type containerWatchFn func(container moby.Container) error
@@ -107,7 +125,7 @@ func (s *composeService) watchContainers(ctx context.Context, projectName string
 				return nil
 			}
 
-			inspected, err := s.apiClient.ContainerInspect(ctx, event.Container)
+			inspected, err := s.apiClient().ContainerInspect(ctx, event.Container)
 			if err != nil {
 				return err
 			}

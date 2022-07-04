@@ -1,0 +1,3 @@
+services:
+  env-compose-priority:
+    image: env-compose-priority

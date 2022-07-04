@@ -1,3 +1,16 @@
+# docker compose events
+
+<!---MARKER_GEN_START-->
+Receive real time events from containers.
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--json` |  |  | Output events as a stream of json objects |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 

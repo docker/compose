@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/compose-spec/compose-go/types"
@@ -28,11 +27,12 @@ import (
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
-	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/pkg/urlutil"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
+	"github.com/moby/buildkit/session/secrets/secretsprovider"
+	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -64,7 +64,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if service.Build != nil {
 			imageName := getImageName(service, project.Name)
 			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(project, service, imageName)
+			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 					Attrs: map[string]string{"ref": image},
 				})
 			}
-
 			opts[imageName] = buildOptions
 		}
 	}
@@ -161,7 +160,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
 				continue
 			}
-			opt, err := s.toBuildOptions(project, service, imageName)
+			opt, err := s.toBuildOptions(project, service, imageName, []types.SSHKey{})
 			if err != nil {
 				return nil, err
 			}
@@ -189,37 +188,29 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	for name, info := range imgs {
 		images[name] = info.ID
 	}
-	return images, nil
-}
 
-func (s *composeService) serverInfo(ctx context.Context) (command.ServerInfo, error) {
-	ping, err := s.apiClient.Ping(ctx)
-	if err != nil {
-		return command.ServerInfo{}, err
+	for _, s := range project.Services {
+		imgName := getImageName(s, project.Name)
+		digest, ok := images[imgName]
+		if ok {
+			s.CustomLabels[api.ImageDigestLabel] = digest
+		}
 	}
-	serverInfo := command.ServerInfo{
-		HasExperimental: ping.Experimental,
-		OSType:          ping.OSType,
-		BuildkitVersion: ping.BuilderVersion,
-	}
-	return serverInfo, err
+
+	return images, nil
 }
 
 func (s *composeService) doBuild(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
 	if len(opts) == 0 {
 		return nil, nil
 	}
-	serverInfo, err := s.serverInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if buildkitEnabled, err := command.BuildKitEnabled(serverInfo); err != nil || !buildkitEnabled {
-		return s.doBuildClassic(ctx, opts)
+	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
+		return s.doBuildClassic(ctx, project, opts)
 	}
 	return s.doBuildBuildkit(ctx, project, opts, mode)
 }
 
-func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string) (build.Options, error) {
+func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {
 	var tags []string
 	tags = append(tags, imageTag)
 
@@ -244,11 +235,59 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		plats = append(plats, p)
 	}
 
+	cacheFrom, err := buildflags.ParseCacheEntry(service.Build.CacheFrom)
+	if err != nil {
+		return build.Options{}, err
+	}
+	cacheTo, err := buildflags.ParseCacheEntry(service.Build.CacheTo)
+	if err != nil {
+		return build.Options{}, err
+	}
+
+	sessionConfig := []session.Attachable{
+		authprovider.NewDockerAuthProvider(s.stderr()),
+	}
+	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
+		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))
+		if err != nil {
+			return build.Options{}, err
+		}
+		sessionConfig = append(sessionConfig, sshAgentProvider)
+	}
+
+	if len(service.Build.Secrets) > 0 {
+		var sources []secretsprovider.Source
+		for _, secret := range service.Build.Secrets {
+			config := project.Secrets[secret.Source]
+			if config.File == "" {
+				return build.Options{}, fmt.Errorf("build.secrets only supports file-based secrets: %q", secret.Source)
+			}
+			sources = append(sources, secretsprovider.Source{
+				ID:       secret.Source,
+				FilePath: config.File,
+			})
+		}
+		store, err := secretsprovider.NewStore(sources)
+		if err != nil {
+			return build.Options{}, err
+		}
+		p := secretsprovider.NewSecretProvider(store)
+		sessionConfig = append(sessionConfig, p)
+	}
+
+	if len(service.Build.Tags) > 0 {
+		tags = append(tags, service.Build.Tags...)
+	}
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
 			DockerfilePath: dockerFilePath(service.Build.Context, service.Build.Dockerfile),
 		},
+		CacheFrom:   cacheFrom,
+		CacheTo:     cacheTo,
+		NoCache:     service.Build.NoCache,
+		Pull:        service.Build.Pull,
 		BuildArgs:   buildArgs,
 		Tags:        tags,
 		Target:      service.Build.Target,
@@ -256,10 +295,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Platforms:   plats,
 		Labels:      service.Build.Labels,
 		NetworkMode: service.Build.Network,
-		ExtraHosts:  service.Build.ExtraHosts,
-		Session: []session.Attachable{
-			authprovider.NewDockerAuthProvider(os.Stderr),
-		},
+		ExtraHosts:  service.Build.ExtraHosts.AsList(),
+		Session:     sessionConfig,
 	}, nil
 }
 
@@ -292,4 +329,15 @@ func dockerFilePath(context string, dockerfile string) string {
 		return dockerfile
 	}
 	return filepath.Join(context, dockerfile)
+}
+
+func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
+	sshConfig := make([]sshprovider.AgentConfig, 0, len(sshKeys))
+	for _, sshKey := range sshKeys {
+		sshConfig = append(sshConfig, sshprovider.AgentConfig{
+			ID:    sshKey.ID,
+			Paths: []string{sshKey.Path},
+		})
+	}
+	return sshprovider.NewSSHAgentProvider(sshConfig)
 }

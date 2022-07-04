@@ -1,0 +1,14 @@
+version: "3.6"
+services:
+  service_a:
+    image: bash
+    command: echo "a"
+    depends_on:
+      - shared_dep
+  service_b:
+    image: bash
+    command: echo "b"
+    depends_on:
+      - shared_dep
+  shared_dep:
+    image: bash

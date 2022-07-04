@@ -26,6 +26,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -41,7 +42,6 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
-	builtFromResources := options.Project == nil
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -51,8 +51,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	if builtFromResources {
-		options.Project, err = s.getProjectWithVolumes(ctx, containers, projectName)
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
 		if err != nil {
 			return err
 		}
@@ -62,7 +63,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	err = InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service string) error {
+	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		serviceContainers := containers.filter(isService(service))
 		err := s.removeContainers(ctx, w, serviceContainers, options.Timeout, options.Volumes)
 		return err
@@ -71,7 +72,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	orphans := containers.filter(isNotService(options.Project.ServiceNames()...))
+	orphans := containers.filter(isNotService(project.ServiceNames()...))
 	if options.RemoveOrphans && len(orphans) > 0 {
 		err := s.removeContainers(ctx, w, orphans, options.Timeout, false)
 		if err != nil {
@@ -79,21 +80,18 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		}
 	}
 
-	ops, err := s.ensureNetworksDown(ctx, projectName)
-	if err != nil {
-		return err
-	}
+	ops := s.ensureNetworksDown(ctx, project, w)
 
 	if options.Images != "" {
-		ops = append(ops, s.ensureImagesDown(ctx, projectName, options, w)...)
+		ops = append(ops, s.ensureImagesDown(ctx, project, options, w)...)
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, options.Project, w)...)
+		ops = append(ops, s.ensureVolumesDown(ctx, project, w)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
-		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
+		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", projectName)
 	}
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -106,6 +104,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
 	for _, vol := range project.Volumes {
+		if vol.External.External {
+			continue
+		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
 			return s.removeVolume(ctx, volumeName, w)
@@ -114,9 +115,9 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, projectName string, options api.DownOptions, w progress.Writer) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) []downOp {
 	var ops []downOp
-	for image := range s.getServiceImages(options, projectName) {
+	for image := range s.getServiceImages(options, project) {
 		image := image
 		ops = append(ops, func() error {
 			return s.removeImage(ctx, image, w)
@@ -125,31 +126,74 @@ func (s *composeService) ensureImagesDown(ctx context.Context, projectName strin
 	return ops
 }
 
-func (s *composeService) ensureNetworksDown(ctx context.Context, projectName string) ([]downOp, error) {
+func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
 	var ops []downOp
-	networks, err := s.apiClient.NetworkList(ctx, moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(projectName))})
-	if err != nil {
-		return ops, err
-	}
-	for _, n := range networks {
-		networkID := n.ID
+	for _, n := range project.Networks {
+		if n.External.External {
+			continue
+		}
+		// loop capture variable for op closure
 		networkName := n.Name
 		ops = append(ops, func() error {
-			return s.removeNetwork(ctx, networkID, networkName)
+			return s.removeNetwork(ctx, networkName, w)
 		})
 	}
-	return ops, nil
+	return ops
 }
 
-func (s *composeService) getServiceImages(options api.DownOptions, projectName string) map[string]struct{} {
+func (s *composeService) removeNetwork(ctx context.Context, name string, w progress.Writer) error {
+	// networks are guaranteed to have unique IDs but NOT names, so it's
+	// possible to get into a situation where a compose down will fail with
+	// an error along the lines of:
+	// 	failed to remove network test: Error response from daemon: network test is ambiguous (2 matches found based on name)
+	// as a workaround here, the delete is done by ID after doing a list using
+	// the name as a filter (99.9% of the time this will return a single result)
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", name)),
+	})
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("failed to inspect network %s", name))
+	}
+	if len(networks) == 0 {
+		return nil
+	}
+
+	eventName := fmt.Sprintf("Network %s", name)
+	w.Event(progress.RemovingEvent(eventName))
+
+	var removed int
+	for _, net := range networks {
+		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			w.Event(progress.ErrorEvent(eventName))
+			return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+		}
+		removed++
+	}
+
+	if removed == 0 {
+		// in practice, it's extremely unlikely for this to ever occur, as it'd
+		// mean the network was present when we queried at the start of this
+		// method but was then deleted by something else in the interim
+		w.Event(progress.NewEvent(eventName, progress.Done, "Warning: No resource found to remove"))
+		return nil
+	}
+
+	w.Event(progress.RemovedEvent(eventName))
+	return nil
+}
+
+func (s *composeService) getServiceImages(options api.DownOptions, project *types.Project) map[string]struct{} {
 	images := map[string]struct{}{}
-	for _, service := range options.Project.Services {
+	for _, service := range project.Services {
 		image := service.Image
 		if options.Images == "local" && image != "" {
 			continue
 		}
 		if image == "" {
-			image = getImageName(service, projectName)
+			image = getImageName(service, project.Name)
 		}
 		images[image] = struct{}{}
 	}
@@ -159,7 +203,7 @@ func (s *composeService) getServiceImages(options api.DownOptions, projectName s
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {
 	id := fmt.Sprintf("Image %s", image)
 	w.Event(progress.NewEvent(id, progress.Working, "Removing"))
-	_, err := s.apiClient.ImageRemove(ctx, image, moby.ImageRemoveOptions{})
+	_, err := s.apiClient().ImageRemove(ctx, image, moby.ImageRemoveOptions{})
 	if err == nil {
 		w.Event(progress.NewEvent(id, progress.Done, "Removed"))
 		return nil
@@ -174,7 +218,7 @@ func (s *composeService) removeImage(ctx context.Context, image string, w progre
 func (s *composeService) removeVolume(ctx context.Context, id string, w progress.Writer) error {
 	resource := fmt.Sprintf("Volume %s", id)
 	w.Event(progress.NewEvent(resource, progress.Working, "Removing"))
-	err := s.apiClient.VolumeRemove(ctx, id, true)
+	err := s.apiClient().VolumeRemove(ctx, id, true)
 	if err == nil {
 		w.Event(progress.NewEvent(resource, progress.Done, "Removed"))
 		return nil
@@ -193,7 +237,7 @@ func (s *composeService) stopContainers(ctx context.Context, w progress.Writer, 
 		eg.Go(func() error {
 			eventName := getContainerProgressName(container)
 			w.Event(progress.StoppingEvent(eventName))
-			err := s.apiClient.ContainerStop(ctx, container.ID, timeout)
+			err := s.apiClient().ContainerStop(ctx, container.ID, timeout)
 			if err != nil {
 				w.Event(progress.ErrorMessageEvent(eventName, "Error while Stopping"))
 				return err
@@ -218,7 +262,7 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 				return err
 			}
 			w.Event(progress.RemovingEvent(eventName))
-			err = s.apiClient.ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
+			err = s.apiClient().ContainerRemove(ctx, container.ID, moby.ContainerRemoveOptions{
 				Force:         true,
 				RemoveVolumes: volumes,
 			})
@@ -233,21 +277,23 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 	return eg.Wait()
 }
 
-func (s *composeService) getProjectWithVolumes(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
+func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	project, _ := s.projectFromName(containers, projectName)
-	volumes, err := s.apiClient.VolumeList(ctx, filters.NewArgs(projectFilter(projectName)))
-	if err != nil {
+	project, err := s.projectFromName(containers, projectName)
+	if err != nil && !api.IsNotFoundError(err) {
 		return nil, err
 	}
 
-	project.Volumes = types.Volumes{}
-	for _, vol := range volumes.Volumes {
-		project.Volumes[vol.Labels[api.VolumeLabel]] = types.VolumeConfig{
-			Name:   vol.Name,
-			Driver: vol.Driver,
-			Labels: vol.Labels,
-		}
+	volumes, err := s.actualVolumes(ctx, projectName)
+	if err != nil {
+		return nil, err
 	}
+	project.Volumes = volumes
+
+	networks, err := s.actualNetworks(ctx, projectName)
+	if err != nil {
+		return nil, err
+	}
+	project.Networks = networks
 	return project, nil
 }

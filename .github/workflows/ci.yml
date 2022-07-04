@@ -5,6 +5,12 @@ on:
     branches:
       - v2
   pull_request:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'To run with tmate enter "debug_enabled"'
+        required: false
+        default: "false"
 
 jobs:
   lint:
@@ -13,16 +19,16 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.3
         id: go
 
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Validate go-mod is up-to-date and license headers
+      - name: Validate go-mod, license headers and docs are up-to-date
         run: make validate
 
       - name: Run golangci-lint
@@ -40,10 +46,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.3
         id: go
 
       - name: Checkout code into the Go module directory
@@ -65,10 +71,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.3
         id: go
 
       - name: Setup docker CLI
@@ -90,7 +96,7 @@ jobs:
       - name: Build for local E2E
         env:
           BUILD_TAGS: e2e
-        run: make -f builder.Makefile compose-plugin
+        run: make GIT_TAG=e2e-PR-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }} -f builder.Makefile compose-plugin
 
       - name: E2E Test in plugin mode
         run: make e2e-compose
@@ -101,10 +107,10 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18.3
         id: go
 
       - name: Setup docker CLI
@@ -123,7 +129,17 @@ jobs:
       - name: Build for local E2E
         env:
           BUILD_TAGS: e2e
-        run: make -f builder.Makefile compose-plugin
+        run: make GIT_TAG=e2e-PR-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }} -f builder.Makefile compose-plugin
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
 
       - name: E2E Test in standalone mode
-        run: make e2e-compose-standalone
+        run: |
+          rm -f /usr/local/bin/docker-compose
+          cp bin/docker-compose /usr/local/bin
+          make e2e-compose-standalone

@@ -16,6 +16,7 @@ options:
   default_value: yaml
   description: 'Format the output. Values: [yaml | json]'
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -24,6 +25,17 @@ options:
   value_type: string
   description: Print the service config hash, one per line.
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: images
+  value_type: bool
+  default_value: "false"
+  description: Print the image names, one per line.
+  deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -33,6 +45,27 @@ options:
   default_value: "false"
   description: Don't interpolate environment variables.
   deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: no-normalize
+  value_type: bool
+  default_value: "false"
+  description: Don't normalize compose model.
+  deprecated: false
+  hidden: false
+  experimental: false
+  experimentalcli: false
+  kubernetes: false
+  swarm: false
+- option: output
+  shorthand: o
+  value_type: string
+  description: Save to file (default to stdout)
+  deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -42,6 +75,7 @@ options:
   default_value: "false"
   description: Print the profile names, one per line.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -52,6 +86,7 @@ options:
   default_value: "false"
   description: Only validate the configuration, don't print anything.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -61,6 +96,7 @@ options:
   default_value: "false"
   description: Pin image tags to digests.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -70,6 +106,7 @@ options:
   default_value: "false"
   description: Print the service names, one per line.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false
@@ -79,6 +116,7 @@ options:
   default_value: "false"
   description: Print the volume names, one per line.
   deprecated: false
+  hidden: false
   experimental: false
   experimentalcli: false
   kubernetes: false

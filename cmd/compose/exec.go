@@ -18,12 +18,10 @@ package compose
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/containerd/console"
 	"github.com/docker/cli/cli"
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/compose"
 	"github.com/spf13/cobra"
@@ -37,14 +35,15 @@ type execOpts struct {
 	environment []string
 	workingDir  string
 
-	noTty      bool
-	user       string
-	detach     bool
-	index      int
-	privileged bool
+	noTty       bool
+	user        string
+	detach      bool
+	index       int
+	privileged  bool
+	interactive bool
 }
 
-func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
+func execCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *cobra.Command {
 	opts := execOpts{
 		composeOptions: &composeOptions{
 			projectOptions: p,
@@ -70,8 +69,13 @@ func execCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	runCmd.Flags().IntVar(&opts.index, "index", 1, "index of the container if there are multiple instances of a service [default: 1].")
 	runCmd.Flags().BoolVarP(&opts.privileged, "privileged", "", false, "Give extended privileges to the process.")
 	runCmd.Flags().StringVarP(&opts.user, "user", "u", "", "Run the command as this user.")
-	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", false, "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
+	runCmd.Flags().BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation. By default `docker compose exec` allocates a TTY.")
 	runCmd.Flags().StringVarP(&opts.workingDir, "workdir", "w", "", "Path to workdir directory for this command.")
+
+	runCmd.Flags().BoolVarP(&opts.interactive, "interactive", "i", true, "Keep STDIN open even if not attached.")
+	runCmd.Flags().MarkHidden("interactive") //nolint:errcheck
+	runCmd.Flags().BoolP("tty", "t", true, "Allocate a pseudo-TTY.")
+	runCmd.Flags().MarkHidden("tty") //nolint:errcheck
 
 	runCmd.Flags().SetInterspersed(false)
 	return runCmd
@@ -100,27 +104,9 @@ func runExec(ctx context.Context, backend api.Service, opts execOpts) error {
 		Index:       opts.index,
 		Detach:      opts.detach,
 		WorkingDir:  opts.workingDir,
-
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+		Interactive: opts.interactive,
 	}
 
-	if execOpts.Tty {
-		con := console.Current()
-		if err := con.SetRaw(); err != nil {
-			return err
-		}
-		defer func() {
-			if err := con.Reset(); err != nil {
-				fmt.Println("Unable to close the console")
-			}
-		}()
-
-		execOpts.Stdin = con
-		execOpts.Stdout = con
-		execOpts.Stderr = con
-	}
 	exitCode, err := backend.Exec(ctx, projectName, execOpts)
 	if exitCode != 0 {
 		errMsg := ""

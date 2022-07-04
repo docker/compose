@@ -8,7 +8,7 @@
   * [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac)
   * make
 * Linux:
-  * [Docker 19.03 or later](https://docs.docker.com/engine/install/)
+  * [Docker 20.10 or later](https://docs.docker.com/engine/install/)
   * make
 
 ### Building the CLI

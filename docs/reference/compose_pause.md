@@ -1,3 +1,10 @@
+# docker compose pause
+
+<!---MARKER_GEN_START-->
+Pause services
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 

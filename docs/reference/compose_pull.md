@@ -1,11 +1,26 @@
+# docker compose pull
+
+<!---MARKER_GEN_START-->
+Pull service images
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--ignore-pull-failures` |  |  | Pull what it can and ignores images with pull failures |
+| `--include-deps` |  |  | Also pull services declared as dependencies |
+| `-q`, `--quiet` |  |  | Pull without printing progress information |
+
+
+<!---MARKER_GEN_END-->
 
 ## Description
 
-Pulls an image associated with a service defined in a `compose.yaml` file, but does not start containers based on 
+Pulls an image associated with a service defined in a `compose.yaml` file, but does not start containers based on
 those images.
 
 
-## Examples 
+## Examples
 
 suppose you have this `compose.yaml`:
 
@@ -24,8 +39,8 @@ services:
       - db
 ```
 
-If you run `docker compose pull ServiceName` in the same directory as the `compose.yaml` file that defines the service, 
-Docker pulls the associated image. For example, to call the postgres image configured as the db service in our example, 
+If you run `docker compose pull ServiceName` in the same directory as the `compose.yaml` file that defines the service,
+Docker pulls the associated image. For example, to call the postgres image configured as the db service in our example,
 you would run `docker compose pull db`.
 
 ```console
@@ -46,4 +61,4 @@ $ docker compose pull db
    ⠹ f63c47038e66 Waiting                                                  9.3s
    ⠹ 77a0c198cde5 Waiting                                                  9.3s
    ⠹ c8752d5b785c Waiting                                                  9.3s
-``̀
+``̀`

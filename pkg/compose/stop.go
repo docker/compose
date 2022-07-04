@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -25,30 +26,20 @@ import (
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.stop(ctx, projectName, options)
+		return s.stop(ctx, strings.ToLower(projectName), options)
 	})
 }
 
 func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
-	services := options.Services
-	if len(services) == 0 {
-		services = []string{}
-	}
-
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true, services...)
-	if err != nil {
-		return err
-	}
-
-	project, err := s.projectFromName(containers, projectName, services...)
+	containers, project, err := s.actualState(ctx, projectName, options.Services)
 	if err != nil {
 		return err
 	}
 
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		return s.stopContainers(ctx, w, containers.filter(isService(service)), options.Timeout)
+		containersToStop := containers.filter(isService(service)).filter(isNotOneOff)
+		return s.stopContainers(ctx, w, containersToStop, options.Timeout)
 	})
 }

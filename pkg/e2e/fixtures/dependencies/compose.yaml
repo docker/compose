@@ -1,0 +1,8 @@
+services:
+  foo:
+    image: nginx:alpine
+    depends_on:
+      - bar
+
+  bar:
+    image: nginx:alpine

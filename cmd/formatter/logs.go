@@ -79,7 +79,7 @@ func (l *logConsumer) Log(container, service, message string) {
 	}
 	p := l.getPresenter(container)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck
+		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line) // nolint:errcheck
 	}
 }
 
@@ -118,5 +118,5 @@ type presenter struct {
 }
 
 func (p *presenter) setPrefix(width int) {
-	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.name))
+	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s | ", p.name))
 }

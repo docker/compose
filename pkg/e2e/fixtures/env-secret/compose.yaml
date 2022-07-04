@@ -1,0 +1,11 @@
+services:
+  foo:
+    image: alpine
+    secrets:
+      - bar
+    command: cat /run/secrets/bar
+
+secrets:
+  bar:
+    environment: SECRET
+

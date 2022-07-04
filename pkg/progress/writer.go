@@ -90,28 +90,45 @@ func RunWithStatus(ctx context.Context, pf progressFuncWithStatus) (string, erro
 	return result, err
 }
 
+const (
+	// ModeAuto detect console capabilities
+	ModeAuto = "auto"
+	// ModeTTY use terminal capability for advanced rendering
+	ModeTTY = "tty"
+	// ModePlain dump raw events to output
+	ModePlain = "plain"
+)
+
+// Mode define how progress should be rendered, either as ModePlain or ModeTTY
+var Mode = ModeAuto
+
 // NewWriter returns a new multi-progress writer
 func NewWriter(out console.File) (Writer, error) {
 	_, isTerminal := term.GetFdInfo(out)
-
-	if isTerminal {
-		con, err := console.ConsoleFromFile(out)
-		if err != nil {
-			return nil, err
-		}
-
-		return &ttyWriter{
-			out:      con,
-			eventIDs: []string{},
-			events:   map[string]Event{},
-			repeated: false,
-			done:     make(chan bool),
-			mtx:      &sync.Mutex{},
-		}, nil
+	if Mode == ModeAuto && isTerminal {
+		return newTTYWriter(out)
 	}
-
+	if Mode == ModeTTY {
+		return newTTYWriter(out)
+	}
 	return &plainWriter{
 		out:  out,
 		done: make(chan bool),
+	}, nil
+}
+
+func newTTYWriter(out console.File) (Writer, error) {
+	con, err := console.ConsoleFromFile(out)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ttyWriter{
+		out:      con,
+		eventIDs: []string{},
+		events:   map[string]Event{},
+		repeated: false,
+		done:     make(chan bool),
+		mtx:      &sync.Mutex{},
 	}, nil
 }

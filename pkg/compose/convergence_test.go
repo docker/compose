@@ -74,8 +74,11 @@ func TestServiceLinks(t *testing.T) {
 	t.Run("service links default", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
+
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		tested.apiClient = apiClient
+		cli := mocks.NewMockCli(mockCtrl)
+		tested.dockerCli = cli
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db"}
 
@@ -95,7 +98,9 @@ func TestServiceLinks(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		tested.apiClient = apiClient
+		cli := mocks.NewMockCli(mockCtrl)
+		tested.dockerCli = cli
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:db"}
 
@@ -115,7 +120,9 @@ func TestServiceLinks(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		tested.apiClient = apiClient
+		cli := mocks.NewMockCli(mockCtrl)
+		tested.dockerCli = cli
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
 
@@ -135,7 +142,9 @@ func TestServiceLinks(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		tested.apiClient = apiClient
+		cli := mocks.NewMockCli(mockCtrl)
+		tested.dockerCli = cli
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
 		s.ExternalLinks = []string{"db1:db2"}
@@ -159,7 +168,9 @@ func TestServiceLinks(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		tested.apiClient = apiClient
+		cli := mocks.NewMockCli(mockCtrl)
+		tested.dockerCli = cli
+		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{}
 		s.ExternalLinks = []string{}
@@ -189,8 +200,11 @@ func TestServiceLinks(t *testing.T) {
 func TestWaitDependencies(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
-	api := mocks.NewMockAPIClient(mockCtrl)
-	tested.apiClient = api
+
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 	t.Run("should skip dependencies with scale 0", func(t *testing.T) {
 		dbService := types.ServiceConfig{Name: "db", Scale: 0}

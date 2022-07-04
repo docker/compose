@@ -103,8 +103,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
-			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
-			create.ignoreOrphans = strings.ToLower(ignore) == "true"
+			create.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
 			if create.ignoreOrphans && create.removeOrphans {
 				return fmt.Errorf("COMPOSE_IGNORE_ORPHANS and --remove-orphans cannot be combined")
 			}
@@ -186,6 +185,9 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	if upOptions.attachDependencies {
 		attachTo = project.ServiceNames()
 	}
+	if len(attachTo) == 0 {
+		attachTo = project.ServiceNames()
+	}
 
 	create := api.CreateOptions{
 		Services:             services,
@@ -205,6 +207,7 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 	return backend.Up(ctx, project, api.UpOptions{
 		Create: create,
 		Start: api.StartOptions{
+			Project:      project,
 			Attach:       consumer,
 			AttachTo:     attachTo,
 			ExitCodeFrom: upOptions.exitCodeFrom,

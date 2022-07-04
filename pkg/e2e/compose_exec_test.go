@@ -25,24 +25,29 @@ import (
 )
 
 func TestLocalComposeExec(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	const projectName = "compose-e2e-exec"
 
-	c.RunDockerComposeCmd("--project-directory", "fixtures/simple-composefile", "--project-name", projectName, "up", "-d")
+	cmdArgs := func(cmd string, args ...string) []string {
+		ret := []string{"--project-directory", "fixtures/simple-composefile", "--project-name", projectName, cmd}
+		ret = append(ret, args...)
+		return ret
+	}
+
+	c.RunDockerComposeCmd(t, cmdArgs("up", "-d")...)
 
 	t.Run("exec true", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "compose-e2e-exec-simple-1", "/bin/true")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
+		c.RunDockerComposeCmd(t, cmdArgs("exec", "simple", "/bin/true")...)
 	})
 
 	t.Run("exec false", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "compose-e2e-exec-simple-1", "/bin/false")
+		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "simple", "/bin/false")...)
 		res.Assert(t, icmd.Expected{ExitCode: 1})
 	})
 
 	t.Run("exec with env set", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerCmd("exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env"),
+		res := icmd.RunCmd(c.NewDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "FOO=BAR")
 			})
@@ -50,8 +55,7 @@ func TestLocalComposeExec(t *testing.T) {
 	})
 
 	t.Run("exec without env set", func(t *testing.T) {
-		res := c.RunDockerOrExitError("exec", "-e", "FOO", "compose-e2e-exec-simple-1", "/usr/bin/env")
-		res.Assert(t, icmd.Expected{ExitCode: 0})
-		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="))
+		res := c.RunDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
+		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
 	})
 }

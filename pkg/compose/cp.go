@@ -42,57 +42,78 @@ const (
 	acrossServices = fromService | toService
 )
 
-func (s *composeService) Copy(ctx context.Context, project string, opts api.CopyOptions) error {
-	srcService, srcPath := splitCpArg(opts.Source)
-	destService, dstPath := splitCpArg(opts.Destination)
+func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
+	projectName = strings.ToLower(projectName)
+	srcService, srcPath := splitCpArg(options.Source)
+	destService, dstPath := splitCpArg(options.Destination)
 
 	var direction copyDirection
 	var serviceName string
+	var copyFunc func(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error
 	if srcService != "" {
 		direction |= fromService
 		serviceName = srcService
+		copyFunc = s.copyFromContainer
 
 		// copying from multiple containers of a services doesn't make sense.
-		if opts.All {
+		if options.All {
 			return errors.New("cannot use the --all flag when copying from a service")
 		}
 	}
 	if destService != "" {
 		direction |= toService
 		serviceName = destService
+		copyFunc = s.copyToContainer
+	}
+	if direction == acrossServices {
+		return errors.New("copying between services is not supported")
 	}
 
-	containers, err := s.getContainers(ctx, project, oneOffExclude, true, serviceName)
+	if direction == 0 {
+		return errors.New("unknown copy direction")
+	}
+
+	containers, err := s.listContainersTargetedForCopy(ctx, projectName, options.Index, direction, serviceName)
 	if err != nil {
 		return err
-	}
-
-	if len(containers) < 1 {
-		return fmt.Errorf("no container found for service %q", serviceName)
-	}
-
-	if !opts.All {
-		containers = containers.filter(indexed(opts.Index))
 	}
 
 	g := errgroup.Group{}
 	for _, container := range containers {
 		containerID := container.ID
 		g.Go(func() error {
-			switch direction {
-			case fromService:
-				return s.copyFromContainer(ctx, containerID, srcPath, dstPath, opts)
-			case toService:
-				return s.copyToContainer(ctx, containerID, srcPath, dstPath, opts)
-			case acrossServices:
-				return errors.New("copying between services is not supported")
-			default:
-				return errors.New("unknown copy direction")
-			}
+			return copyFunc(ctx, containerID, srcPath, dstPath, options)
 		})
 	}
 
 	return g.Wait()
+}
+
+func (s *composeService) listContainersTargetedForCopy(ctx context.Context, projectName string, index int, direction copyDirection, serviceName string) (Containers, error) {
+	var containers Containers
+	var err error
+	switch {
+	case index > 0:
+		container, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, index)
+		if err != nil {
+			return nil, err
+		}
+		return append(containers, container), nil
+	default:
+		containers, err = s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(containers) < 1 {
+			return nil, fmt.Errorf("no container found for service %q", serviceName)
+		}
+		if direction == fromService {
+			return containers[:1], err
+
+		}
+		return containers, err
+	}
 }
 
 func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, opts api.CopyOptions) error {
@@ -107,7 +128,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 
 	// Prepare destination copy info by stat-ing the container path.
 	dstInfo := archive.CopyInfo{Path: dstPath}
-	dstStat, err := s.apiClient.ContainerStatPath(ctx, containerID, dstPath)
+	dstStat, err := s.apiClient().ContainerStatPath(ctx, containerID, dstPath)
 
 	// If the destination is a symbolic link, we should evaluate it.
 	if err == nil && dstStat.Mode&os.ModeSymlink != 0 {
@@ -119,7 +140,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 
 		dstInfo.Path = linkTarget
-		dstStat, err = s.apiClient.ContainerStatPath(ctx, containerID, linkTarget)
+		dstStat, err = s.apiClient().ContainerStatPath(ctx, containerID, linkTarget)
 	}
 
 	// Validate the destination path
@@ -143,7 +164,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 	)
 
 	if srcPath == "-" {
-		content = os.Stdin
+		content = s.stdin()
 		resolvedDstPath = dstInfo.Path
 		if !dstInfo.IsDir {
 			return errors.Errorf("destination \"%s:%s\" must be a directory", containerID, dstPath)
@@ -187,7 +208,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		AllowOverwriteDirWithFile: false,
 		CopyUIDGID:                opts.CopyUIDGID,
 	}
-	return s.apiClient.CopyToContainer(ctx, containerID, resolvedDstPath, content, options)
+	return s.apiClient().CopyToContainer(ctx, containerID, resolvedDstPath, content, options)
 }
 
 func (s *composeService) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, opts api.CopyOptions) error {
@@ -207,7 +228,7 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 	// if client requests to follow symbol link, then must decide target file to be copied
 	var rebaseName string
 	if opts.FollowLink {
-		srcStat, err := s.apiClient.ContainerStatPath(ctx, containerID, srcPath)
+		srcStat, err := s.apiClient().ContainerStatPath(ctx, containerID, srcPath)
 
 		// If the destination is a symbolic link, we should follow it.
 		if err == nil && srcStat.Mode&os.ModeSymlink != 0 {
@@ -223,14 +244,14 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 		}
 	}
 
-	content, stat, err := s.apiClient.CopyFromContainer(ctx, containerID, srcPath)
+	content, stat, err := s.apiClient().CopyFromContainer(ctx, containerID, srcPath)
 	if err != nil {
 		return err
 	}
 	defer content.Close() //nolint:errcheck
 
 	if dstPath == "-" {
-		_, err = io.Copy(os.Stdout, content)
+		_, err = io.Copy(s.stdout(), content)
 		return err
 	}
 

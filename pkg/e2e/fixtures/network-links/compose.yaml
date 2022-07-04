@@ -1,0 +1,9 @@
+services:
+  container1:
+    image: nginx
+    network_mode: bridge
+  container2:
+    image: nginx
+    network_mode: bridge
+    links:
+      - container1
