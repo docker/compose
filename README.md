@@ -13,14 +13,15 @@ Check out the [V2 branch here](https://github.com/docker/compose/tree/v2/)!!
 
 ---------------------------------------------
 
-** Compose V2 is on its way! :star_struck: **
+** Compose V2 is **Generally Available**! :star_struck: **
 ---------------------------------------------
 
-We are currently polishing the next generation of Docker Compose, to be released soon... :stopwatch: 
-- Read more on [RC1 announcement](https://www.docker.com/blog/start-dev-environments-locally-compose-v2-rc-1-and-more-in-docker-desktop-3-6/). 
-- Check the [v2 branch](https://github.com/docker/compose/tree/v2) on this repo.
+Check it out [here](https://github.com/docker/compose/tree/v2/)!
 
-We are working towards providing an easy way to install Compose V2 on Linux. Once this is available, Compose V2 will be marked as generally available, our current target for this is the end of October.
+Read more on the [GA announcement here](https://www.docker.com/blog/announcing-compose-v2-general-availability/)
+
+
+---------------------------------------------
 
 V1 vs V2 transition :hourglass_flowing_sand:
 --------------------------------------------
