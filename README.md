@@ -4,6 +4,15 @@ Docker Compose
 
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
+# :warning: *Compose V1 is DEPRECATED* :warning:
+Since [Compose V2 is now GA](https://www.docker.com/blog/announcing-compose-v2-general-availability/), Compose V1 is officially **End of Life**. This means that:
+- Active development and new features will only be added to the V2 codebase
+- Only security-related issues will be considered for V1
+
+Check out the [V2 branch here](https://github.com/docker/compose/tree/v2/)!!
+
+---------------------------------------------
+
 ** Compose V2 is on its way! :star_struck: **
 ---------------------------------------------
 
