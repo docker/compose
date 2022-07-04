@@ -4,14 +4,24 @@ Docker Compose
 
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
-** Compose V2 is on its way! :star_struck: **
+# :warning: *Compose V1 is DEPRECATED* :warning:
+Since [Compose V2 is now GA](https://www.docker.com/blog/announcing-compose-v2-general-availability/), Compose V1 is officially **End of Life**. This means that:
+- Active development and new features will only be added to the V2 codebase
+- Only security-related issues will be considered for V1
+
+Check out the [V2 branch here](https://github.com/docker/compose/tree/v2/)!!
+
 ---------------------------------------------
 
-We are currently polishing the next generation of Docker Compose, to be released soon... :stopwatch: 
-- Read more on [RC1 announcement](https://www.docker.com/blog/start-dev-environments-locally-compose-v2-rc-1-and-more-in-docker-desktop-3-6/). 
-- Check the [v2 branch](https://github.com/docker/compose/tree/v2) on this repo.
+** Compose V2 is **Generally Available**! :star_struck: **
+---------------------------------------------
 
-We are working towards providing an easy way to install Compose V2 on Linux. Once this is available, Compose V2 will be marked as generally available, our current target for this is the end of October.
+Check it out [here](https://github.com/docker/compose/tree/v2/)!
+
+Read more on the [GA announcement here](https://www.docker.com/blog/announcing-compose-v2-general-availability/)
+
+
+---------------------------------------------
 
 V1 vs V2 transition :hourglass_flowing_sand:
 --------------------------------------------
