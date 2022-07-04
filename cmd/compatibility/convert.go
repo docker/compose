@@ -58,17 +58,18 @@ func Convert(args []string) []string {
 			command = append(command, args[i:]...)
 			break
 		}
-		if arg == "--verbose" {
+
+		switch arg {
+		case "--verbose":
 			arg = "--debug"
-		}
-		if arg == "-h" {
+		case "-h":
 			// docker cli has deprecated -h to avoid ambiguity with -H, while docker-compose still support it
 			arg = "--help"
-		}
-		if arg == "--version" || arg == "-v" {
+		case "--version", "-v":
 			// redirect --version pseudo-command to actual command
 			arg = "version"
 		}
+
 		if contains(getBoolFlags(), arg) {
 			rootFlags = append(rootFlags, arg)
 			continue
