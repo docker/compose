@@ -256,23 +256,11 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	if len(service.Build.Secrets) > 0 {
-		var sources []secretsprovider.Source
-		for _, secret := range service.Build.Secrets {
-			config := project.Secrets[secret.Source]
-			if config.File == "" {
-				return build.Options{}, fmt.Errorf("build.secrets only supports file-based secrets: %q", secret.Source)
-			}
-			sources = append(sources, secretsprovider.Source{
-				ID:       secret.Source,
-				FilePath: config.File,
-			})
-		}
-		store, err := secretsprovider.NewStore(sources)
+		secretsProvider, err := addSecretsConfig(project, service, sessionConfig)
 		if err != nil {
 			return build.Options{}, err
 		}
-		p := secretsprovider.NewSecretProvider(store)
-		sessionConfig = append(sessionConfig, p)
+		sessionConfig = append(sessionConfig, secretsProvider)
 	}
 
 	if len(service.Build.Tags) > 0 {
@@ -340,4 +328,31 @@ func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
 		})
 	}
 	return sshprovider.NewSSHAgentProvider(sshConfig)
+}
+
+func addSecretsConfig(project *types.Project, service types.ServiceConfig, sessionConfig []session.Attachable) (session.Attachable, error) {
+
+	var sources []secretsprovider.Source
+	for _, secret := range service.Build.Secrets {
+		config := project.Secrets[secret.Source]
+		switch {
+		case config.File != "":
+			sources = append(sources, secretsprovider.Source{
+				ID:       secret.Source,
+				FilePath: config.File,
+			})
+		case config.Environment != "":
+			sources = append(sources, secretsprovider.Source{
+				ID:  secret.Source,
+				Env: config.Environment,
+			})
+		default:
+			return nil, fmt.Errorf("build.secrets only supports environment or file-based secrets: %q", secret.Source)
+		}
+	}
+	store, err := secretsprovider.NewStore(sources)
+	if err != nil {
+		return nil, err
+	}
+	return secretsprovider.NewSecretProvider(store), nil
 }
