@@ -31,7 +31,7 @@ func TestUpWait(t *testing.T) {
 	timeout := time.After(30 * time.Second)
 	done := make(chan bool)
 	go func() {
-		res := c.RunDockerComposeCmd(t, "-f", "fixtures/dependencies/deps-completed-successfully.yaml", "--project-name", projectName, "up", "--wait", "-d")
+		res := c.RunDockerComposeCmd("-f", "fixtures/dependencies/deps-completed-successfully.yaml", "--project-name", projectName, "up", "--wait", "-d")
 		assert.Assert(t, strings.Contains(res.Combined(), "e2e-deps-wait-oneshot-1"), res.Combined())
 		done <- true
 	}()
@@ -43,5 +43,5 @@ func TestUpWait(t *testing.T) {
 		break
 	}
 
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	c.RunDockerComposeCmd("--project-name", projectName, "down")
 }

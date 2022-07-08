@@ -35,19 +35,19 @@ func TestLocalComposeExec(t *testing.T) {
 		return ret
 	}
 
-	c.RunDockerComposeCmd(t, cmdArgs("up", "-d")...)
+	c.RunDockerComposeCmd(cmdArgs("up", "-d")...)
 
 	t.Run("exec true", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, cmdArgs("exec", "simple", "/bin/true")...)
+		c.RunDockerComposeCmd(cmdArgs("exec", "simple", "/bin/true")...)
 	})
 
 	t.Run("exec false", func(t *testing.T) {
-		res := c.RunDockerComposeCmdNoCheck(t, cmdArgs("exec", "simple", "/bin/false")...)
+		res := c.RunDockerComposeCmdNoCheck(cmdArgs("exec", "simple", "/bin/false")...)
 		res.Assert(t, icmd.Expected{ExitCode: 1})
 	})
 
 	t.Run("exec with env set", func(t *testing.T) {
-		res := icmd.RunCmd(c.NewDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...),
+		res := icmd.RunCmd(c.NewDockerComposeCmd(cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...),
 			func(cmd *icmd.Cmd) {
 				cmd.Env = append(cmd.Env, "FOO=BAR")
 			})
@@ -55,7 +55,7 @@ func TestLocalComposeExec(t *testing.T) {
 	})
 
 	t.Run("exec without env set", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
+		res := c.RunDockerComposeCmd(cmdArgs("exec", "-e", "FOO", "simple", "/usr/bin/env")...)
 		assert.Check(t, !strings.Contains(res.Stdout(), "FOO="), res.Combined())
 	})
 }

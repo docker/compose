@@ -36,16 +36,16 @@ func TestComposeCancel(t *testing.T) {
 	c := NewParallelCLI(t)
 
 	t.Run("metrics on cancel Compose build", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "ls")
+		c.RunDockerComposeCmd("ls")
 		buildProjectPath := "fixtures/build-infinite/compose.yaml"
 
 		// require a separate groupID from the process running tests, in order to simulate ctrl+C from a terminal.
 		// sending kill signal
-		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerComposeCmd(t, "-f", buildProjectPath, "build",
+		cmd, stdout, stderr, err := StartWithNewGroupID(c.NewDockerComposeCmd("-f", buildProjectPath, "build",
 			"--progress", "plain"))
 		assert.NilError(t, err)
 
-		c.WaitForCondition(t, func() (bool, string) {
+		c.WaitForCondition(func() (bool, string) {
 			out := stdout.String()
 			errors := stderr.String()
 			return strings.Contains(out,
@@ -56,7 +56,7 @@ func TestComposeCancel(t *testing.T) {
 		err = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) // simulate Ctrl-C : send signal to processGroup, children will have same groupId by default
 
 		assert.NilError(t, err)
-		c.WaitForCondition(t, func() (bool, string) {
+		c.WaitForCondition(func() (bool, string) {
 			out := stdout.String()
 			errors := stderr.String()
 			return strings.Contains(out, "CANCELED"), fmt.Sprintf("'CANCELED' not found in : \n%s\nStderr: \n%s\n", out,

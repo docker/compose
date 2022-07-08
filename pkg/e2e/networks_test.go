@@ -33,39 +33,39 @@ func TestNetworks(t *testing.T) {
 	const projectName = "network_e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_dbnet")
-		c.RunDockerOrExitError(t, "network", "rm", "microservices")
+		c.RunDockerOrExitError("network", "rm", projectName+"_dbnet")
+		c.RunDockerOrExitError("network", "rm", "microservices")
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up",
+		c.RunDockerComposeCmd("-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "up",
 			"-d")
 	})
 
 	t.Run("check running project", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-p", projectName, "ps")
+		res := c.RunDockerComposeCmd("-p", projectName, "ps")
 		res.Assert(t, icmd.Expected{Out: `web`})
 
 		endpoint := "http://localhost:80"
-		output := HTTPGetWithRetry(t, endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
+		output := c.HTTPGetWithRetry(endpoint+"/words/noun", http.StatusOK, 2*time.Second, 20*time.Second)
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
-		res = c.RunDockerCmd(t, "network", "ls")
+		res = c.RunDockerCmd("network", "ls")
 		res.Assert(t, icmd.Expected{Out: projectName + "_dbnet"})
 		res.Assert(t, icmd.Expected{Out: "microservices"})
 	})
 
 	t.Run("port", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-name", projectName, "port", "words", "8080")
+		res := c.RunDockerComposeCmd("--project-name", projectName, "port", "words", "8080")
 		res.Assert(t, icmd.Expected{Out: `0.0.0.0:8080`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 
 	t.Run("check networks after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "network", "ls")
+		res := c.RunDockerCmd("network", "ls")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 		assert.Assert(t, !strings.Contains(res.Combined(), "microservices"), res.Combined())
 	})
@@ -77,24 +77,24 @@ func TestNetworkAliases(t *testing.T) {
 	const projectName = "network_alias_e2e"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up",
+		c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName, "up",
 			"-d")
 	})
 
 	t.Run("curl alias", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
 			"exec", "-T", "container1", "curl", "http://alias-of-container2/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
 	t.Run("curl links", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-alias/compose.yaml", "--project-name", projectName,
 			"exec", "-T", "container1", "curl", "http://container/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }
 
@@ -104,18 +104,18 @@ func TestNetworkLinks(t *testing.T) {
 	const projectName = "network_link_e2e"
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName, "up",
+		c.RunDockerComposeCmd("-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName, "up",
 			"-d")
 	})
 
 	t.Run("curl links in default bridge network", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName,
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-links/compose.yaml", "--project-name", projectName,
 			"exec", "-T", "container2", "curl", "http://container1/")
 		assert.Assert(t, strings.Contains(res.Stdout(), "Welcome to nginx!"), res.Stdout())
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }
 
@@ -125,21 +125,21 @@ func TestIPAMConfig(t *testing.T) {
 	const projectName = "ipam_e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_default")
+		c.RunDockerOrExitError("network", "rm", projectName+"_default")
 	})
 
 	t.Run("up", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
+		c.RunDockerComposeCmd("-f", "./fixtures/ipam/compose.yaml", "--project-name", projectName, "up", "-d")
 	})
 
 	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "inspect", projectName+"-foo-1", "-f",
+		res := c.RunDockerCmd("inspect", projectName+"-foo-1", "-f",
 			"{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
 		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }
 
@@ -150,12 +150,12 @@ func TestNetworkModes(t *testing.T) {
 	const projectName = "network_mode_service_run"
 
 	t.Run("run with service mode dependency", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
+		res := c.RunDockerComposeCmd("-f", "./fixtures/network-test/compose.yaml", "--project-name", projectName, "run", "-T", "mydb", "echo", "success")
 		res.Assert(t, icmd.Expected{Out: "success"})
 
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 	})
 }

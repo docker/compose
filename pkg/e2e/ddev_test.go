@@ -63,8 +63,8 @@ func TestComposeRunDdev(t *testing.T) {
 	siteName := filepath.Base(ddevDir)
 
 	t.Cleanup(func() {
-		_ = c.RunCmdInDir(t, ddevDir, "./ddev", "delete", "-Oy")
-		_ = c.RunCmdInDir(t, ddevDir, "./ddev", "poweroff")
+		_ = c.RunCmdInDir(ddevDir, "./ddev", "delete", "-Oy")
+		_ = c.RunCmdInDir(ddevDir, "./ddev", "poweroff")
 	})
 
 	osName := "linux"
@@ -73,26 +73,26 @@ func TestComposeRunDdev(t *testing.T) {
 	}
 
 	compressedFilename := fmt.Sprintf("ddev_%s-%s.%s.tar.gz", osName, runtime.GOARCH, ddevVersion)
-	c.RunCmdInDir(t, ddevDir, "curl", "-LO", fmt.Sprintf("https://github.com/drud/ddev/releases/download/%s/%s",
+	c.RunCmdInDir(ddevDir, "curl", "-LO", fmt.Sprintf("https://github.com/drud/ddev/releases/download/%s/%s",
 		ddevVersion,
 		compressedFilename))
 
-	c.RunCmdInDir(t, ddevDir, "tar", "-xzf", compressedFilename)
+	c.RunCmdInDir(ddevDir, "tar", "-xzf", compressedFilename)
 
 	// Create a simple index.php we can test against.
-	c.RunCmdInDir(t, ddevDir, "sh", "-c", "echo '<?php\nprint \"ddev is working\";' >index.php")
+	c.RunCmdInDir(ddevDir, "sh", "-c", "echo '<?php\nprint \"ddev is working\";' >index.php")
 
-	c.RunCmdInDir(t, ddevDir, "./ddev", "config", "--auto")
-	c.RunCmdInDir(t, ddevDir, "./ddev", "config", "global", "--use-docker-compose-from-path")
-	vRes := c.RunCmdInDir(t, ddevDir, "./ddev", "version")
+	c.RunCmdInDir(ddevDir, "./ddev", "config", "--auto")
+	c.RunCmdInDir(ddevDir, "./ddev", "config", "global", "--use-docker-compose-from-path")
+	vRes := c.RunCmdInDir(ddevDir, "./ddev", "version")
 	out := vRes.Stdout()
 	fmt.Printf("ddev version: %s\n", out)
 
-	c.RunCmdInDir(t, ddevDir, "./ddev", "poweroff")
+	c.RunCmdInDir(ddevDir, "./ddev", "poweroff")
 
-	c.RunCmdInDir(t, ddevDir, "./ddev", "start", "-y")
+	c.RunCmdInDir(ddevDir, "./ddev", "start", "-y")
 
-	curlRes := c.RunCmdInDir(t, ddevDir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
+	curlRes := c.RunCmdInDir(ddevDir, "curl", "-sSL", fmt.Sprintf("http://%s.ddev.site", siteName))
 	out = curlRes.Stdout()
 	fmt.Println(out)
 	assert.Assert(t, strings.Contains(out, "ddev is working"), "Could not start project")

@@ -26,8 +26,8 @@ func TestUpServiceUnhealthy(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-start-fail"
 
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
+	res := c.RunDockerComposeCmdNoCheck("-f", "fixtures/start-fail/compose.yaml", "--project-name", projectName, "up", "-d")
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
 
-	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+	c.RunDockerComposeCmd("--project-name", projectName, "down")
 }

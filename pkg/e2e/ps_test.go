@@ -31,17 +31,17 @@ func TestPs(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-ps"
 
-	res := c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "up", "-d")
+	res := c.RunDockerComposeCmd("-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "up", "-d")
 	if assert.NoError(t, res.Error) {
 		t.Cleanup(func() {
-			_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+			_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
 		})
 	}
 
 	assert.Contains(t, res.Combined(), "Container e2e-ps-busybox-1  Started", res.Combined())
 
 	t.Run("pretty", func(t *testing.T) {
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
+		res = c.RunDockerComposeCmd("-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps")
 		lines := strings.Split(res.Stdout(), "\n")
 		assert.Equal(t, 4, len(lines))
 		count := 0
@@ -59,7 +59,7 @@ func TestPs(t *testing.T) {
 	})
 
 	t.Run("json", func(t *testing.T) {
-		res = c.RunDockerComposeCmd(t, "-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps",
+		res = c.RunDockerComposeCmd("-f", "./fixtures/ps-test/compose.yaml", "--project-name", projectName, "ps",
 			"--format", "json")
 		var output []api.ContainerSummary
 		err := json.Unmarshal([]byte(res.Stdout()), &output)

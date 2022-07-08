@@ -34,23 +34,23 @@ func TestPause(t *testing.T) {
 		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
 
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
+		cli.RunDockerComposeCmd("down", "-v", "--remove-orphans", "-t", "0")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// launch both services and verify that they are accessible
-	cli.RunDockerComposeCmd(t, "up", "-d")
+	cli.RunDockerComposeCmd("up", "-d")
 	urls := map[string]string{
 		"a": urlForService(t, cli, "a", 80),
 		"b": urlForService(t, cli, "b", 80),
 	}
 	for _, url := range urls {
-		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
+		cli.HTTPGetWithRetry(url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
 	}
 
 	// pause a and verify that it can no longer be hit but b still can
-	cli.RunDockerComposeCmd(t, "pause", "a")
+	cli.RunDockerComposeCmd("pause", "a")
 	httpClient := http.Client{Timeout: 250 * time.Millisecond}
 	resp, err := httpClient.Get(urls["a"])
 	if resp != nil {
@@ -58,12 +58,12 @@ func TestPause(t *testing.T) {
 	}
 	require.Error(t, err, "a should no longer respond")
 	require.True(t, err.(net.Error).Timeout(), "Error should have indicated a timeout")
-	HTTPGetWithRetry(t, urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
+	cli.HTTPGetWithRetry(urls["b"], http.StatusOK, 50*time.Millisecond, 5*time.Second)
 
 	// unpause a and verify that both containers work again
-	cli.RunDockerComposeCmd(t, "unpause", "a")
+	cli.RunDockerComposeCmd("unpause", "a")
 	for _, url := range urls {
-		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
+		cli.HTTPGetWithRetry(url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
 	}
 }
 
@@ -73,13 +73,13 @@ func TestPauseServiceNotRunning(t *testing.T) {
 		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
 
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
+		cli.RunDockerComposeCmd("down", "-v", "--remove-orphans", "-t", "0")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// pause a and verify that it can no longer be hit but b still can
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "a")
+	res := cli.RunDockerComposeCmdNoCheck("pause", "a")
 
 	// TODO: `docker pause` errors in this case, should Compose be consistent?
 	res.Assert(t, icmd.Expected{ExitCode: 0})
@@ -91,18 +91,18 @@ func TestPauseServiceAlreadyPaused(t *testing.T) {
 		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
 
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
+		cli.RunDockerComposeCmd("down", "-v", "--remove-orphans", "-t", "0")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// launch a and wait for it to come up
-	cli.RunDockerComposeCmd(t, "up", "-d", "a")
-	HTTPGetWithRetry(t, urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 5*time.Second)
+	cli.RunDockerComposeCmd("up", "-d", "a")
+	cli.HTTPGetWithRetry(urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 5*time.Second)
 
 	// pause a twice - first time should pass, second time fail
-	cli.RunDockerComposeCmd(t, "pause", "a")
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "a")
+	cli.RunDockerComposeCmd("pause", "a")
+	res := cli.RunDockerComposeCmdNoCheck("pause", "a")
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "already paused"})
 }
 
@@ -112,13 +112,13 @@ func TestPauseServiceDoesNotExist(t *testing.T) {
 		"COMPOSE_FILE=./fixtures/pause/compose.yaml"))
 
 	cleanup := func() {
-		cli.RunDockerComposeCmd(t, "down", "-v", "--remove-orphans", "-t", "0")
+		cli.RunDockerComposeCmd("down", "-v", "--remove-orphans", "-t", "0")
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// pause a and verify that it can no longer be hit but b still can
-	res := cli.RunDockerComposeCmdNoCheck(t, "pause", "does_not_exist")
+	res := cli.RunDockerComposeCmdNoCheck("pause", "does_not_exist")
 	// TODO: `compose down does_not_exist` and similar error, this should too
 	res.Assert(t, icmd.Expected{ExitCode: 0})
 }
@@ -133,7 +133,7 @@ func urlForService(t testing.TB, cli *CLI, service string, targetPort int) strin
 
 func publishedPortForService(t testing.TB, cli *CLI, service string, targetPort int) int {
 	t.Helper()
-	res := cli.RunDockerComposeCmd(t, "ps", "--format=json", service)
+	res := cli.RunDockerComposeCmd("ps", "--format=json", service)
 	var psOut []struct {
 		Publishers []struct {
 			TargetPort    int
