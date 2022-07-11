@@ -1041,7 +1041,14 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		return err
 	}
-	if len(networks) == 0 {
+	networkNotFound := true
+	for _, net := range networks {
+		if net.Name == n.Name {
+			networkNotFound = false
+			break
+		}
+	}
+	if networkNotFound {
 		if n.External.External {
 			if n.Driver == "overlay" {
 				// Swarm nodes do not register overlay networks that were
