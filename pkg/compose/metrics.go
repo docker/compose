@@ -50,13 +50,13 @@ var (
 	ComposeParseFailure = FailureCategory{MetricsStatus: ComposeParseFailureStatus, ExitCode: 15}
 	// CommandSyntaxFailure failure for command line syntax
 	CommandSyntaxFailure = FailureCategory{MetricsStatus: CommandSyntaxFailureStatus, ExitCode: 16}
-	//BuildFailure failure while building images.
+	// BuildFailure failure while building images.
 	BuildFailure = FailureCategory{MetricsStatus: BuildFailureStatus, ExitCode: 17}
 	// PullFailure failure while pulling image
 	PullFailure = FailureCategory{MetricsStatus: PullFailureStatus, ExitCode: 18}
 )
 
-//ByExitCode retrieve FailureCategory based on command exit code
+// ByExitCode retrieve FailureCategory based on command exit code
 func ByExitCode(exitCode int) FailureCategory {
 	switch exitCode {
 	case 0:

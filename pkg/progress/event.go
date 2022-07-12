@@ -44,99 +44,99 @@ type Event struct {
 }
 
 // ErrorMessageEvent creates a new Error Event with message
-func ErrorMessageEvent(ID string, msg string) Event {
-	return NewEvent(ID, Error, msg)
+func ErrorMessageEvent(id string, msg string) Event {
+	return NewEvent(id, Error, msg)
 }
 
 // ErrorEvent creates a new Error Event
-func ErrorEvent(ID string) Event {
-	return NewEvent(ID, Error, "Error")
+func ErrorEvent(id string) Event {
+	return NewEvent(id, Error, "Error")
 }
 
 // CreatingEvent creates a new Create in progress Event
-func CreatingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Creating")
+func CreatingEvent(id string) Event {
+	return NewEvent(id, Working, "Creating")
 }
 
 // StartingEvent creates a new Starting in progress Event
-func StartingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Starting")
+func StartingEvent(id string) Event {
+	return NewEvent(id, Working, "Starting")
 }
 
 // StartedEvent creates a new Started in progress Event
-func StartedEvent(ID string) Event {
-	return NewEvent(ID, Done, "Started")
+func StartedEvent(id string) Event {
+	return NewEvent(id, Done, "Started")
 }
 
 // Waiting creates a new waiting event
-func Waiting(ID string) Event {
-	return NewEvent(ID, Working, "Waiting")
+func Waiting(id string) Event {
+	return NewEvent(id, Working, "Waiting")
 }
 
 // Healthy creates a new healthy event
-func Healthy(ID string) Event {
-	return NewEvent(ID, Done, "Healthy")
+func Healthy(id string) Event {
+	return NewEvent(id, Done, "Healthy")
 }
 
 // Exited creates a new exited event
-func Exited(ID string) Event {
-	return NewEvent(ID, Done, "Exited")
+func Exited(id string) Event {
+	return NewEvent(id, Done, "Exited")
 }
 
 // RestartingEvent creates a new Restarting in progress Event
-func RestartingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Restarting")
+func RestartingEvent(id string) Event {
+	return NewEvent(id, Working, "Restarting")
 }
 
 // RestartedEvent creates a new Restarted in progress Event
-func RestartedEvent(ID string) Event {
-	return NewEvent(ID, Done, "Restarted")
+func RestartedEvent(id string) Event {
+	return NewEvent(id, Done, "Restarted")
 }
 
 // RunningEvent creates a new Running in progress Event
-func RunningEvent(ID string) Event {
-	return NewEvent(ID, Done, "Running")
+func RunningEvent(id string) Event {
+	return NewEvent(id, Done, "Running")
 }
 
 // CreatedEvent creates a new Created (done) Event
-func CreatedEvent(ID string) Event {
-	return NewEvent(ID, Done, "Created")
+func CreatedEvent(id string) Event {
+	return NewEvent(id, Done, "Created")
 }
 
 // StoppingEvent creates a new Stopping in progress Event
-func StoppingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Stopping")
+func StoppingEvent(id string) Event {
+	return NewEvent(id, Working, "Stopping")
 }
 
 // StoppedEvent creates a new Stopping in progress Event
-func StoppedEvent(ID string) Event {
-	return NewEvent(ID, Done, "Stopped")
+func StoppedEvent(id string) Event {
+	return NewEvent(id, Done, "Stopped")
 }
 
 // KillingEvent creates a new Killing in progress Event
-func KillingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Killing")
+func KillingEvent(id string) Event {
+	return NewEvent(id, Working, "Killing")
 }
 
 // KilledEvent creates a new Killed in progress Event
-func KilledEvent(ID string) Event {
-	return NewEvent(ID, Done, "Killed")
+func KilledEvent(id string) Event {
+	return NewEvent(id, Done, "Killed")
 }
 
 // RemovingEvent creates a new Removing in progress Event
-func RemovingEvent(ID string) Event {
-	return NewEvent(ID, Working, "Removing")
+func RemovingEvent(id string) Event {
+	return NewEvent(id, Working, "Removing")
 }
 
 // RemovedEvent creates a new removed (done) Event
-func RemovedEvent(ID string) Event {
-	return NewEvent(ID, Done, "Removed")
+func RemovedEvent(id string) Event {
+	return NewEvent(id, Done, "Removed")
 }
 
 // NewEvent new event
-func NewEvent(ID string, status EventStatus, statusText string) Event {
+func NewEvent(id string, status EventStatus, statusText string) Event {
 	return Event{
-		ID:         ID,
+		ID:         id,
 		Status:     status,
 		StatusText: statusText,
 	}

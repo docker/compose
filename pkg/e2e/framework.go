@@ -46,13 +46,16 @@ var (
 
 	// DockerScanExecutableName is the OS dependent Docker CLI binary name
 	DockerScanExecutableName = "docker-scan"
+
+	// WindowsExecutableSuffix is the Windows executable suffix
+	WindowsExecutableSuffix = ".exe"
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		DockerExecutableName = DockerExecutableName + ".exe"
-		DockerComposeExecutableName = DockerComposeExecutableName + ".exe"
-		DockerScanExecutableName = DockerScanExecutableName + ".exe"
+		DockerExecutableName += WindowsExecutableSuffix
+		DockerComposeExecutableName += WindowsExecutableSuffix
+		DockerScanExecutableName += WindowsExecutableSuffix
 	}
 }
 

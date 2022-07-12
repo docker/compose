@@ -7,6 +7,7 @@ linters:
     - deadcode
     - depguard
     - errcheck
+    - gocritic
     - gocyclo
     - gofmt
     - goimports
