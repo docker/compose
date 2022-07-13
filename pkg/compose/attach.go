@@ -127,9 +127,9 @@ func (s *composeService) attachContainerStreams(ctx context.Context, container s
 	if stdout != nil {
 		go func() {
 			if tty {
-				io.Copy(stdout, streamOut) // nolint:errcheck
+				io.Copy(stdout, streamOut) //nolint:errcheck
 			} else {
-				stdcopy.StdCopy(stdout, stderr, streamOut) // nolint:errcheck
+				stdcopy.StdCopy(stdout, stderr, streamOut) //nolint:errcheck
 			}
 		}()
 	}

@@ -110,16 +110,16 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	cmd.Flags().StringArrayVar(&opts.args, "build-arg", []string{}, "Set build-time variables for services.")
 	cmd.Flags().StringVar(&opts.ssh, "ssh", "", "Set SSH authentications used when building service images. (use 'default' for using your default SSH Agent)")
 	cmd.Flags().Bool("parallel", true, "Build images in parallel. DEPRECATED")
-	cmd.Flags().MarkHidden("parallel") // nolint:errcheck
+	cmd.Flags().MarkHidden("parallel") //nolint:errcheck
 	cmd.Flags().Bool("compress", true, "Compress the build context using gzip. DEPRECATED")
-	cmd.Flags().MarkHidden("compress") // nolint:errcheck
+	cmd.Flags().MarkHidden("compress") //nolint:errcheck
 	cmd.Flags().Bool("force-rm", true, "Always remove intermediate containers. DEPRECATED")
-	cmd.Flags().MarkHidden("force-rm") // nolint:errcheck
+	cmd.Flags().MarkHidden("force-rm") //nolint:errcheck
 	cmd.Flags().BoolVar(&opts.noCache, "no-cache", false, "Do not use cache when building the image")
 	cmd.Flags().Bool("no-rm", false, "Do not remove intermediate containers after a successful build. DEPRECATED")
-	cmd.Flags().MarkHidden("no-rm") // nolint:errcheck
+	cmd.Flags().MarkHidden("no-rm") //nolint:errcheck
 	cmd.Flags().StringVarP(&opts.memory, "memory", "m", "", "Set memory limit for the build container. Not supported on buildkit yet.")
-	cmd.Flags().MarkHidden("memory") // nolint:errcheck
+	cmd.Flags().MarkHidden("memory") //nolint:errcheck
 
 	return cmd
 }

@@ -89,14 +89,14 @@ func (l *logConsumer) Log(container, service, message string) {
 	}
 	p := l.getPresenter(container)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line) // nolint:errcheck
+		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line) //nolint:errcheck
 	}
 }
 
 func (l *logConsumer) Status(container, msg string) {
 	p := l.getPresenter(container)
 	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
-	l.writer.Write([]byte(s)) // nolint:errcheck
+	l.writer.Write([]byte(s)) //nolint:errcheck
 }
 
 func (l *logConsumer) computeWidth() {

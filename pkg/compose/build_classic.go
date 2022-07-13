@@ -64,7 +64,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return nameDigests, errs
 }
 
-// nolint: gocyclo
+//nolint: gocyclo
 func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
@@ -96,7 +96,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 			if err != nil {
 				return "", errors.Errorf("unable to open Dockerfile: %v", err)
 			}
-			defer dockerfileCtx.Close() // nolint:errcheck
+			defer dockerfileCtx.Close() //nolint:errcheck
 		}
 	case urlutil.IsGitURL(specifiedContext):
 		tempDir, relDockerfile, err = build.GetContextFromGitURL(specifiedContext, dockerfileName)
@@ -111,7 +111,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	}
 
 	if tempDir != "" {
-		defer os.RemoveAll(tempDir) // nolint:errcheck
+		defer os.RemoveAll(tempDir) //nolint:errcheck
 		contextDir = tempDir
 	}
 
@@ -175,7 +175,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close() // nolint:errcheck
+	defer response.Body.Close() //nolint:errcheck
 
 	imageID := ""
 	aux := func(msg jsonmessage.JSONMessage) {

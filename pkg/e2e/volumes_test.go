@@ -50,7 +50,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("check container volume specs", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", "compose-e2e-volume-nginx2-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
-		// nolint
+		//nolint
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"z","RW":true,"Propagation":""`), output)
 		assert.Assert(t, strings.Contains(output, `"Destination":"/myconfig","Mode":"","RW":false,"Propagation":"rprivate"`), output)
 	})
@@ -68,7 +68,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", "compose-e2e-volume-nginx-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
-		// nolint
+		//nolint
 		assert.Assert(t, strings.Contains(output, `"Type":"bind"`))
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/share/nginx/html"`))
 	})
@@ -103,7 +103,7 @@ func TestProjectVolumeBind(t *testing.T) {
 	t.Run("up on project volume with bind specification", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", projectName)
 		assert.NilError(t, err)
-		defer os.RemoveAll(tmpDir) // nolint
+		defer os.RemoveAll(tmpDir) //nolint
 
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 
