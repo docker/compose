@@ -163,14 +163,16 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 
 	var removed int
 	for _, net := range networks {
-		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
-			if errdefs.IsNotFound(err) {
-				continue
+		if net.Name == name {
+			if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+				if errdefs.IsNotFound(err) {
+					continue
+				}
+				w.Event(progress.ErrorEvent(eventName))
+				return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
 			}
-			w.Event(progress.ErrorEvent(eventName))
-			return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+			removed++
 		}
-		removed++
 	}
 
 	if removed == 0 {
