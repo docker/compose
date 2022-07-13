@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.3
+          go-version: 1.18.4
         id: go
 
       - name: Checkout code into the Go module directory
@@ -49,7 +49,7 @@ jobs:
       - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.3
+          go-version: 1.18.4
         id: go
 
       - name: Checkout code into the Go module directory
@@ -74,7 +74,7 @@ jobs:
       - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.3
+          go-version: 1.18.4
         id: go
 
       - name: Setup docker CLI
@@ -110,7 +110,7 @@ jobs:
       - name: Set up Go 1.18
         uses: actions/setup-go@v2
         with:
-          go-version: 1.18.3
+          go-version: 1.18.4
         id: go
 
       - name: Setup docker CLI
