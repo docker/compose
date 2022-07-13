@@ -27,6 +27,16 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
+// LogConsumer consume logs from services and format them
+type logConsumer struct {
+	ctx        context.Context
+	presenters sync.Map // map[string]*presenter
+	width      int
+	writer     io.Writer
+	color      bool
+	prefix     bool
+}
+
 // NewLogConsumer creates a new LogConsumer
 func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) api.LogConsumer {
 	return &logConsumer{
@@ -99,16 +109,6 @@ func (l *logConsumer) computeWidth() {
 		return true
 	})
 	l.width = width + 1
-}
-
-// LogConsumer consume logs from services and format them
-type logConsumer struct {
-	ctx        context.Context
-	presenters sync.Map // map[string]*presenter
-	width      int
-	writer     io.Writer
-	color      bool
-	prefix     bool
 }
 
 type presenter struct {

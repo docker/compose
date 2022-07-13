@@ -553,7 +553,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 			containerName := getCanonicalContainerName(c)
 			links = append(links,
 				format(containerName, linkName),
-				format(containerName, strings.Join([]string{linkServiceName, strconv.Itoa(number)}, Separator)),
+				format(containerName, linkServiceName+Separator+strconv.Itoa(number)),
 				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, Separator)),
 			)
 		}

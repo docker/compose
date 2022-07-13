@@ -39,9 +39,11 @@ linters-settings:
     enabled-tags:
       - diagnostic
       - opinionated
+      - style
     disabled-checks:
       - paramTypeCombine
       - unnamedResult
+      - whyNoLint
   gocyclo:
     min-complexity: 16
   lll:

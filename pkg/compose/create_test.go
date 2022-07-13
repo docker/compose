@@ -22,7 +22,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
@@ -66,17 +65,17 @@ func TestBuildVolumeMount(t *testing.T) {
 }
 
 func TestServiceImageName(t *testing.T) {
-	assert.Equal(t, getImageName(types.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
-	assert.Equal(t, getImageName(types.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
+	assert.Equal(t, getImageName(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, getImageName(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
 }
 
 func TestPrepareNetworkLabels(t *testing.T) {
-	project := types.Project{
+	project := composetypes.Project{
 		Name:     "myProject",
-		Networks: types.Networks(map[string]types.NetworkConfig{"skynet": {}}),
+		Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{"skynet": {}}),
 	}
 	prepareNetworks(&project)
-	assert.DeepEqual(t, project.Networks["skynet"].Labels, types.Labels(map[string]string{
+	assert.DeepEqual(t, project.Networks["skynet"].Labels, composetypes.Labels(map[string]string{
 		"com.docker.compose.network": "skynet",
 		"com.docker.compose.project": "myProject",
 		"com.docker.compose.version": api.ComposeVersion,
