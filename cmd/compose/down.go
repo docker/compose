@@ -69,8 +69,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
 	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		switch name {
-		case "volume":
+		if name == "volume" {
 			name = "volumes"
 			logrus.Warn("--volume is deprecated, please use --volumes")
 		}

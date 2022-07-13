@@ -7,6 +7,7 @@ linters:
     - deadcode
     - depguard
     - errcheck
+    - gocritic
     - gocyclo
     - gofmt
     - goimports
@@ -32,6 +33,17 @@ linters-settings:
       # The io/ioutil package has been deprecated.
       # https://go.dev/doc/go1.16#ioutil
       - io/ioutil
+  gocritic:
+    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
+    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
+    enabled-tags:
+      - diagnostic
+      - opinionated
+      - style
+    disabled-checks:
+      - paramTypeCombine
+      - unnamedResult
+      - whyNoLint
   gocyclo:
     min-complexity: 16
   lll:

@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	//ExitCodeLoginRequired exit code when command cannot execute because it requires cloud login
+	// ExitCodeLoginRequired exit code when command cannot execute because it requires cloud login
 	// This will be used by VSCode to detect when creating context if the user needs to login first
 	ExitCodeLoginRequired = 5
 )

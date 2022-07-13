@@ -71,9 +71,9 @@ func TestDisplayScanMessageAfterBuild(t *testing.T) {
 	})
 
 	t.Run("do not display if scan already invoked", func(t *testing.T) {
-		_ = os.MkdirAll(filepath.Join(c.ConfigDir, "scan"), 0755)
+		_ = os.MkdirAll(filepath.Join(c.ConfigDir, "scan"), 0o755)
 		scanConfigFile := filepath.Join(c.ConfigDir, "scan", "config.json")
-		err := os.WriteFile(scanConfigFile, []byte(`{"optin":true}`), 0644)
+		err := os.WriteFile(scanConfigFile, []byte(`{"optin":true}`), 0o644)
 		assert.NilError(t, err)
 
 		res := c.RunDockerCmd(t, "build", "-t", "test-image-scan-msg", "fixtures/simple-build-test/nginx-build")

@@ -893,7 +893,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		mount, err := buildMount(p, types.ServiceVolumeConfig{
+		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
@@ -902,7 +902,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		if err != nil {
 			return nil, err
 		}
-		mounts[target] = mount
+		mounts[target] = mnt
 	}
 	values := make([]mount.Mount, 0, len(mounts))
 	for _, v := range mounts {
@@ -911,8 +911,8 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
-func isUnixAbs(path string) bool {
-	return strings.HasPrefix(path, "/")
+func isUnixAbs(p string) bool {
+	return strings.HasPrefix(p, "/")
 }
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {

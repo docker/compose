@@ -60,7 +60,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return progress.Run(ctx, func(ctx context.Context) error {
 			go func() {
 				<-signalChan
-				s.Kill(ctx, project.Name, api.KillOptions{ // nolint:errcheck
+				s.Kill(ctx, project.Name, api.KillOptions{ //nolint:errcheck
 					Services: project.ServiceNames(),
 				})
 			}()
@@ -74,7 +74,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		<-signalChan
 		printer.Cancel()
 		fmt.Println("Gracefully stopping... (press Ctrl+C again to force)")
-		stopFunc() // nolint:errcheck
+		stopFunc() //nolint:errcheck
 	}()
 
 	var exitCode int

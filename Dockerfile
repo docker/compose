@@ -16,8 +16,10 @@
 #   limitations under the License.
 
 ARG GO_VERSION=1.18.4-alpine
-ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
+ARG GOLANGCI_LINT_VERSION=v1.46.2-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
+
+FROM --platform=${BUILDPLATFORM} golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS local-golangci-lint
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
@@ -34,7 +36,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM base AS lint
 ENV CGO_ENABLED=0
-COPY --from=golangci/golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
+COPY --from=local-golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
