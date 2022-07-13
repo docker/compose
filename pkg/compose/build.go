@@ -61,29 +61,30 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	for _, service := range services {
-		if service.Build != nil {
-			imageName := getImageName(service, project.Name)
-			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
-			if err != nil {
-				return err
-			}
-			buildOptions.Pull = options.Pull
-			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-			buildOptions.NoCache = options.NoCache
-			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-			if err != nil {
-				return err
-			}
-
-			for _, image := range service.Build.CacheFrom {
-				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-					Type:  "registry",
-					Attrs: map[string]string{"ref": image},
-				})
-			}
-			opts[imageName] = buildOptions
+		if service.Build == nil {
+			continue
 		}
+		imageName := getImageName(service, project.Name)
+		imagesToBuild = append(imagesToBuild, imageName)
+		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
+		if err != nil {
+			return err
+		}
+		buildOptions.Pull = options.Pull
+		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
+		buildOptions.NoCache = options.NoCache
+		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
+		if err != nil {
+			return err
+		}
+
+		for _, image := range service.Build.CacheFrom {
+			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
+				Type:  "registry",
+				Attrs: map[string]string{"ref": image},
+			})
+		}
+		opts[imageName] = buildOptions
 	}
 
 	_, err = s.doBuild(ctx, project, opts, options.Progress)
@@ -312,11 +313,11 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 	return merged
 }
 
-func dockerFilePath(context string, dockerfile string) string {
-	if urlutil.IsGitURL(context) || filepath.IsAbs(dockerfile) {
+func dockerFilePath(ctxName string, dockerfile string) string {
+	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
-	return filepath.Join(context, dockerfile)
+	return filepath.Join(ctxName, dockerfile)
 }
 
 func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {

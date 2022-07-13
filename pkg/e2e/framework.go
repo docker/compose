@@ -127,7 +127,7 @@ func initializePlugins(t testing.TB, configDir string) {
 		}
 	})
 
-	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0755),
+	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 	if os.IsNotExist(err) {
@@ -175,7 +175,7 @@ func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 	// nolint: errcheck
 	defer src.Close()
 
-	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
 	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
 	// nolint: errcheck
 	defer dst.Close()

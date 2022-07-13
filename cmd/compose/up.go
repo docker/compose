@@ -219,18 +219,20 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 
 func setServiceScale(project *types.Project, name string, replicas uint64) error {
 	for i, s := range project.Services {
-		if s.Name == name {
-			service, err := project.GetService(name)
-			if err != nil {
-				return err
-			}
-			if service.Deploy == nil {
-				service.Deploy = &types.DeployConfig{}
-			}
-			service.Deploy.Replicas = &replicas
-			project.Services[i] = service
-			return nil
+		if s.Name != name {
+			continue
 		}
+
+		service, err := project.GetService(name)
+		if err != nil {
+			return err
+		}
+		if service.Deploy == nil {
+			service.Deploy = &types.DeployConfig{}
+		}
+		service.Deploy.Replicas = &replicas
+		project.Services[i] = service
+		return nil
 	}
 	return fmt.Errorf("unknown service %q", name)
 }
