@@ -355,7 +355,7 @@ func setEnvWithDotEnv(prjOpts *projectOptions) error {
 	}
 	for k, v := range envFromFile {
 		if _, ok := os.LookupEnv(k); !ok {
-			if err = os.Setenv(k, v); err != nil {
+			if err := os.Setenv(k, v); err != nil {
 				return err
 			}
 		}

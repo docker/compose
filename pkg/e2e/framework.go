@@ -216,7 +216,7 @@ func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) ic
 
 // MetricsSocket get the path where test metrics will be sent
 func (c *CLI) MetricsSocket() string {
-	return filepath.Join(c.ConfigDir, "./docker-cli.sock")
+	return filepath.Join(c.ConfigDir, "docker-cli.sock")
 }
 
 // NewDockerCmd creates a docker cmd without running it
