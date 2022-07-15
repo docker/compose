@@ -680,7 +680,7 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 			continue
 		}
 		if spec[0] == "container" {
-			volumes = append(volumes, strings.Join(spec[1:], ":"))
+			volumes = append(volumes, vol)
 			continue
 		}
 		serviceName := spec[0]
