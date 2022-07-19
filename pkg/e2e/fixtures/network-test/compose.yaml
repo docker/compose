@@ -8,6 +8,8 @@ services:
     image: gtardif/sentences-db
     networks:
       - dbnet
+      - closesnetworkname1
+      - closesnetworkname2
   words:
     image: gtardif/sentences-api
     ports:
@@ -28,3 +30,7 @@ networks:
   dbnet:
   servicenet:
     name: microservices
+  closesnetworkname1:
+    name: closenamenet
+  closesnetworkname2:
+    name: closenamenet-2
