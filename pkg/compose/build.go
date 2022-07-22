@@ -48,7 +48,7 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	opts := map[string]build.Options{}
-	imagesToBuild := []string{}
+	var imagesToBuild []string
 
 	args := flatten(options.Args.Resolve(func(s string) (string, bool) {
 		s, ok := project.Environment[s]
@@ -174,7 +174,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
-	imageNames := []string{}
+	var imageNames []string
 	for _, s := range project.Services {
 		imgName := getImageName(s, project.Name)
 		if !utils.StringContains(imageNames, imgName) {
@@ -257,7 +257,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	if len(service.Build.Secrets) > 0 {
-		secretsProvider, err := addSecretsConfig(project, service, sessionConfig)
+		secretsProvider, err := addSecretsConfig(project, service)
 		if err != nil {
 			return build.Options{}, err
 		}
@@ -331,7 +331,7 @@ func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
 	return sshprovider.NewSSHAgentProvider(sshConfig)
 }
 
-func addSecretsConfig(project *types.Project, service types.ServiceConfig, sessionConfig []session.Attachable) (session.Attachable, error) {
+func addSecretsConfig(project *types.Project, service types.ServiceConfig) (session.Attachable, error) {
 
 	var sources []secretsprovider.Source
 	for _, secret := range service.Build.Secrets {
