@@ -17,8 +17,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v3
@@ -44,8 +42,6 @@ jobs:
     name: Validate cross build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    env:
-      GO111MODULE: "on"
     steps:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v3
@@ -64,8 +60,6 @@ jobs:
   build-plugin:
     name: Build and tests in plugin mode
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v3
@@ -95,8 +89,6 @@ jobs:
   build-standalone:
     name: Build and tests in standalone mode
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v3
