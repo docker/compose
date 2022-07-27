@@ -57,6 +57,7 @@ func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			return nil
 		}),
 		RunE: p.WithProject(func(ctx context.Context, project *types.Project) error {
+			opts.Apply(project)
 			return backend.Create(ctx, project, api.CreateOptions{
 				RemoveOrphans:        opts.removeOrphans,
 				IgnoreOrphans:        opts.ignoreOrphans,
