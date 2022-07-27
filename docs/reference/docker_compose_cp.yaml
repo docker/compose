@@ -1,54 +1,55 @@
 command: docker compose cp
 short: Copy files/folders between a service container and the local filesystem
 long: Copy files/folders between a service container and the local filesystem
-usage: "docker compose cp [OPTIONS] SERVICE:SRC_PATH DEST_PATH|-\n\tdocker compose
-  cp [OPTIONS] SRC_PATH|- SERVICE:DEST_PATH"
+usage: |-
+    docker compose cp [OPTIONS] SERVICE:SRC_PATH DEST_PATH|-
+    	docker compose cp [OPTIONS] SRC_PATH|- SERVICE:DEST_PATH
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: all
-  value_type: bool
-  default_value: "false"
-  description: Copy to all the containers of the service.
-  deprecated: true
-  hidden: true
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: archive
-  shorthand: a
-  value_type: bool
-  default_value: "false"
-  description: Archive mode (copy all uid/gid information)
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: follow-link
-  shorthand: L
-  value_type: bool
-  default_value: "false"
-  description: Always follow symbol link in SRC_PATH
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: index
-  value_type: int
-  default_value: "0"
-  description: |
-    Index of the container if there are multiple instances of a service .
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: all
+      value_type: bool
+      default_value: "false"
+      description: Copy to all the containers of the service.
+      deprecated: true
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: archive
+      shorthand: a
+      value_type: bool
+      default_value: "false"
+      description: Archive mode (copy all uid/gid information)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: follow-link
+      shorthand: L
+      value_type: bool
+      default_value: "false"
+      description: Always follow symbol link in SRC_PATH
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: index
+      value_type: int
+      default_value: "0"
+      description: |
+        Index of the container if there are multiple instances of a service .
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

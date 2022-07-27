@@ -5,7 +5,7 @@ Converts the compose file to platform's canonical format
 
 ### Aliases
 
-`convert`, `config`
+`docker compose convert`, `docker compose config`
 
 ### Options
 
