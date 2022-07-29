@@ -176,7 +176,12 @@ func TestBuildSecrets(t *testing.T) {
 		// ensure local test run does not reuse previously build image
 		c.RunDockerOrExitError(t, "rmi", "build-test-secret")
 
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/secrets", "build")
+
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "SOME_SECRET=bar")
+		})
+
 		res.Assert(t, icmd.Success)
 	})
 }
@@ -199,5 +204,42 @@ func TestBuildTags(t *testing.T) {
         ],
 `
 		res.Assert(t, icmd.Expected{Out: expectedOutput})
+	})
+}
+
+func TestBuildImageDependencies(t *testing.T) {
+	doTest := func(t *testing.T, cli *CLI) {
+		resetState := func() {
+			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
+		}
+		resetState()
+		t.Cleanup(resetState)
+
+		// the image should NOT exist now
+		res := cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies_service")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Error: No such image: build-dependencies_service",
+		})
+
+		res = cli.RunDockerComposeCmd(t, "build")
+		t.Log(res.Combined())
+
+		res = cli.RunDockerCmd(t,
+			"image", "inspect", "--format={{ index .RepoTags 0 }}",
+			"build-dependencies_service")
+		res.Assert(t, icmd.Expected{Out: "build-dependencies_service:latest"})
+	}
+
+	t.Run("ClassicBuilder", func(t *testing.T) {
+		cli := NewParallelCLI(t, WithEnv(
+			"DOCKER_BUILDKIT=0",
+			"COMPOSE_FILE=./fixtures/build-dependencies/compose.yaml",
+		))
+		doTest(t, cli)
+	})
+
+	t.Run("BuildKit", func(t *testing.T) {
+		t.Skip("See https://github.com/docker/compose/issues/9232")
 	})
 }

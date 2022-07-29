@@ -44,8 +44,18 @@ func Test_convert(t *testing.T) {
 			want: []string{"--host", "tcp://1.2.3.4", "compose", "up"},
 		},
 		{
+			name: "compose --verbose",
+			args: []string{"--verbose"},
+			want: []string{"--debug", "compose"},
+		},
+		{
 			name: "compose --version",
 			args: []string{"--version"},
+			want: []string{"compose", "version"},
+		},
+		{
+			name: "compose -v",
+			args: []string{"-v"},
 			want: []string{"compose", "version"},
 		},
 		{
@@ -67,6 +77,11 @@ func Test_convert(t *testing.T) {
 			name: "issues/12",
 			args: []string{"--log-level", "INFO", "up"},
 			want: []string{"--log-level", "INFO", "compose", "up"},
+		},
+		{
+			name: "empty string argument",
+			args: []string{"--project-directory", "", "ps"},
+			want: []string{"compose", "--project-directory", "", "ps"},
 		},
 	}
 	for _, tt := range tests {

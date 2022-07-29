@@ -1,277 +1,277 @@
 command: docker compose
 short: Docker Compose
 long: |-
-  You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
-  multiple services in Docker containers.
+    You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
+    multiple services in Docker containers.
 
-  ### Use `-f` to specify name and path of one or more Compose files
-  Use the `-f` flag to specify the location of a Compose configuration file.
+    ### Use `-f` to specify name and path of one or more Compose files
+    Use the `-f` flag to specify the location of a Compose configuration file.
 
-  #### Specifying multiple Compose files
-  You can supply multiple `-f` configuration files. When you supply multiple files, Compose combines them into a single
-  configuration. Compose builds the configuration in the order you supply the files. Subsequent files override and add
-  to their predecessors.
+    #### Specifying multiple Compose files
+    You can supply multiple `-f` configuration files. When you supply multiple files, Compose combines them into a single
+    configuration. Compose builds the configuration in the order you supply the files. Subsequent files override and add
+    to their predecessors.
 
-  For example, consider this command line:
+    For example, consider this command line:
 
-  ```console
-  $ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
-  ```
+    ```console
+    $ docker compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+    ```
 
-  The `docker-compose.yml` file might specify a `webapp` service.
+    The `docker-compose.yml` file might specify a `webapp` service.
 
-  ```yaml
-  services:
-    webapp:
-      image: examples/web
-      ports:
-        - "8000:8000"
-      volumes:
-        - "/data"
-  ```
-  If the `docker-compose.admin.yml` also specifies this same service, any matching fields override the previous file.
-  New values, add to the `webapp` service configuration.
+    ```yaml
+    services:
+      webapp:
+        image: examples/web
+        ports:
+          - "8000:8000"
+        volumes:
+          - "/data"
+    ```
+    If the `docker-compose.admin.yml` also specifies this same service, any matching fields override the previous file.
+    New values, add to the `webapp` service configuration.
 
-  ```yaml
-  services:
-    webapp:
-      build: .
-      environment:
-        - DEBUG=1
-  ```
+    ```yaml
+    services:
+      webapp:
+        build: .
+        environment:
+          - DEBUG=1
+    ```
 
-  When you use multiple Compose files, all paths in the files are relative to the first configuration file specified
-  with `-f`. You can use the `--project-directory` option to override this base path.
+    When you use multiple Compose files, all paths in the files are relative to the first configuration file specified
+    with `-f`. You can use the `--project-directory` option to override this base path.
 
-  Use a `-f` with `-` (dash) as the filename to read the configuration from stdin. When stdin is used all paths in the
-  configuration are relative to the current working directory.
+    Use a `-f` with `-` (dash) as the filename to read the configuration from stdin. When stdin is used all paths in the
+    configuration are relative to the current working directory.
 
-  The `-f` flag is optional. If you don’t provide this flag on the command line, Compose traverses the working directory
-  and its parent directories looking for a `compose.yaml` or `docker-compose.yaml` file.
+    The `-f` flag is optional. If you don’t provide this flag on the command line, Compose traverses the working directory
+    and its parent directories looking for a `compose.yaml` or `docker-compose.yaml` file.
 
-  #### Specifying a path to a single Compose file
-  You can use the `-f` flag to specify a path to a Compose file that is not located in the current directory, either
-  from the command line or by setting up a `COMPOSE_FILE` environment variable in your shell or in an environment file.
+    #### Specifying a path to a single Compose file
+    You can use the `-f` flag to specify a path to a Compose file that is not located in the current directory, either
+    from the command line or by setting up a `COMPOSE_FILE` environment variable in your shell or in an environment file.
 
-  For an example of using the `-f` option at the command line, suppose you are running the Compose Rails sample, and
-  have a `compose.yaml` file in a directory called `sandbox/rails`. You can use a command like `docker compose pull` to
-  get the postgres image for the db service from anywhere by using the `-f` flag as follows:
+    For an example of using the `-f` option at the command line, suppose you are running the Compose Rails sample, and
+    have a `compose.yaml` file in a directory called `sandbox/rails`. You can use a command like `docker compose pull` to
+    get the postgres image for the db service from anywhere by using the `-f` flag as follows:
 
-  ```console
-  $ docker compose -f ~/sandbox/rails/compose.yaml pull db
-  ```
+    ```console
+    $ docker compose -f ~/sandbox/rails/compose.yaml pull db
+    ```
 
-  ### Use `-p` to specify a project name
+    ### Use `-p` to specify a project name
 
-  Each configuration has a project name. If you supply a `-p` flag, you can specify a project name. If you don’t
-  specify the flag, Compose uses the current directory name.
-  Project name can also be set by `COMPOSE_PROJECT_NAME` environment variable.
+    Each configuration has a project name. If you supply a `-p` flag, you can specify a project name. If you don’t
+    specify the flag, Compose uses the current directory name.
+    Project name can also be set by `COMPOSE_PROJECT_NAME` environment variable.
 
-  Most compose subcommand can be ran without a compose file, just passing
-  project name to retrieve the relevant resources.
+    Most compose subcommand can be ran without a compose file, just passing
+    project name to retrieve the relevant resources.
 
-  ```console
-  $ docker compose -p my_project ps -a
-  NAME                 SERVICE    STATUS     PORTS
-  my_project_demo_1    demo       running
+    ```console
+    $ docker compose -p my_project ps -a
+    NAME                 SERVICE    STATUS     PORTS
+    my_project_demo_1    demo       running
 
-  $ docker compose -p my_project logs
-  demo_1  | PING localhost (127.0.0.1): 56 data bytes
-  demo_1  | 64 bytes from 127.0.0.1: seq=0 ttl=64 time=0.095 ms
-  ```
+    $ docker compose -p my_project logs
+    demo_1  | PING localhost (127.0.0.1): 56 data bytes
+    demo_1  | 64 bytes from 127.0.0.1: seq=0 ttl=64 time=0.095 ms
+    ```
 
-  ### Use profiles to enable optional services
+    ### Use profiles to enable optional services
 
-  Use `--profile` to specify one or more active profiles
-  Calling `docker compose --profile frontend up` will start the services with the profile `frontend` and services
-  without any specified profiles.
-  You can also enable multiple profiles, e.g. with `docker compose --profile frontend --profile debug up` the profiles `frontend` and `debug` will be enabled.
+    Use `--profile` to specify one or more active profiles
+    Calling `docker compose --profile frontend up` will start the services with the profile `frontend` and services
+    without any specified profiles.
+    You can also enable multiple profiles, e.g. with `docker compose --profile frontend --profile debug up` the profiles `frontend` and `debug` will be enabled.
 
-  Profiles can also be set by `COMPOSE_PROFILES` environment variable.
+    Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
-  ### Set up environment variables
+    ### Set up environment variables
 
-  You can set environment variables for various docker compose options, including the `-f`, `-p` and `--profiles` flags.
+    You can set environment variables for various docker compose options, including the `-f`, `-p` and `--profiles` flags.
 
-  Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
-  `COMPOSE_PROJECT_NAME` environment variable does the same for to the `-p` flag,
-  and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
+    Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
+    `COMPOSE_PROJECT_NAME` environment variable does the same for to the `-p` flag,
+    and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
 
-  If flags are explicitly set on command line, associated environment variable is ignored
+    If flags are explicitly set on command line, associated environment variable is ignored
 
-  Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
-  containers for the project.
+    Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
+    containers for the project.
 usage: docker compose
 pname: docker
 plink: docker.yaml
 cname:
-- docker compose build
-- docker compose convert
-- docker compose cp
-- docker compose create
-- docker compose down
-- docker compose events
-- docker compose exec
-- docker compose images
-- docker compose kill
-- docker compose logs
-- docker compose ls
-- docker compose pause
-- docker compose port
-- docker compose ps
-- docker compose pull
-- docker compose push
-- docker compose restart
-- docker compose rm
-- docker compose run
-- docker compose start
-- docker compose stop
-- docker compose top
-- docker compose unpause
-- docker compose up
-- docker compose version
+    - docker compose build
+    - docker compose convert
+    - docker compose cp
+    - docker compose create
+    - docker compose down
+    - docker compose events
+    - docker compose exec
+    - docker compose images
+    - docker compose kill
+    - docker compose logs
+    - docker compose ls
+    - docker compose pause
+    - docker compose port
+    - docker compose ps
+    - docker compose pull
+    - docker compose push
+    - docker compose restart
+    - docker compose rm
+    - docker compose run
+    - docker compose start
+    - docker compose stop
+    - docker compose top
+    - docker compose unpause
+    - docker compose up
+    - docker compose version
 clink:
-- docker_compose_build.yaml
-- docker_compose_convert.yaml
-- docker_compose_cp.yaml
-- docker_compose_create.yaml
-- docker_compose_down.yaml
-- docker_compose_events.yaml
-- docker_compose_exec.yaml
-- docker_compose_images.yaml
-- docker_compose_kill.yaml
-- docker_compose_logs.yaml
-- docker_compose_ls.yaml
-- docker_compose_pause.yaml
-- docker_compose_port.yaml
-- docker_compose_ps.yaml
-- docker_compose_pull.yaml
-- docker_compose_push.yaml
-- docker_compose_restart.yaml
-- docker_compose_rm.yaml
-- docker_compose_run.yaml
-- docker_compose_start.yaml
-- docker_compose_stop.yaml
-- docker_compose_top.yaml
-- docker_compose_unpause.yaml
-- docker_compose_up.yaml
-- docker_compose_version.yaml
+    - docker_compose_build.yaml
+    - docker_compose_convert.yaml
+    - docker_compose_cp.yaml
+    - docker_compose_create.yaml
+    - docker_compose_down.yaml
+    - docker_compose_events.yaml
+    - docker_compose_exec.yaml
+    - docker_compose_images.yaml
+    - docker_compose_kill.yaml
+    - docker_compose_logs.yaml
+    - docker_compose_ls.yaml
+    - docker_compose_pause.yaml
+    - docker_compose_port.yaml
+    - docker_compose_ps.yaml
+    - docker_compose_pull.yaml
+    - docker_compose_push.yaml
+    - docker_compose_restart.yaml
+    - docker_compose_rm.yaml
+    - docker_compose_run.yaml
+    - docker_compose_start.yaml
+    - docker_compose_stop.yaml
+    - docker_compose_top.yaml
+    - docker_compose_unpause.yaml
+    - docker_compose_up.yaml
+    - docker_compose_version.yaml
 options:
-- option: ansi
-  value_type: string
-  default_value: auto
-  description: |
-    Control when to print ANSI control characters ("never"|"always"|"auto")
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: compatibility
-  value_type: bool
-  default_value: "false"
-  description: Run compose in backward compatibility mode
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: env-file
-  value_type: string
-  description: Specify an alternate environment file.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: file
-  shorthand: f
-  value_type: stringArray
-  default_value: '[]'
-  description: Compose configuration files
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-ansi
-  value_type: bool
-  default_value: "false"
-  description: Do not print ANSI control characters (DEPRECATED)
-  deprecated: false
-  hidden: true
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: profile
-  value_type: stringArray
-  default_value: '[]'
-  description: Specify a profile to enable
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: project-directory
-  value_type: string
-  description: |-
-    Specify an alternate working directory
-    (default: the path of the, first specified, Compose file)
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: project-name
-  shorthand: p
-  value_type: string
-  description: Project name
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: verbose
-  value_type: bool
-  default_value: "false"
-  description: Show more output
-  deprecated: false
-  hidden: true
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: version
-  shorthand: v
-  value_type: bool
-  default_value: "false"
-  description: Show the Docker Compose version information
-  deprecated: false
-  hidden: true
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: workdir
-  value_type: string
-  description: |-
-    DEPRECATED! USE --project-directory INSTEAD.
-    Specify an alternate working directory
-    (default: the path of the, first specified, Compose file)
-  deprecated: false
-  hidden: true
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: ansi
+      value_type: string
+      default_value: auto
+      description: |
+        Control when to print ANSI control characters ("never"|"always"|"auto")
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: compatibility
+      value_type: bool
+      default_value: "false"
+      description: Run compose in backward compatibility mode
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: env-file
+      value_type: string
+      description: Specify an alternate environment file.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: file
+      shorthand: f
+      value_type: stringArray
+      default_value: '[]'
+      description: Compose configuration files
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-ansi
+      value_type: bool
+      default_value: "false"
+      description: Do not print ANSI control characters (DEPRECATED)
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: profile
+      value_type: stringArray
+      default_value: '[]'
+      description: Specify a profile to enable
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: project-directory
+      value_type: string
+      description: |-
+        Specify an alternate working directory
+        (default: the path of the, first specified, Compose file)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: project-name
+      shorthand: p
+      value_type: string
+      description: Project name
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: verbose
+      value_type: bool
+      default_value: "false"
+      description: Show more output
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: version
+      shorthand: v
+      value_type: bool
+      default_value: "false"
+      description: Show the Docker Compose version information
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: workdir
+      value_type: string
+      description: |-
+        DEPRECATED! USE --project-directory INSTEAD.
+        Specify an alternate working directory
+        (default: the path of the, first specified, Compose file)
+      deprecated: false
+      hidden: true
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

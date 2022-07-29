@@ -22,7 +22,7 @@ import (
 	"gotest.tools/v3/icmd"
 )
 
-func TestStartFail(t *testing.T) {
+func TestUpServiceUnhealthy(t *testing.T) {
 	c := NewParallelCLI(t)
 	const projectName = "e2e-start-fail"
 

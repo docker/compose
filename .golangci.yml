@@ -1,13 +1,13 @@
+run:
+  concurrency: 2
 linters:
-  run:
-    concurrency: 2
-    skip-dirs:
-      - tests/composefiles
   enable-all: false
   disable-all: true
   enable:
     - deadcode
+    - depguard
     - errcheck
+    - gocritic
     - gocyclo
     - gofmt
     - goimports
@@ -26,6 +26,24 @@ linters:
     - unused
     - varcheck
 linters-settings:
+  depguard:
+    list-type: blacklist
+    include-go-root: true
+    packages:
+      # The io/ioutil package has been deprecated.
+      # https://go.dev/doc/go1.16#ioutil
+      - io/ioutil
+  gocritic:
+    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
+    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
+    enabled-tags:
+      - diagnostic
+      - opinionated
+      - style
+    disabled-checks:
+      - paramTypeCombine
+      - unnamedResult
+      - whyNoLint
   gocyclo:
     min-complexity: 16
   lll:

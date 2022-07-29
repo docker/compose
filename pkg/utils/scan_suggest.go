@@ -19,7 +19,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -57,7 +56,7 @@ func scanAlreadyInvoked() bool {
 	type scanOptin struct {
 		Optin bool `json:"optin"`
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return true
 	}

@@ -106,9 +106,9 @@ func combinedStatus(statuses []string) string {
 	for _, status := range keys {
 		nb := nbByStatus[status]
 		if result != "" {
-			result = result + ", "
+			result += ", "
 		}
-		result = result + fmt.Sprintf("%s(%d)", status, nb)
+		result += fmt.Sprintf("%s(%d)", status, nb)
 	}
 	return result
 }

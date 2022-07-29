@@ -21,7 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -414,7 +414,7 @@ func parseSecurityOpts(p *types.Project, securityOpts []string) ([]string, error
 			}
 		}
 		if con[0] == "seccomp" && con[1] != "unconfined" {
-			f, err := ioutil.ReadFile(p.RelativePath(con[1]))
+			f, err := os.ReadFile(p.RelativePath(con[1]))
 			if err != nil {
 				return securityOpts, errors.Errorf("opening seccomp profile (%s) failed: %v", con[1], err)
 			}
@@ -680,7 +680,7 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 			continue
 		}
 		if spec[0] == "container" {
-			volumes = append(volumes, strings.Join(spec[1:], ":"))
+			volumes = append(volumes, vol)
 			continue
 		}
 		serviceName := spec[0]
@@ -727,8 +727,12 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	binds := []string{}
 MOUNTS:
 	for _, m := range mountOptions {
+		if m.Type == mount.TypeNamedPipe {
+			mounts = append(mounts, m)
+			continue
+		}
 		volumeMounts[m.Target] = struct{}{}
-		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
+		if m.Type == mount.TypeBind {
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
@@ -893,7 +897,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		mount, err := buildMount(p, types.ServiceVolumeConfig{
+		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
@@ -902,7 +906,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		if err != nil {
 			return nil, err
 		}
-		mounts[target] = mount
+		mounts[target] = mnt
 	}
 	values := make([]mount.Mount, 0, len(mounts))
 	for _, v := range mounts {
@@ -911,8 +915,8 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
-func isUnixAbs(path string) bool {
-	return strings.HasPrefix(path, "/")
+func isUnixAbs(p string) bool {
+	return strings.HasPrefix(p, "/")
 }
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
@@ -1041,7 +1045,14 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		return err
 	}
-	if len(networks) == 0 {
+	networkNotFound := true
+	for _, net := range networks {
+		if net.Name == n.Name {
+			networkNotFound = false
+			break
+		}
+	}
+	if networkNotFound {
 		if n.External.External {
 			if n.Driver == "overlay" {
 				// Swarm nodes do not register overlay networks that were
@@ -1070,6 +1081,7 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 			}
 		}
 		createOpts := moby.NetworkCreate{
+			CheckDuplicate: true,
 			// TODO NameSpace Labels
 			Labels:     n.Labels,
 			Driver:     n.Driver,
@@ -1107,19 +1119,6 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 		w.Event(progress.CreatedEvent(networkEventName))
 		return nil
 	}
-	return nil
-}
-
-func (s *composeService) removeNetwork(ctx context.Context, network string, w progress.Writer) error {
-	eventName := fmt.Sprintf("Network %s", network)
-	w.Event(progress.RemovingEvent(eventName))
-
-	if err := s.apiClient().NetworkRemove(ctx, network); err != nil {
-		w.Event(progress.ErrorEvent(eventName))
-		return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", network))
-	}
-
-	w.Event(progress.RemovedEvent(eventName))
 	return nil
 }
 

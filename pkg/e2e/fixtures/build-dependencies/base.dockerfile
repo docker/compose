@@ -1,6 +1,3 @@
-# syntax=docker/dockerfile:1.2
-
-
 #   Copyright 2020 Docker Compose CLI authors
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,10 +14,6 @@
 
 FROM alpine
 
-RUN echo "foo" > /tmp/expected
-RUN --mount=type=secret,id=mysecret cat /run/secrets/mysecret > /tmp/actual
-RUN diff /tmp/expected /tmp/actual
+COPY hello.txt /hello.txt
 
-RUN echo "bar" > /tmp/expected
-RUN --mount=type=secret,id=envsecret cat /run/secrets/envsecret > tmp/actual
-RUN diff --ignore-all-space /tmp/expected /tmp/actual
+CMD [ "/bin/true" ]

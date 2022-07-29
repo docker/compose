@@ -22,7 +22,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/compose-spec/compose-go/types"
 	composetypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
@@ -43,6 +42,18 @@ func TestBuildBindMount(t *testing.T) {
 	_, err = os.Stat(mount.Source)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeBind)
+}
+
+func TestBuildNamedPipeMount(t *testing.T) {
+	project := composetypes.Project{}
+	volume := composetypes.ServiceVolumeConfig{
+		Type:   composetypes.VolumeTypeNamedPipe,
+		Source: "\\\\.\\pipe\\docker_engine_windows",
+		Target: "\\\\.\\pipe\\docker_engine",
+	}
+	mount, err := buildMount(project, volume)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Type, mountTypes.TypeNamedPipe)
 }
 
 func TestBuildVolumeMount(t *testing.T) {
@@ -66,17 +77,17 @@ func TestBuildVolumeMount(t *testing.T) {
 }
 
 func TestServiceImageName(t *testing.T) {
-	assert.Equal(t, getImageName(types.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
-	assert.Equal(t, getImageName(types.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
+	assert.Equal(t, getImageName(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, getImageName(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
 }
 
 func TestPrepareNetworkLabels(t *testing.T) {
-	project := types.Project{
+	project := composetypes.Project{
 		Name:     "myProject",
-		Networks: types.Networks(map[string]types.NetworkConfig{"skynet": {}}),
+		Networks: composetypes.Networks(map[string]composetypes.NetworkConfig{"skynet": {}}),
 	}
 	prepareNetworks(&project)
-	assert.DeepEqual(t, project.Networks["skynet"].Labels, types.Labels(map[string]string{
+	assert.DeepEqual(t, project.Networks["skynet"].Labels, composetypes.Labels(map[string]string{
 		"com.docker.compose.network": "skynet",
 		"com.docker.compose.project": "myProject",
 		"com.docker.compose.version": api.ComposeVersion,
@@ -97,6 +108,11 @@ func TestBuildContainerMountOptions(t *testing.T) {
 					{
 						Type:   composetypes.VolumeTypeVolume,
 						Target: "/var/myvolume2",
+					},
+					{
+						Type:   composetypes.VolumeTypeNamedPipe,
+						Source: "\\\\.\\pipe\\docker_engine_windows",
+						Target: "\\\\.\\pipe\\docker_engine",
 					},
 				},
 			},
@@ -129,18 +145,20 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		return mounts[i].Target < mounts[j].Target
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, len(mounts) == 3)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
+	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 
 	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, len(mounts) == 3)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
+	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 }
 
 func TestGetDefaultNetworkMode(t *testing.T) {

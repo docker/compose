@@ -5,48 +5,58 @@ usage: docker compose create [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: build
-  value_type: bool
-  default_value: "false"
-  description: Build images before starting containers.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: force-recreate
-  value_type: bool
-  default_value: "false"
-  description: |
-    Recreate containers even if their configuration and image haven't changed.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-build
-  value_type: bool
-  default_value: "false"
-  description: Don't build an image, even if it's missing.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-recreate
-  value_type: bool
-  default_value: "false"
-  description: |
-    If containers already exist, don't recreate them. Incompatible with --force-recreate.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: build
+      value_type: bool
+      default_value: "false"
+      description: Build images before starting containers.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: force-recreate
+      value_type: bool
+      default_value: "false"
+      description: |
+        Recreate containers even if their configuration and image haven't changed.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-build
+      value_type: bool
+      default_value: "false"
+      description: Don't build an image, even if it's missing.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-recreate
+      value_type: bool
+      default_value: "false"
+      description: |
+        If containers already exist, don't recreate them. Incompatible with --force-recreate.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: pull
+      value_type: string
+      default_value: missing
+      description: Pull image before running ("always"|"missing"|"never")
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

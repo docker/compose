@@ -15,9 +15,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.18.3-alpine
-ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
+ARG GO_VERSION=1.18.4-alpine
+ARG GOLANGCI_LINT_VERSION=v1.46.2-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
+
+FROM --platform=${BUILDPLATFORM} golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS local-golangci-lint
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
@@ -34,7 +36,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM base AS lint
 ENV CGO_ENABLED=0
-COPY --from=golangci/golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
+COPY --from=local-golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
@@ -88,7 +90,7 @@ RUN --mount=target=. \
     make -f builder.Makefile test
 
 FROM base AS check-license-headers
-RUN go install github.com/kunalkushwaha/ltag@latest
+RUN go install github.com/google/addlicense@latest
 RUN --mount=target=. \
     make -f builder.Makefile check-license-headers
 
@@ -105,3 +107,9 @@ COPY --from=make-go-mod-tidy /compose-cli/go.sum .
 FROM base AS check-go-mod
 COPY . .
 RUN make -f builder.Makefile check-go-mod
+
+# docs-reference is a target used as remote context to update docs on release
+# with latest changes on docker.github.io.
+# see open-pr job in .github/workflows/docs.yml for more details
+FROM scratch AS docs-reference
+COPY docs/reference/*.yaml .

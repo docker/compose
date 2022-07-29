@@ -263,7 +263,7 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 	}
 
 	preArchive := content
-	if len(srcInfo.RebaseName) != 0 {
+	if srcInfo.RebaseName != "" {
 		_, srcBase := archive.SplitPathDirEntry(srcInfo.Path)
 		preArchive = archive.RebaseArchiveEntries(content, srcBase, srcInfo.RebaseName)
 	}

@@ -11,22 +11,21 @@ on:
         description: 'To run with tmate enter "debug_enabled"'
         required: false
         default: "false"
-
+env:
+  GO_VERSION: 1.18.4
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18.3
-        id: go
-
       - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Validate go-mod, license headers and docs are up-to-date
         run: make validate
@@ -43,22 +42,15 @@ jobs:
     name: Validate cross build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    env:
-      GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18.3
-        id: go
-
       - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v3
         with:
-          path: ~/go/pkg/mod
-          key: go-${{ hashFiles('**/go.sum') }}
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       # Ensure we don't discover cross platform build issues at release time.
       # Time used to build linux here is gained back in the build for local E2E step
@@ -68,27 +60,20 @@ jobs:
   build-plugin:
     name: Build and tests in plugin mode
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v2
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.18.3
-        id: go
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Setup docker CLI
         run: |
           curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
           sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
-
-      - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: go-${{ hashFiles('**/go.sum') }}
 
       - name: Test
         run: make -f builder.Makefile test
@@ -104,27 +89,20 @@ jobs:
   build-standalone:
     name: Build and tests in standalone mode
     runs-on: ubuntu-latest
-    env:
-      GO111MODULE: "on"
     steps:
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v2
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.18.3
-        id: go
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Setup docker CLI
         run: |
           curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
           sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
-
-      - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: go-${{ hashFiles('**/go.sum') }}
 
       - name: Build for local E2E
         env:
