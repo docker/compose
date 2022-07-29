@@ -14,7 +14,7 @@ Restart containers
 
 ## Description
 
-Restarts all stopped and running services.
+Restarts all stopped and running services, or the specified services only.
 
 If you make changes to your `compose.yml` configuration, these changes are not reflected
 after running this command. For example, changes to environment variables (which are added
