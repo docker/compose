@@ -22,10 +22,12 @@ import (
 	"sort"
 	"testing"
 
-	composetypes "github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/api"
+
+	composetypes "github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	mountTypes "github.com/docker/docker/api/types/mount"
+
 	"gotest.tools/v3/assert"
 )
 
@@ -77,8 +79,8 @@ func TestBuildVolumeMount(t *testing.T) {
 }
 
 func TestServiceImageName(t *testing.T) {
-	assert.Equal(t, getImageName(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
-	assert.Equal(t, getImageName(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
+	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Image: "myImage"}, "myProject"), "myImage")
+	assert.Equal(t, api.GetImageNameOrDefault(composetypes.ServiceConfig{Name: "aService"}, "myProject"), "myProject_aService")
 }
 
 func TestPrepareNetworkLabels(t *testing.T) {

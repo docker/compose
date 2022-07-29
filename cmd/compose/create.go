@@ -126,6 +126,9 @@ func (opts createOptions) Apply(project *types.Project) {
 	if opts.noBuild {
 		for i, service := range project.Services {
 			service.Build = nil
+			if service.Image == "" {
+				service.Image = api.GetImageNameOrDefault(service, project.Name)
+			}
 			project.Services[i] = service
 		}
 	}
