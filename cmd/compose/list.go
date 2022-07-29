@@ -46,6 +46,7 @@ func listCommand(backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runList(ctx, backend, lsOpts)
 		}),
+		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
 	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
