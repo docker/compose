@@ -1,31 +1,31 @@
 command: docker compose restart
-short: Restart containers
+short: Restart service containers
 long: |-
-  Restarts all stopped and running services.
+    Restarts all stopped and running services, or the specified services only.
 
-  If you make changes to your `compose.yml` configuration, these changes are not reflected
-  after running this command. For example, changes to environment variables (which are added
-  after a container is built, but before the container's command is executed) are not updated
-  after restarting.
+    If you make changes to your `compose.yml` configuration, these changes are not reflected
+    after running this command. For example, changes to environment variables (which are added
+    after a container is built, but before the container's command is executed) are not updated
+    after restarting.
 
-  If you are looking to configure a service's restart policy, please refer to
-  [restart](https://github.com/compose-spec/compose-spec/blob/master/spec.md#restart)
-  or [restart_policy](https://github.com/compose-spec/compose-spec/blob/master/deploy.md#restart_policy).
-usage: docker compose restart
+    If you are looking to configure a service's restart policy, please refer to
+    [restart](https://github.com/compose-spec/compose-spec/blob/master/spec.md#restart)
+    or [restart_policy](https://github.com/compose-spec/compose-spec/blob/master/deploy.md#restart_policy).
+usage: docker compose restart [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: timeout
-  shorthand: t
-  value_type: int
-  default_value: "10"
-  description: Specify a shutdown timeout in seconds
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: timeout
+      shorthand: t
+      value_type: int
+      default_value: "10"
+      description: Specify a shutdown timeout in seconds
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

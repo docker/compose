@@ -1,126 +1,126 @@
 command: docker compose convert
-aliases: config
+aliases: docker compose convert, docker compose config
 short: Converts the compose file to platform's canonical format
 long: |-
-  `docker compose convert` render the actual data model to be applied on target platform. When used with Docker engine,
-  it merges the Compose files set by `-f` flags, resolves variables in Compose file, and expands short-notation into
-  fully defined Compose model.
+    `docker compose convert` render the actual data model to be applied on target platform. When used with Docker engine,
+    it merges the Compose files set by `-f` flags, resolves variables in Compose file, and expands short-notation into
+    fully defined Compose model.
 
-  To allow smooth migration from docker-compose, this subcommand declares alias `docker compose config`
+    To allow smooth migration from docker-compose, this subcommand declares alias `docker compose config`
 usage: docker compose convert SERVICES
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: format
-  value_type: string
-  default_value: yaml
-  description: 'Format the output. Values: [yaml | json]'
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: hash
-  value_type: string
-  description: Print the service config hash, one per line.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: images
-  value_type: bool
-  default_value: "false"
-  description: Print the image names, one per line.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-interpolate
-  value_type: bool
-  default_value: "false"
-  description: Don't interpolate environment variables.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-normalize
-  value_type: bool
-  default_value: "false"
-  description: Don't normalize compose model.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: output
-  shorthand: o
-  value_type: string
-  description: Save to file (default to stdout)
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: profiles
-  value_type: bool
-  default_value: "false"
-  description: Print the profile names, one per line.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: quiet
-  shorthand: q
-  value_type: bool
-  default_value: "false"
-  description: Only validate the configuration, don't print anything.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: resolve-image-digests
-  value_type: bool
-  default_value: "false"
-  description: Pin image tags to digests.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: services
-  value_type: bool
-  default_value: "false"
-  description: Print the service names, one per line.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: volumes
-  value_type: bool
-  default_value: "false"
-  description: Print the volume names, one per line.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: format
+      value_type: string
+      default_value: yaml
+      description: 'Format the output. Values: [yaml | json]'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: hash
+      value_type: string
+      description: Print the service config hash, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: images
+      value_type: bool
+      default_value: "false"
+      description: Print the image names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-interpolate
+      value_type: bool
+      default_value: "false"
+      description: Don't interpolate environment variables.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-normalize
+      value_type: bool
+      default_value: "false"
+      description: Don't normalize compose model.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: output
+      shorthand: o
+      value_type: string
+      description: Save to file (default to stdout)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: profiles
+      value_type: bool
+      default_value: "false"
+      description: Print the profile names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Only validate the configuration, don't print anything.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: resolve-image-digests
+      value_type: bool
+      default_value: "false"
+      description: Pin image tags to digests.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: services
+      value_type: bool
+      default_value: "false"
+      description: Print the service names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: volumes
+      value_type: bool
+      default_value: "false"
+      description: Print the volume names, one per line.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

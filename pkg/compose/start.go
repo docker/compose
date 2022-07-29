@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"strings"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
@@ -30,7 +31,7 @@ import (
 
 func (s *composeService) Start(ctx context.Context, projectName string, options api.StartOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.start(ctx, projectName, options, nil)
+		return s.start(ctx, strings.ToLower(projectName), options, nil)
 	})
 }
 
@@ -79,7 +80,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		depends := types.DependsOnConfig{}
 		for _, s := range project.Services {
 			depends[s.Name] = types.ServiceDependency{
-				Condition: ServiceConditionRunningOrHealthy,
+				Condition: getDependencyCondition(s, project),
 			}
 		}
 		err = s.waitDependencies(ctx, project, depends)
@@ -89,6 +90,20 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	}
 
 	return eg.Wait()
+}
+
+// getDependencyCondition checks if service is depended on by other services
+// with service_completed_successfully condition, and applies that condition
+// instead, or --wait will never finish waiting for one-shot containers
+func getDependencyCondition(service types.ServiceConfig, project *types.Project) string {
+	for _, services := range project.Services {
+		for dependencyService, dependencyConfig := range services.DependsOn {
+			if dependencyService == service.Name && dependencyConfig.Condition == types.ServiceConditionCompletedSuccessfully {
+				return types.ServiceConditionCompletedSuccessfully
+			}
+		}
+	}
+	return ServiceConditionRunningOrHealthy
 }
 
 type containerWatchFn func(container moby.Container) error

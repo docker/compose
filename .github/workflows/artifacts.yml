@@ -1,4 +1,6 @@
 name: Publish Artifacts
+env:
+  GO_VERSION: 1.18.4
 on:
   issue_comment:
     types: [created]
@@ -7,43 +9,44 @@ jobs:
     if: github.event.issue.pull_request != '' && contains(github.event.comment.body, '/generate-artifacts')
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.17
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
-        id: go
-
       - name: Checkout code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v3
         with:
-          path: ~/go/pkg/mod
-          key: go-${{ hashFiles('**/go.sum') }}
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Build cross platform compose-plugin binaries
         run: make -f builder.Makefile cross
 
       - name: Upload macos-amd64 binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: docker-compose-darwin-amd64
           path: ${{ github.workspace }}/bin/docker-compose-darwin-amd64
 
       - name: Upload macos-arm64 binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: docker-compose-darwin-arm64
           path: ${{ github.workspace }}/bin/docker-compose-darwin-arm64
 
       - name: Upload linux-amd64 binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: docker-compose-linux-amd64
           path: ${{ github.workspace }}/bin/docker-compose-linux-amd64
 
+      - name: Upload linux-ppc64le binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-compose-linux-ppc64le
+          path: ${{ github.workspace }}/bin/docker-compose-linux-ppc64le
+
       - name: Upload windows-amd64 binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: docker-compose-windows-amd64.exe
           path: ${{ github.workspace }}/bin/docker-compose-windows-amd64.exe

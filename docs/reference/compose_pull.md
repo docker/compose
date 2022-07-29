@@ -61,4 +61,4 @@ $ docker compose pull db
    ⠹ f63c47038e66 Waiting                                                  9.3s
    ⠹ 77a0c198cde5 Waiting                                                  9.3s
    ⠹ c8752d5b785c Waiting                                                  9.3s
-``̀`
+```

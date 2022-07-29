@@ -23,7 +23,7 @@ Docker Compose
 | [`ps`](compose_ps.md) | List containers |
 | [`pull`](compose_pull.md) | Pull service images |
 | [`push`](compose_push.md) | Push service images |
-| [`restart`](compose_restart.md) | Restart containers |
+| [`restart`](compose_restart.md) | Restart service containers |
 | [`rm`](compose_rm.md) | Removes stopped service containers |
 | [`run`](compose_run.md) | Run a one-off command on a service. |
 | [`start`](compose_start.md) | Start services |
@@ -44,7 +44,7 @@ Docker Compose
 | `-f`, `--file` | `stringArray` |  | Compose configuration files |
 | `--profile` | `stringArray` |  | Specify a profile to enable |
 | `--project-directory` | `string` |  | Specify an alternate working directory
-(default: the path of the Compose file) |
+(default: the path of the, first specified, Compose file) |
 | `-p`, `--project-name` | `string` |  | Project name |
 
 

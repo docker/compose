@@ -34,15 +34,51 @@ make test
 
 If you need to update a golden file simply do `go test ./... -test.update-golden`.
 
-### End to end tests
+### End-to-end tests
+To run e2e tests, the Compose CLI binary need to be build. All the commands to run e2e tests propose a version
+with the prefix `build-and-e2e` to first build the CLI before executing tests.
 
-To run the end to end tests, run:
+
+Note that this requires a local Docker Engine to be running.
+
+#### Whole end-to-end tests suite
+
+To execute both CLI and standalone e2e tests, run :
+
+```console
+make e2e
+```
+
+Or if you need to build the CLI, run: 
+```console
+make build-and-e2e
+```
+
+#### Plugin end-to-end tests suite
+
+To execute CLI plugin e2e tests, run :
 
 ```console
 make e2e-compose
 ```
 
-Note that this requires a local Docker Engine to be running.
+Or if you need to build the CLI, run:
+```console
+make build-and-e2e-compose
+```
+
+#### Standalone end-to-end tests suite
+
+To execute the standalone CLI e2e tests, run :
+
+```console
+make e2e-compose-standalone
+```
+
+Or if you need to build the CLI, run:
+```console
+make build-and-e2e-compose-standalone
+```
 
 ## Releases
 

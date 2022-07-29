@@ -27,6 +27,7 @@ import (
 
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
+	composegoutils "github.com/compose-spec/compose-go/utils"
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
@@ -129,8 +130,8 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringVar(&o.EnvFile, "env-file", "", "Specify an alternate environment file.")
-	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the Compose file)")
-	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the Compose file)")
+	f.StringVar(&o.ProjectDir, "project-directory", "", "Specify an alternate working directory\n(default: the path of the, first specified, Compose file)")
+	f.StringVar(&o.WorkDir, "workdir", "", "DEPRECATED! USE --project-directory INSTEAD.\nSpecify an alternate working directory\n(default: the path of the, first specified, Compose file)")
 	f.BoolVar(&o.Compatibility, "compatibility", false, "Run compose in backward compatibility mode")
 	_ = f.MarkHidden("workdir")
 }
@@ -169,7 +170,10 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 
 	ef := o.EnvFile
 	if ef != "" && !filepath.IsAbs(ef) {
-		ef = filepath.Join(project.WorkingDir, o.EnvFile)
+		ef, err = filepath.Abs(ef)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for i, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -210,9 +214,9 @@ func (o *projectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.Proj
 	return cli.NewProjectOptions(o.ConfigPaths,
 		append(po,
 			cli.WithWorkingDirectory(o.ProjectDir),
+			cli.WithOsEnv,
 			cli.WithEnvFile(o.EnvFile),
 			cli.WithDotEnv,
-			cli.WithOsEnv,
 			cli.WithConfigFileEnv,
 			cli.WithDefaultConfigPath,
 			cli.WithName(o.ProjectName))...)
@@ -235,11 +239,11 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		verbose bool
 		version bool
 	)
-	command := &cobra.Command{
+	c := &cobra.Command{
 		Short:            "Docker Compose",
 		Use:              PluginName,
 		TraverseChildren: true,
-		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
+		// By default (no Run/RunE in parent c) for typos in subcommands, cobra displays the help of parent c but exit(0) !
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()
@@ -254,6 +258,10 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 			}
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			err := setEnvWithDotEnv(&opts)
+			if err != nil {
+				return err
+			}
 			parent := cmd.Root()
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
@@ -269,7 +277,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 					return errors.New(`cannot specify DEPRECATED "--no-ansi" and "--ansi". Please use only "--ansi"`)
 				}
 				ansi = "never"
-				fmt.Fprint(os.Stderr, aec.Apply("option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n", aec.RedF))
+				fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
 			}
 			if verbose {
 				logrus.SetLevel(logrus.TraceLevel)
@@ -292,7 +300,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		},
 	}
 
-	command.AddCommand(
+	c.AddCommand(
 		upCommand(&opts, backend),
 		downCommand(&opts, backend),
 		startCommand(&opts, backend),
@@ -319,14 +327,38 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		createCommand(&opts, backend),
 		copyCommand(&opts, backend),
 	)
-	command.Flags().SetInterspersed(false)
-	opts.addProjectFlags(command.Flags())
-	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
-	command.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
-	command.Flags().MarkHidden("version") //nolint:errcheck
-	command.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
-	command.Flags().MarkHidden("no-ansi") //nolint:errcheck
-	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
-	command.Flags().MarkHidden("verbose") //nolint:errcheck
-	return command
+	c.Flags().SetInterspersed(false)
+	opts.addProjectFlags(c.Flags())
+	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
+	c.Flags().MarkHidden("version") //nolint:errcheck
+	c.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
+	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
+	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
+	c.Flags().MarkHidden("verbose") //nolint:errcheck
+	return c
+}
+
+func setEnvWithDotEnv(prjOpts *projectOptions) error {
+	options, err := prjOpts.toProjectOptions()
+	if err != nil {
+		return compose.WrapComposeError(err)
+	}
+	workingDir, err := options.GetWorkingDir()
+	if err != nil {
+		return err
+	}
+
+	envFromFile, err := cli.GetEnvFromFile(composegoutils.GetAsEqualsMap(os.Environ()), workingDir, options.EnvFile)
+	if err != nil {
+		return err
+	}
+	for k, v := range envFromFile {
+		if _, ok := os.LookupEnv(k); !ok {
+			if err := os.Setenv(k, v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -23,28 +23,28 @@ import (
 )
 
 func TestCascadeStop(t *testing.T) {
-	c := NewParallelE2eCLI(t, binDir)
+	c := NewParallelCLI(t)
 
 	const projectName = "e2e-cascade-stop"
 
 	t.Run("abort-on-container-exit", func(t *testing.T) {
-		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--abort-on-container-exit")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Out: `should_fail-1 exited with code 1`})
 		res.Assert(t, icmd.Expected{ExitCode: 1, Out: `Aborting on container exit...`})
 	})
 
 	t.Run("exit-code-from", func(t *testing.T) {
-		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=sleep")
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=sleep")
 		res.Assert(t, icmd.Expected{ExitCode: 137, Out: `should_fail-1 exited with code 1`})
 		res.Assert(t, icmd.Expected{ExitCode: 137, Out: `Aborting on container exit...`})
 	})
 
 	t.Run("exit-code-from unknown", func(t *testing.T) {
-		res := c.RunDockerOrExitError("compose", "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=unknown")
+		res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/cascade-stop-test/compose.yaml", "--project-name", projectName, "up", "--exit-code-from=unknown")
 		res.Assert(t, icmd.Expected{ExitCode: 1, Err: `no such service: unknown`})
 	})
 
 	t.Run("down", func(t *testing.T) {
-		_ = c.RunDockerComposeCmd("--project-name", projectName, "down")
+		_ = c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 	})
 }

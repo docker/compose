@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -29,12 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/compose/v2/cmd/compose"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
-	is "gotest.tools/v3/assert/cmp"
 	"gotest.tools/v3/icmd"
 	"gotest.tools/v3/poll"
+
+	"github.com/docker/compose/v2/cmd/compose"
 )
 
 var (
@@ -46,64 +46,98 @@ var (
 
 	// DockerScanExecutableName is the OS dependent Docker CLI binary name
 	DockerScanExecutableName = "docker-scan"
+
+	// WindowsExecutableSuffix is the Windows executable suffix
+	WindowsExecutableSuffix = ".exe"
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		DockerExecutableName = DockerExecutableName + ".exe"
-		DockerComposeExecutableName = DockerComposeExecutableName + ".exe"
-		DockerScanExecutableName = DockerScanExecutableName + ".exe"
+		DockerExecutableName += WindowsExecutableSuffix
+		DockerComposeExecutableName += WindowsExecutableSuffix
+		DockerScanExecutableName += WindowsExecutableSuffix
 	}
 }
 
-// E2eCLI is used to wrap the CLI for end to end testing
-// nolint stutter
-type E2eCLI struct {
-	BinDir    string
+// CLI is used to wrap the CLI for end to end testing
+type CLI struct {
+	// ConfigDir for Docker configuration (set as DOCKER_CONFIG)
 	ConfigDir string
-	test      *testing.T
+
+	// HomeDir for tools that look for user files (set as HOME)
+	HomeDir string
+
+	// env overrides to apply to every invoked command
+	//
+	// To populate, use WithEnv when creating a CLI instance.
+	env []string
 }
 
-// NewParallelE2eCLI returns a configured TestE2eCLI with t.Parallel() set
-func NewParallelE2eCLI(t *testing.T, binDir string) *E2eCLI {
+// CLIOption to customize behavior for all commands for a CLI instance.
+type CLIOption func(c *CLI)
+
+// NewParallelCLI marks the parent test as parallel and returns a CLI instance
+// suitable for usage across child tests.
+func NewParallelCLI(t *testing.T, opts ...CLIOption) *CLI {
+	t.Helper()
 	t.Parallel()
-	return newE2eCLI(t, binDir)
+	return NewCLI(t, opts...)
 }
 
-func newE2eCLI(t *testing.T, binDir string) *E2eCLI {
-	d, err := ioutil.TempDir("", "")
-	assert.Check(t, is.Nil(err))
+// NewCLI creates a CLI instance for running E2E tests.
+func NewCLI(t testing.TB, opts ...CLIOption) *CLI {
+	t.Helper()
+
+	configDir := t.TempDir()
+	initializePlugins(t, configDir)
+
+	c := &CLI{
+		ConfigDir: configDir,
+		HomeDir:   t.TempDir(),
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
+}
+
+// WithEnv sets environment variables that will be passed to commands.
+func WithEnv(env ...string) CLIOption {
+	return func(c *CLI) {
+		c.env = append(c.env, env...)
+	}
+}
+
+// initializePlugins copies the necessary plugin files to the temporary config
+// directory for the test.
+func initializePlugins(t testing.TB, configDir string) {
+	t.Helper()
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			conf, _ := ioutil.ReadFile(filepath.Join(d, "config.json"))
-			t.Errorf("Config: %s\n", string(conf))
-			t.Error("Contents of config dir:")
-			for _, p := range dirContents(d) {
-				t.Errorf(p)
+			if conf, err := os.ReadFile(filepath.Join(configDir, "config.json")); err == nil {
+				t.Logf("Config: %s\n", string(conf))
+			}
+			t.Log("Contents of config dir:")
+			for _, p := range dirContents(configDir) {
+				t.Logf("  - %s", p)
 			}
 		}
-		_ = os.RemoveAll(d)
 	})
 
-	_ = os.MkdirAll(filepath.Join(d, "cli-plugins"), 0755)
+	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
+		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 	if os.IsNotExist(err) {
-		fmt.Println("WARNING: docker-compose cli-plugin not found")
+		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
 	if err == nil {
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerComposeExecutableName))
-		if err != nil {
-			panic(err)
-		}
+		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerComposeExecutableName))
 		// We don't need a functional scan plugin, but a valid plugin binary
-		err = CopyFile(composePlugin, filepath.Join(d, "cli-plugins", DockerScanExecutableName))
-		if err != nil {
-			panic(err)
-		}
+		CopyFile(t, composePlugin, filepath.Join(configDir, "cli-plugins", DockerScanExecutableName))
 	}
-
-	return &E2eCLI{binDir, d, t}
 }
 
 func dirContents(dir string) []string {
@@ -133,91 +167,145 @@ func findExecutable(executableName string, paths []string) (string, error) {
 }
 
 // CopyFile copies a file from a sourceFile to a destinationFile setting permissions to 0755
-func CopyFile(sourceFile string, destinationFile string) error {
+func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
+	t.Helper()
+
 	src, err := os.Open(sourceFile)
-	if err != nil {
-		return err
-	}
-	// nolint: errcheck
+	require.NoError(t, err, "Failed to open source file: %s")
+	//nolint: errcheck
 	defer src.Close()
 
-	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-	// nolint: errcheck
+	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
+	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
+	//nolint: errcheck
 	defer dst.Close()
 
-	if _, err = io.Copy(dst, src); err != nil {
-		return err
-	}
+	_, err = io.Copy(dst, src)
+	require.NoError(t, err, "Failed to copy file: %s", sourceFile)
+}
 
-	return err
+// BaseEnvironment provides the minimal environment variables used across all
+// Docker / Compose commands.
+func (c *CLI) BaseEnvironment() []string {
+	return []string{
+		"HOME=" + c.HomeDir,
+		"USER=" + os.Getenv("USER"),
+		"DOCKER_CONFIG=" + c.ConfigDir,
+		"KUBECONFIG=invalid",
+	}
 }
 
 // NewCmd creates a cmd object configured with the test environment set
-func (c *E2eCLI) NewCmd(command string, args ...string) icmd.Cmd {
-	env := append(os.Environ(),
-		"DOCKER_CONFIG="+c.ConfigDir,
-		"KUBECONFIG=invalid",
-	)
+func (c *CLI) NewCmd(command string, args ...string) icmd.Cmd {
 	return icmd.Cmd{
 		Command: append([]string{command}, args...),
-		Env:     env,
+		Env:     append(c.BaseEnvironment(), c.env...),
+	}
+}
+
+// NewCmdWithEnv creates a cmd object configured with the test environment set with additional env vars
+func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) icmd.Cmd {
+	// base env -> CLI overrides -> cmd overrides
+	cmdEnv := append(c.BaseEnvironment(), c.env...)
+	cmdEnv = append(cmdEnv, envvars...)
+	return icmd.Cmd{
+		Command: append([]string{command}, args...),
+		Env:     cmdEnv,
 	}
 }
 
 // MetricsSocket get the path where test metrics will be sent
-func (c *E2eCLI) MetricsSocket() string {
-	return filepath.Join(c.ConfigDir, "./docker-cli.sock")
+func (c *CLI) MetricsSocket() string {
+	return filepath.Join(c.ConfigDir, "docker-cli.sock")
 }
 
 // NewDockerCmd creates a docker cmd without running it
-func (c *E2eCLI) NewDockerCmd(args ...string) icmd.Cmd {
+func (c *CLI) NewDockerCmd(t testing.TB, args ...string) icmd.Cmd {
+	t.Helper()
+	for _, arg := range args {
+		if arg == compose.PluginName {
+			t.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
+		}
+	}
 	return c.NewCmd(DockerExecutableName, args...)
 }
 
 // RunDockerOrExitError runs a docker command and returns a result
-func (c *E2eCLI) RunDockerOrExitError(args ...string) *icmd.Result {
-	fmt.Printf("\t[%s] docker %s\n", c.test.Name(), strings.Join(args, " "))
-	return icmd.RunCmd(c.NewDockerCmd(args...))
+func (c *CLI) RunDockerOrExitError(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
+	t.Logf("\t[%s] docker %s\n", t.Name(), strings.Join(args, " "))
+	return icmd.RunCmd(c.NewDockerCmd(t, args...))
 }
 
 // RunCmd runs a command, expects no error and returns a result
-func (c *E2eCLI) RunCmd(args ...string) *icmd.Result {
-	fmt.Printf("\t[%s] %s\n", c.test.Name(), strings.Join(args, " "))
-	assert.Assert(c.test, len(args) >= 1, "require at least one command in parameters")
+func (c *CLI) RunCmd(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
+	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
+	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
 	res := icmd.RunCmd(c.NewCmd(args[0], args[1:]...))
-	res.Assert(c.test, icmd.Success)
+	res.Assert(t, icmd.Success)
+	return res
+}
+
+// RunCmdInDir runs a command in a given dir, expects no error and returns a result
+func (c *CLI) RunCmdInDir(t testing.TB, dir string, args ...string) *icmd.Result {
+	t.Helper()
+	t.Logf("\t[%s] %s\n", t.Name(), strings.Join(args, " "))
+	assert.Assert(t, len(args) >= 1, "require at least one command in parameters")
+	cmd := c.NewCmd(args[0], args[1:]...)
+	cmd.Dir = dir
+	res := icmd.RunCmd(cmd)
+	res.Assert(t, icmd.Success)
 	return res
 }
 
 // RunDockerCmd runs a docker command, expects no error and returns a result
-func (c *E2eCLI) RunDockerCmd(args ...string) *icmd.Result {
-	if len(args) > 0 && args[0] == compose.PluginName {
-		c.test.Fatal("This test called 'RunDockerCmd' for 'compose'. Please prefer 'RunDockerComposeCmd' to be able to test as a plugin and standalone")
-	}
-	res := c.RunDockerOrExitError(args...)
-	res.Assert(c.test, icmd.Success)
+func (c *CLI) RunDockerCmd(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
+	res := c.RunDockerOrExitError(t, args...)
+	res.Assert(t, icmd.Success)
 	return res
 }
 
 // RunDockerComposeCmd runs a docker compose command, expects no error and returns a result
-func (c *E2eCLI) RunDockerComposeCmd(args ...string) *icmd.Result {
-	res := c.RunDockerComposeCmdNoCheck(args...)
-	res.Assert(c.test, icmd.Success)
+func (c *CLI) RunDockerComposeCmd(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
+	res := c.RunDockerComposeCmdNoCheck(t, args...)
+	res.Assert(t, icmd.Success)
 	return res
 }
 
 // RunDockerComposeCmdNoCheck runs a docker compose command, don't presume of any expectation and returns a result
-func (c *E2eCLI) RunDockerComposeCmdNoCheck(args ...string) *icmd.Result {
+func (c *CLI) RunDockerComposeCmdNoCheck(t testing.TB, args ...string) *icmd.Result {
+	t.Helper()
+	return icmd.RunCmd(c.NewDockerComposeCmd(t, args...))
+}
+
+// NewDockerComposeCmd creates a command object for Compose, either in plugin
+// or standalone mode (based on build tags).
+func (c *CLI) NewDockerComposeCmd(t testing.TB, args ...string) icmd.Cmd {
+	t.Helper()
 	if composeStandaloneMode {
-		composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
-		assert.NilError(c.test, err)
-		return icmd.RunCmd(c.NewCmd(composeBinary, args...))
+		return c.NewCmd(ComposeStandalonePath(t), args...)
 	}
 	args = append([]string{"compose"}, args...)
-	return icmd.RunCmd(c.NewCmd(DockerExecutableName, args...))
+	return c.NewCmd(DockerExecutableName, args...)
+}
+
+// ComposeStandalonePath returns the path to the locally-built Compose
+// standalone binary from the repo.
+//
+// This function will fail the test immediately if invoked when not running
+// in standalone test mode.
+func ComposeStandalonePath(t testing.TB) string {
+	t.Helper()
+	if !composeStandaloneMode {
+		require.Fail(t, "Not running in standalone mode")
+	}
+	composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
+	require.NoError(t, err, "Could not find standalone Compose binary (%q)",
+		DockerComposeExecutableName)
+	return composeBinary
 }
 
 // StdoutContains returns a predicate on command result expecting a string in stdout
@@ -228,22 +316,35 @@ func StdoutContains(expected string) func(*icmd.Result) bool {
 }
 
 // WaitForCmdResult try to execute a cmd until resulting output matches given predicate
-func (c *E2eCLI) WaitForCmdResult(command icmd.Cmd, predicate func(*icmd.Result) bool, timeout time.Duration, delay time.Duration) {
-	assert.Assert(c.test, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
+func (c *CLI) WaitForCmdResult(
+	t testing.TB,
+	command icmd.Cmd,
+	predicate func(*icmd.Result) bool,
+	timeout time.Duration,
+	delay time.Duration,
+) {
+	t.Helper()
+	assert.Assert(t, timeout.Nanoseconds() > delay.Nanoseconds(), "timeout must be greater than delay")
 	var res *icmd.Result
 	checkStopped := func(logt poll.LogT) poll.Result {
-		fmt.Printf("\t[%s] %s\n", c.test.Name(), strings.Join(command.Command, " "))
+		fmt.Printf("\t[%s] %s\n", t.Name(), strings.Join(command.Command, " "))
 		res = icmd.RunCmd(command)
 		if !predicate(res) {
 			return poll.Continue("Cmd output did not match requirement: %q", res.Combined())
 		}
 		return poll.Success()
 	}
-	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
+	poll.WaitOn(t, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
 }
 
 // WaitForCondition wait for predicate to execute to true
-func (c *E2eCLI) WaitForCondition(predicate func() (bool, string), timeout time.Duration, delay time.Duration) {
+func (c *CLI) WaitForCondition(
+	t testing.TB,
+	predicate func() (bool, string),
+	timeout time.Duration,
+	delay time.Duration,
+) {
+	t.Helper()
 	checkStopped := func(logt poll.LogT) poll.Result {
 		pass, description := predicate()
 		if !pass {
@@ -251,7 +352,7 @@ func (c *E2eCLI) WaitForCondition(predicate func() (bool, string), timeout time.
 		}
 		return poll.Success()
 	}
-	poll.WaitOn(c.test, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
+	poll.WaitOn(t, checkStopped, poll.WithDelay(delay), poll.WithTimeout(timeout))
 }
 
 // Lines split output into lines
@@ -260,9 +361,16 @@ func Lines(output string) []string {
 }
 
 // HTTPGetWithRetry performs an HTTP GET on an `endpoint`, using retryDelay also as a request timeout.
-// In the case of an error or the response status is not the expeted one, it retries the same request,
+// In the case of an error or the response status is not the expected one, it retries the same request,
 // returning the response body as a string (empty if we could not reach it)
-func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDelay time.Duration, timeout time.Duration) string {
+func HTTPGetWithRetry(
+	t testing.TB,
+	endpoint string,
+	expectedStatus int,
+	retryDelay time.Duration,
+	timeout time.Duration,
+) string {
+	t.Helper()
 	var (
 		r   *http.Response
 		err error
@@ -283,7 +391,7 @@ func HTTPGetWithRetry(t *testing.T, endpoint string, expectedStatus int, retryDe
 	}
 	poll.WaitOn(t, checkUp, poll.WithDelay(retryDelay), poll.WithTimeout(timeout))
 	if r != nil {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		assert.NilError(t, err)
 		return string(b)
 	}

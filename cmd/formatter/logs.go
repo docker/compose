@@ -27,6 +27,16 @@ import (
 	"github.com/docker/compose/v2/pkg/api"
 )
 
+// LogConsumer consume logs from services and format them
+type logConsumer struct {
+	ctx        context.Context
+	presenters sync.Map // map[string]*presenter
+	width      int
+	writer     io.Writer
+	color      bool
+	prefix     bool
+}
+
 // NewLogConsumer creates a new LogConsumer
 func NewLogConsumer(ctx context.Context, w io.Writer, color bool, prefix bool) api.LogConsumer {
 	return &logConsumer{
@@ -79,14 +89,14 @@ func (l *logConsumer) Log(container, service, message string) {
 	}
 	p := l.getPresenter(container)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(l.writer, "%s %s\n", p.prefix, line) // nolint:errcheck
+		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line) //nolint:errcheck
 	}
 }
 
 func (l *logConsumer) Status(container, msg string) {
 	p := l.getPresenter(container)
 	s := p.colors(fmt.Sprintf("%s %s\n", container, msg))
-	l.writer.Write([]byte(s)) // nolint:errcheck
+	l.writer.Write([]byte(s)) //nolint:errcheck
 }
 
 func (l *logConsumer) computeWidth() {
@@ -101,16 +111,6 @@ func (l *logConsumer) computeWidth() {
 	l.width = width + 1
 }
 
-// LogConsumer consume logs from services and format them
-type logConsumer struct {
-	ctx        context.Context
-	presenters sync.Map // map[string]*presenter
-	width      int
-	writer     io.Writer
-	color      bool
-	prefix     bool
-}
-
 type presenter struct {
 	colors colorFunc
 	name   string
@@ -118,5 +118,5 @@ type presenter struct {
 }
 
 func (p *presenter) setPrefix(width int) {
-	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s |", p.name))
+	p.prefix = p.colors(fmt.Sprintf("%-"+strconv.Itoa(width)+"s | ", p.name))
 }

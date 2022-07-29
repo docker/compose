@@ -23,9 +23,10 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/cli/cli/registry/client"
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -90,7 +91,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
-		w.Event(progress.NewEvent(projectName, progress.Done, "Warning: No resource found to remove"))
+		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", projectName)
 	}
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -131,17 +132,59 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		if n.External.External {
 			continue
 		}
+		// loop capture variable for op closure
 		networkName := n.Name
-		_, err := s.apiClient().NetworkInspect(ctx, networkName, moby.NetworkInspectOptions{})
-		if client.IsNotFound(err) {
-			return nil
-		}
-
 		ops = append(ops, func() error {
 			return s.removeNetwork(ctx, networkName, w)
 		})
 	}
 	return ops
+}
+
+func (s *composeService) removeNetwork(ctx context.Context, name string, w progress.Writer) error {
+	// networks are guaranteed to have unique IDs but NOT names, so it's
+	// possible to get into a situation where a compose down will fail with
+	// an error along the lines of:
+	// 	failed to remove network test: Error response from daemon: network test is ambiguous (2 matches found based on name)
+	// as a workaround here, the delete is done by ID after doing a list using
+	// the name as a filter (99.9% of the time this will return a single result)
+	networks, err := s.apiClient().NetworkList(ctx, moby.NetworkListOptions{
+		Filters: filters.NewArgs(filters.Arg("name", name)),
+	})
+	if err != nil {
+		return errors.Wrapf(err, fmt.Sprintf("failed to inspect network %s", name))
+	}
+	if len(networks) == 0 {
+		return nil
+	}
+
+	eventName := fmt.Sprintf("Network %s", name)
+	w.Event(progress.RemovingEvent(eventName))
+
+	var removed int
+	for _, net := range networks {
+		if net.Name == name {
+			if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+				if errdefs.IsNotFound(err) {
+					continue
+				}
+				w.Event(progress.ErrorEvent(eventName))
+				return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+			}
+			removed++
+		}
+	}
+
+	if removed == 0 {
+		// in practice, it's extremely unlikely for this to ever occur, as it'd
+		// mean the network was present when we queried at the start of this
+		// method but was then deleted by something else in the interim
+		w.Event(progress.NewEvent(eventName, progress.Done, "Warning: No resource found to remove"))
+		return nil
+	}
+
+	w.Event(progress.RemovedEvent(eventName))
+	return nil
 }
 
 func (s *composeService) getServiceImages(options api.DownOptions, project *types.Project) map[string]struct{} {
@@ -238,7 +281,10 @@ func (s *composeService) removeContainers(ctx context.Context, w progress.Writer
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {
 	containers = containers.filter(isNotOneOff)
-	project, _ := s.projectFromName(containers, projectName)
+	project, err := s.projectFromName(containers, projectName)
+	if err != nil && !api.IsNotFoundError(err) {
+		return nil, err
+	}
 
 	volumes, err := s.actualVolumes(ctx, projectName)
 	if err != nil {

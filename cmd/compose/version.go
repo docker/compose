@@ -37,7 +37,7 @@ func versionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show the Docker Compose version information",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			runVersion(opts)
 			return nil
