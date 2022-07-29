@@ -306,8 +306,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 			ipv4Address = config.Ipv4Address
 			ipv6Address = config.Ipv6Address
 			ipam = &network.EndpointIPAMConfig{
-				IPv4Address: ipv4Address,
-				IPv6Address: ipv6Address,
+				IPv4Address:  ipv4Address,
+				IPv6Address:  ipv6Address,
+				LinkLocalIPs: config.LinkLocalIPs,
 			}
 		}
 		networkConfig = &network.NetworkingConfig{
