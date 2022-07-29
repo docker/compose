@@ -30,10 +30,10 @@ func TestNetworks(t *testing.T) {
 	// fixture is shared with TestNetworkModes and is not safe to run concurrently
 	c := NewCLI(t)
 
-	const projectName = "network_e2e"
+	const projectName = "network-e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_dbnet")
+		c.RunDockerOrExitError(t, "network", "rm", projectName+"-dbnet")
 		c.RunDockerOrExitError(t, "network", "rm", "microservices")
 	})
 
@@ -125,7 +125,7 @@ func TestIPAMConfig(t *testing.T) {
 	const projectName = "ipam_e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_default")
+		c.RunDockerOrExitError(t, "network", "rm", projectName+"-default")
 	})
 
 	t.Run("up", func(t *testing.T) {

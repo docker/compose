@@ -159,13 +159,13 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	if o.Compatibility || utils.StringToBool(options.Environment["COMPOSE_COMPATIBILITY"]) {
+		api.Separator = "_"
+	}
+
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
-	}
-
-	if o.Compatibility || utils.StringToBool(project.Environment["COMPOSE_COMPATIBILITY"]) {
-		compose.Separator = "_"
 	}
 
 	ef := o.EnvFile
