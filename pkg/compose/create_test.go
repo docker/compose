@@ -44,6 +44,18 @@ func TestBuildBindMount(t *testing.T) {
 	assert.Equal(t, mount.Type, mountTypes.TypeBind)
 }
 
+func TestBuildNamedPipeMount(t *testing.T) {
+	project := composetypes.Project{}
+	volume := composetypes.ServiceVolumeConfig{
+		Type:   composetypes.VolumeTypeNamedPipe,
+		Source: "\\\\.\\pipe\\docker_engine_windows",
+		Target: "\\\\.\\pipe\\docker_engine",
+	}
+	mount, err := buildMount(project, volume)
+	assert.NilError(t, err)
+	assert.Equal(t, mount.Type, mountTypes.TypeNamedPipe)
+}
+
 func TestBuildVolumeMount(t *testing.T) {
 	project := composetypes.Project{
 		Name: "myProject",
@@ -97,6 +109,11 @@ func TestBuildContainerMountOptions(t *testing.T) {
 						Type:   composetypes.VolumeTypeVolume,
 						Target: "/var/myvolume2",
 					},
+					{
+						Type:   composetypes.VolumeTypeNamedPipe,
+						Source: "\\\\.\\pipe\\docker_engine_windows",
+						Target: "\\\\.\\pipe\\docker_engine",
+					},
 				},
 			},
 		},
@@ -128,18 +145,20 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		return mounts[i].Target < mounts[j].Target
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, len(mounts) == 3)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
+	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 
 	mounts, err = buildContainerMountOptions(project, project.Services[0], moby.ImageInspect{}, inherit)
 	sort.Slice(mounts, func(i, j int) bool {
 		return mounts[i].Target < mounts[j].Target
 	})
 	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 2)
+	assert.Assert(t, len(mounts) == 3)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
 	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
+	assert.Equal(t, mounts[2].Target, "\\\\.\\pipe\\docker_engine")
 }
 
 func TestGetDefaultNetworkMode(t *testing.T) {
