@@ -142,7 +142,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				project.Services[i].Labels = types.Labels{}
 			}
 			project.Services[i].CustomLabels[api.ImageDigestLabel] = digest
-			project.Services[i].Image = image
 		}
 	}
 	return nil
