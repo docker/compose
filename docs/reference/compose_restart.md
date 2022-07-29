@@ -1,7 +1,7 @@
 # docker compose restart
 
 <!---MARKER_GEN_START-->
-Restart containers
+Restart service containers
 
 ### Options
 

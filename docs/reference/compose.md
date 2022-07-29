@@ -23,7 +23,7 @@ Docker Compose
 | [`ps`](compose_ps.md) | List containers |
 | [`pull`](compose_pull.md) | Pull service images |
 | [`push`](compose_push.md) | Push service images |
-| [`restart`](compose_restart.md) | Restart containers |
+| [`restart`](compose_restart.md) | Restart service containers |
 | [`rm`](compose_rm.md) | Removes stopped service containers |
 | [`run`](compose_run.md) | Run a one-off command on a service. |
 | [`start`](compose_start.md) | Start services |
