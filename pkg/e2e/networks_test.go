@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -51,7 +52,7 @@ func TestNetworks(t *testing.T) {
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
 		res = c.RunDockerCmd(t, "network", "ls")
-		res.Assert(t, icmd.Expected{Out: projectName + "_dbnet"})
+		res.Assert(t, icmd.Expected{Out: projectName + "-dbnet"})
 		res.Assert(t, icmd.Expected{Out: "microservices"})
 	})
 
@@ -134,7 +135,7 @@ func TestIPAMConfig(t *testing.T) {
 
 	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", projectName+"-foo-1", "-f",
-			"{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
+			fmt.Sprintf(`{{ $network := index .NetworkSettings.Networks "%s-default" }}{{ $network.IPAMConfig.IPv4Address }}`, projectName))
 		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
 	})
 
