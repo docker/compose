@@ -124,9 +124,10 @@ Fork the repository and make changes on your fork in a feature branch:
     issue.
 
 Submit unit tests for your changes. Go has a great test framework built in; use
-it! Take a look at existing tests for inspiration. [Run the full test
-suite](BUILDING.md) on your branch before
-submitting a pull request.
+it! Take a look at existing tests for inspiration. Also end-to-end tests are
+available. Run the full test suite, both unit tests and e2e tests on your
+branch before submitting a pull request. See [BUILDING.md](BUILDING.md) for
+instructions to build and run tests.
 
 Write clean code. Universally formatted code promotes ease of writing, reading,
 and maintenance. Always run `gofmt -s -w file.go` on each changed file before
