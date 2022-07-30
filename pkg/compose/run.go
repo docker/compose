@@ -114,15 +114,12 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 		service.Entrypoint = opts.Entrypoint
 	}
 	if len(opts.Environment) > 0 {
-		env := types.NewMappingWithEquals(opts.Environment)
-		projectEnv := env.Resolve(func(s string) (string, bool) {
-			if _, ok := service.Environment[s]; ok {
-				return "", false
-			}
+		cmdEnv := types.NewMappingWithEquals(opts.Environment)
+		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
 			v, ok := envResolver(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
-		service.Environment.OverrideBy(projectEnv)
+		service.Environment.OverrideBy(serviceOverrideEnv)
 	}
 	for k, v := range opts.Labels {
 		service.Labels = service.Labels.Add(k, v)

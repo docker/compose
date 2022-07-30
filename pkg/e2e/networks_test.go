@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -30,10 +31,10 @@ func TestNetworks(t *testing.T) {
 	// fixture is shared with TestNetworkModes and is not safe to run concurrently
 	c := NewCLI(t)
 
-	const projectName = "network_e2e"
+	const projectName = "network-e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_dbnet")
+		c.RunDockerOrExitError(t, "network", "rm", projectName+"-dbnet")
 		c.RunDockerOrExitError(t, "network", "rm", "microservices")
 	})
 
@@ -51,7 +52,7 @@ func TestNetworks(t *testing.T) {
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
 		res = c.RunDockerCmd(t, "network", "ls")
-		res.Assert(t, icmd.Expected{Out: projectName + "_dbnet"})
+		res.Assert(t, icmd.Expected{Out: projectName + "-dbnet"})
 		res.Assert(t, icmd.Expected{Out: "microservices"})
 	})
 
@@ -125,7 +126,7 @@ func TestIPAMConfig(t *testing.T) {
 	const projectName = "ipam_e2e"
 
 	t.Run("ensure we do not reuse previous networks", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "network", "rm", projectName+"_default")
+		c.RunDockerOrExitError(t, "network", "rm", projectName+"-default")
 	})
 
 	t.Run("up", func(t *testing.T) {
@@ -134,7 +135,7 @@ func TestIPAMConfig(t *testing.T) {
 
 	t.Run("ensure service get fixed IP assigned", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", projectName+"-foo-1", "-f",
-			"{{ .NetworkSettings.Networks."+projectName+"_default.IPAddress }}")
+			fmt.Sprintf(`{{ $network := index .NetworkSettings.Networks "%s-default" }}{{ $network.IPAMConfig.IPv4Address }}`, projectName))
 		res.Assert(t, icmd.Expected{Out: "10.1.0.100"})
 	})
 

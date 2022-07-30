@@ -159,13 +159,13 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	if o.Compatibility || utils.StringToBool(options.Environment["COMPOSE_COMPATIBILITY"]) {
+		api.Separator = "_"
+	}
+
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
-	}
-
-	if o.Compatibility || utils.StringToBool(project.Environment["COMPOSE_COMPATIBILITY"]) {
-		compose.Separator = "_"
 	}
 
 	ef := o.EnvFile
@@ -354,10 +354,8 @@ func setEnvWithDotEnv(prjOpts *projectOptions) error {
 		return err
 	}
 	for k, v := range envFromFile {
-		if _, ok := os.LookupEnv(k); !ok {
-			if err := os.Setenv(k, v); err != nil {
-				return err
-			}
+		if err := os.Setenv(k, v); err != nil { // overwrite the process env with merged OS + env file results
+			return err
 		}
 	}
 	return nil

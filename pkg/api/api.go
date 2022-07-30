@@ -445,3 +445,15 @@ const (
 	// UserCancel user cancelled compose up, we are stopping containers
 	UserCancel
 )
+
+// Separator is used for naming components
+var Separator = "-"
+
+// GetImageNameOrDefault computes the default image name for a service, used to tag built images
+func GetImageNameOrDefault(service types.ServiceConfig, projectName string) string {
+	imageName := service.Image
+	if imageName == "" {
+		imageName = projectName + Separator + service.Name
+	}
+	return imageName
+}

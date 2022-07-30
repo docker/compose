@@ -61,7 +61,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		if service.Build == nil {
 			continue
 		}
-		imageName := getImageName(service, project.Name)
+		imageName := api.GetImageNameOrDefault(service, project.Name)
 		imagesToBuild = append(imagesToBuild, imageName)
 		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
 		if err != nil {
@@ -132,14 +132,13 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 	// set digest as com.docker.compose.image label so we can detect outdated containers
 	for i, service := range project.Services {
-		image := getImageName(service, project.Name)
+		image := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[image]
 		if ok {
 			if project.Services[i].Labels == nil {
 				project.Services[i].Labels = types.Labels{}
 			}
 			project.Services[i].CustomLabels[api.ImageDigestLabel] = digest
-			project.Services[i].Image = image
 		}
 	}
 	return nil
@@ -151,7 +150,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 		if service.Image == "" && service.Build == nil {
 			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
-		imageName := getImageName(service, project.Name)
+		imageName := api.GetImageNameOrDefault(service, project.Name)
 		_, localImagePresent := images[imageName]
 
 		if service.Build != nil {
@@ -173,7 +172,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
 	var imageNames []string
 	for _, s := range project.Services {
-		imgName := getImageName(s, project.Name)
+		imgName := api.GetImageNameOrDefault(s, project.Name)
 		if !utils.StringContains(imageNames, imgName) {
 			imageNames = append(imageNames, imgName)
 		}
@@ -188,7 +187,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	}
 
 	for i := range project.Services {
-		imgName := getImageName(project.Services[i], project.Name)
+		imgName := api.GetImageNameOrDefault(project.Services[i], project.Name)
 		digest, ok := images[imgName]
 		if ok {
 			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
