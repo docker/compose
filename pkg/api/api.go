@@ -141,6 +141,8 @@ type RestartOptions struct {
 
 // StopOptions group options of the Stop API
 type StopOptions struct {
+	// Project is the compose project used to define this app.
+	Project *types.Project
 	// Timeout override container stop timeout
 	Timeout *time.Duration
 	// Services passed in the command line to be stopped

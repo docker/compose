@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -53,9 +54,15 @@ func stopCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runStop(ctx context.Context, backend api.Service, opts stopOptions, services []string) error {
-	projectName, err := opts.toProjectName()
-	if err != nil {
-		return err
+	name := opts.ProjectName
+	var project *types.Project
+	if opts.ProjectName == "" {
+		p, err := opts.toProject(nil)
+		if err != nil {
+			return err
+		}
+		project = p
+		name = p.Name
 	}
 
 	var timeout *time.Duration
@@ -63,7 +70,9 @@ func runStop(ctx context.Context, backend api.Service, opts stopOptions, service
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return backend.Stop(ctx, projectName, api.StopOptions{
+
+	return backend.Stop(ctx, name, api.StopOptions{
+		Project:  project,
 		Timeout:  timeout,
 		Services: services,
 	})

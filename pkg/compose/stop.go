@@ -33,12 +33,13 @@ func (s *composeService) Stop(ctx context.Context, projectName string, options a
 func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
 	w := progress.ContextWriter(ctx)
 
-	containers, project, err := s.actualState(ctx, projectName, options.Services)
+	var containers Containers
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
 
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return InReverseDependencyOrder(ctx, options.Project, func(c context.Context, service string) error {
 		containersToStop := containers.filter(isService(service)).filter(isNotOneOff)
 		return s.stopContainers(ctx, w, containersToStop, options.Timeout)
 	})
