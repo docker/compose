@@ -42,6 +42,11 @@ func versionCommand() *cobra.Command {
 			runVersion(opts)
 			return nil
 		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// overwrite parent PersistentPreRunE to avoid trying to load
+			// compose file on version command if COMPOSE_FILE is set
+			return nil
+		},
 	}
 	// define flags for backward compatibility with com.docker.cli
 	flags := cmd.Flags()
