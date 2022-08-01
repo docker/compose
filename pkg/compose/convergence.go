@@ -605,8 +605,9 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 		ipv4Address = cfg.Ipv4Address
 		ipv6Address = cfg.Ipv6Address
 		ipam = &network.EndpointIPAMConfig{
-			IPv4Address: ipv4Address,
-			IPv6Address: ipv6Address,
+			IPv4Address:  ipv4Address,
+			IPv6Address:  ipv6Address,
+			LinkLocalIPs: cfg.LinkLocalIPs,
 		}
 	}
 	err := s.apiClient().NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{
