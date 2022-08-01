@@ -61,12 +61,12 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 			go func() {
 				<-signalChan
 				s.Kill(ctx, project.Name, api.KillOptions{ //nolint:errcheck
-					Services: project.ServiceNames(),
+					Services: options.Create.Services,
 				})
 			}()
 
 			return s.Stop(ctx, project.Name, api.StopOptions{
-				Services: project.ServiceNames(),
+				Services: options.Create.Services,
 			})
 		})
 	}

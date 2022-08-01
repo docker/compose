@@ -1,0 +1,5 @@
+services:
+  orphan:
+    image: alpine
+    init: true
+    command: /bin/sh -c 'while true; do echo "hello orphan"; sleep 1; done'
