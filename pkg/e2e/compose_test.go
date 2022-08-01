@@ -49,7 +49,7 @@ func TestLocalComposeUp(t *testing.T) {
 		assert.Assert(t, strings.Contains(output, `"word":`))
 
 		res = c.RunDockerCmd(t, "network", "ls")
-		res.Assert(t, icmd.Expected{Out: projectName + "-default"})
+		res.Assert(t, icmd.Expected{Out: projectName + "_default"})
 	})
 
 	t.Run("top", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestLocalComposeUp(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.service": "web"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version":`})
 
-		res = c.RunDockerCmd(t, "network", "inspect", projectName+"-default")
+		res = c.RunDockerCmd(t, "network", "inspect", projectName+"_default")
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.network": "default"`})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.project": `})
 		res.Assert(t, icmd.Expected{Out: `"com.docker.compose.version": `})
@@ -241,6 +241,6 @@ func TestConvert(t *testing.T) {
       default: null
 networks:
   default:
-    name: compose-e2e-convert-default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
+    name: compose-e2e-convert_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
