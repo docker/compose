@@ -107,7 +107,7 @@ func TestProjectVolumeBind(t *testing.T) {
 
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 
-		c.RunDockerOrExitError(t, "volume", "rm", "-f", projectName+"-project-data").Assert(t, icmd.Success)
+		c.RunDockerOrExitError(t, "volume", "rm", "-f", projectName+"_project-data").Assert(t, icmd.Success)
 		cmd := c.NewCmdWithEnv([]string{"TEST_DIR=" + tmpDir},
 			"docker", "compose", "--project-directory", "fixtures/project-volume-bind-test", "--project-name", projectName, "up", "-d")
 		icmd.RunCmd(cmd).Assert(t, icmd.Success)
