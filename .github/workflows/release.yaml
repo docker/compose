@@ -9,7 +9,9 @@ on:
 env:
   GO_VERSION: 1.18.5
 jobs:
-  upload-release:
+  build:
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code into the Go module directory
@@ -30,14 +32,50 @@ jobs:
         run: make GIT_TAG=${{ github.event.inputs.tag }} -f builder.Makefile cross
 
       - name: Compute checksums
-        run: cd bin; for f in *; do shasum --binary --algorithm 256 $f | tee -a checksums.txt > $f.sha256; done
+        working-directory: bin/
+        run: for f in *; do shasum --binary --algorithm 256 $f | tee -a checksums.txt > $f.sha256; done
+
+      - name: Generate SLSA subjects
+        id: hash
+        working-directory: bin/
+        run: |
+          set -euo pipefail
+          echo "::set-output name=hashes::$(cat checksums.txt | base64 -w0)"
 
       - name: License
         run: cp packaging/* bin/
 
+      - uses: actions/upload-artifact@v3
+        with:
+          name: "bin"
+          path: "bin/*"
+
+  provenance:
+    needs: [build]
+    permissions:
+      actions:  read # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.2.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.hashes }}"
+
+  release:
+    needs: [build, provenance]
+    runs-on: ubuntu-latest
+    steps:
+      # Download binaries and license.
+      - uses: actions/download-artifact@v3
+        with:
+          name: "bin"
+      # Download provenance file.
+      - uses: actions/download-artifact@v3
+        with:
+          name: "${{ needs.provenance.outputs.attestation-name }}"
+      # Upload to release.
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "bin/*"
+          artifacts: "*"
           generateReleaseNotes: true
           draft: true
           commit: "v2"

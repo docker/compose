@@ -1,6 +1,7 @@
 # Docker Compose v2
 
 [![Actions Status](https://github.com/docker/compose/workflows/Continuous%20integration/badge.svg)](https://github.com/docker/compose/actions)
+[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev/images/gh-badge-level3.svg)
 
 ![Docker Compose](logo.png?raw=true "Docker Compose Logo")
 
@@ -29,6 +30,16 @@ for Windows and macOS.
 
 You can download Docker Compose binaries from the
 [release page](https://github.com/docker/compose/releases) on this repository.
+
+We generate [SLSA3 provenance](slsa.dev) using the OpenSSF's [slsa-framework/slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator). To verify the binaries:
+1. Install the verification tool from [slsa-framework/slsa-verifier#installation](https://github.com/slsa-framework/slsa-verifier#installation)
+1. Download the file named `attestation.intoto.jsonl` from the release
+1. Run:
+```shell
+$ slsa-verifier -artifact-path <binary> -provenance attestation.intoto.jsonl -source github.com/docker/compose -branch v2
+  PASSED: Verified SLSA provenance
+```
+
 
 Rename the relevant binary for your OS to `docker-compose` and copy it to `$HOME/.docker/cli-plugins` 
 
