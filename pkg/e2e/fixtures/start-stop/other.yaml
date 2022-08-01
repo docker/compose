@@ -1,0 +1,5 @@
+services:
+  a-different-one:
+    image:  nginx:alpine
+  and-another-one:
+    image:  nginx:alpine
