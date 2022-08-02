@@ -9,7 +9,7 @@ require (
 	github.com/compose-spec/compose-go v1.4.0
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.6
-	github.com/distribution/distribution/v3 v3.0.0-20220725133111-4bf3547399eb
+	github.com/distribution/distribution/v3 v3.0.0-20220729163034-26163d82560f
 	github.com/docker/buildx v0.8.2 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.17+incompatible
 	github.com/docker/cli-docs-tool v0.5.0
@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-shellwords v1.0.12
-	github.com/moby/buildkit v0.10.1-0.20220403220257-10e6f94bf90d
+	github.com/moby/buildkit v0.10.3
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -45,7 +45,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cnabio/cnab-go v0.23.4 // indirect
-	github.com/containerd/continuity v0.2.2 // indirect
+	github.com/containerd/continuity v0.2.3-0.20220330195504-d132b287edc8 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
