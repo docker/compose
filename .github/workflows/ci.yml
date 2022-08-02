@@ -12,7 +12,7 @@ on:
         required: false
         default: "false"
 env:
-  GO_VERSION: 1.18.4
+  GO_VERSION: 1.18.5
 jobs:
   lint:
     name: Lint
