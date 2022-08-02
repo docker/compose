@@ -116,7 +116,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	if len(opts.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(opts.Environment)
 		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
-			v, ok := project.Environment[s]
+			v, ok := envResolver(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
 		service.Environment.OverrideBy(serviceOverrideEnv)
