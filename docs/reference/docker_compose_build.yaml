@@ -10,7 +10,7 @@ long: |-
 
     If you change a service's `Dockerfile` or the contents of its build directory,
     run `docker compose build` to rebuild it.
-usage: docker compose build [SERVICE...]
+usage: docker compose build [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

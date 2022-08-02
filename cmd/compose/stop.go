@@ -36,7 +36,7 @@ func stopCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "stop [SERVICE...]",
+		Use:   "stop [OPTIONS] [SERVICE...]",
 		Short: "Stop services",
 		PreRun: func(cmd *cobra.Command, args []string) {
 			opts.timeChanged = cmd.Flags().Changed("timeout")

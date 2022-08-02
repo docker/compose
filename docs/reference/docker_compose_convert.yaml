@@ -7,7 +7,7 @@ long: |-
     fully defined Compose model.
 
     To allow smooth migration from docker-compose, this subcommand declares alias `docker compose config`
-usage: docker compose convert SERVICES
+usage: docker compose convert [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

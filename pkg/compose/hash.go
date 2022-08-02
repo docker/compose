@@ -23,7 +23,7 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-// ServiceHash compute configuration has for a service
+// ServiceHash computes the configuration hash for a service.
 func ServiceHash(o types.ServiceConfig) (string, error) {
 	// remove the Build config when generating the service hash
 	o.Build = nil

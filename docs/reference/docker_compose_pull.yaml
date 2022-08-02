@@ -3,7 +3,7 @@ short: Pull service images
 long: |-
     Pulls an image associated with a service defined in a `compose.yaml` file, but does not start containers based on
     those images.
-usage: docker compose pull [SERVICE...]
+usage: docker compose pull [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

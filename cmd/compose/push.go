@@ -36,7 +36,7 @@ func pushCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	pushCmd := &cobra.Command{
-		Use:   "push [SERVICE...]",
+		Use:   "push [OPTIONS] [SERVICE...]",
 		Short: "Push service images",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPush(ctx, backend, opts, args)

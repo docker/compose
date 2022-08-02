@@ -10,7 +10,7 @@ long: |-
     example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
     example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->80/tcp
     ```
-usage: docker compose ps [SERVICE...]
+usage: docker compose ps [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

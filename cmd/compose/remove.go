@@ -35,7 +35,7 @@ func removeCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "rm [SERVICE...]",
+		Use:   "rm [OPTIONS] [SERVICE...]",
 		Short: "Removes stopped service containers",
 		Long: `Removes stopped service containers
 

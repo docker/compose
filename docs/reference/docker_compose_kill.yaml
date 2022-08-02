@@ -6,7 +6,7 @@ long: |-
     ```console
     $ docker-compose kill -s SIGINT
     ```
-usage: docker compose kill [options] [SERVICE...]
+usage: docker compose kill [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

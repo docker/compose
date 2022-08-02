@@ -54,7 +54,7 @@ long: |-
 
     This runs a database upgrade script, and removes the container when finished running, even if a restart policy is
     specified in the service configuration.
-usage: docker compose run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]
+usage: docker compose run [OPTIONS] SERVICE [COMMAND] [ARGS...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

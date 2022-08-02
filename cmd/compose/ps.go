@@ -70,7 +70,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	psCmd := &cobra.Command{
-		Use:   "ps [SERVICE...]",
+		Use:   "ps [OPTIONS] [SERVICE...]",
 		Short: "List containers",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			return opts.parseFilter()

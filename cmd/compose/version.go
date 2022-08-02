@@ -35,7 +35,7 @@ type versionOptions struct {
 func versionCommand() *cobra.Command {
 	opts := versionOptions{}
 	cmd := &cobra.Command{
-		Use:   "version",
+		Use:   "version [OPTIONS]",
 		Short: "Show the Docker Compose version information",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

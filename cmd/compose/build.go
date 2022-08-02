@@ -77,7 +77,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "build [SERVICE...]",
+		Use:   "build [OPTIONS] [SERVICE...]",
 		Short: "Build or rebuild services",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.memory != "" {

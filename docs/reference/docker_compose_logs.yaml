@@ -1,7 +1,7 @@
 command: docker compose logs
 short: View output from containers
 long: Displays log output from services.
-usage: docker compose logs [SERVICE...]
+usage: docker compose logs [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
