@@ -18,6 +18,7 @@ package compose
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -142,6 +143,12 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 	})
 	if err != nil {
 		return err
+	}
+
+	if !opts.noInterpolate {
+		dollar := []byte{'$'}
+		escDollar := []byte{'$', '$'}
+		json = bytes.ReplaceAll(json, dollar, escDollar)
 	}
 
 	if opts.quiet {
