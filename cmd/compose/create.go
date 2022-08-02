@@ -45,7 +45,7 @@ type createOptions struct {
 func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	opts := createOptions{}
 	cmd := &cobra.Command{
-		Use:   "create [SERVICE...]",
+		Use:   "create [OPTIONS] [SERVICE...]",
 		Short: "Creates containers for a service.",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.Build && opts.noBuild {

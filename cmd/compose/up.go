@@ -96,7 +96,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	upCmd := &cobra.Command{
-		Use:   "up [SERVICE...]",
+		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.timeChanged = cmd.Flags().Changed("timeout")

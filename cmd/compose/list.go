@@ -41,7 +41,7 @@ type lsOptions struct {
 func listCommand(backend api.Service) *cobra.Command {
 	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
-		Use:   "ls",
+		Use:   "ls [OPTIONS]",
 		Short: "List running compose projects",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runList(ctx, backend, lsOpts)

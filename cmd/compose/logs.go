@@ -44,7 +44,7 @@ func logsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	logsCmd := &cobra.Command{
-		Use:   "logs [SERVICE...]",
+		Use:   "logs [OPTIONS] [SERVICE...]",
 		Short: "View output from containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runLogs(ctx, backend, opts, args)

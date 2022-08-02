@@ -1,7 +1,7 @@
 command: docker compose create
 short: Creates containers for a service.
 long: Creates containers for a service.
-usage: docker compose create [SERVICE...]
+usage: docker compose create [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

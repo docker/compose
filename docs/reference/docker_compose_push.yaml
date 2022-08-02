@@ -19,7 +19,7 @@ long: |-
         build: .
         image: your-dockerid/yourimage  ## goes to your repository on Docker Hub
     ```
-usage: docker compose push [SERVICE...]
+usage: docker compose push [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

@@ -1,7 +1,7 @@
 command: docker compose images
 short: List images used by the created containers
 long: List images used by the created containers
-usage: docker compose images [SERVICE...]
+usage: docker compose images [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

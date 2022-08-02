@@ -114,7 +114,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 		},
 	}
 	cmd := &cobra.Command{
-		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
+		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {

@@ -45,7 +45,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	downCmd := &cobra.Command{
-		Use:   "down",
+		Use:   "down [OPTIONS]",
 		Short: "Stop and remove containers, networks",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")

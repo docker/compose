@@ -16,7 +16,7 @@ long: |-
     Are you sure? [yN] y
     Removing djangoquickstart_web_run_1 ... done
     ```
-usage: docker compose rm [SERVICE...]
+usage: docker compose rm [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

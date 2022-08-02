@@ -38,7 +38,7 @@ func eventsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		},
 	}
 	cmd := &cobra.Command{
-		Use:   "events [options] [--] [SERVICE...]",
+		Use:   "events [OPTIONS] [SERVICE...]",
 		Short: "Receive real time events from containers.",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runEvents(ctx, backend, opts, args)

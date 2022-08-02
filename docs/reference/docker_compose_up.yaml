@@ -17,7 +17,7 @@ long: |-
 
     If the process encounters an error, the exit code for this command is `1`.
     If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the containers are stopped, and the exit code is `0`.
-usage: docker compose up [SERVICE...]
+usage: docker compose up [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:

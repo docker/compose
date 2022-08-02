@@ -1,7 +1,7 @@
 command: docker compose version
 short: Show the Docker Compose version information
 long: Show the Docker Compose version information
-usage: docker compose version
+usage: docker compose version [OPTIONS]
 pname: docker compose
 plink: docker_compose.yaml
 options:

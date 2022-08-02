@@ -35,7 +35,7 @@ func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	restartCmd := &cobra.Command{
-		Use:   "restart [SERVICE...]",
+		Use:   "restart [OPTIONS] [SERVICE...]",
 		Short: "Restart service containers",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runRestart(ctx, backend, opts, args)

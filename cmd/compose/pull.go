@@ -43,7 +43,7 @@ func pullCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "pull [SERVICE...]",
+		Use:   "pull [OPTIONS] [SERVICE...]",
 		Short: "Pull service images",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.noParallel {

@@ -58,7 +58,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Aliases: []string{"config"},
-		Use:     "convert SERVICES",
+		Use:     "convert [OPTIONS] [SERVICE...]",
 		Short:   "Converts the compose file to platform's canonical format",
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
 			if opts.quiet {

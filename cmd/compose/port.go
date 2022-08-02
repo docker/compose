@@ -38,7 +38,7 @@ func portCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "port [options] [--] SERVICE PRIVATE_PORT",
+		Use:   "port [OPTIONS] SERVICE PRIVATE_PORT",
 		Short: "Print the public port for a port binding.",
 		Args:  cobra.MinimumNArgs(2),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {

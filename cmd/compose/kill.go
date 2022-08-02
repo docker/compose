@@ -34,7 +34,7 @@ func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "kill [options] [SERVICE...]",
+		Use:   "kill [OPTIONS] [SERVICE...]",
 		Short: "Force stop service containers.",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runKill(ctx, backend, opts, args)
