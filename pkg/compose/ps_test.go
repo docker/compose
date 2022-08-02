@@ -26,6 +26,7 @@ import (
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 
 	compose "github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
@@ -48,6 +49,8 @@ func TestPs(t *testing.T) {
 	c2, inspect2 := containerDetails("service1", "456", "running", "", 0)
 	c2.Ports = []moby.Port{{PublicPort: 80, PrivatePort: 90, IP: "localhost"}}
 	c3, inspect3 := containerDetails("service2", "789", "exited", "", 130)
+	api.EXPECT().VolumeList(ctx, gomock.Any()).Return(volume.VolumeListOKBody{}, nil)
+	api.EXPECT().NetworkList(ctx, gomock.Any()).Return([]moby.NetworkResource{}, nil)
 	api.EXPECT().ContainerList(ctx, listOpts).Return([]moby.Container{c1, c2, c3}, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "123").Return(inspect1, nil)
 	api.EXPECT().ContainerInspect(anyCancellableContext(), "456").Return(inspect2, nil)

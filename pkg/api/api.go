@@ -280,6 +280,7 @@ type ListOptions struct {
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
+	Project  *types.Project
 	All      bool
 	Services []string
 }
