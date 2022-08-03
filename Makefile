@@ -99,7 +99,7 @@ docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t dockercli-output.XXXXXXXXXX))
 	docker build . \
 	--output type=local,dest=$($@_TMP_OUT) \
-	-f ./docs/docs.Dockerfile \
+	-f ./docs/Dockerfile \
 	--target update
 	rm -rf ./docs/internal
 	cp -R "$($@_TMP_OUT)"/out/* ./docs/
@@ -108,7 +108,7 @@ docs: ## generate documentation
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change
 	@docker build . \
-	-f ./docs/docs.Dockerfile \
+	-f ./docs/Dockerfile \
 	--target validate
 
 .PHONY: check-dependencies
