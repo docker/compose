@@ -31,13 +31,17 @@ import (
 
 func (s *composeService) Remove(ctx context.Context, projectName string, options api.RemoveOptions) error {
 	projectName = strings.ToLower(projectName)
-	containers, _, err := s.actualState(ctx, projectName, options.Services)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		if api.IsNotFoundError(err) {
 			fmt.Fprintln(s.stderr(), "No stopped containers")
 			return nil
 		}
 		return err
+	}
+
+	if options.Project != nil {
+		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
 	stoppedContainers := containers.filter(func(c moby.Container) bool {

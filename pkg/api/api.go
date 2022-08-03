@@ -117,7 +117,7 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
-	// Project is the compose project used to define this app. Might be nil if user ran `start` just with project name
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project *types.Project
 	// Attach to container and forward logs if not nil
 	Attach LogConsumer
@@ -133,6 +133,8 @@ type StartOptions struct {
 
 // RestartOptions group options of the Restart API
 type RestartOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 	// Timeout override container restart timeout
 	Timeout *time.Duration
 	// Services passed in the command line to be restarted
@@ -141,6 +143,8 @@ type RestartOptions struct {
 
 // StopOptions group options of the Stop API
 type StopOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 	// Timeout override container stop timeout
 	Timeout *time.Duration
 	// Services passed in the command line to be stopped
@@ -201,6 +205,8 @@ type KillOptions struct {
 
 // RemoveOptions group options of the Remove API
 type RemoveOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 	// DryRun just list removable resources
 	DryRun bool
 	// Volumes remove anonymous volumes
@@ -213,6 +219,8 @@ type RemoveOptions struct {
 
 // RunOptions group options of the Run API
 type RunOptions struct {
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project           *types.Project
 	Name              string
 	Service           string
 	Command           []string
@@ -272,6 +280,7 @@ type ListOptions struct {
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
+	Project  *types.Project
 	All      bool
 	Services []string
 }
@@ -377,6 +386,8 @@ type LogOptions struct {
 type PauseOptions struct {
 	// Services passed in the command line to be started
 	Services []string
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 }
 
 const (

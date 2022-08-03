@@ -246,3 +246,19 @@ func TestStartStopMultipleServices(t *testing.T) {
 			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
 	}
 }
+
+func TestStartStopMultipleFiles(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv("COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple-files"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "-p", "e2e-start-stop-svc-multiple-files", "down", "--remove-orphans")
+	})
+
+	cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "up", "-d")
+	cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/other.yaml", "up", "-d")
+
+	res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "stop")
+	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-simple-1  Stopped"), res.Combined())
+	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-another-1  Stopped"), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-a-different-one-1  Stopped"), res.Combined())
+	assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-and-another-one-1  Stopped"), res.Combined())
+}

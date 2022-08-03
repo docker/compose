@@ -45,8 +45,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	include := oneOffExclude
+	if options.RemoveOrphans {
+		include = oneOffInclude
+	}
+	containers, err := s.getContainers(ctx, projectName, include, true)
 	if err != nil {
 		return err
 	}

@@ -91,11 +91,12 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runPs(ctx context.Context, backend api.Service, services []string, opts psOptions) error {
-	projectName, err := opts.toProjectName()
+	project, name, err := opts.projectOrName()
 	if err != nil {
 		return err
 	}
-	containers, err := backend.Ps(ctx, projectName, api.PsOptions{
+	containers, err := backend.Ps(ctx, name, api.PsOptions{
+		Project:  project,
 		All:      opts.All,
 		Services: services,
 	})

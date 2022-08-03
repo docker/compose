@@ -33,10 +33,14 @@ func (s *composeService) Pause(ctx context.Context, projectName string, options 
 	})
 }
 
-func (s *composeService) pause(ctx context.Context, project string, options api.PauseOptions) error {
-	containers, err := s.getContainers(ctx, project, oneOffExclude, false, options.Services...)
+func (s *composeService) pause(ctx context.Context, projectName string, options api.PauseOptions) error {
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
+	}
+
+	if options.Project != nil {
+		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
 	w := progress.ContextWriter(ctx)
@@ -65,6 +69,10 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
+	}
+
+	if options.Project != nil {
+		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
 	w := progress.ContextWriter(ctx)

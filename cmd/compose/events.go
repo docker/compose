@@ -51,12 +51,12 @@ func eventsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runEvents(ctx context.Context, backend api.Service, opts eventsOpts, services []string) error {
-	project, err := opts.toProjectName()
+	name, err := opts.toProjectName()
 	if err != nil {
 		return err
 	}
 
-	return backend.Events(ctx, project, api.EventsOptions{
+	return backend.Events(ctx, name, api.EventsOptions{
 		Services: services,
 		Consumer: func(event api.Event) error {
 			if opts.json {
