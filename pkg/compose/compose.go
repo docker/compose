@@ -24,6 +24,8 @@ import (
 	"io"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
@@ -33,7 +35,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	"github.com/sanathkr/go-yaml"
 )
 
 // NewComposeService create a local implementation of the compose.Service API
