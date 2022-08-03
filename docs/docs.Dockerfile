@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.3-labs
+# syntax=docker/dockerfile:1
 
 
 #   Copyright 2020 Docker Compose CLI authors
