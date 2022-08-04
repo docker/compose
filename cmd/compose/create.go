@@ -31,6 +31,7 @@ type createOptions struct {
 	Build         bool
 	noBuild       bool
 	Pull          string
+	pullChanged   bool
 	removeOrphans bool
 	ignoreOrphans bool
 	forceRecreate bool
@@ -47,7 +48,8 @@ func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [OPTIONS] [SERVICE...]",
 		Short: "Creates containers for a service.",
-		PreRunE: Adapt(func(ctx context.Context, args []string) error {
+		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
+			opts.pullChanged = cmd.Flags().Changed("pull")
 			if opts.Build && opts.noBuild {
 				return fmt.Errorf("--build and --no-build are incompatible")
 			}
@@ -108,7 +110,7 @@ func (opts createOptions) GetTimeout() *time.Duration {
 }
 
 func (opts createOptions) Apply(project *types.Project) {
-	if opts.Pull != "" {
+	if opts.pullChanged {
 		for i, service := range project.Services {
 			service.PullPolicy = opts.Pull
 			project.Services[i] = service
