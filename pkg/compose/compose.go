@@ -130,9 +130,13 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		serviceLabel := c.Labels[api.ServiceLabel]
 		_, ok := set[serviceLabel]
 		if !ok {
+			serviceImage := c.Image
+			if serviceNameFromLabel, ok := c.Labels[api.ImageNameLabel]; ok {
+				serviceImage = serviceNameFromLabel
+			}
 			set[serviceLabel] = &types.ServiceConfig{
 				Name:   serviceLabel,
-				Image:  c.Image,
+				Image:  serviceImage,
 				Labels: c.Labels,
 			}
 		}
