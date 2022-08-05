@@ -33,8 +33,9 @@ jobs:
       - name: Run golangci-lint
         env:
           BUILD_TAGS: e2e
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
+          version: v1.47.3
           args: --timeout=180s
 
   # only on main branch, costs too much for the gain on every PR
