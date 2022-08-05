@@ -13,6 +13,7 @@ on:
         default: "false"
 env:
   GO_VERSION: 1.18.5
+  DOCKER_CLI_VERSION: 20.10.17
 jobs:
   lint:
     name: Lint
@@ -73,7 +74,7 @@ jobs:
 
       - name: Setup docker CLI
         run: |
-          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz | tar xz
           sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
 
       - name: Test
@@ -102,7 +103,7 @@ jobs:
 
       - name: Setup docker CLI
         run: |
-          curl https://download.docker.com/linux/static/stable/x86_64/docker-20.10.3.tgz | tar xz
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz | tar xz
           sudo cp ./docker/docker /usr/bin/ && rm -rf docker && docker version
 
       - name: Build for local E2E
