@@ -35,11 +35,16 @@ type versionOptions struct {
 func versionCommand() *cobra.Command {
 	opts := versionOptions{}
 	cmd := &cobra.Command{
-		Use:   "version",
+		Use:   "version [OPTIONS]",
 		Short: "Show the Docker Compose version information",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			runVersion(opts)
+			return nil
+		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// overwrite parent PersistentPreRunE to avoid trying to load
+			// compose file on version command if COMPOSE_FILE is set
 			return nil
 		},
 	}

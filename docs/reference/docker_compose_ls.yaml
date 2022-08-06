@@ -1,51 +1,51 @@
 command: docker compose ls
 short: List running compose projects
 long: List Compose projects running on platform.
-usage: docker compose ls
+usage: docker compose ls [OPTIONS]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: all
-  shorthand: a
-  value_type: bool
-  default_value: "false"
-  description: Show all stopped Compose projects
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: filter
-  value_type: filter
-  description: Filter output based on conditions provided.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: format
-  value_type: string
-  default_value: pretty
-  description: 'Format the output. Values: [pretty | json].'
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: quiet
-  shorthand: q
-  value_type: bool
-  default_value: "false"
-  description: Only display IDs.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: all
+      shorthand: a
+      value_type: bool
+      default_value: "false"
+      description: Show all stopped Compose projects
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: filter
+      value_type: filter
+      description: Filter output based on conditions provided.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: format
+      value_type: string
+      default_value: pretty
+      description: 'Format the output. Values: [pretty | json].'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Only display IDs.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

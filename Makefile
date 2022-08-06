@@ -51,6 +51,12 @@ e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2
 	docker-compose version
 	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
+.PHONY: build-and-e2e-compose
+build-and-e2e-compose: compose-plugin e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+
+.PHONY: build-and-e2e-compose-standalone
+build-and-e2e-compose-standalone: compose-plugin e2e-compose-standalone ## Compile the compose cli-plugin and run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
+
 .PHONY: mocks
 mocks:
 	mockgen -destination pkg/mocks/mock_docker_cli.go -package mocks github.com/docker/cli/cli/command Cli
@@ -59,6 +65,9 @@ mocks:
 
 .PHONY: e2e
 e2e: e2e-compose e2e-compose-standalone ## Run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
+
+.PHONY: build-and-e2e
+build-and-e2e: compose-plugin e2e-compose e2e-compose-standalone ## Compile the compose cli-plugin and run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
 
 .PHONY: cross
 cross: ## Compile the CLI for linux, darwin and windows
@@ -90,7 +99,7 @@ docs: ## generate documentation
 	$(eval $@_TMP_OUT := $(shell mktemp -d -t dockercli-output.XXXXXXXXXX))
 	docker build . \
 	--output type=local,dest=$($@_TMP_OUT) \
-	-f ./docs/docs.Dockerfile \
+	-f ./docs/Dockerfile \
 	--target update
 	rm -rf ./docs/internal
 	cp -R "$($@_TMP_OUT)"/out/* ./docs/
@@ -99,7 +108,7 @@ docs: ## generate documentation
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change
 	@docker build . \
-	-f ./docs/docs.Dockerfile \
+	-f ./docs/Dockerfile \
 	--target validate
 
 .PHONY: check-dependencies

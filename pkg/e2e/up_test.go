@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 Docker Compose CLI authors
+   Copyright 2022 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,8 +17,14 @@
 package e2e
 
 import (
+	"context"
+	"os/exec"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/icmd"
 )
 
@@ -30,4 +36,70 @@ func TestUpServiceUnhealthy(t *testing.T) {
 	res.Assert(t, icmd.Expected{ExitCode: 1, Err: `container for service "fail" is unhealthy`})
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+}
+
+func TestUpDependenciesNotStopped(t *testing.T) {
+	c := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=up-deps-stop",
+	))
+
+	reset := func() {
+		c.RunDockerComposeCmdNoCheck(t, "down", "-t=0", "--remove-orphans", "-v")
+	}
+	reset()
+	t.Cleanup(reset)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Log("Launching orphan container (background)")
+	c.RunDockerComposeCmd(t,
+		"-f=./fixtures/ups-deps-stop/orphan.yaml",
+		"up",
+		"--wait",
+		"--detach",
+		"orphan",
+	)
+	RequireServiceState(t, c, "orphan", "running")
+
+	t.Log("Launching app container with implicit dependency")
+	var upOut lockedBuffer
+	var upCmd *exec.Cmd
+	go func() {
+		testCmd := c.NewDockerComposeCmd(t,
+			"-f=./fixtures/ups-deps-stop/compose.yaml",
+			"up",
+			"app",
+		)
+		cmd := exec.CommandContext(ctx, testCmd.Command[0], testCmd.Command[1:]...)
+		cmd.Env = testCmd.Env
+		cmd.Stdout = &upOut
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+		assert.NoError(t, cmd.Start(), "Failed to run compose up")
+		upCmd = cmd
+	}()
+
+	t.Log("Waiting for containers to be in running state")
+	upOut.RequireEventuallyContains(t, "hello app")
+	RequireServiceState(t, c, "app", "running")
+	RequireServiceState(t, c, "dependency", "running")
+
+	t.Log("Simulating Ctrl-C")
+	require.NoError(t, syscall.Kill(-upCmd.Process.Pid, syscall.SIGINT),
+		"Failed to send SIGINT to compose up process")
+
+	time.AfterFunc(5*time.Second, cancel)
+
+	t.Log("Waiting for `compose up` to exit")
+	err := upCmd.Wait()
+	if err != nil {
+		exitErr := err.(*exec.ExitError)
+		require.EqualValues(t, exitErr.ExitCode(), 130)
+	}
+
+	RequireServiceState(t, c, "app", "exited")
+	// dependency should still be running
+	RequireServiceState(t, c, "dependency", "running")
+	RequireServiceState(t, c, "orphan", "running")
 }

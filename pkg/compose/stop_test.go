@@ -26,6 +26,8 @@ import (
 	"github.com/docker/compose/v2/pkg/mocks"
 
 	moby "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/v3/assert"
 )
@@ -40,12 +42,16 @@ func TestStopTimeout(t *testing.T) {
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()
-	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{
 			testContainer("service1", "123", false),
 			testContainer("service1", "456", false),
 			testContainer("service2", "789", false),
 		}, nil)
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return([]moby.NetworkResource{}, nil)
 
 	timeout := time.Duration(2) * time.Second
 	api.EXPECT().ContainerStop(gomock.Any(), "123", &timeout).Return(nil)

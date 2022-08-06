@@ -227,14 +227,6 @@ func (s *composeService) ensureProjectVolumes(ctx context.Context, project *type
 	return nil
 }
 
-func getImageName(service types.ServiceConfig, projectName string) string {
-	imageName := service.Image
-	if imageName == "" {
-		imageName = projectName + "_" + service.Name
-	}
-	return imageName
-}
-
 func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project, service types.ServiceConfig,
 	number int, inherit *moby.Container, autoRemove bool, attachStdin bool) (*container.Config, *container.HostConfig, *network.NetworkingConfig, error) {
 
@@ -279,7 +271,7 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 		AttachStderr:    true,
 		AttachStdout:    true,
 		Cmd:             runCmd,
-		Image:           getImageName(service, p.Name),
+		Image:           api.GetImageNameOrDefault(service, p.Name),
 		WorkingDir:      service.WorkingDir,
 		Entrypoint:      entrypoint,
 		NetworkDisabled: service.NetworkMode == "disabled",
@@ -314,8 +306,9 @@ func (s *composeService) getCreateOptions(ctx context.Context, p *types.Project,
 			ipv4Address = config.Ipv4Address
 			ipv6Address = config.Ipv6Address
 			ipam = &network.EndpointIPAMConfig{
-				IPv4Address: ipv4Address,
-				IPv6Address: ipv6Address,
+				IPv4Address:  ipv4Address,
+				IPv6Address:  ipv6Address,
+				LinkLocalIPs: config.LinkLocalIPs,
 			}
 		}
 		networkConfig = &network.NetworkingConfig{
@@ -680,7 +673,7 @@ func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []s
 			continue
 		}
 		if spec[0] == "container" {
-			volumes = append(volumes, strings.Join(spec[1:], ":"))
+			volumes = append(volumes, vol)
 			continue
 		}
 		serviceName := spec[0]
@@ -712,7 +705,7 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	inherit *moby.Container) (map[string]struct{}, []string, []mount.Mount, error) {
 	var mounts = []mount.Mount{}
 
-	image := getImageName(service, p.Name)
+	image := api.GetImageNameOrDefault(service, p.Name)
 	imgInspect, _, err := s.apiClient().ImageInspectWithRaw(ctx, image)
 	if err != nil {
 		return nil, nil, nil, err
@@ -727,8 +720,12 @@ func (s *composeService) buildContainerVolumes(ctx context.Context, p types.Proj
 	binds := []string{}
 MOUNTS:
 	for _, m := range mountOptions {
+		if m.Type == mount.TypeNamedPipe {
+			mounts = append(mounts, m)
+			continue
+		}
 		volumeMounts[m.Target] = struct{}{}
-		if m.Type == mount.TypeBind || m.Type == mount.TypeNamedPipe {
+		if m.Type == mount.TypeBind {
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
@@ -893,7 +890,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		mount, err := buildMount(p, types.ServiceVolumeConfig{
+		mnt, err := buildMount(p, types.ServiceVolumeConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
@@ -902,7 +899,7 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 		if err != nil {
 			return nil, err
 		}
-		mounts[target] = mount
+		mounts[target] = mnt
 	}
 	values := make([]mount.Mount, 0, len(mounts))
 	for _, v := range mounts {
@@ -911,8 +908,8 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 	return values, nil
 }
 
-func isUnixAbs(path string) bool {
-	return strings.HasPrefix(path, "/")
+func isUnixAbs(p string) bool {
+	return strings.HasPrefix(p, "/")
 }
 
 func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
@@ -1041,7 +1038,14 @@ func (s *composeService) ensureNetwork(ctx context.Context, n types.NetworkConfi
 	if err != nil {
 		return err
 	}
-	if len(networks) == 0 {
+	networkNotFound := true
+	for _, net := range networks {
+		if net.Name == n.Name {
+			networkNotFound = false
+			break
+		}
+	}
+	if networkNotFound {
 		if n.External.External {
 			if n.Driver == "overlay" {
 				// Swarm nodes do not register overlay networks that were

@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Stop(ctx context.Context, projectName string, options api.StopOptions) error {
@@ -31,15 +32,28 @@ func (s *composeService) Stop(ctx context.Context, projectName string, options a
 }
 
 func (s *composeService) stop(ctx context.Context, projectName string, options api.StopOptions) error {
-	w := progress.ContextWriter(ctx)
-
-	containers, project, err := s.actualState(ctx, projectName, options.Services)
+	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true)
 	if err != nil {
 		return err
 	}
 
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(options.Services) == 0 {
+		options.Services = project.ServiceNames()
+	}
+
+	w := progress.ContextWriter(ctx)
 	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		containersToStop := containers.filter(isService(service)).filter(isNotOneOff)
-		return s.stopContainers(ctx, w, containersToStop, options.Timeout)
+		if !utils.StringContains(options.Services, service) {
+			return nil
+		}
+		return s.stopContainers(ctx, w, containers.filter(isService(service)).filter(isNotOneOff), options.Timeout)
 	})
 }

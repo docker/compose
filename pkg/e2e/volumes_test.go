@@ -35,8 +35,8 @@ func TestLocalComposeVolume(t *testing.T) {
 
 	t.Run("up with build and no image name, volume", func(t *testing.T) {
 		// ensure local test run does not reuse previously build image
-		c.RunDockerOrExitError(t, "rmi", "compose-e2e-volume_nginx")
-		c.RunDockerOrExitError(t, "volume", "rm", projectName+"_staticVol")
+		c.RunDockerOrExitError(t, "rmi", "compose-e2e-volume-nginx")
+		c.RunDockerOrExitError(t, "volume", "rm", projectName+"-staticVol")
 		c.RunDockerOrExitError(t, "volume", "rm", "myvolume")
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/volume-test", "--project-name", projectName, "up",
 			"-d")
@@ -50,7 +50,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("check container volume specs", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", "compose-e2e-volume-nginx2-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
-		// nolint
+		//nolint
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/src/app/node_modules","Driver":"local","Mode":"z","RW":true,"Propagation":""`), output)
 		assert.Assert(t, strings.Contains(output, `"Destination":"/myconfig","Mode":"","RW":false,"Propagation":"rprivate"`), output)
 	})
@@ -68,7 +68,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("check container bind-mounts specs", func(t *testing.T) {
 		res := c.RunDockerCmd(t, "inspect", "compose-e2e-volume-nginx-1", "--format", "{{ json .Mounts }}")
 		output := res.Stdout()
-		// nolint
+		//nolint
 		assert.Assert(t, strings.Contains(output, `"Type":"bind"`))
 		assert.Assert(t, strings.Contains(output, `"Destination":"/usr/share/nginx/html"`))
 	})
@@ -88,7 +88,7 @@ func TestLocalComposeVolume(t *testing.T) {
 	t.Run("cleanup volume project", func(t *testing.T) {
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--volumes")
 		ls := c.RunDockerCmd(t, "volume", "ls").Stdout()
-		assert.Assert(t, !strings.Contains(ls, projectName+"_staticVol"))
+		assert.Assert(t, !strings.Contains(ls, projectName+"-staticVol"))
 		assert.Assert(t, !strings.Contains(ls, "myvolume"))
 	})
 }
@@ -103,11 +103,11 @@ func TestProjectVolumeBind(t *testing.T) {
 	t.Run("up on project volume with bind specification", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", projectName)
 		assert.NilError(t, err)
-		defer os.RemoveAll(tmpDir) // nolint
+		defer os.RemoveAll(tmpDir) //nolint
 
 		c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
 
-		c.RunDockerOrExitError(t, "volume", "rm", "-f", projectName+"_project_data").Assert(t, icmd.Success)
+		c.RunDockerOrExitError(t, "volume", "rm", "-f", projectName+"_project-data").Assert(t, icmd.Success)
 		cmd := c.NewCmdWithEnv([]string{"TEST_DIR=" + tmpDir},
 			"docker", "compose", "--project-directory", "fixtures/project-volume-bind-test", "--project-name", projectName, "up", "-d")
 		icmd.RunCmd(cmd).Assert(t, icmd.Success)

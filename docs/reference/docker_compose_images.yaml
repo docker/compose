@@ -1,21 +1,21 @@
 command: docker compose images
 short: List images used by the created containers
 long: List images used by the created containers
-usage: docker compose images [SERVICE...]
+usage: docker compose images [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: quiet
-  shorthand: q
-  value_type: bool
-  default_value: "false"
-  description: Only display IDs
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: quiet
+      shorthand: q
+      value_type: bool
+      default_value: "false"
+      description: Only display IDs
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

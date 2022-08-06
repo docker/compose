@@ -114,7 +114,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 		},
 	}
 	cmd := &cobra.Command{
-		Use:   "run [options] [-v VOLUME...] [-p PORT...] [-e KEY=VAL...] [-l KEY=VALUE...] SERVICE [COMMAND] [ARGS...]",
+		Use:   "run [OPTIONS] SERVICE [COMMAND] [ARGS...]",
 		Short: "Run a one-off command on a service.",
 		Args:  cobra.MinimumNArgs(1),
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
@@ -151,7 +151,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 	flags.StringArrayVarP(&opts.labels, "label", "l", []string{}, "Add or override a label")
 	flags.BoolVar(&opts.Remove, "rm", false, "Automatically remove the container when it exits")
 	flags.BoolVarP(&opts.noTty, "no-TTY", "T", !dockerCli.Out().IsTerminal(), "Disable pseudo-TTY allocation (default: auto-detected).")
-	flags.StringVar(&opts.name, "name", "", " Assign a name to the container")
+	flags.StringVar(&opts.name, "name", "", "Assign a name to the container")
 	flags.StringVarP(&opts.user, "user", "u", "", "Run as specified username or uid")
 	flags.StringVarP(&opts.workdir, "workdir", "w", "", "Working directory inside the container")
 	flags.StringVar(&opts.entrypoint, "entrypoint", "", "Override the entrypoint of the image")

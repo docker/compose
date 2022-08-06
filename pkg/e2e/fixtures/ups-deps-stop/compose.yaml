@@ -1,0 +1,11 @@
+services:
+  dependency:
+    image: alpine
+    init: true
+    command: /bin/sh -c 'while true; do echo "hello dependency"; sleep 1; done'
+
+  app:
+    depends_on: ['dependency']
+    image: alpine
+    init: true
+    command: /bin/sh -c 'while true; do echo "hello app"; sleep 1; done'

@@ -48,12 +48,9 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	opts := map[string]build.Options{}
-	imagesToBuild := []string{}
+	var imagesToBuild []string
 
-	args := flatten(options.Args.Resolve(func(s string) (string, bool) {
-		s, ok := project.Environment[s]
-		return s, ok
-	}))
+	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
 	services, err := project.GetServices(options.Services...)
 	if err != nil {
@@ -61,29 +58,30 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	for _, service := range services {
-		if service.Build != nil {
-			imageName := getImageName(service, project.Name)
-			imagesToBuild = append(imagesToBuild, imageName)
-			buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
-			if err != nil {
-				return err
-			}
-			buildOptions.Pull = options.Pull
-			buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
-			buildOptions.NoCache = options.NoCache
-			buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
-			if err != nil {
-				return err
-			}
-
-			for _, image := range service.Build.CacheFrom {
-				buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
-					Type:  "registry",
-					Attrs: map[string]string{"ref": image},
-				})
-			}
-			opts[imageName] = buildOptions
+		if service.Build == nil {
+			continue
 		}
+		imageName := api.GetImageNameOrDefault(service, project.Name)
+		imagesToBuild = append(imagesToBuild, imageName)
+		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
+		if err != nil {
+			return err
+		}
+		buildOptions.Pull = options.Pull
+		buildOptions.BuildArgs = mergeArgs(buildOptions.BuildArgs, args)
+		buildOptions.NoCache = options.NoCache
+		buildOptions.CacheFrom, err = buildflags.ParseCacheEntry(service.Build.CacheFrom)
+		if err != nil {
+			return err
+		}
+
+		for _, image := range service.Build.CacheFrom {
+			buildOptions.CacheFrom = append(buildOptions.CacheFrom, bclient.CacheOptionsEntry{
+				Type:  "registry",
+				Attrs: map[string]string{"ref": image},
+			})
+		}
+		opts[imageName] = buildOptions
 	}
 
 	_, err = s.doBuild(ctx, project, opts, options.Progress)
@@ -134,14 +132,13 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	}
 	// set digest as com.docker.compose.image label so we can detect outdated containers
 	for i, service := range project.Services {
-		image := getImageName(service, project.Name)
+		image := api.GetImageNameOrDefault(service, project.Name)
 		digest, ok := images[image]
 		if ok {
 			if project.Services[i].Labels == nil {
 				project.Services[i].Labels = types.Labels{}
 			}
 			project.Services[i].CustomLabels[api.ImageDigestLabel] = digest
-			project.Services[i].Image = image
 		}
 	}
 	return nil
@@ -153,7 +150,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 		if service.Image == "" && service.Build == nil {
 			return nil, fmt.Errorf("invalid service %q. Must specify either image or build", service.Name)
 		}
-		imageName := getImageName(service, project.Name)
+		imageName := api.GetImageNameOrDefault(service, project.Name)
 		_, localImagePresent := images[imageName]
 
 		if service.Build != nil {
@@ -173,9 +170,9 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 }
 
 func (s *composeService) getLocalImagesDigests(ctx context.Context, project *types.Project) (map[string]string, error) {
-	imageNames := []string{}
+	var imageNames []string
 	for _, s := range project.Services {
-		imgName := getImageName(s, project.Name)
+		imgName := api.GetImageNameOrDefault(s, project.Name)
 		if !utils.StringContains(imageNames, imgName) {
 			imageNames = append(imageNames, imgName)
 		}
@@ -189,11 +186,11 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 		images[name] = info.ID
 	}
 
-	for _, s := range project.Services {
-		imgName := getImageName(s, project.Name)
+	for i := range project.Services {
+		imgName := api.GetImageNameOrDefault(project.Services[i], project.Name)
 		digest, ok := images[imgName]
 		if ok {
-			s.CustomLabels[api.ImageDigestLabel] = digest
+			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
 		}
 	}
 
@@ -214,10 +211,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	var tags []string
 	tags = append(tags, imageTag)
 
-	buildArgs := flatten(service.Build.Args.Resolve(func(s string) (string, bool) {
-		s, ok := project.Environment[s]
-		return s, ok
-	}))
+	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
 	var plats []specs.Platform
 	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
@@ -256,23 +250,11 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	if len(service.Build.Secrets) > 0 {
-		var sources []secretsprovider.Source
-		for _, secret := range service.Build.Secrets {
-			config := project.Secrets[secret.Source]
-			if config.File == "" {
-				return build.Options{}, fmt.Errorf("build.secrets only supports file-based secrets: %q", secret.Source)
-			}
-			sources = append(sources, secretsprovider.Source{
-				ID:       secret.Source,
-				FilePath: config.File,
-			})
-		}
-		store, err := secretsprovider.NewStore(sources)
+		secretsProvider, err := addSecretsConfig(project, service)
 		if err != nil {
 			return build.Options{}, err
 		}
-		p := secretsprovider.NewSecretProvider(store)
-		sessionConfig = append(sessionConfig, p)
+		sessionConfig = append(sessionConfig, secretsProvider)
 	}
 
 	if len(service.Build.Tags) > 0 {
@@ -324,11 +306,11 @@ func mergeArgs(m ...types.Mapping) types.Mapping {
 	return merged
 }
 
-func dockerFilePath(context string, dockerfile string) string {
-	if urlutil.IsGitURL(context) || filepath.IsAbs(dockerfile) {
+func dockerFilePath(ctxName string, dockerfile string) string {
+	if urlutil.IsGitURL(ctxName) || filepath.IsAbs(dockerfile) {
 		return dockerfile
 	}
-	return filepath.Join(context, dockerfile)
+	return filepath.Join(ctxName, dockerfile)
 }
 
 func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
@@ -340,4 +322,31 @@ func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
 		})
 	}
 	return sshprovider.NewSSHAgentProvider(sshConfig)
+}
+
+func addSecretsConfig(project *types.Project, service types.ServiceConfig) (session.Attachable, error) {
+
+	var sources []secretsprovider.Source
+	for _, secret := range service.Build.Secrets {
+		config := project.Secrets[secret.Source]
+		switch {
+		case config.File != "":
+			sources = append(sources, secretsprovider.Source{
+				ID:       secret.Source,
+				FilePath: config.File,
+			})
+		case config.Environment != "":
+			sources = append(sources, secretsprovider.Source{
+				ID:  secret.Source,
+				Env: config.Environment,
+			})
+		default:
+			return nil, fmt.Errorf("build.secrets only supports environment or file-based secrets: %q", secret.Source)
+		}
+	}
+	store, err := secretsprovider.NewStore(sources)
+	if err != nil {
+		return nil, err
+	}
+	return secretsprovider.NewSecretProvider(store), nil
 }

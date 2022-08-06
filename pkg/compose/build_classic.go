@@ -29,6 +29,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/command/image/build"
+	"github.com/docker/compose/v2/pkg/api"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/pkg/archive"
@@ -45,7 +46,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	var nameDigests = make(map[string]string)
 	var errs error
 	err := project.WithServices(nil, func(service types.ServiceConfig) error {
-		imageName := getImageName(service, project.Name)
+		imageName := api.GetImageNameOrDefault(service, project.Name)
 		o, ok := opts[imageName]
 		if !ok {
 			return nil
@@ -64,7 +65,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return nameDigests, errs
 }
 
-// nolint: gocyclo
+//nolint: gocyclo
 func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
@@ -96,7 +97,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 			if err != nil {
 				return "", errors.Errorf("unable to open Dockerfile: %v", err)
 			}
-			defer dockerfileCtx.Close() // nolint:errcheck
+			defer dockerfileCtx.Close() //nolint:errcheck
 		}
 	case urlutil.IsGitURL(specifiedContext):
 		tempDir, relDockerfile, err = build.GetContextFromGitURL(specifiedContext, dockerfileName)
@@ -111,7 +112,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	}
 
 	if tempDir != "" {
-		defer os.RemoveAll(tempDir) // nolint:errcheck
+		defer os.RemoveAll(tempDir) //nolint:errcheck
 		contextDir = tempDir
 	}
 
@@ -175,7 +176,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close() // nolint:errcheck
+	defer response.Body.Close() //nolint:errcheck
 
 	imageID := ""
 	aux := func(msg jsonmessage.JSONMessage) {
@@ -214,7 +215,7 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		if imageID == "" {
 			return "", errors.Errorf("Server did not provide an image ID. Cannot write %s", options.ImageIDFile)
 		}
-		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0666); err != nil {
+		if err := os.WriteFile(options.ImageIDFile, []byte(imageID), 0o666); err != nil {
 			return "", err
 		}
 	}

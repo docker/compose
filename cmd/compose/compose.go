@@ -136,6 +136,24 @@ func (o *projectOptions) addProjectFlags(f *pflag.FlagSet) {
 	_ = f.MarkHidden("workdir")
 }
 
+func (o *projectOptions) projectOrName() (*types.Project, string, error) {
+	name := o.ProjectName
+	var project *types.Project
+	if o.ProjectName == "" {
+		p, err := o.toProject(nil)
+		if err != nil {
+			envProjectName := os.Getenv("COMPOSE_PROJECT_NAME")
+			if envProjectName != "" {
+				return nil, envProjectName, nil
+			}
+			return nil, "", err
+		}
+		project = p
+		name = p.Name
+	}
+	return project, name, nil
+}
+
 func (o *projectOptions) toProjectName() (string, error) {
 	if o.ProjectName != "" {
 		return o.ProjectName, nil
@@ -159,13 +177,13 @@ func (o *projectOptions) toProject(services []string, po ...cli.ProjectOptionsFn
 		return nil, compose.WrapComposeError(err)
 	}
 
+	if o.Compatibility || utils.StringToBool(options.Environment["COMPOSE_COMPATIBILITY"]) {
+		api.Separator = "_"
+	}
+
 	project, err := cli.ProjectFromOptions(options)
 	if err != nil {
 		return nil, compose.WrapComposeError(err)
-	}
-
-	if o.Compatibility || utils.StringToBool(project.Environment["COMPOSE_COMPATIBILITY"]) {
-		compose.Separator = "_"
 	}
 
 	ef := o.EnvFile
@@ -239,11 +257,11 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		verbose bool
 		version bool
 	)
-	command := &cobra.Command{
+	c := &cobra.Command{
 		Short:            "Docker Compose",
 		Use:              PluginName,
 		TraverseChildren: true,
-		// By default (no Run/RunE in parent command) for typos in subcommands, cobra displays the help of parent command but exit(0) !
+		// By default (no Run/RunE in parent c) for typos in subcommands, cobra displays the help of parent c but exit(0) !
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()
@@ -300,7 +318,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		},
 	}
 
-	command.AddCommand(
+	c.AddCommand(
 		upCommand(&opts, backend),
 		downCommand(&opts, backend),
 		startCommand(&opts, backend),
@@ -327,16 +345,16 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		createCommand(&opts, backend),
 		copyCommand(&opts, backend),
 	)
-	command.Flags().SetInterspersed(false)
-	opts.addProjectFlags(command.Flags())
-	command.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
-	command.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
-	command.Flags().MarkHidden("version") //nolint:errcheck
-	command.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
-	command.Flags().MarkHidden("no-ansi") //nolint:errcheck
-	command.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
-	command.Flags().MarkHidden("verbose") //nolint:errcheck
-	return command
+	c.Flags().SetInterspersed(false)
+	opts.addProjectFlags(c.Flags())
+	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
+	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
+	c.Flags().MarkHidden("version") //nolint:errcheck
+	c.Flags().BoolVar(&noAnsi, "no-ansi", false, `Do not print ANSI control characters (DEPRECATED)`)
+	c.Flags().MarkHidden("no-ansi") //nolint:errcheck
+	c.Flags().BoolVar(&verbose, "verbose", false, "Show more output")
+	c.Flags().MarkHidden("verbose") //nolint:errcheck
+	return c
 }
 
 func setEnvWithDotEnv(prjOpts *projectOptions) error {
@@ -354,10 +372,8 @@ func setEnvWithDotEnv(prjOpts *projectOptions) error {
 		return err
 	}
 	for k, v := range envFromFile {
-		if _, ok := os.LookupEnv(k); !ok {
-			if err = os.Setenv(k, v); err != nil {
-				return err
-			}
+		if err := os.Setenv(k, v); err != nil { // overwrite the process env with merged OS + env file results
+			return err
 		}
 	}
 	return nil

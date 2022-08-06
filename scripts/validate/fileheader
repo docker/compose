@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-#   Copyright Docker Compose CLI authors
+#   Copyright 2020,2022 Docker Compose CLI authors
 
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 
 set -eu -o pipefail
 
-if ! command -v ltag; then
-    >&2 echo "ERROR: ltag not found. Install with:"
-    >&2 echo "    go get -u github.com/kunalkushwaha/ltag"
+if ! command -v addlicense; then
+    >&2 echo "ERROR: addlicense not found. Install with:"
+    >&2 echo "    go install -u github.com/google/addlicense@latest"
     exit 1
 fi
 
 BASEPATH="${1-}"
 
-ltag -t "${BASEPATH}scripts/validate/template" -excludes "validate testdata resolvepath" --check -v
+find . -regex '.*\.sh' -o -regex '.*\.go' -o -regex '.*Makefile' -o -regex '.*Dockerfile' | xargs addlicense -check -l apache -c 'Docker Compose CLI authors' -ignore validate -ignore testdata -ignore resolvepath -v 1>&2

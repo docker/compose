@@ -46,13 +46,16 @@ var (
 
 	// DockerScanExecutableName is the OS dependent Docker CLI binary name
 	DockerScanExecutableName = "docker-scan"
+
+	// WindowsExecutableSuffix is the Windows executable suffix
+	WindowsExecutableSuffix = ".exe"
 )
 
 func init() {
 	if runtime.GOOS == "windows" {
-		DockerExecutableName = DockerExecutableName + ".exe"
-		DockerComposeExecutableName = DockerComposeExecutableName + ".exe"
-		DockerScanExecutableName = DockerScanExecutableName + ".exe"
+		DockerExecutableName += WindowsExecutableSuffix
+		DockerComposeExecutableName += WindowsExecutableSuffix
+		DockerScanExecutableName += WindowsExecutableSuffix
 	}
 }
 
@@ -124,7 +127,7 @@ func initializePlugins(t testing.TB, configDir string) {
 		}
 	})
 
-	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0755),
+	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
 	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin", "../../../bin"})
 	if os.IsNotExist(err) {
@@ -169,12 +172,12 @@ func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 
 	src, err := os.Open(sourceFile)
 	require.NoError(t, err, "Failed to open source file: %s")
-	// nolint: errcheck
+	//nolint: errcheck
 	defer src.Close()
 
-	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
 	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
-	// nolint: errcheck
+	//nolint: errcheck
 	defer dst.Close()
 
 	_, err = io.Copy(dst, src)
@@ -213,7 +216,7 @@ func (c *CLI) NewCmdWithEnv(envvars []string, command string, args ...string) ic
 
 // MetricsSocket get the path where test metrics will be sent
 func (c *CLI) MetricsSocket() string {
-	return filepath.Join(c.ConfigDir, "./docker-cli.sock")
+	return filepath.Join(c.ConfigDir, "docker-cli.sock")
 }
 
 // NewDockerCmd creates a docker cmd without running it

@@ -96,7 +96,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	up := upOptions{}
 	create := createOptions{}
 	upCmd := &cobra.Command{
-		Use:   "up [SERVICE...]",
+		Use:   "up [OPTIONS] [SERVICE...]",
 		Short: "Create and start containers",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			create.timeChanged = cmd.Flags().Changed("timeout")
@@ -115,6 +115,7 @@ func upCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVarP(&up.Detach, "detach", "d", false, "Detached mode: Run containers in the background")
 	flags.BoolVar(&create.Build, "build", false, "Build images before starting containers.")
 	flags.BoolVar(&create.noBuild, "no-build", false, "Don't build an image, even if it's missing.")
+	flags.StringVar(&create.Pull, "pull", "missing", `Pull image before running ("always"|"missing"|"never")`)
 	flags.BoolVar(&create.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file.")
 	flags.StringArrayVar(&up.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVar(&up.noColor, "no-color", false, "Produce monochrome output.")
@@ -219,18 +220,20 @@ func runUp(ctx context.Context, backend api.Service, createOptions createOptions
 
 func setServiceScale(project *types.Project, name string, replicas uint64) error {
 	for i, s := range project.Services {
-		if s.Name == name {
-			service, err := project.GetService(name)
-			if err != nil {
-				return err
-			}
-			if service.Deploy == nil {
-				service.Deploy = &types.DeployConfig{}
-			}
-			service.Deploy.Replicas = &replicas
-			project.Services[i] = service
-			return nil
+		if s.Name != name {
+			continue
 		}
+
+		service, err := project.GetService(name)
+		if err != nil {
+			return err
+		}
+		if service.Deploy == nil {
+			service.Deploy = &types.DeployConfig{}
+		}
+		service.Deploy.Replicas = &replicas
+		project.Services[i] = service
+		return nil
 	}
 	return fmt.Errorf("unknown service %q", name)
 }

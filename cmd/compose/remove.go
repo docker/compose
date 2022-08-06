@@ -35,7 +35,7 @@ func removeCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	cmd := &cobra.Command{
-		Use:   "rm [SERVICE...]",
+		Use:   "rm [OPTIONS] [SERVICE...]",
 		Short: "Removes stopped service containers",
 		Long: `Removes stopped service containers
 
@@ -59,23 +59,25 @@ Any data which is not in a volume will be lost.`,
 }
 
 func runRemove(ctx context.Context, backend api.Service, opts removeOptions, services []string) error {
-	project, err := opts.toProjectName()
+	project, name, err := opts.projectOrName()
 	if err != nil {
 		return err
 	}
 
 	if opts.stop {
-		err := backend.Stop(ctx, project, api.StopOptions{
+		err := backend.Stop(ctx, name, api.StopOptions{
 			Services: services,
+			Project:  project,
 		})
 		if err != nil {
 			return err
 		}
 	}
 
-	return backend.Remove(ctx, project, api.RemoveOptions{
+	return backend.Remove(ctx, name, api.RemoveOptions{
 		Services: services,
 		Force:    opts.force,
 		Volumes:  opts.volumes,
+		Project:  project,
 	})
 }

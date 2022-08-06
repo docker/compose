@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.3-labs
+# syntax=docker/dockerfile:1
 
 
 #   Copyright 2020 Docker Compose CLI authors
@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.18.3
+ARG GO_VERSION=1.18.5
 ARG FORMATS=md,yaml
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS docsgen

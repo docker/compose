@@ -40,7 +40,7 @@ func TestDown(t *testing.T) {
 	tested.dockerCli = cli
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
-	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{
 			testContainer("service1", "123", false),
 			testContainer("service2", "456", false),
@@ -88,7 +88,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	tested.dockerCli = cli
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
-	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
 		[]moby.Container{
 			testContainer("service1", "123", false),
 			testContainer("service2", "789", false),
@@ -125,7 +125,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 	tested.dockerCli = cli
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
-	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt()).Return(
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
 		[]moby.Container{testContainer("service1", "123", false)}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
 		Return(volume.VolumeListOKBody{

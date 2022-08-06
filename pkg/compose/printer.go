@@ -32,6 +32,11 @@ type logPrinter interface {
 	Cancel()
 }
 
+type printer struct {
+	queue    chan api.ContainerEvent
+	consumer api.LogConsumer
+}
+
 // newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
 func newLogPrinter(consumer api.LogConsumer) logPrinter {
 	queue := make(chan api.ContainerEvent)
@@ -46,11 +51,6 @@ func (p *printer) Cancel() {
 	p.queue <- api.ContainerEvent{
 		Type: api.UserCancel,
 	}
-}
-
-type printer struct {
-	queue    chan api.ContainerEvent
-	consumer api.LogConsumer
 }
 
 func (p *printer) HandleEvent(event api.ContainerEvent) {

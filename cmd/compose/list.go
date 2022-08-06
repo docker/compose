@@ -39,19 +39,20 @@ type lsOptions struct {
 }
 
 func listCommand(backend api.Service) *cobra.Command {
-	opts := lsOptions{Filter: opts.NewFilterOpt()}
+	lsOpts := lsOptions{Filter: opts.NewFilterOpt()}
 	lsCmd := &cobra.Command{
-		Use:   "ls",
+		Use:   "ls [OPTIONS]",
 		Short: "List running compose projects",
 		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runList(ctx, backend, opts)
+			return runList(ctx, backend, lsOpts)
 		}),
+		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
 	}
-	lsCmd.Flags().StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
-	lsCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only display IDs.")
-	lsCmd.Flags().Var(&opts.Filter, "filter", "Filter output based on conditions provided.")
-	lsCmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all stopped Compose projects")
+	lsCmd.Flags().StringVar(&lsOpts.Format, "format", "pretty", "Format the output. Values: [pretty | json].")
+	lsCmd.Flags().BoolVarP(&lsOpts.Quiet, "quiet", "q", false, "Only display IDs.")
+	lsCmd.Flags().Var(&lsOpts.Filter, "filter", "Filter output based on conditions provided.")
+	lsCmd.Flags().BoolVarP(&lsOpts.All, "all", "a", false, "Show all stopped Compose projects")
 
 	return lsCmd
 }
@@ -60,18 +61,18 @@ var acceptedListFilters = map[string]bool{
 	"name": true,
 }
 
-func runList(ctx context.Context, backend api.Service, opts lsOptions) error {
-	filters := opts.Filter.Value()
+func runList(ctx context.Context, backend api.Service, lsOpts lsOptions) error {
+	filters := lsOpts.Filter.Value()
 	err := filters.Validate(acceptedListFilters)
 	if err != nil {
 		return err
 	}
 
-	stackList, err := backend.List(ctx, api.ListOptions{All: opts.All})
+	stackList, err := backend.List(ctx, api.ListOptions{All: lsOpts.All})
 	if err != nil {
 		return err
 	}
-	if opts.Quiet {
+	if lsOpts.Quiet {
 		for _, s := range stackList {
 			fmt.Println(s.Name)
 		}
@@ -90,7 +91,7 @@ func runList(ctx context.Context, backend api.Service, opts lsOptions) error {
 	}
 
 	view := viewFromStackList(stackList)
-	return formatter.Print(view, opts.Format, os.Stdout, func(w io.Writer) {
+	return formatter.Print(view, lsOpts.Format, os.Stdout, func(w io.Writer) {
 		for _, stack := range view {
 			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", stack.Name, stack.Status, stack.ConfigFiles)
 		}

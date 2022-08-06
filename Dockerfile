@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.2
+# syntax=docker/dockerfile:1
 
 
 #   Copyright 2020 Docker Compose CLI authors
@@ -15,9 +15,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.18.3-alpine
-ARG GOLANGCI_LINT_VERSION=v1.40.1-alpine
+ARG GO_VERSION=1.18.5-alpine
+ARG GOLANGCI_LINT_VERSION=v1.47.3-alpine
 ARG PROTOC_GEN_GO_VERSION=v1.4.3
+
+FROM --platform=${BUILDPLATFORM} golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS local-golangci-lint
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
 WORKDIR /compose-cli
@@ -34,7 +36,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM base AS lint
 ENV CGO_ENABLED=0
-COPY --from=golangci/golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
+COPY --from=local-golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
 ARG BUILD_TAGS
 ARG GIT_TAG
 RUN --mount=target=. \
@@ -88,7 +90,7 @@ RUN --mount=target=. \
     make -f builder.Makefile test
 
 FROM base AS check-license-headers
-RUN go install github.com/kunalkushwaha/ltag@latest
+RUN go install github.com/google/addlicense@latest
 RUN --mount=target=. \
     make -f builder.Makefile check-license-headers
 

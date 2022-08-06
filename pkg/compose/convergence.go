@@ -261,7 +261,7 @@ func mustRecreate(expected types.ServiceConfig, actual moby.Container, policy st
 }
 
 func getContainerName(projectName string, service types.ServiceConfig, number int) string {
-	name := strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, Separator)
+	name := strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, api.Separator)
 	if service.ContainerName != "" {
 		name = service.ContainerName
 	}
@@ -553,8 +553,8 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 			containerName := getCanonicalContainerName(c)
 			links = append(links,
 				format(containerName, linkName),
-				format(containerName, strings.Join([]string{linkServiceName, strconv.Itoa(number)}, Separator)),
-				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, Separator)),
+				format(containerName, linkServiceName+api.Separator+strconv.Itoa(number)),
+				format(containerName, strings.Join([]string{projectName, linkServiceName, strconv.Itoa(number)}, api.Separator)),
 			)
 		}
 	}
@@ -568,7 +568,7 @@ func (s composeService) getLinks(ctx context.Context, projectName string, servic
 			containerName := getCanonicalContainerName(c)
 			links = append(links,
 				format(containerName, service.Name),
-				format(containerName, strings.TrimPrefix(containerName, projectName+Separator)),
+				format(containerName, strings.TrimPrefix(containerName, projectName+api.Separator)),
 				format(containerName, containerName),
 			)
 		}
@@ -605,8 +605,9 @@ func (s *composeService) connectContainerToNetwork(ctx context.Context, id strin
 		ipv4Address = cfg.Ipv4Address
 		ipv6Address = cfg.Ipv6Address
 		ipam = &network.EndpointIPAMConfig{
-			IPv4Address: ipv4Address,
-			IPv6Address: ipv6Address,
+			IPv4Address:  ipv4Address,
+			IPv6Address:  ipv6Address,
+			LinkLocalIPs: cfg.LinkLocalIPs,
 		}
 	}
 	err := s.apiClient().NetworkConnect(ctx, netwrk, id, &network.EndpointSettings{

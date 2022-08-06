@@ -1,235 +1,245 @@
 command: docker compose up
 short: Create and start containers
 long: |-
-  Builds, (re)creates, starts, and attaches to containers for a service.
+    Builds, (re)creates, starts, and attaches to containers for a service.
 
-  Unless they are already running, this command also starts any linked services.
+    Unless they are already running, this command also starts any linked services.
 
-  The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
-  When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
-  background and leaves them running.
+    The `docker compose up` command aggregates the output of each container (like `docker compose logs --follow` does).
+    When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
+    background and leaves them running.
 
-  If there are existing containers for a service, and the service’s configuration or image was changed after the
-  container’s creation, `docker compose up` picks up the changes by stopping and recreating the containers
-  (preserving mounted volumes). To prevent Compose from picking up changes, use the `--no-recreate` flag.
+    If there are existing containers for a service, and the service’s configuration or image was changed after the
+    container’s creation, `docker compose up` picks up the changes by stopping and recreating the containers
+    (preserving mounted volumes). To prevent Compose from picking up changes, use the `--no-recreate` flag.
 
-  If you want to force Compose to stop and recreate all containers, use the `--force-recreate` flag.
+    If you want to force Compose to stop and recreate all containers, use the `--force-recreate` flag.
 
-  If the process encounters an error, the exit code for this command is `1`.
-  If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the containers are stopped, and the exit code is `0`.
-usage: docker compose up [SERVICE...]
+    If the process encounters an error, the exit code for this command is `1`.
+    If the process is interrupted using `SIGINT` (ctrl + C) or `SIGTERM`, the containers are stopped, and the exit code is `0`.
+usage: docker compose up [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
-- option: abort-on-container-exit
-  value_type: bool
-  default_value: "false"
-  description: |
-    Stops all containers if any container was stopped. Incompatible with -d
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: always-recreate-deps
-  value_type: bool
-  default_value: "false"
-  description: Recreate dependent containers. Incompatible with --no-recreate.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: attach
-  value_type: stringArray
-  default_value: '[]'
-  description: Attach to service output.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: attach-dependencies
-  value_type: bool
-  default_value: "false"
-  description: Attach to dependent containers.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: build
-  value_type: bool
-  default_value: "false"
-  description: Build images before starting containers.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: detach
-  shorthand: d
-  value_type: bool
-  default_value: "false"
-  description: 'Detached mode: Run containers in the background'
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: exit-code-from
-  value_type: string
-  description: |
-    Return the exit code of the selected service container. Implies --abort-on-container-exit
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: force-recreate
-  value_type: bool
-  default_value: "false"
-  description: |
-    Recreate containers even if their configuration and image haven't changed.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-build
-  value_type: bool
-  default_value: "false"
-  description: Don't build an image, even if it's missing.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-color
-  value_type: bool
-  default_value: "false"
-  description: Produce monochrome output.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-deps
-  value_type: bool
-  default_value: "false"
-  description: Don't start linked services.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-log-prefix
-  value_type: bool
-  default_value: "false"
-  description: Don't print prefix in logs.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-recreate
-  value_type: bool
-  default_value: "false"
-  description: |
-    If containers already exist, don't recreate them. Incompatible with --force-recreate.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: no-start
-  value_type: bool
-  default_value: "false"
-  description: Don't start the services after creating them.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: quiet-pull
-  value_type: bool
-  default_value: "false"
-  description: Pull without printing progress information.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: remove-orphans
-  value_type: bool
-  default_value: "false"
-  description: Remove containers for services not defined in the Compose file.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: renew-anon-volumes
-  shorthand: V
-  value_type: bool
-  default_value: "false"
-  description: |
-    Recreate anonymous volumes instead of retrieving data from the previous containers.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: scale
-  value_type: stringArray
-  default_value: '[]'
-  description: |
-    Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: timeout
-  shorthand: t
-  value_type: int
-  default_value: "10"
-  description: |
-    Use this timeout in seconds for container shutdown when attached or when containers are already running.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
-- option: wait
-  value_type: bool
-  default_value: "false"
-  description: Wait for services to be running|healthy. Implies detached mode.
-  deprecated: false
-  hidden: false
-  experimental: false
-  experimentalcli: false
-  kubernetes: false
-  swarm: false
+    - option: abort-on-container-exit
+      value_type: bool
+      default_value: "false"
+      description: |
+        Stops all containers if any container was stopped. Incompatible with -d
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: always-recreate-deps
+      value_type: bool
+      default_value: "false"
+      description: Recreate dependent containers. Incompatible with --no-recreate.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: attach
+      value_type: stringArray
+      default_value: '[]'
+      description: Attach to service output.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: attach-dependencies
+      value_type: bool
+      default_value: "false"
+      description: Attach to dependent containers.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: build
+      value_type: bool
+      default_value: "false"
+      description: Build images before starting containers.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: detach
+      shorthand: d
+      value_type: bool
+      default_value: "false"
+      description: 'Detached mode: Run containers in the background'
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: exit-code-from
+      value_type: string
+      description: |
+        Return the exit code of the selected service container. Implies --abort-on-container-exit
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: force-recreate
+      value_type: bool
+      default_value: "false"
+      description: |
+        Recreate containers even if their configuration and image haven't changed.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-build
+      value_type: bool
+      default_value: "false"
+      description: Don't build an image, even if it's missing.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-color
+      value_type: bool
+      default_value: "false"
+      description: Produce monochrome output.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-deps
+      value_type: bool
+      default_value: "false"
+      description: Don't start linked services.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-log-prefix
+      value_type: bool
+      default_value: "false"
+      description: Don't print prefix in logs.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-recreate
+      value_type: bool
+      default_value: "false"
+      description: |
+        If containers already exist, don't recreate them. Incompatible with --force-recreate.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: no-start
+      value_type: bool
+      default_value: "false"
+      description: Don't start the services after creating them.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: pull
+      value_type: string
+      default_value: missing
+      description: Pull image before running ("always"|"missing"|"never")
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: quiet-pull
+      value_type: bool
+      default_value: "false"
+      description: Pull without printing progress information.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: remove-orphans
+      value_type: bool
+      default_value: "false"
+      description: Remove containers for services not defined in the Compose file.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: renew-anon-volumes
+      shorthand: V
+      value_type: bool
+      default_value: "false"
+      description: |
+        Recreate anonymous volumes instead of retrieving data from the previous containers.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: scale
+      value_type: stringArray
+      default_value: '[]'
+      description: |
+        Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: timeout
+      shorthand: t
+      value_type: int
+      default_value: "10"
+      description: |
+        Use this timeout in seconds for container shutdown when attached or when containers are already running.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
+    - option: wait
+      value_type: bool
+      default_value: "false"
+      description: Wait for services to be running|healthy. Implies detached mode.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
 deprecated: false
 experimental: false
 experimentalcli: false

@@ -3,10 +3,10 @@ services:
     image: nginx
     container_name: frontend
     volumes:
-      - project_data:/data
+      - project-data:/data
 
 volumes:
-  project_data:
+  project-data:
     driver: local
     driver_opts:
       type: none

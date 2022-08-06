@@ -45,8 +45,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
-	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, true)
+	include := oneOffExclude
+	if options.RemoveOrphans {
+		include = oneOffInclude
+	}
+	containers, err := s.getContainers(ctx, projectName, include, true)
 	if err != nil {
 		return err
 	}
@@ -163,14 +166,16 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 
 	var removed int
 	for _, net := range networks {
-		if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
-			if errdefs.IsNotFound(err) {
-				continue
+		if net.Name == name {
+			if err := s.apiClient().NetworkRemove(ctx, net.ID); err != nil {
+				if errdefs.IsNotFound(err) {
+					continue
+				}
+				w.Event(progress.ErrorEvent(eventName))
+				return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
 			}
-			w.Event(progress.ErrorEvent(eventName))
-			return errors.Wrapf(err, fmt.Sprintf("failed to remove network %s", name))
+			removed++
 		}
-		removed++
 	}
 
 	if removed == 0 {
@@ -193,7 +198,7 @@ func (s *composeService) getServiceImages(options api.DownOptions, project *type
 			continue
 		}
 		if image == "" {
-			image = getImageName(service, project.Name)
+			image = api.GetImageNameOrDefault(service, project.Name)
 		}
 		images[image] = struct{}{}
 	}

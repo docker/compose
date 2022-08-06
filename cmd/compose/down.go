@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -45,7 +44,7 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		projectOptions: p,
 	}
 	downCmd := &cobra.Command{
-		Use:   "down",
+		Use:   "down [OPTIONS]",
 		Short: "Stop and remove containers, networks",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.timeChanged = cmd.Flags().Changed("timeout")
@@ -66,11 +65,10 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS"))
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
 	flags.IntVarP(&opts.timeout, "timeout", "t", 10, "Specify a shutdown timeout in seconds")
-	flags.BoolVarP(&opts.volumes, "volumes", "v", false, " Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
+	flags.BoolVarP(&opts.volumes, "volumes", "v", false, "Remove named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers.")
 	flags.StringVar(&opts.images, "rmi", "", `Remove images used by services. "local" remove only images that don't have a custom tag ("local"|"all")`)
 	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		switch name {
-		case "volume":
+		if name == "volume" {
 			name = "volumes"
 			logrus.Warn("--volume is deprecated, please use --volumes")
 		}
@@ -80,15 +78,9 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
-	name := opts.ProjectName
-	var project *types.Project
-	if opts.ProjectName == "" {
-		p, err := opts.toProject(nil)
-		if err != nil {
-			return err
-		}
-		project = p
-		name = p.Name
+	project, name, err := opts.projectOrName()
+	if err != nil {
+		return err
 	}
 
 	var timeout *time.Duration

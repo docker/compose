@@ -95,7 +95,7 @@ func (s *composeService) logContainers(ctx context.Context, consumer api.LogCons
 	if err != nil {
 		return err
 	}
-	defer r.Close() // nolint errcheck
+	defer r.Close() //nolint errcheck
 
 	name := getContainerNameWithoutProject(c)
 	w := utils.GetWriter(func(line string) {
