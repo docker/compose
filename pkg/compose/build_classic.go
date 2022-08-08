@@ -65,7 +65,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return nameDigests, errs
 }
 
-//nolint: gocyclo
+// nolint: gocyclo
 func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
 	var (
 		buildCtx      io.ReadCloser
