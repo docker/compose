@@ -134,7 +134,7 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 
 	tmpFolder, err := os.MkdirTemp("fixtures/simple-composefile", "test-tmp")
 	assert.NilError(t, err)
-	defer os.Remove(tmpFolder) // nolint: errcheck
+	defer os.Remove(tmpFolder) //nolint:errcheck
 	projectName := filepath.Base(tmpFolder)
 
 	res := c.RunDockerComposeCmd(t, "--project-directory", tmpFolder, "up", "-d")
