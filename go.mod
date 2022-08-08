@@ -101,7 +101,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.29.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.29.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.29.0 // indirect
-	go.opentelemetry.io/otel v1.4.1 // indirect
+	go.opentelemetry.io/otel v1.4.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.4.1 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
 	go.opentelemetry.io/otel/metric v0.27.0 // indirect
@@ -122,7 +122,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apimachinery v0.24.1 // indirect; see replace for the actual version used
-	k8s.io/client-go v0.24.1 // indirect; see replace for the actual version used
+	k8s.io/client-go v0.24.1 // see replace for the actual version used
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
@@ -130,9 +130,17 @@ require (
 )
 
 require (
+	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20210303052042-6bc126869bf4 // indirect
+	github.com/googleapis/gnostic v0.5.5 // indirect
+	github.com/moby/spdystream v0.2.0 // indirect
+	github.com/serialx/hashring v0.0.0-20190422032157-8b2912629002 // indirect
 	github.com/zmap/zcrypto v0.0.0-20220605182715-4dfcec6e9a8c // indirect
 	github.com/zmap/zlint v1.1.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.4.1 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.4.1 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.4.1 // indirect
+	k8s.io/api v0.24.1 // indirect
 )
 
 replace (
