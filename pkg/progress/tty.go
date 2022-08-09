@@ -164,14 +164,12 @@ func (w *ttyWriter) print() {
 			continue
 		}
 		line := lineText(event, "", terminalWidth, statusPadding, runtime.GOOS != "windows")
-		//nolint: errcheck
 		fmt.Fprint(w.out, line)
 		numLines++
 		for _, v := range w.eventIDs {
 			ev := w.events[v]
 			if ev.ParentID == event.ID {
 				line := lineText(ev, "  ", terminalWidth, statusPadding, runtime.GOOS != "windows")
-				//nolint: errcheck
 				fmt.Fprint(w.out, line)
 				numLines++
 			}

@@ -22,18 +22,19 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+//nolint:errcheck
 func TestSplitWriter(t *testing.T) {
 	var lines []string
 	w := GetWriter(func(line string) {
 		lines = append(lines, line)
 	})
-	w.Write([]byte("h"))        //nolint: errcheck
-	w.Write([]byte("e"))        //nolint: errcheck
-	w.Write([]byte("l"))        //nolint: errcheck
-	w.Write([]byte("l"))        //nolint: errcheck
-	w.Write([]byte("o"))        //nolint: errcheck
-	w.Write([]byte("\n"))       //nolint: errcheck
-	w.Write([]byte("world!\n")) //nolint: errcheck
+	w.Write([]byte("h"))
+	w.Write([]byte("e"))
+	w.Write([]byte("l"))
+	w.Write([]byte("l"))
+	w.Write([]byte("o"))
+	w.Write([]byte("\n"))
+	w.Write([]byte("world!\n"))
 	assert.DeepEqual(t, lines, []string{"hello", "world!"})
 
 }
