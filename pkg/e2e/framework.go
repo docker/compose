@@ -172,12 +172,12 @@ func CopyFile(t testing.TB, sourceFile string, destinationFile string) {
 
 	src, err := os.Open(sourceFile)
 	require.NoError(t, err, "Failed to open source file: %s")
-	//nolint: errcheck
+	//nolint:errcheck
 	defer src.Close()
 
 	dst, err := os.OpenFile(destinationFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755)
 	require.NoError(t, err, "Failed to open destination file: %s", destinationFile)
-	//nolint: errcheck
+	//nolint:errcheck
 	defer dst.Close()
 
 	_, err = io.Copy(dst, src)

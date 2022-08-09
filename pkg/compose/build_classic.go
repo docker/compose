@@ -29,7 +29,6 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/build"
 	"github.com/docker/cli/cli/command/image/build"
-	"github.com/docker/compose/v2/pkg/api"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/pkg/archive"
@@ -40,6 +39,8 @@ import (
 	"github.com/docker/docker/pkg/urlutil"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, opts map[string]buildx.Options) (map[string]string, error) {
@@ -65,7 +66,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 	return nameDigests, errs
 }
 
-// nolint: gocyclo
+//nolint:gocyclo
 func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options buildx.Options) (string, error) {
 	var (
 		buildCtx      io.ReadCloser

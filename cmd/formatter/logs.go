@@ -89,7 +89,7 @@ func (l *logConsumer) Log(container, service, message string) {
 	}
 	p := l.getPresenter(container)
 	for _, line := range strings.Split(message, "\n") {
-		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line) //nolint:errcheck
+		fmt.Fprintf(l.writer, "%s%s\n", p.prefix, line)
 	}
 }
 

@@ -18,6 +18,7 @@ linters:
     - lll
     - misspell
     - nakedret
+    - nolintlint
     - staticcheck
     - structcheck
     - typecheck
