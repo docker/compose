@@ -72,6 +72,11 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: "${{ needs.provenance.outputs.attestation-name }}"
+      # Verify binaries if dry run
+      - name: Verify binaries
+        if: 'inputs.dry-run' 
+        run: |
+          echo TODO: verify with slsa-verifier
       # Upload to release.
       - uses: ncipollo/release-action@v1
         with:
