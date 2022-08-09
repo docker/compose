@@ -6,6 +6,11 @@ on:
       tag:
         description: "Release Tag"
         required: true
+      dry-run:
+        description: "Build, sign, verify but do not release"
+        required: false
+        type: boolean
+        default: true
 env:
   GO_VERSION: 1.18.5
 jobs:
