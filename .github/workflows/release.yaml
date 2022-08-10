@@ -15,7 +15,7 @@ on:
 permissions: read-all
 
 env:
-  GO_VERSION: 1.18.4
+  GO_VERSION: 1.18.5
 
 jobs:
   build:
