@@ -103,14 +103,10 @@ jobs:
           fi
           chmod ug+x slsa-verifier-linux-amd64
 
-          # Verify all files, except LICENSE, .sha256 and checksums.txt files.
+          # Verify the binaries.
           for f in *;
           do
-              if [[ "$f" == "attestation.intoto.jsonl" ]] || \
-                 [[ "$f" == "slsa-verifier-linux-amd64" ]] || \
-                 [[ "$f" == "LICENSE" ]] || \
-                 [[ "$f" == "checksums.txt" ]] || \
-                 [[ $f == *.sha256 ]]; then
+              if [[ ! -f "$f.sha256" ]]; then
                 continue
               fi
 
