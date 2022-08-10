@@ -8,7 +8,7 @@ require (
 	github.com/cnabio/cnab-to-oci v0.3.6
 	github.com/compose-spec/compose-go v1.4.0
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.7
+	github.com/containerd/containerd v1.6.8
 	github.com/distribution/distribution/v3 v3.0.0-20220729163034-26163d82560f
 	github.com/docker/buildx v0.8.2 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.17+incompatible
