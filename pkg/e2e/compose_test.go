@@ -122,31 +122,49 @@ func TestLocalComposeUp(t *testing.T) {
 func TestComposePull(t *testing.T) {
 	c := NewParallelCLI(t)
 
-	res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/simple-composefile", "pull")
-	output := res.Combined()
+	t.Run("Verify image pulled", func(t *testing.T) {
+		// cleanup existing images
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "down", "--rmi", "all")
 
-	expected := []string{
-		"Skipped - No image to be pulled",
-		"Skipped - Image is already present locally",
-		"Skipped - Image is already being pulled by",
-		"simple Pulled",
-		"another Pulled",
-	}
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
+		output := res.Combined()
 
-	assert.Assert(t, contains(output, expected))
-}
+		assert.Assert(t, strings.Contains(output, "simple Pulled"))
+		assert.Assert(t, strings.Contains(output, "another Pulled"))
+	})
 
-func contains(str string, array []string) bool {
-	found := false
+	t.Run("Verify a image is pulled once", func(t *testing.T) {
+		// cleanup existing images
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/duplicate-images", "down", "--rmi", "all")
 
-	for _, val := range array {
-		if strings.Contains(str, val) {
-			found = true
-			break
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/duplicate-images", "pull")
+		output := res.Combined()
+
+		if strings.Contains(output, "another Pulled") {
+			assert.Assert(t, strings.Contains(output, "another Pulled"))
+			assert.Assert(t, strings.Contains(output, "Skipped - Image is already being pulled by another"))
+		} else {
+			assert.Assert(t, strings.Contains(output, "simple Pulled"))
+			assert.Assert(t, strings.Contains(output, "Skipped - Image is already being pulled by simple"))
 		}
-	}
+	})
 
-	return found
+	t.Run("Verify skipped pull if image is already present locally", func(t *testing.T) {
+		// make sure the requied image is present
+		c.RunDockerCmd(t, "pull", "alpine")
+
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
+		output := res.Combined()
+
+		assert.Assert(t, strings.Contains(output, "Skipped - Image is already present locally"))
+	})
+
+	t.Run("Verify skipped no image to be pulled", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/no-image-name-given", "pull")
+		output := res.Combined()
+
+		assert.Assert(t, strings.Contains(output, "Skipped - No image to be pulled"))
+	})
 }
 
 func TestDownComposefileInParentFolder(t *testing.T) {

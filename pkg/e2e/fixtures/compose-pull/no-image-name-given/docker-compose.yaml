@@ -1,0 +1,3 @@
+services:
+  no-image-service:
+    build: .

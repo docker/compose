@@ -1,0 +1,7 @@
+services:
+  simple:
+    image: alpine:3.14
+    command: top
+  another:
+    image: alpine:3.15
+    command: top
