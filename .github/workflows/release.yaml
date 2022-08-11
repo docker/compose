@@ -75,14 +75,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Install the verifier. his be replaced with the GHA in the future.
+      # Install the verifier. This be replaced with the GHA in the future.
       - name: Install the verfier
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # Download the verifier. This will be replaced by the GHA.
           gh -R slsa-framework/slsa-verifier release download v1.2.0 -p "slsa-verifier-linux-amd64"
           chmod ug+x slsa-verifier-linux-amd64
           # Note: see https://github.com/slsa-framework/slsa-verifier/blob/main/SHA256SUM.md
