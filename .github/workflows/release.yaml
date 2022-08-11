@@ -75,19 +75,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Download binaries and license.
-      - uses: actions/download-artifact@v3
-        with:
-          name: "bin"
-      # Download provenance file.
-      - uses: actions/download-artifact@v3
-        with:
-          name: "${{ needs.provenance.outputs.attestation-name }}"
-      # Verify binaries.
-      - name: Verify binaries
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PROVENANCE: "${{ needs.provenance.outputs.attestation-name }}"
+      # Install the verifier
+      - name: Install the verfier
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -101,6 +91,20 @@ jobs:
               echo "error: expected $EXPECTED_HASH, computed $COMPUTED_HASH"
               exit 1
           fi
+      # Download binaries and license.
+      - uses: actions/download-artifact@v3
+        with:
+          name: "bin"
+      # Download provenance file.
+      - uses: actions/download-artifact@v3
+        with:
+          name: "${{ needs.provenance.outputs.attestation-name }}"
+      # Verify binaries.
+      - name: Verify binaries
+        env:
+          PROVENANCE: "${{ needs.provenance.outputs.attestation-name }}"
+        run: |
+          set -euo pipefail
 
           # Verify the binaries.
           for f in *;
@@ -117,7 +121,7 @@ jobs:
 
           done
 
-          # The slsa verifier is not part of the project.
+          # The slsa verifier is not part of the project, so remove it.
           rm ./slsa-verifier-linux-amd64
 
       # Upload to release.
