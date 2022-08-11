@@ -106,7 +106,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Verify the binaries.
           for f in *;
           do
               if [[ ! -f "$f.sha256" ]]; then
