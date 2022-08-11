@@ -77,7 +77,8 @@ jobs:
     steps:
       # Install the verifier. his be replaced with the GHA in the future.
       - name: Install the verfier
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
