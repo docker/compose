@@ -15,98 +15,173 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.18.5-alpine
-ARG GOLANGCI_LINT_VERSION=v1.47.3-alpine
-ARG PROTOC_GEN_GO_VERSION=v1.4.3
+ARG GO_VERSION=1.18.5
+ARG XX_VERSION=1.1.2
+ARG GOLANGCI_LINT_VERSION=v1.47.3
+ARG ADDLICENSE_VERSION=v1.0.0
 
-FROM --platform=${BUILDPLATFORM} golangci/golangci-lint:${GOLANGCI_LINT_VERSION} AS local-golangci-lint
+ARG BUILD_TAGS="e2e,kube"
+ARG DOCS_FORMATS="md,yaml"
+ARG LICENSE_FILES=".*\(Dockerfile\|Makefile\|\.go\|\.hcl\|\.sh\)"
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} AS base
-WORKDIR /compose-cli
-RUN apk add --no-cache -vv \
-    git \
-    docker \
-    make \
-    protoc \
-    protobuf-dev
+# xx is a helper for cross-compilation
+FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
+
+FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
+FROM ghcr.io/google/addlicense:${ADDLICENSE_VERSION} AS addlicense
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine AS base
+COPY --from=xx / /
+RUN apk add --no-cache \
+      docker \
+      file \
+      git \
+      protoc \
+      protobuf-dev
+WORKDIR /src
+ENV CGO_ENABLED=0
+
+FROM base AS build-base
 COPY go.* .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download
 
-FROM base AS lint
-ENV CGO_ENABLED=0
-COPY --from=local-golangci-lint /usr/bin/golangci-lint /usr/bin/golangci-lint
-ARG BUILD_TAGS
-ARG GIT_TAG
-RUN --mount=target=. \
+FROM build-base AS vendored
+RUN --mount=type=bind,target=.,rw \
     --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/root/.cache/golangci-lint \
-    BUILD_TAGS=${BUILD_TAGS} \
-    GIT_TAG=${GIT_TAG} \
-    make -f builder.Makefile lint
+    go mod tidy && mkdir /out && cp go.mod go.sum /out
 
-FROM base AS make-compose-plugin
-ENV CGO_ENABLED=0
+FROM scratch AS vendor-update
+COPY --from=vendored /out /
+
+FROM vendored AS vendor-validate
+RUN --mount=type=bind,target=.,rw <<EOT
+  set -e
+  git add -A
+  cp -rf /out/* .
+  diff=$(git status --porcelain -- go.mod go.sum)
+  if [ -n "$diff" ]; then
+    echo >&2 'ERROR: Vendor result differs. Please vendor your package with "make go-mod-tidy"'
+    echo "$diff"
+    exit 1
+  fi
+EOT
+
+FROM base AS version
+RUN --mount=target=. \
+    PKG=github.com/docker/compose/v2 VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always --tags); \
+    echo "-X ${PKG}/internal.Version=${VERSION}" | tee /tmp/.ldflags; \
+    echo -n "${VERSION}" | tee /tmp/.version;
+
+FROM build-base AS build
+ARG BUILD_TAGS
+ARG TARGETPLATFORM
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=bind,source=/tmp/.ldflags,target=/tmp/.ldflags,from=version \
+    set -x; xx-go build -trimpath -tags "$BUILD_TAGS" -ldflags "$(cat /tmp/.ldflags) -w -s" -o /usr/bin/docker-compose ./cmd && \
+    xx-verify --static /usr/bin/docker-compose
+
+FROM build-base AS lint
+ARG BUILD_TAGS
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=from=golangci-lint,source=/usr/bin/golangci-lint,target=/usr/bin/golangci-lint \
+    golangci-lint run --build-tags "$BUILD_TAGS" ./...
+
+FROM build-base AS test
+ARG CGO_ENABLED=0
+ARG BUILD_TAGS
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg/mod \
+    go test -tags "$BUILD_TAGS" -v -coverprofile=/tmp/coverage.txt -covermode=atomic $(go list  $(TAGS) ./... | grep -vE 'e2e') && \
+    go tool cover -func=/tmp/coverage.txt
+
+FROM scratch AS test-coverage
+COPY --from=test /tmp/coverage.txt /coverage.txt
+
+FROM base AS license-set
+ARG LICENSE_FILES
+RUN --mount=type=bind,target=.,rw \
+    --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -c 'Docker Compose CLI' -l apache && \
+    mkdir /out && \
+    find . -regex "${LICENSE_FILES}" | cpio -pdm /out
+
+FROM scratch AS license-update
+COPY --from=set /out /
+
+FROM base AS license-validate
+ARG LICENSE_FILES
+RUN --mount=type=bind,target=. \
+    --mount=from=addlicense,source=/app/addlicense,target=/usr/bin/addlicense \
+    find . -regex "${LICENSE_FILES}" | xargs addlicense -check -c 'Docker Compose CLI' -l apache -ignore validate -ignore testdata -ignore resolvepath -v
+
+FROM base AS docsgen
+WORKDIR /src
+RUN --mount=target=. \
+    --mount=target=/root/.cache,type=cache \
+    go build -o /out/docsgen ./docs/yaml/main/generate.go
+
+FROM --platform=${BUILDPLATFORM} alpine AS docs-build
+RUN apk add --no-cache rsync git
+WORKDIR /src
+COPY --from=docsgen /out/docsgen /usr/bin
+ARG DOCS_FORMATS
+RUN --mount=target=/context \
+    --mount=target=.,type=tmpfs <<EOT
+  set -e
+  rsync -a /context/. .
+  docsgen --formats "$DOCS_FORMATS" --source "docs/reference"
+  mkdir /out
+  cp -r docs/reference /out
+EOT
+
+FROM scratch AS docs-update
+COPY --from=docs-build /out /out
+
+FROM docs-build AS docs-validate
+RUN --mount=target=/context \
+    --mount=target=.,type=tmpfs <<EOT
+  set -e
+  rsync -a /context/. .
+  git add -A
+  rm -rf docs/reference/*
+  cp -rf /out/* ./docs/
+  if [ -n "$(git status --porcelain -- docs/reference)" ]; then
+    echo >&2 'ERROR: Docs result differs. Please update with "make docs"'
+    git status --porcelain -- docs/reference
+    exit 1
+  fi
+EOT
+
+FROM scratch AS binary-unix
+COPY --link --from=build /usr/bin/docker-compose /
+FROM binary-unix AS binary-darwin
+FROM binary-unix AS binary-linux
+FROM scratch AS binary-windows
+COPY --link --from=build /usr/bin/docker-compose /docker-compose.exe
+FROM binary-$TARGETOS AS binary
+
+FROM --platform=$BUILDPLATFORM alpine AS releaser
+RUN apk add --no-cache file perl-utils
+WORKDIR /work
 ARG TARGETOS
 ARG TARGETARCH
-ARG BUILD_TAGS
-ARG GIT_TAG
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=${TARGETOS} \
-    GOARCH=${TARGETARCH} \
-    BUILD_TAGS=${BUILD_TAGS} \
-    GIT_TAG=${GIT_TAG} \
-    make COMPOSE_BINARY=/out/docker-compose -f builder.Makefile compose-plugin
+ARG TARGETVARIANT
+RUN --mount=from=binary \
+    mkdir -p /out && \
+    # TODO: should just use standard arch
+    TARGETARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH"); \
+    TARGETARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "$TARGETARCH"); \
+    cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')" && \
+    (cd /out ; for f in *; do shasum --binary --algorithm 256 $f | tee -a /out/checksums.txt > $f.sha256; done)
 
-FROM base AS make-cross
-ARG BUILD_TAGS
-ARG GIT_TAG
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    BUILD_TAGS=${BUILD_TAGS} \
-    GIT_TAG=${GIT_TAG} \
-    make COMPOSE_BINARY=/out/docker-compose -f builder.Makefile cross
-
-FROM scratch AS compose-plugin
-COPY --from=make-compose-plugin /out/* .
-
-FROM scratch AS cross
-COPY --from=make-cross /out/* .
-
-FROM base AS test
-ENV CGO_ENABLED=0
-ARG BUILD_TAGS
-ARG GIT_TAG
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    BUILD_TAGS=${BUILD_TAGS} \
-    GIT_TAG=${GIT_TAG} \
-    make -f builder.Makefile test
-
-FROM base AS check-license-headers
-RUN go install github.com/google/addlicense@latest
-RUN --mount=target=. \
-    make -f builder.Makefile check-license-headers
-
-FROM base AS make-go-mod-tidy
-COPY . .
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go mod tidy
-
-FROM scratch AS go-mod-tidy
-COPY --from=make-go-mod-tidy /compose-cli/go.mod .
-COPY --from=make-go-mod-tidy /compose-cli/go.sum .
-
-FROM base AS check-go-mod
-COPY . .
-RUN make -f builder.Makefile check-go-mod
+FROM scratch AS release
+COPY --from=releaser /out/ /
 
 # docs-reference is a target used as remote context to update docs on release
 # with latest changes on docker.github.io.
