@@ -22,6 +22,8 @@ import (
 	"github.com/compose-spec/compose-go/types"
 )
 
+var _ Service = &ServiceProxy{}
+
 // ServiceProxy implements Service by delegating to implementation functions. This allows lazy init and per-method overrides
 type ServiceProxy struct {
 	BuildFn              func(ctx context.Context, project *types.Project, options BuildOptions) error
@@ -58,8 +60,6 @@ func NewServiceProxy() *ServiceProxy {
 
 // Interceptor allow to customize the compose types.Project before the actual Service method is executed
 type Interceptor func(ctx context.Context, project *types.Project)
-
-var _ Service = &ServiceProxy{}
 
 // WithService configure proxy to use specified Service as delegate
 func (s *ServiceProxy) WithService(service Service) *ServiceProxy {

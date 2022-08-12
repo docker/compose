@@ -294,7 +294,7 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 				return err
 			}
 
-			// Reset DockerCli and APIClient to get possible `DOCKER_HOST` and/or `DOCKER_CONTEXT` loaded from environment file
+			// Reset DockerCli and APIClient to get possible `DOCKER_HOST` and/or `DOCKER_CONTEXT` loaded from environment file.
 			err = dockerCli.Apply(func(cli *command.DockerCli) error {
 				return cli.Initialize(flags.NewClientOptions(),
 					command.WithInitializeClient(func(_ *command.DockerCli) (client.APIClient, error) {
