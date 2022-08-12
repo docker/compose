@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -72,7 +71,7 @@ func TestEventOrdering(t *testing.T) {
 	for i, dir := range dirs {
 		base := fmt.Sprintf("%d.txt", i)
 		p := filepath.Join(dir, base)
-		err := ioutil.WriteFile(p, []byte(base), os.FileMode(0777))
+		err := os.WriteFile(p, []byte(base), os.FileMode(0777))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,7 +236,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 	path := filepath.Join(f.paths[0], "change")
 
 	d1 := []byte("hello\ngo\n")
-	err := ioutil.WriteFile(path, d1, 0644)
+	err := os.WriteFile(path, d1, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +251,7 @@ func TestRemoveAndAddBack(t *testing.T) {
 	f.assertEvents(path)
 	f.events = nil
 
-	err = ioutil.WriteFile(path, d1, 0644)
+	err = os.WriteFile(path, d1, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +272,7 @@ func TestSingleFile(t *testing.T) {
 	f.fsync()
 
 	d2 := []byte("hello\nworld\n")
-	err := ioutil.WriteFile(path, d2, 0644)
+	err := os.WriteFile(path, d2, 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +302,7 @@ func TestWriteGoodLink(t *testing.T) {
 	f := newNotifyFixture(t)
 
 	goodFile := filepath.Join(f.paths[0], "goodFile")
-	err := ioutil.WriteFile(goodFile, []byte("hello"), 0644)
+	err := os.WriteFile(goodFile, []byte("hello"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
