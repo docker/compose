@@ -1,7 +1,6 @@
 package watch
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -18,7 +17,7 @@ func NewDir(prefix string) (*TempDir, error) {
 
 // NewDir creates a new TempDir at the given root.
 func NewDirAtRoot(root, prefix string) (*TempDir, error) {
-	tmpDir, err := ioutil.TempDir(root, prefix)
+	tmpDir, err := os.MkdirTemp(root, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +41,7 @@ func NewDirAtSlashTmp(prefix string) (*TempDir, error) {
 
 // d.NewDir creates a new TempDir under d
 func (d *TempDir) NewDir(prefix string) (*TempDir, error) {
-	d2, err := ioutil.TempDir(d.dir, prefix)
+	d2, err := os.MkdirTemp(d.dir, prefix)
 	if err != nil {
 		return nil, err
 	}
