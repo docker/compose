@@ -12,7 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-export DOCKER_BUILDKIT=1
+ifneq (, $(BUILDX_BIN))
+	export BUILDX_CMD = $(BUILDX_BIN)
+else ifneq (, $(shell docker buildx version))
+	export BUILDX_CMD = docker buildx
+else ifneq (, $(shell which buildx))
+	export BUILDX_CMD = $(which buildx)
+else
+	$(error "Buildx is required: https://github.com/docker/buildx#installing")
+endif
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -35,11 +43,12 @@ all: compose-plugin
 
 .PHONY: compose-plugin
 compose-plugin: ## Compile the compose cli-plugin
-	@docker build . --target compose-plugin \
-	--platform local \
-	--build-arg BUILD_TAGS=e2e,kube \
-	--build-arg GIT_TAG=$(GIT_TAG) \
-	--output ./bin
+	$(BUILDX_CMD) bake binary
+
+.PHONY: install
+install: compose-plugin
+	mkdir -p ~/.docker/cli-plugins
+	install bin/build/docker-compose ~/.docker/cli-plugins/docker-compose
 
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
@@ -71,45 +80,31 @@ build-and-e2e: compose-plugin e2e-compose e2e-compose-standalone ## Compile the 
 
 .PHONY: cross
 cross: ## Compile the CLI for linux, darwin and windows
-	@docker build . --target cross \
-	--build-arg BUILD_TAGS \
-	--build-arg GIT_TAG=$(GIT_TAG) \
-	--output ./bin \
+	$(BUILDX_CMD) bake binary
 
 .PHONY: test
 test: ## Run unit tests
-	@docker build --progress=plain . \
-	--build-arg BUILD_TAGS=kube \
-	--build-arg GIT_TAG=$(GIT_TAG) \
-	--target test
+	$(BUILDX_CMD) bake test
 
 .PHONY: cache-clear
 cache-clear: ## Clear the builder cache
-	@docker builder prune --force --filter type=exec.cachemount --filter=unused-for=24h
+	$(BUILDX_CMD) prune --force --filter type=exec.cachemount --filter=unused-for=24h
 
 .PHONY: lint
 lint: ## run linter(s)
-	@docker build . \
-	--build-arg BUILD_TAGS=kube,e2e \
-	--build-arg GIT_TAG=$(GIT_TAG) \
-	--target lint
+	$(BUILDX_CMD) bake lint
 
 .PHONY: docs
 docs: ## generate documentation
-	$(eval $@_TMP_OUT := $(shell mktemp -d -t dockercli-output.XXXXXXXXXX))
-	docker build . \
-	--output type=local,dest=$($@_TMP_OUT) \
-	-f ./docs/Dockerfile \
-	--target update
+	$(eval $@_TMP_OUT := $(shell mktemp -d -t compose-output.XXXXXXXXXX))
+	$(BUILDX_CMD) bake --set "*.output=type=local,dest=$($@_TMP_OUT)" docs-update
 	rm -rf ./docs/internal
 	cp -R "$($@_TMP_OUT)"/out/* ./docs/
 	rm -rf "$($@_TMP_OUT)"/*
 
 .PHONY: validate-docs
 validate-docs: ## validate the doc does not change
-	@docker build . \
-	-f ./docs/Dockerfile \
-	--target validate
+	$(BUILDX_CMD) bake docs-validate
 
 .PHONY: check-dependencies
 check-dependencies: ## check dependency updates
@@ -117,15 +112,15 @@ check-dependencies: ## check dependency updates
 
 .PHONY: validate-headers
 validate-headers: ## Check license header for all files
-	@docker build . --target check-license-headers
+	$(BUILDX_CMD) bake license-validate
 
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and go.sum
-	@docker build . --target go-mod-tidy --output .
+	$(BUILDX_CMD) bake vendor-update
 
 .PHONY: validate-go-mod
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
-	@docker build . --target check-go-mod
+	$(BUILDX_CMD) bake vendor-validate
 
 validate: validate-go-mod validate-headers validate-docs ## Validate sources
 

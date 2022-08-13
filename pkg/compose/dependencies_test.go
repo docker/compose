@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var project = types.Project{
@@ -45,25 +45,27 @@ var project = types.Project{
 }
 
 func TestInDependencyUpCommandOrder(t *testing.T) {
-	order := make(chan string)
-	//nolint:errcheck, unparam
-	go InDependencyOrder(context.TODO(), &project, func(ctx context.Context, config string) error {
-		order <- config
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	var order []string
+	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+		order = append(order, service)
 		return nil
 	})
-	assert.Equal(t, <-order, "test3")
-	assert.Equal(t, <-order, "test2")
-	assert.Equal(t, <-order, "test1")
+	require.NoError(t, err, "Error during iteration")
+	require.Equal(t, []string{"test3", "test2", "test1"}, order)
 }
 
 func TestInDependencyReverseDownCommandOrder(t *testing.T) {
-	order := make(chan string)
-	//nolint:errcheck, unparam
-	go InReverseDependencyOrder(context.TODO(), &project, func(ctx context.Context, config string) error {
-		order <- config
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	var order []string
+	err := InReverseDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+		order = append(order, service)
 		return nil
 	})
-	assert.Equal(t, <-order, "test1")
-	assert.Equal(t, <-order, "test2")
-	assert.Equal(t, <-order, "test3")
+	require.NoError(t, err, "Error during iteration")
+	require.Equal(t, []string{"test1", "test2", "test3"}, order)
 }

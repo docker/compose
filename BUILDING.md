@@ -19,7 +19,8 @@ Once you have the prerequisites installed, you can build the CLI using:
 make
 ```
 
-This will output a `docker-compose` CLI plugin for your host machine in `./bin`.
+This will output a `docker-compose` CLI plugin for your host machine in
+`./bin/build`.
 
 You can statically cross compile the CLI for Windows, macOS, and Linux using the
 `cross` target.
@@ -37,7 +38,6 @@ If you need to update a golden file simply do `go test ./... -test.update-golden
 ### End-to-end tests
 To run e2e tests, the Compose CLI binary need to be build. All the commands to run e2e tests propose a version
 with the prefix `build-and-e2e` to first build the CLI before executing tests.
-
 
 Note that this requires a local Docker Engine to be running.
 
@@ -76,6 +76,7 @@ make e2e-compose-standalone
 ```
 
 Or if you need to build the CLI, run:
+
 ```console
 make build-and-e2e-compose-standalone
 ```
