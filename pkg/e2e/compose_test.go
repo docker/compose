@@ -150,8 +150,8 @@ func TestComposePull(t *testing.T) {
 	})
 
 	t.Run("Verify skipped pull if image is already present locally", func(t *testing.T) {
-		// make sure the requied image is present
-		c.RunDockerCmd(t, "pull", "alpine:3.13.12")
+		// make sure the required image is present
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
 
 		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/image-present-locally", "pull")
 		output := res.Combined()
