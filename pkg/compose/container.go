@@ -30,13 +30,13 @@ const (
 	// ContainerRunning running status
 	ContainerRunning = "running"
 	// ContainerRemoving removing status
-	ContainerRemoving = "removing" //nolint
+	ContainerRemoving = "removing"
 	// ContainerPaused paused status
-	ContainerPaused = "paused" //nolint
+	ContainerPaused = "paused"
 	// ContainerExited exited status
-	ContainerExited = "exited" //nolint
+	ContainerExited = "exited"
 	// ContainerDead dead status
-	ContainerDead = "dead" //nolint
+	ContainerDead = "dead"
 )
 
 var _ io.ReadCloser = ContainerStdout{}

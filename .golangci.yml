@@ -1,5 +1,6 @@
 run:
   concurrency: 2
+  timeout: 10m
 linters:
   enable-all: false
   disable-all: true
@@ -18,6 +19,7 @@ linters:
     - lll
     - misspell
     - nakedret
+    - nolintlint
     - staticcheck
     - structcheck
     - typecheck
