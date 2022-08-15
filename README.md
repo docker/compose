@@ -36,7 +36,7 @@ We generate [SLSA3 provenance](slsa.dev) using the OpenSSF's [slsa-framework/sls
 1. Download the file named `attestation.intoto.jsonl` from the release
 1. Run:
 ```shell
-$ slsa-verifier -artifact-path <binary> -provenance attestation.intoto.jsonl -source github.com/docker/compose -branch v2
+$ slsa-verifier -artifact-path <binary> -provenance attestation.intoto.jsonl -source github.com/docker/compose -branch v2 -workflow-input tag=<tag>
   PASSED: Verified SLSA provenance
 ```
 
