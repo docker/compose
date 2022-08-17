@@ -352,6 +352,12 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 		return false, nil
 	}
 	if service, err := project.GetService(serviceName); err != nil {
+		for _, ds := range project.DisabledServices {
+			if ds.Name == serviceName {
+				// don't wait for disabled service (--no-deps)
+				return false, nil
+			}
+		}
 		return false, err
 	} else if service.Scale == 0 {
 		// don't wait for the dependency which configured to have 0 containers running
