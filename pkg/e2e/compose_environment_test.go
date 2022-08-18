@@ -34,7 +34,7 @@ func TestEnvPriority(t *testing.T) {
 	})
 
 	// Full options activated
-	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file)
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From OS Environment)
 	// 2. Compose File (service::environment section)
 	// 3. Compose File (service::env_file section file)
 	// 4. Container Image ENV directive
@@ -45,7 +45,7 @@ func TestEnvPriority(t *testing.T) {
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
-		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
 	})
 
 	// Full options activated
@@ -63,7 +63,7 @@ func TestEnvPriority(t *testing.T) {
 	})
 
 	// No Compose file, all other options
-	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From environment patched by --env-file)
+	// 1. Command Line (docker compose run --env <KEY[=VAL]>)  <-- Result expected (From OS Environment)
 	// 2. Compose File (service::environment section)
 	// 3. Compose File (service::env_file section file)
 	// 4. Container Image ENV directive
@@ -74,7 +74,7 @@ func TestEnvPriority(t *testing.T) {
 			"run", "--rm", "-e", "WHEREAMI", "env-compose-priority")
 		cmd.Env = append(cmd.Env, "WHEREAMI=shell")
 		res := icmd.RunCmd(cmd)
-		assert.Equal(t, strings.TrimSpace(res.Stdout()), "override")
+		assert.Equal(t, strings.TrimSpace(res.Stdout()), "shell")
 	})
 
 	// No Compose file, all other options with env variable from OS environment

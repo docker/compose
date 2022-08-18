@@ -383,8 +383,10 @@ func setEnvWithDotEnv(prjOpts *projectOptions) error {
 		return err
 	}
 	for k, v := range envFromFile {
-		if err := os.Setenv(k, v); err != nil { // overwrite the process env with merged OS + env file results
-			return err
+		if _, ok := os.LookupEnv(k); !ok { // Precedence to OS Env
+			if err := os.Setenv(k, v); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
