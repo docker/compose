@@ -45,6 +45,17 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return err
 	}
 
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !options.RemoveOrphans {
+		containers = containers.filter(isService(project.ServiceNames()...))
+	}
 	if len(containers) == 0 {
 		fmt.Fprintf(s.stderr(), "no container to kill")
 	}
