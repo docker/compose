@@ -10,6 +10,16 @@ usage: docker compose kill [OPTIONS] [SERVICE...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: remove-orphans
+      value_type: bool
+      default_value: "false"
+      description: Remove containers for services not defined in the Compose file.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: signal
       shorthand: s
       value_type: string
