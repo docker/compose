@@ -32,6 +32,8 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli/flags"
+	"github.com/docker/docker/client"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -291,6 +293,18 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			// Reset DockerCli and APIClient to get possible `DOCKER_HOST` and/or `DOCKER_CONTEXT` loaded from environment file.
+			err = dockerCli.Apply(func(cli *command.DockerCli) error {
+				return cli.Initialize(flags.NewClientOptions(),
+					command.WithInitializeClient(func(_ *command.DockerCli) (client.APIClient, error) {
+						return nil, nil
+					}))
+			})
+			if err != nil {
+				return err
+			}
+
 			parent := cmd.Root()
 			if parent != nil {
 				parentPrerun := parent.PersistentPreRunE
@@ -383,8 +397,10 @@ func setEnvWithDotEnv(prjOpts *projectOptions) error {
 		return err
 	}
 	for k, v := range envFromFile {
-		if err := os.Setenv(k, v); err != nil { // overwrite the process env with merged OS + env file results
-			return err
+		if _, ok := os.LookupEnv(k); !ok { // Precedence to OS Env
+			if err := os.Setenv(k, v); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

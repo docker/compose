@@ -167,7 +167,6 @@ COPY --link --from=build /usr/bin/docker-compose /docker-compose.exe
 FROM binary-$TARGETOS AS binary
 
 FROM --platform=$BUILDPLATFORM alpine AS releaser
-RUN apk add --no-cache file perl-utils
 WORKDIR /work
 ARG TARGETOS
 ARG TARGETARCH
@@ -177,8 +176,7 @@ RUN --mount=from=binary \
     # TODO: should just use standard arch
     TARGETARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH"); \
     TARGETARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "$TARGETARCH"); \
-    cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')" && \
-    (cd /out ; for f in *; do shasum --binary --algorithm 256 $f | tee -a /out/checksums.txt > $f.sha256; done)
+    cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')"
 
 FROM scratch AS release
 COPY --from=releaser /out/ /
