@@ -92,7 +92,16 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				w.Event(progress.Event{
 					ID:     service.Name,
 					Status: progress.Done,
-					Text:   "Exists",
+					Text:   "Skipped - Image is already present locally",
+				})
+				continue
+			}
+		default:
+			if _, ok := images[service.Image]; ok {
+				w.Event(progress.Event{
+					ID:     service.Name,
+					Status: progress.Done,
+					Text:   "Skipped - Image is already present locally",
 				})
 				continue
 			}
