@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -64,13 +65,16 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var mustBuild []string
+
+	imagesBeingPulled := map[string]string{}
+
 	for _, service := range project.Services {
 		service := service
 		if service.Image == "" {
 			w.Event(progress.Event{
 				ID:     service.Name,
 				Status: progress.Done,
-				Text:   "Skipped",
+				Text:   "Skipped - No image to be pulled",
 			})
 			continue
 		}
@@ -88,11 +92,31 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 				w.Event(progress.Event{
 					ID:     service.Name,
 					Status: progress.Done,
-					Text:   "Exists",
+					Text:   "Skipped - Image is already present locally",
+				})
+				continue
+			}
+		default:
+			if _, ok := images[service.Image]; ok {
+				w.Event(progress.Event{
+					ID:     service.Name,
+					Status: progress.Done,
+					Text:   "Skipped - Image is already present locally",
 				})
 				continue
 			}
 		}
+
+		if s, ok := imagesBeingPulled[service.Image]; ok {
+			w.Event(progress.Event{
+				ID:     service.Name,
+				Status: progress.Done,
+				Text:   fmt.Sprintf("Skipped - Image is already being pulled by %v", s),
+			})
+			continue
+		}
+
+		imagesBeingPulled[service.Image] = service.Name
 
 		eg.Go(func() error {
 			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
