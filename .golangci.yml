@@ -29,7 +29,7 @@ linters:
     - varcheck
 linters-settings:
   depguard:
-    list-type: blacklist
+    list-type: denylist
     include-go-root: true
     packages:
       # The io/ioutil package has been deprecated.
