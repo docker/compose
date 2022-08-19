@@ -197,6 +197,10 @@ type ImagesOptions struct {
 
 // KillOptions group options of the Kill API
 type KillOptions struct {
+	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
+	RemoveOrphans bool
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	Project *types.Project
 	// Services passed in the command line to be killed
 	Services []string
 	// Signal to send to containers

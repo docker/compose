@@ -7,6 +7,7 @@ Force stop service containers.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
+| `--remove-orphans` |  |  | Remove containers for services not defined in the Compose file. |
 | `-s`, `--signal` | `string` | `SIGKILL` | SIGNAL to send to the container. |
 
 

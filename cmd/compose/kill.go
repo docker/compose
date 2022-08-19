@@ -18,15 +18,18 @@ package compose
 
 import (
 	"context"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type killOptions struct {
 	*projectOptions
-	signal string
+	removeOrphans bool
+	signal        string
 }
 
 func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -43,20 +46,24 @@ func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	}
 
 	flags := cmd.Flags()
+	removeOrphans := utils.StringToBool(os.Getenv("COMPOSE_REMOVE_ORPHANS"))
+	flags.BoolVar(&opts.removeOrphans, "remove-orphans", removeOrphans, "Remove containers for services not defined in the Compose file.")
 	flags.StringVarP(&opts.signal, "signal", "s", "SIGKILL", "SIGNAL to send to the container.")
 
 	return cmd
 }
 
 func runKill(ctx context.Context, backend api.Service, opts killOptions, services []string) error {
-	name, err := opts.toProjectName()
+	project, name, err := opts.projectOrName()
 	if err != nil {
 		return err
 	}
 
 	return backend.Kill(ctx, name, api.KillOptions{
-		Services: services,
-		Signal:   opts.signal,
+		RemoveOrphans: opts.removeOrphans,
+		Project:       project,
+		Services:      services,
+		Signal:        opts.signal,
 	})
 
 }
