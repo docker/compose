@@ -131,6 +131,13 @@ func TestComposePull(t *testing.T) {
 
 		assert.Assert(t, strings.Contains(output, "simple Pulled"))
 		assert.Assert(t, strings.Contains(output, "another Pulled"))
+
+		// verify default policy is 'always' for pull command
+		res = c.RunDockerComposeCmd(t, "--project-directory", "fixtures/compose-pull/simple", "pull")
+		output = res.Combined()
+
+		assert.Assert(t, strings.Contains(output, "simple Pulled"))
+		assert.Assert(t, strings.Contains(output, "another Pulled"))
 	})
 
 	t.Run("Verify a image is pulled once", func(t *testing.T) {
