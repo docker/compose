@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	"github.com/docker/compose/v2/pkg/api"
-
-	"github.com/sirupsen/logrus"
 )
 
 // logPrinter watch application containers an collect their logs
@@ -99,7 +97,6 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 						exitCodeFrom = event.Service
 					}
 					if exitCodeFrom == event.Service {
-						logrus.Error(event.ExitCode)
 						exitCode = event.ExitCode
 					}
 				}
