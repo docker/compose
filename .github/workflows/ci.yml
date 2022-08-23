@@ -199,8 +199,9 @@ jobs:
         name: Create checksums
         working-directory: ${{ env.DESTDIR }}
         run: |
-          find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# .*/#  #' > checksums.txt
-          shasum -a 256 -U -c checksums.txt
+          find . -type f -print0 | sort -z | xargs -r0 shasum -a 256 -b | sed 's# .*/#  #' > $RUNNER_TEMP/checksums.txt
+          shasum -a 256 -U -c $RUNNER_TEMP/checksums.txt
+          mv $RUNNER_TEMP/checksums.txt .
       -
         name: License
         run: cp packaging/* ${{ env.DESTDIR }}/
