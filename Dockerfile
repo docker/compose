@@ -36,6 +36,7 @@ RUN apk add --no-cache \
       docker \
       file \
       git \
+      make \
       protoc \
       protobuf-dev
 WORKDIR /src
@@ -68,20 +69,14 @@ RUN --mount=type=bind,target=.,rw <<EOT
   fi
 EOT
 
-FROM base AS version
-RUN --mount=target=. \
-    PKG=github.com/docker/compose/v2 VERSION=$(git describe --match 'v[0-9]*' --dirty='.m' --always --tags); \
-    echo "-X ${PKG}/internal.Version=${VERSION}" | tee /tmp/.ldflags; \
-    echo -n "${VERSION}" | tee /tmp/.version;
-
 FROM build-base AS build
 ARG BUILD_TAGS
 ARG TARGETPLATFORM
+RUN xx-go --wrap
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=bind,source=/tmp/.ldflags,target=/tmp/.ldflags,from=version \
-    set -x; xx-go build -trimpath -tags "$BUILD_TAGS" -ldflags "$(cat /tmp/.ldflags) -w -s" -o /usr/bin/docker-compose ./cmd && \
+    make build GO_BUILDTAGS="$BUILD_TAGS" DESTDIR=/usr/bin && \
     xx-verify --static /usr/bin/docker-compose
 
 FROM build-base AS lint
