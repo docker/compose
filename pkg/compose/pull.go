@@ -88,7 +88,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 			})
 			continue
 		case types.PullPolicyMissing, types.PullPolicyIfNotPresent:
-			if _, ok := images[service.Image]; ok {
+			if imageAlreadyPresent(service.Image, images) {
 				w.Event(progress.Event{
 					ID:     service.Name,
 					Status: progress.Done,
@@ -131,6 +131,19 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 	}
 
 	return err
+}
+
+func imageAlreadyPresent(serviceImage string, localImages map[string]string) bool {
+	normalizedImage, err := reference.ParseDockerRef(serviceImage)
+	if err != nil {
+		return false
+	}
+	tagged, ok := normalizedImage.(reference.NamedTagged)
+	if !ok {
+		return false
+	}
+	_, ok = localImages[serviceImage]
+	return ok && tagged.Tag() != "latest"
 }
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) (string, error) {
