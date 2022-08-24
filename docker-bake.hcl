@@ -124,3 +124,23 @@ target "docs-update" {
   target = "docs-update"
   output = ["./docs"]
 }
+
+target "docker-metadata-action" {}
+
+target "release-image" {
+  inherits = ["docker-metadata-action"]
+  target = "release-image"
+  platforms = [
+    "linux/amd64",
+    "linux/arm/v6",
+    "linux/arm/v7",
+    "linux/arm64",
+  ]
+}
+
+target "image" {
+  inherits = ["release-image"]
+  platforms = []
+  tags = ["docker.io/docker/docker-compose"]
+  output = ["type=docker"]
+}

@@ -186,3 +186,9 @@ COPY --from=releaser /out/ /
 # see open-pr job in .github/workflows/docs.yml for more details
 FROM scratch AS docs-reference
 COPY docs/reference/*.yaml .
+
+FROM base AS release-image
+WORKDIR /root
+COPY --link --from=build /usr/bin/docker-compose /usr/bin/
+RUN mkdir -p /usr/local/lib/docker/cli-plugins
+RUN ln -s /usr/bin/docker-compose /usr/local/lib/docker/cli-plugins/

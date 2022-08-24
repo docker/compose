@@ -82,6 +82,10 @@ build-and-e2e: compose-plugin e2e-compose e2e-compose-standalone ## Compile the 
 cross: ## Compile the CLI for linux, darwin and windows
 	$(BUILDX_CMD) bake binary
 
+.PHONY: image
+image: ## Build the docker/docker-compose image locally and load it into Docker
+	$(BUILDX_CMD) bake image
+
 .PHONY: test
 test: ## Run unit tests
 	$(BUILDX_CMD) bake test
