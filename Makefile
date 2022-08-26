@@ -12,15 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ifneq (, $(BUILDX_BIN))
-	export BUILDX_CMD = $(BUILDX_BIN)
-else ifneq (, $(shell docker buildx version))
-	export BUILDX_CMD = docker buildx
-else ifneq (, $(shell which buildx))
-	export BUILDX_CMD = $(which buildx)
-else
-	$(error "Buildx is required: https://github.com/docker/buildx#installing")
-endif
+PKG := github.com/docker/compose/v2
+VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
+
+GO_LDFLAGS ?= -s -w -X ${PKG}/internal.Version=${VERSION}
+GO_BUILDTAGS ?= e2e,kube
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -30,8 +26,6 @@ ifeq ($(UNAME_S),Darwin)
 	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
 endif
 
-BINARY_FOLDER=$(shell pwd)/bin
-GIT_TAG?=$(shell git describe --tags --match "v[0-9]*")
 TEST_FLAGS?=
 E2E_TEST?=
 ifeq ($(E2E_TEST),)
@@ -39,14 +33,21 @@ else
 	TEST_FLAGS=-run $(E2E_TEST)
 endif
 
-all: compose-plugin
+BUILDX_CMD ?= docker buildx
+DESTDIR ?= ./bin/build
 
-.PHONY: compose-plugin
-compose-plugin: ## Compile the compose cli-plugin
+all: build
+
+.PHONY: build ## Build the compose cli-plugin
+build:
+	CGO_ENABLED=0 GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose" ./cmd
+
+.PHONY: binary
+binary:
 	$(BUILDX_CMD) bake binary
 
 .PHONY: install
-install: compose-plugin
+install: binary
 	mkdir -p ~/.docker/cli-plugins
 	install bin/build/docker-compose ~/.docker/cli-plugins/docker-compose
 
@@ -61,10 +62,10 @@ e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2
 	go test $(TEST_FLAGS) -v -count=1 -parallel=1 --tags=standalone ./pkg/e2e
 
 .PHONY: build-and-e2e-compose
-build-and-e2e-compose: compose-plugin e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
+build-and-e2e-compose: build e2e-compose ## Compile the compose cli-plugin and run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 
 .PHONY: build-and-e2e-compose-standalone
-build-and-e2e-compose-standalone: compose-plugin e2e-compose-standalone ## Compile the compose cli-plugin and run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
+build-and-e2e-compose-standalone: build e2e-compose-standalone ## Compile the compose cli-plugin and run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
 
 .PHONY: mocks
 mocks:
@@ -76,11 +77,11 @@ mocks:
 e2e: e2e-compose e2e-compose-standalone ## Run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
 
 .PHONY: build-and-e2e
-build-and-e2e: compose-plugin e2e-compose e2e-compose-standalone ## Compile the compose cli-plugin and run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
+build-and-e2e: build e2e-compose e2e-compose-standalone ## Compile the compose cli-plugin and run end to end local tests in both modes. Set E2E_TEST=TestName to run a single test
 
 .PHONY: cross
 cross: ## Compile the CLI for linux, darwin and windows
-	$(BUILDX_CMD) bake binary
+	$(BUILDX_CMD) bake binary-cross
 
 .PHONY: test
 test: ## Run unit tests
@@ -124,7 +125,7 @@ validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 
 validate: validate-go-mod validate-headers validate-docs ## Validate sources
 
-pre-commit: validate check-dependencies lint compose-plugin test e2e-compose
+pre-commit: validate check-dependencies lint build test e2e-compose
 
 help: ## Show help
 	@echo Please specify a build target. The choices are:
