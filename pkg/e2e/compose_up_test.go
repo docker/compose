@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"gotest.tools/v3/assert"
+	"gotest.tools/v3/icmd"
 )
 
 func TestUpWait(t *testing.T) {
@@ -44,4 +45,14 @@ func TestUpWait(t *testing.T) {
 	}
 
 	c.RunDockerComposeCmd(t, "--project-name", projectName, "down")
+}
+
+func TestUpExitCodeFrom(t *testing.T) {
+	c := NewParallelCLI(t)
+	const projectName = "e2e-exit-code-from"
+
+	res := c.RunDockerComposeCmdNoCheck(t, "-f", "fixtures/start-fail/start-depends_on-long-lived.yaml", "--project-name", projectName, "up", "--exit-code-from=test")
+	res.Assert(t, icmd.Expected{ExitCode: 137})
+
+	c.RunDockerComposeCmd(t, "--project-name", projectName, "down", "--remove-orphans")
 }
