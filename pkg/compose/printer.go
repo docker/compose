@@ -93,11 +93,13 @@ func (p *printer) Run(ctx context.Context, cascadeStop bool, exitCodeFrom string
 							return 0, err
 						}
 					}
-					if exitCodeFrom == "" {
-						exitCodeFrom = event.Service
-					}
-					if exitCodeFrom == event.Service {
-						exitCode = event.ExitCode
+					if event.Type == api.ContainerEventExit {
+						if exitCodeFrom == "" {
+							exitCodeFrom = event.Service
+						}
+						if exitCodeFrom == event.Service {
+							exitCode = event.ExitCode
+						}
 					}
 				}
 				if len(containers) == 0 {
