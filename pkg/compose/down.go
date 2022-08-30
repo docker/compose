@@ -120,7 +120,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 
 func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) []downOp {
 	var ops []downOp
-	for image := range s.getServiceImages(options, project) {
+	for image := range s.getServiceImagesToRemove(options, project) {
 		image := image
 		ops = append(ops, func() error {
 			return s.removeImage(ctx, image, w)
@@ -190,16 +190,14 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 	return nil
 }
 
-func (s *composeService) getServiceImages(options api.DownOptions, project *types.Project) map[string]struct{} {
+func (s *composeService) getServiceImagesToRemove(options api.DownOptions, project *types.Project) map[string]struct{} {
 	images := map[string]struct{}{}
 	for _, service := range project.Services {
-		image := service.Image
-		if options.Images == "local" && image != "" {
+		image, ok := service.Labels[api.ImageNameLabel] // Information on the compose file at the creation of the container
+		if !ok || (options.Images == "local" && image != "") {
 			continue
 		}
-		if image == "" {
-			image = api.GetImageNameOrDefault(service, project.Name)
-		}
+		image = api.GetImageNameOrDefault(service, project.Name)
 		images[image] = struct{}{}
 	}
 	return images

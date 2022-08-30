@@ -142,3 +142,90 @@ func TestDownRemoveVolumes(t *testing.T) {
 	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
 	assert.NilError(t, err)
 }
+
+func TestDownRemoveImageLocal(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
+
+	container := testContainer("service1", "123", false)
+	container.Labels[compose.ImageNameLabel] = ""
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		[]moby.Container{container}, nil)
+
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{
+			Volumes: []*moby.Volume{{Name: "myProject_volume"}},
+		}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return(nil, nil)
+
+	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+
+	api.EXPECT().ImageRemove(gomock.Any(), "testproject-service1", moby.ImageRemoveOptions{}).Return(nil, nil)
+
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
+	assert.NilError(t, err)
+}
+
+func TestDownRemoveImageLocalNoLabel(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
+
+	container := testContainer("service1", "123", false)
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		[]moby.Container{container}, nil)
+
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{
+			Volumes: []*moby.Volume{{Name: "myProject_volume"}},
+		}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return(nil, nil)
+
+	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "local"})
+	assert.NilError(t, err)
+}
+
+func TestDownRemoveImageAll(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	tested.dockerCli = cli
+	cli.EXPECT().Client().Return(api).AnyTimes()
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
+		[]moby.Container{testContainer("service1", "123", false)}, nil)
+
+	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
+		Return(volume.VolumeListOKBody{
+			Volumes: []*moby.Volume{{Name: "myProject_volume"}},
+		}, nil)
+	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
+		Return(nil, nil)
+
+	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", moby.ContainerRemoveOptions{Force: true}).Return(nil)
+
+	api.EXPECT().ImageRemove(gomock.Any(), "service1-img", moby.ImageRemoveOptions{}).Return(nil, nil)
+
+	err := tested.Down(context.Background(), strings.ToLower(testProject), compose.DownOptions{Images: "all"})
+	assert.NilError(t, err)
+}

@@ -139,6 +139,7 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				project.Services[i].Labels = types.Labels{}
 			}
 			project.Services[i].CustomLabels[api.ImageDigestLabel] = digest
+			project.Services[i].CustomLabels[api.ImageNameLabel] = service.Image
 		}
 	}
 	return nil
@@ -191,6 +192,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 		digest, ok := images[imgName]
 		if ok {
 			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
+			project.Services[i].CustomLabels.Add(api.ImageNameLabel, project.Services[i].Image)
 		}
 	}
 
