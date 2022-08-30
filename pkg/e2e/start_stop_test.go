@@ -222,29 +222,46 @@ func TestStopAlreadyStopped(t *testing.T) {
 }
 
 func TestStartStopMultipleServices(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple",
-		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
+	cli := NewParallelCLI(t, WithEnv("COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple"))
 	t.Cleanup(func() {
 		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
 	})
 
-	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
+	t.Run("starts/stops multiple services", func(t *testing.T) {
+		cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "up", "-d", "--wait")
 
-	res := cli.RunDockerComposeCmd(t, "stop", "simple", "another")
-	services := []string{"simple", "another"}
-	for _, svc := range services {
-		stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Stopped", svc)
-		assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
-			fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
-	}
+		res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "stop", "simple", "another")
+		services := []string{"simple", "another"}
+		for _, svc := range services {
+			stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Stopped", svc)
+			assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
+				fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
+		}
 
-	res = cli.RunDockerComposeCmd(t, "start", "simple", "another")
-	for _, svc := range services {
-		startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Started", svc)
-		assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
-			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
-	}
+		res = cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "start", "simple", "another")
+		for _, svc := range services {
+			startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Started", svc)
+			assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
+				fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
+		}
+	})
+
+	t.Run("starts one service out of many", func(t *testing.T) {
+		cli.RunDockerComposeCmd(t, "down")
+		cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "create", "desired")
+
+		res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "start", "desired")
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-desired-1  Started"),
+			fmt.Sprintf("Missing start message for service: desired\n%s", res.Combined()))
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_1-1  Started"),
+			fmt.Sprintf("Missing start message for service: dep_1\n%s", res.Combined()))
+		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_2-1  Started"),
+			fmt.Sprintf("Missing start message for service: dep_2\n%s", res.Combined()))
+		assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-another-1  Started"),
+			fmt.Sprintf("Shouldn't have tried to start service: another\n%s", res.Combined()))
+		assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-another_2-1  Started"),
+			fmt.Sprintf("Shouldn't have tried to start service: another_2\n%s", res.Combined()))
+	})
 }
 
 func TestStartStopMultipleFiles(t *testing.T) {
