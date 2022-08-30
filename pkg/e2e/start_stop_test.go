@@ -246,21 +246,21 @@ func TestStartStopMultipleServices(t *testing.T) {
 		}
 	})
 
-	t.Run("starts one service out of many", func(t *testing.T) {
+	t.Run("starts one service out of many, and it's dependencies", func(t *testing.T) {
 		cli.RunDockerComposeCmd(t, "down")
 		cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "create", "desired")
 
 		res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "start", "desired")
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-desired-1  Started"),
-			fmt.Sprintf("Missing start message for service: desired\n%s", res.Combined()))
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_1-1  Started"),
-			fmt.Sprintf("Missing start message for service: dep_1\n%s", res.Combined()))
-		assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_2-1  Started"),
-			fmt.Sprintf("Missing start message for service: dep_2\n%s", res.Combined()))
-		assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-another-1  Started"),
-			fmt.Sprintf("Shouldn't have tried to start service: another\n%s", res.Combined()))
-		assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-another_2-1  Started"),
-			fmt.Sprintf("Shouldn't have tried to start service: another_2\n%s", res.Combined()))
+		desiredServices := []string{"desired", "dep_1", "dep_2"}
+		for _, s := range desiredServices {
+			assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-desired-1  Started"),
+				fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
+		}
+		undesiredServices := []string{"another", "another_2"}
+		for _, s := range undesiredServices {
+			assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_2-1  Started"),
+				fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
+		}
 	})
 }
 
