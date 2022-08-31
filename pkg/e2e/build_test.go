@@ -281,6 +281,22 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 
 	})
 
+	t.Run("multi-arch multi service builds ok", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
+			"-f", "fixtures/build-test/platforms/compose-multiple-platform-builds.yaml", "build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res = c.RunDockerCmd(t, "manifest", "inspect", "--insecure", "localhost:5001/build-test-platform-a:test")
+		res.Assert(t, icmd.Expected{Out: `"architecture": "amd64",`})
+		res.Assert(t, icmd.Expected{Out: `"architecture": "arm64",`})
+		res = c.RunDockerCmd(t, "manifest", "inspect", "--insecure", "localhost:5001/build-test-platform-b:test")
+		res.Assert(t, icmd.Expected{Out: `"architecture": "amd64",`})
+		res.Assert(t, icmd.Expected{Out: `"architecture": "arm64",`})
+		res = c.RunDockerCmd(t, "manifest", "inspect", "--insecure", "localhost:5001/build-test-platform-c:test")
+		res.Assert(t, icmd.Expected{Out: `"architecture": "amd64",`})
+		res.Assert(t, icmd.Expected{Out: `"architecture": "arm64",`})
+
+	})
+
 	t.Run("multi-arch up --build", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
 		assert.NilError(t, res.Error, res.Stderr())

@@ -56,10 +56,7 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 	defer cancel()
 	w := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
 
-	// Get the DockerAPI if a "docker" export is defined (ie: up and run command), otherwise get nil and let use the default buildx builder
-	API := getDockerAPI(s.dockerCli, opts)
-
-	response, err := build.Build(ctx, dis, opts, API, filepath.Dir(s.configFile().Filename), w)
+	response, err := build.Build(ctx, dis, opts, &internalAPI{dockerCli: s.dockerCli}, filepath.Dir(s.configFile().Filename), w)
 	errW := w.Wait()
 	if err == nil {
 		err = errW
@@ -264,19 +261,4 @@ func (a *internalAPI) DockerAPI(name string) (dockerclient.APIClient, error) {
 		name = a.dockerCli.CurrentContext()
 	}
 	return clientForEndpoint(a.dockerCli, name)
-}
-
-func dockerAPI(dockerCli command.Cli) *internalAPI {
-	return &internalAPI{dockerCli: dockerCli}
-}
-
-func getDockerAPI(cli command.Cli, opts map[string]build.Options) *internalAPI {
-	for _, opt := range opts {
-		for _, export := range opt.Exports {
-			if export.Type == "docker" {
-				return dockerAPI(cli)
-			}
-		}
-	}
-	return nil
 }
