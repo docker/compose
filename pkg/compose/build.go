@@ -83,10 +83,8 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 		}
 		if len(buildOptions.Platforms) > 1 {
 			buildOptions.Exports = []bclient.ExportEntry{{
-				Type: "image",
-				Attrs: map[string]string{
-					"push": "true",
-				},
+				Type:  "image",
+				Attrs: map[string]string{},
 			}}
 		}
 		opts[imageName] = buildOptions
@@ -177,7 +175,9 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 						"load": "true",
 					},
 				}}
-				opt.Platforms = []specs.Platform{}
+				if opt.Platforms, err = useDockerDefaultPlatform(project, service.Build.Platforms); err != nil {
+					opt.Platforms = []specs.Platform{}
+				}
 			}
 			opts[imageName] = opt
 			continue
@@ -360,20 +360,34 @@ func addSecretsConfig(project *types.Project, service types.ServiceConfig) (sess
 }
 
 func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.Platform, error) {
-	var plats []specs.Platform
-	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
-		p, err := platforms.Parse(platform)
-		if err != nil {
-			return nil, err
-		}
-		plats = append(plats, p)
+	plats, err := useDockerDefaultPlatform(project, service.Build.Platforms)
+	if err != nil {
+		return nil, err
 	}
+
 	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
 		return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
 	}
 
 	for _, buildPlatform := range service.Build.Platforms {
 		p, err := platforms.Parse(buildPlatform)
+		if err != nil {
+			return nil, err
+		}
+		if !utils.Contains(plats, p) {
+			plats = append(plats, p)
+		}
+	}
+	return plats, nil
+}
+
+func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
+	var plats []specs.Platform
+	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
+		if !utils.StringContains(platformList, platform) {
+			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: %q", platform)
+		}
+		p, err := platforms.Parse(platform)
 		if err != nil {
 			return nil, err
 		}

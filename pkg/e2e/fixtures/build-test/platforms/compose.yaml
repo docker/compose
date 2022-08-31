@@ -1,6 +1,6 @@
 services:
   platforms:
-    image: localhost:5001/build-test-platform:test
+    image: build-test-platform:test
     build:
       context: .
       platforms:

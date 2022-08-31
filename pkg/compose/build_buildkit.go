@@ -102,9 +102,10 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 				continue
 			}
 		}
-		f = driver.GetFactory(ng.Driver, true)
 		if f == nil {
-			return nil, fmt.Errorf("failed to find buildx driver %q", ng.Driver)
+			if f = driver.GetFactory(ng.Driver, true); f == nil {
+				return nil, fmt.Errorf("failed to find buildx driver %q", ng.Driver)
+			}
 		}
 	} else {
 		ep := ng.Nodes[0].Endpoint
