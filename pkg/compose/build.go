@@ -173,7 +173,11 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if len(opt.Platforms) > 1 {
 				opt.Exports = []bclient.ExportEntry{{
 					Type: "docker",
+					Attrs: map[string]string{
+						"load": "true",
+					},
 				}}
+				opt.Platforms = []specs.Platform{}
 			}
 			opts[imageName] = opt
 			continue

@@ -20,8 +20,8 @@ import (
 	"github.com/moby/buildkit/util/tracing/detect"
 	"go.opentelemetry.io/otel"
 
-	_ "github.com/moby/buildkit/util/tracing/detect/delegated" //nolint:revive
-	_ "github.com/moby/buildkit/util/tracing/env"              //nolint:revive
+	_ "github.com/moby/buildkit/util/tracing/detect/delegated" //nolint:blank-imports
+	_ "github.com/moby/buildkit/util/tracing/env"              //nolint:blank-imports
 )
 
 func init() {

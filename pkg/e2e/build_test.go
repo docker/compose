@@ -258,6 +258,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "down")
 		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-platform")
 		_ = c.RunDockerCmd(t, "rm", "-f", "registry")
 	})
@@ -278,6 +279,12 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"architecture": "amd64",`})
 		res.Assert(t, icmd.Expected{Out: `"architecture": "arm64",`})
 
+	})
+
+	t.Run("multi-arch up --build", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "platforms-platforms-1 exited with code 0"})
 	})
 }
 

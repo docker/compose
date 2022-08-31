@@ -12,6 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-FROM alpine
+FROM --platform=$BUILDPLATFORM golang:alpine AS build
 
-RUN echo "SUCCESS"
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+RUN echo "I am running on $BUILDPLATFORM, building for $TARGETPLATFORM" > /log
+
+FROM alpine
+COPY --from=build /log /log

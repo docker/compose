@@ -1,7 +1,6 @@
 services:
   platforms:
     image: localhost:5001/build-test-platform:test
-    platform: linux/amd64
     build:
       context: .
       platforms:

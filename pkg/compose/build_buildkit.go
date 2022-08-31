@@ -37,9 +37,9 @@ import (
 
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
-	_ "github.com/docker/buildx/driver/docker"           //nolint:revive
-	_ "github.com/docker/buildx/driver/docker-container" //nolint:revive
-	_ "github.com/docker/buildx/driver/kubernetes"       //nolint:revive
+	_ "github.com/docker/buildx/driver/docker"           //nolint:blank-imports
+	_ "github.com/docker/buildx/driver/docker-container" //nolint:blank-imports
+	_ "github.com/docker/buildx/driver/kubernetes"       //nolint:blank-imports
 	xprogress "github.com/docker/buildx/util/progress"
 )
 
@@ -56,8 +56,10 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, opts map[string]bu
 	defer cancel()
 	w := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
 
-	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
-	response, err := build.Build(ctx, dis, opts, nil, filepath.Dir(s.configFile().Filename), w)
+	// Get the DockerAPI if a "docker" export is defined (ie: up and run command), otherwise get nil and let use the default buildx builder
+	API := getDockerAPI(s.dockerCli, opts)
+
+	response, err := build.Build(ctx, dis, opts, API, filepath.Dir(s.configFile().Filename), w)
 	errW := w.Wait()
 	if err == nil {
 		err = errW
@@ -251,4 +253,30 @@ func configFromContext(endpointName string, s ctxstore.Reader) (clientcmd.Client
 		return clientcmd.NewDefaultClientConfig(*apiConfig, &clientcmd.ConfigOverrides{}), nil
 	}
 	return ctxkube.ConfigFromContext(endpointName, s)
+}
+
+type internalAPI struct {
+	dockerCli command.Cli
+}
+
+func (a *internalAPI) DockerAPI(name string) (dockerclient.APIClient, error) {
+	if name == "" {
+		name = a.dockerCli.CurrentContext()
+	}
+	return clientForEndpoint(a.dockerCli, name)
+}
+
+func dockerAPI(dockerCli command.Cli) *internalAPI {
+	return &internalAPI{dockerCli: dockerCli}
+}
+
+func getDockerAPI(cli command.Cli, opts map[string]build.Options) *internalAPI {
+	for _, opt := range opts {
+		for _, export := range opt.Exports {
+			if export.Type == "docker" {
+				return dockerAPI(cli)
+			}
+		}
+	}
+	return nil
 }
