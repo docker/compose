@@ -29,7 +29,7 @@ import (
 type Service interface {
 	// Build executes the equivalent to a `compose build`
 	Build(ctx context.Context, project *types.Project, options BuildOptions) error
-	// Push executes the equivalent ot a `compose push`
+	// Push executes the equivalent to a `compose push`
 	Push(ctx context.Context, project *types.Project, options PushOptions) error
 	// Pull executes the equivalent of a `compose pull`
 	Pull(ctx context.Context, project *types.Project, options PullOptions) error
