@@ -60,7 +60,7 @@ RUN --mount=from=binary \
   TARGETARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "$TARGETARCH"); \
   cp docker-compose* "/out/docker-compose-${TARGETOS}-${TARGETARCH}${TARGETVARIANT}$(ls docker-compose* | sed -e 's/^docker-compose//')"
 
-FROM alpine:3.15.4 AS compose-plugin
+FROM alpine:3.16 AS compose-plugin
 WORKDIR /root
 COPY --from=make-compose-plugin /out/* /usr/local/bin/
 
