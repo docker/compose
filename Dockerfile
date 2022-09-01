@@ -30,7 +30,7 @@ RUN --mount=target=. \
     GIT_TAG=${GIT_TAG} \
     make COMPOSE_BINARY=/out/docker-compose -f builder.Makefile compose-plugin
 
-FROM alpine:3.15.4 AS compose-plugin
+FROM alpine:3.16 AS compose-plugin
 WORKDIR /root
 COPY --from=make-compose-plugin /out/* /usr/local/bin/
 
