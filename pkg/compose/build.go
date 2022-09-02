@@ -168,16 +168,14 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if err != nil {
 				return nil, err
 			}
-			if len(opt.Platforms) > 1 {
-				opt.Exports = []bclient.ExportEntry{{
-					Type: "docker",
-					Attrs: map[string]string{
-						"load": "true",
-					},
-				}}
-				if opt.Platforms, err = useDockerDefaultPlatform(project, service.Build.Platforms); err != nil {
-					opt.Platforms = []specs.Platform{}
-				}
+			opt.Exports = []bclient.ExportEntry{{
+				Type: "docker",
+				Attrs: map[string]string{
+					"load": "true",
+				},
+			}}
+			if opt.Platforms, err = useDockerDefaultPlatform(project, service.Build.Platforms); err != nil {
+				opt.Platforms = []specs.Platform{}
 			}
 			opts[imageName] = opt
 			continue
