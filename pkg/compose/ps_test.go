@@ -38,7 +38,9 @@ func TestPs(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	ctx := context.Background()

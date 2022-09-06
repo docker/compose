@@ -37,7 +37,9 @@ func TestDown(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
@@ -85,7 +87,9 @@ func TestDownRemoveOrphans(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(true)).Return(
@@ -122,7 +126,9 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
@@ -149,7 +155,9 @@ func TestDownRemoveImageLocal(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	container := testContainer("service1", "123", false)
@@ -180,7 +188,9 @@ func TestDownRemoveImageLocalNoLabel(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	container := testContainer("service1", "123", false)
@@ -208,7 +218,9 @@ func TestDownRemoveImageAll(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(
