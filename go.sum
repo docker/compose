@@ -270,8 +270,8 @@ github.com/cloudflare/cfssl v0.0.0-20181213083726-b94e044bb51e/go.mod h1:yMWuSON
 github.com/cloudflare/cfssl v1.4.1 h1:vScfU2DrIUI9VPHBVeeAQ0q5A+9yshO1Gz+3QoUQiKw=
 github.com/cnabio/cnab-go v0.23.4 h1:jplQcSnvFyQlD6swiqL3BmqRnhbnS+lc/EKdBLH9E80=
 github.com/cnabio/cnab-go v0.23.4/go.mod h1:9EmgHR51LFqQStzaC+xHPJlkD4OPsF6Ev5Y8e/YHEns=
-github.com/cnabio/cnab-to-oci v0.3.6 h1:QVvy4WjQpGyf20xbbeYtRObX+pB8cWNuvvT/e4w1DoQ=
-github.com/cnabio/cnab-to-oci v0.3.6/go.mod h1:AvVNl0Hh3VBk1zqeLdyE5S3bTQ5EsZPPF4mUUJYyy1Y=
+github.com/cnabio/cnab-to-oci v0.3.7 h1:wA2AG3HQMaJZhWlr3zsfVoa2m5B1R/SP+YcoFuNfP9o=
+github.com/cnabio/cnab-to-oci v0.3.7/go.mod h1:AvVNl0Hh3VBk1zqeLdyE5S3bTQ5EsZPPF4mUUJYyy1Y=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
 github.com/cncf/udpa/go v0.0.0-20200629203442-efcf912fb354/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
