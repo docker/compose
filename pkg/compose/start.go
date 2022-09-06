@@ -50,6 +50,13 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 		}
 	}
 
+	if len(options.Services) > 0 {
+		err := project.ForServices(options.Services)
+		if err != nil {
+			return err
+		}
+	}
+
 	eg, ctx := errgroup.WithContext(ctx)
 	if listener != nil {
 		attached, err := s.attach(ctx, project, listener, options.AttachTo)

@@ -63,21 +63,24 @@ var (
 )
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
-func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
-	return visit(ctx, project, upDirectionTraversalConfig, fn, ServiceStopped)
+func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversalConfig)) error {
+	graph, err := NewGraph(project.Services, ServiceStopped)
+	if err != nil {
+		return err
+	}
+	return visit(ctx, graph, upDirectionTraversalConfig, fn)
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
 func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error) error {
-	return visit(ctx, project, downDirectionTraversalConfig, fn, ServiceStarted)
-}
-
-func visit(ctx context.Context, project *types.Project, traversalConfig graphTraversalConfig, fn func(context.Context, string) error, initialStatus ServiceStatus) error {
-	g := NewGraph(project.Services, initialStatus)
-	if b, err := g.HasCycles(); b {
+	graph, err := NewGraph(project.Services, ServiceStarted)
+	if err != nil {
 		return err
 	}
+	return visit(ctx, graph, downDirectionTraversalConfig, fn)
+}
 
+func visit(ctx context.Context, g *Graph, traversalConfig graphTraversalConfig, fn func(context.Context, string) error) error {
 	nodes := traversalConfig.extremityNodesFn(g)
 
 	eg, _ := errgroup.WithContext(ctx)
@@ -155,7 +158,7 @@ func (v *Vertex) GetChildren() []*Vertex {
 }
 
 // NewGraph returns the dependency graph of the services
-func NewGraph(services types.Services, initialStatus ServiceStatus) *Graph {
+func NewGraph(services types.Services, initialStatus ServiceStatus) (*Graph, error) {
 	graph := &Graph{
 		lock:     sync.RWMutex{},
 		Vertices: map[string]*Vertex{},
@@ -171,7 +174,11 @@ func NewGraph(services types.Services, initialStatus ServiceStatus) *Graph {
 		}
 	}
 
-	return graph
+	if b, err := graph.HasCycles(); b {
+		return nil, err
+	}
+
+	return graph, nil
 }
 
 // NewVertex is the constructor function for the Vertex
