@@ -47,14 +47,14 @@ const (
 	OneoffLabel = "com.docker.compose.oneoff"
 	// SlugLabel stores unique slug used for one-off container identity
 	SlugLabel = "com.docker.compose.slug"
-	// ImageNameLabel stores the content of the image section in the compose file
-	ImageNameLabel = "com.docker.compose.image_name"
 	// ImageDigestLabel stores digest of the container image used to run service
 	ImageDigestLabel = "com.docker.compose.image"
 	// DependenciesLabel stores service dependencies
 	DependenciesLabel = "com.docker.compose.depends_on"
-	// VersionLabel stores the compose tool version used to run application
+	// VersionLabel stores the compose tool version used to build/run application
 	VersionLabel = "com.docker.compose.version"
+	// ImageBuilderLabel stores the builder (classic or BuildKit) used to produce the image.
+	ImageBuilderLabel = "com.docker.compose.image.builder"
 )
 
 // ComposeVersion is the compose tool version as declared by label VersionLabel

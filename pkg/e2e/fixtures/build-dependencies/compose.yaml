@@ -10,3 +10,5 @@ services:
     build:
       context: .
       dockerfile: service.dockerfile
+  nginx:
+    image: nginx

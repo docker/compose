@@ -89,6 +89,11 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		}
 	}
 
+	if options.Labels == nil {
+		options.Labels = make(map[string]string)
+	}
+	options.Labels[api.ImageBuilderLabel] = "classic"
+
 	switch {
 	case isLocalDir(specifiedContext):
 		contextDir, relDockerfile, err = build.GetContextFromLocalDir(specifiedContext, dockerfileName)

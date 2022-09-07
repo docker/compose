@@ -25,6 +25,8 @@ import (
 	"github.com/docker/buildx/build"
 	"github.com/docker/buildx/driver"
 	xprogress "github.com/docker/buildx/util/progress"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Project, opts map[string]build.Options, mode string) (map[string]string, error) {
@@ -46,6 +48,15 @@ func (s *composeService) doBuildBuildkit(ctx context.Context, project *types.Pro
 	progressCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := xprogress.NewPrinter(progressCtx, s.stdout(), os.Stdout, mode)
+
+	for k := range opts {
+		if opts[k].Labels == nil {
+			opt := opts[k]
+			opt.Labels = make(map[string]string)
+			opts[k] = opt
+		}
+		opts[k].Labels[api.ImageBuilderLabel] = "buildkit"
+	}
 
 	// We rely on buildx "docker" builder integrated in docker engine, so don't need a DockerAPI here
 	response, err := build.Build(ctx, driverInfo, opts, nil, filepath.Dir(s.configFile().Filename), w)

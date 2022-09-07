@@ -109,7 +109,6 @@ func containerLabels(service string, oneOff bool) map[string]string {
 	composefile := filepath.Join(workingdir, "compose.yaml")
 	labels := map[string]string{
 		compose.ServiceLabel:     service,
-		compose.ImageNameLabel:   service + "-img",
 		compose.ConfigFilesLabel: composefile,
 		compose.WorkingDirLabel:  workingdir,
 		compose.ProjectLabel:     strings.ToLower(testProject)}

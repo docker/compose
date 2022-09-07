@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type downOp func() error
@@ -86,7 +88,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops := s.ensureNetworksDown(ctx, project, w)
 
 	if options.Images != "" {
-		ops = append(ops, s.ensureImagesDown(ctx, project, options, w)...)
+		imgOps, err := s.ensureImagesDown(ctx, project, options, w)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, imgOps...)
 	}
 
 	if options.Volumes {
@@ -118,15 +124,20 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) ([]downOp, error) {
+	images, err := s.getServiceImagesToRemove(ctx, options, project)
+	if err != nil {
+		return nil, err
+	}
+
 	var ops []downOp
-	for image := range s.getServiceImagesToRemove(options, project) {
-		image := image
+	for i := range images {
+		img := images[i]
 		ops = append(ops, func() error {
-			return s.removeImage(ctx, image, w)
+			return s.removeImage(ctx, img, w)
 		})
 	}
-	return ops
+	return ops, nil
 }
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
@@ -190,17 +201,108 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 	return nil
 }
 
-func (s *composeService) getServiceImagesToRemove(options api.DownOptions, project *types.Project) map[string]struct{} {
-	images := map[string]struct{}{}
+//nolint:gocyclo
+func (s *composeService) getServiceImagesToRemove(ctx context.Context, options api.DownOptions, project *types.Project) ([]string, error) {
+	if options.Images == "" {
+		return nil, nil
+	}
+
+	var localServiceImages []string
+	var imagesToRemove []string
+	addImageToRemove := func(img string, checkExistence bool) {
+		// since some references come from user input (service.image) and some
+		// come from the engine API, we standardize them, opting for the
+		// familiar name format since they'll also be displayed in the CLI
+		ref, err := reference.ParseNormalizedNamed(img)
+		if err != nil {
+			return
+		}
+		ref = reference.TagNameOnly(ref)
+		img = reference.FamiliarString(ref)
+		if utils.StringContains(imagesToRemove, img) {
+			return
+		}
+
+		if checkExistence {
+			_, _, err := s.apiClient().ImageInspectWithRaw(ctx, img)
+			if errdefs.IsNotFound(err) {
+				// err on the side of caution: only skip if we successfully
+				// queried the API and got back a definitive "not exists"
+				return
+			}
+		}
+
+		imagesToRemove = append(imagesToRemove, img)
+	}
+
+	imageListOpts := moby.ImageListOptions{
+		Filters: filters.NewArgs(
+			projectFilter(project.Name),
+			// TODO(milas): we should really clean up the dangling images as
+			// well (historically we have NOT); need to refactor this to handle
+			// it gracefully without producing confusing CLI output, i.e. we
+			// do not want to print out a bunch of untagged/dangling image IDs,
+			// they should be grouped into a logical operation for the relevant
+			// service
+			filters.Arg("dangling", "false"),
+		),
+	}
+	projectImages, err := s.apiClient().ImageList(ctx, imageListOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Remote / custom-named images - only deleted on `--rmi="all"`
 	for _, service := range project.Services {
-		image, ok := service.Labels[api.ImageNameLabel] // Information on the compose file at the creation of the container
-		if !ok || (options.Images == "local" && image != "") {
+		if service.Image == "" {
+			localServiceImages = append(localServiceImages, service.Name)
 			continue
 		}
-		image = api.GetImageNameOrDefault(service, project.Name)
-		images[image] = struct{}{}
+
+		if options.Images == "all" {
+			addImageToRemove(service.Image, true)
+		}
 	}
-	return images
+
+	// 2. *LABELED* Locally-built images with implicit image names
+	//
+	// If `--remove-orphans` is being used, then ALL images for the project
+	// will be selected for removal. Otherwise, only those that match a known
+	// service based on the loaded project will be included.
+	for _, img := range projectImages {
+		if len(img.RepoTags) == 0 {
+			// currently, we're only removing the tagged references, but
+			// if we start removing the dangling images and grouping by
+			// service, we can remove this (and should rely on `Image::ID`)
+			continue
+		}
+
+		shouldRemove := options.RemoveOrphans
+		for _, service := range localServiceImages {
+			if img.Labels[api.ServiceLabel] == service {
+				shouldRemove = true
+				break
+			}
+		}
+
+		if shouldRemove {
+			addImageToRemove(img.RepoTags[0], false)
+		}
+	}
+
+	// 3. *UNLABELED* Locally-built images with implicit image names
+	//
+	// This is a fallback for (2) to handle images built by previous
+	// versions of Compose, which did not label their built images.
+	for _, serviceName := range localServiceImages {
+		service, err := project.GetService(serviceName)
+		if err != nil || service.Image != "" {
+			continue
+		}
+		imgName := api.GetImageNameOrDefault(service, project.Name)
+		addImageToRemove(imgName, true)
+	}
+	return imagesToRemove, nil
 }
 
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {

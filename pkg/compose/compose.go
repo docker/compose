@@ -30,11 +30,12 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/compose/v2/pkg/api"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
+
+	"github.com/docker/compose/v2/pkg/api"
 )
 
 // NewComposeService create a local implementation of the compose.Service API
@@ -130,13 +131,9 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 		serviceLabel := c.Labels[api.ServiceLabel]
 		_, ok := set[serviceLabel]
 		if !ok {
-			serviceImage := c.Image
-			if serviceNameFromLabel, ok := c.Labels[api.ImageNameLabel]; ok {
-				serviceImage = serviceNameFromLabel
-			}
 			set[serviceLabel] = &types.ServiceConfig{
 				Name:   serviceLabel,
-				Image:  serviceImage,
+				Image:  c.Image,
 				Labels: c.Labels,
 			}
 		}
