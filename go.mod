@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/buger/goterm v1.0.4
+	github.com/cnabio/cnab-go v0.24.1-0.20220907172316-1ca5c8721bf7
 	github.com/cnabio/cnab-to-oci v0.3.7
 	github.com/compose-spec/compose-go v1.5.0
 	github.com/containerd/console v1.0.3
@@ -44,7 +45,6 @@ require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cnabio/cnab-go v0.23.4 // indirect
 	github.com/containerd/continuity v0.2.3-0.20220330195504-d132b287edc8 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
@@ -133,6 +133,8 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20210303052042-6bc126869bf4 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
+	github.com/mitchellh/copystructure v1.0.0 // indirect
+	github.com/mitchellh/reflectwalk v1.0.0 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/serialx/hashring v0.0.0-20190422032157-8b2912629002 // indirect
 	github.com/zmap/zcrypto v0.0.0-20220605182715-4dfcec6e9a8c // indirect
