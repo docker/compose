@@ -754,7 +754,10 @@ class Project:
         services = self.get_services(service_names, include_deps)
 
         if parallel_pull:
-            self.parallel_pull(services, silent=silent)
+            self.parallel_pull(
+                services, silent=silent,
+                ignore_pull_failures=ignore_pull_failures,
+            )
 
         else:
             must_build = []
