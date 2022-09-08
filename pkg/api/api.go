@@ -380,6 +380,7 @@ type ServiceStatus struct {
 
 // LogOptions defines optional parameters for the `Log` API
 type LogOptions struct {
+	Project    *types.Project
 	Services   []string
 	Tail       string
 	Since      string
@@ -431,7 +432,7 @@ type Stack struct {
 
 // LogConsumer is a callback to process log messages from services
 type LogConsumer interface {
-	Log(service, container, message string)
+	Log(containerName, service, message string)
 	Status(container, msg string)
 	Register(container string)
 }
@@ -441,7 +442,11 @@ type ContainerEventListener func(event ContainerEvent)
 
 // ContainerEvent notify an event has been collected on source container implementing Service
 type ContainerEvent struct {
-	Type      int
+	Type int
+	// Container is the name of the container _without the project prefix_.
+	//
+	// This is only suitable for display purposes within Compose, as it's
+	// not guaranteed to be unique across services.
 	Container string
 	Service   string
 	Line      string
