@@ -33,7 +33,8 @@ ifeq ($(DETECTED_OS),Windows)
 	BINARY_EXT=.exe
 endif
 
-TEST_FLAGS?=
+TEST_COVERAGE_FLAGS = -race -coverprofile=coverage.out -covermode=atomic
+TEST_FLAGS?= -timeout 15m
 E2E_TEST?=
 ifeq ($(E2E_TEST),)
 else
@@ -61,7 +62,7 @@ install: binary
 .PHONY: e2e-compose
 e2e-compose: ## Run end to end local tests in plugin mode. Set E2E_TEST=TestName to run a single test
 	docker compose version
-	go test $(TEST_FLAGS) -count=1 ./pkg/e2e
+	go test $(TEST_FLAGS) $(TEST_COVERAGE_FLAGS) -count=1 ./pkg/e2e
 
 .PHONY: e2e-compose-standalone
 e2e-compose-standalone: ## Run End to end local tests in standalone mode. Set E2E_TEST=TestName to run a single test
