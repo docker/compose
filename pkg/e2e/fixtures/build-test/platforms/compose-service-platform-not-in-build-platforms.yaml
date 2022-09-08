@@ -1,0 +1,9 @@
+services:
+  platforms:
+    image: build-test-platform:test
+    platform: linux/riscv64
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+        - linux/arm64
