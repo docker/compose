@@ -222,46 +222,53 @@ func TestStopAlreadyStopped(t *testing.T) {
 }
 
 func TestStartStopMultipleServices(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv("COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple"))
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple",
+		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
 	t.Cleanup(func() {
 		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
 	})
 
-	t.Run("starts/stops multiple services", func(t *testing.T) {
-		cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "up", "-d", "--wait")
+	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
 
-		res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "stop", "simple", "another")
-		services := []string{"simple", "another"}
-		for _, svc := range services {
-			stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Stopped", svc)
-			assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
-				fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
-		}
+	res := cli.RunDockerComposeCmd(t, "stop", "simple", "another")
+	services := []string{"simple", "another"}
+	for _, svc := range services {
+		stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Stopped", svc)
+		assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
+			fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
+	}
 
-		res = cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "start", "simple", "another")
-		for _, svc := range services {
-			startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Started", svc)
-			assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
-				fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
-		}
+	res = cli.RunDockerComposeCmd(t, "start", "simple", "another")
+	for _, svc := range services {
+		startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1  Started", svc)
+		assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
+			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
+	}
+}
+
+func TestStartSingleServiceAndDependency(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-single-deps",
+		"COMPOSE_FILE=./fixtures/start-stop/start-stop-deps.yaml"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
 	})
 
-	t.Run("starts one service out of many, and it's dependencies", func(t *testing.T) {
-		cli.RunDockerComposeCmd(t, "down")
-		cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "create", "desired")
+	cli.RunDockerComposeCmd(t, "create", "desired")
 
-		res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/start-stop-deps.yaml", "start", "desired")
-		desiredServices := []string{"desired", "dep_1", "dep_2"}
-		for _, s := range desiredServices {
-			assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-desired-1  Started"),
-				fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
-		}
-		undesiredServices := []string{"another", "another_2"}
-		for _, s := range undesiredServices {
-			assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-dep_2-1  Started"),
-				fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
-		}
-	})
+	res := cli.RunDockerComposeCmd(t, "start", "desired")
+	desiredServices := []string{"desired", "dep_1", "dep_2"}
+	for _, s := range desiredServices {
+		startMsg := fmt.Sprintf("Container e2e-start-single-deps-%s-1  Started", s)
+		assert.Assert(t, strings.Contains(res.Combined(), startMsg),
+			fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
+	}
+	undesiredServices := []string{"another", "another_2"}
+	for _, s := range undesiredServices {
+		assert.Assert(t, !strings.Contains(res.Combined(), s),
+			fmt.Sprintf("Shouldn't have message for service: %s\n%s", s, res.Combined()))
+	}
 }
 
 func TestStartStopMultipleFiles(t *testing.T) {
