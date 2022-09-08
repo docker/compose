@@ -234,3 +234,25 @@ networks:
     name: compose-e2e-convert_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
 	})
 }
+
+func TestConvertInterpolate(t *testing.T) {
+	const projectName = "compose-e2e-convert-interpolate"
+	c := NewParallelCLI(t)
+
+	wd, err := os.Getwd()
+	assert.NilError(t, err)
+
+	t.Run("convert", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "-f", "./fixtures/simple-build-test/compose-interpolate.yaml", "-p", projectName, "convert", "--no-interpolate")
+		res.Assert(t, icmd.Expected{Out: fmt.Sprintf(`services:
+  nginx:
+    build:
+      context: %s
+      dockerfile: ${MYVAR}
+    networks:
+      default: null
+networks:
+  default:
+    name: compose-e2e-convert-interpolate_default`, filepath.Join(wd, "fixtures", "simple-build-test", "nginx-build")), ExitCode: 0})
+	})
+}
