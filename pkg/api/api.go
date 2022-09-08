@@ -129,6 +129,8 @@ type StartOptions struct {
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state
 	Wait bool
+	// Services passed in the command line to be started
+	Services []string
 }
 
 // RestartOptions group options of the Restart API
