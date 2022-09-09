@@ -2,6 +2,8 @@ module github.com/docker/compose/v2
 
 go 1.19
 
+replace github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220912022410-e644a1b8c0d2
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/buger/goterm v1.0.4
@@ -131,6 +133,7 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
+	github.com/cucumber/godog v0.12.5
 	github.com/cyberphone/json-canonicalization v0.0.0-20210303052042-6bc126869bf4 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -141,6 +144,15 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.4.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.4.1 // indirect
 	k8s.io/api v0.24.1 // indirect
+)
+
+require (
+	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
+	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
+	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-memdb v1.3.2 // indirect
+	github.com/hashicorp/golang-lru v0.5.4 // indirect
 )
 
 replace (
