@@ -75,7 +75,7 @@ func (w *ttyWriter) Event(e Event) {
 	if _, ok := w.events[e.ID]; ok {
 		last := w.events[e.ID]
 		switch e.Status {
-		case Done, Error:
+		case Done, Error, Warning:
 			if last.Status != e.Status {
 				last.stop()
 			}
@@ -221,6 +221,9 @@ func lineText(event Event, pad string, terminalWidth, statusPadding int, color b
 		}
 		if event.Status == Error {
 			color = aec.RedF
+		}
+		if event.Status == Warning {
+			color = aec.YellowF
 		}
 		return aec.Apply(o, color)
 	}

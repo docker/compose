@@ -28,6 +28,8 @@ const (
 	Done
 	// Error means that the current task has errored
 	Error
+	// Warning means that the current task has warning
+	Warning
 )
 
 // Event represents a progress event.
