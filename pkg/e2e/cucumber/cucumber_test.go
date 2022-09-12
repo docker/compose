@@ -74,16 +74,18 @@ func setup(s *godog.ScenarioContext) {
 	})
 
 	s.Step(`^a compose file$`, th.setComposeFile)
-	s.Step(`^I run "compose ([^"]*)"$`, th.runComposeCommand)
-	s.Step(`service "([^"]*)" is "([^"]*)"$`, th.serviceIsStatus)
-	s.Step(`output contains "([^"]*)"$`, th.outputContains)
+	s.Step(`^I run "compose (.*)"$`, th.runComposeCommand)
+	s.Step(`service "(.*)" is "(.*)"$`, th.serviceIsStatus)
+	s.Step(`output contains "(.*)"$`, th.outputContains)
+	s.Step(`exit code is (\d+)$`, th.exitCodeIs)
 }
 
 type testHelper struct {
-	T             *testing.T
-	ComposeFile   string
-	CommandOutput string
-	CLI           *e2e.CLI
+	T               *testing.T
+	ComposeFile     string
+	CommandOutput   string
+	CommandExitCode int
+	CLI             *e2e.CLI
 }
 
 func (th *testHelper) serviceIsStatus(service, status string) error {
@@ -103,16 +105,21 @@ func (th *testHelper) outputContains(substring string) error {
 	return nil
 }
 
+func (th *testHelper) exitCodeIs(exitCode int) error {
+	if exitCode != th.CommandExitCode {
+		return fmt.Errorf("Wrong exit code: %d expected: %d", th.CommandExitCode, exitCode)
+	}
+	return nil
+}
+
 func (th *testHelper) runComposeCommand(command string) error {
 	commandArgs := []string{"-f", "-"}
 	commandArgs = append(commandArgs, strings.Split(command, " ")...)
 	cmd := th.CLI.NewDockerComposeCmd(th.T, commandArgs...)
 	cmd.Stdin = strings.NewReader(th.ComposeFile)
 	res := icmd.RunCmd(cmd)
-	if res.Error != nil {
-		return fmt.Errorf("compose up failed with error: %s\noutput: %s", res.Error, res.Combined())
-	}
 	th.CommandOutput = res.Combined()
+	th.CommandExitCode = res.ExitCode
 	return nil
 }
 
