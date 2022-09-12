@@ -1,4 +1,4 @@
-Feature: Single service up
+Feature: Start
 
 Background:
     Given a compose file
@@ -12,7 +12,7 @@ Background:
             command: top
         """
 
-Scenario: single service up
+Scenario: Start single service
     When I run "compose create"
     Then the output contains "simple-1  Created"
     And the output contains "another-1  Created"
