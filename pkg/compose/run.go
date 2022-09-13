@@ -112,6 +112,9 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, opts 
 	}
 	if opts.Entrypoint != nil {
 		service.Entrypoint = opts.Entrypoint
+		if len(opts.Command) == 0 {
+			service.Command = []string{}
+		}
 	}
 	if len(opts.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(opts.Environment)
