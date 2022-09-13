@@ -192,10 +192,11 @@ func TestDownRemoveImages(t *testing.T) {
 	}, nil).AnyTimes()
 
 	imagesToBeInspected := map[string]bool{
-		"local-named-image:latest":               true,
-		"remote-image:latest":                    true,
-		"testproject-no-images-anonymous:latest": false,
-		"missing-named-image:latest":             false,
+		"testproject-local-anonymous":     true,
+		"local-named-image":               true,
+		"remote-image":                    true,
+		"testproject-no-images-anonymous": false,
+		"missing-named-image":             false,
 	}
 	for img, exists := range imagesToBeInspected {
 		var resp moby.ImageInspect
@@ -278,7 +279,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 		),
 	}).Return(nil, nil)
 
-	api.EXPECT().ImageInspectWithRaw(gomock.Any(), "testproject-service1:latest").
+	api.EXPECT().ImageInspectWithRaw(gomock.Any(), "testproject-service1").
 		Return(moby.ImageInspect{}, nil, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", nil).Return(nil)
