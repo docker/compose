@@ -19,7 +19,6 @@ on:
         default: "false"
 
 env:
-  GO_VERSION: "1.18.5" # for non sandboxed e2e tests
   DESTDIR: "./bin"
   DOCKER_CLI_VERSION: "20.10.17"
 
@@ -143,7 +142,8 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: 'go.mod'
+          check-latest: true
           cache: true
       -
         name: Setup docker CLI

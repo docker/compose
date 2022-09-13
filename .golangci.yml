@@ -5,7 +5,6 @@ linters:
   enable-all: false
   disable-all: true
   enable:
-    - deadcode
     - depguard
     - errcheck
     - gocritic
@@ -21,13 +20,15 @@ linters:
     - nakedret
     - nolintlint
     - staticcheck
-    - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
 linters-settings:
+  revive:
+    rules:
+      - name: package-comments
+        disabled: true
   depguard:
     list-type: denylist
     include-go-root: true
