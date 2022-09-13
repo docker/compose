@@ -3,7 +3,7 @@ module github.com/docker/compose/v2
 go 1.18
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.3.5
+	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/buger/goterm v1.0.4
 	github.com/cnabio/cnab-go v0.24.1-0.20220907172316-1ca5c8721bf7
 	github.com/cnabio/cnab-to-oci v0.3.7
