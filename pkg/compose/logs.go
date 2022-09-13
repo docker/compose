@@ -29,13 +29,32 @@ import (
 	"github.com/docker/compose/v2/pkg/utils"
 )
 
-func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
+func (s *composeService) Logs(
+	ctx context.Context,
+	projectName string,
+	consumer api.LogConsumer,
+	options api.LogOptions,
+) error {
 	projectName = strings.ToLower(projectName)
+
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, true, options.Services...)
 	if err != nil {
 		return err
 	}
 
+	project := options.Project
+	if project == nil {
+		project, err = s.getProjectWithResources(ctx, containers, projectName)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(options.Services) == 0 {
+		options.Services = project.ServiceNames()
+	}
+
+	containers = containers.filter(isService(options.Services...))
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, c := range containers {
 		c := c

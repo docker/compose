@@ -1,0 +1,17 @@
+services:
+  another_2:
+    image:  nginx:alpine
+  another:
+    image:  nginx:alpine
+    depends_on:
+    - another_2
+  dep_2:
+    image:  nginx:alpine
+  dep_1:
+    image:  nginx:alpine
+    depends_on:
+    - dep_2
+  desired:
+    image:  nginx:alpine
+    depends_on:
+    - dep_1

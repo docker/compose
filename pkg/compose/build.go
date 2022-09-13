@@ -81,6 +81,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				Attrs: map[string]string{"ref": image},
 			})
 		}
+		if len(buildOptions.Platforms) > 1 {
+			buildOptions.Exports = []bclient.ExportEntry{{
+				Type:  "image",
+				Attrs: map[string]string{},
+			}}
+		}
 		opts[imageName] = buildOptions
 	}
 
@@ -161,6 +167,15 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 			if err != nil {
 				return nil, err
 			}
+			opt.Exports = []bclient.ExportEntry{{
+				Type: "docker",
+				Attrs: map[string]string{
+					"load": "true",
+				},
+			}}
+			if opt.Platforms, err = useDockerDefaultPlatform(project, service.Build.Platforms); err != nil {
+				opt.Platforms = []specs.Platform{}
+			}
 			opts[imageName] = opt
 			continue
 		}
@@ -204,7 +219,7 @@ func (s *composeService) doBuild(ctx context.Context, project *types.Project, op
 	if buildkitEnabled, err := s.dockerCli.BuildKitEnabled(); err != nil || !buildkitEnabled {
 		return s.doBuildClassic(ctx, project, opts)
 	}
-	return s.doBuildBuildkit(ctx, project, opts, mode)
+	return s.doBuildBuildkit(ctx, opts, mode)
 }
 
 func (s *composeService) toBuildOptions(project *types.Project, service types.ServiceConfig, imageTag string, sshKeys []types.SSHKey) (build.Options, error) {
@@ -213,20 +228,9 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 
 	buildArgs := flatten(service.Build.Args.Resolve(envResolver(project.Environment)))
 
-	var plats []specs.Platform
-	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
-		p, err := platforms.Parse(platform)
-		if err != nil {
-			return build.Options{}, err
-		}
-		plats = append(plats, p)
-	}
-	if service.Platform != "" {
-		p, err := platforms.Parse(service.Platform)
-		if err != nil {
-			return build.Options{}, err
-		}
-		plats = append(plats, p)
+	plats, err := addPlatforms(project, service)
+	if err != nil {
+		return build.Options{}, err
 	}
 
 	cacheFrom, err := buildflags.ParseCacheEntry(service.Build.CacheFrom)
@@ -352,6 +356,28 @@ func addSecretsConfig(project *types.Project, service types.ServiceConfig) (sess
 	return secretsprovider.NewSecretProvider(store), nil
 }
 
+func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.Platform, error) {
+	plats, err := useDockerDefaultPlatform(project, service.Build.Platforms)
+	if err != nil {
+		return nil, err
+	}
+
+	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
+		return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
+	}
+
+	for _, buildPlatform := range service.Build.Platforms {
+		p, err := platforms.Parse(buildPlatform)
+		if err != nil {
+			return nil, err
+		}
+		if !utils.Contains(plats, p) {
+			plats = append(plats, p)
+		}
+	}
+	return plats, nil
+}
+
 func getImageBuildLabels(project *types.Project, service types.ServiceConfig) types.Labels {
 	ret := make(types.Labels)
 	if service.Build != nil {
@@ -364,4 +390,19 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 	ret.Add(api.ProjectLabel, project.Name)
 	ret.Add(api.ServiceLabel, service.Name)
 	return ret
+}
+
+func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
+	var plats []specs.Platform
+	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
+		if !utils.StringContains(platformList, platform) {
+			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: %q", platform)
+		}
+		p, err := platforms.Parse(platform)
+		if err != nil {
+			return nil, err
+		}
+		plats = append(plats, p)
+	}
+	return plats, nil
 }

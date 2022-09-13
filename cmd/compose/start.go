@@ -51,5 +51,6 @@ func runStart(ctx context.Context, backend api.Service, opts startOptions, servi
 	return backend.Start(ctx, name, api.StartOptions{
 		AttachTo: services,
 		Project:  project,
+		Services: services,
 	})
 }

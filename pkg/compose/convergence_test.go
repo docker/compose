@@ -23,12 +23,13 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
-	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/mocks"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/golang/mock/gomock"
 	"gotest.tools/assert"
+
+	"github.com/docker/compose/v2/pkg/api"
+	"github.com/docker/compose/v2/pkg/mocks"
 )
 
 func TestContainerName(t *testing.T) {
@@ -77,7 +78,9 @@ func TestServiceLinks(t *testing.T) {
 
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested.dockerCli = cli
+		tested := composeService{
+			dockerCli: cli,
+		}
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db"}
@@ -99,7 +102,9 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested.dockerCli = cli
+		tested := composeService{
+			dockerCli: cli,
+		}
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:db"}
@@ -121,7 +126,9 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested.dockerCli = cli
+		tested := composeService{
+			dockerCli: cli,
+		}
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
@@ -143,7 +150,9 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested.dockerCli = cli
+		tested := composeService{
+			dockerCli: cli,
+		}
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{"db:dbname"}
@@ -169,7 +178,9 @@ func TestServiceLinks(t *testing.T) {
 		defer mockCtrl.Finish()
 		apiClient := mocks.NewMockAPIClient(mockCtrl)
 		cli := mocks.NewMockCli(mockCtrl)
-		tested.dockerCli = cli
+		tested := composeService{
+			dockerCli: cli,
+		}
 		cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 		s.Links = []string{}
@@ -203,7 +214,9 @@ func TestWaitDependencies(t *testing.T) {
 
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
 
 	t.Run("should skip dependencies with scale 0", func(t *testing.T) {

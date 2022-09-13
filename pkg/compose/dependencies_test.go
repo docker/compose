@@ -18,10 +18,12 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
 )
 
 var project = types.Project{
@@ -68,4 +70,182 @@ func TestInDependencyReverseDownCommandOrder(t *testing.T) {
 	})
 	require.NoError(t, err, "Error during iteration")
 	require.Equal(t, []string{"test1", "test2", "test3"}, order)
+}
+
+func TestBuildGraph(t *testing.T) {
+	testCases := []struct {
+		desc             string
+		services         types.Services
+		expectedVertices map[string]*Vertex
+	}{
+		{
+			desc: "builds graph with single service",
+			services: types.Services{
+				{
+					Name:      "test",
+					DependsOn: types.DependsOnConfig{},
+				},
+			},
+			expectedVertices: map[string]*Vertex{
+				"test": {
+					Key:      "test",
+					Service:  "test",
+					Status:   ServiceStopped,
+					Children: map[string]*Vertex{},
+					Parents:  map[string]*Vertex{},
+				},
+			},
+		},
+		{
+			desc: "builds graph with two separate services",
+			services: types.Services{
+				{
+					Name:      "test",
+					DependsOn: types.DependsOnConfig{},
+				},
+				{
+					Name:      "another",
+					DependsOn: types.DependsOnConfig{},
+				},
+			},
+			expectedVertices: map[string]*Vertex{
+				"test": {
+					Key:      "test",
+					Service:  "test",
+					Status:   ServiceStopped,
+					Children: map[string]*Vertex{},
+					Parents:  map[string]*Vertex{},
+				},
+				"another": {
+					Key:      "another",
+					Service:  "another",
+					Status:   ServiceStopped,
+					Children: map[string]*Vertex{},
+					Parents:  map[string]*Vertex{},
+				},
+			},
+		},
+		{
+			desc: "builds graph with a service and a dependency",
+			services: types.Services{
+				{
+					Name: "test",
+					DependsOn: types.DependsOnConfig{
+						"another": types.ServiceDependency{},
+					},
+				},
+				{
+					Name:      "another",
+					DependsOn: types.DependsOnConfig{},
+				},
+			},
+			expectedVertices: map[string]*Vertex{
+				"test": {
+					Key:     "test",
+					Service: "test",
+					Status:  ServiceStopped,
+					Children: map[string]*Vertex{
+						"another": {},
+					},
+					Parents: map[string]*Vertex{},
+				},
+				"another": {
+					Key:      "another",
+					Service:  "another",
+					Status:   ServiceStopped,
+					Children: map[string]*Vertex{},
+					Parents: map[string]*Vertex{
+						"test": {},
+					},
+				},
+			},
+		},
+		{
+			desc: "builds graph with multiple dependency levels",
+			services: types.Services{
+				{
+					Name: "test",
+					DependsOn: types.DependsOnConfig{
+						"another": types.ServiceDependency{},
+					},
+				},
+				{
+					Name: "another",
+					DependsOn: types.DependsOnConfig{
+						"another_dep": types.ServiceDependency{},
+					},
+				},
+				{
+					Name:      "another_dep",
+					DependsOn: types.DependsOnConfig{},
+				},
+			},
+			expectedVertices: map[string]*Vertex{
+				"test": {
+					Key:     "test",
+					Service: "test",
+					Status:  ServiceStopped,
+					Children: map[string]*Vertex{
+						"another": {},
+					},
+					Parents: map[string]*Vertex{},
+				},
+				"another": {
+					Key:     "another",
+					Service: "another",
+					Status:  ServiceStopped,
+					Children: map[string]*Vertex{
+						"another_dep": {},
+					},
+					Parents: map[string]*Vertex{
+						"test": {},
+					},
+				},
+				"another_dep": {
+					Key:      "another_dep",
+					Service:  "another_dep",
+					Status:   ServiceStopped,
+					Children: map[string]*Vertex{},
+					Parents: map[string]*Vertex{
+						"another": {},
+					},
+				},
+			},
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			project := types.Project{
+				Services: tC.services,
+			}
+
+			graph, err := NewGraph(project.Services, ServiceStopped)
+			assert.NilError(t, err, fmt.Sprintf("failed to build graph for: %s", tC.desc))
+
+			for k, vertex := range graph.Vertices {
+				expected, ok := tC.expectedVertices[k]
+				assert.Equal(t, true, ok)
+				assert.Equal(t, true, isVertexEqual(*expected, *vertex))
+			}
+		})
+	}
+}
+
+func isVertexEqual(a, b Vertex) bool {
+	childrenEquality := true
+	for c := range a.Children {
+		if _, ok := b.Children[c]; !ok {
+			childrenEquality = false
+		}
+	}
+	parentEquality := true
+	for p := range a.Parents {
+		if _, ok := b.Parents[p]; !ok {
+			parentEquality = false
+		}
+	}
+	return a.Key == b.Key &&
+		a.Service == b.Service &&
+		childrenEquality &&
+		parentEquality
 }

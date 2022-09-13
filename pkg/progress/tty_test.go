@@ -54,6 +54,10 @@ func TestLineText(t *testing.T) {
 	ev.Status = Error
 	out = lineText(ev, "", 50, lineWidth, true)
 	assert.Equal(t, out, "\x1b[31m . id Text Status                            0.0s\n\x1b[0m")
+
+	ev.Status = Warning
+	out = lineText(ev, "", 50, lineWidth, true)
+	assert.Equal(t, out, "\x1b[33m . id Text Status                            0.0s\n\x1b[0m")
 }
 
 func TestLineTextSingleEvent(t *testing.T) {
@@ -98,6 +102,35 @@ func TestErrorEvent(t *testing.T) {
 
 	// Fire "Error" event and check end time is set
 	e.Status = Error
+	w.Event(e)
+	event, ok = w.events[e.ID]
+	assert.Assert(t, ok)
+	assert.Assert(t, event.endTime.After(time.Now().Add(-10*time.Second)))
+}
+
+func TestWarningEvent(t *testing.T) {
+	w := &ttyWriter{
+		events: map[string]Event{},
+		mtx:    &sync.Mutex{},
+	}
+	e := Event{
+		ID:         "id",
+		Text:       "Text",
+		Status:     Working,
+		StatusText: "Working",
+		startTime:  time.Now(),
+		spinner: &spinner{
+			chars: []string{"."},
+		},
+	}
+	// Fire "Working" event and check end time isn't touched
+	w.Event(e)
+	event, ok := w.events[e.ID]
+	assert.Assert(t, ok)
+	assert.Assert(t, event.endTime.Equal(time.Time{}))
+
+	// Fire "Warning" event and check end time is set
+	e.Status = Warning
 	w.Event(e)
 	event, ok = w.events[e.ID]
 	assert.Assert(t, ok)

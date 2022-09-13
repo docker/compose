@@ -1,0 +1,23 @@
+services:
+  serviceA:
+    image: build-test-platform-a:test
+    build:
+      context: ./contextServiceA
+      platforms:
+        - linux/amd64
+        - linux/arm64
+  serviceB:
+    image: build-test-platform-b:test
+    build:
+      context: ./contextServiceB
+      platforms:
+        - linux/amd64
+        - linux/arm64
+  serviceC:
+    image: build-test-platform-c:test
+    build:
+      context: ./contextServiceC
+      platforms:
+        - linux/amd64
+        - linux/arm64
+

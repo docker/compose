@@ -35,15 +35,15 @@ import (
 
 const testProject = "testProject"
 
-var tested = composeService{}
-
 func TestKillAll(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
@@ -74,7 +74,9 @@ func TestKillSignal(t *testing.T) {
 
 	api := mocks.NewMockAPIClient(mockCtrl)
 	cli := mocks.NewMockCli(mockCtrl)
-	tested.dockerCli = cli
+	tested := composeService{
+		dockerCli: cli,
+	}
 	cli.EXPECT().Client().Return(api).AnyTimes()
 
 	name := strings.ToLower(testProject)
@@ -97,9 +99,13 @@ func TestKillSignal(t *testing.T) {
 }
 
 func testContainer(service string, id string, oneOff bool) moby.Container {
+	// canonical docker names in the API start with a leading slash, some
+	// parts of Compose code will attempt to strip this off, so make sure
+	// it's consistently present
+	name := "/" + strings.TrimPrefix(id, "/")
 	return moby.Container{
 		ID:     id,
-		Names:  []string{id},
+		Names:  []string{name},
 		Labels: containerLabels(service, oneOff),
 	}
 }

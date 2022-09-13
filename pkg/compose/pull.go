@@ -181,6 +181,18 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
 		Platform:     service.Platform,
 	})
+
+	// check if has error and the service has a build section
+	// then the status should be warning instead of error
+	if err != nil && service.Build != nil {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Warning,
+			Text:   "Warning",
+		})
+		return "", WrapCategorisedComposeError(err, PullFailure)
+	}
+
 	if err != nil {
 		w.Event(progress.Event{
 			ID:     service.Name,
