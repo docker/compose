@@ -18,6 +18,7 @@ package compose
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -112,7 +113,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runConvert(ctx context.Context, backend api.Service, opts convertOptions, services []string) error {
-	var json []byte
+	var content []byte
 	project, err := opts.toProject(services,
 		cli.WithInterpolation(!opts.noInterpolate),
 		cli.WithResolvedPaths(true),
@@ -136,7 +137,7 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 		}
 	}
 
-	json, err = backend.Convert(ctx, project, api.ConvertOptions{
+	content, err = backend.Convert(ctx, project, api.ConvertOptions{
 		Format: opts.Format,
 		Output: opts.Output,
 	})
@@ -144,19 +145,23 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 		return err
 	}
 
+	if !opts.noInterpolate {
+		content = escapeDollarSign(content)
+	}
+
 	if opts.quiet {
 		return nil
 	}
 
 	var out io.Writer = os.Stdout
-	if opts.Output != "" && len(json) > 0 {
+	if opts.Output != "" && len(content) > 0 {
 		file, err := os.Create(opts.Output)
 		if err != nil {
 			return err
 		}
 		out = bufio.NewWriter(file)
 	}
-	_, err = fmt.Fprint(out, string(json))
+	_, err = fmt.Fprint(out, string(content))
 	return err
 }
 
@@ -236,4 +241,10 @@ func runConfigImages(opts convertOptions, services []string) error {
 		}
 	}
 	return nil
+}
+
+func escapeDollarSign(marshal []byte) []byte {
+	dollar := []byte{'$'}
+	escDollar := []byte{'$', '$'}
+	return bytes.ReplaceAll(marshal, dollar, escDollar)
 }

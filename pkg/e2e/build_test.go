@@ -243,3 +243,105 @@ func TestBuildImageDependencies(t *testing.T) {
 		t.Skip("See https://github.com/docker/compose/issues/9232")
 	})
 }
+
+func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	// declare builder
+	result := c.RunDockerCmd(t, "buildx", "create", "--name", "build-platform", "--use", "--bootstrap")
+	assert.NilError(t, result.Error)
+
+	t.Cleanup(func() {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "down")
+		_ = c.RunDockerCmd(t, "buildx", "rm", "-f", "build-platform")
+	})
+
+	t.Run("platform not supported by builder", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
+			"-f", "fixtures/build-test/platforms/compose-unsupported-platform.yml", "build")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 17,
+			Err:      "failed to solve: alpine: no match for platform in",
+		})
+	})
+
+	t.Run("multi-arch build ok", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "I am building for linux/arm64"})
+		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
+
+	})
+
+	t.Run("multi-arch multi service builds ok", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
+			"-f", "fixtures/build-test/platforms/compose-multiple-platform-builds.yaml", "build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "I'm Service A and I am building for linux/arm64"})
+		res.Assert(t, icmd.Expected{Out: "I'm Service A and I am building for linux/amd64"})
+		res.Assert(t, icmd.Expected{Out: "I'm Service B and I am building for linux/arm64"})
+		res.Assert(t, icmd.Expected{Out: "I'm Service B and I am building for linux/amd64"})
+		res.Assert(t, icmd.Expected{Out: "I'm Service C and I am building for linux/arm64"})
+		res.Assert(t, icmd.Expected{Out: "I'm Service C and I am building for linux/amd64"})
+	})
+
+	t.Run("multi-arch up --build", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "platforms-platforms-1 exited with code 0"})
+	})
+
+	t.Run("use DOCKER_DEFAULT_PLATFORM value when up --build", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "up", "--build")
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "DOCKER_DEFAULT_PLATFORM=linux/amd64")
+		})
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
+		assert.Assert(t, !strings.Contains(res.Stdout(), "I am building for linux/arm64"))
+	})
+}
+
+func TestBuildPlatformsStandardErrors(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Run("no platform support with Classic Builder", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "build")
+
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "DOCKER_BUILDKIT=0")
+		})
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder",
+		})
+	})
+
+	t.Run("builder does not support multi-arch", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms", "build")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 17,
+			Err:      `multiple platforms feature is currently not supported for docker driver. Please switch to a different driver (eg. "docker buildx create --use")`,
+		})
+	})
+
+	t.Run("service platform not defined in platforms build section", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
+			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      `service.platform should be part of the service.build.platforms: "linux/riscv64"`,
+		})
+	})
+
+	t.Run("DOCKER_DEFAULT_PLATFORM value not defined in platforms build section", func(t *testing.T) {
+		cmd := c.NewDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "build")
+		res := icmd.RunCmd(cmd, func(cmd *icmd.Cmd) {
+			cmd.Env = append(cmd.Env, "DOCKER_DEFAULT_PLATFORM=windows/amd64")
+		})
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      `DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: "windows/amd64"`,
+		})
+	})
+}

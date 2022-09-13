@@ -247,6 +247,30 @@ func TestStartStopMultipleServices(t *testing.T) {
 	}
 }
 
+func TestStartSingleServiceAndDependency(t *testing.T) {
+	cli := NewParallelCLI(t, WithEnv(
+		"COMPOSE_PROJECT_NAME=e2e-start-single-deps",
+		"COMPOSE_FILE=./fixtures/start-stop/start-stop-deps.yaml"))
+	t.Cleanup(func() {
+		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
+	})
+
+	cli.RunDockerComposeCmd(t, "create", "desired")
+
+	res := cli.RunDockerComposeCmd(t, "start", "desired")
+	desiredServices := []string{"desired", "dep_1", "dep_2"}
+	for _, s := range desiredServices {
+		startMsg := fmt.Sprintf("Container e2e-start-single-deps-%s-1  Started", s)
+		assert.Assert(t, strings.Contains(res.Combined(), startMsg),
+			fmt.Sprintf("Missing start message for service: %s\n%s", s, res.Combined()))
+	}
+	undesiredServices := []string{"another", "another_2"}
+	for _, s := range undesiredServices {
+		assert.Assert(t, !strings.Contains(res.Combined(), s),
+			fmt.Sprintf("Shouldn't have message for service: %s\n%s", s, res.Combined()))
+	}
+}
+
 func TestStartStopMultipleFiles(t *testing.T) {
 	cli := NewParallelCLI(t, WithEnv("COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple-files"))
 	t.Cleanup(func() {

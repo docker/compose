@@ -89,6 +89,10 @@ func (s *composeService) doBuildClassicSimpleImage(ctx context.Context, options 
 		}
 	}
 
+	if len(options.Platforms) > 1 {
+		return "", errors.Errorf("this builder doesn't support multi-arch build, set DOCKER_BUILDKIT=1 to use multi-arch builder")
+	}
+
 	switch {
 	case isLocalDir(specifiedContext):
 		contextDir, relDockerfile, err = build.GetContextFromLocalDir(specifiedContext, dockerfileName)

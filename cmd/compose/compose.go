@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	cnabgodocker "github.com/cnabio/cnab-go/driver/docker"
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
 	composegoutils "github.com/compose-spec/compose-go/utils"
@@ -32,6 +33,7 @@ import (
 	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/docker/cli/cli/command"
+	"github.com/docker/docker/client"
 	"github.com/morikuni/aec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -288,6 +290,16 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			err := setEnvWithDotEnv(&opts)
+			if err != nil {
+				return err
+			}
+			// Reset DockerCli and APIClient to get possible `DOCKER_HOST` and/or `DOCKER_CONTEXT` loaded from environment file.
+			err = dockerCli.Apply(func(cli *command.DockerCli) error {
+				return cli.Initialize(cnabgodocker.BuildDockerClientOptions(),
+					command.WithInitializeClient(func(_ *command.DockerCli) (client.APIClient, error) {
+						return nil, nil
+					}))
+			})
 			if err != nil {
 				return err
 			}
