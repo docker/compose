@@ -668,8 +668,8 @@ func buildContainerPortBindingOptions(s types.ServiceConfig) nat.PortMap {
 }
 
 func getVolumesFrom(project *types.Project, volumesFrom []string) ([]string, []string, error) {
-	var volumes = []string{}
-	var services = []string{}
+	var volumes []string
+	var services []string
 	// parse volumes_from
 	if len(volumesFrom) == 0 {
 		return volumes, services, nil
