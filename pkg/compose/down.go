@@ -86,7 +86,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops := s.ensureNetworksDown(ctx, project, w)
 
 	if options.Images != "" {
-		ops = append(ops, s.ensureImagesDown(ctx, project, options, w)...)
+		imgOps, err := s.ensureImagesDown(ctx, project, options, w)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, imgOps...)
 	}
 
 	if options.Volumes {
@@ -118,15 +122,25 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	return ops
 }
 
-func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) []downOp {
+func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, w progress.Writer) ([]downOp, error) {
+	imagePruner := NewImagePruner(s.apiClient(), project)
+	pruneOpts := ImagePruneOptions{
+		Mode:          ImagePruneMode(options.Images),
+		RemoveOrphans: options.RemoveOrphans,
+	}
+	images, err := imagePruner.ImagesToPrune(ctx, pruneOpts)
+	if err != nil {
+		return nil, err
+	}
+
 	var ops []downOp
-	for image := range s.getServiceImagesToRemove(options, project) {
-		image := image
+	for i := range images {
+		img := images[i]
 		ops = append(ops, func() error {
-			return s.removeImage(ctx, image, w)
+			return s.removeImage(ctx, img, w)
 		})
 	}
-	return ops
+	return ops, nil
 }
 
 func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.Project, w progress.Writer) []downOp {
@@ -188,19 +202,6 @@ func (s *composeService) removeNetwork(ctx context.Context, name string, w progr
 
 	w.Event(progress.RemovedEvent(eventName))
 	return nil
-}
-
-func (s *composeService) getServiceImagesToRemove(options api.DownOptions, project *types.Project) map[string]struct{} {
-	images := map[string]struct{}{}
-	for _, service := range project.Services {
-		image, ok := service.Labels[api.ImageNameLabel] // Information on the compose file at the creation of the container
-		if !ok || (options.Images == "local" && image != "") {
-			continue
-		}
-		image = api.GetImageNameOrDefault(service, project.Name)
-		images[image] = struct{}{}
-	}
-	return images
 }
 
 func (s *composeService) removeImage(ctx context.Context, image string, w progress.Writer) error {

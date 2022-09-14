@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/icmd"
 )
@@ -211,6 +212,10 @@ func TestBuildImageDependencies(t *testing.T) {
 	doTest := func(t *testing.T, cli *CLI) {
 		resetState := func() {
 			cli.RunDockerComposeCmd(t, "down", "--rmi=all", "-t=0")
+			res := cli.RunDockerOrExitError(t, "image", "rm", "build-dependencies-service")
+			if res.Error != nil {
+				require.Contains(t, res.Stderr(), `Error: No such image: build-dependencies-service`)
+			}
 		}
 		resetState()
 		t.Cleanup(resetState)
@@ -229,6 +234,15 @@ func TestBuildImageDependencies(t *testing.T) {
 			"image", "inspect", "--format={{ index .RepoTags 0 }}",
 			"build-dependencies-service")
 		res.Assert(t, icmd.Expected{Out: "build-dependencies-service:latest"})
+
+		res = cli.RunDockerComposeCmd(t, "down", "-t0", "--rmi=all", "--remove-orphans")
+		t.Log(res.Combined())
+
+		res = cli.RunDockerOrExitError(t, "image", "inspect", "build-dependencies-service")
+		res.Assert(t, icmd.Expected{
+			ExitCode: 1,
+			Err:      "Error: No such image: build-dependencies-service",
+		})
 	}
 
 	t.Run("ClassicBuilder", func(t *testing.T) {

@@ -145,7 +145,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 				project.Services[i].Labels = types.Labels{}
 			}
 			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
-			project.Services[i].CustomLabels.Add(api.ImageNameLabel, service.Image)
 		}
 	}
 	return nil
@@ -207,7 +206,6 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 		digest, ok := images[imgName]
 		if ok {
 			project.Services[i].CustomLabels.Add(api.ImageDigestLabel, digest)
-			project.Services[i].CustomLabels.Add(api.ImageNameLabel, project.Services[i].Image)
 		}
 	}
 
@@ -267,6 +265,8 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		tags = append(tags, service.Build.Tags...)
 	}
 
+	imageLabels := getImageBuildLabels(project, service)
+
 	return build.Options{
 		Inputs: build.Inputs{
 			ContextPath:    service.Build.Context,
@@ -281,7 +281,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 		Target:      service.Build.Target,
 		Exports:     []bclient.ExportEntry{{Type: "image", Attrs: map[string]string{}}},
 		Platforms:   plats,
-		Labels:      service.Build.Labels,
+		Labels:      imageLabels,
 		NetworkMode: service.Build.Network,
 		ExtraHosts:  service.Build.ExtraHosts.AsList(),
 		Session:     sessionConfig,
@@ -331,7 +331,6 @@ func sshAgentProvider(sshKeys types.SSHConfig) (session.Attachable, error) {
 }
 
 func addSecretsConfig(project *types.Project, service types.ServiceConfig) (session.Attachable, error) {
-
 	var sources []secretsprovider.Source
 	for _, secret := range service.Build.Secrets {
 		config := project.Secrets[secret.Source]
@@ -377,6 +376,20 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 		}
 	}
 	return plats, nil
+}
+
+func getImageBuildLabels(project *types.Project, service types.ServiceConfig) types.Labels {
+	ret := make(types.Labels)
+	if service.Build != nil {
+		for k, v := range service.Build.Labels {
+			ret.Add(k, v)
+		}
+	}
+
+	ret.Add(api.VersionLabel, api.ComposeVersion)
+	ret.Add(api.ProjectLabel, project.Name)
+	ret.Add(api.ServiceLabel, service.Name)
+	return ret
 }
 
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
