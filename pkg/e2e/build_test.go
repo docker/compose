@@ -314,6 +314,14 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: "I am building for linux/amd64"})
 		assert.Assert(t, !strings.Contains(res.Stdout(), "I am building for linux/arm64"))
 	})
+
+	t.Run("use service platform value when no build platforms defined ", func(t *testing.T) {
+		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test/platforms",
+			"-f", "fixtures/build-test/platforms/compose-service-platform-and-no-build-platforms.yaml", "build")
+		assert.NilError(t, res.Error, res.Stderr())
+		res.Assert(t, icmd.Expected{Out: "I am building for linux/386"})
+	})
+
 }
 
 func TestBuildPlatformsStandardErrors(t *testing.T) {
