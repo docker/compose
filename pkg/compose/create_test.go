@@ -96,6 +96,46 @@ func TestPrepareNetworkLabels(t *testing.T) {
 	}))
 }
 
+func TestPrepareVolumes(t *testing.T) {
+	t.Run("adds dependency condition if service depends on volume from another service", func(t *testing.T) {
+		project := composetypes.Project{
+			Name: "myProject",
+			Services: []composetypes.ServiceConfig{
+				{
+					Name:        "aService",
+					VolumesFrom: []string{"anotherService"},
+				},
+				{
+					Name: "anotherService",
+				},
+			},
+		}
+		err := prepareVolumes(&project)
+		assert.NilError(t, err)
+		assert.Equal(t, project.Services[0].DependsOn["anotherService"].Condition, composetypes.ServiceConditionStarted)
+	})
+	t.Run("doesn't overwrite existing dependency condition", func(t *testing.T) {
+		project := composetypes.Project{
+			Name: "myProject",
+			Services: []composetypes.ServiceConfig{
+				{
+					Name:        "aService",
+					VolumesFrom: []string{"anotherService"},
+					DependsOn: map[string]composetypes.ServiceDependency{
+						"anotherService": {Condition: composetypes.ServiceConditionHealthy},
+					},
+				},
+				{
+					Name: "anotherService",
+				},
+			},
+		}
+		err := prepareVolumes(&project)
+		assert.NilError(t, err)
+		assert.Equal(t, project.Services[0].DependsOn["anotherService"].Condition, composetypes.ServiceConditionHealthy)
+	})
+}
+
 func TestBuildContainerMountOptions(t *testing.T) {
 	project := composetypes.Project{
 		Name: "myProject",

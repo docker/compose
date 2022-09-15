@@ -125,7 +125,8 @@ func prepareVolumes(p *types.Project) error {
 				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
 			}
 			for _, service := range p.Services {
-				if utils.StringContains(dependServices, service.Name) {
+				if utils.StringContains(dependServices, service.Name) &&
+					p.Services[i].DependsOn[service.Name].Condition == "" {
 					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 						Condition: types.ServiceConditionStarted,
 					}
