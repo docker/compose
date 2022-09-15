@@ -371,6 +371,17 @@ func RootCommand(dockerCli command.Cli, backend api.Service) *cobra.Command {
 	)
 	c.Flags().SetInterspersed(false)
 	opts.addProjectFlags(c.Flags())
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"project-name",
+		completeProjectNames(backend),
+	)
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"file",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{"yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
+		},
+	)
+
 	c.Flags().StringVar(&ansi, "ansi", "auto", `Control when to print ANSI control characters ("never"|"always"|"auto")`)
 	c.Flags().BoolVarP(&version, "version", "v", false, "Show the Docker Compose version information")
 	c.Flags().MarkHidden("version") //nolint:errcheck

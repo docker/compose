@@ -70,7 +70,7 @@ func createCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				QuietPull:            false,
 			})
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVar(&opts.Build, "build", false, "Build images before starting containers.")

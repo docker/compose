@@ -143,7 +143,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			opts.ignoreOrphans = strings.ToLower(ignore) == "true"
 			return runRun(ctx, backend, project, opts)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.Detach, "detach", "d", false, "Run container in background and print container ID")

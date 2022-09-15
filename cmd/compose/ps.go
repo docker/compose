@@ -78,7 +78,7 @@ func psCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runPs(ctx, backend, args, opts)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	flags := psCmd.Flags()
 	flags.StringVar(&opts.Format, "format", "pretty", "Format the output. Values: [pretty | json]")
