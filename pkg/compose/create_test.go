@@ -110,7 +110,8 @@ func TestPrepareVolumes(t *testing.T) {
 				},
 			},
 		}
-		prepareVolumes(&project)
+		err := prepareVolumes(&project)
+		assert.NilError(t, err)
 		assert.Equal(t, project.Services[0].DependsOn["anotherService"].Condition, composetypes.ServiceConditionStarted)
 	})
 	t.Run("doesn't overwrite existing dependency condition", func(t *testing.T) {
@@ -129,7 +130,8 @@ func TestPrepareVolumes(t *testing.T) {
 				},
 			},
 		}
-		prepareVolumes(&project)
+		err := prepareVolumes(&project)
+		assert.NilError(t, err)
 		assert.Equal(t, project.Services[0].DependsOn["anotherService"].Condition, composetypes.ServiceConditionHealthy)
 	})
 }
