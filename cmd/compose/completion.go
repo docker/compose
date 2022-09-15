@@ -17,35 +17,11 @@
 package compose
 
 import (
-	"os"
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
-
-var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "Generate completion script",
-	Long: `To load completions run:
-
-$ docker compose completion [bash|zsh|fish|powershell] | source`,
-	DisableFlagsInUseLine: true,
-	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
-	Args:                  cobra.ExactValidArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		switch args[0] {
-		case "bash":
-			cmd.Root().GenBashCompletion(os.Stdout) //nolint:errcheck
-		case "zsh":
-			cmd.Root().GenZshCompletion(os.Stdout) //nolint:errcheck
-		case "fish":
-			cmd.Root().GenFishCompletion(os.Stdout, true) //nolint:errcheck
-		case "powershell":
-			cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout) //nolint:errcheck
-		}
-	},
-}
 
 // validArgsFn defines a completion func to be returned to fetch completion options
 type validArgsFn func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
