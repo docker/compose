@@ -98,7 +98,7 @@ func TestPauseServiceAlreadyPaused(t *testing.T) {
 
 	// launch a and wait for it to come up
 	cli.RunDockerComposeCmd(t, "up", "-d", "a")
-	HTTPGetWithRetry(t, urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 5*time.Second)
+	HTTPGetWithRetry(t, urlForService(t, cli, "a", 80), http.StatusOK, 50*time.Millisecond, 10*time.Second)
 
 	// pause a twice - first time should pass, second time fail
 	cli.RunDockerComposeCmd(t, "pause", "a")
