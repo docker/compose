@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -99,6 +100,9 @@ func TestProjectVolumeBind(t *testing.T) {
 	const projectName = "compose-e2e-project-volume-bind"
 
 	t.Run("up on project volume with bind specification", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Running on Windows. Skipping...")
+		}
 		tmpDir, err := os.MkdirTemp("", projectName)
 		assert.NilError(t, err)
 		defer os.RemoveAll(tmpDir) //nolint
