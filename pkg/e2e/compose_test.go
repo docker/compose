@@ -135,6 +135,9 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 }
 
 func TestAttachRestart(t *testing.T) {
+	if _, ok := os.LookupEnv("CI"); ok {
+		t.Skip("Skipping test on CI... flaky")
+	}
 	c := NewParallelCLI(t)
 
 	cmd := c.NewDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
