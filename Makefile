@@ -18,12 +18,19 @@ VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always --tags)
 GO_LDFLAGS ?= -s -w -X ${PKG}/internal.Version=${VERSION}
 GO_BUILDTAGS ?= e2e,kube
 
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
+ifeq ($(OS),Windows_NT)
+    DETECTED_OS = Windows
+else
+    DETECTED_OS = $(shell uname)
+endif
+ifeq ($(DETECTED_OS),Linux)
 	MOBY_DOCKER=/usr/bin/docker
 endif
-ifeq ($(UNAME_S),Darwin)
+ifeq ($(DETECTED_OS),Darwin)
 	MOBY_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
+endif
+ifeq ($(DETECTED_OS),Windows)
+	BINARY_EXT=.exe
 endif
 
 TEST_FLAGS?=
@@ -40,7 +47,7 @@ all: build
 
 .PHONY: build ## Build the compose cli-plugin
 build:
-	CGO_ENABLED=0 GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose" ./cmd
+	CGO_ENABLED=0 GO111MODULE=on go build -trimpath -tags "$(GO_BUILDTAGS)" -ldflags "$(GO_LDFLAGS)" -o "$(DESTDIR)/docker-compose$(BINARY_EXT)" ./cmd
 
 .PHONY: binary
 binary:
