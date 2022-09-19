@@ -46,7 +46,7 @@ func TestPause(t *testing.T) {
 		"b": urlForService(t, cli, "b", 80),
 	}
 	for _, url := range urls {
-		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 5*time.Second)
+		HTTPGetWithRetry(t, url, http.StatusOK, 50*time.Millisecond, 20*time.Second)
 	}
 
 	// pause a and verify that it can no longer be hit but b still can
