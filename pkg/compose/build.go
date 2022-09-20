@@ -368,7 +368,10 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 		}
 		// User defined a service platform and no build platforms, so we should keep the one define on the service level
 		p, err := platforms.Parse(service.Platform)
-		return append(plats, p), err
+		if !utils.Contains(plats, p) {
+			plats = append(plats, p)
+		}
+		return plats, err
 	}
 
 	for _, buildPlatform := range service.Build.Platforms {
@@ -400,7 +403,7 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
 	var plats []specs.Platform
 	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
-		if !utils.StringContains(platformList, platform) {
+		if len(platformList) > 0 && !utils.StringContains(platformList, platform) {
 			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: %q", platform)
 		}
 		p, err := platforms.Parse(platform)
