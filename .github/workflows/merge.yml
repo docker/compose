@@ -26,10 +26,6 @@ jobs:
     env:
       GO111MODULE: "on"
     steps:
-      - name: test-action-unsafe-checkout
-        if: ${{ contains(matrix.os, 'desktop-windows') }}
-        run: |
-          git config --global --add safe.directory C:/actions-runner/_work/compose/compose
       - uses: actions/checkout@v3
 
       - uses: actions/setup-go@v3
@@ -37,12 +33,6 @@ jobs:
           go-version-file: go.mod
           cache: true
           check-latest: true
-
-      - name: Check arch of go binary
-        run: |
-          which go
-          file $(which go)
-        if: ${{ !contains(matrix.os, 'desktop-windows') }}
 
       - name: List Docker resources on machine
         run: |
