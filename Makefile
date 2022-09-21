@@ -21,7 +21,7 @@ GO_BUILDTAGS ?= e2e,kube
 ifeq ($(OS),Windows_NT)
     DETECTED_OS = Windows
 else
-    DETECTED_OS = $(shell uname)
+    DETECTED_OS = $(shell uname -s)
 endif
 ifeq ($(DETECTED_OS),Linux)
 	MOBY_DOCKER=/usr/bin/docker
