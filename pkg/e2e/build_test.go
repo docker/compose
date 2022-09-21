@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +86,51 @@ func TestLocalComposeBuild(t *testing.T) {
 		res.Assert(t, icmd.Expected{Out: `"RESULT": "SUCCESS"`})
 	})
 
+	t.Run("build as part of up", func(t *testing.T) {
+		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
+		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
+
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
+		})
+
+		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
+
+		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
+		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
+
+		c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
+		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
+	})
+
+	t.Run("no rebuild when up again", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
+
+		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
+	})
+
+	t.Run("rebuild when up --build", func(t *testing.T) {
+		res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
+
+		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
+		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
+	})
+
+	t.Run("cleanup build project", func(t *testing.T) {
+		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
+		c.RunDockerCmd(t, "rmi", "build-test-nginx")
+		c.RunDockerCmd(t, "rmi", "custom-nginx")
+	})
+}
+
+func TestBuildSSH(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Running on Windows. Skipping...")
+	}
+	c := NewParallelCLI(t)
+
 	t.Run("build failed with ssh default value", func(t *testing.T) {
 		res := c.RunDockerComposeCmdNoCheck(t, "--project-directory", "fixtures/build-test", "build", "--ssh", "")
 		res.Assert(t, icmd.Expected{
@@ -130,47 +176,12 @@ func TestLocalComposeBuild(t *testing.T) {
 		})
 		c.RunDockerCmd(t, "image", "inspect", "build-test-ssh")
 	})
-
-	t.Run("build as part of up", func(t *testing.T) {
-		c.RunDockerOrExitError(t, "rmi", "build-test-nginx")
-		c.RunDockerOrExitError(t, "rmi", "custom-nginx")
-
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
-		t.Cleanup(func() {
-			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
-		})
-
-		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
-
-		output := HTTPGetWithRetry(t, "http://localhost:8070", http.StatusOK, 2*time.Second, 20*time.Second)
-		assert.Assert(t, strings.Contains(output, "Hello from Nginx container"))
-
-		c.RunDockerCmd(t, "image", "inspect", "build-test-nginx")
-		c.RunDockerCmd(t, "image", "inspect", "custom-nginx")
-	})
-
-	t.Run("no rebuild when up again", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "up", "-d")
-
-		assert.Assert(t, !strings.Contains(res.Stdout(), "COPY static"), res.Stdout())
-	})
-
-	t.Run("rebuild when up --build", func(t *testing.T) {
-		res := c.RunDockerComposeCmd(t, "--workdir", "fixtures/build-test", "up", "-d", "--build")
-
-		res.Assert(t, icmd.Expected{Out: "COPY static /usr/share/nginx/html"})
-		res.Assert(t, icmd.Expected{Out: "COPY static2 /usr/share/nginx/html"})
-	})
-
-	t.Run("cleanup build project", func(t *testing.T) {
-		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test", "down")
-		c.RunDockerCmd(t, "rmi", "build-test-nginx")
-		c.RunDockerCmd(t, "rmi", "custom-nginx")
-	})
 }
 
 func TestBuildSecrets(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping test on windows")
+	}
 	c := NewParallelCLI(t)
 
 	t.Run("build with secrets", func(t *testing.T) {
@@ -259,6 +270,9 @@ func TestBuildImageDependencies(t *testing.T) {
 }
 
 func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Running on Windows. Skipping...")
+	}
 	c := NewParallelCLI(t)
 
 	// declare builder

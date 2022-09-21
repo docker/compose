@@ -135,6 +135,9 @@ func TestDownComposefileInParentFolder(t *testing.T) {
 }
 
 func TestAttachRestart(t *testing.T) {
+	if _, ok := os.LookupEnv("CI"); ok {
+		t.Skip("Skipping test on CI... flaky")
+	}
 	c := NewParallelCLI(t)
 
 	cmd := c.NewDockerComposeCmd(t, "--ansi=never", "--project-directory", "./fixtures/attach-restart", "up")
@@ -146,7 +149,7 @@ func TestAttachRestart(t *testing.T) {
 		return strings.Count(res.Stdout(),
 				"failing-1 exited with code 1") == 3, fmt.Sprintf("'failing-1 exited with code 1' not found 3 times in : \n%s\n",
 				debug)
-	}, 2*time.Minute, 2*time.Second)
+	}, 4*time.Minute, 2*time.Second)
 
 	assert.Equal(t, strings.Count(res.Stdout(), "failing-1  | world"), 3, res.Combined())
 }

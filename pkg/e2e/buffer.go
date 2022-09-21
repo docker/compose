@@ -60,7 +60,7 @@ func (l *lockedBuffer) RequireEventuallyContains(t testing.TB, v string) {
 				"Error: %v", err)
 		}
 		return strings.Contains(bufContents.String(), v)
-	}, 2*time.Second, 20*time.Millisecond,
+	}, 5*time.Second, 20*time.Millisecond,
 		"Buffer did not contain %q\n============\n%s\n============",
 		v, &bufContents)
 }
