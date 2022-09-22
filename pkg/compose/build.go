@@ -81,6 +81,12 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 				Attrs: map[string]string{"ref": image},
 			})
 		}
+		buildOptions.Exports = []bclient.ExportEntry{{
+			Type: "docker",
+			Attrs: map[string]string{
+				"load": "true",
+			},
+		}}
 		if len(buildOptions.Platforms) > 1 {
 			buildOptions.Exports = []bclient.ExportEntry{{
 				Type:  "image",
