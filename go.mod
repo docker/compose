@@ -2,7 +2,7 @@ module github.com/docker/compose/v2
 
 go 1.19
 
-replace github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220912022410-e644a1b8c0d2
+replace github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-20220922095256-4c4b17abdae7
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
