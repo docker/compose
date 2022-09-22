@@ -179,7 +179,7 @@ func (s *composeService) getBuildOptions(project *types.Project, images map[stri
 					"load": "true",
 				},
 			}}
-			if opt.Platforms, err = useDockerDefaultPlatform(project, service.Build.Platforms); err != nil {
+			if opt.Platforms, err = useDockerDefaultOrServicePlatform(project, service, true); err != nil {
 				opt.Platforms = []specs.Platform{}
 			}
 			opts[imageName] = opt
@@ -363,21 +363,9 @@ func addSecretsConfig(project *types.Project, service types.ServiceConfig) (sess
 }
 
 func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.Platform, error) {
-	plats, err := useDockerDefaultPlatform(project, service.Build.Platforms)
+	plats, err := useDockerDefaultOrServicePlatform(project, service, false)
 	if err != nil {
 		return nil, err
-	}
-
-	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
-		if len(service.Build.Platforms) > 0 {
-			return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
-		}
-		// User defined a service platform and no build platforms, so we should keep the one define on the service level
-		p, err := platforms.Parse(service.Platform)
-		if !utils.Contains(plats, p) {
-			plats = append(plats, p)
-		}
-		return plats, err
 	}
 
 	for _, buildPlatform := range service.Build.Platforms {
@@ -417,6 +405,26 @@ func useDockerDefaultPlatform(project *types.Project, platformList types.StringL
 			return nil, err
 		}
 		plats = append(plats, p)
+	}
+	return plats, nil
+}
+
+func useDockerDefaultOrServicePlatform(project *types.Project, service types.ServiceConfig, useOnePlatform bool) ([]specs.Platform, error) {
+	plats, err := useDockerDefaultPlatform(project, service.Build.Platforms)
+	if (len(plats) > 0 && useOnePlatform) || err != nil {
+		return plats, err
+	}
+
+	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
+		if len(service.Build.Platforms) > 0 {
+			return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
+		}
+		// User defined a service platform and no build platforms, so we should keep the one define on the service level
+		p, err := platforms.Parse(service.Platform)
+		if !utils.Contains(plats, p) {
+			plats = append(plats, p)
+		}
+		return plats, err
 	}
 	return plats, nil
 }
