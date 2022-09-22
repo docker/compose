@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/docker/compose/v2/cmd/compose"
 )
 
@@ -70,11 +72,11 @@ func Convert(args []string) []string {
 			arg = "version"
 		}
 
-		if contains(getBoolFlags(), arg) {
+		if slices.Contains(getBoolFlags(), arg) {
 			rootFlags = append(rootFlags, arg)
 			continue
 		}
-		if contains(getStringFlags(), arg) {
+		if slices.Contains(getStringFlags(), arg) {
 			i++
 			if i >= l {
 				fmt.Fprintf(os.Stderr, "flag needs an argument: '%s'\n", arg)
@@ -86,13 +88,4 @@ func Convert(args []string) []string {
 		command = append(command, arg)
 	}
 	return append(rootFlags, command...)
-}
-
-func contains(array []string, needle string) bool {
-	for _, val := range array {
-		if val == needle {
-			return true
-		}
-	}
-	return false
 }

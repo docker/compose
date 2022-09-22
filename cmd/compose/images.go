@@ -27,10 +27,10 @@ import (
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/go-units"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 
 	"github.com/docker/compose/v2/cmd/formatter"
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type imageOptions struct {
@@ -74,7 +74,7 @@ func runImages(ctx context.Context, backend api.Service, opts imageOptions, serv
 			if i := strings.IndexRune(img.ID, ':'); i >= 0 {
 				id = id[i+1:]
 			}
-			if !utils.StringContains(ids, id) {
+			if !slices.Contains(ids, id) {
 				ids = append(ids, id)
 			}
 		}

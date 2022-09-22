@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/docker/docker/api/types"
+	"golang.org/x/exp/slices"
 
 	formatter2 "github.com/docker/cli/cli/command/formatter"
 	"github.com/pkg/errors"
@@ -132,7 +132,7 @@ SERVICES:
 	if opts.Services {
 		services := []string{}
 		for _, s := range containers {
-			if !utils.StringContains(services, s.Service) {
+			if !slices.Contains(services, s.Service) {
 				services = append(services, s.Service)
 			}
 		}

@@ -21,10 +21,10 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/pkg/api"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Restart(ctx context.Context, projectName string, options api.RestartOptions) error {
@@ -53,7 +53,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 
 	w := progress.ContextWriter(ctx)
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
-		if !utils.StringContains(options.Services, service) {
+		if !slices.Contains(options.Services, service) {
 			return nil
 		}
 		eg, ctx := errgroup.WithContext(ctx)

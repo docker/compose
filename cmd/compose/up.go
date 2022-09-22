@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v2/cmd/formatter"
+	"golang.org/x/exp/slices"
 
 	"github.com/compose-spec/compose-go/types"
 	"github.com/spf13/cobra"
@@ -59,7 +60,7 @@ func (opts upOptions) apply(project *types.Project, services []string) error {
 			return err
 		}
 		for _, s := range project.Services {
-			if !utils.StringContains(services, s.Name) {
+			if !slices.Contains(services, s.Name) {
 				project.DisabledServices = append(project.DisabledServices, s)
 			}
 		}

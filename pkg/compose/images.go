@@ -25,10 +25,10 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/errdefs"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Images(ctx context.Context, projectName string, options api.ImagesOptions) ([]api.ImageSummary, error) {
@@ -44,7 +44,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	if len(options.Services) > 0 {
 		// filter service containers
 		for _, c := range allContainers {
-			if utils.StringContains(options.Services, c.Labels[api.ServiceLabel]) {
+			if slices.Contains(options.Services, c.Labels[api.ServiceLabel]) {
 				containers = append(containers, c)
 
 			}
@@ -56,7 +56,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	imageIDs := []string{}
 	// aggregate image IDs
 	for _, c := range containers {
-		if !utils.StringContains(imageIDs, c.ImageID) {
+		if !slices.Contains(imageIDs, c.ImageID) {
 			imageIDs = append(imageIDs, c.ImageID)
 		}
 	}

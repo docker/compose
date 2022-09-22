@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/compose/v2/pkg/utils"
+	"golang.org/x/exp/slices"
 
 	"github.com/buger/goterm"
 	"github.com/morikuni/aec"
@@ -69,7 +69,7 @@ func (w *ttyWriter) Stop() {
 func (w *ttyWriter) Event(e Event) {
 	w.mtx.Lock()
 	defer w.mtx.Unlock()
-	if !utils.StringContains(w.eventIDs, e.ID) {
+	if !slices.Contains(w.eventIDs, e.ID) {
 		w.eventIDs = append(w.eventIDs, e.ID)
 	}
 	if _, ok := w.events[e.ID]; ok {

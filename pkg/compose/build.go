@@ -34,6 +34,7 @@ import (
 	"github.com/moby/buildkit/session/secrets/secretsprovider"
 	"github.com/moby/buildkit/session/sshforward/sshprovider"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/exp/slices"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -194,7 +195,7 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	var imageNames []string
 	for _, s := range project.Services {
 		imgName := api.GetImageNameOrDefault(s, project.Name)
-		if !utils.StringContains(imageNames, imgName) {
+		if !slices.Contains(imageNames, imgName) {
 			imageNames = append(imageNames, imgName)
 		}
 	}
@@ -368,7 +369,7 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 		return nil, err
 	}
 
-	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
+	if service.Platform != "" && !slices.Contains(service.Build.Platforms, service.Platform) {
 		if len(service.Build.Platforms) > 0 {
 			return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
 		}
@@ -409,7 +410,7 @@ func getImageBuildLabels(project *types.Project, service types.ServiceConfig) ty
 func useDockerDefaultPlatform(project *types.Project, platformList types.StringList) ([]specs.Platform, error) {
 	var plats []specs.Platform
 	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
-		if len(platformList) > 0 && !utils.StringContains(platformList, platform) {
+		if len(platformList) > 0 && !slices.Contains(platformList, platform) {
 			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: %q", platform)
 		}
 		p, err := platforms.Parse(platform)

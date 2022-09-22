@@ -22,9 +22,9 @@ import (
 	"sort"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"golang.org/x/exp/slices"
 )
 
 // Containers is a set of moby Container
@@ -94,14 +94,14 @@ type containerPredicate func(c moby.Container) bool
 func isService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
-		return utils.StringContains(services, service)
+		return slices.Contains(services, service)
 	}
 }
 
 func isNotService(services ...string) containerPredicate {
 	return func(c moby.Container) bool {
 		service := c.Labels[api.ServiceLabel]
-		return !utils.StringContains(services, service)
+		return !slices.Contains(services, service)
 	}
 }
 

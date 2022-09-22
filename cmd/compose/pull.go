@@ -23,9 +23,9 @@ import (
 
 	"github.com/morikuni/aec"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type pullOptions struct {
@@ -79,7 +79,7 @@ func runPull(ctx context.Context, backend api.Service, opts pullOptions, service
 			return err
 		}
 		for _, s := range project.Services {
-			if !utils.StringContains(services, s.Name) {
+			if !slices.Contains(services, s.Name) {
 				project.DisabledServices = append(project.DisabledServices, s)
 			}
 		}

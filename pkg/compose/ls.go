@@ -22,8 +22,9 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/docker/compose/v2/pkg/api"
-	"github.com/docker/compose/v2/pkg/utils"
 
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -73,7 +74,7 @@ func combinedConfigFiles(containers []moby.Container) (string, error) {
 		}
 
 		for _, f := range strings.Split(files, ",") {
-			if !utils.StringContains(configFiles, f) {
+			if !slices.Contains(configFiles, f) {
 				configFiles = append(configFiles, f)
 			}
 		}

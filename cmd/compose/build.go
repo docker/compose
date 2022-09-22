@@ -26,8 +26,8 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -91,7 +91,7 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 				}
 				os.Stdout = devnull
 			}
-			if !utils.StringContains(printerModes, opts.progress) {
+			if !slices.Contains(printerModes, opts.progress) {
 				return fmt.Errorf("unsupported --progress value %q", opts.progress)
 			}
 			return nil

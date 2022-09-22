@@ -31,11 +31,11 @@ import (
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 const (
@@ -93,7 +93,7 @@ func (c *convergence) apply(ctx context.Context, project *types.Project, options
 		}
 
 		strategy := options.RecreateDependencies
-		if utils.StringContains(options.Services, name) {
+		if slices.Contains(options.Services, name) {
 			strategy = options.Recreate
 		}
 		err = c.ensureService(ctx, project, service, strategy, options.Inherit, options.Timeout)
@@ -448,7 +448,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 // setDependentLifecycle define the Lifecycle strategy for all services to depend on specified service
 func setDependentLifecycle(project *types.Project, service string, strategy string) {
 	for i, s := range project.Services {
-		if utils.StringContains(s.GetDependencies(), service) {
+		if slices.Contains(s.GetDependencies(), service) {
 			if s.Extensions == nil {
 				s.Extensions = map[string]interface{}{}
 			}

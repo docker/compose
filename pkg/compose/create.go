@@ -41,10 +41,10 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
-	"github.com/docker/compose/v2/pkg/utils"
 )
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
@@ -125,7 +125,7 @@ func prepareVolumes(p *types.Project) error {
 				p.Services[i].DependsOn = make(types.DependsOnConfig, len(dependServices))
 			}
 			for _, service := range p.Services {
-				if utils.StringContains(dependServices, service.Name) &&
+				if slices.Contains(dependServices, service.Name) &&
 					p.Services[i].DependsOn[service.Name].Condition == "" {
 					p.Services[i].DependsOn[service.Name] = types.ServiceDependency{
 						Condition: types.ServiceConditionStarted,
