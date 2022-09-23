@@ -33,7 +33,7 @@ import (
 func TestCucumber(t *testing.T) {
 	testingOptions := godog.Options{
 		TestingT: t,
-		Paths:    []string{"."},
+		Paths:    []string{"./cucumber-features"},
 		Output:   colors.Colored(os.Stdout),
 		Format:   "pretty",
 	}
