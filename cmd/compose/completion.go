@@ -58,7 +58,9 @@ func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []s
 		}
 		var values []string
 		for _, stack := range list {
-			values = append(values, stack.Name)
+			if strings.HasPrefix(stack.Name, toComplete) {
+				values = append(values, stack.Name)
+			}
 		}
 		return values, cobra.ShellCompDirectiveNoFileComp
 	}
