@@ -368,6 +368,18 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 		return nil, err
 	}
 
+	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
+		if len(service.Build.Platforms) > 0 {
+			return nil, fmt.Errorf("service.platform %q should be part of the service.build.platforms: %q", service.Platform, service.Build.Platforms)
+		}
+		// User defined a service platform and no build platforms, so we should keep the one define on the service level
+		p, err := platforms.Parse(service.Platform)
+		if !utils.Contains(plats, p) {
+			plats = append(plats, p)
+		}
+		return plats, err
+	}
+
 	for _, buildPlatform := range service.Build.Platforms {
 		p, err := platforms.Parse(buildPlatform)
 		if err != nil {
@@ -398,7 +410,7 @@ func useDockerDefaultPlatform(project *types.Project, platformList types.StringL
 	var plats []specs.Platform
 	if platform, ok := project.Environment["DOCKER_DEFAULT_PLATFORM"]; ok {
 		if len(platformList) > 0 && !utils.StringContains(platformList, platform) {
-			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: %q", platform)
+			return nil, fmt.Errorf("the DOCKER_DEFAULT_PLATFORM %q value should be part of the service.build.platforms: %q", platform, platformList)
 		}
 		p, err := platforms.Parse(platform)
 		if err != nil {
@@ -417,7 +429,7 @@ func useDockerDefaultOrServicePlatform(project *types.Project, service types.Ser
 
 	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
 		if len(service.Build.Platforms) > 0 {
-			return nil, fmt.Errorf("service.platform should be part of the service.build.platforms: %q", service.Platform)
+			return nil, fmt.Errorf("service.platform %q should be part of the service.build.platforms: %q", service.Platform, service.Build.Platforms)
 		}
 		// User defined a service platform and no build platforms, so we should keep the one define on the service level
 		p, err := platforms.Parse(service.Platform)
