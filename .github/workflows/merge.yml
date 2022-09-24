@@ -12,6 +12,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
 jobs:
   e2e:
     name: Build and test
