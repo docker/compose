@@ -366,7 +366,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 			"-f", "fixtures/build-test/platforms/compose-service-platform-not-in-build-platforms.yaml", "build")
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      `service.platform should be part of the service.build.platforms: "linux/riscv64"`,
+			Err:      `service.platform "linux/riscv64" should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
 		})
 	})
 
@@ -377,7 +377,7 @@ func TestBuildPlatformsStandardErrors(t *testing.T) {
 		})
 		res.Assert(t, icmd.Expected{
 			ExitCode: 1,
-			Err:      `DOCKER_DEFAULT_PLATFORM value should be part of the service.build.platforms: "windows/amd64"`,
+			Err:      `DOCKER_DEFAULT_PLATFORM "windows/amd64" value should be part of the service.build.platforms: ["linux/amd64" "linux/arm64"]`,
 		})
 	})
 }
