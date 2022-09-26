@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/types"
+	testify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 )
@@ -44,6 +45,51 @@ var project = types.Project{
 			Name: "test3",
 		},
 	},
+}
+
+func TestTraversalWithMultipleParents(t *testing.T) {
+	dependent := types.ServiceConfig{
+		Name:      "dependent",
+		DependsOn: make(types.DependsOnConfig),
+	}
+
+	project := types.Project{
+		Services: []types.ServiceConfig{dependent},
+	}
+
+	for i := 1; i <= 100; i++ {
+		name := fmt.Sprintf("svc_%d", i)
+		dependent.DependsOn[name] = types.ServiceDependency{}
+
+		svc := types.ServiceConfig{Name: name}
+		project.Services = append(project.Services, svc)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	svc := make(chan string, 10)
+	seen := make(map[string]int)
+	done := make(chan struct{})
+	go func() {
+		for service := range svc {
+			seen[service]++
+		}
+		done <- struct{}{}
+	}()
+
+	err := InDependencyOrder(ctx, &project, func(ctx context.Context, service string) error {
+		svc <- service
+		return nil
+	})
+	require.NoError(t, err, "Error during iteration")
+	close(svc)
+	<-done
+
+	testify.Len(t, seen, 101)
+	for svc, count := range seen {
+		assert.Equal(t, 1, count, "Service: %s", svc)
+	}
 }
 
 func TestInDependencyUpCommandOrder(t *testing.T) {
