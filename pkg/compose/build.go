@@ -368,18 +368,6 @@ func addPlatforms(project *types.Project, service types.ServiceConfig) ([]specs.
 		return nil, err
 	}
 
-	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
-		if len(service.Build.Platforms) > 0 {
-			return nil, fmt.Errorf("service.platform %q should be part of the service.build.platforms: %q", service.Platform, service.Build.Platforms)
-		}
-		// User defined a service platform and no build platforms, so we should keep the one define on the service level
-		p, err := platforms.Parse(service.Platform)
-		if !utils.Contains(plats, p) {
-			plats = append(plats, p)
-		}
-		return plats, err
-	}
-
 	for _, buildPlatform := range service.Build.Platforms {
 		p, err := platforms.Parse(buildPlatform)
 		if err != nil {
