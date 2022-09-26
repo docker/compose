@@ -60,7 +60,7 @@ func copyCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			opts.destination = args[1]
 			return runCopy(ctx, backend, opts)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 
 	flags := copyCmd.Flags()

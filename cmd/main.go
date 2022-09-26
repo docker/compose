@@ -34,14 +34,13 @@ import (
 
 func pluginMain() {
 	plugin.Run(func(dockerCli command.Cli) *cobra.Command {
-		lazyInit := api.NewServiceProxy()
-		cmd := commands.RootCommand(dockerCli, lazyInit)
+		serviceProxy := api.NewServiceProxy().WithService(compose.NewComposeService(dockerCli))
+		cmd := commands.RootCommand(dockerCli, serviceProxy)
 		originalPreRun := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 			if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
-			lazyInit.WithService(compose.NewComposeService(dockerCli))
 			if originalPreRun != nil {
 				return originalPreRun(cmd, args)
 			}

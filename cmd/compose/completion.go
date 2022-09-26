@@ -19,6 +19,7 @@ package compose
 import (
 	"strings"
 
+	"github.com/docker/compose/v2/pkg/api"
 	"github.com/spf13/cobra"
 )
 
@@ -27,11 +28,11 @@ type validArgsFn func(cmd *cobra.Command, args []string, toComplete string) ([]s
 
 func noCompletion() validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveNoFileComp
+		return []string{}, cobra.ShellCompDirectiveNoSpace
 	}
 }
 
-func serviceCompletion(p *projectOptions) validArgsFn {
+func completeServiceNames(p *projectOptions) validArgsFn {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		project, err := p.toProject(nil)
 		if err != nil {
@@ -44,5 +45,23 @@ func serviceCompletion(p *projectOptions) validArgsFn {
 			}
 		}
 		return serviceNames, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+func completeProjectNames(backend api.Service) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		list, err := backend.List(cmd.Context(), api.ListOptions{
+			All: true,
+		})
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		var values []string
+		for _, stack := range list {
+			if strings.HasPrefix(stack.Name, toComplete) {
+				values = append(values, stack.Name)
+			}
+		}
+		return values, cobra.ShellCompDirectiveNoFileComp
 	}
 }

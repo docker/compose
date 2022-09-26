@@ -46,7 +46,7 @@ Any data which is not in a volume will be lost.`,
 		RunE: Adapt(func(ctx context.Context, args []string) error {
 			return runRemove(ctx, backend, opts, args)
 		}),
-		ValidArgsFunction: serviceCompletion(p),
+		ValidArgsFunction: completeServiceNames(p),
 	}
 	f := cmd.Flags()
 	f.BoolVarP(&opts.force, "force", "f", false, "Don't ask to confirm removal")
