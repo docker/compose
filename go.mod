@@ -9,7 +9,7 @@ require (
 	github.com/compose-spec/compose-go v1.5.1
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.8
-	github.com/distribution/distribution/v3 v3.0.0-20220902125104-0122d7ddaec0
+	github.com/distribution/distribution/v3 v3.0.0-20220907155224-78b9c98c5c31
 	github.com/docker/buildx v0.8.2 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.17+incompatible
 	github.com/docker/cli-docs-tool v0.5.0

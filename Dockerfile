@@ -69,6 +69,11 @@ RUN --mount=type=bind,target=.,rw <<EOT
   fi
 EOT
 
+FROM vendored AS modules-validate
+RUN apk add --no-cache bash
+RUN apk add --no-cache jq
+RUN --mount=type=bind,target=.,rw ./verify-go-modules.sh e2e
+
 FROM build-base AS build
 ARG BUILD_TAGS
 ARG TARGETPLATFORM

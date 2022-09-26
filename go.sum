@@ -450,8 +450,8 @@ github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8
 github.com/dimchansky/utfbom v1.1.0/go.mod h1:rO41eb7gLfo8SF1jd9F8HplJm1Fewwi4mQvIirEdv+8=
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
 github.com/distribution/distribution/v3 v3.0.0-20210316161203-a01c71e2477e/go.mod h1:xpWTC2KnJMiDLkoawhsPQcXjvwATEBcbq0xevG2YR9M=
-github.com/distribution/distribution/v3 v3.0.0-20220902125104-0122d7ddaec0 h1:0UuPq7m6stSY6at1v5PLo0zzYTpailcwjhmkJpgnGBY=
-github.com/distribution/distribution/v3 v3.0.0-20220902125104-0122d7ddaec0/go.mod h1:28YO/VJk9/64+sTGNuYaBjWxrXTPrj0C0XmgTIOjxX4=
+github.com/distribution/distribution/v3 v3.0.0-20220907155224-78b9c98c5c31 h1:AqcwAyaSEkILnr/bLybFnM2i/+EW67JJIRs/4dWmzxo=
+github.com/distribution/distribution/v3 v3.0.0-20220907155224-78b9c98c5c31/go.mod h1:XrR+08YQxO57vT8gtNmhLfHy/YIutMmmEeKMhU7zXqY=
 github.com/dnaeon/go-vcr v1.0.1/go.mod h1:aBB1+wY4s93YsC3HHjMBMrwTj2R9FHDzUr9KyGc8n1E=
 github.com/docker/buildx v0.8.2 h1:dsd3F0hhmUydFX/KFrvbK81JvlTA4T3Iy0lwDJt4PsU=
 github.com/docker/buildx v0.8.2/go.mod h1:5sMOfNwOmO2jy/MxBL4ySk2LoLIG1tQFu2EU8wbKa34=
