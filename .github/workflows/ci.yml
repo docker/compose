@@ -22,6 +22,9 @@ env:
   DESTDIR: "./bin"
   DOCKER_CLI_VERSION: "20.10.17"
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -182,6 +185,9 @@ jobs:
           make e2e-compose-standalone
 
   release:
+    permissions:
+      contents: write # to create a release (ncipollo/release-action)
+
     runs-on: ubuntu-latest
     needs:
       - binary
