@@ -52,6 +52,7 @@ jobs:
         target:
           - lint
           - validate-go-mod
+          - validate-modules
           - validate-headers
           - validate-docs
     steps:

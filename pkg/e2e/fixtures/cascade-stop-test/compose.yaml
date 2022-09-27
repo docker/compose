@@ -1,7 +1,0 @@
-services:
-  should_fail:
-    image: alpine
-    command: ls /does_not_exist
-  sleep: # will be killed
-    image: alpine
-    command: ping localhost

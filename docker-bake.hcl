@@ -71,6 +71,12 @@ target "vendor-validate" {
   output = ["type=cacheonly"]
 }
 
+target "modules-validate" {
+  inherits = ["_common"]
+  target = "modules-validate"
+  output = ["type=cacheonly"]
+}
+
 target "vendor" {
   inherits = ["_common"]
   target = "vendor-update"
