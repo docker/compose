@@ -80,7 +80,7 @@ done
 # containerd/containerd which we know will be different
 for k in "${!map_replaces_2[@]}"
 do
-  if [[ "${k}" == "github.com/containerd/containerd"* ]]; then
+  if [[ "${k}" == "github.com/docker/compose"* ]]; then
     continue
   fi
   if [ -v "map_replaces_1[$k]" ]; then
@@ -96,7 +96,7 @@ done
 # same items are present in the second go.mod's replace section and nothing is missing
 for k in "${!map_replaces_1[@]}"
 do
-  if [[ "${k}" == "github.com/containerd/containerd"* ]]; then
+  if [[ "${k}" == "github.com/docker/compose"* ]]; then
     continue
   fi
   if [ ! -v "map_replaces_2[$k]" ]; then
