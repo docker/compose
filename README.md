@@ -1,3 +1,11 @@
+# Table of Contents
+- [Docker Compose v2](#docker-compose-v2)
+- [About update and backward compatibility](#about-update-and-backward-compatibility)
+- [Where to get Docker Compose](#where-to-get-docker-compose)
+    + [Windows and macOS](#windows-and-macos)
+    + [Linux](#linux)
+- [Quick Start](#quick-start)
+- [Contributing](#contributing)
 # Docker Compose v2
 
 [![GitHub release](https://img.shields.io/github/release/docker/compose.svg?style=flat-square)](https://github.com/docker/compose/releases/latest)
