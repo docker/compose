@@ -9,7 +9,7 @@ replace github.com/cucumber/godog => github.com/laurazard/godog v0.0.0-202209220
 require (
 	github.com/cucumber/godog v0.12.5
 	github.com/docker/compose/v2 v2.11.1
-	gotest.tools/v3 v3.3.0
+	gotest.tools/v3 v3.4.0
 )
 
 require (
