@@ -37,6 +37,9 @@ import (
 )
 
 func (s *composeService) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
+	if options.Quiet {
+		return s.push(ctx, project, options)
+	}
 	return progress.Run(ctx, func(ctx context.Context) error {
 		return s.push(ctx, project, options)
 	})
@@ -65,7 +68,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 		}
 		service := service
 		eg.Go(func() error {
-			err := s.pushServiceImage(ctx, service, info, s.configFile(), w)
+			err := s.pushServiceImage(ctx, service, info, s.configFile(), w, options.Quiet)
 			if err != nil {
 				if !options.IgnoreFailures {
 					return err
@@ -78,7 +81,7 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 	return eg.Wait()
 }
 
-func (s *composeService) pushServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer) error {
+func (s *composeService) pushServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPush bool) error {
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return err
@@ -121,7 +124,10 @@ func (s *composeService) pushServiceImage(ctx context.Context, service types.Ser
 		if jm.Error != nil {
 			return errors.New(jm.Error.Message)
 		}
-		toPushProgressEvent(service.Name, jm, w)
+
+		if !quietPush {
+			toPushProgressEvent(service.Name, jm, w)
+		}
 	}
 	return nil
 }
