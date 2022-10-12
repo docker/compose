@@ -40,7 +40,7 @@ func (s *composeService) Port(ctx context.Context, projectName string, service s
 		return "", 0, err
 	}
 	if len(list) == 0 {
-		return "", 0, fmt.Errorf("no container found for %s_%d", service, options.Index)
+		return "", 0, fmt.Errorf("no container found for %s%s%d", service, api.Separator, options.Index)
 	}
 	container := list[0]
 	for _, p := range container.Ports {
