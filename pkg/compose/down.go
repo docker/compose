@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/types"
@@ -35,13 +34,13 @@ import (
 
 type downOp func() error
 
-func (s *composeService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
+func (s *composeService) Down(ctx context.Context, project *types.Project, options api.DownOptions) error {
 	return progress.Run(ctx, func(ctx context.Context) error {
-		return s.down(ctx, strings.ToLower(projectName), options)
+		return s.down(ctx, project, options)
 	})
 }
 
-func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
+func (s *composeService) down(ctx context.Context, project *types.Project, options api.DownOptions) error {
 	w := progress.ContextWriter(ctx)
 	resourceToRemove := false
 
@@ -49,17 +48,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	if options.RemoveOrphans {
 		include = oneOffInclude
 	}
-	containers, err := s.getContainers(ctx, projectName, include, true)
+	containers, err := s.getContainers(ctx, project.Name, include, true)
 	if err != nil {
 		return err
-	}
-
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return err
-		}
 	}
 
 	if len(containers) > 0 {
@@ -98,7 +89,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
-		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", projectName)
+		fmt.Fprintf(s.stderr(), "Warning: No resource found to remove for project %q.\n", project.Name)
 	}
 
 	eg, _ := errgroup.WithContext(ctx)

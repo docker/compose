@@ -44,7 +44,7 @@ type Service interface {
 	// Up executes the equivalent to a `compose up`
 	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`
-	Down(ctx context.Context, projectName string, options DownOptions) error
+	Down(ctx context.Context, project *types.Project, options DownOptions) error
 	// Logs executes the equivalent to a `compose logs`
 	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	// Ps executes the equivalent to a `compose ps`
@@ -163,8 +163,6 @@ type UpOptions struct {
 type DownOptions struct {
 	// RemoveOrphans will cleanup containers that are not declared on the compose model but own the same labels
 	RemoveOrphans bool
-	// Project is the compose project used to define this app. Might be nil if user ran `down` just with project name
-	Project *types.Project
 	// Timeout override container stop timeout
 	Timeout *time.Duration
 	// Images remove image used by services. 'all': Remove all images. 'local': Remove only images that don't have a tag

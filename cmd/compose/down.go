@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/compose-spec/compose-go/types"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -55,8 +56,8 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 			}
 			return nil
 		}),
-		RunE: Adapt(func(ctx context.Context, args []string) error {
-			return runDown(ctx, backend, opts)
+		RunE: p.WithServices(func(ctx context.Context, project *types.Project, services []string) error {
+			return runDown(ctx, backend, project, opts)
 		}),
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: noCompletion(),
@@ -77,20 +78,14 @@ func downCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	return downCmd
 }
 
-func runDown(ctx context.Context, backend api.Service, opts downOptions) error {
-	project, name, err := opts.projectOrName()
-	if err != nil {
-		return err
-	}
-
+func runDown(ctx context.Context, backend api.Service, project *types.Project, opts downOptions) error {
 	var timeout *time.Duration
 	if opts.timeChanged {
 		timeoutValue := time.Duration(opts.timeout) * time.Second
 		timeout = &timeoutValue
 	}
-	return backend.Down(ctx, name, api.DownOptions{
+	return backend.Down(ctx, project, api.DownOptions{
 		RemoveOrphans: opts.removeOrphans,
-		Project:       project,
 		Timeout:       timeout,
 		Images:        opts.images,
 		Volumes:       opts.volumes,

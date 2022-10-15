@@ -94,17 +94,17 @@ func (mr *MockServiceMockRecorder) Create(ctx, project, options interface{}) *go
 }
 
 // Down mocks base method.
-func (m *MockService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
+func (m *MockService) Down(ctx context.Context, project *types.Project, options api.DownOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Down", ctx, projectName, options)
+	ret := m.ctrl.Call(m, "Down", ctx, project, options)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Down indicates an expected call of Down.
-func (mr *MockServiceMockRecorder) Down(ctx, projectName, options interface{}) *gomock.Call {
+func (mr *MockServiceMockRecorder) Down(ctx, project, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Down", reflect.TypeOf((*MockService)(nil).Down), ctx, projectName, options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Down", reflect.TypeOf((*MockService)(nil).Down), ctx, project, options)
 }
 
 // Events mocks base method.
@@ -405,15 +405,15 @@ func (m *MockLogConsumer) EXPECT() *MockLogConsumerMockRecorder {
 }
 
 // Log mocks base method.
-func (m *MockLogConsumer) Log(service, container, message string) {
+func (m *MockLogConsumer) Log(containerName, service, message string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Log", service, container, message)
+	m.ctrl.Call(m, "Log", containerName, service, message)
 }
 
 // Log indicates an expected call of Log.
-func (mr *MockLogConsumerMockRecorder) Log(service, container, message interface{}) *gomock.Call {
+func (mr *MockLogConsumerMockRecorder) Log(containerName, service, message interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), service, container, message)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogConsumer)(nil).Log), containerName, service, message)
 }
 
 // Register mocks base method.

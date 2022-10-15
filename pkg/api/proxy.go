@@ -34,7 +34,7 @@ type ServiceProxy struct {
 	RestartFn            func(ctx context.Context, projectName string, options RestartOptions) error
 	StopFn               func(ctx context.Context, projectName string, options StopOptions) error
 	UpFn                 func(ctx context.Context, project *types.Project, options UpOptions) error
-	DownFn               func(ctx context.Context, projectName string, options DownOptions) error
+	DownFn               func(ctx context.Context, project *types.Project, options DownOptions) error
 	LogsFn               func(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
 	PsFn                 func(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	ListFn               func(ctx context.Context, options ListOptions) ([]Stack, error)
@@ -176,7 +176,7 @@ func (s *ServiceProxy) Up(ctx context.Context, project *types.Project, options U
 }
 
 // Down implements Service interface
-func (s *ServiceProxy) Down(ctx context.Context, project string, options DownOptions) error {
+func (s *ServiceProxy) Down(ctx context.Context, project *types.Project, options DownOptions) error {
 	if s.DownFn == nil {
 		return ErrNotImplemented
 	}
