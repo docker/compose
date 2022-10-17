@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/icmd"
@@ -52,9 +53,6 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	reset()
 	t.Cleanup(reset)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	t.Log("Launching orphan container (background)")
 	c.RunDockerComposeCmd(t,
 		"-f=./fixtures/ups-deps-stop/orphan.yaml",
@@ -66,22 +64,18 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "orphan", "running")
 
 	t.Log("Launching app container with implicit dependency")
-	var upOut lockedBuffer
-	var upCmd *exec.Cmd
-	go func() {
-		testCmd := c.NewDockerComposeCmd(t,
-			"-f=./fixtures/ups-deps-stop/compose.yaml",
-			"up",
-			"app",
-		)
-		cmd := exec.CommandContext(ctx, testCmd.Command[0], testCmd.Command[1:]...)
-		cmd.Env = testCmd.Env
-		cmd.Stdout = &upOut
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	upOut := &utils.SafeBuffer{}
+	testCmd := c.NewDockerComposeCmd(t,
+		"-f=./fixtures/ups-deps-stop/compose.yaml",
+		"up",
+		"app",
+	)
 
-		assert.NoError(t, cmd.Start(), "Failed to run compose up")
-		upCmd = cmd
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd, err := StartWithNewGroupID(ctx, testCmd, upOut, nil)
+	assert.NoError(t, err, "Failed to run compose up")
 
 	t.Log("Waiting for containers to be in running state")
 	upOut.RequireEventuallyContains(t, "hello app")
@@ -89,13 +83,13 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "dependency", "running")
 
 	t.Log("Simulating Ctrl-C")
-	require.NoError(t, syscall.Kill(-upCmd.Process.Pid, syscall.SIGINT),
+	require.NoError(t, syscall.Kill(-cmd.Process.Pid, syscall.SIGINT),
 		"Failed to send SIGINT to compose up process")
 
 	time.AfterFunc(5*time.Second, cancel)
 
 	t.Log("Waiting for `compose up` to exit")
-	err := upCmd.Wait()
+	err = cmd.Wait()
 	if err != nil {
 		exitErr := err.(*exec.ExitError)
 		require.EqualValues(t, exitErr.ExitCode(), 130)
