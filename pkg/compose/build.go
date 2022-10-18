@@ -249,7 +249,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	sessionConfig := []session.Attachable{
-		authprovider.NewDockerAuthProvider(s.stderr()),
+		authprovider.NewDockerAuthProvider(s.configFile()),
 	}
 	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
 		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))

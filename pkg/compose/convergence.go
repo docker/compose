@@ -27,6 +27,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	"github.com/containerd/containerd/platforms"
 	moby "github.com/docker/docker/api/types"
+	containerType "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -180,7 +181,10 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 			// Scale Down
 			container := container
 			eg.Go(func() error {
-				err := c.service.apiClient().ContainerStop(ctx, container.ID, timeout)
+				timeoutInSecond := utils.DurationSecondToInt(timeout)
+				err := c.service.apiClient().ContainerStop(ctx, container.ID, containerType.StopOptions{
+					Timeout: timeoutInSecond,
+				})
 				if err != nil {
 					return err
 				}
@@ -412,7 +416,8 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 	var created moby.Container
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.NewEvent(getContainerProgressName(replaced), progress.Working, "Recreate"))
-	err := s.apiClient().ContainerStop(ctx, replaced.ID, timeout)
+	timeoutInSecond := utils.DurationSecondToInt(timeout)
+	err := s.apiClient().ContainerStop(ctx, replaced.ID, containerType.StopOptions{Timeout: timeoutInSecond})
 	if err != nil {
 		return created, err
 	}
