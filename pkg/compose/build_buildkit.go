@@ -104,7 +104,7 @@ func (s *composeService) getDrivers(ctx context.Context) ([]build.DriverInfo, er
 		}
 		if f == nil {
 			if f, err = driver.GetFactory(ng.Driver, true); f == nil || err != nil {
-				return nil, fmt.Errorf("failed to find buildx driver %q, error: %s", ng.Driver, err.Error())
+				return nil, fmt.Errorf("failed to find buildx driver %q, error: %w", ng.Driver, err)
 			}
 		}
 	} else {
