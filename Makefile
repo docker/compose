@@ -130,7 +130,6 @@ go-mod-tidy: ## Run go mod tidy in a container and output resulting go.mod and g
 .PHONY: validate-go-mod
 validate-go-mod: ## Validate go.mod and go.sum are up-to-date
 	$(BUILDX_CMD) bake vendor-validate
-	$(BUILDX_CMD) bake modules-validate
 
 .PHONY: validate-modules
 validate-modules: ## Validate root and e2e go.mod are synced
