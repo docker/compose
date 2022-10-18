@@ -27,7 +27,7 @@ import (
 	_ "github.com/docker/buildx/driver/docker" // required to get default driver registered
 	"github.com/docker/buildx/util/buildflags"
 	xprogress "github.com/docker/buildx/util/progress"
-	"github.com/docker/docker/pkg/urlutil"
+	"github.com/docker/docker/builder/remotecontext/urlutil"
 	bclient "github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/session/auth/authprovider"
@@ -249,7 +249,7 @@ func (s *composeService) toBuildOptions(project *types.Project, service types.Se
 	}
 
 	sessionConfig := []session.Attachable{
-		authprovider.NewDockerAuthProvider(s.stderr()),
+		authprovider.NewDockerAuthProvider(s.configFile()),
 	}
 	if len(sshKeys) > 0 || len(service.Build.SSH) > 0 {
 		sshAgentProvider, err := sshAgentProvider(append(service.Build.SSH, sshKeys...))
