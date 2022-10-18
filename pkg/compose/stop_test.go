@@ -18,10 +18,11 @@ package compose
 
 import (
 	"context"
-	"github.com/docker/compose/v2/pkg/utils"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/compose/v2/pkg/utils"
 
 	compose "github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
@@ -53,7 +54,7 @@ func TestStopTimeout(t *testing.T) {
 			testContainer("service2", "789", false),
 		}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), filters.NewArgs(projectFilter(strings.ToLower(testProject)))).
-		Return(volume.VolumeListOKBody{}, nil)
+		Return(volume.ListResponse{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), moby.NetworkListOptions{Filters: filters.NewArgs(projectFilter(strings.ToLower(testProject)))}).
 		Return([]moby.NetworkResource{}, nil)
 

@@ -19,9 +19,10 @@ package compose
 import (
 	"context"
 	"fmt"
-	"github.com/docker/compose/v2/pkg/utils"
 	"strings"
 	"time"
+
+	"github.com/docker/compose/v2/pkg/utils"
 
 	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"

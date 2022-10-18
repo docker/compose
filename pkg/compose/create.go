@@ -1155,7 +1155,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 	eventName := fmt.Sprintf("Volume %q", volume.Name)
 	w := progress.ContextWriter(ctx)
 	w.Event(progress.CreatingEvent(eventName))
-	_, err := s.apiClient().VolumeCreate(ctx, volume_api.VolumeCreateBody{
+	_, err := s.apiClient().VolumeCreate(ctx, volume_api.CreateOptions{
 		Labels:     volume.Labels,
 		Name:       volume.Name,
 		Driver:     volume.Driver,
