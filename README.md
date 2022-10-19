@@ -20,7 +20,6 @@ Check it out [here](https://github.com/docker/compose/tree/v2/)!
 
 Read more on the [GA announcement here](https://www.docker.com/blog/announcing-compose-v2-general-availability/)
 
-
 ---------------------------------------------
 
 V1 vs V2 transition :hourglass_flowing_sand:
