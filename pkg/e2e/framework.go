@@ -37,6 +37,8 @@ import (
 	"github.com/docker/compose/v2/cmd/compose"
 )
 
+// Test Codecov
+
 var (
 	// DockerExecutableName is the OS dependent Docker CLI binary name
 	DockerExecutableName = "docker"
