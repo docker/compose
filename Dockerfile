@@ -40,7 +40,9 @@ RUN apk add --no-cache \
       protoc \
       protobuf-dev
 WORKDIR /src
-ENV CGO_ENABLED=0
+# Switching CGO to true as there is a weird issue with the Golang DNS resolver and IPV6
+#https://github.com/golang/go/issues/52839
+ENV CGO_ENABLED=1
 
 FROM base AS build-base
 COPY go.* .
@@ -85,6 +87,7 @@ RUN --mount=type=bind,target=. \
     xx-verify --static /usr/bin/docker-compose
 
 FROM build-base AS lint
+ENV CGO_ENABLED=0
 ARG BUILD_TAGS
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
@@ -92,7 +95,7 @@ RUN --mount=type=bind,target=. \
     golangci-lint run --build-tags "$BUILD_TAGS" ./...
 
 FROM build-base AS test
-ARG CGO_ENABLED=0
+ENV CGO_ENABLED=0
 ARG BUILD_TAGS
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache \
