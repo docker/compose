@@ -21,6 +21,7 @@ package e2e
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"syscall"
 	"testing"
@@ -43,6 +44,9 @@ func TestUpServiceUnhealthy(t *testing.T) {
 }
 
 func TestUpDependenciesNotStopped(t *testing.T) {
+	if _, ok := os.LookupEnv("CI"); ok {
+		t.Skip("Skipping test on CI... flaky")
+	}
 	c := NewParallelCLI(t, WithEnv(
 		"COMPOSE_PROJECT_NAME=up-deps-stop",
 	))
