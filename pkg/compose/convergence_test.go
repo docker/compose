@@ -26,7 +26,7 @@ import (
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/golang/mock/gomock"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/mocks"
