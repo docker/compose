@@ -11,9 +11,9 @@ require (
 	github.com/containerd/containerd v1.6.8
 	github.com/distribution/distribution/v3 v3.0.0-20220907155224-78b9c98c5c31
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
-	github.com/docker/cli v20.10.19+incompatible
+	github.com/docker/cli v20.10.19+incompatible // v22.06.x - see "replace" for the actual version
 	github.com/docker/cli-docs-tool v0.5.0
-	github.com/docker/docker v20.10.19+incompatible
+	github.com/docker/docker v20.10.19+incompatible // v22.06.x - see "replace" for the actual version
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.5.0
 	github.com/golang/mock v1.6.0
@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mattn/go-shellwords v1.0.12
-	github.com/moby/buildkit v0.10.4
+	github.com/moby/buildkit v0.10.4 // see "replace" for the actual version
 	github.com/moby/term v0.0.0-20220808134915-39b0c02b01ae
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -149,7 +149,7 @@ require (
 
 replace (
 	github.com/docker/cli => github.com/docker/cli v20.10.3-0.20221013132413-1d6c6e2367e2+incompatible // 22.06 master branch
-	github.com/docker/docker => github.com/docker/docker v20.10.3-0.20221013203545-33ab36d6b304+incompatible // 22.06 branch
+	github.com/docker/docker => github.com/docker/docker v20.10.3-0.20221021122114-f9cb47a052be+incompatible // 22.06 branch
 	github.com/moby/buildkit => github.com/moby/buildkit v0.10.1-0.20220816171719-55ba9d14360a // same as buildx
 
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2 // Can be removed on next bump of containerd to > 1.6.4
