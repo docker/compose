@@ -578,6 +578,12 @@ func setReservations(reservations *types.Resource, resources *container.Resource
 	if reservations == nil {
 		return
 	}
+	// Cpu reservation is a swarm option and PIDs is only a limit
+	// So we only need to map memory reservation and devices
+	if reservations.MemoryBytes != 0 {
+		resources.MemoryReservation = int64(reservations.MemoryBytes)
+	}
+
 	for _, device := range reservations.Devices {
 		resources.DeviceRequests = append(resources.DeviceRequests, container.DeviceRequest{
 			Capabilities: [][]string{device.Capabilities},
