@@ -1,0 +1,11 @@
+services:
+  docker-compose:
+    entrypoint:
+      - sleep
+      - infinity
+    image: docker/dev-environments-go:stable-1
+    init: true
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
