@@ -11,6 +11,7 @@ linters:
     - gocyclo
     - gofmt
     - goimports
+    - gomodguard
     - revive
     - gosimple
     - govet
@@ -36,6 +37,12 @@ linters-settings:
       # The io/ioutil package has been deprecated.
       # https://go.dev/doc/go1.16#ioutil
       - io/ioutil
+  gomodguard:
+    blocked:
+      versions:
+        - gotest.tools:
+            version: "< 3.0.0"
+            reason: "deprecated, pre-modules version"
   gocritic:
     # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
     # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".

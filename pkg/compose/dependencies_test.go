@@ -24,7 +24,7 @@ import (
 	"github.com/compose-spec/compose-go/types"
 	testify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
+	"gotest.tools/v3/assert"
 )
 
 var project = types.Project{
