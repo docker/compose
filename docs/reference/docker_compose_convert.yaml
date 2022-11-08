@@ -40,6 +40,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: no-consistency
+      value_type: bool
+      default_value: "false"
+      description: |
+        Don't check model consistency - warning: may produce invalid Compose output
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-interpolate
       value_type: bool
       default_value: "false"
