@@ -23,7 +23,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cnabio/cnab-go v0.23.4 // indirect
 	github.com/cnabio/cnab-to-oci v0.3.7 // indirect
-	github.com/compose-spec/compose-go v1.6.0 // indirect
+	github.com/compose-spec/compose-go v1.7.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/containerd v1.6.9 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
