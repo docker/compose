@@ -1,0 +1,9 @@
+services:
+  foo:
+    image: built-image-dependency
+    build:
+      context: .
+  bar:
+    image: built-image-dependency
+    depends_on:
+      - foo
