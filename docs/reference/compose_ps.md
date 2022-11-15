@@ -35,7 +35,7 @@ example-foo-1  "/docker-entrypoint.…"   foo       running      0.0.0.0:8080->8
 
 By default, the `docker compose ps` command uses a table ("pretty") format to
 show the containers. The `--format` flag allows you to specify alternative
-presentations for the output. Currently supported options are `pretty` (default),
+presentations for the output. Currently, supported options are `pretty` (default),
 and `json`, which outputs information about the containers as a JSON array:
 
 ```console
@@ -85,7 +85,7 @@ $ docker compose ps --format json | jq .
 ### <a name="status"></a> Filter containers by status (--status)
 
 Use the `--status` flag to filter the list of containers by status. For example,
-to show only containers that are running, or only containers that have exited:
+to show only containers that are running or only containers that have exited:
 
 ```console
 $ docker compose ps --status=running
@@ -99,7 +99,7 @@ example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
 
 ### <a name="filter"></a> Filter containers by status (--filter)
 
-The [`--status` flag](#status) is a convenience shorthand for the `--filter status=<status>`
+The [`--status` flag](#status) is a convenient shorthand for the `--filter status=<status>`
 flag. The example below is the equivalent to the example from the previous section,
 this time using the `--filter` flag:
 
@@ -114,4 +114,4 @@ example-bar-1  "/docker-entrypoint.…"   bar       exited (0)
 ```
 
 The `docker compose ps` command currently only supports the `--filter status=<status>`
-option, but additional filter options may be added in future.
+option, but additional filter options may be added in the future.
