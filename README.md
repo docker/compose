@@ -10,7 +10,7 @@
 
 Docker Compose is a tool for running multi-container applications on Docker
 defined using the [Compose file format](https://compose-spec.io).
-A Compose file is used to define how the one or more containers that make up
+A Compose file is used to define how one or more containers that make up
 your application are configured.
 Once you have a Compose file, you can create and start your application with a
 single command: `docker compose up`.
@@ -47,7 +47,7 @@ Or copy it into one of these folders to install it system-wide:
 Quick Start
 -----------
 
-Using Docker Compose is basically a three-step process:
+Using Docker Compose is a three-step process:
 1. Define your app's environment with a `Dockerfile` so it can be
    reproduced anywhere.
 2. Define the services that make up your app in `docker-compose.yml` so
