@@ -5,10 +5,10 @@ go 1.19
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/buger/goterm v1.0.4
-	github.com/cnabio/cnab-to-oci v0.3.7
+	github.com/cnabio/cnab-to-oci v0.3.1-beta1
 	github.com/compose-spec/compose-go v1.7.0
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.9
+	github.com/containerd/containerd v1.6.10
 	github.com/distribution/distribution/v3 v3.0.0-20221108081720-e9a25da7a47e
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
@@ -46,7 +46,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cnabio/cnab-go v0.23.4 // indirect
+	github.com/cnabio/cnab-go v0.23.0 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
@@ -102,7 +102,6 @@ require (
 	github.com/qri-io/jsonschema v0.2.2-0.20210831022256-780655b2ba0e // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/serialx/hashring v0.0.0-20190422032157-8b2912629002 // indirect
-	github.com/spf13/viper v1.4.0 // indirect
 	github.com/tonistiigi/fsutil v0.0.0-20220930225714-4638ad635be5 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20210615222946-8066bb97264f // indirect
@@ -142,6 +141,16 @@ require (
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
+)
+
+require (
+	github.com/gobuffalo/logger v1.0.3 // indirect
+	github.com/gobuffalo/packd v1.0.0 // indirect
+	github.com/gobuffalo/packr/v2 v2.8.0 // indirect
+	github.com/karrick/godirwalk v1.15.3 // indirect
+	github.com/markbates/errx v1.1.0 // indirect
+	github.com/markbates/oncer v1.0.0 // indirect
+	github.com/markbates/safe v1.0.1 // indirect
 )
 
 replace (
