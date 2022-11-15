@@ -55,7 +55,7 @@ Docker Compose
 You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
 multiple services in Docker containers.
 
-### Use `-f` to specify name and path of one or more Compose files
+### Use `-f` to specify the name and path of one or more Compose files
 Use the `-f` flag to specify the location of a Compose configuration file.
 
 #### Specifying multiple Compose files
@@ -118,8 +118,8 @@ Each configuration has a project name. If you supply a `-p` flag, you can specif
 specify the flag, Compose uses the current directory name.
 Project name can also be set by `COMPOSE_PROJECT_NAME` environment variable.
 
-Most compose subcommand can be ran without a compose file, just passing
-project name to retrieve the relevant resources.
+Most compose subcommand can be run without a compose file, just passing
+the project name to retrieve the relevant resources.
 
 ```console
 $ docker compose -p my_project ps -a
@@ -145,10 +145,10 @@ Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 You can set environment variables for various docker compose options, including the `-f`, `-p` and `--profiles` flags.
 
 Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
-`COMPOSE_PROJECT_NAME` environment variable does the same for to the `-p` flag,
-and so does `COMPOSE_PROFILES` environment variable for to the `--profiles` flag.
+`COMPOSE_PROJECT_NAME` environment variable does the same to the `-p` flag,
+and so does `COMPOSE_PROFILES` environment variable to the `--profiles` flag.
 
-If flags are explicitly set on command line, associated environment variable is ignored
+If flags are explicitly set on the command line, the associated environment variable is ignored
 
 Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
 containers for the project.
