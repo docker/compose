@@ -51,6 +51,7 @@ type convertOptions struct {
 	profiles            bool
 	images              bool
 	hash                string
+	noConsistency       bool
 }
 
 func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
@@ -101,6 +102,7 @@ func convertCommand(p *projectOptions, backend api.Service) *cobra.Command {
 	flags.BoolVarP(&opts.quiet, "quiet", "q", false, "Only validate the configuration, don't print anything.")
 	flags.BoolVar(&opts.noInterpolate, "no-interpolate", false, "Don't interpolate environment variables.")
 	flags.BoolVar(&opts.noNormalize, "no-normalize", false, "Don't normalize compose model.")
+	flags.BoolVar(&opts.noConsistency, "no-consistency", false, "Don't check model consistency - warning: may produce invalid Compose output")
 
 	flags.BoolVar(&opts.services, "services", false, "Print the service names, one per line.")
 	flags.BoolVar(&opts.volumes, "volumes", false, "Print the volume names, one per line.")
@@ -118,6 +120,7 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 		cli.WithInterpolation(!opts.noInterpolate),
 		cli.WithResolvedPaths(true),
 		cli.WithNormalization(!opts.noNormalize),
+		cli.WithConsistency(!opts.noConsistency),
 		cli.WithDiscardEnvFile)
 
 	if err != nil {

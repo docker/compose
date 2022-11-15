@@ -14,6 +14,7 @@ Converts the compose file to the platform's canonical format
 | `--format` | `string` | `yaml` | Format the output. Values: [yaml \| json] |
 | `--hash` | `string` |  | Print the service config hash, one per line. |
 | `--images` |  |  | Print the image names, one per line. |
+| `--no-consistency` |  |  | Don't check model consistency - warning: may produce invalid Compose output |
 | `--no-interpolate` |  |  | Don't interpolate environment variables. |
 | `--no-normalize` |  |  | Don't normalize compose model. |
 | `-o`, `--output` | `string` |  | Save to file (default to stdout) |
