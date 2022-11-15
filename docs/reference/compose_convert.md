@@ -1,7 +1,7 @@
 # docker compose convert
 
 <!---MARKER_GEN_START-->
-Converts the compose file to platform's canonical format
+Converts the compose file to the platform's canonical format
 
 ### Aliases
 
@@ -28,8 +28,8 @@ Converts the compose file to platform's canonical format
 
 ## Description
 
-`docker compose convert` render the actual data model to be applied on target platform. When used with Docker engine,
+`docker compose convert` renders the actual data model to be applied on the target platform. When used with the Docker engine,
 it merges the Compose files set by `-f` flags, resolves variables in Compose file, and expands short-notation into
-fully defined Compose model.
+a fully defined Compose model.
 
 To allow smooth migration from docker-compose, this subcommand declares alias `docker compose config`
