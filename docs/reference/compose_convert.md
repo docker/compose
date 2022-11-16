@@ -1,7 +1,7 @@
 # docker compose convert
 
 <!---MARKER_GEN_START-->
-Converts the compose file to the platform's canonical format
+Converts the compose file to platform's canonical format
 
 ### Aliases
 
