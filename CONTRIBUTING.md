@@ -2,7 +2,7 @@
 
 Want to hack on Docker? Awesome!  We have a contributor's guide that explains
 [setting up a Docker development environment and the contribution
-process](https://docs.docker.com/opensource/project/who-written-for/).
+process](https://docs.docker.com/contribute/overview/).
 
 This page contains information about reporting issues as well as some tips and
 guidelines useful to experienced open source contributors. Finally, make sure
@@ -11,11 +11,19 @@ start participating.
 
 ## Topics
 
-* [Reporting Security Issues](#reporting-security-issues)
-* [Design and Cleanup Proposals](#design-and-cleanup-proposals)
-* [Reporting Issues](#reporting-other-issues)
-* [Quick Contribution Tips and Guidelines](#quick-contribution-tips-and-guidelines)
-* [Community Guidelines](#docker-community-guidelines)
+- [Contributing to Docker](#contributing-to-docker)
+  - [Topics](#topics)
+  - [Reporting security issues](#reporting-security-issues)
+  - [Reporting other issues](#reporting-other-issues)
+  - [Quick contribution tips and guidelines](#quick-contribution-tips-and-guidelines)
+    - [Pull requests are always welcome](#pull-requests-are-always-welcome)
+    - [Talking to other Docker users and contributors](#talking-to-other-docker-users-and-contributors)
+    - [Conventions](#conventions)
+    - [Merge approval](#merge-approval)
+    - [Sign your work](#sign-your-work)
+    - [How can I become a maintainer?](#how-can-i-become-a-maintainer)
+  - [Docker community guidelines](#docker-community-guidelines)
+  - [Coding Style](#coding-style)
 
 ## Reporting security issues
 
