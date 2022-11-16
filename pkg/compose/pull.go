@@ -110,7 +110,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		imagesBeingPulled[service.Image] = service.Name
 
 		eg.Go(func() error {
-			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false)
+			_, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, false, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 			if err != nil {
 				if !opts.IgnoreFailures {
 					if service.Build != nil {
@@ -146,7 +146,8 @@ func imageAlreadyPresent(serviceImage string, localImages map[string]string) boo
 	return ok && tagged.Tag() != "latest"
 }
 
-func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info, configFile driver.Auth, w progress.Writer, quietPull bool) (string, error) {
+func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, info moby.Info,
+	configFile driver.Auth, w progress.Writer, quietPull bool, defaultPlatform string) (string, error) {
 	w.Event(progress.Event{
 		ID:     service.Name,
 		Status: progress.Working,
@@ -176,10 +177,14 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	if err != nil {
 		return "", err
 	}
+	platform := service.Platform
+	if platform == "" {
+		platform = defaultPlatform
+	}
 
 	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
 		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
-		Platform:     service.Platform,
+		Platform:     platform,
 	})
 
 	// check if has error and the service has a build section
@@ -269,7 +274,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		for i, service := range needPull {
 			i, service := i, service
 			eg.Go(func() error {
-				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
+				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				pulledImages[i] = id
 				if err != nil && isServiceImageToBuild(service, project.Services) {
 					// image can be built, so we can ignore pull failure
