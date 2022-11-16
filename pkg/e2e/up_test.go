@@ -104,3 +104,22 @@ func TestUpDependenciesNotStopped(t *testing.T) {
 	RequireServiceState(t, c, "dependency", "running")
 	RequireServiceState(t, c, "orphan", "running")
 }
+
+func TestUpWithBuildDependencies(t *testing.T) {
+	c := NewParallelCLI(t)
+
+	t.Run("up with service using image build by an another service", func(t *testing.T) {
+		// ensure local test run does not reuse previously build image
+		c.RunDockerOrExitError(t, "rmi", "built-image-dependency")
+
+		res := c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
+			"-f", "fixtures/dependencies/service-image-depends-on.yaml", "up", "-d")
+
+		t.Cleanup(func() {
+			c.RunDockerComposeCmd(t, "--project-directory", "fixtures/dependencies",
+				"-f", "fixtures/dependencies/service-image-depends-on.yaml", "down", "--rmi", "all")
+		})
+
+		res.Assert(t, icmd.Success)
+	})
+}

@@ -271,7 +271,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			eg.Go(func() error {
 				id, err := s.pullServiceImage(ctx, service, info, s.configFile(), w, quietPull)
 				pulledImages[i] = id
-				if err != nil && service.Build != nil {
+				if err != nil && isServiceImageToBuild(service, project.Services) {
 					// image can be built, so we can ignore pull failure
 					return nil
 				}
@@ -289,6 +289,19 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		return err
 	})
+}
+
+func isServiceImageToBuild(service types.ServiceConfig, services []types.ServiceConfig) bool {
+	if service.Build != nil {
+		return true
+	}
+
+	for _, depService := range services {
+		if depService.Image == service.Image && depService.Build != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func toPullProgressEvent(parent string, jm jsonmessage.JSONMessage, w progress.Writer) {
