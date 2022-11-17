@@ -7,6 +7,7 @@ Run a one-off command on a service.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
+| `--build` |  |  | Build image before starting container. |
 | `-d`, `--detach` |  |  | Run container in background and print container ID |
 | `--entrypoint` | `string` |  | Override the entrypoint of the image |
 | `-e`, `--env` | `stringArray` |  | Set environment variables |
