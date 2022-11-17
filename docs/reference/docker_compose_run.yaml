@@ -58,6 +58,16 @@ usage: docker compose run [OPTIONS] SERVICE [COMMAND] [ARGS...]
 pname: docker compose
 plink: docker_compose.yaml
 options:
+    - option: build
+      value_type: bool
+      default_value: "false"
+      description: Build image before starting container.
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: detach
       shorthand: d
       value_type: bool
