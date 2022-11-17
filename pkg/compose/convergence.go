@@ -226,10 +226,7 @@ func (c *convergence) ensureService(ctx context.Context, project *types.Project,
 		updated[i] = container
 	}
 
-	next, err := nextContainerNumber(containers)
-	if err != nil {
-		return err
-	}
+	next := nextContainerNumber(containers)
 	for i := 0; i < expected-actual; i++ {
 		// Scale UP
 		number := next + i
@@ -370,18 +367,23 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 	return true, nil
 }
 
-func nextContainerNumber(containers []moby.Container) (int, error) {
+func nextContainerNumber(containers []moby.Container) int {
 	max := 0
 	for _, c := range containers {
-		n, err := strconv.Atoi(c.Labels[api.ContainerNumberLabel])
+		s, ok := c.Labels[api.ContainerNumberLabel]
+		if !ok {
+			logrus.Warnf("container %s is missing %s label", c.ID, api.ContainerNumberLabel)
+		}
+		n, err := strconv.Atoi(s)
 		if err != nil {
-			return 0, err
+			logrus.Warnf("container %s has invalid %s label: %s", c.ID, api.ContainerNumberLabel, s)
+			continue
 		}
 		if n > max {
 			max = n
 		}
 	}
-	return max + 1, nil
+	return max + 1
 
 }
 
