@@ -64,7 +64,7 @@ FROM debian:bullseye-slim AS compose-plugin
 WORKDIR /root
 COPY --from=make-compose-plugin /out/* /usr/local/bin/
 
-RUN adduser -D -h /home/cfu -s /bin/bash cfu
+RUN adduser --gecos "" --disabled-password --home /home/cfu --shell /bin/bash cfu
 USER cfu
 
 ENTRYPOINT [ "docker-compose" ]
