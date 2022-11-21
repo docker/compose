@@ -405,7 +405,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	w := progress.ContextWriter(ctx)
 	eventName := "Container " + name
 	w.Event(progress.CreatingEvent(eventName))
-	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin)
+	container, err = s.createMobyContainer(ctx, project, service, name, number, nil, autoRemove, useNetworkAliases, attachStdin, w)
 	if err != nil {
 		return
 	}
@@ -439,7 +439,7 @@ func (s *composeService) recreateContainer(ctx context.Context, project *types.P
 		inherited = &replaced
 	}
 	name = getContainerName(project.Name, service, number)
-	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false)
+	created, err = s.createMobyContainer(ctx, project, service, name, number, inherited, false, true, false, w)
 	if err != nil {
 		return created, err
 	}
@@ -477,7 +477,7 @@ func (s *composeService) startContainer(ctx context.Context, container moby.Cont
 }
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
-	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool) (moby.Container, error) {
+	name string, number int, inherit *moby.Container, autoRemove bool, useNetworkAliases bool, attachStdin bool, w progress.Writer) (moby.Container, error) {
 	var created moby.Container
 	containerConfig, hostConfig, networkingConfig, err := s.getCreateOptions(ctx, project, service, number, inherit, autoRemove, attachStdin)
 	if err != nil {
@@ -495,6 +495,13 @@ func (s *composeService) createMobyContainer(ctx context.Context, project *types
 	response, err := s.apiClient().ContainerCreate(ctx, containerConfig, hostConfig, networkingConfig, plat, name)
 	if err != nil {
 		return created, err
+	}
+	for _, warning := range response.Warnings {
+		w.Event(progress.Event{
+			ID:     service.Name,
+			Status: progress.Warning,
+			Text:   warning,
+		})
 	}
 	inspectedContainer, err := s.apiClient().ContainerInspect(ctx, response.ID)
 	if err != nil {
