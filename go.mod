@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/buger/goterm v1.0.4
-	github.com/cnabio/cnab-to-oci v0.3.1-beta1
+	github.com/cnabio/cnab-to-oci v0.3.7
 	github.com/compose-spec/compose-go v1.7.0
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.10
@@ -46,7 +46,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cnabio/cnab-go v0.23.0 // indirect
+	github.com/cnabio/cnab-go v0.23.4 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
@@ -143,15 +143,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-require (
-	github.com/gobuffalo/logger v1.0.3 // indirect
-	github.com/gobuffalo/packd v1.0.0 // indirect
-	github.com/gobuffalo/packr/v2 v2.8.0 // indirect
-	github.com/karrick/godirwalk v1.15.3 // indirect
-	github.com/markbates/errx v1.1.0 // indirect
-	github.com/markbates/oncer v1.0.0 // indirect
-	github.com/markbates/safe v1.0.1 // indirect
-)
+require github.com/spf13/viper v1.4.0 // indirect
 
 replace (
 	github.com/docker/cli => github.com/docker/cli v20.10.3-0.20221013132413-1d6c6e2367e2+incompatible // 22.06 master branch
