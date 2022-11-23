@@ -415,8 +415,8 @@ func useDockerDefaultOrServicePlatform(project *types.Project, service types.Ser
 		return plats, err
 	}
 
-	if service.Platform != "" && !utils.StringContains(service.Build.Platforms, service.Platform) {
-		if len(service.Build.Platforms) > 0 {
+	if service.Platform != "" {
+		if len(service.Build.Platforms) > 0 && !utils.StringContains(service.Build.Platforms, service.Platform) {
 			return nil, fmt.Errorf("service.platform %q should be part of the service.build.platforms: %q", service.Platform, service.Build.Platforms)
 		}
 		// User defined a service platform and no build platforms, so we should keep the one define on the service level
