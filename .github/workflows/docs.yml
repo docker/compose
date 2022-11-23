@@ -19,7 +19,7 @@ jobs:
         with:
           token: ${{ secrets.GHPAT_DOCS_DISPATCH }}
           repository: docker/docs
-          ref: master
+          ref: main
       -
         name: Prepare
         run: |
