@@ -6,7 +6,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/docker/compose/v2?style=flat-square)](https://goreportcard.com/report/github.com/docker/compose/v2)
 [![Codecov](https://codecov.io/gh/docker/compose/branch/master/graph/badge.svg?token=HP3K4Y4ctu)](https://codecov.io/gh/docker/compose)
 
-![Docker Compose](logo.png?raw=true "Docker Compose Logo")
+![Docker Compose](https://i.imgur.com/WGV6N2l.png) 
 
 Docker Compose is a tool for running multi-container applications on Docker
 defined using the [Compose file format](https://compose-spec.io).
