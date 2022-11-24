@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
 	buildx "github.com/docker/buildx/util/progress"
+	"github.com/docker/compose/v2/pkg/progress"
 	"github.com/docker/compose/v2/pkg/utils"
 	"github.com/spf13/cobra"
 
@@ -99,6 +100,9 @@ func buildCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		RunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("ssh") && opts.ssh == "" {
 				opts.ssh = "default"
+			}
+			if progress.Mode == progress.ModePlain && !cmd.Flags().Changed("progress") {
+				opts.progress = buildx.PrinterModePlain
 			}
 			return runBuild(ctx, backend, opts, args)
 		}),
