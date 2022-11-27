@@ -4,7 +4,7 @@ long: |-
     You can use compose subcommand, `docker compose [-f <arg>...] [options] [COMMAND] [ARGS...]`, to build and manage
     multiple services in Docker containers.
 
-    ### Use `-f` to specify the path to one or more Compose files
+    ### Use `-f` to specify the name and path of one or more Compose files
     Use the `-f` flag to specify the location of a Compose configuration file.
 
     #### Specifying multiple Compose files
@@ -97,7 +97,7 @@ long: |-
     `COMPOSE_PROJECT_NAME` environment variable does the same as the `-p` flag,
     and `COMPOSE_PROFILES` environment variable is equivalent to the `--profiles` flag.
 
-    If a flag is set via the command line, the associated environment variable is ignored.
+    If flags are explicitly set on the command line, the associated environment variable is ignored.
 
     Setting the `COMPOSE_IGNORE_ORPHANS` environment variable to `true` will stop docker compose from detecting orphaned
     containers for the project.
