@@ -17,4 +17,4 @@ List running compose projects
 
 ## Description
 
-List Compose projects running on a platform.
+Lists running Compose projects.
