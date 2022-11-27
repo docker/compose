@@ -145,7 +145,7 @@ suggested modifications and push additional commits to your feature branch. Post
 a comment after pushing. New commits show up in the pull request automatically,
 but the reviewers are notified only when you comment.
 
-Pull requests must be cleanly rebased on top of the master without multiple branches
+Pull requests must be cleanly rebased on top of the base branch without multiple branches
 mixed into the PR.
 
 **Git tip**: If your PR no longer merges cleanly, use `rebase master` in your
@@ -298,10 +298,10 @@ The rules:
 1. All code should be formatted with `gofmt -s`.
 2. All code should pass the default levels of
    [`golint`](https://github.com/golang/lint).
-3. All codes should follow the guidelines covered in [Effective
+3. All code should follow the guidelines covered in [Effective
    Go](http://golang.org/doc/effective_go.html) and [Go Code Review
    Comments](https://github.com/golang/go/wiki/CodeReviewComments).
-4. Comment on the code. Tell us the why, the history and the context.
+4. Include code comments. Tell us the why, the history and the context.
 5. Document _all_ declarations and methods, even private ones. Declare
    expectations, caveats and anything else that may be important. If a type
    gets exported, having the comments already there will ensure it's ready.
