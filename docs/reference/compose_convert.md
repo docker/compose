@@ -29,7 +29,7 @@ Converts the compose file to platform's canonical format
 ## Description
 
 `docker compose convert` renders the actual data model to be applied on the target platform. When used with the Docker engine,
-it merges the Compose files set by `-f` flags, resolves variables in Compose file, and expands short-notation into
-a fully defined Compose model.
+it merges the Compose files set by `-f` flags, resolves variables in the Compose file, and expands short-notation into
+the canonical format.
 
 To allow smooth migration from docker-compose, this subcommand declares alias `docker compose config`
