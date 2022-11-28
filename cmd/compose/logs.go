@@ -63,7 +63,7 @@ func logsCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runLogs(ctx context.Context, backend api.Service, opts logsOptions, services []string) error {
-	project, name, err := opts.projectOrName()
+	project, name, err := opts.projectOrName(services...)
 	if err != nil {
 		return err
 	}
