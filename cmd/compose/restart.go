@@ -49,7 +49,7 @@ func restartCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runRestart(ctx context.Context, backend api.Service, opts restartOptions, services []string) error {
-	project, name, err := opts.projectOrName()
+	project, name, err := opts.projectOrName(services...)
 	if err != nil {
 		return err
 	}

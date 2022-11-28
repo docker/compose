@@ -54,7 +54,7 @@ func killCommand(p *projectOptions, backend api.Service) *cobra.Command {
 }
 
 func runKill(ctx context.Context, backend api.Service, opts killOptions, services []string) error {
-	project, name, err := opts.projectOrName()
+	project, name, err := opts.projectOrName(services...)
 	if err != nil {
 		return err
 	}
