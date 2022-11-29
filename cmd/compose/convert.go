@@ -26,12 +26,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/cli"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/distribution/distribution/v3/reference"
-	cliconfig "github.com/docker/cli/cli/config"
-	"github.com/opencontainers/go-digest"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v2/pkg/api"
@@ -127,22 +123,10 @@ func runConvert(ctx context.Context, backend api.Service, opts convertOptions, s
 		return err
 	}
 
-	if opts.resolveImageDigests {
-		configFile := cliconfig.LoadDefaultConfigFile(os.Stderr)
-
-		resolver := remotes.CreateResolver(configFile)
-		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
-			_, desc, err := resolver.Resolve(ctx, named.String())
-			return desc.Digest, err
-		})
-		if err != nil {
-			return err
-		}
-	}
-
 	content, err = backend.Convert(ctx, project, api.ConvertOptions{
-		Format: opts.Format,
-		Output: opts.Output,
+		Format:              opts.Format,
+		Output:              opts.Output,
+		ResolveImageDigests: opts.resolveImageDigests,
 	})
 	if err != nil {
 		return err

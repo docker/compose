@@ -23,16 +23,19 @@ import (
 	"io"
 	"strings"
 
-	"gopkg.in/yaml.v2"
-
+	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/types"
+	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
+	registry "github.com/docker/cli/cli/registry/client"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 
 	"github.com/docker/compose/v2/pkg/api"
 )
@@ -50,6 +53,10 @@ type composeService struct {
 
 func (s *composeService) apiClient() client.APIClient {
 	return s.dockerCli.Client()
+}
+
+func (s *composeService) registryClient() registry.RegistryClient {
+	return s.dockerCli.RegistryClient(false)
 }
 
 func (s *composeService) configFile() *configfile.ConfigFile {
@@ -93,6 +100,18 @@ func getContainerNameWithoutProject(c moby.Container) string {
 }
 
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
+	if options.ResolveImageDigests {
+		// TODO use dockercli.RegistryClient instead
+		resolver := remotes.CreateResolver(s.configFile())
+		err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+			_, desc, err := resolver.Resolve(ctx, named.String())
+			return desc.Digest, err
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	switch options.Format {
 	case "json":
 		return json.MarshalIndent(project, "", "  ")
