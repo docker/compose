@@ -22,12 +22,12 @@ start participating.
 The Docker maintainers take security seriously. If you discover a security
 issue, please bring it to their attention right away!
 
-Please **DO NOT** file a public issue, instead send your report privately to
+Please **DO NOT** file a public issue, instead, send your report privately to
 [security@docker.com](mailto:security@docker.com).
 
-Security reports are greatly appreciated and we will publicly thank you for it.
+Security reports are greatly appreciated and we will publicly thank you for them.
 We also like to send gifts&mdash;if you're into Docker swag, make sure to let
-us know. We currently do not offer a paid security bounty program, but are not
+us know. We currently do not offer a paid security bounty program but are not
 ruling it out in the future.
 
 
@@ -39,11 +39,11 @@ and will thank you for it!
 
 Check that [our issue database](https://github.com/docker/compose/labels/Docker%20Compose%20V2)
 doesn't already include that problem or suggestion before submitting an issue.
-If you find a match, you can use the "subscribe" button to get notified on
+If you find a match, you can use the "subscribe" button to get notified of
 updates. Do *not* leave random "+1" or "I have this too" comments, as they
 only clutter the discussion, and don't help to resolve it. However, if you
 have ways to reproduce the issue or have additional information that may help
-resolving the issue, please leave a comment.
+resolve the issue, please leave a comment.
 
 When reporting issues, always include:
 
@@ -51,7 +51,7 @@ When reporting issues, always include:
 * The output of `docker context show`.
 * The output of `docker info`.
 
-Also include the steps required to reproduce the problem if possible and
+Also, include the steps required to reproduce the problem if possible and
 applicable. This information will help us review and fix your issue faster.
 When sending lengthy log files, consider posting them as a gist
 (https://gist.github.com).
@@ -124,7 +124,7 @@ Fork the repository and make changes on your fork in a feature branch:
     issue.
 
 Submit unit tests for your changes. Go has a great test framework built in; use
-it! Take a look at existing tests for inspiration. Also end-to-end tests are
+it! Take a look at existing tests for inspiration. Also, end-to-end tests are
 available. Run the full test suite, both unit tests and e2e tests on your
 branch before submitting a pull request. See [BUILDING.md](BUILDING.md) for
 instructions to build and run tests.
@@ -145,7 +145,7 @@ suggested modifications and push additional commits to your feature branch. Post
 a comment after pushing. New commits show up in the pull request automatically,
 but the reviewers are notified only when you comment.
 
-Pull requests must be cleanly rebased on top of master without multiple branches
+Pull requests must be cleanly rebased on top of the base branch without multiple branches
 mixed into the PR.
 
 **Git tip**: If your PR no longer merges cleanly, use `rebase master` in your
@@ -165,7 +165,7 @@ changes in the same pull request so that a revert would remove all traces of
 the feature or fix.
 
 Include an issue reference like `Closes #XXXX` or `Fixes #XXXX` in the pull
-request description that close an issue. Including references automatically
+request description that closes an issue. Including references automatically
 closes the issue on a merge.
 
 Please do not add yourself to the `AUTHORS` file, as it is regenerated regularly
@@ -256,7 +256,7 @@ your help to keep it that way. To help with this we've come up with some general
 guidelines for the community as a whole:
 
 * Be nice: Be courteous, respectful and polite to fellow community members:
-  no regional, racial, gender, or other abuse will be tolerated. We like
+  no regional, racial, gender or other abuse will be tolerated. We like
   nice people way better than mean ones!
 
 * Encourage diversity and participation: Make everyone in our community feel
@@ -270,10 +270,10 @@ guidelines for the community as a whole:
 
 * Stay on topic: Make sure that you are posting to the correct channel and
   avoid off-topic discussions. Remember when you update an issue or respond
-  to an email you are potentially sending to a large number of people. Please
-  consider this before you update. Also remember that nobody likes spam.
+  to an email you are potentially sending it to a large number of people. Please
+  consider this before you update. Also, remember that nobody likes spam.
 
-* Don't send email to the maintainers: There's no need to send email to the
+* Don't send emails to the maintainers: There's no need to send emails to the
   maintainers to ask them to investigate an issue or to take a look at a
   pull request. Instead of sending an email, GitHub mentions should be
   used to ping maintainers to review a pull request, a proposal or an
@@ -287,7 +287,7 @@ to result in a solid, consistent codebase.
 
 It is possible that the code base does not currently comply with these
 guidelines. We are not looking for a massive PR that fixes this, since that
-goes against the spirit of the guidelines. All new contributions should make a
+goes against the spirit of the guidelines. All new contributors should make their
 best effort to clean up and make the code base better than they left it.
 Obviously, apply your best judgement. Remember, the goal here is to make the
 code base easier for humans to navigate and understand. Always keep that in
@@ -301,7 +301,7 @@ The rules:
 3. All code should follow the guidelines covered in [Effective
    Go](http://golang.org/doc/effective_go.html) and [Go Code Review
    Comments](https://github.com/golang/go/wiki/CodeReviewComments).
-4. Comment the code. Tell us the why, the history and the context.
+4. Include code comments. Tell us the why, the history and the context.
 5. Document _all_ declarations and methods, even private ones. Declare
    expectations, caveats and anything else that may be important. If a type
    gets exported, having the comments already there will ensure it's ready.
