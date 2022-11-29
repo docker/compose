@@ -179,6 +179,8 @@ type ConvertOptions struct {
 	Format string
 	// Output defines the path to save the application model
 	Output string
+	// Resolve image reference to digests
+	ResolveImageDigests bool
 }
 
 // PushOptions group options of the Push API
