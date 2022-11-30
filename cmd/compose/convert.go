@@ -240,7 +240,7 @@ func runConfigImages(opts convertOptions, services []string) error {
 		if s.Image != "" {
 			fmt.Println(s.Image)
 		} else {
-			fmt.Printf("%s_%s\n", project.Name, s.Name)
+			fmt.Printf("%s%s%s\n", project.Name, api.Separator, s.Name)
 		}
 	}
 	return nil
