@@ -23,12 +23,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/cnabio/cnab-to-oci/remotes"
 	"github.com/compose-spec/compose-go/types"
 	"github.com/distribution/distribution/v3/reference"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
-	registry "github.com/docker/cli/cli/registry/client"
 	"github.com/docker/cli/cli/streams"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
@@ -53,10 +51,6 @@ type composeService struct {
 
 func (s *composeService) apiClient() client.APIClient {
 	return s.dockerCli.Client()
-}
-
-func (s *composeService) registryClient() registry.RegistryClient {
-	return s.dockerCli.RegistryClient(false)
 }
 
 func (s *composeService) configFile() *configfile.ConfigFile {
@@ -101,11 +95,20 @@ func getContainerNameWithoutProject(c moby.Container) string {
 
 func (s *composeService) Convert(ctx context.Context, project *types.Project, options api.ConvertOptions) ([]byte, error) {
 	if options.ResolveImageDigests {
-		// TODO use dockercli.RegistryClient instead
-		resolver := remotes.CreateResolver(s.configFile())
-		err := project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
-			_, desc, err := resolver.Resolve(ctx, named.String())
-			return desc.Digest, err
+		info, err := s.apiClient().Info(ctx)
+		if err != nil {
+			return nil, err
+		}
+		err = project.ResolveImages(func(named reference.Named) (digest.Digest, error) {
+			auth, err := encodedAuth(named, info, s.configFile())
+			if err != nil {
+				return "", err
+			}
+			inspect, err := s.apiClient().DistributionInspect(ctx, named.String(), auth)
+			if err != nil {
+				return "", err
+			}
+			return inspect.Descriptor.Digest, nil
 		})
 		if err != nil {
 			return nil, err
@@ -118,7 +121,7 @@ func (s *composeService) Convert(ctx context.Context, project *types.Project, op
 	case "yaml":
 		return yaml.Marshal(project)
 	default:
-		return nil, fmt.Errorf("unsupported format %q", options)
+		return nil, fmt.Errorf("unsupported format %q", options.Format)
 	}
 }
 
