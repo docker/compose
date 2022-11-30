@@ -158,32 +158,18 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 
-	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	encodedAuth, err := encodedAuth(ref, info, configFile)
 	if err != nil {
 		return "", err
 	}
 
-	key := repoInfo.Index.Name
-	if repoInfo.Index.Official {
-		key = info.IndexServerAddress
-	}
-
-	authConfig, err := configFile.GetAuthConfig(key)
-	if err != nil {
-		return "", err
-	}
-
-	buf, err := json.Marshal(authConfig)
-	if err != nil {
-		return "", err
-	}
 	platform := service.Platform
 	if platform == "" {
 		platform = defaultPlatform
 	}
 
 	stream, err := s.apiClient().ImagePull(ctx, service.Image, moby.ImagePullOptions{
-		RegistryAuth: base64.URLEncoding.EncodeToString(buf),
+		RegistryAuth: encodedAuth,
 		Platform:     platform,
 	})
 
@@ -234,6 +220,29 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return "", err
 	}
 	return inspected.ID, nil
+}
+
+func encodedAuth(ref reference.Named, info moby.Info, configFile driver.Auth) (string, error) {
+	repoInfo, err := registry.ParseRepositoryInfo(ref)
+	if err != nil {
+		return "", err
+	}
+
+	key := repoInfo.Index.Name
+	if repoInfo.Index.Official {
+		key = info.IndexServerAddress
+	}
+
+	authConfig, err := configFile.GetAuthConfig(key)
+	if err != nil {
+		return "", err
+	}
+
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(buf), nil
 }
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]string, quietPull bool) error {
