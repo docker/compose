@@ -1,0 +1,8 @@
+services:
+  main:
+    image: nginx:alpine
+
+  profiled-service:
+    image: nginx:alpine
+    profiles:
+      - test-profile
