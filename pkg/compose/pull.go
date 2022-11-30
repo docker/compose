@@ -63,6 +63,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	w := progress.ContextWriter(ctx)
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
 
 	var mustBuild []string
 
@@ -279,6 +280,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	return progress.Run(ctx, func(ctx context.Context) error {
 		w := progress.ContextWriter(ctx)
 		eg, ctx := errgroup.WithContext(ctx)
+		eg.SetLimit(s.maxConcurrency)
 		pulledImages := make([]string, len(needPull))
 		for i, service := range needPull {
 			i, service := i, service

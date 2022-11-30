@@ -194,6 +194,18 @@ func (mr *MockServiceMockRecorder) Logs(ctx, projectName, consumer, options inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logs", reflect.TypeOf((*MockService)(nil).Logs), ctx, projectName, consumer, options)
 }
 
+// MaxConcurrency mocks base method.
+func (m *MockService) MaxConcurrency(parallel int) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MaxConcurrency", parallel)
+}
+
+// MaxConcurrency indicates an expected call of MaxConcurrency.
+func (mr *MockServiceMockRecorder) MaxConcurrency(parallel interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxConcurrency", reflect.TypeOf((*MockService)(nil).MaxConcurrency), parallel)
+}
+
 // Pause mocks base method.
 func (m *MockService) Pause(ctx context.Context, projectName string, options api.PauseOptions) error {
 	m.ctrl.T.Helper()

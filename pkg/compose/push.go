@@ -47,6 +47,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(s.maxConcurrency)
 
 	info, err := s.apiClient().Info(ctx)
 	if err != nil {
