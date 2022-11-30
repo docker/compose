@@ -26,8 +26,10 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
-	"github.com/docker/compose/v2/pkg/e2e"
+	"github.com/mattn/go-shellwords"
 	"gotest.tools/v3/icmd"
+
+	"github.com/docker/compose/v2/pkg/e2e"
 )
 
 func TestCucumber(t *testing.T) {
@@ -113,8 +115,12 @@ func (th *testHelper) exitCodeIs(exitCode int) error {
 }
 
 func (th *testHelper) runComposeCommand(command string) error {
-	commandArgs := []string{"-f", "-"}
-	commandArgs = append(commandArgs, strings.Split(command, " ")...)
+	commandArgs, err := shellwords.Parse(command)
+	if err != nil {
+		return err
+	}
+	commandArgs = append([]string{"-f", "-"}, commandArgs...)
+
 	cmd := th.CLI.NewDockerComposeCmd(th.T, commandArgs...)
 	cmd.Stdin = strings.NewReader(th.ComposeFile)
 	res := icmd.RunCmd(cmd)
