@@ -1,5 +1,5 @@
 services:
-  main:
+  regular-service:
     image: nginx:alpine
 
   profiled-service:
