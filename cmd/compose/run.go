@@ -32,6 +32,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
+	"github.com/docker/compose/v2/pkg/utils"
 )
 
 type runOptions struct {
@@ -140,8 +141,7 @@ func runCommand(p *projectOptions, dockerCli command.Cli, backend api.Service) *
 			if err != nil {
 				return err
 			}
-			ignore := project.Environment["COMPOSE_IGNORE_ORPHANS"]
-			opts.ignoreOrphans = strings.ToLower(ignore) == "true"
+			opts.ignoreOrphans = utils.StringToBool(project.Environment["COMPOSE_IGNORE_ORPHANS"])
 			return runRun(ctx, backend, project, opts, createOpts)
 		}),
 		ValidArgsFunction: completeServiceNames(p),
