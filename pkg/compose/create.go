@@ -27,7 +27,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/blkiodev"
 	"github.com/docker/docker/api/types/container"
@@ -41,6 +40,8 @@ import (
 	"github.com/docker/go-units"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/compose-spec/compose-go/types"
 
 	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/compose/v2/pkg/progress"
@@ -989,7 +990,7 @@ func buildMountOptions(project types.Project, volume types.ServiceVolumeConfig) 
 			logrus.Warnf("mount of type `bind` should not define `volume` option")
 		}
 		if volume.Tmpfs != nil {
-			logrus.Warnf("mount of type `tmpfs` should not define `tmpfs` option")
+			logrus.Warnf("mount of type `bind` should not define `tmpfs` option")
 		}
 		return buildBindOption(volume.Bind), nil, nil
 	case "volume":
@@ -1044,7 +1045,7 @@ func buildTmpfsOptions(tmpfs *types.ServiceVolumeTmpfs) *mount.TmpfsOptions {
 	}
 	return &mount.TmpfsOptions{
 		SizeBytes: int64(tmpfs.Size),
-		// Mode:      , // FIXME missing from model ?
+		Mode:      os.FileMode(tmpfs.Mode),
 	}
 }
 

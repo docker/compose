@@ -21,7 +21,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -129,7 +128,7 @@ func initializePlugins(t testing.TB, configDir string) {
 
 	require.NoError(t, os.MkdirAll(filepath.Join(configDir, "cli-plugins"), 0o755),
 		"Failed to create cli-plugins directory")
-	composePlugin, err := findExecutable(DockerComposeExecutableName, []string{"../../bin/build", "../../../bin/build"})
+	composePlugin, err := findExecutable(DockerComposeExecutableName)
 	if os.IsNotExist(err) {
 		t.Logf("WARNING: docker-compose cli-plugin not found")
 	}
@@ -149,17 +148,17 @@ func dirContents(dir string) []string {
 	return res
 }
 
-func findExecutable(executableName string, paths []string) (string, error) {
-	for _, p := range paths {
-		bin, err := filepath.Abs(path.Join(p, executableName))
-		if err != nil {
-			return "", err
-		}
+func findExecutable(executableName string) (string, error) {
+	_, filename, _, _ := runtime.Caller(0)
+	root := filepath.Join(filepath.Dir(filename), "..", "..")
+	buildPath := filepath.Join(root, "bin", "build")
 
-		if _, err := os.Stat(bin); os.IsNotExist(err) {
-			continue
-		}
+	bin, err := filepath.Abs(filepath.Join(buildPath, executableName))
+	if err != nil {
+		return "", err
+	}
 
+	if _, err := os.Stat(bin); err == nil {
 		return bin, nil
 	}
 
@@ -302,7 +301,7 @@ func ComposeStandalonePath(t testing.TB) string {
 	if !composeStandaloneMode {
 		require.Fail(t, "Not running in standalone mode")
 	}
-	composeBinary, err := findExecutable(DockerComposeExecutableName, []string{"../../bin/build", "../../../bin/build"})
+	composeBinary, err := findExecutable(DockerComposeExecutableName)
 	require.NoError(t, err, "Could not find standalone Compose binary (%q)",
 		DockerComposeExecutableName)
 	return composeBinary
