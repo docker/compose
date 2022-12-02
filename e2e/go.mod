@@ -29,7 +29,7 @@ require (
 	github.com/cucumber/gherkin-go/v19 v19.0.3 // indirect
 	github.com/cucumber/messages-go/v16 v16.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/distribution/distribution/v3 v3.0.0-20221108081720-e9a25da7a47e // indirect
+	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf // indirect
 	github.com/docker/buildx v0.9.1 // indirect
 	github.com/docker/cli v20.10.20+incompatible // indirect; replaced; see replace rule for actual version
 	github.com/docker/distribution v2.8.1+incompatible // indirect
@@ -82,7 +82,7 @@ require (
 	github.com/moby/sys/sequential v0.5.0 // indirect
 	github.com/moby/sys/signal v0.7.0 // indirect
 	github.com/moby/sys/symlink v0.2.0 // indirect
-	github.com/moby/term v0.0.0-20221105221325-4eb28fa6025c // indirect
+	github.com/moby/term v0.0.0-20221128092401-c43b287e0e0f // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
