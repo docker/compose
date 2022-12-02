@@ -126,22 +126,13 @@ func updateServices(service *types.ServiceConfig, cnts Containers) {
 	if len(cnts) == 0 {
 		return
 	}
-	serviceName2containerID := make(map[string]string)
-	for _, cnt := range cnts {
-		serviceName := cnt.Labels[api.ServiceLabel]
-		if _, exists := serviceName2containerID[serviceName]; !exists {
-			serviceName2containerID[serviceName] = cnt.ID
-		}
-	}
 
-	if id, found := serviceName2containerID[getDependentServiceFromMode(service.NetworkMode)]; found {
-		service.NetworkMode = types.NetworkModeContainerPrefix + id
-	}
-	if id, found := serviceName2containerID[getDependentServiceFromMode(service.Ipc)]; found {
-		service.Ipc = types.NetworkModeContainerPrefix + id
-	}
-	if id, found := serviceName2containerID[getDependentServiceFromMode(service.Pid)]; found {
-		service.Pid = types.NetworkModeContainerPrefix + id
+	for _, str := range []*string{&service.NetworkMode, &service.Ipc, &service.Pid} {
+		if d := getDependentServiceFromMode(*str); d != "" {
+			if serviceContainers := cnts.filter(isService(d)); len(serviceContainers) > 0 {
+				*str = types.NetworkModeContainerPrefix + serviceContainers[0].ID
+			}
+		}
 	}
 	var links []string
 	for _, serviceLink := range service.Links {
