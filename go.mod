@@ -8,7 +8,7 @@ require (
 	github.com/compose-spec/compose-go v1.8.0
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd v1.6.10
-	github.com/distribution/distribution/v3 v3.0.0-20221108081720-e9a25da7a47e
+	github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf
 	github.com/docker/buildx v0.9.1 // when updating, also update the replace rules accordingly
 	github.com/docker/cli v20.10.20+incompatible // replaced; see replace rule for actual version
 	github.com/docker/cli-docs-tool v0.5.0
@@ -21,7 +21,7 @@ require (
 	github.com/mattn/go-isatty v0.0.16
 	github.com/mattn/go-shellwords v1.0.12
 	github.com/moby/buildkit v0.10.4 // replaced; see replace rule for actual version
-	github.com/moby/term v0.0.0-20221105221325-4eb28fa6025c
+	github.com/moby/term v0.0.0-20221128092401-c43b287e0e0f
 	github.com/morikuni/aec v1.0.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2

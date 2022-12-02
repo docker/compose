@@ -129,8 +129,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73/go.mod h1:xbL0rPBG9cCiLr28tMa8zpbdarY27NDyej4t/EjAShU=
-github.com/distribution/distribution/v3 v3.0.0-20221108081720-e9a25da7a47e h1:TA/651vA37cytCxRbOzA6QgQWJqothv3qtzxCInfjIo=
-github.com/distribution/distribution/v3 v3.0.0-20221108081720-e9a25da7a47e/go.mod h1:6rIc5NMSjXjjnwzWWy3HAm9gDBu+X7aCzL8VrHIKgxM=
+github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf h1:q0uyPLfHgAu2Mke31RRXErLcAbuBguRpJugWxjMNRnQ=
+github.com/distribution/distribution/v3 v3.0.0-20221201083218-92d136e113cf/go.mod h1:4x0IxAMsdeCSTr9UopCvp6MnryD2nyRLycsOrgvveAs=
 github.com/docker/buildx v0.9.1 h1:VLyyJ1s4seWHmBY+oNc0J4+jHluRHLyv8KHOYYdSu3U=
 github.com/docker/buildx v0.9.1/go.mod h1:zHiKsXO4H8cgUQFaNCqitRroVta3Kj9TVzhMhe5GLlk=
 github.com/docker/cli v20.10.3-0.20221013132413-1d6c6e2367e2+incompatible h1:je9pK1shVhf561ujVYyn8ycOEfbgXFXryWxNqkYqsxg=
@@ -423,8 +423,8 @@ github.com/moby/sys/signal v0.7.0 h1:25RW3d5TnQEoKvRbEKUGay6DCQ46IxAVTT9CUMgmsSI
 github.com/moby/sys/signal v0.7.0/go.mod h1:GQ6ObYZfqacOwTtlXvcmh9A26dVRul/hbOZn88Kg8Tg=
 github.com/moby/sys/symlink v0.2.0 h1:tk1rOM+Ljp0nFmfOIBtlV3rTDlWOwFRhjEeAhZB0nZc=
 github.com/moby/sys/symlink v0.2.0/go.mod h1:7uZVF2dqJjG/NsClqul95CqKOBRQyYSNnJ6BMgR/gFs=
-github.com/moby/term v0.0.0-20221105221325-4eb28fa6025c h1:RC8WMpjonrBfyAh6VN/POIPtYD5tRAq0qMqCRjQNK+g=
-github.com/moby/term v0.0.0-20221105221325-4eb28fa6025c/go.mod h1:9OcmHNQQUTbk4XCffrLgN1NEKc2mh5u++biHVrvHsSU=
+github.com/moby/term v0.0.0-20221128092401-c43b287e0e0f h1:J/7hjLaHLD7epG0m6TBMGmp4NQ+ibBYLfeyJWdAIFLA=
+github.com/moby/term v0.0.0-20221128092401-c43b287e0e0f/go.mod h1:15ce4BGCFxt7I5NQKT+HV0yEDxmf6fSysfEDiVo3zFM=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
