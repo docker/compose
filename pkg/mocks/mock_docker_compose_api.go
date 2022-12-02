@@ -209,7 +209,7 @@ func (mr *MockServiceMockRecorder) Pause(ctx, projectName, options interface{}) 
 }
 
 // Port mocks base method.
-func (m *MockService) Port(ctx context.Context, projectName, service string, port int, options api.PortOptions) (string, int, error) {
+func (m *MockService) Port(ctx context.Context, projectName, service string, port uint16, options api.PortOptions) (string, int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Port", ctx, projectName, service, port, options)
 	ret0, _ := ret[0].(string)

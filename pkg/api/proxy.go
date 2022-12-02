@@ -48,7 +48,7 @@ type ServiceProxy struct {
 	UnPauseFn            func(ctx context.Context, project string, options PauseOptions) error
 	TopFn                func(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
 	EventsFn             func(ctx context.Context, project string, options EventsOptions) error
-	PortFn               func(ctx context.Context, project string, service string, port int, options PortOptions) (string, int, error)
+	PortFn               func(ctx context.Context, project string, service string, port uint16, options PortOptions) (string, int, error)
 	ImagesFn             func(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 	interceptors         []Interceptor
 }
@@ -294,7 +294,7 @@ func (s *ServiceProxy) Events(ctx context.Context, projectName string, options E
 }
 
 // Port implements Service interface
-func (s *ServiceProxy) Port(ctx context.Context, projectName string, service string, port int, options PortOptions) (string, int, error) {
+func (s *ServiceProxy) Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error) {
 	if s.PortFn == nil {
 		return "", 0, ErrNotImplemented
 	}
