@@ -53,7 +53,7 @@ func (s *composeService) Port(ctx context.Context, projectName string, service s
 
 func portNotFoundError(protocol string, port uint16, ctr moby.Container) error {
 	formatPort := func(protocol string, port uint16) string {
-		return fmt.Sprintf("%s/%d", protocol, port)
+		return fmt.Sprintf("%d/%s", port, protocol)
 	}
 
 	var containerPorts []string
