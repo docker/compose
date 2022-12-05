@@ -72,7 +72,7 @@ type Service interface {
 	// Events executes the equivalent to a `compose events`
 	Events(ctx context.Context, projectName string, options EventsOptions) error
 	// Port executes the equivalent to a `compose port`
-	Port(ctx context.Context, projectName string, service string, port int, options PortOptions) (string, int, error)
+	Port(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (string, int, error)
 	// Images executes the equivalent of a `compose images`
 	Images(ctx context.Context, projectName string, options ImagesOptions) ([]ImageSummary, error)
 }

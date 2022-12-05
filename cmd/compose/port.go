@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -28,7 +29,7 @@ import (
 
 type portOptions struct {
 	*projectOptions
-	port     int
+	port     uint16
 	protocol string
 	index    int
 }
@@ -42,11 +43,12 @@ func portCommand(p *projectOptions, backend api.Service) *cobra.Command {
 		Short: "Print the public port for a port binding.",
 		Args:  cobra.MinimumNArgs(2),
 		PreRunE: Adapt(func(ctx context.Context, args []string) error {
-			port, err := strconv.Atoi(args[1])
+			port, err := strconv.ParseUint(args[1], 10, 16)
 			if err != nil {
 				return err
 			}
-			opts.port = port
+			opts.port = uint16(port)
+			opts.protocol = strings.ToLower(opts.protocol)
 			return nil
 		}),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
