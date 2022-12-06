@@ -48,8 +48,6 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions) error {
 	opts := map[string]build.Options{}
-	var imagesToBuild []string
-
 	args := flatten(options.Args.Resolve(envResolver(project.Environment)))
 
 	services, err := project.GetServices(options.Services...)
@@ -62,7 +60,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 			continue
 		}
 		imageName := api.GetImageNameOrDefault(service, project.Name)
-		imagesToBuild = append(imagesToBuild, imageName)
 		buildOptions, err := s.toBuildOptions(project, service, imageName, options.SSHs)
 		if err != nil {
 			return err
@@ -97,12 +94,6 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 	}
 
 	_, err = s.doBuild(ctx, project, opts, options.Progress)
-	if err == nil {
-		if len(imagesToBuild) > 0 && !options.Quiet {
-			utils.DisplayScanSuggestMsg()
-		}
-	}
-
 	return err
 }
 
@@ -136,9 +127,6 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 		return err
 	}
 
-	if len(builtImages) > 0 {
-		utils.DisplayScanSuggestMsg()
-	}
 	for name, digest := range builtImages {
 		images[name] = digest
 	}
