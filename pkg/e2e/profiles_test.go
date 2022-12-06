@@ -75,7 +75,7 @@ func TestExplicitProfileUsage(t *testing.T) {
 	})
 
 	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--all")
+		res := c.RunDockerCmd(t, "ps")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
@@ -125,7 +125,7 @@ func TestNoProfileUsage(t *testing.T) {
 	})
 
 	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--all")
+		res := c.RunDockerCmd(t, "ps")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
@@ -181,7 +181,7 @@ func TestActiveProfileViaTargetedService(t *testing.T) {
 	})
 
 	t.Run("check containers after down", func(t *testing.T) {
-		res := c.RunDockerCmd(t, "ps", "--all")
+		res := c.RunDockerCmd(t, "ps")
 		assert.Assert(t, !strings.Contains(res.Combined(), projectName), res.Combined())
 	})
 }
